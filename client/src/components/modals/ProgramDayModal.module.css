@@ -120,3 +120,31 @@
     display: flex;
     gap: var(--spacing-md);
 }
+
+.checkboxLabel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    cursor: pointer;
+}
+
+.checkbox {
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    accent-color: var(--color-brand-primary);
+}
+
+.conditionMet {
+    font-size: 11px;
+    color: var(--color-brand-success, #4caf50);
+    margin-top: 2px;
+}
+
+.conditionUnmet {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+}

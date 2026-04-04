@@ -27,6 +27,7 @@ const ActivityAssociator = lazyWithRetry(() => import('./goalDetail/ActivityAsso
 const InlineActivityBuilder = lazyWithRetry(() => import('./goalDetail/InlineActivityBuilder'), 'components/goalDetail/InlineActivityBuilder');
 const GenericGraphModal = lazyWithRetry(() => import('./analytics/GenericGraphModal'), 'components/analytics/GenericGraphModal');
 const GoalOptionsView = lazyWithRetry(() => import('./goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
+const GoalNotesView = lazyWithRetry(() => import('./goalDetail/GoalNotesView'), 'components/goalDetail/GoalNotesView');
 
 /**
  * GoalDetailModal Component
@@ -633,6 +634,17 @@ function GoalDetailModal({
                 />
             </Suspense>
         );
+    } else if (viewState === 'goal-notes') {
+        content = (
+            <Suspense fallback={null}>
+                <GoalNotesView
+                    rootId={rootId}
+                    goalId={goalId}
+                    goalColor={goalColor}
+                    onBack={() => setViewState('goal')}
+                />
+            </Suspense>
+        );
     } else if (needsLevelPicker && selectedChildType === null) {
         // Show level picker before the create form when multiple levels are valid.
         content = renderLevelPicker();
@@ -640,7 +652,7 @@ function GoalDetailModal({
         content = renderGoalContent();
     }
 
-    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options')
+    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes')
         && !(needsLevelPicker && selectedChildType === null);
     if (shouldShowPersistentHeader) {
         content = (

@@ -616,6 +616,20 @@ def serialize_program_block(block):
 
 def serialize_program_day(day):
     """Serialize a ProgramDay object."""
+    # note_condition_satisfied: True if any note was written during a completed session on this day
+    note_condition = bool(getattr(day, 'note_condition', False))
+    note_condition_satisfied = False
+    if note_condition:
+        session_ids = {s.id for s in (day.completed_sessions or []) if not s.deleted_at}
+        if session_ids:
+            note_condition_satisfied = any(
+                hasattr(s, 'notes_list') and len([
+                    n for n in (s.notes_list or []) if not n.deleted_at
+                ]) > 0
+                for s in (day.completed_sessions or [])
+                if not s.deleted_at
+            )
+
     return {
         "id": day.id,
         "block_id": day.block_id,
@@ -626,6 +640,8 @@ def serialize_program_day(day):
         "day_of_week": day.day_of_week or [],
         "templates": [serialize_session_template(t) for t in day.templates],
         "is_completed": day.is_completed,
+        "note_condition": note_condition,
+        "note_condition_satisfied": note_condition_satisfied,
         "sessions": [serialize_program_day_session_light(s) for s in day.completed_sessions if not s.deleted_at],
         "day_sessions": [{
             "id": ds.id,
@@ -652,10 +668,31 @@ def serialize_note(note, include_image=False):
         "updated_at": format_utc(note.updated_at),
         "nano_goal_id": note.nano_goal_id,
         "is_nano_goal": note.nano_goal_id is not None,
-        "nano_goal_completed": note.nano_goal.completed if getattr(note, 'nano_goal', None) else False
+        "nano_goal_completed": note.nano_goal.completed if getattr(note, 'nano_goal', None) else False,
+        "goal_id": note.goal_id,
+        "pinned_at": format_utc(note.pinned_at) if note.pinned_at else None,
+        "is_pinned": note.pinned_at is not None,
     }
     if include_image:
         result["image_data"] = note.image_data
+    return result
+
+
+def serialize_note_display(note, include_image=False):
+    """Serialize a note with the display context used on note-dedicated surfaces."""
+    result = serialize_note(note, include_image=include_image)
+
+    if note.session:
+        result["session_name"] = note.session.name
+        result["session_date"] = format_utc(note.session.session_start or note.session.created_at)
+
+    if note.goal:
+        result["goal_name"] = note.goal.name
+        result["goal_type"] = get_canonical_goal_type(note.goal)
+
+    if note.activity_definition:
+        result["activity_definition_name"] = note.activity_definition.name
+
     return result
 
 def serialize_visualization_annotation(annotation):

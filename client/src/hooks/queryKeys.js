@@ -54,4 +54,6 @@ export const queryKeys = {
     sessionsSearch: (rootId, filters = {}) => ['sessions', rootId, 'search', filters],
     sessionsHeatmap: (rootId, filters = {}) => ['sessions', rootId, 'heatmap', filters],
     sessionsPaginated: (rootId) => ['sessions', rootId, 'paginated'],
+    goalNotes: (rootId, goalId, includeDescendants = false) => ['goal-notes', rootId, goalId, includeDescendants],
+    allNotes: (rootId, filters = {}) => ['all-notes', rootId, filters],
 };

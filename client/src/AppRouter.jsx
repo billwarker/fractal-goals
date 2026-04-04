@@ -21,6 +21,7 @@ const CreateSessionTemplate = lazyWithRetry(() => import('./pages/CreateSessionT
 const ManageActivities = lazyWithRetry(() => import('./pages/ManageActivities'), 'pages/ManageActivities');
 const Analytics = lazyWithRetry(() => import('./pages/Analytics'), 'pages/Analytics');
 const Logs = lazyWithRetry(() => import('./pages/Logs'), 'pages/Logs');
+const Notes = lazyWithRetry(() => import('./pages/Notes'), 'pages/Notes');
 const SettingsModal = lazyWithRetry(() => import('./components/modals/SettingsModal'), 'components/modals/SettingsModal');
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 
@@ -72,6 +73,7 @@ const NavigationHeader = ({ onOpenSettings }) => {
         { path: `/${rootId}/goals`, label: 'GOALS' },
         { path: `/${rootId}/programs`, label: 'PROGRAMS' },
         { path: `/${rootId}/sessions`, label: 'SESSIONS' },
+        { path: `/${rootId}/notes`, label: 'NOTES' },
         { path: `/${rootId}/analytics`, label: 'ANALYTICS' }
     ];
     const logsNavItem = { path: `/${rootId}/logs`, label: 'LOGS' };
@@ -250,6 +252,13 @@ function App() {
                                 <ComponentErrorBoundary>
                                     <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
                                         <Analytics />
+                                    </Suspense>
+                                </ComponentErrorBoundary>
+                            } />
+                            <Route path="/:rootId/notes" element={
+                                <ComponentErrorBoundary>
+                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <Notes />
                                     </Suspense>
                                 </ComponentErrorBoundary>
                             } />

@@ -21,7 +21,9 @@ function NotesPanel({
     previousSessionNotes,
     addNote,
     updateNote,
-    deleteNote
+    deleteNote,
+    pinNote,
+    unpinNote,
 }) {
     const [selectedNoteId, setSelectedNoteId] = useState(null);
 
@@ -76,6 +78,8 @@ function NotesPanel({
                         notes={combinedNotes}
                         onUpdate={updateNote}
                         onDelete={deleteNote}
+                        onPin={pinNote}
+                        onUnpin={unpinNote}
                         compact={false}
                         selectedNoteId={selectedNoteId}
                         onNoteSelect={setSelectedNoteId}

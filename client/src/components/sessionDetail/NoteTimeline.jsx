@@ -1,37 +1,41 @@
+/**
+ * NoteTimeline (session detail) — delegates to shared NoteTimeline.
+ * Keeps the existing prop API for backward compatibility.
+ */
+
 import React from 'react';
-import NoteItem from './NoteItem';
-import styles from './NoteItem.module.css';
+import SharedNoteTimeline from '../notes/NoteTimeline';
 
 function NoteTimeline({
     notes,
     onUpdate,
     onDelete,
+    onPin,
+    onUnpin,
     onToggleNanoGoal,
     pendingNanoGoalIds = new Set(),
     compact = false,
     selectedNoteId,
-    onNoteSelect
+    onNoteSelect,
 }) {
-    if (!notes || notes.length === 0) {
-        return null;
-    }
+    if (!notes || notes.length === 0) return null;
 
     return (
-        <div className={`${styles.noteTimeline} ${compact ? styles.compact : ''}`}>
-            {notes.map(note => (
-                <NoteItem
-                    key={note.id}
-                    note={note}
-                    onUpdate={onUpdate}
-                    onDelete={onDelete}
-                    onToggleNanoGoal={onToggleNanoGoal}
-                    nanoToggleDisabled={Boolean(note.nano_goal_id && pendingNanoGoalIds.has(note.nano_goal_id))}
-                    compact={compact}
-                    isSelected={selectedNoteId === note.id}
-                    onSelect={() => onNoteSelect && onNoteSelect(note.id)}
-                />
-            ))}
-        </div>
+        <SharedNoteTimeline
+            notes={notes}
+            onEdit={onUpdate ? (noteId, content) => onUpdate(noteId, content) : undefined}
+            onDelete={onDelete}
+            onPin={onPin}
+            onUnpin={onUnpin}
+            onToggleNanoGoal={onToggleNanoGoal}
+            pendingNanoGoalIds={pendingNanoGoalIds}
+            compact={compact}
+            selectedNoteId={selectedNoteId}
+            onNoteSelect={(note) => onNoteSelect && onNoteSelect(note.id)}
+            groupByDate={false}
+            showContext={false}
+            variant="flat"
+        />
     );
 }
 

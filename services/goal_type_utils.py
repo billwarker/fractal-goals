@@ -28,8 +28,35 @@ def get_canonical_goal_type(goal):
             return known[normalized]
 
     goal_id = getattr(goal, 'id', '<unknown>')
+    depth = 0
+    current = goal
+    while current and getattr(current, 'parent_id', None):
+        depth += 1
+        current = getattr(current, 'parent', None)
+        if current is None:
+            break
+
+    fallback_by_depth = {
+        0: "UltimateGoal",
+        1: "LongTermGoal",
+        2: "MidTermGoal",
+        3: "ShortTermGoal",
+        4: "ImmediateGoal",
+        5: "MicroGoal",
+        6: "NanoGoal",
+    }
+    fallback = fallback_by_depth.get(depth)
+    if fallback:
+        logging.getLogger(__name__).warning(
+            "get_canonical_goal_type: goal %s has no attached level; falling back to %s by depth. "
+            "Run migration 94008ce509bb to backfill level_id.",
+            goal_id,
+            fallback,
+        )
+        return fallback
+
     logging.getLogger(__name__).warning(
-        "get_canonical_goal_type: goal %s has no attached level; returning None. "
+        "get_canonical_goal_type: goal %s has no attached level and no fallback depth match; returning None. "
         "Run migration 94008ce509bb to backfill level_id.",
         goal_id,
     )

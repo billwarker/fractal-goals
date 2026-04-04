@@ -1,6 +1,6 @@
 import uuid
 
-from models import Goal, GoalLevel, Note
+from models import Goal, GoalLevel, Note, session_goals
 from services.events import Events
 from services.note_service import NoteService
 
@@ -12,8 +12,8 @@ def test_create_note_emits_note_created_event(db_session, sample_ultimate_goal, 
     service = NoteService(db_session)
     payload, error, status = service.create_note(sample_ultimate_goal.id, test_user.id, {
         'content': 'A useful note',
-        'context_type': 'session',
-        'context_id': 'ctx-1',
+        'context_type': 'root',
+        'context_id': sample_ultimate_goal.id,
     })
 
     assert error is None
@@ -109,6 +109,13 @@ def test_create_nano_goal_note_emits_note_and_goal_events(
         fake_create_fractal_goal_record,
     )
 
+    db_session.execute(session_goals.insert().values(
+        session_id=sample_activity_instance.session_id,
+        goal_id=sample_goal_hierarchy['short_term'].id,
+        goal_type='ShortTermGoal',
+    ))
+    db_session.commit()
+
     service = NoteService(db_session)
     payload, error, status = service.create_nano_goal_note(root.id, test_user.id, {
         'name': 'Nano note goal',
@@ -124,3 +131,111 @@ def test_create_nano_goal_note_emits_note_and_goal_events(
     assert [event.name for event in emitted] == [Events.NOTE_CREATED, Events.GOAL_CREATED]
     assert emitted[0].data['note_id'] == payload['note']['id']
     assert emitted[1].data['goal_id'] == payload['goal']['id']
+
+
+def test_create_image_only_root_note_succeeds(db_session, sample_ultimate_goal, test_user):
+    service = NoteService(db_session)
+
+    payload, error, status = service.create_note(sample_ultimate_goal.id, test_user.id, {
+        'context_type': 'root',
+        'context_id': sample_ultimate_goal.id,
+        'image_data': 'data:image/png;base64,abc123',
+    })
+
+    assert error is None
+    assert status == 201
+    assert payload['content'] == '[Image]'
+    assert payload['image_data'] == 'data:image/png;base64,abc123'
+
+
+def test_create_activity_instance_note_hydrates_session_and_activity_definition(
+    db_session,
+    sample_goal_hierarchy,
+    sample_activity_instance,
+    test_user,
+):
+    service = NoteService(db_session)
+
+    payload, error, status = service.create_note(sample_goal_hierarchy['ultimate'].id, test_user.id, {
+        'content': 'Track this rep',
+        'context_type': 'activity_instance',
+        'context_id': sample_activity_instance.id,
+        'activity_instance_id': sample_activity_instance.id,
+    })
+
+    assert error is None
+    assert status == 201
+    assert payload['session_id'] == sample_activity_instance.session_id
+    assert payload['activity_definition_id'] == sample_activity_instance.activity_definition_id
+
+
+def test_create_note_rejects_unlinked_nano_goal_for_activity_instance(
+    db_session,
+    sample_goal_hierarchy,
+    sample_activity_instance,
+    test_user,
+):
+    root = sample_goal_hierarchy['ultimate']
+    immediate = Goal(
+        id=str(uuid.uuid4()),
+        name='Immediate Goal',
+        owner_id=test_user.id,
+        parent_id=sample_goal_hierarchy['short_term'].id,
+        root_id=root.id,
+    )
+    micro = Goal(
+        id=str(uuid.uuid4()),
+        name='Micro Goal',
+        owner_id=test_user.id,
+        parent_id=immediate.id,
+        root_id=root.id,
+    )
+    nano = Goal(
+        id=str(uuid.uuid4()),
+        name='Nano Goal',
+        owner_id=test_user.id,
+        parent_id=micro.id,
+        root_id=root.id,
+    )
+    db_session.add_all([immediate, micro, nano])
+    db_session.commit()
+
+    service = NoteService(db_session)
+    payload, error, status = service.create_note(root.id, test_user.id, {
+        'content': 'Nano note',
+        'context_type': 'activity_instance',
+        'context_id': sample_activity_instance.id,
+        'activity_instance_id': sample_activity_instance.id,
+        'nano_goal_id': nano.id,
+    })
+
+    assert payload is None
+    assert status == 400
+    assert error == 'nano_goal_id is not linked to the provided session'
+
+
+def test_get_goal_notes_returns_display_context_and_images(db_session, sample_goal_hierarchy, test_user):
+    goal = sample_goal_hierarchy['short_term']
+    note = Note(
+        id=str(uuid.uuid4()),
+        root_id=sample_goal_hierarchy['ultimate'].id,
+        context_type='goal',
+        context_id=goal.id,
+        goal_id=goal.id,
+        content='Goal note',
+        image_data='data:image/png;base64,goalnote',
+    )
+    db_session.add(note)
+    db_session.commit()
+
+    service = NoteService(db_session)
+    payload, error, status = service.get_goal_notes(
+        sample_goal_hierarchy['ultimate'].id,
+        goal.id,
+        test_user.id,
+    )
+
+    assert error is None
+    assert status == 200
+    assert payload[0]['goal_name'] == goal.name
+    assert payload[0]['image_data'] == 'data:image/png;base64,goalnote'

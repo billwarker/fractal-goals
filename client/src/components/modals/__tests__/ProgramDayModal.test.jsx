@@ -1,6 +1,6 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import ProgramDayModal from '../ProgramDayModal';
 import { queryKeys } from '../../../hooks/queryKeys';
@@ -71,5 +71,35 @@ describe('ProgramDayModal', () => {
         expect(queryClient.getQueryData(queryKeys.activityGroups('root-1'))).toEqual([
             { id: 'group-1', name: 'Technique' },
         ]);
+    });
+
+    it('includes note_condition in the save payload', async () => {
+        const queryClient = createQueryClient();
+        const onSave = vi.fn();
+        getSessionTemplates.mockResolvedValueOnce({ data: [] });
+        getActivities.mockResolvedValueOnce({ data: [] });
+        getActivityGroups.mockResolvedValueOnce({ data: [] });
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <ProgramDayModal
+                    isOpen={true}
+                    onClose={vi.fn()}
+                    onSave={onSave}
+                    rootId="root-1"
+                />
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('+ Add Session Template')).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByLabelText('Require a note for this day'));
+        fireEvent.click(screen.getByRole('button', { name: 'Add Day' }));
+
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+            note_condition: true,
+        }));
     });
 });

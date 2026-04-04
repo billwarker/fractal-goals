@@ -525,6 +525,7 @@ class ProgramService:
         
         name = data.get('name')
         template_ids = data.get('template_ids', [])
+        note_condition = bool(data.get('note_condition', False))
         if 'template_id' in data and data['template_id']:
             if data['template_id'] not in template_ids:
                 template_ids.append(data['template_id'])
@@ -567,12 +568,15 @@ class ProgramService:
                     date=target_date,
                     day_number=count + 1,
                     name=name,
-                    day_of_week=day_of_week_list
+                    day_of_week=day_of_week_list,
+                    note_condition=note_condition,
                 )
                 session.add(day)
             else:
                 if name: day.name = name
                 day.day_of_week = day_of_week_list
+                if 'note_condition' in data:
+                    day.note_condition = note_condition
             
             if template_ids:
                 templates = session.query(SessionTemplate).filter(SessionTemplate.id.in_(template_ids)).all()
@@ -605,6 +609,7 @@ class ProgramService:
         
         if 'name' in data: day.name = data['name']
         if 'day_number' in data: day.day_number = data['day_number']
+        if 'note_condition' in data: day.note_condition = bool(data['note_condition'])
         
         if 'date' in data:
             if data['date']:

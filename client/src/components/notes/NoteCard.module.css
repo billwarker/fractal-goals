@@ -1,0 +1,367 @@
+.noteCard {
+    padding: 10px 14px;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    position: relative;
+    transition: background 0.15s, border-color 0.15s;
+    cursor: default;
+}
+
+/* Flat variant — transparent, border-bottom only (session detail style) */
+.noteCard.flat {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 0;
+    padding: 10px 0;
+}
+
+.noteCard:not(.flat):hover {
+    border-color: var(--color-border-hover, var(--color-border));
+}
+
+.noteCard.compact {
+    padding: 8px 10px;
+}
+
+.noteCard.selected {
+    background: var(--color-bg-hover);
+}
+
+.noteCard.pinned {
+    border-left: 2px solid var(--color-accent, #6c8ebf);
+    padding-left: 10px;
+}
+
+.noteCard.pastNote {
+    opacity: 0.75;
+}
+
+.noteCardDeleting {
+    opacity: 0.5;
+    font-style: italic;
+    color: var(--color-text-muted);
+    padding: 10px 0;
+}
+
+.pinnedIndicator {
+    position: absolute;
+    top: 8px;
+    left: -2px;
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+/* Top row: meta + options */
+.topRow {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.metaRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.timestamp {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+.metaSep {
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.setBadge {
+    background: var(--color-bg-input);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    color: var(--color-text-primary);
+}
+
+.nanoBadge {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.pastSessionName {
+    color: var(--color-text-muted);
+    font-size: 10px;
+}
+
+/* Options button + menu */
+.optionsWrapper {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.optionsBtn {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    border-radius: 4px;
+    letter-spacing: 1px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.noteCard:hover .optionsBtn {
+    opacity: 1;
+}
+
+.optionsMenu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 50;
+    min-width: 120px;
+    overflow: hidden;
+}
+
+.optionsMenuItem {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 8px 14px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    transition: background 0.1s;
+}
+
+.optionsMenuItem:hover {
+    background: var(--color-bg-hover);
+}
+
+.optionsMenuItemDanger {
+    color: var(--color-danger, #e05555);
+}
+
+/* Context badges */
+.contextBadges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.contextBadge {
+    font-size: 10px;
+    background: var(--color-bg-input);
+    color: var(--color-text-secondary);
+    padding: 2px 7px;
+    border-radius: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+}
+
+/* Image */
+.imageWrapper {
+    position: relative;
+    cursor: pointer;
+    margin-bottom: 6px;
+    display: inline-block;
+}
+
+.imageThumbnail {
+    max-width: 100%;
+    max-height: 160px;
+    border-radius: 6px;
+    object-fit: cover;
+    display: block;
+}
+
+.imageOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    font-size: 12px;
+    color: #fff;
+}
+
+.imageWrapper:hover .imageOverlay {
+    opacity: 1;
+}
+
+/* Content */
+.content {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.nanoIcon {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.markdownContent {
+    font-size: 14px;
+    color: var(--color-text-primary);
+    line-height: 1.5;
+    word-break: break-word;
+    flex: 1;
+    min-width: 0;
+}
+
+.markdownContent p {
+    margin: 0 0 6px;
+}
+
+.markdownContent p:last-child {
+    margin-bottom: 0;
+}
+
+.markdownContent h1 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 10px 0 6px;
+    line-height: 1.2;
+}
+
+.markdownContent h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 8px 0 4px;
+    line-height: 1.3;
+}
+
+.markdownContent h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 6px 0 3px;
+    line-height: 1.3;
+}
+
+.markdownContent h1:first-child,
+.markdownContent h2:first-child,
+.markdownContent h3:first-child {
+    margin-top: 0;
+}
+
+.markdownContent ul,
+.markdownContent ol {
+    padding-left: 18px;
+    margin: 4px 0;
+}
+
+.markdownContent li {
+    margin-bottom: 2px;
+}
+
+.markdownContent code {
+    font-family: monospace;
+    background: var(--color-bg-input);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.markdownContent a {
+    color: var(--color-link, #6c8ebf);
+}
+
+.noteCard.compact .markdownContent {
+    font-size: 13px;
+}
+
+.nanoContent {
+    font-style: italic;
+}
+
+.completedContent .markdownContent {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+.nanoCheckbox {
+    margin-left: auto;
+    flex-shrink: 0;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-accent, #6c8ebf);
+}
+
+/* Edit */
+.editArea {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.editTextarea {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-primary);
+    font-size: 14px;
+    resize: none;
+    overflow: hidden;
+    font-family: inherit;
+    line-height: 1.4;
+    box-sizing: border-box;
+}
+
+.editTextarea:focus {
+    outline: none;
+    border-color: var(--color-accent, #6c8ebf);
+}
+
+.editActions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.saveBtn,
+.cancelBtn {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.1s;
+}
+
+.saveBtn:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}
+
+.cancelBtn:hover {
+    background: var(--color-bg-hover);
+}

@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 import logging
 import uuid
 
+from sqlalchemy.orm import selectinload
+
 from models import (
     ActivityDefinition,
     ActivityInstance,
@@ -17,7 +19,7 @@ from services.owned_entity_queries import get_owned_activity_instance, get_owned
 from services.payload_normalizers import normalize_note_payload
 from services.goal_type_utils import get_canonical_goal_type
 from services.service_types import JsonDict, JsonList, ServiceResult
-from services.serializers import serialize_goal, serialize_note
+from services.serializers import serialize_goal, serialize_note_display
 from services.session_runtime import is_quick_session
 from services.view_serializers import (
     serialize_activity_history_entry,
@@ -56,8 +58,13 @@ class NoteService:
             Note.root_id == root_id,
             Note.session_id == session_id,
             Note.deleted_at.is_(None),
+        ).options(
+            selectinload(Note.session),
+            selectinload(Note.goal),
+            selectinload(Note.activity_definition),
+            selectinload(Note.nano_goal),
         ).order_by(Note.created_at.desc()).all()
-        return [serialize_note(note) for note in notes], None, 200
+        return [serialize_note_display(note, include_image=True) for note in notes], None, 200
 
     def get_activity_instance_notes(self, root_id, instance_id, current_user_id) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -68,8 +75,13 @@ class NoteService:
             Note.root_id == root_id,
             Note.activity_instance_id == instance_id,
             Note.deleted_at.is_(None),
+        ).options(
+            selectinload(Note.session),
+            selectinload(Note.goal),
+            selectinload(Note.activity_definition),
+            selectinload(Note.nano_goal),
         ).order_by(Note.created_at.desc()).all()
-        return [serialize_note(note) for note in notes], None, 200
+        return [serialize_note_display(note, include_image=True) for note in notes], None, 200
 
     def get_previous_session_notes(self, root_id, session_id, current_user_id) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -108,6 +120,11 @@ class NoteService:
             Note.session_id.in_(session_ids),
             Note.context_type == 'session',
             Note.deleted_at.is_(None),
+        ).options(
+            selectinload(Note.session),
+            selectinload(Note.goal),
+            selectinload(Note.activity_definition),
+            selectinload(Note.nano_goal),
         ).order_by(Note.created_at.desc()).all()
 
         results = []
@@ -129,6 +146,11 @@ class NoteService:
             Note.root_id == root_id,
             Note.activity_definition_id == activity_id,
             Note.deleted_at.is_(None),
+        ).options(
+            selectinload(Note.session),
+            selectinload(Note.goal),
+            selectinload(Note.activity_definition),
+            selectinload(Note.nano_goal),
         )
 
         if exclude_session_id:
@@ -165,6 +187,11 @@ class NoteService:
             notes = self.db_session.query(Note).filter(
                 Note.activity_instance_id.in_(instance_ids),
                 Note.deleted_at.is_(None),
+            ).options(
+                selectinload(Note.session),
+                selectinload(Note.goal),
+                selectinload(Note.activity_definition),
+                selectinload(Note.nano_goal),
             ).order_by(Note.created_at).all()
 
         results = []
@@ -177,7 +204,31 @@ class NoteService:
 
         return results, None, 200
 
+    def _goal_looks_like_type(self, goal, canonical_type):
+        resolved_type = get_canonical_goal_type(goal)
+        if resolved_type:
+            return resolved_type == canonical_type
+
+        ancestor_count = 0
+        current = goal
+        while current and current.parent_id:
+            ancestor_count += 1
+            current = self.db_session.query(Goal).filter(Goal.id == current.parent_id).first()
+
+        fallback_by_depth = {
+            0: 'UltimateGoal',
+            1: 'LongTermGoal',
+            2: 'MidTermGoal',
+            3: 'ShortTermGoal',
+            4: 'ImmediateGoal',
+            5: 'MicroGoal',
+            6: 'NanoGoal',
+        }
+        return fallback_by_depth.get(ancestor_count) == canonical_type
+
     def _validate_note_creation_relations(self, root_id, session_id, nano_goal_id, activity_instance_id):
+        effective_session_id = session_id
+
         if session_id:
             session_obj = self.db_session.query(Session).filter(
                 Session.id == session_id,
@@ -197,6 +248,7 @@ class NoteService:
                 return "Activity instance not found in this fractal", 400
             if session_id and instance.session_id != session_id:
                 return "Activity instance does not belong to the provided session", 400
+            effective_session_id = effective_session_id or instance.session_id
 
         if not nano_goal_id:
             return None
@@ -208,10 +260,10 @@ class NoteService:
         ).first()
         if not nano_goal:
             return "Nano goal not found in this fractal", 400
-        if get_canonical_goal_type(nano_goal) != 'NanoGoal':
+        if not self._goal_looks_like_type(nano_goal, 'NanoGoal'):
             return "nano_goal_id must reference a NanoGoal", 400
 
-        if not session_id:
+        if not effective_session_id:
             return None
 
         ancestor_ids = []
@@ -223,14 +275,261 @@ class NoteService:
         has_session_link = False
         if ancestor_ids:
             has_session_link = self.db_session.query(session_goals).filter(
-                session_goals.c.session_id == session_id,
+                session_goals.c.session_id == effective_session_id,
                 session_goals.c.goal_id.in_(ancestor_ids),
             ).first() is not None
 
-        if not has_session_link and not activity_instance_id:
+        if not has_session_link:
             return "nano_goal_id is not linked to the provided session", 400
 
         return None
+
+    def _validate_note_context(
+        self,
+        *,
+        root_id,
+        context_type,
+        context_id,
+        session_id,
+        activity_instance_id,
+        activity_definition_id,
+        goal_id,
+    ) -> tuple[JsonDict | None, tuple[str, int] | None]:
+        activity = None
+        if activity_definition_id:
+            activity = self.db_session.query(ActivityDefinition).filter(
+                ActivityDefinition.id == activity_definition_id,
+                ActivityDefinition.root_id == root_id,
+                ActivityDefinition.deleted_at.is_(None),
+            ).first()
+            if not activity:
+                return None, ("Activity definition not found in this fractal", 400)
+
+        if context_type == 'root':
+            if context_id != root_id:
+                return None, ("root notes must use the fractal root id as context_id", 400)
+            if session_id or activity_instance_id or goal_id or activity_definition_id:
+                return None, ("root notes cannot be linked to a goal, session, or activity", 400)
+            return {'activity_definition': activity}, None
+
+        if context_type == 'goal':
+            if not goal_id or context_id != goal_id:
+                return None, ("goal notes require matching context_id and goal_id", 400)
+            linked_goal = self.db_session.query(Goal).filter(
+                Goal.id == goal_id,
+                Goal.root_id == root_id,
+                Goal.deleted_at.is_(None),
+            ).first()
+            if not linked_goal:
+                return None, ("Goal not found in this fractal", 400)
+            if session_id or activity_instance_id:
+                return None, ("goal notes cannot be linked directly to a session or activity instance", 400)
+            return {'goal': linked_goal, 'activity_definition': activity}, None
+
+        if context_type == 'session':
+            if not session_id or context_id != session_id:
+                return None, ("session notes require matching context_id and session_id", 400)
+            session_obj = self.db_session.query(Session).filter(
+                Session.id == session_id,
+                Session.root_id == root_id,
+                Session.deleted_at.is_(None),
+            ).first()
+            if not session_obj:
+                return None, ("Session not found in this fractal", 400)
+            if activity_instance_id:
+                return None, ("session notes cannot include activity_instance_id", 400)
+            return {'session': session_obj, 'activity_definition': activity}, None
+
+        if context_type == 'activity_instance':
+            if not activity_instance_id or context_id != activity_instance_id:
+                return None, ("activity instance notes require matching context_id and activity_instance_id", 400)
+            instance = self.db_session.query(ActivityInstance).filter(
+                ActivityInstance.id == activity_instance_id,
+                ActivityInstance.root_id == root_id,
+                ActivityInstance.deleted_at.is_(None),
+            ).first()
+            if not instance:
+                return None, ("Activity instance not found in this fractal", 400)
+            if session_id and instance.session_id != session_id:
+                return None, ("Activity instance does not belong to the provided session", 400)
+            if activity and instance.activity_definition_id and instance.activity_definition_id != activity.id:
+                return None, ("activity_definition_id does not match the activity instance", 400)
+            return {'session': None, 'activity_definition': activity, 'activity_instance': instance}, None
+
+        if context_type == 'activity_definition':
+            if not activity_definition_id or context_id != activity_definition_id:
+                return None, ("activity definition notes require matching context_id and activity_definition_id", 400)
+            if session_id or activity_instance_id or goal_id:
+                return None, ("activity definition notes cannot also target a session, instance, or goal", 400)
+            return {'activity_definition': activity}, None
+
+        return None, ("Unsupported note context_type", 400)
+
+    def get_goal_notes(
+        self, root_id, goal_id, current_user_id, include_descendants=False
+    ) -> ServiceResult[JsonList]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        goal = self.db_session.query(Goal).filter(
+            Goal.id == goal_id,
+            Goal.root_id == root_id,
+            Goal.deleted_at.is_(None),
+        ).first()
+        if not goal:
+            return None, "Goal not found", 404
+
+        goal_ids = [goal_id]
+        if include_descendants:
+            goal_ids = self._collect_descendant_goal_ids(root_id, goal_id)
+
+        notes = self.db_session.query(Note).filter(
+            Note.root_id == root_id,
+            Note.goal_id.in_(goal_ids),
+            Note.deleted_at.is_(None),
+        ).options(
+            selectinload(Note.session),
+            selectinload(Note.goal),
+            selectinload(Note.activity_definition),
+            selectinload(Note.nano_goal),
+        ).order_by(
+            Note.pinned_at.desc().nullslast(),
+            Note.created_at.desc(),
+        ).all()
+        return [serialize_note_display(note, include_image=True) for note in notes], None, 200
+
+    def _collect_descendant_goal_ids(self, root_id, goal_id):
+        """BFS to collect all descendant goal IDs including the given goal_id."""
+        from collections import deque
+        result = [goal_id]
+        queue = deque([goal_id])
+        while queue:
+            parent_id = queue.popleft()
+            children = self.db_session.query(Goal.id).filter(
+                Goal.parent_id == parent_id,
+                Goal.root_id == root_id,
+                Goal.deleted_at.is_(None),
+            ).all()
+            for (child_id,) in children:
+                result.append(child_id)
+                queue.append(child_id)
+        return result
+
+    def get_all_notes(
+        self, root_id, current_user_id, filters=None, page=0, page_size=25
+    ) -> ServiceResult[JsonDict]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        filters = filters or {}
+        query = self.db_session.query(Note).filter(
+            Note.root_id == root_id,
+            Note.deleted_at.is_(None),
+        ).options(
+            selectinload(Note.session),
+            selectinload(Note.goal),
+            selectinload(Note.activity_definition),
+            selectinload(Note.nano_goal),
+        )
+
+        context_types = filters.get('context_types')
+        if context_types:
+            query = query.filter(Note.context_type.in_(context_types))
+
+        filter_goal_id = filters.get('goal_id')
+        if filter_goal_id:
+            query = query.filter(Note.goal_id == filter_goal_id)
+
+        filter_activity_definition_ids = filters.get('activity_definition_ids') or []
+        filter_activity_group_ids = filters.get('activity_group_ids') or []
+
+        if filter_activity_definition_ids or filter_activity_group_ids:
+            from models.activity import ActivityDefinition
+            conditions = []
+            if filter_activity_definition_ids:
+                conditions.append(Note.activity_definition_id.in_(filter_activity_definition_ids))
+            if filter_activity_group_ids:
+                group_act_ids = self.db_session.query(ActivityDefinition.id).filter(
+                    ActivityDefinition.group_id.in_(filter_activity_group_ids),
+                    ActivityDefinition.deleted_at.is_(None),
+                ).all()
+                group_act_ids = [r[0] for r in group_act_ids]
+                if group_act_ids:
+                    conditions.append(Note.activity_definition_id.in_(group_act_ids))
+            if conditions:
+                from sqlalchemy import or_
+                query = query.filter(or_(*conditions))
+
+        if filters.get('pinned_only'):
+            query = query.filter(Note.pinned_at.isnot(None))
+
+        search = filters.get('search', '').strip()
+        if search:
+            query = query.filter(Note.content.ilike(f'%{search}%'))
+
+        date_from = filters.get('date_from')
+        if date_from:
+            query = query.filter(Note.created_at >= date_from)
+
+        date_to = filters.get('date_to')
+        if date_to:
+            query = query.filter(Note.created_at <= date_to)
+
+        total = query.count()
+        notes = query.order_by(
+            Note.pinned_at.desc().nullslast(),
+            Note.created_at.desc(),
+        ).limit(page_size).offset(page * page_size).all()
+
+        results = []
+        for note in notes:
+            results.append(serialize_note_display(note, include_image=True))
+
+        return {
+            'notes': results,
+            'total': total,
+            'page': page,
+            'page_size': page_size,
+            'has_more': (page + 1) * page_size < total,
+        }, None, 200
+
+    def pin_note(self, root_id, note_id, current_user_id) -> ServiceResult[JsonDict]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        note = self.db_session.query(Note).filter(
+            Note.id == note_id,
+            Note.root_id == root_id,
+            Note.deleted_at.is_(None),
+        ).first()
+        if not note:
+            return None, "Note not found", 404
+
+        note.pinned_at = datetime.now(timezone.utc)
+        self.db_session.commit()
+        logger.info("Pinned note %s", note_id)
+        return serialize_note_display(note, include_image=True), None, 200
+
+    def unpin_note(self, root_id, note_id, current_user_id) -> ServiceResult[JsonDict]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        note = self.db_session.query(Note).filter(
+            Note.id == note_id,
+            Note.root_id == root_id,
+            Note.deleted_at.is_(None),
+        ).first()
+        if not note:
+            return None, "Note not found", 404
+
+        note.pinned_at = None
+        self.db_session.commit()
+        logger.info("Unpinned note %s", note_id)
+        return serialize_note_display(note, include_image=True), None, 200
 
     def create_note(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         data = normalize_note_payload(data)
@@ -243,6 +542,29 @@ class NoteService:
         session_id = data.get('session_id')
         nano_goal_id = data.get('nano_goal_id')
         activity_instance_id = data.get('activity_instance_id')
+        goal_id = data.get('goal_id')
+        activity_definition_id = data.get('activity_definition_id')
+        context_type = data['context_type']
+        context_id = data['context_id']
+
+        context_payload, context_error = self._validate_note_context(
+            root_id=root_id,
+            context_type=context_type,
+            context_id=context_id,
+            session_id=session_id,
+            activity_instance_id=activity_instance_id,
+            activity_definition_id=activity_definition_id,
+            goal_id=goal_id,
+        )
+        if context_error:
+            return None, *context_error
+
+        activity_instance = (context_payload or {}).get('activity_instance')
+        if activity_instance:
+            if not session_id:
+                session_id = activity_instance.session_id
+            if not activity_definition_id:
+                activity_definition_id = activity_instance.activity_definition_id
 
         relation_error = self._validate_note_creation_relations(
             root_id,
@@ -265,11 +587,12 @@ class NoteService:
             note = Note(
                 id=str(uuid.uuid4()),
                 root_id=root_id,
-                context_type=data['context_type'],
-                context_id=data['context_id'],
+                context_type=context_type,
+                context_id=context_id,
                 session_id=session_id,
                 activity_instance_id=activity_instance_id,
-                activity_definition_id=data.get('activity_definition_id'),
+                activity_definition_id=activity_definition_id,
+                goal_id=goal_id,
                 set_index=data.get('set_index'),
                 content=content,
                 image_data=image_data,
@@ -290,10 +613,11 @@ class NoteService:
                 'session_id': note.session_id,
                 'activity_instance_id': note.activity_instance_id,
                 'nano_goal_id': note.nano_goal_id,
+                'goal_id': note.goal_id,
             },
             source='note_service.create_note',
         ))
-        return serialize_note(note), None, 201
+        return serialize_note_display(note, include_image=True), None, 201
 
     def create_nano_goal_note(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -375,7 +699,7 @@ class NoteService:
         )
         return {
             "goal": serialize_goal(new_goal, include_children=False),
-            "note": serialize_note(note),
+            "note": serialize_note_display(note, include_image=True),
         }, None, 201
 
     def update_note(self, root_id, note_id, current_user_id, data) -> ServiceResult[JsonDict]:
@@ -395,6 +719,12 @@ class NoteService:
         if 'content' in data:
             note.content = data['content']
 
+        if 'pin' in data:
+            if data['pin']:
+                note.pinned_at = datetime.now(timezone.utc)
+            else:
+                note.pinned_at = None
+
         self.db_session.commit()
         logger.info("Updated note %s", note_id)
         event_bus.emit(Event(
@@ -412,7 +742,7 @@ class NoteService:
             },
             source='note_service.update_note',
         ))
-        return serialize_note(note), None, 200
+        return serialize_note_display(note, include_image=True), None, 200
 
     def delete_note(self, root_id, note_id, current_user_id) -> ServiceResult[JsonDict]:
         _, error = self._validate_owned_root(root_id, current_user_id)

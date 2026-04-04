@@ -4,6 +4,7 @@ from services.serializers import (
     serialize_activity_instance,
     serialize_goal,
     serialize_note,
+    serialize_note_display,
 )
 
 
@@ -46,7 +47,7 @@ def serialize_previous_session_notes_group(session, notes):
         'session_id': session.id,
         'session_name': session.name,
         'session_date': format_utc(session.session_start or session.created_at),
-        'notes': [serialize_note(note) for note in notes],
+        'notes': [serialize_note_display(note, include_image=True) for note in notes],
     }
 
 
@@ -55,16 +56,12 @@ def serialize_activity_history_entry(instance, notes):
     if instance.session:
         payload['session_name'] = instance.session.name
         payload['session_date'] = format_utc(instance.session.session_start or instance.session.created_at)
-    payload['notes'] = [serialize_note(note) for note in notes]
+    payload['notes'] = [serialize_note_display(note, include_image=True) for note in notes]
     return payload
 
 
 def serialize_note_with_session(note):
-    payload = serialize_note(note)
-    if note.session:
-        payload['session_name'] = note.session.name
-        payload['session_date'] = format_utc(note.session.session_start or note.session.created_at)
-    return payload
+    return serialize_note_display(note, include_image=True)
 
 
 def serialize_goal_session_analytics_row(*, session_id, session_name, duration_seconds, completed, session_start):

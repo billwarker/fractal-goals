@@ -333,6 +333,18 @@
     font-style: italic;
 }
 
+.noteConditionMet {
+    font-size: 10px;
+    color: var(--color-brand-success, #4caf50);
+    margin-top: 4px;
+}
+
+.noteConditionUnmet {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    margin-top: 4px;
+}
+
 /* ─── Add Day Card ────────────────────────────────────────────────────────── */
 
 .addDayCard {

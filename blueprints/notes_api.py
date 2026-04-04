@@ -195,3 +195,90 @@ def delete_note(current_user, root_id, note_id):
         return internal_error(logger, "Error deleting note")
     finally:
         db_session.close()
+
+
+@notes_bp.route('/<root_id>/goals/<goal_id>/notes', methods=['GET'])
+@token_required
+def get_goal_notes(current_user, root_id, goal_id):
+    db_session, note_service = _with_note_service()
+    try:
+        include_descendants = request.args.get('include_descendants', 'false').lower() == 'true'
+        payload, error, status = note_service.get_goal_notes(
+            root_id, goal_id, current_user.id, include_descendants=include_descendants
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching goal notes")
+        return internal_error(logger, "Error fetching goal notes")
+    finally:
+        db_session.close()
+
+
+@notes_bp.route('/<root_id>/notes', methods=['GET'])
+@token_required
+def get_all_notes(current_user, root_id):
+    db_session, note_service = _with_note_service()
+    try:
+        context_types_raw = request.args.get('context_types', '')
+        context_types = [ct.strip() for ct in context_types_raw.split(',') if ct.strip()] or None
+        filters = {
+            'context_types': context_types,
+            'goal_id': request.args.get('goal_id') or None,
+            'activity_definition_ids': request.args.getlist('activity_definition_ids[]') or request.args.getlist('activity_definition_ids') or [],
+            'activity_group_ids': request.args.getlist('activity_group_ids[]') or request.args.getlist('activity_group_ids') or [],
+            'pinned_only': request.args.get('pinned_only', 'false').lower() == 'true',
+            'search': request.args.get('search', ''),
+            'date_from': request.args.get('date_from') or None,
+            'date_to': request.args.get('date_to') or None,
+        }
+        page = request.args.get('page', 0, type=int)
+        page_size = request.args.get('page_size', 25, type=int)
+        payload, error, status = note_service.get_all_notes(
+            root_id, current_user.id, filters=filters, page=page, page_size=page_size
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching all notes")
+        return internal_error(logger, "Error fetching all notes")
+    finally:
+        db_session.close()
+
+
+@notes_bp.route('/<root_id>/notes/<note_id>/pin', methods=['PUT'])
+@token_required
+def pin_note(current_user, root_id, note_id):
+    db_session, note_service = _with_note_service()
+    try:
+        payload, error, status = note_service.pin_note(root_id, note_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error pinning note")
+        return internal_error(logger, "Error pinning note")
+    finally:
+        db_session.close()
+
+
+@notes_bp.route('/<root_id>/notes/<note_id>/unpin', methods=['PUT'])
+@token_required
+def unpin_note(current_user, root_id, note_id):
+    db_session, note_service = _with_note_service()
+    try:
+        payload, error, status = note_service.unpin_note(root_id, note_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error unpinning note")
+        return internal_error(logger, "Error unpinning note")
+    finally:
+        db_session.close()

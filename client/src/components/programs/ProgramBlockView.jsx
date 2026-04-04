@@ -308,6 +308,12 @@ function ProgramBlockView({
                                                         return <div className={styles.restDay}>Rest</div>;
                                                     })()}
                                                 </div>
+
+                                                {day.note_condition && (
+                                                    <div className={day.note_condition_satisfied ? styles.noteConditionMet : styles.noteConditionUnmet}>
+                                                        {day.note_condition_satisfied ? '✎ Note written' : '✎ Note required'}
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
 

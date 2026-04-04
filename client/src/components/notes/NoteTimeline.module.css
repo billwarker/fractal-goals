@@ -1,0 +1,63 @@
+.timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.emptyState {
+    color: var(--color-text-muted);
+    font-size: 14px;
+    padding: 24px 0;
+    text-align: center;
+}
+
+.pinnedSection {
+    margin-bottom: 8px;
+}
+
+.sectionHeader {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    padding: 6px 0 4px;
+}
+
+.dateGroup {
+    margin-bottom: 0;
+}
+
+.dateHeader {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    padding: 12px 0 4px;
+    letter-spacing: 0.04em;
+    border-top: 1px solid var(--color-border);
+    margin-top: 4px;
+}
+
+.dateGroup:first-child .dateHeader {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+}
+
+.loadMoreBtn {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin: 16px auto 0;
+    display: block;
+    transition: background 0.15s;
+}
+
+.loadMoreBtn:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}

@@ -90,7 +90,8 @@ class ProgramDay(Base):
     is_completed = Column(Boolean, default=False)
     
     day_of_week = Column(JSON_TYPE)
-    
+    note_condition = Column(Boolean, default=False, nullable=False)
+
     block = relationship("ProgramBlock", back_populates="days")
     templates = relationship("SessionTemplate", secondary=program_day_templates, order_by="program_day_templates.c.order")
     completed_sessions = relationship("Session", back_populates="program_day")

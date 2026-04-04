@@ -133,7 +133,7 @@ def normalize_note_payload(data, *, partial=False):
         image_data = normalized.get('image_data')
         normalized['content'] = content or ('[Image]' if image_data else content)
 
-    for key in ('session_id', 'activity_instance_id', 'activity_definition_id', 'nano_goal_id', 'context_id'):
+    for key in ('session_id', 'activity_instance_id', 'activity_definition_id', 'nano_goal_id', 'goal_id', 'context_id'):
         if key in normalized or not partial:
             normalized[key] = _normalize_optional_string(normalized.get(key))
 

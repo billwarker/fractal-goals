@@ -150,6 +150,19 @@ function GoalViewMode({
                 </button>
 
                 <button
+                    onClick={() => setViewState('goal-notes')}
+                    className={styles.btnAction}
+                    style={{
+                        background: 'transparent',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-text-primary)',
+                        fontWeight: 600,
+                    }}
+                >
+                    Notes
+                </button>
+
+                <button
                     onClick={() => setViewState('goal-options')}
                     className={styles.btnAction}
                     style={{

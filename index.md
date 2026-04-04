@@ -130,6 +130,35 @@ Key frontend pieces:
 - `client/src/pages/SessionDetail.jsx`
 - `client/src/hooks/useSessionGoalsViewModel.js`
 
+### Notes
+
+Notes are now a first-class cross-cutting domain area rather than just a session subfeature.
+
+They support:
+
+- root/fractal notes
+- goal notes, including descendant goal views
+- session and activity-instance notes
+- image notes
+- pinning and timeline-style browsing
+- nano-goal note creation flows
+
+Key backend pieces:
+
+- `services/note_service.py`
+- `services/serializers.py`
+- `services/view_serializers.py`
+- `blueprints/notes_api.py`
+- `validators.py`
+
+Key frontend pieces:
+
+- `client/src/pages/Notes.jsx`
+- `client/src/hooks/useNotesPageQuery.js`
+- `client/src/components/notes/`
+- `client/src/components/goalDetail/GoalNotesView.jsx`
+- `client/src/components/sessionDetail/NotesPanel.jsx`
+
 ### Activities
 
 Activities are reusable definitions used inside sessions and templates.

@@ -51,6 +51,7 @@ function buildInitialProgramDayState(initialData) {
         name: initialData?.name || '',
         selectedTemplates,
         selectedDaysOfWeek: getInitialSelectedDaysOfWeek(initialData),
+        noteCondition: initialData?.note_condition || false,
         copyStatus: '',
         copyMode: 'all',
     };
@@ -63,6 +64,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
     const [selectedTemplates, setSelectedTemplates] = useState(initialState.selectedTemplates);
     const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState(initialState.selectedDaysOfWeek);
 
+    const [noteCondition, setNoteCondition] = useState(initialState.noteCondition);
     const [copyStatus, setCopyStatus] = useState(initialState.copyStatus);
     const [copyMode] = useState(initialState.copyMode);
 
@@ -125,6 +127,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
             name,
             template_ids: selectedTemplates,
             day_of_week: fixedDate ? [] : selectedDaysOfWeek,
+            note_condition: noteCondition,
             ...(fixedDate ? { date: fixedDate } : {}),
         });
     };
@@ -279,6 +282,23 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                                 )}
                             </div>
                         )}
+
+                        <div className={styles.field}>
+                            <label className={styles.checkboxLabel}>
+                                <input
+                                    type="checkbox"
+                                    checked={noteCondition}
+                                    onChange={e => setNoteCondition(e.target.checked)}
+                                    className={styles.checkbox}
+                                />
+                                <span>Require a note for this day</span>
+                            </label>
+                            {noteCondition && initialData?.note_condition_satisfied !== undefined && (
+                                <div className={noteCondition && initialData.note_condition_satisfied ? styles.conditionMet : styles.conditionUnmet}>
+                                    {initialData.note_condition_satisfied ? '✓ Note written' : '○ No note yet'}
+                                </div>
+                            )}
+                        </div>
 
                         {isEdit && (
                             <div className={styles.copyArea}>

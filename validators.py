@@ -133,6 +133,22 @@ def sanitize_string(value: str) -> str:
     return value
 
 
+def sanitize_note_content(value: str) -> str:
+    """
+    Sanitize note content, preserving newlines for markdown rendering.
+    - Removes null bytes
+    - Strips leading/trailing whitespace
+    - Collapses multiple spaces on a single line (but preserves newlines)
+    """
+    if not value:
+        return value
+    value = value.replace('\x00', '')
+    value = value.strip()
+    # Collapse multiple spaces/tabs within each line, but keep newlines intact
+    value = re.sub(r'[^\S\n]+', ' ', value)
+    return value
+
+
 def parse_date_string(value: str) -> date:
     """Parse various date formats to a date object."""
     if not value:
@@ -907,12 +923,13 @@ class NoteCreateSchema(BaseModel):
     """Schema for creating a note."""
     model_config = ConfigDict(str_strip_whitespace=True)
     
-    content: str = Field(..., min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
-    context_type: str = Field(..., pattern=r'^(session|activity_instance|set)$')
+    content: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
+    context_type: str = Field(..., pattern=r'^(root|goal|session|activity_instance|activity_definition)$')
     context_id: str = Field(..., min_length=1)
     session_id: Optional[str] = None
     activity_instance_id: Optional[str] = None
     activity_definition_id: Optional[str] = None
+    goal_id: Optional[str] = None
     set_index: Optional[int] = Field(None, ge=0)
     image_data: Optional[str] = None  # Base64 encoded image
     nano_goal_id: Optional[str] = None
@@ -920,20 +937,29 @@ class NoteCreateSchema(BaseModel):
     
     @field_validator('content')
     @classmethod
-    def sanitize_content(cls, v: str) -> str:
-        return sanitize_string(v)
+    def sanitize_content(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitize_note_content(v)
+
+    @model_validator(mode='after')
+    def validate_note_body(self):
+        if self.content or self.image_data:
+            return self
+        raise ValueError('content is required unless image_data is provided')
 
 
 class NoteUpdateSchema(BaseModel):
     """Schema for updating a note."""
     content: Optional[str] = Field(None, min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
-    
+    pin: Optional[bool] = None
+
     @field_validator('content')
     @classmethod
     def sanitize_content(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
-        return sanitize_string(v)
+        return sanitize_note_content(v)
 
 
 class NanoGoalNoteCreateSchema(BaseModel):
@@ -1101,6 +1127,7 @@ class ProgramDayCreateSchema(BaseModel):
     day_of_week: Optional[List[str]] = None
     template_id: Optional[str] = None
     template_ids: Optional[List[str]] = None
+    note_condition: Optional[bool] = False
     cascade: Optional[bool] = False
 
     @field_validator('day_of_week')
@@ -1122,6 +1149,7 @@ class ProgramDayUpdateSchema(BaseModel):
     date: Optional[str] = None
     day_of_week: Optional[List[str]] = None
     template_ids: Optional[List[str]] = None
+    note_condition: Optional[bool] = None
     cascade: Optional[bool] = False
 
     @field_validator('day_of_week')

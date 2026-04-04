@@ -16,8 +16,8 @@ class TestNotesApiNanoValidation:
             f"/api/{root.id}/notes",
             data=json.dumps({
                 "content": "Invalid note link",
-                "context_type": "session",
-                "context_id": "ctx-1",
+                "context_type": "root",
+                "context_id": root.id,
                 "nano_goal_id": non_nano_goal_id
             }),
             content_type='application/json'
@@ -26,14 +26,8 @@ class TestNotesApiNanoValidation:
         assert response.status_code == 400
         assert "NanoGoal" in response.get_json().get("error", "")
 
-    def test_create_note_rejects_nano_goal_not_linked_to_session(self, authed_client, db_session, test_user, sample_goal_hierarchy):
+    def test_create_note_rejects_nano_goal_not_linked_to_session(self, authed_client, db_session, test_user, sample_goal_hierarchy, sample_activity_instance):
         root = sample_goal_hierarchy['ultimate']
-        session = Session(
-            id=str(uuid.uuid4()),
-            name="Session A",
-            root_id=root.id
-        )
-        db_session.add(session)
 
         immediate = Goal(
             id=str(uuid.uuid4()),
@@ -66,8 +60,10 @@ class TestNotesApiNanoValidation:
             data=json.dumps({
                 "content": "Nano note",
                 "context_type": "activity_instance",
-                "context_id": "instance-1",
-                "session_id": session.id,
+                "context_id": sample_activity_instance.id,
+                "session_id": sample_activity_instance.session_id,
+                "activity_instance_id": sample_activity_instance.id,
+                "activity_definition_id": sample_activity_instance.activity_definition_id,
                 "nano_goal_id": nano_id
             }),
             content_type='application/json'
@@ -76,14 +72,8 @@ class TestNotesApiNanoValidation:
         assert response.status_code == 400
         assert "not linked to the provided session" in response.get_json().get("error", "")
 
-    def test_create_note_accepts_session_linked_nano_goal(self, authed_client, db_session, test_user, sample_goal_hierarchy):
+    def test_create_note_accepts_session_linked_nano_goal(self, authed_client, db_session, test_user, sample_goal_hierarchy, sample_activity_instance):
         root = sample_goal_hierarchy['ultimate']
-        session = Session(
-            id=str(uuid.uuid4()),
-            name="Session B",
-            root_id=root.id
-        )
-        db_session.add(session)
 
         immediate = Goal(
             id=str(uuid.uuid4()),
@@ -99,7 +89,7 @@ class TestNotesApiNanoValidation:
             "name": "Linked Micro",
             "type": "MicroGoal",
             "parent_id": immediate.id,
-            "session_id": session.id
+            "session_id": sample_activity_instance.session_id
         })
         assert micro_response.status_code == 201
         micro_id = micro_response.get_json()["id"]
@@ -117,8 +107,10 @@ class TestNotesApiNanoValidation:
             data=json.dumps({
                 "content": "Valid nano note",
                 "context_type": "activity_instance",
-                "context_id": "instance-1",
-                "session_id": session.id,
+                "context_id": sample_activity_instance.id,
+                "session_id": sample_activity_instance.session_id,
+                "activity_instance_id": sample_activity_instance.id,
+                "activity_definition_id": sample_activity_instance.activity_definition_id,
                 "nano_goal_id": nano_id
             }),
             content_type='application/json'
@@ -190,8 +182,8 @@ class TestNotesApiNanoValidation:
             f'/api/{root_id}/notes',
             json={
                 'content': 'Track this cue',
-                'context_type': 'session',
-                'context_id': 'ctx-1',
+                'context_type': 'root',
+                'context_id': root_id,
             }
         )
         assert create_response.status_code == 201

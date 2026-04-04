@@ -125,6 +125,53 @@ def test_create_block_starts_empty_and_can_add_day(db_session, sample_program, s
     assert day_res_count['days'][0]['name'] == 'Bonus Day'
 
 
+def test_add_block_day_persists_note_condition(db_session, sample_program, sample_goal_hierarchy):
+    root_id = sample_goal_hierarchy['ultimate'].id
+
+    block_res = ProgramService.create_block(db_session, root_id, sample_program.id, {
+        'name': 'Condition Block',
+        'start_date': date.today().isoformat(),
+        'end_date': (date.today() + timedelta(days=3)).isoformat(),
+    })
+
+    day_res = ProgramService.add_block_day(db_session, root_id, sample_program.id, block_res['id'], {
+        'name': 'Reflect',
+        'day_of_week': ['Tuesday'],
+        'note_condition': True,
+    })
+
+    assert day_res['days'][0]['note_condition'] is True
+
+    persisted = db_session.query(ProgramDay).get(day_res['days'][0]['id'])
+    assert persisted.note_condition is True
+
+
+def test_update_block_day_persists_note_condition(db_session, sample_program, sample_goal_hierarchy):
+    root_id = sample_goal_hierarchy['ultimate'].id
+
+    block = ProgramBlock(
+        program_id=sample_program.id,
+        name='Condition Update Block',
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=5),
+    )
+    db_session.add(block)
+    db_session.flush()
+
+    day = ProgramDay(block_id=block.id, name='Reflect', day_number=1, note_condition=False)
+    db_session.add(day)
+    db_session.commit()
+
+    result = ProgramService.update_block_day(db_session, root_id, sample_program.id, block.id, day.id, {
+        'note_condition': True,
+    })
+
+    assert result['note_condition'] is True
+
+    db_session.refresh(day)
+    assert day.note_condition is True
+
+
 def test_create_block_accepts_camel_case_dates(db_session, sample_program, sample_goal_hierarchy):
     root_id = sample_goal_hierarchy['ultimate'].id
 
