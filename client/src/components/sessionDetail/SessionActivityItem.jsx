@@ -239,13 +239,12 @@ function SessionActivityItem({
         ? activityNotesProp
         : (allNotes?.filter(n => n.activity_instance_id === exercise.id) || []);
 
-    const handleAddNote = async (content, imageData = null) => {
-        // Either content or image is required
-        if ((!content.trim() && !imageData) || !onAddNote || !exercise.id) return;
+    const handleAddNote = async (content) => {
+        if (!content.trim() || !onAddNote || !exercise.id) return;
 
         // NEW: Check if in nano mode
         if (nanoMode && activeMicroGoal) {
-            await handleAddNanoNote(content, imageData);
+            await handleAddNanoNote(content);
             return;
         }
 
@@ -254,12 +253,10 @@ function SessionActivityItem({
                 context_type: 'activity_instance',
                 context_id: exercise.id,
                 session_id: sessionId || exercise.session_id,
-
                 activity_instance_id: exercise.id,
                 activity_definition_id: activityDefinition?.id,
                 set_index: selectedSetIndex,
-                content: content.trim() || (imageData ? '[Image]' : ''),
-                image_data: imageData
+                content: content.trim(),
             });
             if (onNoteCreated) onNoteCreated();
 
@@ -270,8 +267,8 @@ function SessionActivityItem({
         }
     };
 
-    const handleAddNanoNote = async (content, imageData = null) => {
-        if (!content.trim() && !imageData) return;
+    const handleAddNanoNote = async (content) => {
+        if (!content.trim()) return;
         try {
             const response = await fractalApi.createNanoGoalNote(rootId, {
                 name: content.trim(),
@@ -280,7 +277,6 @@ function SessionActivityItem({
                 activity_instance_id: exercise.id,
                 activity_definition_id: activityDefinition?.id,
                 set_index: selectedSetIndex,
-                image_data: imageData,
             });
             const createdGoal = response?.data?.goal;
             const createdNote = response?.data?.note;

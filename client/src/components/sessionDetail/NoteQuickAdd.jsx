@@ -1,8 +1,7 @@
 /**
- * NoteQuickAdd - Quick input for adding notes with image paste support
+ * NoteQuickAdd - Quick input for adding notes
  * 
  * Simple text input with Enter key to submit.
- * Supports pasting images from clipboard.
  */
 
 import React, { useState, useRef } from 'react';
@@ -11,12 +10,10 @@ import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import styles from './NoteQuickAdd.module.css';
 
 function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = false, hasMicroGoal = false, onToggleNanoMode }) {
-    const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
+    const { getGoalColor, getGoalIcon } = useGoalLevels();
     const nanoColor = getGoalColor('NanoGoal');
     const [content, setContent] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [pastedImage, setPastedImage] = useState(null);
-    const [imagePreview, setImagePreview] = useState(null);
     const inputRef = useRef(null);
 
     const adjustHeight = (el) => {
@@ -37,48 +34,17 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = fa
         }
     };
 
-    const handlePaste = (e) => {
-        const items = e.clipboardData?.items;
-        if (!items) return;
-
-        for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-
-            if (item.type.startsWith('image/')) {
-                e.preventDefault();
-                const file = item.getAsFile();
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const base64Data = event.target.result;
-                        setPastedImage(base64Data);
-                        setImagePreview(base64Data);
-                    };
-                    reader.readAsDataURL(file);
-                }
-                break;
-            }
-        }
-    };
-
-    const removeImage = () => {
-        setPastedImage(null);
-        setImagePreview(null);
-    };
-
     // Reset height on submit
     const handleSubmit = async (e) => {
         e?.preventDefault();
 
         const trimmedContent = content.trim();
-        if ((!trimmedContent && !pastedImage) || isSubmitting) return;
+        if (!trimmedContent || isSubmitting) return;
 
         setIsSubmitting(true);
         try {
-            await onSubmit(trimmedContent, pastedImage);
+            await onSubmit(trimmedContent);
             setContent('');
-            setPastedImage(null);
-            setImagePreview(null);
             if (inputRef.current) {
                 inputRef.current.style.height = 'auto';
                 inputRef.current.focus();
@@ -92,25 +58,6 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = fa
 
     return (
         <form className={styles.noteQuickAdd} onSubmit={handleSubmit}>
-            {/* Image Preview */}
-            {imagePreview && (
-                <div className={styles.noteImagePreviewContainer}>
-                    <img
-                        src={imagePreview}
-                        alt="Pasted image"
-                        className={styles.noteImagePreview}
-                    />
-                    <button
-                        type="button"
-                        className={styles.noteImageRemove}
-                        onClick={removeImage}
-                        title="Remove image"
-                    >
-                        ×
-                    </button>
-                </div>
-            )}
-
             <div className={styles.noteInputRow}>
                 {hasMicroGoal && (
                     <button
@@ -131,8 +78,7 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = fa
                     value={content}
                     onChange={handleChange}
                     onKeyDown={handleKeyDown}
-                    onPaste={handlePaste}
-                    placeholder={imagePreview ? "Add a caption (optional)..." : placeholder}
+                    placeholder={placeholder}
                     disabled={isSubmitting}
                     className={`${styles.quickAddTextarea} ${isNanoMode ? styles.nanoModeInput : ''}`}
                     rows={1}
@@ -140,19 +86,17 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = fa
                 />
                 <button
                     type="submit"
-                    disabled={(!content.trim() && !pastedImage) || isSubmitting}
+                    disabled={!content.trim() || isSubmitting}
                     className={styles.noteSubmitBtn}
-                    title="Add note (Enter, Shift+Enter for new line, Paste image with Ctrl/Cmd+V)"
+                    title="Add note (Enter, Shift+Enter for new line)"
                 >
-                    {isSubmitting ? '...' : pastedImage ? '🖼️' : '📝'}
+                    {isSubmitting ? '...' : '📝'}
                 </button>
             </div>
 
-            {!imagePreview && (
-                <div className={styles.noteHint}>
-                    Paste images with Ctrl/Cmd+V
-                </div>
-            )}
+            <div className={styles.noteHint}>
+                Markdown supported. Press Enter to save, Shift+Enter for a new line.
+            </div>
         </form>
     );
 }

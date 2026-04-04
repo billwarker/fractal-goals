@@ -3,8 +3,8 @@
  */
 
 import React, { useState } from 'react';
-import Linkify from '../atoms/Linkify';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import MarkdownNoteContent from '../notes/MarkdownNoteContent';
 
 function PreviousNotesSection({ notes, activityName }) {
     const [isExpanded, setIsExpanded] = useState(true);
@@ -72,13 +72,13 @@ function PreviousNotesSection({ notes, activityName }) {
                                 📅 {formatSessionDate(group.sessionDate)}
                                 <span className="previous-session-name">{group.sessionName}</span>
                             </div>
-                            <div className="previous-session-notes">
-                                {group.notes.map(note => (
-                                    <div key={note.id} className="previous-note-item">
-                                        <Linkify>{note.content}</Linkify>
-                                    </div>
-                                ))}
-                            </div>
+                                <div className="previous-session-notes">
+                                    {group.notes.map(note => (
+                                        <div key={note.id} className="previous-note-item">
+                                            <MarkdownNoteContent content={note.content} />
+                                        </div>
+                                    ))}
+                                </div>
                         </div>
                     ))}
                 </div>

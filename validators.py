@@ -923,7 +923,7 @@ class NoteCreateSchema(BaseModel):
     """Schema for creating a note."""
     model_config = ConfigDict(str_strip_whitespace=True)
     
-    content: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
+    content: str = Field(..., min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
     context_type: str = Field(..., pattern=r'^(root|goal|session|activity_instance|activity_definition)$')
     context_id: str = Field(..., min_length=1)
     session_id: Optional[str] = None
@@ -931,22 +931,13 @@ class NoteCreateSchema(BaseModel):
     activity_definition_id: Optional[str] = None
     goal_id: Optional[str] = None
     set_index: Optional[int] = Field(None, ge=0)
-    image_data: Optional[str] = None  # Base64 encoded image
     nano_goal_id: Optional[str] = None
     is_nano_goal: Optional[bool] = False
     
     @field_validator('content')
     @classmethod
-    def sanitize_content(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
+    def sanitize_content(cls, v: str) -> str:
         return sanitize_note_content(v)
-
-    @model_validator(mode='after')
-    def validate_note_body(self):
-        if self.content or self.image_data:
-            return self
-        raise ValueError('content is required unless image_data is provided')
 
 
 class NoteUpdateSchema(BaseModel):
@@ -972,7 +963,6 @@ class NanoGoalNoteCreateSchema(BaseModel):
     activity_instance_id: str = Field(..., min_length=1)
     activity_definition_id: Optional[str] = None
     set_index: Optional[int] = Field(None, ge=0)
-    image_data: Optional[str] = None
 
     @field_validator('name')
     @classmethod

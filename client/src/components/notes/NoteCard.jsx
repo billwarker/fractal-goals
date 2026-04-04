@@ -4,12 +4,11 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import GoalIcon from '../atoms/GoalIcon';
 import ImageViewerModal from '../sessionDetail/ImageViewerModal';
+import MarkdownNoteContent from './MarkdownNoteContent';
 import styles from './NoteCard.module.css';
 
 function NoteCard({
@@ -286,9 +285,7 @@ function NoteCard({
                                     />
                                 </div>
                             )}
-                            <div className={styles.markdownContent}>
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{note.content}</ReactMarkdown>
-                            </div>
+                            <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
                             {note.is_nano_goal && onToggleNanoGoal && (
                                 <input
                                     type="checkbox"

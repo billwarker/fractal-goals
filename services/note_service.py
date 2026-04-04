@@ -537,7 +537,6 @@ class NoteService:
         if error:
             return None, *error
         content = data.get('content', '')
-        image_data = data.get('image_data')
 
         session_id = data.get('session_id')
         nano_goal_id = data.get('nano_goal_id')
@@ -558,6 +557,9 @@ class NoteService:
         )
         if context_error:
             return None, *context_error
+
+        if not content:
+            return None, "content is required", 400
 
         activity_instance = (context_payload or {}).get('activity_instance')
         if activity_instance:
@@ -595,7 +597,6 @@ class NoteService:
                 goal_id=goal_id,
                 set_index=data.get('set_index'),
                 content=content,
-                image_data=image_data,
                 nano_goal_id=nano_goal_id,
             )
             self.db_session.add(note)
@@ -658,7 +659,6 @@ class NoteService:
             activity_definition_id=data.get("activity_definition_id"),
             set_index=data.get("set_index"),
             content=data["name"],
-            image_data=data.get("image_data"),
             nano_goal_id=new_goal.id,
         )
         self.db_session.add(note)
@@ -717,6 +717,8 @@ class NoteService:
             return None, "Note not found", 404
 
         if 'content' in data:
+            if not data['content']:
+                return None, "content is required", 400
             note.content = data['content']
 
         if 'pin' in data:

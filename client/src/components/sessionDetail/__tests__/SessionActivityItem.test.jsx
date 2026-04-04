@@ -183,7 +183,6 @@ describe('SessionActivityItem nano note flow', () => {
             activity_instance_id: 'instance-1',
             activity_definition_id: 'activity-1',
             set_index: null,
-            image_data: null
         });
     });
 
@@ -236,7 +235,6 @@ describe('SessionActivityItem nano note flow', () => {
                 activity_instance_id: 'instance-1',
                 activity_definition_id: 'activity-1',
                 set_index: null,
-                image_data: null
             });
         });
         expect(deleteGoal).not.toHaveBeenCalled();

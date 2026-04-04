@@ -7,6 +7,7 @@
 import React, { useMemo, useState } from 'react';
 import { useActivityHistory } from '../../hooks/useActivityHistory';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import MarkdownNoteContent from '../notes/MarkdownNoteContent';
 import styles from './HistoryPanel.module.css';
 
 function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs }) {
@@ -210,9 +211,7 @@ function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
                                     Set {note.set_index + 1}
                                 </span>
                             )}
-                            <span className={styles.noteContent}>
-                                {note.content}
-                            </span>
+                            <MarkdownNoteContent content={note.content} className={styles.noteContent} />
                         </div>
                     ))}
                 </div>

@@ -133,19 +133,18 @@ def test_create_nano_goal_note_emits_note_and_goal_events(
     assert emitted[1].data['goal_id'] == payload['goal']['id']
 
 
-def test_create_image_only_root_note_succeeds(db_session, sample_ultimate_goal, test_user):
+def test_create_note_rejects_blank_content_after_normalization(db_session, sample_ultimate_goal, test_user):
     service = NoteService(db_session)
 
     payload, error, status = service.create_note(sample_ultimate_goal.id, test_user.id, {
         'context_type': 'root',
         'context_id': sample_ultimate_goal.id,
-        'image_data': 'data:image/png;base64,abc123',
+        'content': '   ',
     })
 
-    assert error is None
-    assert status == 201
-    assert payload['content'] == '[Image]'
-    assert payload['image_data'] == 'data:image/png;base64,abc123'
+    assert payload is None
+    assert status == 400
+    assert error == 'content is required'
 
 
 def test_create_activity_instance_note_hydrates_session_and_activity_definition(

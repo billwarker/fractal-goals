@@ -10,6 +10,7 @@ import { useSessionNotes } from '../hooks/useSessionQueries';
 import { useActivities } from '../hooks/useActivityQueries';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import { useTimezone } from '../contexts/TimezoneContext';
+import MarkdownNoteContent from './notes/MarkdownNoteContent';
 import './SessionNotesPreview.css';
 
 function SessionNotesPreview({ rootId, sessionId }) {
@@ -113,9 +114,7 @@ function SessionNotesPreview({ rootId, sessionId }) {
                             <div className="note-timestamp">
                                 {formatNoteTime(note.created_at)}
                             </div>
-                            <div className="note-content">
-                                {note.content}
-                            </div>
+                            <MarkdownNoteContent content={note.content} className="note-content" />
                             {note.image_data && (
                                 <div className="note-image">
                                     <img
@@ -134,4 +133,3 @@ function SessionNotesPreview({ rootId, sessionId }) {
 }
 
 export default SessionNotesPreview;
-

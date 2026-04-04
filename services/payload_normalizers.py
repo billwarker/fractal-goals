@@ -2,7 +2,7 @@ from typing import Any
 
 import models
 
-from validators import sanitize_string
+from validators import sanitize_note_content, sanitize_string
 
 
 def _normalize_optional_string(value):
@@ -129,9 +129,7 @@ def normalize_note_payload(data, *, partial=False):
     normalized = dict(data or {})
 
     if 'content' in normalized or not partial:
-        content = sanitize_string(normalized.get('content') or '')
-        image_data = normalized.get('image_data')
-        normalized['content'] = content or ('[Image]' if image_data else content)
+        normalized['content'] = sanitize_note_content(normalized.get('content') or '')
 
     for key in ('session_id', 'activity_instance_id', 'activity_definition_id', 'nano_goal_id', 'goal_id', 'context_id'):
         if key in normalized or not partial:

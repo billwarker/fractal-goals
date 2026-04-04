@@ -156,7 +156,7 @@
 .noteRow {
     display: flex;
     gap: 8px;
-    align-items: baseline;
+    align-items: flex-start;
     margin-top: 4px;
 }
 
@@ -176,6 +176,8 @@
 }
 
 .noteContent {
+    flex: 1;
     color: var(--color-text-secondary);
     font-size: 12px;
+    font-style: normal;
 }

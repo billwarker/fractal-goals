@@ -48,14 +48,13 @@ function NotesPanel({
         return allNotes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }, [notes, previousSessionNotes]);
 
-    const handleAddNote = async (content, imageData = null) => {
+    const handleAddNote = async (content) => {
         try {
             await addNote({
                 context_type: 'session', // Always add as session note from sidepane
                 context_id: sessionId,
                 session_id: sessionId,
                 content,
-                image_data: imageData
             });
             onNoteAdded?.();
         } catch (err) {

@@ -1,0 +1,82 @@
+.markdown {
+    color: inherit;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.markdown :where(p, ul, ol, blockquote, pre) {
+    margin: 0 0 0.5rem;
+}
+
+.markdown :where(p:last-child, ul:last-child, ol:last-child, blockquote:last-child, pre:last-child) {
+    margin-bottom: 0;
+}
+
+.markdown :where(p, li) {
+    white-space: pre-wrap;
+}
+
+.markdown :where(h1, h2, h3, h4, h5, h6) {
+    margin: 0.75rem 0 0.35rem;
+    line-height: 1.25;
+    font-weight: 700;
+}
+
+.markdown :where(h1:first-child, h2:first-child, h3:first-child, h4:first-child, h5:first-child, h6:first-child) {
+    margin-top: 0;
+}
+
+.markdown h1 {
+    font-size: 1.15em;
+}
+
+.markdown h2 {
+    font-size: 1.05em;
+}
+
+.markdown h3,
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+    font-size: 1em;
+}
+
+.markdown :where(ul, ol) {
+    padding-left: 1.25rem;
+}
+
+.markdown li + li {
+    margin-top: 0.15rem;
+}
+
+.markdown code {
+    font-family: monospace;
+    background: var(--color-bg-input);
+    padding: 0.05rem 0.25rem;
+    border-radius: 3px;
+    font-size: 0.92em;
+}
+
+.markdown pre {
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    padding: 0.75rem;
+    overflow-x: auto;
+}
+
+.markdown pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+}
+
+.markdown blockquote {
+    border-left: 3px solid var(--color-border);
+    padding-left: 0.75rem;
+    color: var(--color-text-secondary);
+}
+
+.markdown a {
+    color: var(--color-link, #6c8ebf);
+}

@@ -48,16 +48,15 @@ def test_normalize_goal_payload_cleans_optional_ids_and_defaults():
     assert payload['deadline'] is None
 
 
-def test_normalize_note_payload_uses_image_placeholder_and_cleans_ids():
+def test_normalize_note_payload_preserves_markdown_newlines_and_cleans_ids():
     payload = normalize_note_payload({
-        'content': '   ',
-        'image_data': 'base64',
+        'content': '  Intro line\n## Heading\n- one  \n- two  ',
         'session_id': ' session-1 ',
         'context_id': ' ctx-1 ',
         'activity_instance_id': ' ',
     })
 
-    assert payload['content'] == '[Image]'
+    assert payload['content'] == 'Intro line\n## Heading\n- one \n- two'
     assert payload['session_id'] == 'session-1'
     assert payload['context_id'] == 'ctx-1'
     assert payload['activity_instance_id'] is None

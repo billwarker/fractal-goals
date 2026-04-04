@@ -12,6 +12,7 @@ import React, { useMemo, useState } from 'react';
 import { formatDateInTimezone } from '../../utils/dateUtils';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import ImageViewerModal from '../sessionDetail/ImageViewerModal';
+import MarkdownNoteContent from '../notes/MarkdownNoteContent';
 import './SessionNotesSidebar.css';
 
 function SessionNotesSidebar({
@@ -157,9 +158,7 @@ function SessionNotesSidebar({
                                             </div>
                                         </>
                                     )}
-                                    <div className="note-content">
-                                        {note.content}
-                                    </div>
+                                    <MarkdownNoteContent content={note.content} className="note-content" />
                                     {/* Show image if image_data is present (detail view) */}
                                     {note.image_data && (
                                         <div
