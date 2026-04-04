@@ -221,7 +221,6 @@ function FractalGoals() {
 
     const sidebarWidth = isMobile ? '100%' : '32.5vw';
     const minSidebarWidth = isMobile ? '0' : '390px';
-    const navSpacerHeight = isMobile ? '76px' : '60px';
     const isSidebarOpen = showGoalModal || !!sidebarMode;
     const sheetTitle = showGoalModal
         ? 'Create Goal'
@@ -239,15 +238,12 @@ function FractalGoals() {
 
     return (
         <div className="fractal-page-container" style={{
-            height: '100vh',
-            width: '100vw',
+            height: '100%',
+            width: '100%',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden'
         }}>
-            {/* Nav Padding Spacer */}
-            <div style={{ height: navSpacerHeight, flexShrink: 0 }} />
-
             <div className="fractal-main-layout" style={{
                 display: 'flex',
                 flex: 1,

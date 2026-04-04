@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import { useLogsData } from '../hooks/useLogsData';
+import useIsMobile from '../hooks/useIsMobile';
 import './Logs.css';
 
 /**
@@ -13,6 +14,7 @@ function Logs() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const { timezone } = useTimezone();
+    const isMobile = useIsMobile();
 
     const [page, setPage] = useState(1);
     const pageSize = 50;
@@ -54,7 +56,7 @@ function Logs() {
         <div className="logs-page-container">
             <div className="logs-page-header">
                 <div className="header-main">
-                    <h1>Application Events</h1>
+                    {!isMobile ? <h1>Application Events</h1> : null}
                     <div className="logs-filters">
                         <div className="filter-group">
                             <label>Type</label>

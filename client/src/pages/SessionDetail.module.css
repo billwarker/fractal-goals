@@ -9,7 +9,6 @@
     padding: var(--spacing-xl);
     color: var(--color-text-primary);
     box-sizing: border-box;
-    padding-top: 84px;
 }
 
 .sessionMainContent {
@@ -31,8 +30,8 @@
 
 .sessionSidebarSticky {
     position: sticky;
-    top: 84px;
-    height: calc(100vh - 112px);
+    top: 0;
+    height: calc(100vh - var(--app-nav-height, 0px) - 48px);
     overflow-y: auto;
 }
 
@@ -50,7 +49,7 @@
 }
 
 .statusWrapper {
-    padding: 96px var(--spacing-xl) 0;
+    padding: var(--spacing-xl);
     max-width: 680px;
     margin: 0 auto;
 }
@@ -211,12 +210,11 @@
 @media (max-width: 640px) {
     .sessionDetailContainer {
         padding: var(--spacing-md);
-        padding-top: 76px;
         gap: var(--spacing-lg);
     }
 
     .statusWrapper {
-        padding-top: 76px;
+        padding-top: var(--spacing-md);
         padding-left: var(--spacing-md);
         padding-right: var(--spacing-md);
     }

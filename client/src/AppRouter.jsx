@@ -1,9 +1,10 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { fractalApi } from './utils/api';
 import { HeaderProvider, useHeader } from './contexts/HeaderContext';
 import useIsMobile from './hooks/useIsMobile';
 import { lazyWithRetry } from './utils/lazyWithRetry';
+import { getViewportMetaContent } from './utils/viewportMeta';
 import styles from './AppRouter.module.css';
 import './App.css';
 
@@ -28,13 +29,14 @@ import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 import { usePageTitle } from './hooks/usePageTitle';
 
 // Navigation header component defined outside of App to avoid re-declaration
-const NavigationHeader = ({ onOpenSettings }) => {
+const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { headerActions } = useHeader();
     const [fractalName, setFractalName] = useState('Fractal Goals');
     const [fractalNameCache, setFractalNameCache] = useState({});
     const isMobile = useIsMobile();
+    const navRef = useRef(null);
 
     // Extract rootId from current path
     const pathParts = location.pathname.split('/');
@@ -66,6 +68,39 @@ const NavigationHeader = ({ onOpenSettings }) => {
         }
     }, [rootId]); // Remove fractalNameCache from dependencies
 
+    useEffect(() => {
+        if (typeof onHeightChange !== 'function') {
+            return undefined;
+        }
+
+        const navElement = navRef.current;
+        if (!navElement) {
+            onHeightChange(0);
+            return undefined;
+        }
+
+        const updateHeight = () => {
+            onHeightChange(Math.ceil(navElement.getBoundingClientRect().height));
+        };
+
+        updateHeight();
+
+        if (typeof ResizeObserver === 'function') {
+            const observer = new ResizeObserver(updateHeight);
+            observer.observe(navElement);
+            return () => {
+                observer.disconnect();
+                onHeightChange(0);
+            };
+        }
+
+        window.addEventListener('resize', updateHeight);
+        return () => {
+            window.removeEventListener('resize', updateHeight);
+            onHeightChange(0);
+        };
+    }, [headerActions, isMobile, location.pathname, onHeightChange]);
+
     // Only show nav if we're on a fractal page
     if (!rootId || rootId === '') return null;
 
@@ -82,19 +117,15 @@ const NavigationHeader = ({ onOpenSettings }) => {
 
     if (isMobile) {
         return (
-            <div className="top-nav-links">
+            <div className="top-nav-links" ref={navRef}>
                 <div className={styles.mobileNav}>
-                    <div className={styles.mobileTitleRow}>
-                        <span className={`fractal-title ${styles.fractalTitleMobile}`}>{fractalName}</span>
+                    <div className={styles.mobileControlsRow}>
                         <button
-                            className={`${styles.addSessionBtn} ${styles.mobileTopAddBtn}`}
+                            className={`${styles.addSessionBtn} ${styles.mobileBtn} ${styles.mobileTopAddBtn}`}
                             onClick={() => navigate(`/${rootId}/create-session`)}
                         >
                             + ADD SESSION
                         </button>
-                    </div>
-
-                    <div className={styles.mobileControlsRow}>
 
                         {primaryNavItems.map(item => (
                             <button
@@ -127,7 +158,7 @@ const NavigationHeader = ({ onOpenSettings }) => {
     }
 
     return (
-        <div className="top-nav-links">
+        <div className="top-nav-links" ref={navRef}>
             <div className="nav-group">
                 {/* Left Side: Title and Primary Nav */}
                 <div className={styles.navContainer}>
@@ -187,6 +218,8 @@ const NavigationHeader = ({ onOpenSettings }) => {
 function App() {
     const location = useLocation();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const isMobile = useIsMobile();
+    const [navHeight, setNavHeight] = useState(() => (location.pathname === '/' ? 0 : (isMobile ? 56 : 60)));
 
     // Determine page title based on path
     const getPageTitle = (pathname) => {
@@ -205,12 +238,39 @@ function App() {
 
     usePageTitle(getPageTitle(location.pathname));
 
+    useEffect(() => {
+        const viewportMeta = document.querySelector('meta[name="viewport"]');
+        if (!viewportMeta) {
+            return undefined;
+        }
+
+        const isFlowTreeRoute = /^\/[^/]+\/goals(?:\/)?$/.test(location.pathname);
+        viewportMeta.setAttribute('content', getViewportMetaContent({
+            isMobile,
+            allowZoom: !isMobile || isFlowTreeRoute,
+        }));
+
+        return undefined;
+    }, [isMobile, location.pathname]);
+
+    useEffect(() => {
+        document.documentElement.style.setProperty('--app-nav-height', `${navHeight}px`);
+
+        return () => {
+            document.documentElement.style.setProperty('--app-nav-height', '0px');
+        };
+    }, [navHeight]);
+
     return (
         <HeaderProvider>
             <div className="app-container">
                 {location.pathname !== '/' && (
-                    <NavigationHeader onOpenSettings={() => setIsSettingsOpen(true)} />
+                    <NavigationHeader
+                        onOpenSettings={() => setIsSettingsOpen(true)}
+                        onHeightChange={setNavHeight}
+                    />
                 )}
+                {location.pathname !== '/' ? <div aria-hidden="true" style={{ height: navHeight, flexShrink: 0 }} /> : null}
 
                 <div className="content-container">
                     {location.pathname === '/' ? (

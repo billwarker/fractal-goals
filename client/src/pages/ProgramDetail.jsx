@@ -214,24 +214,26 @@ const ProgramDetail = () => {
         <div className={styles.container}>
             {/* Header */}
             <div className={styles.header}>
-                <div className={styles.headerLeft}>
+                <div className={styles.headerTopRow}>
                     <button
                         onClick={() => navigate(`/${rootId}/programs?show_all=true`)}
                         className={styles.backBtn}
                     >
                         ← Back
                     </button>
-                    <div>
+                    <div className={styles.headerCopy}>
                         <h1 className={styles.programTitle}>{program.name}</h1>
-                        <div className={styles.programMeta}>
-                            <span>{formatDate(program.start_date)} - {formatDate(program.end_date)}</span>
-                            {program.description && (
-                                <>
-                                    <span>•</span>
-                                    <span className={styles.description}><Linkify>{program.description}</Linkify></span>
-                                </>
-                            )}
-                        </div>
+                        {!isMobile ? (
+                            <div className={styles.programMeta}>
+                                <span>{formatDate(program.start_date)} - {formatDate(program.end_date)}</span>
+                                {program.description && (
+                                    <>
+                                        <span>•</span>
+                                        <span className={styles.description}><Linkify>{program.description}</Linkify></span>
+                                    </>
+                                )}
+                            </div>
+                        ) : null}
                     </div>
                 </div>
                 <div className={styles.headerActions}>

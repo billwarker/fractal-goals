@@ -4,6 +4,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { useProgramDetailController } from '../useProgramDetailController';
 
 describe('useProgramDetailController', () => {
+    it('keeps the sidebar closed by default until the user opens it', () => {
+        const { result } = renderHook(() => useProgramDetailController({ goals: [] }));
+
+        expect(result.current.isSidebarOpen).toBe(false);
+    });
+
     it('opens block creation modal from calendar selection and resets state after save success', () => {
         const unselect = vi.fn();
         const { result } = renderHook(() => useProgramDetailController({ goals: [] }));

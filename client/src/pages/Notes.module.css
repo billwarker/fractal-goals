@@ -89,7 +89,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    padding: 80px 16px 14px;
+    padding: 16px 16px 14px;
     border-bottom: 1px solid var(--color-border);
     flex-shrink: 0;
     gap: 10px;
@@ -296,7 +296,7 @@
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
-    z-index: 300;
+    z-index: 1301;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -625,36 +625,93 @@
 .bottomSheet {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 200;
-    display: flex;
-    align-items: flex-end;
+    z-index: 1200;
+    background: rgba(7, 12, 18, 0.58);
+    display: grid;
+    align-items: end;
 }
 
-.bottomSheetContent {
+.bottomSheetCard {
     background: var(--color-bg-surface);
-    border-radius: 12px 12px 0 0;
-    padding: 20px 16px 32px;
-    width: 100%;
-    max-height: 80vh;
-    overflow-y: auto;
-    position: relative;
+    border-top-left-radius: var(--border-radius-xl);
+    border-top-right-radius: var(--border-radius-xl);
+    border: 1px solid var(--color-border);
+    border-bottom: none;
+    max-height: 82vh;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
 }
 
-.bottomSheetClose {
-    position: absolute;
-    top: 12px;
-    right: 16px;
-    background: transparent;
-    border: none;
-    font-size: 22px;
+.bottomSheetHandle {
+    width: 44px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--color-border-hover);
+    margin: 10px auto 0;
+    flex-shrink: 0;
+}
+
+.bottomSheetHeader {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+.bottomSheetHeaderCopy {
+    min-width: 0;
+}
+
+.bottomSheetTitle {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.bottomSheetSubtitle {
+    margin-top: 4px;
+    font-size: 12px;
     color: var(--color-text-muted);
+}
+
+.bottomSheetActions {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.bottomSheetActionButton {
+    padding: 6px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm, 6px);
+    background: var(--color-bg-card, var(--color-bg-input));
+    color: var(--color-text-primary);
+    font-size: 12px;
     cursor: pointer;
-    line-height: 1;
+    white-space: nowrap;
+}
+
+.bottomSheetActionButton:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.bottomSheetBody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 @media (max-width: 768px) {
     .rightColumn {
         display: none;
+    }
+
+    .composeLinkCardBody {
+        overflow-y: auto;
     }
 }

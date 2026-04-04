@@ -301,7 +301,7 @@ function Notes() {
     const [editingNote, setEditingNote] = useState(null); // note object being edited
     const [goalPickerOpen, setGoalPickerOpen] = useState(false);
     const [activityPickerOpen, setActivityPickerOpen] = useState(false);
-    const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+    const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
 
     useEffect(() => {
         window.localStorage.setItem(filtersPaneStorageKey, String(isFiltersPaneOpen));
@@ -358,6 +358,7 @@ function Notes() {
             });
         }
         setComposing(false);
+        setMobilePanelOpen(false);
         resetComposeLinks();
     };
 
@@ -365,6 +366,9 @@ function Notes() {
         setEditingNote(note);
         setComposing(true);
         setIsFiltersPaneOpen(true);
+        if (isMobile) {
+            setMobilePanelOpen(true);
+        }
     };
 
     const handleGoalFilterSelect = (id, name) => {
@@ -391,6 +395,9 @@ function Notes() {
         filterActivityIds.length > 0 || filterGroupIds.length > 0 || search;
 
     const activityFilterCount = filterActivityIds.length + filterGroupIds.length;
+    const mobilePanelLabel = composing
+        ? (mobilePanelOpen ? 'Hide Associator' : 'Show Associator')
+        : (mobilePanelOpen ? 'Hide Filters' : 'Show Filters');
 
     /* ─── Left column ─── */
     const leftColumn = (
@@ -410,9 +417,9 @@ function Notes() {
                         {isMobile ? (
                             <button
                                 className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
-                                onClick={() => setMobileFiltersOpen(true)}
+                                onClick={() => setMobilePanelOpen((value) => !value)}
                             >
-                                Filters
+                                {mobilePanelLabel}
                             </button>
                         ) : (
                             <button
@@ -434,7 +441,12 @@ function Notes() {
                         key={editingNote?.id || 'new'}
                         rootId={rootId}
                         onSubmit={handleCompose}
-                        onCancel={() => { setComposing(false); setEditingNote(null); resetComposeLinks(); }}
+                        onCancel={() => {
+                            setComposing(false);
+                            setEditingNote(null);
+                            setMobilePanelOpen(false);
+                            resetComposeLinks();
+                        }}
                         initialContent={editingNote?.content}
                         selectedGoalId={composeGoalId}
                         selectedGoalName={composeGoalName}
@@ -442,7 +454,7 @@ function Notes() {
                         selectedActivityName={composeActivityName}
                         onGoalSelect={(id, name) => { setComposeGoalId(id); setComposeGoalName(name); }}
                         onActivitySelect={(id, name) => { setComposeActivityId(id); setComposeActivityName(name); }}
-                        hideLinkPanel={!isMobile}
+                        hideLinkPanel={true}
                         bare={!isMobile}
                         submitLabel={editingNote ? 'Save changes' : 'Save note'}
                     />
@@ -459,6 +471,87 @@ function Notes() {
                         onLoadMore={loadNextPage}
                         emptyMessage={hasActiveFilters ? 'No notes match the current filters.' : 'No notes yet. Write your first note!'}
                     />
+                )}
+            </div>
+        </div>
+    );
+
+    const filterPanelBody = (
+        <div className={styles.filterPanelBody}>
+            {/* Search */}
+            <div className={styles.filterSection}>
+                <div className={styles.filterSectionHeader}><h4>Search</h4></div>
+                <input
+                    className={styles.searchInput}
+                    placeholder="Search notes…"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    type="text"
+                />
+            </div>
+
+            {/* Note Type */}
+            <div className={styles.filterSection}>
+                <div className={styles.filterSectionHeader}><h4>Note Type</h4></div>
+                <div className={styles.chipGroup}>
+                    {CONTEXT_TYPE_OPTIONS.map(opt => (
+                        <button
+                            key={opt.value}
+                            className={[styles.chip, selectedContextTypes.includes(opt.value) ? styles.chipActive : ''].filter(Boolean).join(' ')}
+                            onClick={() => toggleContextType(opt.value)}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Pinned */}
+            <div className={styles.filterSection}>
+                <div className={styles.filterSectionHeader}><h4>Pinned</h4></div>
+                <div className={styles.chipGroup}>
+                    <button
+                        className={[styles.chip, !pinnedOnly ? styles.chipActive : ''].filter(Boolean).join(' ')}
+                        onClick={() => setPinnedOnly(false)}
+                    >
+                        All
+                    </button>
+                    <button
+                        className={[styles.chip, pinnedOnly ? styles.chipActive : ''].filter(Boolean).join(' ')}
+                        onClick={() => setPinnedOnly(true)}
+                    >
+                        Pinned only
+                    </button>
+                </div>
+            </div>
+
+            {/* Goal */}
+            <div className={styles.filterSection}>
+                <div className={styles.filterSectionHeader}><h4>Goal</h4></div>
+                <button className={styles.pickerButton} onClick={() => setGoalPickerOpen(true)}>
+                    {filterGoalName || 'Select a goal…'}
+                    <span className={styles.pickerButtonArrow}>›</span>
+                </button>
+                {filterGoalId && (
+                    <div className={styles.pickerSelection}>
+                        <span>{filterGoalName}</span>
+                        <button onClick={() => handleGoalFilterSelect(null, null)}>Clear</button>
+                    </div>
+                )}
+            </div>
+
+            {/* Activity */}
+            <div className={styles.filterSection}>
+                <div className={styles.filterSectionHeader}><h4>Activity</h4></div>
+                <button className={styles.pickerButton} onClick={() => setActivityPickerOpen(true)}>
+                    {activityFilterCount > 0 ? `${activityFilterCount} selected` : 'Select activities…'}
+                    <span className={styles.pickerButtonArrow}>›</span>
+                </button>
+                {activityFilterCount > 0 && (
+                    <div className={styles.pickerSelection}>
+                        <span>{activityFilterCount} activit{activityFilterCount === 1 ? 'y' : 'ies/groups'} selected</span>
+                        <button onClick={() => { setFilterActivityIds([]); setFilterGroupIds([]); }}>Clear</button>
+                    </div>
                 )}
             </div>
         </div>
@@ -483,88 +576,23 @@ function Notes() {
                 </button>
             </div>
 
-            <div className={styles.filterPanelBody}>
-                {/* Search */}
-                <div className={styles.filterSection}>
-                    <div className={styles.filterSectionHeader}><h4>Search</h4></div>
-                    <input
-                        className={styles.searchInput}
-                        placeholder="Search notes…"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        type="text"
-                    />
-                </div>
-
-                {/* Note Type */}
-                <div className={styles.filterSection}>
-                    <div className={styles.filterSectionHeader}><h4>Note Type</h4></div>
-                    <div className={styles.chipGroup}>
-                        {CONTEXT_TYPE_OPTIONS.map(opt => (
-                            <button
-                                key={opt.value}
-                                className={[styles.chip, selectedContextTypes.includes(opt.value) ? styles.chipActive : ''].filter(Boolean).join(' ')}
-                                onClick={() => toggleContextType(opt.value)}
-                            >
-                                {opt.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Pinned */}
-                <div className={styles.filterSection}>
-                    <div className={styles.filterSectionHeader}><h4>Pinned</h4></div>
-                    <div className={styles.chipGroup}>
-                        <button
-                            className={[styles.chip, !pinnedOnly ? styles.chipActive : ''].filter(Boolean).join(' ')}
-                            onClick={() => setPinnedOnly(false)}
-                        >
-                            All
-                        </button>
-                        <button
-                            className={[styles.chip, pinnedOnly ? styles.chipActive : ''].filter(Boolean).join(' ')}
-                            onClick={() => setPinnedOnly(true)}
-                        >
-                            Pinned only
-                        </button>
-                    </div>
-                </div>
-
-                {/* Goal */}
-                <div className={styles.filterSection}>
-                    <div className={styles.filterSectionHeader}><h4>Goal</h4></div>
-                    <button className={styles.pickerButton} onClick={() => setGoalPickerOpen(true)}>
-                        {filterGoalName || 'Select a goal…'}
-                        <span className={styles.pickerButtonArrow}>›</span>
-                    </button>
-                    {filterGoalId && (
-                        <div className={styles.pickerSelection}>
-                            <span>{filterGoalName}</span>
-                            <button onClick={() => handleGoalFilterSelect(null, null)}>Clear</button>
-                        </div>
-                    )}
-                </div>
-
-                {/* Activity */}
-                <div className={styles.filterSection}>
-                    <div className={styles.filterSectionHeader}><h4>Activity</h4></div>
-                    <button className={styles.pickerButton} onClick={() => setActivityPickerOpen(true)}>
-                        {activityFilterCount > 0 ? `${activityFilterCount} selected` : 'Select activities…'}
-                        <span className={styles.pickerButtonArrow}>›</span>
-                    </button>
-                    {activityFilterCount > 0 && (
-                        <div className={styles.pickerSelection}>
-                            <span>{activityFilterCount} activit{activityFilterCount === 1 ? 'y' : 'ies/groups'} selected</span>
-                            <button onClick={() => { setFilterActivityIds([]); setFilterGroupIds([]); }}>Clear</button>
-                        </div>
-                    )}
-                </div>
-            </div>
+            {filterPanelBody}
         </div>
     );
 
-    const composeLinkPanel = composing && !isMobile && (
+    const composeLinkPanelBody = (
+        <div className={styles.composeLinkCardBody}>
+            <ComposeLinkPanel
+                rootId={rootId}
+                selectedGoalId={composeGoalId}
+                selectedActivityId={composeActivityId}
+                onGoalSelect={(id, name) => { setComposeGoalId(id); setComposeGoalName(name); }}
+                onActivitySelect={(id, name) => { setComposeActivityId(id); setComposeActivityName(name); }}
+            />
+        </div>
+    );
+
+    const composeLinkPanel = (
         <div className={styles.composeLinkCard}>
             <div className={styles.filterPanelHeader}>
                 <div>
@@ -572,15 +600,7 @@ function Notes() {
                     <div className={styles.filterPanelSubtitle}>Goal or Activity</div>
                 </div>
             </div>
-            <div className={styles.composeLinkCardBody}>
-                <ComposeLinkPanel
-                    rootId={rootId}
-                    selectedGoalId={composeGoalId}
-                    selectedActivityId={composeActivityId}
-                    onGoalSelect={(id, name) => { setComposeGoalId(id); setComposeGoalName(name); }}
-                    onActivitySelect={(id, name) => { setComposeActivityId(id); setComposeActivityName(name); }}
-                />
-            </div>
+            {composeLinkPanelBody}
         </div>
     );
 
@@ -613,11 +633,40 @@ function Notes() {
                 />
             )}
 
-            {isMobile && mobileFiltersOpen && (
-                <div className={styles.bottomSheet} onClick={() => setMobileFiltersOpen(false)}>
-                    <div className={styles.bottomSheetContent} onClick={e => e.stopPropagation()}>
-                        <button className={styles.bottomSheetClose} onClick={() => setMobileFiltersOpen(false)}>×</button>
-                        {filterPanel}
+            {isMobile && mobilePanelOpen && (
+                <div className={styles.bottomSheet} onClick={() => setMobilePanelOpen(false)}>
+                    <div className={styles.bottomSheetCard} onClick={e => e.stopPropagation()}>
+                        <div className={styles.bottomSheetHandle} />
+                        <div className={styles.bottomSheetHeader}>
+                            <div className={styles.bottomSheetHeaderCopy}>
+                                <div className={styles.bottomSheetTitle}>
+                                    {composing ? 'Associator' : 'Filters'}
+                                </div>
+                                <div className={styles.bottomSheetSubtitle}>
+                                    {composing ? 'Link this note to a goal or activity.' : `${total} note${total !== 1 ? 's' : ''} shown`}
+                                </div>
+                            </div>
+                            <div className={styles.bottomSheetActions}>
+                                {!composing ? (
+                                    <button
+                                        className={styles.bottomSheetActionButton}
+                                        onClick={clearFilters}
+                                        disabled={!hasActiveFilters}
+                                    >
+                                        Reset
+                                    </button>
+                                ) : null}
+                                <button
+                                    className={styles.bottomSheetActionButton}
+                                    onClick={() => setMobilePanelOpen(false)}
+                                >
+                                    Hide
+                                </button>
+                            </div>
+                        </div>
+                        <div className={styles.bottomSheetBody}>
+                            {composing ? composeLinkPanelBody : filterPanelBody}
+                        </div>
                     </div>
                 </div>
             )}

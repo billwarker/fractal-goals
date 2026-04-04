@@ -4,7 +4,7 @@ import moment from 'moment';
 export function useProgramDetailController({ goals = [] }) {
     const [showEditBuilder, setShowEditBuilder] = useState(false);
     const [viewMode, setViewMode] = useState('calendar');
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const [showBlockModal, setShowBlockModal] = useState(false);
     const [blockModalData, setBlockModalData] = useState(null);
