@@ -40,8 +40,9 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 16px;
     flex-wrap: wrap;
+    padding: 4px 0;
 }
 
 .checkboxLabel {
@@ -60,22 +61,25 @@
 }
 
 .writeBtn {
-    background: transparent;
-    border: 1px solid;
-    border-radius: 6px;
-    padding: 5px 14px;
-    font-size: 13px;
-    cursor: pointer;
-    transition: background 0.1s;
     white-space: nowrap;
+    background: var(--color-brand-primary);
+    border: 1px solid var(--color-brand-primary);
+    color: white;
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
 }
 
 .writeBtn:hover {
-    background: var(--color-bg-hover);
+    background: var(--color-brand-primary-hover);
+    border-color: var(--color-brand-primary-hover);
 }
 
 .composeArea {
-    margin-bottom: 16px;
+    margin-bottom: 18px;
+    padding: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-bg-secondary);
 }
 
 .timelineArea {

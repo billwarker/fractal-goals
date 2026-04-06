@@ -78,8 +78,6 @@
     flex-shrink: 0;
 }
 
-/* Annotations Button specific */
-/* Annotations Button specific (mostly Atom now) */
 .narrow {
     width: 32px;
     padding: 0;
@@ -185,7 +183,7 @@
 }
 
 .vizContainerHidden {
-    /* For AnnotatedChartWrapper containers that need overflow: hidden */
+    /* Shared chart container with clipped overflow */
     flex: 1;
     padding: 20px;
     display: flex;

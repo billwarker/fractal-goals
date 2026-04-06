@@ -8,7 +8,7 @@
  * Mobile: single column; filter panel becomes bottom sheet.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { NoteTimeline, NoteComposer } from '../components/notes';
@@ -16,6 +16,7 @@ import { ComposeLinkPanel } from '../components/notes/NoteComposer';
 import { useNotesPageQuery } from '../hooks/useNotesPageQuery';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
+import ActivityFilterModal from '../components/common/ActivityFilterModal';
 import GoalTreePicker from '../components/common/GoalTreePicker';
 import { queryKeys } from '../hooks/queryKeys';
 import { fractalApi } from '../utils/api';
@@ -24,12 +25,13 @@ import PageHeader from '../components/layout/PageHeader';
 import headerStyles from '../components/layout/PageHeader.module.css';
 import styles from './Notes.module.css';
 
-const CONTEXT_TYPE_OPTIONS = [
-    { value: 'root', label: 'Fractal Notes' },
-    { value: 'goal', label: 'Goal Notes' },
-    { value: 'session', label: 'Session Notes' },
-    { value: 'activity_instance', label: 'Activity Notes' },
-    { value: 'activity_definition', label: 'Activity Definition Notes' },
+const NOTE_TYPE_OPTIONS = [
+    { value: 'fractal_note', label: 'Fractal Notes' },
+    { value: 'goal_note', label: 'Goal Notes' },
+    { value: 'session_note', label: 'Session Notes' },
+    { value: 'activity_instance_note', label: 'Activity Notes' },
+    { value: 'activity_set_note', label: 'Activity Set Notes' },
+    { value: 'activity_definition_note', label: 'Activity Definition Notes' },
 ];
 
 // ─── Goal Picker Modal ───────────────────────────────────────────────────────
@@ -71,218 +73,31 @@ function GoalPickerModal({ rootId, selectedGoalId, onSelect, onClose }) {
     );
 }
 
-// ─── Activity Filter Modal ───────────────────────────────────────────────────
-
-function ActivityFilterModal({ rootId, initialActivityIds = [], initialGroupIds = [], onConfirm, onClose }) {
-    const { data: activities = [] } = useQuery({
-        queryKey: queryKeys.activities(rootId),
-        queryFn: async () => { const res = await fractalApi.getActivities(rootId); return res.data || []; },
-        enabled: Boolean(rootId),
-    });
-    const { data: activityGroups = [] } = useQuery({
-        queryKey: queryKeys.activityGroups(rootId),
-        queryFn: async () => { const res = await fractalApi.getActivityGroups(rootId); return res.data || []; },
-        enabled: Boolean(rootId),
-    });
-
-    const [pendingActivityIds, setPendingActivityIds] = useState(new Set(initialActivityIds));
-    const [pendingGroupIds, setPendingGroupIds] = useState(new Set(initialGroupIds));
-    const [browseGroupId, setBrowseGroupId] = useState(null); // null = top level
-
-    // Build maps
-    const groupMap = useMemo(() => {
-        const m = {};
-        activityGroups.forEach(g => { m[g.id] = g; });
-        return m;
-    }, [activityGroups]);
-
-    const childGroupsByParent = useMemo(() => {
-        const m = {};
-        activityGroups.forEach(g => {
-            const pid = g.parent_id || '__root__';
-            if (!m[pid]) m[pid] = [];
-            m[pid].push(g);
-        });
-        return m;
-    }, [activityGroups]);
-
-    const activitiesByGroup = useMemo(() => {
-        const m = {};
-        activities.forEach(a => {
-            const gid = a.group_id || '__ungrouped__';
-            if (!m[gid]) m[gid] = [];
-            m[gid].push(a);
-        });
-        return m;
-    }, [activities]);
-
-    const topLevelGroups = childGroupsByParent['__root__'] || [];
-    const currentGroup = browseGroupId ? groupMap[browseGroupId] : null;
-    const currentSubGroups = childGroupsByParent[browseGroupId || '__root__'] || [];
-    const currentActivities = activitiesByGroup[browseGroupId] || [];
-
-    const totalSelected = pendingActivityIds.size + pendingGroupIds.size;
-
-    const toggleGroup = (group) => {
-        const newGroupIds = new Set(pendingGroupIds);
-        const newActivityIds = new Set(pendingActivityIds);
-        const groupActivities = activitiesByGroup[group.id] || [];
-
-        if (newGroupIds.has(group.id)) {
-            newGroupIds.delete(group.id);
-            groupActivities.forEach(a => newActivityIds.delete(a.id));
-        } else {
-            newGroupIds.add(group.id);
-            groupActivities.forEach(a => newActivityIds.add(a.id));
-        }
-        setPendingGroupIds(newGroupIds);
-        setPendingActivityIds(newActivityIds);
-    };
-
-    const toggleActivity = (activity) => {
-        const newIds = new Set(pendingActivityIds);
-        if (newIds.has(activity.id)) {
-            newIds.delete(activity.id);
-        } else {
-            newIds.add(activity.id);
-        }
-        setPendingActivityIds(newIds);
-    };
-
-    const handleClear = () => {
-        setPendingActivityIds(new Set());
-        setPendingGroupIds(new Set());
-    };
-
-    const handleApply = () => {
-        onConfirm([...pendingActivityIds], [...pendingGroupIds]);
-        onClose();
-    };
-
-    const handleBack = () => {
-        if (browseGroupId) {
-            const parent = groupMap[browseGroupId]?.parent_id || null;
-            setBrowseGroupId(parent);
-        }
-    };
-
-    return (
-        <div className={styles.modalOverlay} onClick={onClose}>
-            <div className={styles.modalSheet} onClick={e => e.stopPropagation()}>
-                <div className={styles.modalHeader}>
-                    <div className={styles.modalHeaderLeft}>
-                        {browseGroupId && (
-                            <button className={styles.modalBackBtn} onClick={handleBack}>‹</button>
-                        )}
-                        <span className={styles.modalTitle}>
-                            {currentGroup ? currentGroup.name : 'Filter by Activity'}
-                        </span>
-                    </div>
-                    <button className={styles.modalClose} onClick={onClose}>×</button>
-                </div>
-
-                <div className={styles.activityModalBody}>
-                    {/* Sub-groups */}
-                    {currentSubGroups.length > 0 && (
-                        <div className={styles.activityGroupGrid}>
-                            {currentSubGroups.map(group => {
-                                const hasChildren = (childGroupsByParent[group.id] || []).length > 0;
-                                const actCount = (activitiesByGroup[group.id] || []).length;
-                                const isChecked = pendingGroupIds.has(group.id);
-                                return (
-                                    <div
-                                        key={group.id}
-                                        className={[styles.activityGroupCard, isChecked ? styles.activityGroupCardChecked : ''].filter(Boolean).join(' ')}
-                                    >
-                                        <label className={styles.activityGroupCardCheckbox} onClick={e => e.stopPropagation()}>
-                                            <input
-                                                type="checkbox"
-                                                checked={isChecked}
-                                                onChange={() => toggleGroup(group)}
-                                            />
-                                        </label>
-                                        <button
-                                            className={styles.activityGroupCardName}
-                                            onClick={() => setBrowseGroupId(group.id)}
-                                        >
-                                            {group.name}
-                                            {hasChildren && <span className={styles.subgroupArrow}>›</span>}
-                                            {!hasChildren && actCount > 0 && (
-                                                <span className={styles.actCount}>{actCount}</span>
-                                            )}
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-
-                    {/* Activities in current group */}
-                    {currentActivities.length > 0 && (
-                        <div className={styles.activityCheckList}>
-                            {currentSubGroups.length > 0 && (
-                                <div className={styles.activityCheckListDivider}>Activities in this group</div>
-                            )}
-                            {currentActivities.map(activity => (
-                                <label key={activity.id} className={styles.activityCheckRow}>
-                                    <input
-                                        type="checkbox"
-                                        checked={pendingActivityIds.has(activity.id)}
-                                        onChange={() => toggleActivity(activity)}
-                                    />
-                                    <span className={styles.activityCheckName}>{activity.name}</span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Ungrouped activities (only at root level) */}
-                    {!browseGroupId && (activitiesByGroup['__ungrouped__'] || []).length > 0 && (
-                        <div className={styles.activityCheckList}>
-                            <div className={styles.activityCheckListDivider}>Ungrouped</div>
-                            {(activitiesByGroup['__ungrouped__'] || []).map(activity => (
-                                <label key={activity.id} className={styles.activityCheckRow}>
-                                    <input
-                                        type="checkbox"
-                                        checked={pendingActivityIds.has(activity.id)}
-                                        onChange={() => toggleActivity(activity)}
-                                    />
-                                    <span className={styles.activityCheckName}>{activity.name}</span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-
-                    {currentSubGroups.length === 0 && currentActivities.length === 0 && !browseGroupId && (
-                        <span className={styles.modalEmpty}>No activities found.</span>
-                    )}
-                </div>
-
-                <div className={styles.modalFooter}>
-                    <span className={styles.modalFooterCount}>
-                        {totalSelected > 0 ? `${totalSelected} selected` : 'None selected'}
-                    </span>
-                    <button className={styles.modalClearBtn} onClick={handleClear} disabled={totalSelected === 0}>
-                        Clear
-                    </button>
-                    <button className={styles.modalApplyBtn} onClick={handleApply}>
-                        Apply filters
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 // ─── Main Notes Page ─────────────────────────────────────────────────────────
 
 function Notes() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const isMobile = useIsMobile();
+    const { data: activities = [] } = useQuery({
+        queryKey: queryKeys.activities(rootId),
+        queryFn: async () => {
+            const response = await fractalApi.getActivities(rootId);
+            return response.data || [];
+        },
+        enabled: Boolean(rootId),
+    });
+    const { data: activityGroups = [] } = useQuery({
+        queryKey: queryKeys.activityGroups(rootId),
+        queryFn: async () => {
+            const response = await fractalApi.getActivityGroups(rootId);
+            return response.data || [];
+        },
+        enabled: Boolean(rootId),
+    });
 
     // Filter state
-    const [selectedContextTypes, setSelectedContextTypes] = useState([]);
+    const [selectedNoteTypes, setSelectedNoteTypes] = useState([]);
     const [pinnedOnly, setPinnedOnly] = useState(false);
     const [filterGoalId, setFilterGoalId] = useState(null);
     const [filterGoalName, setFilterGoalName] = useState('');
@@ -314,7 +129,7 @@ function Notes() {
     const [composeActivityName, setComposeActivityName] = useState(null);
 
     const filters = {
-        context_types: selectedContextTypes.length ? selectedContextTypes : undefined,
+        note_types: selectedNoteTypes.length ? selectedNoteTypes : undefined,
         goal_id: filterGoalId || undefined,
         activity_definition_ids: filterActivityIds.length ? filterActivityIds : undefined,
         activity_group_ids: filterGroupIds.length ? filterGroupIds : undefined,
@@ -329,9 +144,9 @@ function Notes() {
 
     useEffect(() => { if (!rootId) navigate('/'); }, [rootId, navigate]);
 
-    const toggleContextType = (ct) => {
-        setSelectedContextTypes(prev =>
-            prev.includes(ct) ? prev.filter(x => x !== ct) : [...prev, ct]
+    const toggleNoteType = (noteType) => {
+        setSelectedNoteTypes(prev =>
+            prev.includes(noteType) ? prev.filter(x => x !== noteType) : [...prev, noteType]
         );
     };
 
@@ -382,7 +197,7 @@ function Notes() {
     };
 
     const clearFilters = () => {
-        setSelectedContextTypes([]);
+        setSelectedNoteTypes([]);
         setPinnedOnly(false);
         setFilterGoalId(null);
         setFilterGoalName('');
@@ -391,7 +206,7 @@ function Notes() {
         setSearch('');
     };
 
-    const hasActiveFilters = selectedContextTypes.length > 0 || pinnedOnly || filterGoalId ||
+    const hasActiveFilters = selectedNoteTypes.length > 0 || pinnedOnly || filterGoalId ||
         filterActivityIds.length > 0 || filterGroupIds.length > 0 || search;
 
     const activityFilterCount = filterActivityIds.length + filterGroupIds.length;
@@ -494,11 +309,11 @@ function Notes() {
             <div className={styles.filterSection}>
                 <div className={styles.filterSectionHeader}><h4>Note Type</h4></div>
                 <div className={styles.chipGroup}>
-                    {CONTEXT_TYPE_OPTIONS.map(opt => (
+                    {NOTE_TYPE_OPTIONS.map(opt => (
                         <button
                             key={opt.value}
-                            className={[styles.chip, selectedContextTypes.includes(opt.value) ? styles.chipActive : ''].filter(Boolean).join(' ')}
-                            onClick={() => toggleContextType(opt.value)}
+                            className={[styles.chip, selectedNoteTypes.includes(opt.value) ? styles.chipActive : ''].filter(Boolean).join(' ')}
+                            onClick={() => toggleNoteType(opt.value)}
                         >
                             {opt.label}
                         </button>
@@ -625,7 +440,9 @@ function Notes() {
             )}
             {activityPickerOpen && (
                 <ActivityFilterModal
-                    rootId={rootId}
+                    title="Filter by Activity"
+                    activities={activities}
+                    activityGroups={activityGroups}
                     initialActivityIds={filterActivityIds}
                     initialGroupIds={filterGroupIds}
                     onConfirm={handleActivityFilterConfirm}

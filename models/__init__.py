@@ -22,7 +22,7 @@ from .program import (
     Program, ProgramBlock, ProgramDay, ProgramDaySession,
     program_day_templates, program_goals, program_block_goals
 )
-from .common import Note, VisualizationAnnotation, EventLog
+from .common import AnalyticsDashboard, Note, EventLog
 
 # Legacy ALIASES for backward compatibility (Optional)
 PracticeSession = Session

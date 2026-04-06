@@ -14,10 +14,6 @@ vi.mock('../LineGraph', () => ({ default: () => <div /> }));
 vi.mock('../GoalCompletionTimeline', () => ({ default: () => <div /> }));
 vi.mock('../GoalTimeDistribution', () => ({ default: () => <div /> }));
 vi.mock('../ActivityHeatmap', () => ({ default: () => <div /> }));
-vi.mock('../AnnotatedHeatmap', () => ({ default: () => <div /> }));
-vi.mock('../AnnotatedChartWrapper', () => ({
-    default: ({ children }) => <div>{children}</div>,
-}));
 vi.mock('../StreakTimeline', () => ({ default: () => <div /> }));
 vi.mock('../WeeklyBarChart', () => ({ default: () => <div /> }));
 vi.mock('react-chartjs-2', () => ({
@@ -54,6 +50,7 @@ describe('ProfileWindow', () => {
                     sessions: [],
                     goalAnalytics: { summary: {}, goals: [] },
                     activities: [{ id: 'activity-1', name: 'Bench Press', has_sets: false, has_splits: false }],
+                    activityGroups: [],
                     activityInstances: {
                         'activity-1': [
                             { id: 'instance-1', modes: [{ id: 'mode-1', name: 'Strength' }] },
@@ -74,15 +71,11 @@ describe('ProfileWindow', () => {
                     selectedGoal: null,
                     selectedGoalChart: 'duration',
                     heatmapMonths: 12,
-                    isAnnotating: false,
                 }}
                 updateWindowState={vi.fn()}
-                onAnnotationsClick={vi.fn()}
-                updateSourceWindowState={vi.fn()}
-                highlightedAnnotationId={null}
-                setHighlightedAnnotationId={vi.fn()}
                 onSelect={vi.fn()}
-                sourceWindowState={null}
+                globalDateRange={{ start: null, end: null }}
+                onGlobalDateRangeChange={vi.fn()}
             />
         );
 

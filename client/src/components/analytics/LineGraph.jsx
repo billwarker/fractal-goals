@@ -18,12 +18,34 @@ function LineGraph({
     setSelectedMetricY2 = null,
     setsHandling = 'top',
     selectedSplit = 'all',
-    chartRef
+    chartRef,
+    selectedDateRange = null,
+    onDateRangeChange = null,
 }) {
-    console.log('LineGraph called', { selectedActivity, selectedMetric, selectedMetricY2, selectedSplit });
+    const [brushState, setBrushState] = React.useState(null);
 
     const activityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
     const instances = activityInstances[selectedActivity?.id] || [];
+    const parsedStart = selectedDateRange?.start ? new Date(`${selectedDateRange.start}T00:00:00`) : null;
+    const parsedEnd = selectedDateRange?.end ? new Date(`${selectedDateRange.end}T23:59:59`) : null;
+    const filteredInstances = React.useMemo(() => (
+        instances.filter((instance) => {
+            if (!parsedStart && !parsedEnd) {
+                return true;
+            }
+            const sessionDate = new Date(instance.session_date);
+            if (Number.isNaN(sessionDate.getTime())) {
+                return false;
+            }
+            if (parsedStart && sessionDate < parsedStart) {
+                return false;
+            }
+            if (parsedEnd && sessionDate > parsedEnd) {
+                return false;
+            }
+            return true;
+        })
+    ), [instances, parsedStart, parsedEnd]);
 
     // Prepare metric definitions
     const metrics = activityDef?.metric_definitions || [];
@@ -80,7 +102,13 @@ function LineGraph({
         title: chartTitle,
         xAxisLabel: 'Date',
         yAxisLabel: `${metricLabelY1} (${metricUnitY1})`,
-        isTimeScale: true
+        isTimeScale: true,
+        layoutPadding: {
+            top: 8,
+            right: metricToPlotY2 ? 28 : 16,
+            bottom: 20,
+            left: 8,
+        }
     });
 
     if (!selectedActivity) {
@@ -98,7 +126,7 @@ function LineGraph({
         );
     }
 
-    if (!activityDef || instances.length === 0) {
+    if (!activityDef || filteredInstances.length === 0) {
         return (
             <div style={{
                 display: 'flex',
@@ -185,7 +213,7 @@ function LineGraph({
         if (!metricToPlot) return [];
 
         const dataPoints = [];
-        instances.forEach(instance => {
+        filteredInstances.forEach(instance => {
             const timestamp = new Date(instance.session_date);
             const modeNames = Array.isArray(instance.modes) && instance.modes.length > 0
                 ? instance.modes.map((m) => m.name).join(', ')
@@ -450,6 +478,87 @@ function LineGraph({
         }
     };
 
+    const formatDateInput = (value) => {
+        if (!value) {
+            return null;
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+        return date.toISOString().slice(0, 10);
+    };
+
+    const readChartXValue = (event) => {
+        const chart = chartRef?.current;
+        const canvas = chart?.canvas;
+        const xScale = chart?.scales?.x;
+        if (!canvas || !xScale) {
+            return null;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const pixel = event.clientX - rect.left;
+        const clampedPixel = Math.min(xScale.right, Math.max(xScale.left, pixel));
+        const value = xScale.getValueForPixel(clampedPixel);
+        if (!value) {
+            return null;
+        }
+
+        return {
+            pixel: clampedPixel,
+            value: new Date(value),
+        };
+    };
+
+    const handleBrushStart = (event) => {
+        if (!onDateRangeChange || event.target.tagName !== 'CANVAS') {
+            return;
+        }
+        const point = readChartXValue(event);
+        if (!point || Number.isNaN(point.value.getTime())) {
+            return;
+        }
+        setBrushState({
+            startPixel: point.pixel,
+            currentPixel: point.pixel,
+            startValue: point.value,
+        });
+    };
+
+    const handleBrushMove = (event) => {
+        if (!brushState) {
+            return;
+        }
+        const point = readChartXValue(event);
+        if (!point) {
+            return;
+        }
+        setBrushState((current) => current ? { ...current, currentPixel: point.pixel } : current);
+    };
+
+    const handleBrushEnd = (event) => {
+        if (!brushState) {
+            return;
+        }
+        const point = readChartXValue(event) || {
+            pixel: brushState.currentPixel,
+            value: brushState.startValue,
+        };
+        const delta = Math.abs((point.pixel ?? brushState.currentPixel) - brushState.startPixel);
+
+        if (delta >= 8) {
+            const start = brushState.startValue < point.value ? brushState.startValue : point.value;
+            const end = brushState.startValue < point.value ? point.value : brushState.startValue;
+            onDateRangeChange?.({
+                start: formatDateInput(start),
+                end: formatDateInput(end),
+            });
+        }
+
+        setBrushState(null);
+    };
+
     // Helper function to render metric selectors
     function renderMetricSelectors(metrics, metricY1, setMetricY1, metricY2, setMetricY2, activityDef, multiplicativeMetrics) {
         const selectStyle = {
@@ -578,7 +687,28 @@ function LineGraph({
     return (
         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {renderMetricSelectors(metrics, metricToPlotY1, setSelectedMetric, metricToPlotY2, setSelectedMetricY2, activityDef, multiplicativeMetrics)}
-            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+            <div
+                style={{ flex: 1, minHeight: 0, position: 'relative' }}
+                onMouseDown={handleBrushStart}
+                onMouseMove={handleBrushMove}
+                onMouseUp={handleBrushEnd}
+                onMouseLeave={handleBrushEnd}
+            >
+                {brushState && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            bottom: 0,
+                            left: `${Math.min(brushState.startPixel, brushState.currentPixel)}px`,
+                            width: `${Math.abs(brushState.currentPixel - brushState.startPixel)}px`,
+                            background: 'rgba(33, 150, 243, 0.12)',
+                            border: '1px solid rgba(33, 150, 243, 0.35)',
+                            pointerEvents: 'none',
+                            zIndex: 2,
+                        }}
+                    />
+                )}
                 <Line ref={chartRef} data={chartData} options={options} />
             </div>
         </div>

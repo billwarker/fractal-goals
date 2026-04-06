@@ -11,6 +11,38 @@ import ImageViewerModal from '../sessionDetail/ImageViewerModal';
 import MarkdownNoteContent from './MarkdownNoteContent';
 import styles from './NoteCard.module.css';
 
+function deriveNoteType(note) {
+    if (note.note_type) {
+        return note.note_type;
+    }
+    if (note.context_type === 'root') return 'fractal_note';
+    if (note.context_type === 'goal') return 'goal_note';
+    if (note.context_type === 'session') return 'session_note';
+    if (note.context_type === 'activity_definition') return 'activity_definition_note';
+    if (note.context_type === 'activity_instance') {
+        return note.set_index !== null && note.set_index !== undefined
+            ? 'activity_set_note'
+            : 'activity_instance_note';
+    }
+    return 'note';
+}
+
+function deriveNoteTypeLabel(note) {
+    if (note.note_type_label) {
+        return note.note_type_label;
+    }
+    const labels = {
+        fractal_note: 'Fractal Note',
+        goal_note: 'Goal Note',
+        session_note: 'Session Note',
+        activity_instance_note: 'Activity Instance Note',
+        activity_set_note: 'Activity Set Note',
+        activity_definition_note: 'Activity Definition Note',
+        note: 'Note',
+    };
+    return labels[deriveNoteType(note)] || 'Note';
+}
+
 function NoteCard({
     note,
     onEdit,
@@ -35,6 +67,8 @@ function NoteCard({
     const textareaRef = useRef(null);
     const { timezone } = useTimezone();
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
+    const resolvedNoteType = deriveNoteType(note);
+    const resolvedNoteTypeLabel = deriveNoteTypeLabel(note);
 
     const adjustHeight = (el) => {
         if (!el) return;
@@ -140,9 +174,43 @@ function NoteCard({
     const isImageOnly = note.content === '[Image]' && note.image_data;
     const hasImage = !!note.image_data;
     const canEdit = (!!onEdit || !!onEditRequest) && !isImageOnly && !note.isPast;
-    const canPin = (!!onPin || !!onUnpin) && !note.isPast;
+    const canPin = (!!onPin || !!onUnpin) && !note.isPast && resolvedNoteType !== 'activity_set_note';
     const canDelete = !!onDelete && !note.isPast;
     const hasMenu = canEdit || canPin || canDelete;
+
+    const primaryContextLabel = (() => {
+        switch (resolvedNoteType) {
+            case 'fractal_note':
+                return 'Fractal';
+            case 'goal_note':
+                return note.goal_name || note.content || 'Goal';
+            case 'session_note':
+                return note.session_template_name || note.session_name || 'Session';
+            case 'activity_set_note':
+                return `${note.activity_definition_name || 'Activity'} · Set ${(note.set_index ?? 0) + 1}`;
+            case 'activity_instance_note':
+            case 'activity_definition_note':
+                return note.activity_definition_name || 'Activity';
+            default:
+                return 'Note';
+        }
+    })();
+
+    const secondaryContextBadges = [];
+    if (showContext && resolvedNoteType !== 'fractal_note') {
+        if (resolvedNoteType !== 'goal_note' && note.goal_name) {
+            secondaryContextBadges.push(note.goal_name);
+        }
+        if (resolvedNoteType !== 'activity_instance_note' && resolvedNoteType !== 'activity_definition_note' && resolvedNoteType !== 'activity_set_note' && note.activity_definition_name) {
+            secondaryContextBadges.push(note.activity_definition_name);
+        }
+        if (resolvedNoteType !== 'session_note' && note.session_name) {
+            secondaryContextBadges.push(note.session_name);
+        }
+        if (!secondaryContextBadges.length && note.context_type === 'root') {
+            secondaryContextBadges.push('Fractal');
+        }
+    }
 
     if (isDeleting) {
         return <div className={`${styles.noteCard} ${styles.noteCardDeleting}`}>Deleting…</div>;
@@ -172,74 +240,79 @@ function NoteCard({
 
                 {/* Top row: timestamp + badges + options */}
                 <div className={styles.topRow}>
-                    <div className={styles.metaRow}>
-                        {note.set_index !== null && note.set_index !== undefined && (
-                            <>
-                                <span className={styles.setBadge}>Set {note.set_index + 1}</span>
-                                <span className={styles.metaSep}>·</span>
-                            </>
+                    <div className={styles.metaStack}>
+                        <div className={styles.metaRow}>
+                            <div className={styles.contextSummary}>
+                                {resolvedNoteType === 'goal_note' && note.goal_type ? (
+                                    <span className={styles.goalContext}>
+                                        <GoalIcon
+                                            shape={getGoalIcon(note.goal_type)}
+                                            color={getGoalColor(note.goal_type)}
+                                            secondaryColor={getGoalSecondaryColor(note.goal_type)}
+                                            isSmart={Boolean(note.goal_is_smart)}
+                                            size={12}
+                                        />
+                                        <span className={styles.contextPrimary}>{primaryContextLabel}</span>
+                                    </span>
+                                ) : (
+                                    <span className={styles.contextPrimary}>{primaryContextLabel}</span>
+                                )}
+                            </div>
+                            {note.is_nano_goal && (
+                                <span className={styles.nanoBadge}>Nano Goal</span>
+                            )}
+                        </div>
+                        {secondaryContextBadges.length > 0 && (
+                            <div className={styles.contextBadges}>
+                                {secondaryContextBadges.map((badge, index) => (
+                                    <span key={`${badge}-${index}`} className={styles.contextBadge}>{badge}</span>
+                                ))}
+                            </div>
                         )}
+                    </div>
+
+                    <div className={styles.headerActions}>
+                        <span className={styles.noteTypePill}>{resolvedNoteTypeLabel}</span>
                         <span className={styles.timestamp}>
                             {formatDate(note.created_at)}
-                            {note.isPast && note.session_name && (
+                            {note.isPast && note.session_name && resolvedNoteType !== 'session_note' && (
                                 <span className={styles.pastSessionName}> ({note.session_name})</span>
                             )}
                         </span>
-                        {note.is_nano_goal && (
-                            <span className={styles.nanoBadge}>Nano Goal</span>
+
+                        {hasMenu && (
+                            <div className={styles.optionsWrapper} ref={menuRef}>
+                                <button
+                                    className={styles.optionsBtn}
+                                    onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }}
+                                    title="Options"
+                                    aria-label="Note options"
+                                >
+                                    ···
+                                </button>
+                                {menuOpen && (
+                                    <div className={styles.optionsMenu}>
+                                        {canEdit && (
+                                            <button className={styles.optionsMenuItem} onClick={handleEditClick}>
+                                                Edit
+                                            </button>
+                                        )}
+                                        {canPin && (
+                                            <button className={styles.optionsMenuItem} onClick={handlePinToggle}>
+                                                {note.is_pinned ? 'Unpin' : 'Pin note'}
+                                            </button>
+                                        )}
+                                        {canDelete && (
+                                            <button className={`${styles.optionsMenuItem} ${styles.optionsMenuItemDanger}`} onClick={handleDelete}>
+                                                Delete
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         )}
                     </div>
-
-                    {hasMenu && (
-                        <div className={styles.optionsWrapper} ref={menuRef}>
-                            <button
-                                className={styles.optionsBtn}
-                                onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }}
-                                title="Options"
-                                aria-label="Note options"
-                            >
-                                ···
-                            </button>
-                            {menuOpen && (
-                                <div className={styles.optionsMenu}>
-                                    {canEdit && (
-                                        <button className={styles.optionsMenuItem} onClick={handleEditClick}>
-                                            Edit
-                                        </button>
-                                    )}
-                                    {canPin && (
-                                        <button className={styles.optionsMenuItem} onClick={handlePinToggle}>
-                                            {note.is_pinned ? 'Unpin' : 'Pin note'}
-                                        </button>
-                                    )}
-                                    {canDelete && (
-                                        <button className={`${styles.optionsMenuItem} ${styles.optionsMenuItemDanger}`} onClick={handleDelete}>
-                                            Delete
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
-
-                {/* Context badges */}
-                {showContext && (
-                    <div className={styles.contextBadges}>
-                        {note.context_type === 'root' && (
-                            <span className={styles.contextBadge}>Fractal</span>
-                        )}
-                        {note.goal_name && (
-                            <span className={styles.contextBadge}>{note.goal_name}</span>
-                        )}
-                        {note.activity_definition_name && (
-                            <span className={styles.contextBadge}>{note.activity_definition_name}</span>
-                        )}
-                        {note.session_name && (
-                            <span className={styles.contextBadge}>{note.session_name}</span>
-                        )}
-                    </div>
-                )}
 
                 {/* Image */}
                 {hasImage && (
@@ -272,19 +345,8 @@ function NoteCard({
                     !isImageOnly && (
                         <div className={[
                             styles.content,
-                            note.is_nano_goal ? styles.nanoContent : '',
                             note.nano_goal_completed ? styles.completedContent : '',
                         ].filter(Boolean).join(' ')}>
-                            {note.is_nano_goal && (
-                                <div className={styles.nanoIcon}>
-                                    <GoalIcon
-                                        shape={getGoalIcon('NanoGoal')}
-                                        color={note.nano_goal_completed ? getGoalColor('Completed') : getGoalColor('NanoGoal')}
-                                        secondaryColor={note.nano_goal_completed ? getGoalSecondaryColor('Completed') : getGoalSecondaryColor('NanoGoal')}
-                                        size={14}
-                                    />
-                                </div>
-                            )}
                             <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
                             {note.is_nano_goal && onToggleNanoGoal && (
                                 <input

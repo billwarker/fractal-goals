@@ -68,7 +68,7 @@ function buildActivityInstancesMap(sessions) {
 }
 
 export function useAnalyticsPageData(rootId) {
-    const [sessionsQuery, goalAnalyticsQuery, activitiesQuery] = useQueries({
+    const [sessionsQuery, goalAnalyticsQuery, activitiesQuery, activityGroupsQuery] = useQueries({
         queries: [
             {
                 queryKey: queryKeys.analyticsSessions(rootId),
@@ -94,6 +94,14 @@ export function useAnalyticsPageData(rootId) {
                 },
                 enabled: Boolean(rootId),
             },
+            {
+                queryKey: queryKeys.activityGroups(rootId),
+                queryFn: async () => {
+                    const response = await fractalApi.getActivityGroups(rootId);
+                    return response.data || [];
+                },
+                enabled: Boolean(rootId),
+            },
         ],
     });
 
@@ -106,8 +114,9 @@ export function useAnalyticsPageData(rootId) {
         sessions: sessionsQuery.data || [],
         goalAnalytics: goalAnalyticsQuery.data || null,
         activities: activitiesQuery.data || [],
+        activityGroups: activityGroupsQuery.data || [],
         activityInstances,
-        loading: sessionsQuery.isLoading || goalAnalyticsQuery.isLoading || activitiesQuery.isLoading,
-        error: sessionsQuery.error || goalAnalyticsQuery.error || activitiesQuery.error || null,
+        loading: sessionsQuery.isLoading || goalAnalyticsQuery.isLoading || activitiesQuery.isLoading || activityGroupsQuery.isLoading,
+        error: sessionsQuery.error || goalAnalyticsQuery.error || activitiesQuery.error || activityGroupsQuery.error || null,
     };
 }

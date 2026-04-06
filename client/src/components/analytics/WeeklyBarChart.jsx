@@ -8,7 +8,33 @@ import styles from './WeeklyBarChart.module.css';
  * @param {Array} sessions - Array of session objects with session_start dates
  * @param {number} weeks - Number of weeks to display (default: 12)
  */
-function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
+function WeeklyBarChart({ sessions = [], weeks = 12, chartRef, selectedDateRange = null, onDateRangeChange = null }) {
+    const [brushState, setBrushState] = React.useState(null);
+    const parsedStart = selectedDateRange?.start ? new Date(`${selectedDateRange.start}T00:00:00`) : null;
+    const parsedEnd = selectedDateRange?.end ? new Date(`${selectedDateRange.end}T23:59:59`) : null;
+    const filteredSessions = useMemo(() => (
+        sessions.filter((session) => {
+            if (!parsedStart && !parsedEnd) {
+                return true;
+            }
+            const rawDate = session.session_start || session.created_at;
+            if (!rawDate) {
+                return false;
+            }
+            const date = new Date(rawDate);
+            if (Number.isNaN(date.getTime())) {
+                return false;
+            }
+            if (parsedStart && date < parsedStart) {
+                return false;
+            }
+            if (parsedEnd && date > parsedEnd) {
+                return false;
+            }
+            return true;
+        })
+    ), [sessions, parsedStart, parsedEnd]);
+
     // Process sessions into weekly counts
     const { weeklyData, averagePerWeek, maxSessions, trend } = useMemo(() => {
         const today = new Date();
@@ -33,7 +59,7 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
         }
 
         // Count sessions per week
-        sessions.forEach(session => {
+        filteredSessions.forEach(session => {
             const sessionDate = session.session_start || session.created_at;
             if (!sessionDate) return;
 
@@ -64,7 +90,7 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
             maxSessions: max,
             trend: trendDirection
         };
-    }, [sessions, weeks]);
+    }, [filteredSessions, weeks]);
 
     // Chart.js data
     const chartData = {
@@ -101,6 +127,14 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
     const chartOptions = {
         responsive: true,
         maintainAspectRatio: false,
+        layout: {
+            padding: {
+                top: 8,
+                right: 16,
+                bottom: 22,
+                left: 8,
+            }
+        },
         plugins: {
             legend: { display: false },
             tooltip: {
@@ -208,6 +242,82 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
     const thisWeek = weeklyData[weeklyData.length - 1]?.count || 0;
     const lastWeek = weeklyData[weeklyData.length - 2]?.count || 0;
 
+    const formatDateInput = (value) => {
+        if (!value) {
+            return null;
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+        return date.toISOString().slice(0, 10);
+    };
+
+    const readChartIndex = (event) => {
+        const chart = chartRef?.current;
+        const canvas = chart?.canvas;
+        const xScale = chart?.scales?.x;
+        if (!canvas || !xScale) {
+            return null;
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const pixel = event.clientX - rect.left;
+        const clampedPixel = Math.min(xScale.right, Math.max(xScale.left, pixel));
+        const rawIndex = xScale.getValueForPixel(clampedPixel);
+        const index = Math.round(rawIndex);
+        if (Number.isNaN(index) || index < 0 || index >= weeklyData.length) {
+            return null;
+        }
+
+        return {
+            pixel: clampedPixel,
+            index,
+        };
+    };
+
+    const handleBrushStart = (event) => {
+        if (!onDateRangeChange || event.target.tagName !== 'CANVAS') {
+            return;
+        }
+        const point = readChartIndex(event);
+        if (!point) {
+            return;
+        }
+        setBrushState({
+            startPixel: point.pixel,
+            currentPixel: point.pixel,
+            startIndex: point.index,
+        });
+    };
+
+    const handleBrushMove = (event) => {
+        if (!brushState) {
+            return;
+        }
+        const point = readChartIndex(event);
+        if (!point) {
+            return;
+        }
+        setBrushState((current) => current ? { ...current, currentPixel: point.pixel } : current);
+    };
+
+    const handleBrushEnd = (event) => {
+        if (!brushState) {
+            return;
+        }
+        const point = readChartIndex(event) || { pixel: brushState.currentPixel, index: brushState.startIndex };
+        if (Math.abs(point.pixel - brushState.startPixel) >= 8) {
+            const startIndex = Math.min(brushState.startIndex, point.index);
+            const endIndex = Math.max(brushState.startIndex, point.index);
+            onDateRangeChange?.({
+                start: formatDateInput(weeklyData[startIndex]?.weekStart),
+                end: formatDateInput(weeklyData[endIndex]?.weekEnd),
+            });
+        }
+        setBrushState(null);
+    };
+
     return (
         <div className={styles.panel}>
             <div className={styles.header}>
@@ -259,7 +369,22 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef }) {
             </div>
 
             {/* Chart */}
-            <div className={styles.chartWrap}>
+            <div
+                className={styles.chartWrap}
+                onMouseDown={handleBrushStart}
+                onMouseMove={handleBrushMove}
+                onMouseUp={handleBrushEnd}
+                onMouseLeave={handleBrushEnd}
+            >
+                {brushState && (
+                    <div
+                        className={styles.brushOverlay}
+                        style={{
+                            left: `${Math.min(brushState.startPixel, brushState.currentPixel)}px`,
+                            width: `${Math.abs(brushState.currentPixel - brushState.startPixel)}px`,
+                        }}
+                    />
+                )}
                 <Bar ref={chartRef} data={chartData} options={chartOptions} />
             </div>
 

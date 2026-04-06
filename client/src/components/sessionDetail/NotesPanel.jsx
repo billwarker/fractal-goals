@@ -44,8 +44,12 @@ function NotesPanel({
             });
         }
 
-        // Sort descending by created_at (newest first)
-        return allNotes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        return allNotes.sort((a, b) => {
+            if (a.is_pinned !== b.is_pinned) {
+                return a.is_pinned ? -1 : 1;
+            }
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
     }, [notes, previousSessionNotes]);
 
     const handleAddNote = async (content) => {

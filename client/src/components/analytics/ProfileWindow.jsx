@@ -4,8 +4,6 @@ import LineGraph from './LineGraph';
 import GoalCompletionTimeline from './GoalCompletionTimeline';
 import GoalTimeDistribution from './GoalTimeDistribution';
 import ActivityHeatmap from './ActivityHeatmap';
-import AnnotatedHeatmap from './AnnotatedHeatmap';
-import AnnotatedChartWrapper from './AnnotatedChartWrapper';
 import StreakTimeline from './StreakTimeline';
 import WeeklyBarChart from './WeeklyBarChart';
 import { Bar, Line } from 'react-chartjs-2';
@@ -14,6 +12,7 @@ import Button from '../atoms/Button';
 import Select from '../atoms/Select';
 import { Heading } from '../atoms/Typography';
 import ActivityModeSelector from '../common/ActivityModeSelector';
+import ActivityGraphSelector from './ActivityGraphSelector';
 import styles from './ProfileWindow.module.css';
 
 /**
@@ -28,11 +27,8 @@ import styles from './ProfileWindow.module.css';
  * @param {object} props.data - All analytics data (sessions, goalAnalytics, activities, activityInstances)
  * @param {object} props.windowState - Controlled state for this window (from parent)
  * @param {function} props.updateWindowState - Callback to update window state
- * @param {function} props.onAnnotationsClick - Callback when annotations category is clicked
- * @param {object} props.sourceWindowState - State from the source window (for annotations view)
- * @param {boolean} props.isSelected - Whether this window is selected for annotation targeting
+ * @param {boolean} props.isSelected - Whether this window is selected
  * @param {function} props.onSelect - Callback when the window is clicked to select it
- * @param {boolean} props.hasAnnotationsWindow - Whether any window is showing annotations
  */
 function ProfileWindow({
     canSplit = false,
@@ -42,17 +38,13 @@ function ProfileWindow({
     data,
     windowState,
     updateWindowState,
-    onAnnotationsClick,
-    sourceWindowState,
-    updateSourceWindowState,
-    highlightedAnnotationId,
-    setHighlightedAnnotationId,
     isSelected = false,
     onSelect,
-    hasAnnotationsWindow = false
+    globalDateRange = null,
+    onGlobalDateRangeChange,
 }) {
     const { getGoalColor } = useGoalLevels();
-    const { sessions, goalAnalytics, activities, activityInstances, formatDuration, rootId } = data;
+    const { sessions, goalAnalytics, activities, activityGroups, activityInstances, formatDuration, rootId } = data;
     const chartRef = useRef(null);
     const containerRef = useRef(null);
 
@@ -92,7 +84,6 @@ function ProfileWindow({
         selectedGoal,
         selectedGoalChart,
         heatmapMonths,
-        isAnnotating // New state for annotation mode
     } = windowState;
 
     // Helper to update state (setSelectedCategory is handled by handleCategoryChange below)
@@ -106,6 +97,8 @@ function ProfileWindow({
     const setSelectedGoal = (value) => updateWindowState({ selectedGoal: value });
     const setSelectedGoalChart = (value) => updateWindowState({ selectedGoalChart: value });
     const setHeatmapMonths = (value) => updateWindowState({ heatmapMonths: value });
+    const effectiveSelectedActivity = selectedActivity;
+    const effectiveDateRange = globalDateRange;
 
     // Reset visualization when category changes
     const handleCategoryChange = (category) => {
@@ -116,7 +109,6 @@ function ProfileWindow({
                 selectedActivity: null,
                 selectedModeIds: [],
                 selectedGoal: null,
-                isAnnotating: false
             });
         }
     };
@@ -128,7 +120,6 @@ function ProfileWindow({
                 selectedActivity: null,
                 selectedModeIds: [],
                 selectedGoal: null,
-                isAnnotating: false
             });
         } else if (selectedCategory) {
             updateWindowState({
@@ -136,7 +127,6 @@ function ProfileWindow({
                 selectedVisualization: null,
                 selectedActivity: null,
                 selectedGoal: null,
-                isAnnotating: false
             });
         }
     };
@@ -148,7 +138,6 @@ function ProfileWindow({
             selectedActivity: null,
             selectedModeIds: [],
             selectedGoal: null,
-            isAnnotating: false
         });
     };
 
@@ -169,62 +158,7 @@ function ProfileWindow({
         activities: [
             { id: 'scatterPlot', name: 'Scatter Plot', icon: '⚡' },
             { id: 'lineGraph', name: 'Line Graph', icon: '📈' }
-        ],
-        annotations: []
-    };
-
-    // Helper to extract visualization type from window state
-    const getVisualizationType = (state) => {
-        if (!state || !state.selectedCategory || !state.selectedVisualization) {
-            return null;
-        }
-
-        const { selectedCategory: cat, selectedVisualization: viz } = state;
-
-        // Map category + visualization to visualization type used by annotations
-        if (cat === 'activities') {
-            if (viz === 'scatterPlot') return 'scatter';
-            if (viz === 'lineGraph') return 'line';
-        } else if (cat === 'goals') {
-            if (viz === 'completionTimeline') return 'timeline';
-            if (viz === 'timeDistribution') return 'distribution';
-            if (viz === 'goalDetail') return 'goalDetail';
-            if (viz === 'stats') return 'goalStats';
-        } else if (cat === 'sessions') {
-            if (viz === 'weeklyChart') return 'bar';
-            if (viz === 'heatmap') return 'heatmap';
-            if (viz === 'streaks') return 'streaks';
-            if (viz === 'stats') return 'sessionStats';
-        }
-
-        return null;
-    };
-
-    // Helper to extract context from window state
-    const getVisualizationContext = (state) => {
-        if (!state) return {};
-
-        const context = {};
-
-        // Add activity_id for activity visualizations
-        if (state.selectedCategory === 'activities' && state.selectedActivity?.id) {
-            context.activity_id = state.selectedActivity.id;
-            if (Array.isArray(state.selectedModeIds) && state.selectedModeIds.length > 0) {
-                context.mode_ids = state.selectedModeIds;
-            }
-        }
-
-        // Add goal_id for goal detail visualization
-        if (state.selectedCategory === 'goals' && state.selectedVisualization === 'goalDetail' && state.selectedGoal?.id) {
-            context.goal_id = state.selectedGoal.id;
-        }
-
-        // Add time_range for heatmap
-        if (state.selectedCategory === 'sessions' && state.selectedVisualization === 'heatmap') {
-            context.time_range = state.heatmapMonths || 12;
-        }
-
-        return context;
+        ]
     };
 
     // Get goal type color
@@ -247,6 +181,53 @@ function ProfileWindow({
             ])
         );
     }, [activityInstances, selectedModeIds]);
+
+    const activityCounts = useMemo(() => Object.fromEntries(
+        activities.map((activity) => [activity.id, filteredActivityInstances[activity.id]?.length || 0])
+    ), [activities, filteredActivityInstances]);
+
+    const groupCounts = useMemo(() => {
+        const childGroupsByParent = new Map();
+        activityGroups.forEach((group) => {
+            const parentId = group.parent_id || '__root__';
+            if (!childGroupsByParent.has(parentId)) {
+                childGroupsByParent.set(parentId, []);
+            }
+            childGroupsByParent.get(parentId).push(group);
+        });
+
+        const activitiesByGroup = new Map();
+        activities.forEach((activity) => {
+            const groupId = activity.group_id || '__ungrouped__';
+            if (!activitiesByGroup.has(groupId)) {
+                activitiesByGroup.set(groupId, []);
+            }
+            activitiesByGroup.get(groupId).push(activity);
+        });
+
+        const totals = {};
+        const collectTotal = (groupId) => {
+            const directTotal = (activitiesByGroup.get(groupId) || []).reduce(
+                (sum, activity) => sum + (activityCounts[activity.id] || 0),
+                0
+            );
+            const childTotal = (childGroupsByParent.get(groupId) || []).reduce(
+                (sum, group) => sum + collectTotal(group.id),
+                0
+            );
+            const total = directTotal + childTotal;
+            totals[groupId] = total;
+            return total;
+        };
+
+        activityGroups.forEach((group) => {
+            if (!(group.id in totals)) {
+                collectTotal(group.id);
+            }
+        });
+
+        return totals;
+    }, [activities, activityCounts, activityGroups]);
 
     // Prepare goal chart data
     const getActivityChartData = () => {
@@ -362,7 +343,6 @@ function ProfileWindow({
         goals: '🎯',
         sessions: '⏱️',
         activities: '🏋️',
-        annotations: '📝'
     };
 
     const renderUnifiedHeader = () => {
@@ -404,23 +384,6 @@ function ProfileWindow({
 
                 {/* Global Actions (Annotations, Split, Close) */}
                 <div className={styles.globalActions}>
-                    {(!hasAnnotationsWindow || selectedCategory === 'annotations') && (
-                        <Button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onAnnotationsClick ? onAnnotationsClick() : handleCategoryChange('annotations');
-                            }}
-                            title="View Annotations"
-                            variant={selectedCategory === 'annotations' ? 'primary' : 'secondary'}
-                            size="sm"
-                            className={`${isNarrow ? styles.narrow : ''}`}
-                            style={{ padding: isNarrow ? '0' : '0 10px', minWidth: isNarrow ? '32px' : 'auto' }}
-                        >
-                            <span>📝</span>
-                            {!isNarrow && <span style={{ marginLeft: '4px' }}>Annotations</span>}
-                        </Button>
-                    )}
-
                     {canSplit && (
                         <div style={{ position: 'relative' }}>
                             <Button
@@ -526,26 +489,23 @@ function ProfileWindow({
             const sortedActivities = [...activities].sort((a, b) => (
                 (filteredActivityInstances[b.id]?.length || 0) - (filteredActivityInstances[a.id]?.length || 0)
             ));
-            const currentActivityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
+            const currentActivityDef = effectiveSelectedActivity ? activities.find(a => a.id === effectiveSelectedActivity.id) : null;
 
             return (
                 <div className={styles.level2Container}>
-                    <Select
-                        value={selectedActivity?.id || ''}
-                        onChange={(e) => {
-                            const activity = activities.find(a => a.id === e.target.value);
+                    <ActivityGraphSelector
+                        activities={sortedActivities}
+                        activityGroups={activityGroups}
+                        value={effectiveSelectedActivity}
+                        activityCounts={activityCounts}
+                        groupCounts={groupCounts}
+                        onChange={(activity) => {
                             setSelectedActivity(activity || null);
                             setSelectedSplit('all');
                         }}
-                        className={styles.selectAtom}
-                    >
-                        <option value="">Select Activity...</option>
-                        {sortedActivities.map(a => (
-                            <option key={a.id} value={a.id}>{a.name}</option>
-                        ))}
-                    </Select>
+                    />
 
-                    {selectedActivity && currentActivityDef?.has_sets && (
+                    {effectiveSelectedActivity && currentActivityDef?.has_sets && (
                         <Select
                             value={setsHandling}
                             onChange={(e) => setSetsHandling(e.target.value)}
@@ -556,7 +516,7 @@ function ProfileWindow({
                         </Select>
                     )}
 
-                    {selectedActivity && currentActivityDef?.has_splits && currentActivityDef?.split_definitions?.length > 0 && (
+                    {effectiveSelectedActivity && currentActivityDef?.has_splits && currentActivityDef?.split_definitions?.length > 0 && (
                         <Select
                             value={selectedSplit}
                             onChange={(e) => setSelectedSplit(e.target.value)}
@@ -569,7 +529,7 @@ function ProfileWindow({
                         </Select>
                     )}
 
-                    {selectedActivity ? (
+                    {effectiveSelectedActivity ? (
                         <ActivityModeSelector
                             rootId={rootId}
                             selectedModeIds={selectedModeIds}
@@ -643,7 +603,7 @@ function ProfileWindow({
             );
         }
 
-        if (!selectedVisualization && selectedCategory !== 'annotations') {
+        if (!selectedVisualization) {
             return (
                 <div className={styles.emptyState}>
                     <div className={styles.emptyIcon}>
@@ -677,31 +637,13 @@ function ProfileWindow({
                 case 'completionTimeline':
                     return (
                         <div className={styles.vizContainerHidden}>
-                            <AnnotatedChartWrapper
-                                chartRef={chartRef}
-                                visualizationType="timeline"
-                                rootId={rootId}
-                                annotationMode={isAnnotating}
-                                onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
-                                highlightedAnnotationId={highlightedAnnotationId}
-                            >
-                                <GoalCompletionTimeline goals={goalAnalytics?.goals || []} chartRef={chartRef} />
-                            </AnnotatedChartWrapper>
+                            <GoalCompletionTimeline goals={goalAnalytics?.goals || []} chartRef={chartRef} />
                         </div>
                     );
                 case 'timeDistribution':
                     return (
                         <div className={styles.vizContainerHidden}>
-                            <AnnotatedChartWrapper
-                                chartRef={chartRef}
-                                visualizationType="distribution"
-                                rootId={rootId}
-                                annotationMode={isAnnotating}
-                                onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
-                                highlightedAnnotationId={highlightedAnnotationId}
-                            >
-                                <GoalTimeDistribution goals={goalAnalytics?.goals || []} chartRef={chartRef} />
-                            </AnnotatedChartWrapper>
+                            <GoalTimeDistribution goals={goalAnalytics?.goals || []} chartRef={chartRef} />
                         </div>
                     );
                 case 'goalDetail':
@@ -770,13 +712,9 @@ function ProfileWindow({
                 case 'heatmap': {
                     return (
                         <div className={styles.vizContainerHeatmap}>
-                            {/* Annotated Heatmap with selection support */}
-                            <AnnotatedHeatmap
+                            <ActivityHeatmap
                                 sessions={sessions}
                                 months={heatmapMonths || 12}
-                                rootId={rootId}
-                                highlightedAnnotationId={highlightedAnnotationId}
-                                setHighlightedAnnotationId={setHighlightedAnnotationId}
                             />
                         </div>
                     );
@@ -790,16 +728,13 @@ function ProfileWindow({
                 case 'weeklyChart':
                     return (
                         <div className={styles.vizContainerHidden}>
-                            <AnnotatedChartWrapper
+                            <WeeklyBarChart
+                                sessions={sessions}
+                                weeks={12}
                                 chartRef={chartRef}
-                                visualizationType="bar"
-                                rootId={rootId}
-                                annotationMode={isAnnotating}
-                                onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
-                                highlightedAnnotationId={highlightedAnnotationId}
-                            >
-                                <WeeklyBarChart sessions={sessions} weeks={12} chartRef={chartRef} />
-                            </AnnotatedChartWrapper>
+                                selectedDateRange={effectiveDateRange}
+                                onDateRangeChange={onGlobalDateRangeChange}
+                            />
                         </div>
                     );
             }
@@ -807,7 +742,7 @@ function ProfileWindow({
 
         // Activities visualizations
         if (selectedCategory === 'activities') {
-            if (!selectedActivity) {
+            if (!effectiveSelectedActivity) {
                 return (
                     <div className={styles.emptyState}>
                         Select an activity above to view data
@@ -819,101 +754,50 @@ function ProfileWindow({
                 case 'scatterPlot':
                     return (
                         <div className={styles.vizContainerHidden}>
-                            <AnnotatedChartWrapper
+                            <ScatterPlot
+                                selectedActivity={effectiveSelectedActivity}
+                                activityInstances={filteredActivityInstances}
+                                activities={activities}
+                                setsHandling={setsHandling}
+                                selectedSplit={selectedSplit}
                                 chartRef={chartRef}
-                                visualizationType="scatter"
-                                rootId={rootId}
-                                context={{ activity_id: selectedActivity?.id }}
-                                annotationMode={isAnnotating}
-                                onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
-                                highlightedAnnotationId={highlightedAnnotationId}
-                            >
-                                <ScatterPlot
-                                    selectedActivity={selectedActivity}
-                                    activityInstances={filteredActivityInstances}
-                                    activities={activities}
-                                    setsHandling={setsHandling}
-                                    selectedSplit={selectedSplit}
-                                    chartRef={chartRef}
-                                />
-                            </AnnotatedChartWrapper>
+                            />
                         </div>
                     );
                 case 'lineGraph':
                     return (
                         <div className={styles.vizContainerHidden}>
-                            <AnnotatedChartWrapper
+                            <LineGraph
+                                selectedActivity={effectiveSelectedActivity}
+                                activityInstances={filteredActivityInstances}
+                                activities={activities}
+                                selectedMetric={selectedMetric}
+                                setSelectedMetric={setSelectedMetric}
+                                selectedMetricY2={selectedMetricY2}
+                                setSelectedMetricY2={setSelectedMetricY2}
+                                setsHandling={setsHandling}
+                                selectedSplit={selectedSplit}
                                 chartRef={chartRef}
-                                visualizationType="line"
-                                rootId={rootId}
-                                context={{ activity_id: selectedActivity?.id }}
-                                annotationMode={isAnnotating}
-                                onSetAnnotationMode={(val) => updateWindowState({ isAnnotating: val })}
-                                highlightedAnnotationId={highlightedAnnotationId}
-                            >
-                                <LineGraph
-                                    selectedActivity={selectedActivity}
-                                    activityInstances={filteredActivityInstances}
-                                    activities={activities}
-                                    selectedMetric={selectedMetric}
-                                    setSelectedMetric={setSelectedMetric}
-                                    selectedMetricY2={selectedMetricY2}
-                                    setSelectedMetricY2={setSelectedMetricY2}
-                                    setsHandling={setsHandling}
-                                    selectedSplit={selectedSplit}
-                                    chartRef={chartRef}
-                                />
-                            </AnnotatedChartWrapper>
+                                selectedDateRange={effectiveDateRange}
+                                onDateRangeChange={onGlobalDateRangeChange}
+                            />
                         </div>
                     );
             }
         }
 
-        // Annotations view
-        if (selectedCategory === 'annotations') {
-            // Get visualization type and context from source window
-            const sourceVizType = getVisualizationType(sourceWindowState);
-            const sourceContext = getVisualizationContext(sourceWindowState);
-
-            // Debug logging
-            console.log('ProfileWindow Annotations View:', {
-                sourceWindowState,
-                sourceVizType,
-                sourceContext,
-                rootId
-            });
-
-            return (
-                <div className={styles.vizContainerHidden}>
-                    <AnnotationsList
-                        rootId={rootId}
-                        visualizationType={sourceVizType}
-                        context={sourceContext}
-                        isAnnotating={sourceWindowState?.isAnnotating}
-                        onToggleAnnotationMode={() => updateSourceWindowState && updateSourceWindowState({ isAnnotating: !sourceWindowState?.isAnnotating })}
-                        highlightedAnnotationId={highlightedAnnotationId}
-                        onHighlight={setHighlightedAnnotationId}
-                    />
-                </div>
-            );
-        }
-
         return null;
     };
-
-    // Whether this is a visualization window (not annotations)
-    const isVisualizationWindow = selectedCategory !== 'annotations';
 
     return (
         <div
             ref={containerRef}
             onClick={() => {
-                // Only allow selection for visualization windows
-                if (isVisualizationWindow && onSelect) {
+                if (onSelect) {
                     onSelect();
                 }
             }}
-            className={`${styles.windowContainer} ${isVisualizationWindow && hasAnnotationsWindow ? styles.selectable : ''} ${isVisualizationWindow && isSelected && hasAnnotationsWindow ? styles.selected : ''}`}
+            className={`${styles.windowContainer} ${isSelected ? styles.selected : ''}`}
         >
             {renderUnifiedHeader()}
             {renderVisualizationContent()}

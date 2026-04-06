@@ -39,24 +39,19 @@ class Note(Base):
     nano_goal = relationship("Goal", foreign_keys=[nano_goal_id])
     goal = relationship("Goal", foreign_keys=[goal_id])
 
-class VisualizationAnnotation(Base):
-    __tablename__ = 'visualization_annotations'
-    
+class AnalyticsDashboard(Base):
+    __tablename__ = 'analytics_dashboards'
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
-    
-    visualization_type = Column(String, nullable=False)
-    visualization_context = Column(JSON_TYPE, nullable=True)
-    
-    selected_points = Column(JSON_TYPE, nullable=False)
-    selection_bounds = Column(JSON_TYPE, nullable=True)
-    
+    user_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    layout = Column(JSON_TYPE, nullable=False)
+
     __table_args__ = (
-        sa.Index('ix_viz_annotations_root_type_context', 'root_id', 'visualization_type', 'deleted_at'),
+        sa.Index('ix_analytics_dashboards_root_user_deleted', 'root_id', 'user_id', 'deleted_at'),
     )
-    
-    content = Column(Text, nullable=False)
-    
+
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)

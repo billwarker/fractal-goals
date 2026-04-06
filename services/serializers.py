@@ -654,6 +654,11 @@ def serialize_program_day(day):
 
 def serialize_note(note, include_image=False):
     """Serialize a Note object."""
+    resolved_note_type = derive_note_type(
+        note.context_type,
+        note.set_index,
+        is_nano_goal=note.nano_goal_id is not None,
+    )
     result = {
         "id": note.id,
         "context_type": note.context_type,
@@ -663,6 +668,8 @@ def serialize_note(note, include_image=False):
         "activity_definition_id": note.activity_definition_id,
         "set_index": note.set_index,
         "content": note.content,
+        "note_type": resolved_note_type,
+        "note_type_label": note_type_label(resolved_note_type),
         "has_image": note.image_data is not None and len(note.image_data) > 0,
         "created_at": format_utc(note.created_at),
         "updated_at": format_utc(note.updated_at),
@@ -678,6 +685,36 @@ def serialize_note(note, include_image=False):
     return result
 
 
+def derive_note_type(context_type, set_index=None, *, is_nano_goal=False):
+    """Derive a semantic note type from the stored note context."""
+    if is_nano_goal:
+        return "goal_note"
+    if context_type == "root":
+        return "fractal_note"
+    if context_type == "goal":
+        return "goal_note"
+    if context_type == "session":
+        return "session_note"
+    if context_type == "activity_definition":
+        return "activity_definition_note"
+    if context_type == "activity_instance":
+        return "activity_set_note" if set_index is not None else "activity_instance_note"
+    return "note"
+
+
+def note_type_label(note_type):
+    labels = {
+        "fractal_note": "Fractal Note",
+        "goal_note": "Goal Note",
+        "session_note": "Session Note",
+        "activity_instance_note": "Activity Instance Note",
+        "activity_set_note": "Activity Set Note",
+        "activity_definition_note": "Activity Definition Note",
+        "note": "Note",
+    }
+    return labels.get(note_type, "Note")
+
+
 def serialize_note_display(note, include_image=False):
     """Serialize a note with the display context used on note-dedicated surfaces."""
     result = serialize_note(note, include_image=include_image)
@@ -685,27 +722,40 @@ def serialize_note_display(note, include_image=False):
     if note.session:
         result["session_name"] = note.session.name
         result["session_date"] = format_utc(note.session.session_start or note.session.created_at)
+        session_attrs = _safe_load_json(getattr(note.session, "attributes", None), {})
+        session_data = session_attrs.get("session_data") if isinstance(session_attrs, dict) else {}
+        if not isinstance(session_data, dict):
+            session_data = {}
+        template_name = session_data.get("template_name")
+        if not template_name and getattr(getattr(note.session, "template", None), "name", None):
+            template_name = note.session.template.name
+        result["session_template_name"] = template_name or note.session.name
 
     if note.goal:
         result["goal_name"] = note.goal.name
         result["goal_type"] = get_canonical_goal_type(note.goal)
+        result["goal_is_smart"] = bool(all(calculate_smart_status(note.goal).values()))
+
+    if note.nano_goal:
+        result["goal_name"] = note.nano_goal.name
+        result["goal_type"] = get_canonical_goal_type(note.nano_goal) or "NanoGoal"
+        result["goal_is_smart"] = bool(all(calculate_smart_status(note.nano_goal).values()))
 
     if note.activity_definition:
         result["activity_definition_name"] = note.activity_definition.name
 
     return result
 
-def serialize_visualization_annotation(annotation):
-    """Serialize a VisualizationAnnotation object."""
+def serialize_analytics_dashboard(dashboard):
+    """Serialize an AnalyticsDashboard object."""
     return {
-        "id": annotation.id,
-        "root_id": annotation.root_id,
-        "visualization_type": annotation.visualization_type,
-        "visualization_context": annotation.visualization_context,
-        "selected_points": _safe_load_json(annotation.selected_points, []),
-        "selection_bounds": _safe_load_json(getattr(annotation, 'selection_bounds', None), None),
-        "content": annotation.content,
-        "created_at": format_utc(annotation.created_at)
+        "id": dashboard.id,
+        "root_id": dashboard.root_id,
+        "user_id": dashboard.user_id,
+        "name": dashboard.name,
+        "layout": dashboard.layout,
+        "created_at": format_utc(dashboard.created_at),
+        "updated_at": format_utc(dashboard.updated_at),
     }
 
 def serialize_event_log(log):

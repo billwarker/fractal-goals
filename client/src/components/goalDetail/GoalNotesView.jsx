@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { NoteTimeline, NoteComposer } from '../notes';
+import Button from '../atoms/Button';
 import { useGoalNotes } from '../../hooks/useGoalNotes';
 import styles from './GoalNotesView.module.css';
 
@@ -60,14 +61,15 @@ function GoalNotesView({ rootId, goalId, goalColor, onBack }) {
                 </label>
 
                 {!composing && (
-                    <button
+                    <Button
+                        variant="primary"
+                        size="sm"
                         className={styles.writeBtn}
                         onClick={() => setComposing(true)}
                         type="button"
-                        style={{ borderColor: goalColor, color: goalColor }}
                     >
                         + Write Note
-                    </button>
+                    </Button>
                 )}
             </div>
 

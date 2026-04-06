@@ -47,9 +47,10 @@ export function useChartOptions({
     title = '',
     xAxisLabel = '',
     yAxisLabel = '',
-    isTimeScale = false
+    isTimeScale = false,
+    layoutPadding = { top: 8, right: 16, bottom: 16, left: 8 }
 }) {
-    const [options, setOptions] = useState(createChartOptions({ title, xAxisLabel, yAxisLabel, isTimeScale }));
+    const [options, setOptions] = useState(createChartOptions({ title, xAxisLabel, yAxisLabel, isTimeScale, layoutPadding }));
 
     useEffect(() => {
         // Function to update options based on current theme
@@ -67,6 +68,9 @@ export function useChartOptions({
             setOptions({
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: layoutPadding
+                },
                 plugins: {
                     legend: {
                         display: false
@@ -163,7 +167,7 @@ export function useChartOptions({
         observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'class'] });
 
         return () => observer.disconnect();
-    }, [title, xAxisLabel, yAxisLabel, isTimeScale]);
+    }, [title, xAxisLabel, yAxisLabel, isTimeScale, layoutPadding]);
 
     return options;
 }
@@ -191,6 +195,10 @@ export function createChartOptions(props) {
     // Return safe defaults using vars (might not work in all canvas contexts but safer than nothing)
     return {
         responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+            padding: props.layoutPadding || { top: 8, right: 16, bottom: 16, left: 8 }
+        },
         plugins: {
             legend: { display: false },
             title: { display: !!props.title, text: props.title },

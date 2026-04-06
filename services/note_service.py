@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import logging
 import uuid
 
+from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 
 from models import (
@@ -19,7 +20,7 @@ from services.owned_entity_queries import get_owned_activity_instance, get_owned
 from services.payload_normalizers import normalize_note_payload
 from services.goal_type_utils import get_canonical_goal_type
 from services.service_types import JsonDict, JsonList, ServiceResult
-from services.serializers import serialize_goal, serialize_note_display
+from services.serializers import derive_note_type, serialize_goal, serialize_note_display
 from services.session_runtime import is_quick_session
 from services.view_serializers import (
     serialize_activity_history_entry,
@@ -59,11 +60,14 @@ class NoteService:
             Note.session_id == session_id,
             Note.deleted_at.is_(None),
         ).options(
-            selectinload(Note.session),
+            selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
             selectinload(Note.activity_definition),
             selectinload(Note.nano_goal),
-        ).order_by(Note.created_at.desc()).all()
+        ).order_by(
+            Note.pinned_at.desc().nullslast(),
+            Note.created_at.desc(),
+        ).all()
         return [serialize_note_display(note, include_image=True) for note in notes], None, 200
 
     def get_activity_instance_notes(self, root_id, instance_id, current_user_id) -> ServiceResult[JsonList]:
@@ -76,11 +80,14 @@ class NoteService:
             Note.activity_instance_id == instance_id,
             Note.deleted_at.is_(None),
         ).options(
-            selectinload(Note.session),
+            selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
             selectinload(Note.activity_definition),
             selectinload(Note.nano_goal),
-        ).order_by(Note.created_at.desc()).all()
+        ).order_by(
+            Note.pinned_at.desc().nullslast(),
+            Note.created_at.desc(),
+        ).all()
         return [serialize_note_display(note, include_image=True) for note in notes], None, 200
 
     def get_previous_session_notes(self, root_id, session_id, current_user_id) -> ServiceResult[JsonList]:
@@ -121,7 +128,7 @@ class NoteService:
             Note.context_type == 'session',
             Note.deleted_at.is_(None),
         ).options(
-            selectinload(Note.session),
+            selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
             selectinload(Note.activity_definition),
             selectinload(Note.nano_goal),
@@ -147,7 +154,7 @@ class NoteService:
             Note.activity_definition_id == activity_id,
             Note.deleted_at.is_(None),
         ).options(
-            selectinload(Note.session),
+            selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
             selectinload(Note.activity_definition),
             selectinload(Note.nano_goal),
@@ -156,7 +163,10 @@ class NoteService:
         if exclude_session_id:
             query = query.filter(Note.session_id != exclude_session_id)
 
-        notes = query.order_by(Note.created_at.desc()).limit(limit).all()
+        notes = query.order_by(
+            Note.pinned_at.desc().nullslast(),
+            Note.created_at.desc(),
+        ).limit(limit).all()
         results = []
         for note in notes:
             results.append(serialize_note_with_session(note))
@@ -188,11 +198,14 @@ class NoteService:
                 Note.activity_instance_id.in_(instance_ids),
                 Note.deleted_at.is_(None),
             ).options(
-                selectinload(Note.session),
+                selectinload(Note.session).selectinload(Session.template),
                 selectinload(Note.goal),
                 selectinload(Note.activity_definition),
                 selectinload(Note.nano_goal),
-            ).order_by(Note.created_at).all()
+            ).order_by(
+                Note.pinned_at.desc().nullslast(),
+                Note.created_at.desc(),
+            ).all()
 
         results = []
         for instance in instances:
@@ -386,10 +399,13 @@ class NoteService:
 
         notes = self.db_session.query(Note).filter(
             Note.root_id == root_id,
-            Note.goal_id.in_(goal_ids),
+            or_(
+                Note.goal_id.in_(goal_ids),
+                Note.nano_goal_id.in_(goal_ids),
+            ),
             Note.deleted_at.is_(None),
         ).options(
-            selectinload(Note.session),
+            selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
             selectinload(Note.activity_definition),
             selectinload(Note.nano_goal),
@@ -428,19 +444,25 @@ class NoteService:
             Note.root_id == root_id,
             Note.deleted_at.is_(None),
         ).options(
-            selectinload(Note.session),
+            selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
             selectinload(Note.activity_definition),
             selectinload(Note.nano_goal),
         )
 
+        note_types = filters.get('note_types') or []
         context_types = filters.get('context_types')
         if context_types:
             query = query.filter(Note.context_type.in_(context_types))
 
         filter_goal_id = filters.get('goal_id')
         if filter_goal_id:
-            query = query.filter(Note.goal_id == filter_goal_id)
+            query = query.filter(
+                or_(
+                    Note.goal_id == filter_goal_id,
+                    Note.nano_goal_id == filter_goal_id,
+                )
+            )
 
         filter_activity_definition_ids = filters.get('activity_definition_ids') or []
         filter_activity_group_ids = filters.get('activity_group_ids') or []
@@ -459,7 +481,6 @@ class NoteService:
                 if group_act_ids:
                     conditions.append(Note.activity_definition_id.in_(group_act_ids))
             if conditions:
-                from sqlalchemy import or_
                 query = query.filter(or_(*conditions))
 
         if filters.get('pinned_only'):
@@ -477,15 +498,30 @@ class NoteService:
         if date_to:
             query = query.filter(Note.created_at <= date_to)
 
-        total = query.count()
-        notes = query.order_by(
-            Note.pinned_at.desc().nullslast(),
-            Note.created_at.desc(),
-        ).limit(page_size).offset(page * page_size).all()
-
-        results = []
-        for note in notes:
-            results.append(serialize_note_display(note, include_image=True))
+        if note_types:
+            ordered_notes = query.order_by(
+                Note.pinned_at.desc().nullslast(),
+                Note.created_at.desc(),
+            ).all()
+            serialized_notes = [
+                serialize_note_display(note, include_image=True)
+                for note in ordered_notes
+            ]
+            filtered_results = [
+                note
+                for note in serialized_notes
+                if note.get('note_type') in note_types
+            ]
+            total = len(filtered_results)
+            start_index = page * page_size
+            results = filtered_results[start_index:start_index + page_size]
+        else:
+            total = query.count()
+            notes = query.order_by(
+                Note.pinned_at.desc().nullslast(),
+                Note.created_at.desc(),
+            ).limit(page_size).offset(page * page_size).all()
+            results = [serialize_note_display(note, include_image=True) for note in notes]
 
         return {
             'notes': results,
@@ -507,6 +543,9 @@ class NoteService:
         ).first()
         if not note:
             return None, "Note not found", 404
+
+        if derive_note_type(note.context_type, note.set_index) == 'activity_set_note':
+            return None, "Activity set notes cannot be pinned", 400
 
         note.pinned_at = datetime.now(timezone.utc)
         self.db_session.commit()

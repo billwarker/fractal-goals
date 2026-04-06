@@ -18,7 +18,6 @@ from models import (
     SplitDefinition,
     Target,
     TargetMetricCondition,
-    VisualizationAnnotation,
     activity_goal_associations,
     goal_activity_group_associations,
     get_goal_by_id,
@@ -387,7 +386,6 @@ class GoalService:
             SessionTemplate,
             Target,
             Note,
-            VisualizationAnnotation,
         ):
             query = self.db_session.query(model).filter(model.root_id == root_id)
             if hasattr(model, "deleted_at"):

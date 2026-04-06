@@ -11,7 +11,7 @@ import os
 import sys
 import pytest
 import tempfile
-from sqlalchemy import event
+from sqlalchemy import event, text
 from datetime import datetime, timedelta, timezone
 import uuid
 import json
@@ -41,7 +41,7 @@ from blueprints.templates_api import templates_bp
 from blueprints.timers_api import timers_bp
 from blueprints.programs_api import programs_bp
 from blueprints.notes_api import notes_bp
-from blueprints.annotations_api import annotations_bp
+from blueprints.dashboards_api import dashboards_bp
 from blueprints.logs_api import logs_api
 from blueprints.auth_api import auth_bp
 from blueprints.goal_levels_api import goal_levels_bp
@@ -75,7 +75,7 @@ def app():
     test_app.register_blueprint(timers_bp)
     test_app.register_blueprint(programs_bp)
     test_app.register_blueprint(notes_bp)
-    test_app.register_blueprint(annotations_bp)
+    test_app.register_blueprint(dashboards_bp)
     test_app.register_blueprint(logs_api)
     test_app.register_blueprint(auth_bp)
     test_app.register_blueprint(goal_levels_bp)
@@ -106,6 +106,9 @@ def app():
     
     models.get_engine = mock_get_engine
     
+    with engine.begin() as connection:
+        connection.execute(text('DROP TABLE IF EXISTS visualization_annotations CASCADE'))
+
     # Reset Database
     # Drop all tables and recreate them to ensure a clean state
     Base.metadata.drop_all(engine)

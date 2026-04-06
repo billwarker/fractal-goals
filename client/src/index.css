@@ -40,6 +40,11 @@ body {
   overflow-x: hidden;
 }
 
+html,
+body {
+  touch-action: manipulation;
+}
+
 /* Heading hierarchy */
 h1, h2, h3, h4, h5, h6 {
   line-height: var(--line-height-tight);

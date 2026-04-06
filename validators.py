@@ -971,6 +971,75 @@ class NanoGoalNoteCreateSchema(BaseModel):
 
 
 # =============================================================================
+# ANALYTICS DASHBOARD SCHEMAS
+# =============================================================================
+
+def validate_dashboard_layout(value: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError('layout must be an object')
+
+    required_keys = {'layout', 'window_states', 'selected_window_id', 'version'}
+    missing = sorted(required_keys - set(value.keys()))
+    if missing:
+        raise ValueError(f"layout is missing required keys: {', '.join(missing)}")
+
+    if not isinstance(value.get('layout'), dict):
+        raise ValueError('layout.layout must be an object')
+    if not isinstance(value.get('window_states'), dict):
+        raise ValueError('layout.window_states must be an object')
+    if not isinstance(value.get('selected_window_id'), str) or not value['selected_window_id'].strip():
+        raise ValueError('layout.selected_window_id must be a non-empty string')
+    if not isinstance(value.get('version'), int):
+        raise ValueError('layout.version must be an integer')
+
+    return value
+
+
+class DashboardCreateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
+    layout: Dict[str, Any] = Field(...)
+
+    @field_validator('name')
+    @classmethod
+    def sanitize_name(cls, v: str) -> str:
+        return sanitize_string(v)
+
+    @field_validator('layout')
+    @classmethod
+    def validate_layout(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+        return validate_dashboard_layout(v)
+
+
+class DashboardUpdateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
+    layout: Optional[Dict[str, Any]] = None
+
+    @field_validator('name')
+    @classmethod
+    def sanitize_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitize_string(v)
+
+    @field_validator('layout')
+    @classmethod
+    def validate_layout(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if v is None:
+            return v
+        return validate_dashboard_layout(v)
+
+    @model_validator(mode='after')
+    def require_at_least_one_field(self):
+        if self.name is None and self.layout is None:
+            raise ValueError('At least one of name or layout is required')
+        return self
+
+
+# =============================================================================
 # PROGRAM SCHEMAS
 # =============================================================================
 
@@ -1275,39 +1344,3 @@ class SessionTemplateUpdateSchema(BaseModel):
         if v is None:
             return v
         return validate_session_template_data(v)
-
-
-# =============================================================================
-# ANNOTATION SCHEMAS
-# =============================================================================
-
-class AnnotationCreateSchema(BaseModel):
-    """Schema for creating a visualization annotation."""
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    visualization_type: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
-    visualization_context: Optional[Dict[str, Any]] = None
-    selected_points: List[Dict[str, Any]] = Field(..., min_length=1)
-    selection_bounds: Optional[Dict[str, Any]] = None
-    content: str = Field(..., min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
-
-    @field_validator('visualization_type', 'content')
-    @classmethod
-    def sanitize_strings(cls, v: str) -> str:
-        return sanitize_string(v)
-
-
-class AnnotationUpdateSchema(BaseModel):
-    """Schema for updating a visualization annotation."""
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    content: Optional[str] = Field(None, min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
-    selected_points: Optional[List[Dict[str, Any]]] = None
-    selection_bounds: Optional[Dict[str, Any]] = None
-
-    @field_validator('content')
-    @classmethod
-    def sanitize_content(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        return sanitize_string(v)

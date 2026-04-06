@@ -94,6 +94,16 @@
     min-height: 0;
 }
 
+.brushOverlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: rgba(33, 150, 243, 0.12);
+    border: 1px solid rgba(33, 150, 243, 0.35);
+    pointer-events: none;
+    z-index: 2;
+}
+
 .legend {
     display: flex;
     align-items: center;

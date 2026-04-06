@@ -1,6 +1,7 @@
 import inspect
 
 from services.activity_service import ActivityService
+from services.dashboard_service import DashboardService
 from services.goal_service import GoalService
 from services.note_service import NoteService
 from services.session_service import SessionService
@@ -61,6 +62,12 @@ def test_core_service_public_methods_have_return_contract_annotations():
             "create_note",
             "update_note",
             "delete_note",
+        ],
+        DashboardService: [
+            "list_dashboards",
+            "create_dashboard",
+            "update_dashboard",
+            "delete_dashboard",
         ],
     }
 

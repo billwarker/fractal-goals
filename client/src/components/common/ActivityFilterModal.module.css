@@ -1,0 +1,286 @@
+.overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3200;
+    background: rgba(5, 10, 18, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.sheet {
+    width: min(760px, calc(100vw - 48px));
+    max-height: min(86vh, 760px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 18px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-surface);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 22px 28px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.headerLeft {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.backButton,
+.closeButton {
+    border: none;
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: 28px;
+    line-height: 1;
+    padding: 0;
+}
+
+.body {
+    overflow: auto;
+    padding: 24px 28px;
+    min-height: 220px;
+}
+
+.searchInput {
+    width: 100%;
+    padding: 10px 14px;
+    margin-bottom: 18px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.searchInput:focus {
+    border-color: var(--color-brand-primary);
+}
+
+.searchInput::placeholder {
+    color: var(--color-text-muted);
+}
+
+.searchGroupLabel {
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.groupGrid {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.groupCard {
+    display: grid;
+    grid-template-columns: 84px 1fr;
+    min-height: 72px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--color-bg-card, var(--color-bg-elevated, rgba(255, 255, 255, 0.02)));
+}
+
+.groupCardChecked {
+    border-color: color-mix(in srgb, var(--color-brand-primary) 55%, var(--color-border));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 35%, transparent);
+}
+
+.groupCheckbox,
+.groupCheckboxSpacer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-right: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-brand-primary) 10%, transparent);
+}
+
+.groupCheckbox input,
+.activityRow input {
+    width: 22px;
+    height: 22px;
+    accent-color: var(--color-brand-primary);
+}
+
+.groupNameButton {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: none;
+    background: transparent;
+    color: var(--color-text-primary);
+    cursor: pointer;
+    padding: 18px 22px;
+    font: inherit;
+    font-size: 16px;
+    text-align: left;
+}
+
+.groupMeta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--color-text-secondary);
+}
+
+.countBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-brand-primary) 20%, transparent);
+    color: var(--color-text-primary);
+    font-size: 15px;
+    font-weight: 600;
+    padding: 0 10px;
+}
+
+.arrow {
+    font-size: 24px;
+    line-height: 1;
+}
+
+.activityList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sectionHeading {
+    margin: 14px 0 8px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.activityRow {
+    display: grid;
+    grid-template-columns: 34px 1fr auto;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 0;
+    color: var(--color-text-primary);
+    font-size: 16px;
+}
+
+.activityName {
+    min-width: 0;
+}
+
+.emptyState {
+    padding: 8px 0;
+    color: var(--color-text-muted);
+    font-size: 15px;
+}
+
+.footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px 28px;
+    border-top: 1px solid var(--color-border);
+}
+
+.footerCount {
+    color: var(--color-text-secondary);
+    font-size: 15px;
+}
+
+.footerActions {
+    display: flex;
+    gap: 12px;
+}
+
+.clearButton,
+.applyButton {
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    padding: 12px 18px;
+    font: inherit;
+    cursor: pointer;
+}
+
+.clearButton {
+    background: transparent;
+    color: var(--color-text-secondary);
+}
+
+.clearButton:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.applyButton {
+    background: var(--color-brand-primary);
+    border-color: var(--color-brand-primary);
+    color: white;
+    font-weight: 600;
+}
+
+@media (max-width: 720px) {
+    .overlay {
+        padding: 12px;
+        align-items: flex-end;
+    }
+
+    .sheet {
+        width: min(100%, calc(100vw - 24px));
+        max-height: 88vh;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+
+    .header,
+    .body,
+    .footer {
+        padding-left: 18px;
+        padding-right: 18px;
+    }
+
+    .groupCard {
+        grid-template-columns: 64px 1fr;
+    }
+
+    .footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .footerActions {
+        width: 100%;
+    }
+
+    .clearButton,
+    .applyButton {
+        flex: 1;
+    }
+}

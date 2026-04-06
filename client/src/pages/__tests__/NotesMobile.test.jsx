@@ -15,6 +15,14 @@ vi.mock('react-router-dom', async (importOriginal) => {
     };
 });
 
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        useQuery: () => ({ data: [] }),
+    };
+});
+
 vi.mock('../../hooks/useNotesPageQuery', () => ({
     useNotesPageQuery: () => ({
         notes: [],

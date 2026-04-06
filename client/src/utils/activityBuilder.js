@@ -31,6 +31,7 @@ export function prepareActivityDefinitionCopy(activity) {
 
     return {
         ...activity,
+        _builderKey: Date.now(),
         id: undefined,
         name: `${activity.name} (Copy)`,
         metric_definitions: (activity.metric_definitions || []).map((metric) => ({

@@ -6,9 +6,11 @@ import Notes from '../Notes';
 const {
     createNote,
     navigate,
+    useNotesPageQueryMock,
 } = vi.hoisted(() => ({
     createNote: vi.fn(),
     navigate: vi.fn(),
+    useNotesPageQueryMock: vi.fn(),
 }));
 
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -20,20 +22,16 @@ vi.mock('react-router-dom', async (importOriginal) => {
     };
 });
 
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        useQuery: () => ({ data: [] }),
+    };
+});
+
 vi.mock('../../hooks/useNotesPageQuery', () => ({
-    useNotesPageQuery: () => ({
-        notes: [],
-        total: 0,
-        hasMore: false,
-        isLoading: false,
-        isFetching: false,
-        loadNextPage: vi.fn(),
-        createNote,
-        updateNote: vi.fn(),
-        deleteNote: vi.fn(),
-        pinNote: vi.fn(),
-        unpinNote: vi.fn(),
-    }),
+    useNotesPageQuery: (...args) => useNotesPageQueryMock(...args),
 }));
 
 vi.mock('../../components/notes', () => ({
@@ -89,6 +87,19 @@ vi.mock('../../components/layout/PageHeader.module.css', () => ({
 describe('Notes page', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        useNotesPageQueryMock.mockReturnValue({
+            notes: [],
+            total: 0,
+            hasMore: false,
+            isLoading: false,
+            isFetching: false,
+            loadNextPage: vi.fn(),
+            createNote,
+            updateNote: vi.fn(),
+            deleteNote: vi.fn(),
+            pinNote: vi.fn(),
+            unpinNote: vi.fn(),
+        });
         Object.defineProperty(window, 'localStorage', {
             value: {
                 getItem: vi.fn(() => null),
@@ -123,6 +134,21 @@ describe('Notes page', () => {
                 goal_id: undefined,
                 activity_definition_id: undefined,
             });
+        });
+    });
+
+    it('shows note type filters and passes selected note types to the notes query', async () => {
+        render(<Notes />);
+
+        expect(screen.getByRole('button', { name: 'Activity Set Notes' })).toBeInTheDocument();
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Goal Notes' }));
+        });
+
+        const latestCall = useNotesPageQueryMock.mock.calls.at(-1);
+        expect(latestCall[1]).toMatchObject({
+            note_types: ['goal_note'],
         });
     });
 });

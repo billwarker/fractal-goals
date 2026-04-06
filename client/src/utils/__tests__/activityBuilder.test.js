@@ -47,6 +47,8 @@ describe('prepareActivityDefinitionCopy', () => {
     });
 
     it('strips ids and deep-copies mutable arrays', () => {
+        const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1234567890);
+
         const source = {
             id: 'activity-1',
             name: 'Scale Practice',
@@ -58,6 +60,7 @@ describe('prepareActivityDefinitionCopy', () => {
         const copy = prepareActivityDefinitionCopy(source);
 
         expect(copy).toEqual({
+            _builderKey: 1234567890,
             id: undefined,
             name: 'Scale Practice (Copy)',
             associated_goal_ids: ['goal-1'],
@@ -79,5 +82,7 @@ describe('prepareActivityDefinitionCopy', () => {
         expect(source.metric_definitions[0].name).toBe('Speed');
         expect(source.split_definitions[0].name).toBe('Left Hand');
         expect(source.associated_goal_ids).toEqual(['goal-1']);
+
+        nowSpy.mockRestore();
     });
 });

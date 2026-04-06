@@ -29,7 +29,7 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
         >
             <ModalBody>
             <ActivityBuilderForm
-                key={editingActivity?.id || 'create'}
+                key={editingActivity?.id || editingActivity?._builderKey || 'create'}
                 allGoals={allGoals}
                 editingActivity={editingActivity}
                 rootId={rootId}

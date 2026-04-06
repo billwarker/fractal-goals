@@ -104,7 +104,8 @@ function NoteTimeline({
     if (!groupByDate) {
         return (
             <div className={styles.timeline}>
-                {notes.map(renderNote)}
+                {pinnedNotes.map(renderNote)}
+                {unpinnedNotes.map(renderNote)}
                 {hasMore && (
                     <button className={styles.loadMoreBtn} onClick={onLoadMore}>Load more</button>
                 )}

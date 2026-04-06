@@ -224,8 +224,11 @@ def get_all_notes(current_user, root_id):
     try:
         context_types_raw = request.args.get('context_types', '')
         context_types = [ct.strip() for ct in context_types_raw.split(',') if ct.strip()] or None
+        note_types_raw = request.args.get('note_types', '')
+        note_types = [nt.strip() for nt in note_types_raw.split(',') if nt.strip()] or None
         filters = {
             'context_types': context_types,
+            'note_types': note_types,
             'goal_id': request.args.get('goal_id') or None,
             'activity_definition_ids': request.args.getlist('activity_definition_ids[]') or request.args.getlist('activity_definition_ids') or [],
             'activity_group_ids': request.args.getlist('activity_group_ids[]') or request.args.getlist('activity_group_ids') or [],

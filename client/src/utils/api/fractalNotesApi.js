@@ -23,6 +23,7 @@ export const fractalNotesApi = {
     getAllNotes: (rootId, params = {}) => {
         const query = new URLSearchParams();
         if (params.context_types && params.context_types.length) query.set('context_types', params.context_types.join(','));
+        if (params.note_types && params.note_types.length) query.set('note_types', params.note_types.join(','));
         if (params.goal_id) query.set('goal_id', params.goal_id);
         if (params.activity_definition_ids && params.activity_definition_ids.length)
             params.activity_definition_ids.forEach(id => query.append('activity_definition_ids[]', id));
