@@ -45,6 +45,11 @@ body {
   touch-action: manipulation;
 }
 
+html.pinch-zoom-disabled,
+body.pinch-zoom-disabled {
+  touch-action: pan-x pan-y;
+}
+
 /* Heading hierarchy */
 h1, h2, h3, h4, h5, h6 {
   line-height: var(--line-height-tight);

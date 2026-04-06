@@ -68,31 +68,35 @@ function ActivityBuilderForm({
         setShowAssociationModal(false);
     };
 
-    const handleAddMetric = () => {
-        if (metrics.length < 3) {
-            setMetrics([...metrics, DEFAULT_METRIC]);
-        }
+    const handleAddMetric = (metric = DEFAULT_METRIC) => {
+        setMetrics((currentMetrics) => {
+            if (currentMetrics.length >= 3) {
+                return currentMetrics;
+            }
+
+            return [
+                ...currentMetrics,
+                { ...DEFAULT_METRIC, ...metric },
+            ];
+        });
     };
 
     const handleRemoveMetric = (index) => {
-        const nextMetrics = [...metrics];
-        nextMetrics.splice(index, 1);
-        setMetrics(nextMetrics);
+        setMetrics((currentMetrics) => currentMetrics.filter((_, metricIndex) => metricIndex !== index));
     };
 
     const handleMetricChange = (index, field, value) => {
-        const nextMetrics = [...metrics];
+        setMetrics((currentMetrics) => currentMetrics.map((metric, metricIndex) => {
+            if (field === 'is_top_set_metric' && value === true && metricIndex !== index) {
+                return { ...metric, is_top_set_metric: false };
+            }
 
-        if (field === 'is_top_set_metric' && value === true) {
-            nextMetrics.forEach((metric, metricIndex) => {
-                if (metricIndex !== index) {
-                    metric.is_top_set_metric = false;
-                }
-            });
-        }
+            if (metricIndex !== index) {
+                return metric;
+            }
 
-        nextMetrics[index] = { ...nextMetrics[index], [field]: value };
-        setMetrics(nextMetrics);
+            return { ...metric, [field]: value };
+        }));
     };
 
     const handleAddSplit = () => {

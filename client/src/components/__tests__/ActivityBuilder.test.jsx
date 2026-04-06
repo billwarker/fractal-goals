@@ -7,10 +7,12 @@ const {
     mockCreateActivity,
     mockUpdateActivity,
     mockUseFractalTree,
+    mockUseFractalMetrics,
 } = vi.hoisted(() => ({
     mockCreateActivity: vi.fn(),
     mockUpdateActivity: vi.fn(),
     mockUseFractalTree: vi.fn(),
+    mockUseFractalMetrics: vi.fn(),
 }));
 
 vi.mock('../../contexts/ActivitiesContext', () => ({
@@ -26,7 +28,7 @@ vi.mock('../../hooks/useActivityQueries', () => ({
         isLoading: false,
         error: null,
     }),
-    useFractalMetrics: () => ({ fractalMetrics: [], isLoading: false }),
+    useFractalMetrics: (...args) => mockUseFractalMetrics(...args),
     useCreateFractalMetric: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
@@ -73,6 +75,20 @@ describe('ActivityBuilder', () => {
                 ],
             },
         });
+        mockUseFractalMetrics.mockReturnValue({
+            fractalMetrics: [
+                {
+                    id: 'metric-fractal-1',
+                    name: 'Speed',
+                    unit: 'bpm',
+                    is_multiplicative: true,
+                    is_additive: false,
+                    input_type: 'number',
+                },
+            ],
+            isLoading: false,
+            error: null,
+        });
     });
 
     it('creates an activity through the extracted form flow', async () => {
@@ -104,6 +120,39 @@ describe('ActivityBuilder', () => {
 
         expect(onSave).toHaveBeenCalledWith({ id: 'activity-1', name: 'Scale Practice' });
         expect(onClose).toHaveBeenCalled();
+    });
+
+    it('persists metric selections chosen from the dropdown', async () => {
+        render(
+            <ActivityBuilder
+                isOpen={true}
+                onClose={vi.fn()}
+                editingActivity={null}
+                rootId="root-1"
+                onSave={vi.fn()}
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText('Activity Name'), {
+            target: { value: 'Scale Practice' },
+        });
+        fireEvent.change(screen.getByLabelText('Metric 1'), {
+            target: { value: 'metric-fractal-1' },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Create Activity' }));
+
+        await waitFor(() => {
+            expect(mockCreateActivity).toHaveBeenCalledWith('root-1', expect.objectContaining({
+                metrics: [
+                    expect.objectContaining({
+                        fractal_metric_id: 'metric-fractal-1',
+                        name: 'Speed',
+                        unit: 'bpm',
+                    }),
+                ],
+            }));
+        });
     });
 
     it('warns before removing existing metrics and updates after confirmation', async () => {

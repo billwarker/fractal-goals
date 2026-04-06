@@ -4,7 +4,7 @@ import { fractalApi } from './utils/api';
 import { HeaderProvider, useHeader } from './contexts/HeaderContext';
 import useIsMobile from './hooks/useIsMobile';
 import { lazyWithRetry } from './utils/lazyWithRetry';
-import { getViewportMetaContent } from './utils/viewportMeta';
+import { getViewportMetaContent, shouldAllowZoom } from './utils/viewportMeta';
 import styles from './AppRouter.module.css';
 import './App.css';
 
@@ -238,20 +238,68 @@ function App() {
 
     usePageTitle(getPageTitle(location.pathname));
 
+    const allowZoom = shouldAllowZoom({
+        isMobile,
+        pathname: location.pathname,
+    });
+
     useEffect(() => {
         const viewportMeta = document.querySelector('meta[name="viewport"]');
         if (!viewportMeta) {
             return undefined;
         }
 
-        const isFlowTreeRoute = /^\/[^/]+\/goals(?:\/)?$/.test(location.pathname);
         viewportMeta.setAttribute('content', getViewportMetaContent({
             isMobile,
-            allowZoom: !isMobile || isFlowTreeRoute,
+            allowZoom,
         }));
 
         return undefined;
-    }, [isMobile, location.pathname]);
+    }, [allowZoom, isMobile]);
+
+    useEffect(() => {
+        const rootElement = document.documentElement;
+        const bodyElement = document.body;
+
+        if (!rootElement || !bodyElement) {
+            return undefined;
+        }
+
+        const className = 'pinch-zoom-disabled';
+        rootElement.classList.toggle(className, !allowZoom);
+        bodyElement.classList.toggle(className, !allowZoom);
+
+        if (allowZoom) {
+            return () => {
+                rootElement.classList.remove(className);
+                bodyElement.classList.remove(className);
+            };
+        }
+
+        const preventGesture = (event) => {
+            event.preventDefault();
+        };
+
+        const preventPinch = (event) => {
+            if (event.touches?.length > 1) {
+                event.preventDefault();
+            }
+        };
+
+        window.addEventListener('gesturestart', preventGesture);
+        window.addEventListener('gesturechange', preventGesture);
+        window.addEventListener('gestureend', preventGesture);
+        document.addEventListener('touchmove', preventPinch, { passive: false });
+
+        return () => {
+            rootElement.classList.remove(className);
+            bodyElement.classList.remove(className);
+            window.removeEventListener('gesturestart', preventGesture);
+            window.removeEventListener('gesturechange', preventGesture);
+            window.removeEventListener('gestureend', preventGesture);
+            document.removeEventListener('touchmove', preventPinch);
+        };
+    }, [allowZoom]);
 
     useEffect(() => {
         document.documentElement.style.setProperty('--app-nav-height', `${navHeight}px`);

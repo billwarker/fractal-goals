@@ -105,6 +105,7 @@ function ActivityMetricsSection({
                             <div className={styles.metricRow}>
                                 <select
                                     className={metricStyles.metricSelect}
+                                    aria-label={`Metric ${idx + 1}`}
                                     value={metric.fractal_metric_id || ''}
                                     onChange={(e) => handleSelectMetric(idx, e.target.value)}
                                 >
