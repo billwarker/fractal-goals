@@ -1,25 +1,25 @@
 /**
- * SessionSectionGrid - Grid of session sections with exercises
- * 
- * Renders sections horizontally with their exercises.
+ * SessionSectionGrid - Grid of session sections with activities
+ *
+ * Renders sections horizontally with their activities.
  * Optimized with React.memo for list rendering performance.
  */
 
 import React, { memo, useMemo } from 'react';
 import { formatShortDuration } from '../../hooks/useSessionDuration';
-import ExerciseCard from './ExerciseCard';
+import ActivityCard from './ActivityCard';
 import useIsMobile from '../../hooks/useIsMobile';
 import styles from './SessionSectionGrid.module.css';
 
 /**
- * Single section column with exercises
+ * Single section column with activities
  */
 const SectionColumn = memo(function SectionColumn({
     section,
     activities,
     activityInstances = []
 }) {
-    const sectionExercises = useMemo(() => {
+    const sectionActivities = useMemo(() => {
         const instanceIds = section.activity_ids || [];
         if (!instanceIds.length || !activityInstances.length) return [];
 
@@ -40,12 +40,12 @@ const SectionColumn = memo(function SectionColumn({
     }, [section.activity_ids, activityInstances]);
 
     const sectionDuration = useMemo(() => {
-        const seconds = sectionExercises.reduce((sum, exercise) => sum + (exercise.duration_seconds || 0), 0);
+        const seconds = sectionActivities.reduce((sum, activity) => sum + (activity.duration_seconds || 0), 0);
         if (seconds > 0) {
             return formatShortDuration(seconds);
         }
         return `${section.duration_minutes || 0} min (planned)`;
-    }, [section.duration_minutes, sectionExercises]);
+    }, [section.duration_minutes, sectionActivities]);
 
     return (
         <div className={styles.sectionColumn}>
@@ -58,18 +58,18 @@ const SectionColumn = memo(function SectionColumn({
                 {sectionDuration}
             </div>
 
-            {/* Exercises - Vertical List */}
-            {sectionExercises.length > 0 && (
-                <div className={styles.exercisesList}>
-                    {sectionExercises.map((exercise, exerciseIndex) => {
-                        const actDef = exercise.type === 'activity'
-                            ? activities.find(a => a.id === exercise.activity_id)
+            {/* Activities - Vertical List */}
+            {sectionActivities.length > 0 && (
+                <div className={styles.activitiesList}>
+                    {sectionActivities.map((activity, activityIndex) => {
+                        const actDef = activity.type === 'activity'
+                            ? activities.find(a => a.id === activity.activity_id)
                             : null;
 
                         return (
-                            <ExerciseCard
-                                key={exerciseIndex}
-                                exercise={exercise}
+                            <ActivityCard
+                                key={activityIndex}
+                                activity={activity}
                                 activityDefinition={actDef}
                             />
                         );

@@ -1,7 +1,7 @@
 /**
  * SessionCardExpanded - Full session card with all details
  * 
- * Displays session header, goals, targets achieved, and sections/exercises.
+ * Displays session header, goals, targets achieved, and sections/activities.
  * This is the main session card component for the Sessions page.
  * Optimized with React.memo for list rendering performance.
  */
@@ -17,7 +17,7 @@ import GoalAccomplishmentChip from '../common/GoalAccomplishmentChip';
 import MetaField from '../common/MetaField';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import SessionSectionGrid from './SessionSectionGrid';
-import ExerciseCard from './ExerciseCard';
+import ActivityCard from './ActivityCard';
 import styles from './SessionCardExpanded.module.css';
 import {
     getReadableTextColor,
@@ -436,9 +436,9 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                                 const activityDefinition = activities?.find((entry) => entry.id === activity.activity_id) || null;
 
                                 return (
-                                    <ExerciseCard
+                                    <ActivityCard
                                         key={activity.instance_id || activity.id || `${activity.name}-${index}`}
-                                        exercise={activity}
+                                        activity={activity}
                                         activityDefinition={activityDefinition}
                                     />
                                 );

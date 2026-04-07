@@ -1,14 +1,14 @@
 /**
- * ExerciseCard - Individual exercise/activity card for session display
- * 
- * Displays exercise name, completion status, duration, and metrics/sets.
+ * ActivityCard - Individual activity-instance card for session display
+ *
+ * Displays activity name, completion status, duration, and metrics/sets.
  * Optimized with React.memo for list rendering performance.
  */
 
 import React, { memo, useMemo } from 'react';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import { formatShortDuration } from '../../hooks/useSessionDuration';
-import styles from './ExerciseCard.module.css';
+import styles from './ActivityCard.module.css';
 
 /**
  * Helper to get metric definition info
@@ -102,18 +102,18 @@ function SetRow({ set, setIdx, activityDefinition, hasSplits }) {
 /**
  * Renders single metrics (no sets)
  */
-function SingleMetrics({ exercise, activityDefinition }) {
+function SingleMetrics({ activity, activityDefinition }) {
     const hasSplits = activityDefinition?.has_splits && activityDefinition?.split_definitions?.length > 0;
 
     const filteredMetrics = useMemo(() => {
-        return exercise.metrics?.filter(m => {
+        return activity.metrics?.filter(m => {
             const mInfo = getMetricInfo(m.metric_id, activityDefinition);
             if (hasSplits) {
                 return mInfo.name && m.value && m.split_id;
             }
             return mInfo.name && m.value && !m.split_id;
         }) || [];
-    }, [exercise.metrics, activityDefinition, hasSplits]);
+    }, [activity.metrics, activityDefinition, hasSplits]);
 
     if (filteredMetrics.length === 0) return null;
 
@@ -136,34 +136,35 @@ function SingleMetrics({ exercise, activityDefinition }) {
 }
 
 /**
- * Main ExerciseCard component
+ * Main ActivityCard component
  */
-const ExerciseCard = memo(function ExerciseCard({
-    exercise,
+const ActivityCard = memo(function ActivityCard({
+    activity,
     activityDefinition
 }) {
     const hasSplits = activityDefinition?.has_splits && activityDefinition?.split_definitions?.length > 0;
-    const isActivity = exercise.type === 'activity';
+    const isActivity = activity.type === 'activity';
+    const hasSets = activity.has_sets ?? Boolean(activity.sets?.length);
 
     return (
-        <div className={`${styles.exerciseCard} ${isActivity ? styles.exerciseCardActivity : ''}`}>
+        <div className={`${styles.activityCard} ${isActivity ? styles.activityCardInstance : ''}`}>
             {/* Header */}
-            <div className={styles.exerciseHeader}>
-                {exercise.completed ? (
+            <div className={styles.activityHeader}>
+                {activity.completed ? (
                     <CompletionCheckBadge className={styles.completionBadge} label="Completed activity" />
                 ) : (
                     <span className={styles.completionIcon} aria-hidden="true">○</span>
                 )}
                 <div className={styles.content}>
-                    <div className={styles.exerciseTitleRow}>
-                        <div className={styles.exerciseName}>
-                            {exercise.name}
+                    <div className={styles.activityTitleRow}>
+                        <div className={styles.activityName}>
+                            {activity.name}
                         </div>
 
                         {/* Duration for activities */}
-                        {exercise.instance_id && exercise.duration_seconds != null && (
+                        {activity.instance_id && activity.duration_seconds != null && (
                             <div className={styles.activityDuration}>
-                                {formatShortDuration(exercise.duration_seconds)}
+                                {formatShortDuration(activity.duration_seconds)}
                             </div>
                         )}
                     </div>
@@ -172,9 +173,9 @@ const ExerciseCard = memo(function ExerciseCard({
                     {isActivity && (
                         <div className={styles.activityData}>
                             {/* Sets View */}
-                            {exercise.has_sets && exercise.sets?.length > 0 && (
+                            {hasSets && activity.sets?.length > 0 && (
                                 <div className={styles.setsContainer}>
-                                    {exercise.sets.map((set, setIdx) => (
+                                    {activity.sets.map((set, setIdx) => (
                                         <SetRow
                                             key={setIdx}
                                             set={set}
@@ -187,9 +188,9 @@ const ExerciseCard = memo(function ExerciseCard({
                             )}
 
                             {/* Single Metrics View */}
-                            {!exercise.has_sets && activityDefinition?.metric_definitions?.length > 0 && exercise.metrics && (
+                            {!hasSets && activityDefinition?.metric_definitions?.length > 0 && activity.metrics && (
                                 <SingleMetrics
-                                    exercise={exercise}
+                                    activity={activity}
                                     activityDefinition={activityDefinition}
                                 />
                             )}
@@ -197,16 +198,16 @@ const ExerciseCard = memo(function ExerciseCard({
                     )}
 
                     {/* Description */}
-                    {exercise.description && (
+                    {activity.description && (
                         <div className={styles.description}>
-                            {exercise.description}
+                            {activity.description}
                         </div>
                     )}
 
                     {/* Notes */}
-                    {exercise.notes && (
+                    {activity.notes && (
                         <div className={styles.notes}>
-                            💡 {exercise.notes}
+                            💡 {activity.notes}
                         </div>
                     )}
                 </div>
@@ -215,4 +216,4 @@ const ExerciseCard = memo(function ExerciseCard({
     );
 });
 
-export default ExerciseCard;
+export default ActivityCard;

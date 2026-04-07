@@ -165,6 +165,8 @@ def serialize_activity_instance(instance):
         "total_paused_seconds": getattr(instance, 'total_paused_seconds', 0),
         "completed": instance.completed,
         "notes": instance.notes,
+        "has_sets": bool(getattr(instance.definition, "has_sets", False) or data_dict.get('sets')),
+        "has_metrics": bool(getattr(instance.definition, "has_metrics", False) or metric_values_list),
         "sets": data_dict.get('sets', []),
         "data": data_dict,
         "modes": modes,
@@ -180,6 +182,28 @@ def _active_session_instances(session):
         for instance in (getattr(session, "activity_instances", None) or [])
         if getattr(instance, "deleted_at", None) is None
     ]
+
+
+def _merge_legacy_activity_payload(serialized_instance, legacy_item):
+    """Backfill legacy embedded activity data onto a serialized instance payload."""
+    if not isinstance(serialized_instance, dict) or not isinstance(legacy_item, dict):
+        return serialized_instance
+
+    legacy_sets = legacy_item.get("sets")
+    if (
+        isinstance(legacy_sets, list)
+        and legacy_sets
+        and not (serialized_instance.get("sets") or [])
+    ):
+        serialized_instance["sets"] = copy.deepcopy(legacy_sets)
+        data_dict = serialized_instance.get("data")
+        if not isinstance(data_dict, dict):
+            data_dict = {}
+        data_dict = copy.deepcopy(data_dict)
+        data_dict["sets"] = copy.deepcopy(legacy_sets)
+        serialized_instance["data"] = data_dict
+
+    return serialized_instance
 
 def serialize_goal(goal, include_children=True):
     """Serialize a Goal object."""
@@ -262,6 +286,7 @@ def serialize_session(session, include_image_data=False):
     """Serialize a Session object."""
     active_instances = _active_session_instances(session)
     template_payload = _safe_load_json(getattr(getattr(session, "template", None), "template_data", None), {})
+    serialized_activity_instances = [serialize_activity_instance(inst) for inst in active_instances]
     result = {
         "id": session.id,
         "name": session.name,
@@ -296,7 +321,7 @@ def serialize_session(session, include_image_data=False):
             "created_at": format_utc(session.created_at),
             "updated_at": format_utc(session.updated_at),
         },
-        "activity_instances": [serialize_activity_instance(inst) for inst in active_instances],
+        "activity_instances": serialized_activity_instances,
         "notes": [serialize_note(n, include_image=include_image_data) for n in session.notes_list if not n.deleted_at] if hasattr(session, 'notes_list') else []
     }
     
@@ -348,6 +373,11 @@ def serialize_session(session, include_image_data=False):
     session_sections = result["attributes"]["session_data"].get("sections")
     if isinstance(session_sections, list):
         instance_map = {inst.id: inst for inst in active_instances}
+        serialized_instance_map = {
+            inst_payload["id"]: inst_payload
+            for inst_payload in serialized_activity_instances
+            if isinstance(inst_payload, dict) and inst_payload.get("id")
+        }
         remaining_ids = [inst.id for inst in active_instances]
         used_ids = set()
 
@@ -377,12 +407,12 @@ def serialize_session(session, include_image_data=False):
             if not isinstance(section, dict):
                 continue
 
+            raw_items = section.get("exercises") or section.get("activities") or []
             activity_ids = section.get("activity_ids") if isinstance(section.get("activity_ids"), list) else []
             normalized_ids = [iid for iid in activity_ids if iid in instance_map and iid not in used_ids]
+            legacy_items_by_instance_id = {}
 
             if not normalized_ids:
-                raw_items = section.get("exercises") or section.get("activities") or []
-
                 # Prefer explicit instance ids when provided.
                 for item in raw_items:
                     if not isinstance(item, dict):
@@ -390,6 +420,7 @@ def serialize_session(session, include_image_data=False):
                     iid = item.get("instance_id")
                     if iid in instance_map and iid not in used_ids and iid not in normalized_ids:
                         normalized_ids.append(iid)
+                        legacy_items_by_instance_id[iid] = item
 
                 # Otherwise map template activity definitions to first unused instances.
                 if not normalized_ids:
@@ -400,11 +431,21 @@ def serialize_session(session, include_image_data=False):
                         for iid in ids_by_def.get(def_id, []):
                             if iid not in used_ids and iid not in normalized_ids:
                                 normalized_ids.append(iid)
+                                legacy_items_by_instance_id[iid] = item
                                 break
 
                 # Last-resort: if only one section, include all remaining instances.
                 if not normalized_ids and len(session_sections) == 1:
                     normalized_ids = [iid for iid in remaining_ids if iid not in used_ids]
+            else:
+                raw_items_by_instance_id = {}
+                for item in raw_items:
+                    if not isinstance(item, dict):
+                        continue
+                    iid = item.get("instance_id")
+                    if iid:
+                        raw_items_by_instance_id[iid] = item
+                legacy_items_by_instance_id = raw_items_by_instance_id
 
             section["activity_ids"] = normalized_ids
             for iid in normalized_ids:
@@ -415,6 +456,10 @@ def serialize_session(session, include_image_data=False):
                 if inst_id in instance_map:
                     inst = instance_map[inst_id]
                     ex = serialize_activity_instance(inst)
+                    legacy_item = legacy_items_by_instance_id.get(inst_id)
+                    ex = _merge_legacy_activity_payload(ex, legacy_item)
+                    if inst_id in serialized_instance_map:
+                        _merge_legacy_activity_payload(serialized_instance_map[inst_id], legacy_item)
                     ex['type'] = 'activity'
                     ex['instance_id'] = inst.id
                     ex['activity_id'] = inst.activity_definition_id

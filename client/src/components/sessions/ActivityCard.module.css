@@ -1,7 +1,7 @@
-/* ExerciseCard Styles - Extracted from Sessions.module.css */
+/* ActivityCard Styles - Extracted from Sessions.module.css */
 
-/* Exercises (Loop) */
-.exerciseCard {
+/* Activity instances (loop) */
+.activityCard {
     padding: 8px;
     background: var(--color-bg-card);
     border-radius: var(--border-radius-sm);
@@ -9,11 +9,11 @@
     border: none;
 }
 
-.exerciseCardActivity {
+.activityCardInstance {
     border: 1px solid var(--color-border);
 }
 
-.exerciseHeader {
+.activityHeader {
     display: flex;
     align-items: flex-start;
     gap: 6px;
@@ -43,14 +43,14 @@
     flex-shrink: 0;
 }
 
-.exerciseTitleRow {
+.activityTitleRow {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2px;
 }
 
-.exerciseName {
+.activityName {
     font-weight: 500;
     color: var(--color-text-primary);
     text-decoration: none;
@@ -170,11 +170,11 @@
 }
 
 @media (max-width: 768px) {
-    .exerciseCard {
+    .activityCard {
         padding: 10px;
     }
 
-    .exerciseTitleRow {
+    .activityTitleRow {
         flex-wrap: wrap;
         gap: 4px 8px;
     }

@@ -39,11 +39,11 @@ vi.mock('../SessionSectionGrid', () => ({
     default: () => <div data-testid="section-grid" />,
 }));
 
-vi.mock('../ExerciseCard', () => ({
-    default: ({ exercise, activityDefinition }) => (
-        <div data-testid="exercise-card">
-            <div>{exercise.name}</div>
-            {Array.isArray(exercise.metrics) && exercise.metrics.map((metric) => {
+vi.mock('../ActivityCard', () => ({
+    default: ({ activity, activityDefinition }) => (
+        <div data-testid="activity-card">
+            <div>{activity.name}</div>
+            {Array.isArray(activity.metrics) && activity.metrics.map((metric) => {
                 const definition = activityDefinition?.metric_definitions?.find((entry) => entry.id === metric.metric_id);
                 return (
                     <div key={metric.metric_id}>
@@ -209,7 +209,7 @@ describe('SessionCardExpanded', () => {
         expect(screen.getByText('Manual completion')).toBeInTheDocument();
     });
 
-    it('renders quick-session activities as exercise cards instead of pills', () => {
+    it('renders quick-session activities as activity cards instead of pills', () => {
         renderWithProviders(
             <SessionCardExpanded
                 session={{
@@ -263,7 +263,7 @@ describe('SessionCardExpanded', () => {
             }
         );
 
-        expect(screen.getByTestId('exercise-card')).toBeInTheDocument();
+        expect(screen.getByTestId('activity-card')).toBeInTheDocument();
         expect(screen.getAllByText('Weigh Myself')).toHaveLength(2);
         expect(screen.getByText('Weight: 180 lb')).toBeInTheDocument();
     });

@@ -42,6 +42,60 @@ class TestSessionListEndpoints:
         data = json.loads(response.data)
         assert len(data['sessions']) >= 1
         assert any(s['id'] == sample_practice_session.id for s in data['sessions'])
+
+    def test_list_sessions_backfills_legacy_sets_into_row_payload(
+        self, authed_client, db_session, sample_practice_session, sample_activity_definition
+    ):
+        """Legacy section exercise set data should be preserved in session row payloads."""
+        legacy_sets = [
+            {
+                'metrics': [
+                    {'metric_id': 'metric-weight', 'value': 135},
+                    {'metric_id': 'metric-reps', 'value': 5},
+                ]
+            }
+        ]
+        instance = ActivityInstance(
+            id=str(uuid4()),
+            session_id=sample_practice_session.id,
+            activity_definition_id=sample_activity_definition.id,
+            root_id=sample_practice_session.root_id,
+            created_at=datetime.now(timezone.utc),
+            data=json.dumps({}),
+        )
+        sample_practice_session.attributes = json.dumps({
+            'session_data': {
+                'sections': [
+                    {
+                        'name': 'Main',
+                        'exercises': [
+                            {
+                                'type': 'activity',
+                                'name': sample_activity_definition.name,
+                                'activity_id': sample_activity_definition.id,
+                                'instance_id': instance.id,
+                                'sets': legacy_sets,
+                            }
+                        ],
+                    }
+                ]
+            }
+        })
+        db_session.add(instance)
+        db_session.commit()
+
+        response = authed_client.get(f'/api/{sample_practice_session.root_id}/sessions')
+        assert response.status_code == 200
+
+        data = json.loads(response.data)
+        matching_session = next(
+            session for session in data['sessions']
+            if session['id'] == sample_practice_session.id
+        )
+
+        assert matching_session['activity_instances'][0]['has_sets'] is True
+        assert matching_session['activity_instances'][0]['sets'] == legacy_sets
+        assert matching_session['attributes']['session_data']['sections'][0]['exercises'][0]['sets'] == legacy_sets
     
     def test_get_specific_session(self, authed_client, sample_practice_session):
         """Test retrieving a specific session."""

@@ -10,4 +10,4 @@ export { default as SessionsList } from './SessionsList';
 export { default as SessionNotesSidebar } from './SessionNotesSidebar';
 export { default as SessionsQuerySidebar } from './SessionsQuerySidebar';
 export { default as SessionSectionGrid } from './SessionSectionGrid';
-export { default as ExerciseCard } from './ExerciseCard';
+export { default as ActivityCard } from './ActivityCard';
