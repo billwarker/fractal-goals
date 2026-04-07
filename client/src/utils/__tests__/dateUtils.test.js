@@ -2,15 +2,21 @@
  * Tests for dateUtils utility functions
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
     getLocalISOString,
     getTodayLocalDate,
     parseAnyDate,
     formatDateInTimezone,
     getDatePart,
-    formatLiteralDate
+    formatLiteralDate,
+    formatForInput,
+    localToISO
 } from '../dateUtils';
+
+afterEach(() => {
+    vi.restoreAllMocks();
+});
 
 describe('getLocalISOString', () => {
     it('returns a valid ISO string', () => {
@@ -143,5 +149,38 @@ describe('formatLiteralDate', () => {
         // Should show June 15, not June 16 (even though in some timezones this would be the 16th)
         expect(result).toContain('Jun');
         expect(result).toContain('15');
+    });
+});
+
+describe('midnight normalization', () => {
+    const mockMidnightAs24Hour = () => {
+        const RealDateTimeFormat = Intl.DateTimeFormat;
+
+        vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function mockDateTimeFormat(locale, options) {
+            const formatter = new RealDateTimeFormat(locale, options);
+
+            return {
+                ...formatter,
+                formatToParts(date) {
+                    return formatter.formatToParts(date).map((part) => (
+                        part.type === 'hour' && part.value === '00'
+                            ? { ...part, value: '24' }
+                            : part
+                    ));
+                }
+            };
+        });
+    };
+
+    it('normalizes 24:00 formatter output to 00:00 for input fields', () => {
+        mockMidnightAs24Hour();
+
+        expect(formatForInput('2026-01-01T00:00:00.000Z', 'UTC')).toBe('2026-01-01 00:00:00');
+    });
+
+    it('preserves midnight when converting local input back to ISO', () => {
+        mockMidnightAs24Hour();
+
+        expect(localToISO('2026-01-01 00:00:00', 'UTC')).toBe('2026-01-01T00:00:00.000Z');
     });
 });

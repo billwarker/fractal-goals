@@ -193,6 +193,14 @@ export const formatDateOnly = (dateValue, timezone) => {
     });
 };
 
+const normalizeHourPart = (parts) => {
+    return parts.map((part) => (
+        part.type === 'hour' && part.value === '24'
+            ? { ...part, value: '00' }
+            : part
+    ));
+};
+
 /**
  * Format datetime for input fields (YYYY-MM-DD HH:MM:SS) in the specified timezone
  * @param {string|Date} dateValue - ISO string or Date object
@@ -221,10 +229,11 @@ export const formatForInput = (dateValue, timezone) => {
         minute: '2-digit',
         second: '2-digit',
         hour12: false,
+        hourCycle: 'h23',
         timeZone: timezone
     });
 
-    const parts = formatter.formatToParts(date);
+    const parts = normalizeHourPart(formatter.formatToParts(date));
     const year = parts.find(p => p.type === 'year').value;
     const month = parts.find(p => p.type === 'month').value;
     const day = parts.find(p => p.type === 'day').value;
@@ -264,12 +273,13 @@ export const localToISO = (localDateStr, timezone) => {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
-        hour12: false
+        hour12: false,
+        hourCycle: 'h23',
     });
 
     // This is a workaround - create the date assuming UTC, then adjust
     const utcDate = new Date(`${dateStr}Z`);
-    const localParts = formatter.formatToParts(utcDate);
+    const localParts = normalizeHourPart(formatter.formatToParts(utcDate));
 
     // Calculate offset
     const localYear = parseInt(localParts.find(p => p.type === 'year').value);
@@ -311,10 +321,11 @@ export const getShiftedDate = (dateValue, timezone) => {
         minute: 'numeric',
         second: 'numeric',
         hour12: false,
+        hourCycle: 'h23',
         fractionalSecondDigits: 3
     });
 
-    const parts = formatter.formatToParts(date);
+    const parts = normalizeHourPart(formatter.formatToParts(date));
     const getPart = (type) => parseInt(parts.find(p => p.type === type)?.value || 0);
 
     const year = getPart('year');
