@@ -1,3 +1,76 @@
+function normalizeString(value) {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeOptionalId(value) {
+    if (typeof value === 'string') {
+        const normalized = value.trim();
+        return normalized || null;
+    }
+
+    if (value && typeof value === 'object') {
+        return normalizeOptionalId(value.id ?? value.value ?? null);
+    }
+
+    return null;
+}
+
+function sanitizeMetric(metric) {
+    const name = normalizeString(metric?.name);
+    const unit = normalizeString(metric?.unit);
+
+    if (!name || !unit) {
+        return null;
+    }
+
+    const sanitized = {
+        name,
+        unit,
+        is_top_set_metric: Boolean(metric?.is_top_set_metric),
+        is_multiplicative: metric?.is_multiplicative !== false,
+    };
+
+    const metricId = normalizeOptionalId(metric?.id);
+    const fractalMetricId = normalizeOptionalId(metric?.fractal_metric_id);
+
+    if (metricId) {
+        sanitized.id = metricId;
+    }
+
+    if (fractalMetricId) {
+        sanitized.fractal_metric_id = fractalMetricId;
+    }
+
+    return sanitized;
+}
+
+function sanitizeSplit(split) {
+    const name = normalizeString(split?.name);
+
+    if (!name) {
+        return null;
+    }
+
+    const sanitized = { name };
+    const splitId = normalizeOptionalId(split?.id);
+
+    if (splitId) {
+        sanitized.id = splitId;
+    }
+
+    return sanitized;
+}
+
+function sanitizeGoalIds(goalIds) {
+    if (!Array.isArray(goalIds)) {
+        return [];
+    }
+
+    return goalIds
+        .map((goalId) => normalizeOptionalId(goalId))
+        .filter(Boolean);
+}
+
 export function buildActivityPayload({
     name,
     description,
@@ -10,17 +83,24 @@ export function buildActivityPayload({
     groupId,
     selectedGoalIds,
 }) {
+    const sanitizedMetrics = (metrics || [])
+        .map((metric) => sanitizeMetric(metric))
+        .filter(Boolean);
+    const sanitizedSplits = (splits || [])
+        .map((split) => sanitizeSplit(split))
+        .filter(Boolean);
+
     return {
         name,
         description,
-        metrics: hasMetrics ? (metrics || []).filter((m) => m.name?.trim() !== '' && m.unit?.trim() !== '') : [],
-        splits: hasSplits ? (splits || []).filter((s) => s.name.trim() !== '') : [],
+        metrics: hasMetrics ? sanitizedMetrics : [],
+        splits: hasSplits ? sanitizedSplits : [],
         has_sets: hasSets,
         has_metrics: hasMetrics,
         metrics_multiplicative: metricsMultiplicative,
         has_splits: hasSplits,
-        group_id: groupId || null,
-        goal_ids: selectedGoalIds || []
+        group_id: normalizeOptionalId(groupId),
+        goal_ids: sanitizeGoalIds(selectedGoalIds),
     };
 }
 
@@ -29,19 +109,34 @@ export function prepareActivityDefinitionCopy(activity) {
         return null;
     }
 
-    return {
-        ...activity,
-        _builderKey: Date.now(),
-        id: undefined,
-        name: `${activity.name} (Copy)`,
-        metric_definitions: (activity.metric_definitions || []).map((metric) => ({
+    const metricDefinitions = (activity.metric_definitions || [])
+        .map((metric) => sanitizeMetric(metric))
+        .filter(Boolean)
+        .map((metric) => ({
             ...metric,
             id: undefined,
-        })),
-        split_definitions: (activity.split_definitions || []).map((split) => ({
+        }));
+
+    const splitDefinitions = (activity.split_definitions || [])
+        .map((split) => sanitizeSplit(split))
+        .filter(Boolean)
+        .map((split) => ({
             ...split,
             id: undefined,
-        })),
-        associated_goal_ids: activity.associated_goal_ids ? [...activity.associated_goal_ids] : [],
+        }));
+
+    return {
+        _builderKey: Date.now(),
+        id: undefined,
+        name: `${activity.name || 'Untitled Activity'} (Copy)`,
+        description: activity.description || '',
+        has_sets: Boolean(activity.has_sets),
+        has_metrics: Boolean(activity.has_metrics ?? metricDefinitions.length > 0),
+        metrics_multiplicative: Boolean(activity.metrics_multiplicative),
+        has_splits: Boolean(activity.has_splits ?? splitDefinitions.length > 0),
+        group_id: normalizeOptionalId(activity.group_id),
+        metric_definitions: metricDefinitions,
+        split_definitions: splitDefinitions,
+        associated_goal_ids: sanitizeGoalIds(activity.associated_goal_ids),
     };
 }

@@ -39,6 +39,54 @@ describe('buildActivityPayload', () => {
         expect(payload.splits).toEqual([]);
         expect(payload.group_id).toBe('group-1');
     });
+
+    it('sanitizes cyclic metric metadata down to API-safe fields', () => {
+        const cyclicMetric = {
+            id: 'metric-def-1',
+            fractal_metric_id: { id: 'metric-lib-1' },
+            name: ' Weight ',
+            unit: ' lbs ',
+            is_top_set_metric: true,
+            is_multiplicative: false,
+        };
+        cyclicMetric.self = cyclicMetric;
+
+        const payload = buildActivityPayload({
+            name: 'Bench Press',
+            description: '',
+            metrics: [cyclicMetric],
+            splits: [{ id: 'split-1', name: ' Main Set ', self: cyclicMetric }],
+            hasSets: true,
+            hasMetrics: true,
+            metricsMultiplicative: false,
+            hasSplits: true,
+            groupId: { id: 'group-1' },
+            selectedGoalIds: [{ id: 'goal-1' }, 'goal-2', { bad: true }],
+        });
+
+        expect(payload).toEqual({
+            name: 'Bench Press',
+            description: '',
+            metrics: [{
+                id: 'metric-def-1',
+                fractal_metric_id: 'metric-lib-1',
+                name: 'Weight',
+                unit: 'lbs',
+                is_top_set_metric: true,
+                is_multiplicative: false,
+            }],
+            splits: [{
+                id: 'split-1',
+                name: 'Main Set',
+            }],
+            has_sets: true,
+            has_metrics: true,
+            metrics_multiplicative: false,
+            has_splits: true,
+            group_id: 'group-1',
+            goal_ids: ['goal-1', 'goal-2'],
+        });
+    });
 });
 
 describe('prepareActivityDefinitionCopy', () => {
@@ -52,6 +100,12 @@ describe('prepareActivityDefinitionCopy', () => {
         const source = {
             id: 'activity-1',
             name: 'Scale Practice',
+            description: 'desc',
+            has_sets: true,
+            has_metrics: true,
+            metrics_multiplicative: false,
+            has_splits: true,
+            group_id: { id: 'group-1' },
             associated_goal_ids: ['goal-1'],
             metric_definitions: [{ id: 'metric-1', name: 'Speed', unit: 'bpm' }],
             split_definitions: [{ id: 'split-1', name: 'Left Hand' }],
@@ -63,8 +117,20 @@ describe('prepareActivityDefinitionCopy', () => {
             _builderKey: 1234567890,
             id: undefined,
             name: 'Scale Practice (Copy)',
+            description: 'desc',
+            has_sets: true,
+            has_metrics: true,
+            metrics_multiplicative: false,
+            has_splits: true,
+            group_id: 'group-1',
             associated_goal_ids: ['goal-1'],
-            metric_definitions: [{ id: undefined, name: 'Speed', unit: 'bpm' }],
+            metric_definitions: [{
+                id: undefined,
+                name: 'Speed',
+                unit: 'bpm',
+                is_top_set_metric: false,
+                is_multiplicative: true,
+            }],
             split_definitions: [{ id: undefined, name: 'Left Hand' }],
         });
 
