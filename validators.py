@@ -460,6 +460,21 @@ class GoalCompletionUpdateSchema(BaseModel):
     session_id: Optional[str] = None
 
 
+class GoalFreezeSchema(BaseModel):
+    """Schema for toggling the frozen state on a goal."""
+    frozen: bool = True
+
+
+class GoalMoveSchema(BaseModel):
+    """Schema for moving a goal under a new parent."""
+    new_parent_id: str = Field(..., min_length=1)
+
+
+class GoalConvertLevelSchema(BaseModel):
+    """Schema for converting a goal to a different level."""
+    level_id: str = Field(..., min_length=1)
+
+
 class GoalTargetCreateSchema(BaseModel):
     """Schema for creating a target on a goal."""
     model_config = ConfigDict(str_strip_whitespace=True)

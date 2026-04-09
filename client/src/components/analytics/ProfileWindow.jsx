@@ -13,6 +13,7 @@ import Select from '../atoms/Select';
 import { Heading } from '../atoms/Typography';
 import ActivityModeSelector from '../common/ActivityModeSelector';
 import ActivityGraphSelector from './ActivityGraphSelector';
+import { DISABLED_CHART_ANIMATION } from './ChartJSWrapper';
 import styles from './ProfileWindow.module.css';
 
 /**
@@ -272,6 +273,7 @@ function ProfileWindow({
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
+        ...DISABLED_CHART_ANIMATION,
         plugins: {
             legend: { display: false },
             tooltip: {
@@ -300,6 +302,7 @@ function ProfileWindow({
     const durationChartOptions = {
         responsive: true,
         maintainAspectRatio: false,
+        ...DISABLED_CHART_ANIMATION,
         plugins: {
             legend: { display: false },
             tooltip: {

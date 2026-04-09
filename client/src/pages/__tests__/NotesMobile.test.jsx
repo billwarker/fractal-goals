@@ -15,14 +15,6 @@ vi.mock('react-router-dom', async (importOriginal) => {
     };
 });
 
-vi.mock('@tanstack/react-query', async (importOriginal) => {
-    const actual = await importOriginal();
-    return {
-        ...actual,
-        useQuery: () => ({ data: [] }),
-    };
-});
-
 vi.mock('../../hooks/useNotesPageQuery', () => ({
     useNotesPageQuery: () => ({
         notes: [],
@@ -37,6 +29,11 @@ vi.mock('../../hooks/useNotesPageQuery', () => ({
         pinNote: vi.fn(),
         unpinNote: vi.fn(),
     }),
+}));
+
+vi.mock('../../hooks/useActivityQueries', () => ({
+    useActivities: () => ({ activities: [] }),
+    useActivityGroups: () => ({ activityGroups: [] }),
 }));
 
 vi.mock('../../components/notes', () => ({

@@ -1433,6 +1433,8 @@ class GoalService:
         return goal, None, 200
 
     def move_goal(self, root_id, goal_id, current_user_id, new_parent_id) -> ServiceResult[Goal]:
+        from services.goal_type_utils import get_canonical_goal_type
+
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -1466,6 +1468,11 @@ class GoalService:
         ).filter_by(id=new_parent_id, root_id=root_id, deleted_at=None).first()
         if not new_parent:
             return None, "New parent goal not found in this fractal", 404
+
+        goal_type = get_canonical_goal_type(goal)
+
+        if goal_type not in {'MicroGoal', 'NanoGoal'} and not self._goals_share_same_tier(current_parent, new_parent):
+            return None, "Can only move a goal under a parent on the same tier as its current parent", 400
 
         # Prevent circular references — walk up from new_parent
         current = new_parent
@@ -1503,6 +1510,10 @@ class GoalService:
         """
         from services.goal_type_utils import get_canonical_goal_type
 
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
         # Load the goal
         goal = self.db_session.query(Goal).options(
             selectinload(Goal.level),
@@ -1531,6 +1542,7 @@ class GoalService:
 
         # Execution tier rules
         goal_type = get_canonical_goal_type(goal)
+        current_parent = next((candidate for candidate in all_goals if candidate.id == goal.parent_id), None)
 
         eligible = []
         for candidate in all_goals:
@@ -1549,6 +1561,8 @@ class GoalService:
                 if get_canonical_goal_type(candidate) != 'MicroGoal':
                     continue
             else:
+                if current_parent and not self._goals_share_same_tier(candidate, current_parent):
+                    continue
                 # Macro goal: candidate must have lower rank
                 if not goal.level or candidate.level.rank >= goal.level.rank:
                     continue

@@ -11,6 +11,9 @@ from validators import (
     validate_request,
     GoalCreateSchema, GoalUpdateSchema,
     GoalCompletionUpdateSchema,
+    GoalConvertLevelSchema,
+    GoalFreezeSchema,
+    GoalMoveSchema,
     GoalTargetCreateSchema, GoalTargetEvaluationSchema,
     FractalCreateSchema,
 )
@@ -610,14 +613,18 @@ def copy_goal_endpoint(current_user, root_id: str, goal_id: str):
 
 @goals_bp.route('/<root_id>/goals/<goal_id>/freeze', methods=['PATCH'])
 @token_required
-def freeze_goal_endpoint(current_user, root_id: str, goal_id: str):
+@validate_request(GoalFreezeSchema, allow_empty_json=True)
+def freeze_goal_endpoint(current_user, root_id: str, goal_id: str, validated_data):
     """Toggle frozen state on a goal."""
     db_session = get_db_session()
     try:
-        data = request.get_json(force=True, silent=True) or {}
-        frozen = data.get('frozen', True)
         service = GoalService(db_session, sync_targets=_sync_targets)
-        goal, error, status = service.toggle_freeze(root_id, goal_id, current_user.id, frozen)
+        goal, error, status = service.toggle_freeze(
+            root_id,
+            goal_id,
+            current_user.id,
+            validated_data['frozen'],
+        )
         if error:
             return jsonify({"error": error}), status
         return jsonify(serialize_goal(goal)), status
@@ -652,14 +659,18 @@ def get_eligible_move_parents(current_user, root_id: str, goal_id: str):
 
 @goals_bp.route('/<root_id>/goals/<goal_id>/move', methods=['PATCH'])
 @token_required
-def move_goal_endpoint(current_user, root_id: str, goal_id: str):
+@validate_request(GoalMoveSchema)
+def move_goal_endpoint(current_user, root_id: str, goal_id: str, validated_data):
     """Move a goal to a new parent."""
     db_session = get_db_session()
     try:
-        data = request.get_json(force=True, silent=True) or {}
-        new_parent_id = data.get('new_parent_id')
         service = GoalService(db_session, sync_targets=_sync_targets)
-        goal, error, status = service.move_goal(root_id, goal_id, current_user.id, new_parent_id)
+        goal, error, status = service.move_goal(
+            root_id,
+            goal_id,
+            current_user.id,
+            validated_data['new_parent_id'],
+        )
         if error:
             return jsonify({"error": error}), status
         return jsonify(serialize_goal(goal)), status
@@ -673,16 +684,18 @@ def move_goal_endpoint(current_user, root_id: str, goal_id: str):
 
 @goals_bp.route('/<root_id>/goals/<goal_id>/convert-level', methods=['PATCH'])
 @token_required
-def convert_goal_level_endpoint(current_user, root_id: str, goal_id: str):
+@validate_request(GoalConvertLevelSchema)
+def convert_goal_level_endpoint(current_user, root_id: str, goal_id: str, validated_data):
     """Convert a goal to a different level."""
     db_session = get_db_session()
     try:
-        data = request.get_json(force=True, silent=True) or {}
-        level_id = data.get('level_id')
-        if not level_id:
-            return jsonify({"error": "level_id is required"}), 400
         service = GoalService(db_session, sync_targets=_sync_targets)
-        goal, error, status = service.convert_goal_level(root_id, goal_id, current_user.id, level_id)
+        goal, error, status = service.convert_goal_level(
+            root_id,
+            goal_id,
+            current_user.id,
+            validated_data['level_id'],
+        )
         if error:
             return jsonify({"error": error}), status
         return jsonify(serialize_goal(goal)), status

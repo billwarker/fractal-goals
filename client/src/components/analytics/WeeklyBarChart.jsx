@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
+import { DISABLED_CHART_ANIMATION } from './ChartJSWrapper';
 import styles from './WeeklyBarChart.module.css';
 
 /**
@@ -127,6 +128,7 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef, selectedDateRange
     const chartOptions = {
         responsive: true,
         maintainAspectRatio: false,
+        ...DISABLED_CHART_ANIMATION,
         layout: {
             padding: {
                 top: 8,

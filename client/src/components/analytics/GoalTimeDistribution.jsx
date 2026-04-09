@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { useTheme } from '../../contexts/ThemeContext'
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
-import { chartDefaults } from './ChartJSWrapper'; // Import chartDefaults for consistent coloring
+import { chartDefaults, DISABLED_CHART_ANIMATION } from './ChartJSWrapper'; // Import chartDefaults for consistent coloring
 
 /**
  * GoalTimeDistribution - Stacked bar chart showing time spent working towards goals over time
@@ -156,6 +156,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
         indexAxis: 'x', // Explicit: vertical bars (dates on X-axis)
         responsive: true,
         maintainAspectRatio: false,
+        ...DISABLED_CHART_ANIMATION,
         plugins: {
             legend: {
                 display: true,

@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Line, Bar } from 'react-chartjs-2';
-import { useChartOptions } from './ChartJSWrapper'; // Import hook
+import { DISABLED_CHART_ANIMATION, useChartOptions } from './ChartJSWrapper'; // Import hook
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import GoalIcon from '../atoms/GoalIcon';
 import styles from './GenericGraphModal.module.css';
@@ -78,6 +78,7 @@ const GenericGraphModal = ({
     const finalOptions = {
         ...baseOptions,
         ...options,
+        ...DISABLED_CHART_ANIMATION,
         plugins: {
             ...baseOptions.plugins,
             ...options.plugins,

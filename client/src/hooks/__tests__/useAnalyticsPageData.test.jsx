@@ -8,12 +8,14 @@ import { queryKeys } from '../queryKeys';
 const getSessions = vi.fn();
 const getGoalAnalytics = vi.fn();
 const getActivities = vi.fn();
+const getActivityGroups = vi.fn();
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
         getSessions: (...args) => getSessions(...args),
         getGoalAnalytics: (...args) => getGoalAnalytics(...args),
         getActivities: (...args) => getActivities(...args),
+        getActivityGroups: (...args) => getActivityGroups(...args),
     },
 }));
 
@@ -63,6 +65,7 @@ describe('useAnalyticsPageData', () => {
         });
         getGoalAnalytics.mockResolvedValueOnce({ data: { totals: { complete: 3 } } });
         getActivities.mockResolvedValueOnce({ data: [{ id: 'activity-1', name: 'Scales' }] });
+        getActivityGroups.mockResolvedValueOnce({ data: [{ id: 'group-1', name: 'Technique' }] });
 
         const { result } = renderHook(
             () => useAnalyticsPageData('root-1'),
@@ -78,10 +81,14 @@ describe('useAnalyticsPageData', () => {
         expect(queryClient.getQueryData(queryKeys.activities('root-1'))).toEqual([
             { id: 'activity-1', name: 'Scales' },
         ]);
+        expect(queryClient.getQueryData(queryKeys.activityGroups('root-1'))).toEqual([
+            { id: 'group-1', name: 'Technique' },
+        ]);
         expect(result.current.activityInstances['activity-1']).toHaveLength(1);
         expect(result.current.activityInstances['activity-1'][0]).toMatchObject({
             session_id: 'session-1',
             session_name: 'Session A',
         });
+        expect(result.current.activityGroups).toEqual([{ id: 'group-1', name: 'Technique' }]);
     });
 });

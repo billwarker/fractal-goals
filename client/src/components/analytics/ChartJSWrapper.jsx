@@ -39,6 +39,39 @@ const getCSSVar = (name) => {
     return undefined;
 };
 
+export const DISABLED_CHART_ANIMATION = {
+    animation: false,
+    animations: {
+        colors: false,
+        x: false,
+        y: false,
+    },
+    transitions: {
+        active: {
+            animation: {
+                duration: 0,
+            },
+        },
+        resize: {
+            animation: {
+                duration: 0,
+            },
+        },
+        show: {
+            animations: {
+                x: { duration: 0 },
+                y: { duration: 0 },
+            },
+        },
+        hide: {
+            animations: {
+                x: { duration: 0 },
+                y: { duration: 0 },
+            },
+        },
+    },
+};
+
 /**
  * Hook to get chart options that update with theme changes
  * Resolves CSS variables to actual color strings for Chart.js compatibility
@@ -68,6 +101,7 @@ export function useChartOptions({
             setOptions({
                 responsive: true,
                 maintainAspectRatio: false,
+                ...DISABLED_CHART_ANIMATION,
                 layout: {
                     padding: layoutPadding
                 },
@@ -196,6 +230,7 @@ export function createChartOptions(props) {
     return {
         responsive: true,
         maintainAspectRatio: false,
+        ...DISABLED_CHART_ANIMATION,
         layout: {
             padding: props.layoutPadding || { top: 8, right: 16, bottom: 16, left: 8 }
         },

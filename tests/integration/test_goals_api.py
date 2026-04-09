@@ -386,6 +386,60 @@ class TestGoalCompletionEndpoints:
 
 @pytest.mark.integration
 class TestGoalOptionsEndpoints:
+    def test_eligible_move_parents_only_returns_same_tier_candidates(
+        self,
+        authed_client,
+        db_session,
+        test_user,
+        sample_goal_hierarchy,
+    ):
+        root = sample_goal_hierarchy['ultimate']
+        long_term = sample_goal_hierarchy['long_term']
+        short_term = sample_goal_hierarchy['short_term']
+
+        root_level = GoalLevel(id=str(uuid.uuid4()), name='Ultimate Goal', rank=0)
+        long_level = GoalLevel(id=str(uuid.uuid4()), name='Long Term Goal', rank=1)
+        mid_level = GoalLevel(id=str(uuid.uuid4()), name='Mid Term Goal', rank=2)
+        short_level = GoalLevel(id=str(uuid.uuid4()), name='Short Term Goal', rank=3)
+        db_session.add_all([root_level, long_level, mid_level, short_level])
+        db_session.flush()
+
+        root.level_id = root_level.id
+        long_term.level_id = long_level.id
+        sample_goal_hierarchy['mid_term'].level_id = mid_level.id
+        short_term.level_id = short_level.id
+
+        alternate_mid = Goal(
+            id=str(uuid.uuid4()),
+            name='Alternate mid-term parent',
+            description='Valid move target',
+            parent_id=long_term.id,
+            root_id=root.id,
+            level_id=mid_level.id,
+            owner_id=test_user.id,
+            created_at=datetime.now(timezone.utc),
+        )
+        alternate_long = Goal(
+            id=str(uuid.uuid4()),
+            name='Alternate long-term parent',
+            description='Invalid move target',
+            parent_id=root.id,
+            root_id=root.id,
+            level_id=long_level.id,
+            owner_id=test_user.id,
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add_all([alternate_mid, alternate_long])
+        db_session.commit()
+
+        response = authed_client.get(f'/api/{root.id}/goals/{short_term.id}/eligible-parents')
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        eligible_parent_ids = {parent['id'] for parent in payload['eligible_parents']}
+        assert alternate_mid.id in eligible_parent_ids
+        assert alternate_long.id not in eligible_parent_ids
+
     def test_freeze_endpoint_blocks_completion(self, authed_client, sample_goal_hierarchy):
         root_id = sample_goal_hierarchy['ultimate'].id
         goal_id = sample_goal_hierarchy['short_term'].id
@@ -468,6 +522,20 @@ class TestGoalOptionsEndpoints:
 
         assert rejected_response.status_code == 400
         assert rejected_response.get_json()['error'] == 'Can only move a goal under a parent on the same tier as its current parent'
+
+    def test_move_goal_endpoint_validates_request_shape(self, authed_client, sample_goal_hierarchy):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal_id = sample_goal_hierarchy['short_term'].id
+
+        response = authed_client.patch(
+            f'/api/{root_id}/goals/{goal_id}/move',
+            json={},
+        )
+
+        assert response.status_code == 400
+        payload = response.get_json()
+        assert payload['error'] == 'Validation failed'
+        assert payload['details'][0]['field'] == 'new_parent_id'
 
     def test_convert_level_endpoint_rejects_root_tier(
         self,

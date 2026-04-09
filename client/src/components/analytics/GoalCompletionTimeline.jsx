@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
 import { useTheme } from '../../contexts/ThemeContext'
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import { DISABLED_CHART_ANIMATION } from './ChartJSWrapper';
 
 /**
  * GoalCompletionTimeline - Stacked area chart showing cumulative goal completions over time
@@ -156,6 +157,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
     const chartOptions = useMemo(() => ({
         responsive: true,
         maintainAspectRatio: false,
+        ...DISABLED_CHART_ANIMATION,
         plugins: {
             legend: {
                 display: true,

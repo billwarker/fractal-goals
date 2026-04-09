@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useEligibleMoveParents } from '../../hooks/useEligibleMoveParents';
-import { queryKeys } from '../../hooks/queryKeys';
-import { fractalApi } from '../../utils/api';
+import { useGoalOptionsMutations } from '../../hooks/useGoalOptionsMutations';
 import {
     findGoalNodeById,
     flattenGoalTree,
@@ -12,7 +10,6 @@ import {
     getGoalNodeId,
     getGoalNodeType,
 } from '../../utils/goalNodeModel';
-import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import GoalHierarchyList from './GoalHierarchyList';
 import GoalIcon from '../atoms/GoalIcon';
@@ -48,7 +45,6 @@ function GoalOptionsView({
     onClose,
     displayMode,
 }) {
-    const queryClient = useQueryClient();
     const {
         goalLevels = [],
         getGoalColor,
@@ -56,17 +52,14 @@ function GoalOptionsView({
         getGoalIcon,
     } = useGoalLevels();
     const [subView, setSubView] = useState('main');
-    const [loading, setLoading] = useState(false);
     const isFrozen = Boolean(goal?.frozen || goal?.attributes?.frozen);
-
-    const invalidateGoalQueries = async () => {
-        await Promise.all([
-            queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(rootId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.goals(rootId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.goalsForSelection(rootId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.goalMetrics(goalId) }),
-        ]);
-    };
+    const {
+        isLoading: loading,
+        copyGoal,
+        freezeGoal,
+        moveGoal,
+        convertGoalLevel,
+    } = useGoalOptionsMutations(rootId, goalId);
 
     const convertState = useMemo(() => {
         const currentGoalNode = treeData && goalId ? (findGoalNodeById(treeData, goalId) || goal) : goal;
@@ -120,37 +113,23 @@ function GoalOptionsView({
     }, [goal, goalId, goalLevels, treeData]);
 
     const handleCopy = async () => {
-        setLoading(true);
         try {
-            const response = await fractalApi.copyGoal(rootId, goalId);
-            const newGoal = response.data;
-            await invalidateGoalQueries();
+            const newGoal = await copyGoal();
             notify.success(`Copied goal: ${newGoal.name}`);
             if (onGoalSelect) {
                 onGoalSelect(newGoal);
             }
             setViewState('goal');
             setIsEditing(true);
-        } catch (error) {
-            notify.error(`Failed to copy goal: ${formatError(error)}`);
-        } finally {
-            setLoading(false);
-        }
+        } catch {}
     };
 
     const handleFreeze = async () => {
-        setLoading(true);
         try {
             const nextFrozen = !isFrozen;
-            await fractalApi.freezeGoal(rootId, goalId, nextFrozen);
-            await invalidateGoalQueries();
-            notify.success(nextFrozen ? 'Goal frozen' : 'Goal unfrozen');
+            await freezeGoal(nextFrozen);
             setViewState('goal');
-        } catch (error) {
-            notify.error(`Failed to ${isFrozen ? 'unfreeze' : 'freeze'} goal: ${formatError(error)}`);
-        } finally {
-            setLoading(false);
-        }
+        } catch {}
     };
 
     const handleMove = async (newParentId) => {
@@ -158,33 +137,19 @@ function GoalOptionsView({
             return;
         }
 
-        setLoading(true);
         try {
-            await fractalApi.moveGoal(rootId, goalId, newParentId);
-            await invalidateGoalQueries();
-            notify.success('Goal moved');
+            await moveGoal(newParentId);
             setSubView('main');
             setViewState('goal');
-        } catch (error) {
-            notify.error(`Failed to move goal: ${formatError(error)}`);
-        } finally {
-            setLoading(false);
-        }
+        } catch {}
     };
 
     const handleConvertLevel = async (levelId) => {
-        setLoading(true);
         try {
-            await fractalApi.convertGoalLevel(rootId, goalId, levelId);
-            await invalidateGoalQueries();
-            notify.success('Goal level converted');
+            await convertGoalLevel(levelId);
             setSubView('main');
             setViewState('goal');
-        } catch (error) {
-            notify.error(`Failed to convert level: ${formatError(error)}`);
-        } finally {
-            setLoading(false);
-        }
+        } catch {}
     };
 
     if (subView === 'move') {

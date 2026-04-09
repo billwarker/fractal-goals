@@ -10,16 +10,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { NoteTimeline, NoteComposer } from '../components/notes';
 import { ComposeLinkPanel } from '../components/notes/NoteComposer';
+import { useActivities, useActivityGroups } from '../hooks/useActivityQueries';
 import { useNotesPageQuery } from '../hooks/useNotesPageQuery';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import ActivityFilterModal from '../components/common/ActivityFilterModal';
 import GoalTreePicker from '../components/common/GoalTreePicker';
-import { queryKeys } from '../hooks/queryKeys';
-import { fractalApi } from '../utils/api';
 import useIsMobile from '../hooks/useIsMobile';
 import PageHeader from '../components/layout/PageHeader';
 import headerStyles from '../components/layout/PageHeader.module.css';
@@ -79,22 +77,8 @@ function Notes() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const isMobile = useIsMobile();
-    const { data: activities = [] } = useQuery({
-        queryKey: queryKeys.activities(rootId),
-        queryFn: async () => {
-            const response = await fractalApi.getActivities(rootId);
-            return response.data || [];
-        },
-        enabled: Boolean(rootId),
-    });
-    const { data: activityGroups = [] } = useQuery({
-        queryKey: queryKeys.activityGroups(rootId),
-        queryFn: async () => {
-            const response = await fractalApi.getActivityGroups(rootId);
-            return response.data || [];
-        },
-        enabled: Boolean(rootId),
-    });
+    const { activities = [] } = useActivities(rootId);
+    const { activityGroups = [] } = useActivityGroups(rootId);
 
     // Filter state
     const [selectedNoteTypes, setSelectedNoteTypes] = useState([]);
