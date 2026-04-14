@@ -82,51 +82,55 @@
 }
 
 .completePendingButton {
-    background: #dff5df;
-    border-color: #9fd49f;
-    color: #245c2f;
+    background: color-mix(in srgb, var(--color-brand-success) 18%, var(--color-bg-surface));
+    border-color: color-mix(in srgb, var(--color-brand-success) 48%, var(--color-border));
+    color: color-mix(in srgb, var(--color-brand-success) 78%, var(--color-text-primary));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .completePendingButton:hover:not(:disabled) {
-    background: #d3efd3;
-    border-color: #84c284;
-    color: #1f4f29;
+    background: color-mix(in srgb, var(--color-brand-success) 24%, var(--color-bg-surface));
+    border-color: color-mix(in srgb, var(--color-brand-success) 60%, var(--color-border));
+    color: color-mix(in srgb, var(--color-brand-success) 88%, var(--color-text-primary));
 }
 
 .optionsButton {
-    background: #e5f0ff;
-    border-color: #76a7eb;
-    color: #255a9f;
+    background: color-mix(in srgb, var(--color-brand-primary) 18%, var(--color-bg-surface));
+    border-color: color-mix(in srgb, var(--color-brand-primary) 48%, var(--color-border));
+    color: color-mix(in srgb, var(--color-brand-primary) 80%, var(--color-text-primary));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .optionsButton:hover:not(:disabled) {
-    background: #d7e7ff;
-    border-color: #5f97e4;
-    color: #1f4d89;
+    background: color-mix(in srgb, var(--color-brand-primary) 24%, var(--color-bg-surface));
+    border-color: color-mix(in srgb, var(--color-brand-primary) 60%, var(--color-border));
+    color: color-mix(in srgb, var(--color-brand-primary) 90%, var(--color-text-primary));
 }
 
 .pauseButton {
-    background: #fff0d9;
-    border-color: #efb15b;
-    color: #9a5600;
+    background: color-mix(in srgb, var(--color-brand-secondary) 18%, var(--color-bg-surface));
+    border-color: color-mix(in srgb, var(--color-brand-secondary) 48%, var(--color-border));
+    color: color-mix(in srgb, var(--color-brand-secondary) 80%, var(--color-text-primary));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .pauseButton:hover:not(:disabled) {
-    background: #ffe5bf;
-    border-color: #e29b3c;
-    color: #814600;
+    background: color-mix(in srgb, var(--color-brand-secondary) 24%, var(--color-bg-surface));
+    border-color: color-mix(in srgb, var(--color-brand-secondary) 60%, var(--color-border));
+    color: color-mix(in srgb, var(--color-brand-secondary) 90%, var(--color-text-primary));
 }
 
 .deleteButton {
-    background: #ffe2e2;
-    border-color: #ef8585;
-    color: #b13838;
+    background: color-mix(in srgb, var(--color-brand-danger) 18%, var(--color-bg-surface));
+    border-color: color-mix(in srgb, var(--color-brand-danger) 48%, var(--color-border));
+    color: color-mix(in srgb, var(--color-brand-danger) 78%, var(--color-text-primary));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .deleteButton:hover:not(:disabled) {
-    background: #ffd4d4;
-    border-color: #e36f6f;
-    color: #992c2c;
+    background: color-mix(in srgb, var(--color-brand-danger) 24%, var(--color-bg-surface));
+    border-color: color-mix(in srgb, var(--color-brand-danger) 60%, var(--color-border));
+    color: color-mix(in srgb, var(--color-brand-danger) 88%, var(--color-text-primary));
 }
 
 /* The missing inline style */
