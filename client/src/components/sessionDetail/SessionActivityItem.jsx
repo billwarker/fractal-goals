@@ -15,6 +15,12 @@ import NoteTimeline from './NoteTimeline';
 import styles from './SessionActivityItem.module.css';
 import useMetricDrafts from './useMetricDrafts';
 import { useProgressComparison } from '../../hooks/useProgressComparison';
+import {
+    computeAutoAggregations,
+    filterTrackedMetricDefs,
+    formatAggValue,
+    resolveAutoAggregationMode,
+} from '../../utils/progressAggregations';
 
 /**
  * Format duration in seconds to MM:SS format
@@ -90,6 +96,99 @@ function getBestSetIndexes(sets, anchorMetricId, higherIsBetter, getMetricValue)
     });
 
     return bestIndexes;
+}
+
+/**
+ * Progress summary shown below sets: additive totals, yield, best set.
+ */
+function SessionActivityProgressSummary({ sets, metricDefs, activeProgress }) {
+    const trackedMetricDefs = useMemo(() => filterTrackedMetricDefs(metricDefs), [metricDefs]);
+    const autoAgg = useMemo(() => {
+        const fromRecord = activeProgress?.derived_summary?.auto_aggregations;
+        if (fromRecord) return fromRecord;
+        if (!sets || sets.length === 0) return null;
+        if (trackedMetricDefs.length === 0) return null;
+        return computeAutoAggregations(sets, trackedMetricDefs);
+    }, [activeProgress, sets, trackedMetricDefs]);
+
+    if (!autoAgg) return null;
+
+    const multDefs = trackedMetricDefs.filter((md) => md.is_multiplicative);
+    const hasYield = multDefs.length >= 2 && autoAgg.total_yield != null;
+    const hasAdditive = Object.keys(autoAgg.additive_totals).length > 0;
+    const hasBestSet = autoAgg.best_set_index != null;
+
+    if (!hasYield && !hasAdditive && !hasBestSet) return null;
+
+    // Previous total yield for delta display
+    const prevYield = (() => {
+        if (!activeProgress?.metric_comparisons) return null;
+        const yieldComp = activeProgress.metric_comparisons.find((mc) => mc.type === 'yield');
+        return yieldComp?.previous_value ?? null;
+    })();
+
+    const isFirstInstance = activeProgress?.is_first_instance;
+
+    const bestSetLabel = hasBestSet
+        ? (hasYield && autoAgg.best_set_yield != null
+            ? `= ${formatAggValue(autoAgg.best_set_yield)}`
+            : trackedMetricDefs
+                .filter((md) => autoAgg.best_set_values[md.id] != null)
+                .map((md) => `${formatAggValue(autoAgg.best_set_values[md.id])} ${md.unit}`)
+                .join(' × ')
+        )
+        : null;
+
+    return (
+        <div className={styles.progressSummary}>
+            {hasAdditive && trackedMetricDefs
+                .filter((md) => md.is_additive !== false && !md.is_multiplicative && autoAgg.additive_totals[md.id] != null)
+                .map((md) => (
+                    <div key={md.id} className={`${styles.progressSummaryRow} ${styles.progressSummaryTotal}`}>
+                        <span className={styles.progressSummaryLabel}>Total {md.name}:</span>
+                        <span className={styles.progressSummaryValue}>
+                            {formatAggValue(autoAgg.additive_totals[md.id])} {md.unit}
+                        </span>
+                    </div>
+                ))
+            }
+
+            {/* Total yield + best set on one line */}
+            {(hasYield || hasBestSet) && (
+                <div className={`${styles.progressSummaryRow} ${styles.progressSummaryTotal}`}>
+                    {hasYield && (
+                        <>
+                            <span className={styles.progressSummaryLabel}>Total yield:</span>
+                            <span className={styles.progressSummaryValue}>
+                                {formatAggValue(autoAgg.total_yield)}
+                                {!isFirstInstance && prevYield != null && autoAgg.total_yield != null && (
+                                    <SummaryDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter styles={styles} />
+                                )}
+                            </span>
+                        </>
+                    )}
+                    {hasBestSet && bestSetLabel && (
+                        <span className={styles.progressSummaryBestSetInline}>
+                            · Best: Set {autoAgg.best_set_index + 1} {bestSetLabel}
+                        </span>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function SummaryDelta({ current, previous, higherIsBetter = true, styles }) {
+    if (previous == null || current == null) return null;
+    const delta = current - previous;
+    if (delta === 0) return null;
+    const improved = (delta > 0 && higherIsBetter) || (delta < 0 && !higherIsBetter);
+    const pct = previous !== 0 ? Math.abs(delta / previous * 100) : null;
+    const label = pct != null
+        ? `${improved ? '▲' : '▼'}${formatAggValue(pct)}%`
+        : `${improved ? '+' : ''}${formatAggValue(delta)}`;
+    const cls = improved ? styles.metricInlineProgressImproved : styles.metricInlineProgressRegressed;
+    return <span className={`${styles.metricInlineProgress} ${cls}`}> ({label})</span>;
 }
 
 function buildEmptySet(definition, hasSplits) {
@@ -183,7 +282,7 @@ function SessionActivityItem({
     const [stopTimeDraft, setStopTimeDraft] = useState(null);
     // Progress comparison: stored from completion mutation response or fetched live
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
-    const [realtimeDuration, setRealtimeDuration] = useState(0);
+    const [realtimeDuration, setRealtimeDuration] = useState(() => exercise.duration_seconds ?? 0);
 
 
 
@@ -229,11 +328,6 @@ function SessionActivityItem({
                 // Start interval
                 intervalId = setInterval(updateTimerLocal, 1000);
             }
-        } else if (exercise.duration_seconds != null) {
-            // Use stored duration if available (completed)
-            setRealtimeDuration(exercise.duration_seconds);
-        } else {
-            setRealtimeDuration(0);
         }
 
         return () => {
@@ -249,6 +343,9 @@ function SessionActivityItem({
         session?.last_paused_at,
         session?.attributes?.last_paused_at
     ]);
+    const displayedDuration = exercise.time_start && !exercise.time_stop
+        ? realtimeDuration
+        : (exercise.duration_seconds ?? 0);
 
     // Filter notes for this activity
     const activityNotes = Array.isArray(activityNotesProp)
@@ -309,9 +406,7 @@ function SessionActivityItem({
 
     // The displayed progress: prefer completion result, fall back to live query
     const activeProgress = activityProgress || liveProgressComparison;
-    const metricDefinitionsById = useMemo(() => new Map(
-        (def.metric_definitions || []).map((metric) => [metric.id, metric])
-    ), [def.metric_definitions]);
+    const trackedMetricDefs = useMemo(() => filterTrackedMetricDefs(def.metric_definitions || []), [def.metric_definitions]);
     const metricProgressById = useMemo(() => {
         const items = activeProgress?.metric_comparisons || [];
         return new Map(
@@ -334,9 +429,7 @@ function SessionActivityItem({
             if (!comparison) continue;
 
             const aggregation = comparison.aggregation
-                || metric.progress_aggregation
-                || metric.default_progress_aggregation
-                || 'last';
+                || resolveAutoAggregationMode(metric, trackedMetricDefs, { hasSets });
 
             const presentSetValues = exercise.sets
                 .map((set, setIndex) => {
@@ -377,7 +470,33 @@ function SessionActivityItem({
         }
 
         return visibilityMap;
-    }, [def.metric_definitions, exercise.sets, getMetricValue, hasSets, metricProgressById]);
+    }, [def.metric_definitions, exercise.sets, getMetricValue, hasSets, metricProgressById, trackedMetricDefs]);
+
+    // Compute auto-aggregations for set-level display (yield per set, best set highlight)
+    const liveAutoAgg = useMemo(() => {
+        if (!hasSets || !Array.isArray(exercise.sets) || exercise.sets.length === 0) return null;
+        if (trackedMetricDefs.length === 0) return null;
+        return computeAutoAggregations(exercise.sets, trackedMetricDefs);
+    }, [hasSets, exercise.sets, trackedMetricDefs]);
+    const bestSetIndex = liveAutoAgg?.best_set_index ?? null;
+    const yieldBySetIndex = useMemo(() => {
+        if (!liveAutoAgg?.yield_per_set?.length) return null;
+        const map = {};
+        for (const { set_index, yield: y } of liveAutoAgg.yield_per_set) {
+            map[set_index] = y;
+        }
+        return map;
+    }, [liveAutoAgg]);
+
+    const prevYieldBySetIndex = useMemo(() => {
+        const prevAgg = activeProgress?.derived_summary?.prev_auto_aggregations;
+        if (!prevAgg?.yield_per_set?.length) return null;
+        const map = {};
+        for (const { set_index, yield: y } of prevAgg.yield_per_set) {
+            map[set_index] = y;
+        }
+        return map;
+    }, [activeProgress]);
 
     const renderMetricProgress = useCallback((metricId, options = {}) => {
         if (!metricId || !activeProgress || activeProgress.is_first_instance) {
@@ -418,10 +537,15 @@ function SessionActivityItem({
                 );
             }
 
-            // Fallback: only show hint on the driving set row
             const visibleIndexes = setProgressVisibility.get(metricId);
-            if (visibleIndexes && !visibleIndexes.has(options.setIndex)) {
-                return null;
+
+            // Keep max-style comparisons pinned to the driving set row even
+            // before completion so best-set anchors stay spatially coherent.
+            // Other in-progress comparisons still show references on every row.
+            if (isCompleted || comparison.aggregation === 'max') {
+                if (visibleIndexes && !visibleIndexes.has(options.setIndex)) {
+                    return null;
+                }
             }
         }
 
@@ -669,7 +793,7 @@ function SessionActivityItem({
                                         <MetaField
                                             className={styles.durationMetaField}
                                             label="Duration"
-                                            value={formatDuration(realtimeDuration)}
+                                            value={formatDuration(displayedDuration)}
                                             valueClassName={[
                                                 styles.durationDisplay,
                                                 (exercise.time_start && !exercise.time_stop) ? styles.durationActive : styles.durationInactive,
@@ -769,106 +893,110 @@ function SessionActivityItem({
                                         // Notify parent of set selection change
                                         if (onFocus) onFocus(exercise, newSetIndex);
                                     }}
-                                    className={`${styles.setRow} ${selectedSetIndex === setIdx ? styles.setRowSelected : ''}`}
+                                    className={`${styles.setRow} ${selectedSetIndex === setIdx ? styles.setRowSelected : ''} ${bestSetIndex === setIdx ? styles.setRowBestSet : ''}`}
                                 >
                                     <div className={styles.setNumber}>#{setIdx + 1}</div>
 
-                                    {hasMetrics && (
-                                        hasSplits ? (
-                                            // Render metrics grouped by split
-                                            def.split_definitions.map(split => (
-                                                <div key={split.id} className={styles.splitContainer}>
-                                                    <span className={styles.splitLabel}>{split.name}</span>
-                                                    {def.metric_definitions.map(m => (
-                                                        <div key={m.id} className={styles.metricInputContainer}>
-                                                            <label className={styles.metricLabel}>{m.name}</label>
-                                                            <input
-                                                                type="number"
-                                                                className={`${styles.metricInput} ${styles.metricInputSmall}`}
-                                                                value={getSetMetricDisplayValue(setIdx, set.metrics, m.id, split.id)}
-                                                                onChange={(e) => handleSetMetricDraftChange(setIdx, m.id, e.target.value, split.id)}
-                                                                onBlur={() => commitSetMetricChange(setIdx, m.id, split.id)}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter') e.currentTarget.blur();
-                                                                }}
-                                                            />
-                                                            <span className={styles.metricMeta}>
-                                                                <span className={styles.metricUnit}>{m.unit}</span>
-                                                                {renderMetricProgress(m.id, { setIndex: setIdx })}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ))
-                                        ) : (
-                                            // Render metrics without splits (original behavior)
-                                            def.metric_definitions.map(m => (
-                                                <div key={m.id} className={styles.metricInputContainer}>
-                                                    <label className={styles.metricLabelLarge}>{m.name}</label>
-                                                    <input
-                                                        type="number"
-                                                        className={`${styles.metricInput} ${styles.metricInputLarge}`}
-                                                        value={getSetMetricDisplayValue(setIdx, set.metrics, m.id)}
-                                                        onChange={(e) => handleSetMetricDraftChange(setIdx, m.id, e.target.value)}
-                                                        onBlur={() => commitSetMetricChange(setIdx, m.id)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') e.currentTarget.blur();
-                                                        }}
-                                                    />
-                                                    <span className={`${styles.metricMeta} ${styles.metricMetaLarge}`}>
-                                                        <span className={styles.metricUnitLarge}>{m.unit}</span>
-                                                        {renderMetricProgress(m.id, { setIndex: setIdx })}
-                                                    </span>
-                                                </div>
-                                            ))
-                                        )
-                                    )}
+                                    <div className={styles.setMetricsContent}>
+                                        {hasMetrics && (
+                                            hasSplits ? (
+                                                // Render metrics grouped by split
+                                                def.split_definitions.map(split => (
+                                                    <div key={split.id} className={styles.splitContainer}>
+                                                        <span className={styles.splitLabel}>{split.name}</span>
+                                                        {def.metric_definitions.map(m => (
+                                                            <div key={m.id} className={styles.metricInputContainer}>
+                                                                <label className={styles.metricLabel}>{m.name}</label>
+                                                                <input
+                                                                    type="number"
+                                                                    className={`${styles.metricInput} ${styles.metricInputSmall}`}
+                                                                    value={getSetMetricDisplayValue(setIdx, set.metrics, m.id, split.id)}
+                                                                    onChange={(e) => handleSetMetricDraftChange(setIdx, m.id, e.target.value, split.id)}
+                                                                    onBlur={() => commitSetMetricChange(setIdx, m.id, split.id)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') e.currentTarget.blur();
+                                                                    }}
+                                                                />
+                                                                <span className={styles.metricMeta}>
+                                                                    <span className={styles.metricUnit}>{m.unit}</span>
+                                                                    {renderMetricProgress(m.id, { setIndex: setIdx })}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                // Render metrics without splits (original behavior)
+                                                def.metric_definitions.map(m => (
+                                                    <div key={m.id} className={styles.metricInputContainer}>
+                                                        <label className={styles.metricLabelLarge}>{m.name}</label>
+                                                        <input
+                                                            type="number"
+                                                            className={`${styles.metricInput} ${styles.metricInputLarge}`}
+                                                            value={getSetMetricDisplayValue(setIdx, set.metrics, m.id)}
+                                                            onChange={(e) => handleSetMetricDraftChange(setIdx, m.id, e.target.value)}
+                                                            onBlur={() => commitSetMetricChange(setIdx, m.id)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') e.currentTarget.blur();
+                                                            }}
+                                                        />
+                                                        <span className={`${styles.metricMeta} ${styles.metricMetaLarge}`}>
+                                                            <span className={styles.metricUnitLarge}>{m.unit}</span>
+                                                            {renderMetricProgress(m.id, { setIndex: setIdx })}
+                                                        </span>
+                                                    </div>
+                                                ))
+                                            )
+                                        )}
 
-                                    {/* Cascade Buttons Container */}
-                                    {/* Show IF: not the last set AND next set is empty for at least one metric */}
-                                    {setIdx < exercise.sets.length - 1 && (
-                                        <div className={styles.cascadeButtonsContainer}>
-                                            {/* Logic to render buttons for all applicable metrics */}
-                                            {(() => {
-                                                const buttons = [];
-
-                                                // Helper to check and add button
-                                                const checkAndAddButton = (m, splitId = null) => {
-                                                    // Must have a value in CURRENT set
-                                                    const val = getMetricValue(set.metrics, m.id, splitId);
-
-                                                    // AND next set must be empty for this metric
-                                                    if (val && isNextSetEmpty(setIdx, m.id, splitId)) {
-                                                        const key = splitId ? `${splitId}-${m.id}` : m.id;
-                                                        buttons.push(
-                                                            <button
-                                                                key={key}
-                                                                className={styles.cascadeButton}
-                                                                onClick={() => handleCascade(m.id, val, splitId, setIdx)}
-                                                                title={`Copy ${val} ${m.unit || ''} to subsequent empty sets`}
-                                                            >
-                                                                Cascade {m.unit || 'Value'}
-                                                            </button>
-                                                        );
+                                        {/* Cascade Buttons Container */}
+                                        {setIdx < exercise.sets.length - 1 && (
+                                            <div className={styles.cascadeButtonsContainer}>
+                                                {(() => {
+                                                    const buttons = [];
+                                                    const checkAndAddButton = (m, splitId = null) => {
+                                                        const val = getMetricValue(set.metrics, m.id, splitId);
+                                                        if (val && isNextSetEmpty(setIdx, m.id, splitId)) {
+                                                            const key = splitId ? `${splitId}-${m.id}` : m.id;
+                                                            buttons.push(
+                                                                <button
+                                                                    key={key}
+                                                                    className={styles.cascadeButton}
+                                                                    onClick={() => handleCascade(m.id, val, splitId, setIdx)}
+                                                                    title={`Copy ${val} ${m.unit || ''} to subsequent empty sets`}
+                                                                >
+                                                                    Cascade {m.unit || 'Value'}
+                                                                </button>
+                                                            );
+                                                        }
+                                                    };
+                                                    if (hasSplits) {
+                                                        def.split_definitions.forEach(split => {
+                                                            def.metric_definitions.forEach(m => checkAndAddButton(m, split.id));
+                                                        });
+                                                    } else {
+                                                        def.metric_definitions.forEach(m => checkAndAddButton(m));
                                                     }
-                                                };
+                                                    if (buttons.length === 0) return null;
+                                                    return buttons;
+                                                })()}
+                                            </div>
+                                        )}
+                                    </div>
 
-                                                if (hasSplits) {
-                                                    def.split_definitions.forEach(split => {
-                                                        def.metric_definitions.forEach(m => checkAndAddButton(m, split.id));
-                                                    });
-                                                } else {
-                                                    def.metric_definitions.forEach(m => checkAndAddButton(m));
-                                                }
-
-                                                // Only render container if we have buttons
-                                                if (buttons.length === 0) return null;
-
-                                                return buttons;
-                                            })()}
-                                        </div>
+                                    {yieldBySetIndex?.[setIdx] != null && (
+                                        <span className={styles.setYield}>
+                                            Yield: {formatAggValue(yieldBySetIndex[setIdx])}
+                                            {!activeProgress?.is_first_instance && prevYieldBySetIndex?.[setIdx] != null && (
+                                                <SummaryDelta
+                                                    current={yieldBySetIndex[setIdx]}
+                                                    previous={prevYieldBySetIndex[setIdx]}
+                                                    higherIsBetter
+                                                    styles={styles}
+                                                />
+                                            )}
+                                        </span>
                                     )}
-
 
                                     <button onClick={() => handleRemoveSet(setIdx)} className={styles.removeSetButton} aria-label="Remove set">×</button>
                                 </div>
@@ -880,6 +1008,11 @@ function SessionActivityItem({
                         >
                             + Add Set
                         </button>
+                        <SessionActivityProgressSummary
+                            sets={exercise.sets}
+                            metricDefs={def.metric_definitions}
+                            activeProgress={activeProgress}
+                        />
                     </div>
                 ) : (
                     /* SINGLE VIEW (NO SETS) */

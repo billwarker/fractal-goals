@@ -9,6 +9,11 @@ import { useActivityHistory } from '../../hooks/useActivityHistory';
 import { useProgressHistory } from '../../hooks/useProgressHistory';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import MarkdownNoteContent from '../notes/MarkdownNoteContent';
+import {
+    computeAutoAggregations,
+    filterTrackedMetricDefs,
+    formatAggValue,
+} from '../../utils/progressAggregations';
 import styles from './HistoryPanel.module.css';
 
 const HISTORY_LIMIT = 10;
@@ -142,8 +147,42 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
  */
 function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate, timezone }) {
     // Parse sets from instance data
-    const sets = instance.sets || [];
+    const sets = useMemo(() => instance.sets || [], [instance.sets]);
     const hasMetrics = instance.metric_values && instance.metric_values.length > 0;
+    const metricDefs = useMemo(() => activityDef?.metric_definitions || [], [activityDef?.metric_definitions]);
+    const trackedMetricDefs = useMemo(() => filterTrackedMetricDefs(metricDefs), [metricDefs]);
+
+    // Auto-aggregations: prefer stored record, fall back to client-side computation
+    const autoAgg = useMemo(() => {
+        const fromRecord = progressRecord?.derived_summary?.auto_aggregations;
+        if (fromRecord) return fromRecord;
+        if (sets.length === 0 || trackedMetricDefs.length === 0) return null;
+        return computeAutoAggregations(sets, trackedMetricDefs);
+    }, [progressRecord, sets, trackedMetricDefs]);
+
+    const prevAutoAgg = progressRecord?.derived_summary?.prev_auto_aggregations ?? null;
+
+    const multDefs = trackedMetricDefs.filter((md) => md.is_multiplicative);
+    const hasYield = multDefs.length >= 2 && autoAgg?.total_yield != null;
+
+    // Build yield-by-set-index maps (current and previous)
+    const yieldBySetIndex = useMemo(() => {
+        if (!autoAgg?.yield_per_set?.length) return null;
+        const map = {};
+        for (const { set_index, yield: y } of autoAgg.yield_per_set) {
+            map[set_index] = y;
+        }
+        return map;
+    }, [autoAgg]);
+
+    const prevYieldBySetIndex = useMemo(() => {
+        if (!prevAutoAgg?.yield_per_set?.length) return null;
+        const map = {};
+        for (const { set_index, yield: y } of prevAutoAgg.yield_per_set) {
+            map[set_index] = y;
+        }
+        return map;
+    }, [prevAutoAgg]);
 
     // Format duration
     const formatDuration = (seconds) => {
@@ -224,6 +263,21 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
         return { label: '(0)', tone: 'neutral' };
     };
 
+    const renderYieldDelta = (current, previous) => {
+        if (previous == null || current == null) return null;
+        const delta = current - previous;
+        if (Math.abs(delta) < 0.001) return { label: '(0%)', tone: 'neutral' };
+        if (previous === 0) {
+            const formatted = formatMetricNumber(Math.abs(delta));
+            if (delta > 0) return { label: `(+${formatted})`, tone: 'improved' };
+            return { label: `(-${formatted})`, tone: 'regressed' };
+        }
+        const pct = Math.abs((delta / previous) * 100);
+        const formatted = formatMetricNumber(pct);
+        if (delta > 0) return { label: `(▲${formatted}%)`, tone: 'improved' };
+        return { label: `(▼${formatted}%)`, tone: 'regressed' };
+    };
+
     const renderMetricRow = (label, indicator) => {
         const indicatorClassName = indicator?.tone === 'improved'
             ? styles.historyProgressImproved
@@ -264,7 +318,10 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
             {sets.length > 0 && (
                 <div className={styles.historyCardSets}>
                     {sets.map((set, idx) => (
-                        <div key={set.instance_id || idx} className={styles.historySet}>
+                        <div
+                            key={set.instance_id || idx}
+                            className={`${styles.historySet} ${autoAgg?.best_set_index === idx ? styles.historySetBest : ''}`}
+                        >
                             <span className={styles.historySetNum}>#{idx + 1}</span>
                             <div className={styles.historySetMetrics}>
                                 {set.metrics?.map((m, mIdx) => {
@@ -283,8 +340,72 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
                                     );
                                 })}
                             </div>
+                            {yieldBySetIndex?.[idx] != null && (() => {
+                                const currYield = yieldBySetIndex[idx];
+                                const prevYield = prevYieldBySetIndex?.[idx];
+                                const indicator = !progressRecord?.is_first_instance
+                                    ? renderYieldDelta(currYield, prevYield)
+                                    : null;
+                                const indicatorClass = indicator?.tone === 'improved'
+                                    ? styles.historyProgressImproved
+                                    : indicator?.tone === 'regressed'
+                                        ? styles.historyProgressRegressed
+                                        : styles.historyProgressNeutral;
+                                return (
+                                    <span className={styles.historySetYield}>
+                                        Yield: {formatAggValue(currYield)}
+                                        {indicator && (
+                                            <span className={`${styles.historyProgressIndicator} ${indicatorClass}`}>
+                                                {' '}{indicator.label}
+                                            </span>
+                                        )}
+                                    </span>
+                                );
+                            })()}
                         </div>
                     ))}
+
+                    {/* Summary: total yield + best set */}
+                    {(hasYield || autoAgg?.best_set_index != null) && (
+                        <div className={styles.historyAggSummary}>
+                            {hasYield && (() => {
+                                const totalIndicator = !progressRecord?.is_first_instance
+                                    ? renderYieldDelta(autoAgg.total_yield, prevAutoAgg?.total_yield)
+                                    : null;
+                                const totalIndicatorClass = totalIndicator?.tone === 'improved'
+                                    ? styles.historyProgressImproved
+                                    : totalIndicator?.tone === 'regressed'
+                                        ? styles.historyProgressRegressed
+                                        : styles.historyProgressNeutral;
+                                return (
+                                    <span className={styles.historyAggItem}>
+                                        <span className={styles.historyAggLabel}>Total yield:</span>
+                                        <span className={styles.historyAggValue}>{formatAggValue(autoAgg.total_yield)}</span>
+                                        {totalIndicator && (
+                                            <span className={`${styles.historyProgressIndicator} ${totalIndicatorClass}`}>
+                                                {totalIndicator.label}
+                                            </span>
+                                        )}
+                                    </span>
+                                );
+                            })()}
+                            {autoAgg?.best_set_index != null && (
+                                <span className={styles.historyAggItem}>
+                                    <span className={styles.historyAggLabel}>Best:</span>
+                                    <span className={styles.historyAggValue}>
+                                        Set {autoAgg.best_set_index + 1}
+                                        {hasYield && autoAgg.best_set_yield != null
+                                            ? ` · ${formatAggValue(autoAgg.best_set_yield)}`
+                                            : metricDefs
+                                                .filter((md) => autoAgg.best_set_values?.[md.id] != null)
+                                                .map((md) => ` · ${formatAggValue(autoAgg.best_set_values[md.id])} ${md.unit}`)
+                                                .join('')
+                                        }
+                                    </span>
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 

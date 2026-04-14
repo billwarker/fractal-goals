@@ -195,6 +195,58 @@
     margin-left: 4px;
 }
 
+.setYieldInline {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.progressSummaryDivider {
+    color: var(--color-border);
+    font-size: 11px;
+}
+
+/* Progress summary bar (totals, yield, best set) */
+.progressSummary {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 6px;
+    padding-top: 5px;
+    border-top: 1px dashed var(--color-border);
+}
+
+.progressSummaryRow {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    font-size: 11px;
+}
+
+.progressSummaryLabel {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+
+.progressSummaryValue {
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.progressSummaryTotal {
+    color: var(--color-text-primary);
+}
+
+.progressSummaryTotal .progressSummaryValue {
+    color: var(--color-text-primary);
+}
+
+.progressSummaryBestSet {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
 @media (max-width: 768px) {
     .activityCard {
         padding: 10px;

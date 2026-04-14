@@ -148,8 +148,8 @@ class ProgressService:
         settings = self._get_root_progress_settings(root_id)
         return settings.get('enabled', True) is not False
 
-    def _resolve_aggregation(self, metric_def: MetricDefinition, activity_def=None, root_progress_settings=None) -> str:
-        """Resolve progress_aggregation: ActivityDefinition -> MetricDefinition -> FractalMetricDefinition -> root default -> 'last'."""
+    def _resolve_configured_aggregation(self, metric_def: MetricDefinition, activity_def=None, root_progress_settings=None) -> Optional[str]:
+        """Return a legacy explicitly-configured aggregation, if one exists."""
         if activity_def and getattr(activity_def, 'progress_aggregation', None):
             return activity_def.progress_aggregation
         if metric_def.progress_aggregation:
@@ -158,7 +158,38 @@ class ProgressService:
             return metric_def.fractal_metric.default_progress_aggregation
         if root_progress_settings and root_progress_settings.get('default_aggregation'):
             return root_progress_settings['default_aggregation']
-        return 'last'
+        return None
+
+    def _resolve_aggregation(
+        self,
+        metric_def: MetricDefinition,
+        metric_defs: Optional[list] = None,
+        activity_def=None,
+        root_progress_settings=None,
+        has_sets: bool = False,
+    ) -> str:
+        """Resolve comparison mode from legacy config when present, else auto-derive it from metric flags."""
+        configured = self._resolve_configured_aggregation(metric_def, activity_def, root_progress_settings)
+        if configured:
+            return configured
+
+        if not has_sets:
+            return 'last'
+
+        has_best_set_anchor = any(md.is_best_set_metric for md in (metric_defs or []))
+
+        if metric_def.is_best_set_metric or (has_best_set_anchor and not metric_def.is_multiplicative):
+            return 'max'
+
+        if metric_def.is_multiplicative:
+            # Multiplicative metrics participate in the activity-level yield comparison.
+            # Keep per-metric hints on the raw metric values rather than duplicating yield.
+            return 'last'
+
+        if self._resolve_is_additive(metric_def):
+            return 'sum'
+
+        return 'max'
 
     def _resolve_higher_is_better(self, metric_def: MetricDefinition) -> bool:
         """Resolve higher_is_better: FractalMetricDefinition -> True (default)."""
@@ -408,6 +439,179 @@ class ProgressService:
         # Unknown aggregation — fall back to last value recorded
         return values[-1]
 
+    def _compute_auto_aggregations(self, instance: ActivityInstance, metric_defs: list) -> dict:
+        """Compute all meaningful aggregations automatically from metric types.
+
+        Returns a dict with:
+          - additive_totals: {metric_id: total} for additive metrics
+          - yield_per_set: [{set_index, yield}] for multiplicative metrics (if 2+)
+          - total_yield: float sum of per-set yields (if multiplicative)
+          - best_set_index: index of the best set (None if no sets)
+          - best_set_yield: yield value of the best set (None if not multiplicative)
+          - best_set_values: {metric_id: value} for all metrics in the best set
+        """
+        raw_data = models._safe_load_json(instance.data, {})
+        sets = raw_data.get('sets', []) if isinstance(raw_data, dict) else []
+
+        result = {
+            'additive_totals': {},
+            'yield_per_set': [],
+            'total_yield': None,
+            'best_set_index': None,
+            'best_set_yield': None,
+            'best_set_values': {},
+        }
+
+        if not metric_defs:
+            return result
+
+        mult_defs = [md for md in metric_defs if md.is_multiplicative]
+        has_multiplicative = len(mult_defs) >= 2
+
+        # --- Additive totals ---
+        for md in metric_defs:
+            if md.is_multiplicative or not self._resolve_is_additive(md):
+                continue
+            if sets:
+                values = []
+                for s in sets:
+                    for m in s.get('metrics', []):
+                        mid = m.get('metric_id') or m.get('metric_definition_id')
+                        v = self._coerce_numeric(m.get('value'))
+                        if mid == md.id and v is not None:
+                            values.append(v)
+                if values:
+                    result['additive_totals'][md.id] = sum(values)
+            else:
+                mv = next(
+                    (v for v in instance.metric_values if v.metric_definition_id == md.id),
+                    None,
+                )
+                v = self._coerce_numeric(mv.value) if mv is not None else None
+                if v is not None:
+                    result['additive_totals'][md.id] = v
+
+        # --- Yield per set and total yield ---
+        if has_multiplicative and sets:
+            yield_per_set = []
+            total_yield = 0.0
+            has_any_yield = False
+            for set_index, s in enumerate(sets):
+                set_metrics = {
+                    (m.get('metric_id') or m.get('metric_definition_id')): self._coerce_numeric(m.get('value'))
+                    for m in s.get('metrics', [])
+                }
+                product = 1.0
+                set_complete = True
+                for md in mult_defs:
+                    val = set_metrics.get(md.id)
+                    if val is None:
+                        set_complete = False
+                        break
+                    product *= val
+                if set_complete:
+                    yield_per_set.append({'set_index': set_index, 'yield': product})
+                    total_yield += product
+                    has_any_yield = True
+            if has_any_yield:
+                result['yield_per_set'] = yield_per_set
+                result['total_yield'] = total_yield
+        elif has_multiplicative:
+            product = 1.0
+            has_all_values = True
+            for md in mult_defs:
+                mv = next(
+                    (v for v in instance.metric_values if v.metric_definition_id == md.id),
+                    None,
+                )
+                v = self._coerce_numeric(mv.value) if mv is not None else None
+                if v is None:
+                    has_all_values = False
+                    break
+                product *= v
+            if has_all_values:
+                result['total_yield'] = product
+
+        # --- Best set ---
+        if sets:
+            # Determine anchor metric: is_best_set_metric wins, else use yield if multiplicative
+            anchor = next((md for md in metric_defs if md.is_best_set_metric), None)
+
+            if anchor is not None:
+                # Best set by anchor metric value (respects higher_is_better)
+                higher_is_better = self._resolve_higher_is_better(anchor)
+                best_index = None
+                best_val = None
+                for set_index, s in enumerate(sets):
+                    for m in s.get('metrics', []):
+                        mid = m.get('metric_id') or m.get('metric_definition_id')
+                        if mid == anchor.id:
+                            v = self._coerce_numeric(m.get('value'))
+                            if v is None:
+                                continue
+                            if (
+                                best_val is None
+                                or (higher_is_better and v > best_val)
+                                or (not higher_is_better and v < best_val)
+                            ):
+                                best_val = v
+                                best_index = set_index
+                result['best_set_index'] = best_index
+            elif has_multiplicative and result['yield_per_set']:
+                # Best set = highest yield set
+                best = max(result['yield_per_set'], key=lambda x: x['yield'])
+                best_index = best['set_index']
+                result['best_set_index'] = best_index
+                result['best_set_yield'] = best['yield']
+            elif metric_defs:
+                # Single/non-multiplicative: best by first metric's higher_is_better
+                primary = metric_defs[0]
+                higher_is_better = self._resolve_higher_is_better(primary)
+                best_index = None
+                best_val = None
+                for set_index, s in enumerate(sets):
+                    for m in s.get('metrics', []):
+                        mid = m.get('metric_id') or m.get('metric_definition_id')
+                        if mid == primary.id:
+                            v = self._coerce_numeric(m.get('value'))
+                            if v is None:
+                                continue
+                            if (
+                                best_val is None
+                                or (higher_is_better and v > best_val)
+                                or (not higher_is_better and v < best_val)
+                            ):
+                                best_val = v
+                                best_index = set_index
+                result['best_set_index'] = best_index
+
+            # Populate best_set_values
+            if result['best_set_index'] is not None and result['best_set_index'] < len(sets):
+                best_s = sets[result['best_set_index']]
+                for m in best_s.get('metrics', []):
+                    mid = m.get('metric_id') or m.get('metric_definition_id')
+                    v = self._coerce_numeric(m.get('value'))
+                    if mid and v is not None:
+                        result['best_set_values'][mid] = v
+                # Also attach yield for best set if multiplicative
+                if has_multiplicative and result['best_set_yield'] is None:
+                    set_metrics = {
+                        (m.get('metric_id') or m.get('metric_definition_id')): self._coerce_numeric(m.get('value'))
+                        for m in best_s.get('metrics', [])
+                    }
+                    product = 1.0
+                    set_complete = True
+                    for md in mult_defs:
+                        val = set_metrics.get(md.id)
+                        if val is None:
+                            set_complete = False
+                            break
+                        product *= val
+                    if set_complete:
+                        result['best_set_yield'] = product
+
+        return result
+
     def _resolve_yield(self, instance: ActivityInstance, metric_defs: list, activity_def=None, root_progress_settings=None):
         """Compute total yield as Σ(product of multiplicative metrics per set).
 
@@ -457,7 +661,13 @@ class ProgressService:
         # No sets — multiply scalar values together (single-set equivalent).
         product = 1.0
         for md in mult_defs:
-            aggregation = self._resolve_aggregation(md, activity_def, root_progress_settings)
+            aggregation = self._resolve_aggregation(
+                md,
+                mult_defs,
+                activity_def,
+                root_progress_settings,
+                has_sets=False,
+            )
             val = self._extract_metric_value(instance, md, aggregation)
             if val is None:
                 return None, []
@@ -482,34 +692,44 @@ class ProgressService:
             (metric_comparisons, derived_summary, has_improvement, has_regression,
              has_change, comparison_type)
         """
+        activity_tracks_progress = activity_def is None or getattr(activity_def, 'track_progress', None) is not False
+        tracked_defs = [md for md in metric_defs if md.track_progress] if activity_tracks_progress else []
+
         if previous_instance is None:
             # First time this activity has been completed
-            summary_line = "First time!"
+            auto_aggregations = self._compute_auto_aggregations(current_instance, tracked_defs)
+            summary_line = 'First time!' if tracked_defs else 'No tracked metrics'
+            comparison_type = 'first_instance' if tracked_defs else None
             return (
                 [],
-                {'summary_line': summary_line},
+                {'summary_line': summary_line, 'auto_aggregations': auto_aggregations},
                 False,
                 False,
                 False,
-                'first_instance',
+                comparison_type,
             )
 
         # Filter to metrics with track_progress enabled
         # Activity-level track_progress (null = True for backward compat) takes priority over per-metric
-        activity_tracks_progress = activity_def is None or getattr(activity_def, 'track_progress', None) is not False
         if not activity_tracks_progress:
-            return [], {'summary_line': 'No tracked metrics'}, False, False, False, None
-        tracked_defs = [md for md in metric_defs if md.track_progress]
+            auto_aggregations = self._compute_auto_aggregations(current_instance, tracked_defs)
+            return [], {'summary_line': 'No tracked metrics', 'auto_aggregations': auto_aggregations}, False, False, False, None
         if not tracked_defs:
-            return [], {'summary_line': 'No tracked metrics'}, False, False, False, None
+            auto_aggregations = self._compute_auto_aggregations(current_instance, tracked_defs)
+            return [], {'summary_line': 'No tracked metrics', 'auto_aggregations': auto_aggregations}, False, False, False, None
 
         metric_comparisons = []
         has_improvement = False
         has_regression = False
         has_change = False
 
-        # Yield should only be used when explicitly requested by at least one metric.
-        yield_requested = any(self._resolve_aggregation(md, activity_def, root_progress_settings) == 'yield' for md in tracked_defs)
+        curr_data = models._safe_load_json(current_instance.data, {})
+        curr_sets = curr_data.get('sets', []) if isinstance(curr_data, dict) else []
+        has_sets = bool(curr_sets)
+
+        # Yield is derived automatically when at least two tracked multiplicative metrics exist.
+        mult_tracked_defs = [md for md in tracked_defs if md.is_multiplicative]
+        yield_requested = len(mult_tracked_defs) >= 2
         curr_yield = None
         prev_yield = None
         yield_ids = []
@@ -520,8 +740,6 @@ class ProgressService:
         comparison_type = 'flat_metrics'
 
         # Check if sets are present to pick a better comparison_type label
-        curr_data = models._safe_load_json(current_instance.data, {})
-        curr_sets = curr_data.get('sets', []) if isinstance(curr_data, dict) else []
         if curr_sets:
             comparison_type = 'set_metrics'
 
@@ -555,7 +773,13 @@ class ProgressService:
             })
         else:
             for md in tracked_defs:
-                aggregation = self._resolve_aggregation(md, activity_def, root_progress_settings)
+                aggregation = self._resolve_aggregation(
+                    md,
+                    tracked_defs,
+                    activity_def,
+                    root_progress_settings,
+                    has_sets=has_sets,
+                )
                 if aggregation == 'yield':
                     continue
                 higher_is_better = self._resolve_higher_is_better(md)
@@ -570,22 +794,19 @@ class ProgressService:
                 if curr_val is None:
                     # Build per-set hints from previous instance so each set row
                     # can show its own "last N" placeholder, not just the aggregate.
-                    if aggregation == 'max':
-                        in_progress_set_comparisons = []
-                    else:
-                        prev_set_values = self._extract_set_values(previous_instance, md)
-                        in_progress_set_comparisons = [
-                            {
-                                'set_index': idx,
-                                'current_value': None,
-                                'previous_value': val,
-                                'delta': None,
-                                'pct_change': None,
-                                'improved': False,
-                                'regressed': False,
-                            }
-                            for idx, val in prev_set_values
-                        ]
+                    prev_set_values = self._extract_set_values(previous_instance, md)
+                    in_progress_set_comparisons = [
+                        {
+                            'set_index': idx,
+                            'current_value': None,
+                            'previous_value': val,
+                            'delta': None,
+                            'pct_change': None,
+                            'improved': False,
+                            'regressed': False,
+                        }
+                        for idx, val in prev_set_values
+                    ]
                     metric_comparisons.append({
                         'metric_id': md.id,
                         'metric_name': md.name,
@@ -641,17 +862,22 @@ class ProgressService:
                 })
 
         if yield_requested and not metric_comparisons:
-            return [], {'summary_line': 'Yield unavailable'}, False, False, False, 'yield'
+            auto_aggregations = self._compute_auto_aggregations(current_instance, tracked_defs)
+            return [], {'summary_line': 'Yield unavailable', 'auto_aggregations': auto_aggregations}, False, False, False, 'yield'
 
         # Build a human-readable summary line
         # Count how many yield-aggregated metrics were skipped due to unavailable yield data
         yield_skipped = yield_requested and comparison_type != 'yield'
         summary_line = self._build_summary_line(metric_comparisons, has_improvement, has_regression, has_change, comparison_type)
+        auto_aggregations = self._compute_auto_aggregations(current_instance, tracked_defs)
+        prev_auto_aggregations = self._compute_auto_aggregations(previous_instance, tracked_defs) if previous_instance is not None else None
         derived_summary = {
             'summary_line': summary_line,
             'improved_count': sum(1 for mc in metric_comparisons if mc.get('improved')),
             'regressed_count': sum(1 for mc in metric_comparisons if mc.get('regressed')),
             'yield_partial': yield_skipped,
+            'auto_aggregations': auto_aggregations,
+            'prev_auto_aggregations': prev_auto_aggregations,
         }
 
         return metric_comparisons, derived_summary, has_improvement, has_regression, has_change, comparison_type

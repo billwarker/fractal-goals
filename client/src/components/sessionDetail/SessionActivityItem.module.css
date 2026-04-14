@@ -435,6 +435,29 @@
     border-color: var(--color-brand-success);
 }
 
+.setRowBestSet {
+}
+
+.setMetricsContent {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.setYield {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+    min-width: 100px;
+    text-align: right;
+    padding-right: 6px;
+    flex-shrink: 0;
+}
+
 .setNumber {
     width: 30px;
     color: var(--color-text-muted);
@@ -775,4 +798,43 @@
     .singleMetricGroup {
         width: 100%;
     }
+}
+
+/* Progress summary bar */
+.progressSummary {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--color-border);
+}
+
+.progressSummaryRow {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    font-size: 12px;
+}
+
+.progressSummaryLabel {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+
+.progressSummaryValue {
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.progressSummaryTotal .progressSummaryValue {
+    color: var(--color-text-primary);
+}
+
+.progressSummaryBestSetInline {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 400;
+    font-style: italic;
+    margin-left: 8px;
 }

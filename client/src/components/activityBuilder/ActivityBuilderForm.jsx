@@ -10,7 +10,6 @@ import TextArea from '../atoms/TextArea';
 import { buildActivityPayload } from '../../utils/activityBuilder';
 import { getGroupBreadcrumb, sortGroupsTreeOrder } from '../../utils/manageActivities';
 import styles from '../ActivityBuilder.module.css';
-import metricStyles from './ActivityMetricsSection.module.css';
 import ActivityAssociationsField from './ActivityAssociationsField';
 import ActivityMetricsSection from './ActivityMetricsSection';
 import ActivitySplitsSection from './ActivitySplitsSection';
@@ -51,7 +50,6 @@ function ActivityBuilderForm({
     const [groupId, setGroupId] = useState(initialState.groupId);
     const [selectedGoalIds, setSelectedGoalIds] = useState(initialState.selectedGoalIds);
     const [trackProgress, setTrackProgress] = useState(initialState.trackProgress);
-    const [progressAggregation, setProgressAggregation] = useState(initialState.progressAggregation);
 
     const resetForm = () => {
         setError(null);
@@ -66,7 +64,6 @@ function ActivityBuilderForm({
         setGroupId('');
         setSelectedGoalIds([]);
         setTrackProgress(true);
-        setProgressAggregation('last');
         setPendingSubmission(null);
         setShowMetricWarning(false);
         setMetricWarningMessage('');
@@ -154,7 +151,6 @@ function ActivityBuilderForm({
                 groupId,
                 selectedGoalIds,
                 trackProgress,
-                progressAggregation,
             });
 
             const result = editingActivity?.id
@@ -202,7 +198,6 @@ function ActivityBuilderForm({
             groupId,
             selectedGoalIds,
             trackProgress,
-            progressAggregation,
         });
 
         const persistedMetrics = editingActivity?.id
@@ -311,19 +306,6 @@ function ActivityBuilderForm({
                                 checked={trackProgress}
                                 onChange={(event) => setTrackProgress(event.target.checked)}
                             />
-                            {trackProgress && (
-                                <select
-                                    className={metricStyles.progressAggregationSelect}
-                                    value={progressAggregation}
-                                    onChange={(e) => setProgressAggregation(e.target.value)}
-                                    aria-label="Compare by"
-                                >
-                                    <option value="last">Last value</option>
-                                    {hasSets && <option value="sum">Sum across sets</option>}
-                                    {hasSets && <option value="max">Best set</option>}
-                                    {hasSets && metricsMultiplicative && <option value="yield">Yield (×)</option>}
-                                </select>
-                            )}
                         </div>
                     </div>
 
@@ -341,7 +323,6 @@ function ActivityBuilderForm({
                             rootId={rootId}
                             metrics={metrics}
                             hasSets={hasSets}
-                            activityProgressAggregation={progressAggregation}
                             onAddMetric={handleAddMetric}
                             onRemoveMetric={handleRemoveMetric}
                             onMetricChange={handleMetricChange}

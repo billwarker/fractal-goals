@@ -29,7 +29,6 @@ function sanitizeMetric(metric) {
         is_best_set_metric: Boolean(metric?.is_best_set_metric),
         is_multiplicative: metric?.is_multiplicative !== false,
         track_progress: metric?.track_progress !== false,
-        progress_aggregation: metric?.progress_aggregation || null,
     };
 
     const metricId = normalizeOptionalId(metric?.id);
@@ -85,7 +84,6 @@ export function buildActivityPayload({
     groupId,
     selectedGoalIds,
     trackProgress,
-    progressAggregation,
 }) {
     const sanitizedMetrics = (metrics || [])
         .map((metric) => sanitizeMetric(metric))
@@ -106,7 +104,6 @@ export function buildActivityPayload({
         group_id: normalizeOptionalId(groupId),
         goal_ids: sanitizeGoalIds(selectedGoalIds),
         track_progress: trackProgress !== false,
-        progress_aggregation: progressAggregation || null,
     };
 }
 
@@ -142,7 +139,6 @@ export function prepareActivityDefinitionCopy(activity) {
         has_splits: Boolean(activity.has_splits ?? splitDefinitions.length > 0),
         group_id: normalizeOptionalId(activity.group_id),
         track_progress: activity.track_progress !== false,
-        progress_aggregation: activity.progress_aggregation || null,
         metric_definitions: metricDefinitions,
         split_definitions: splitDefinitions,
         associated_goal_ids: sanitizeGoalIds(activity.associated_goal_ids),

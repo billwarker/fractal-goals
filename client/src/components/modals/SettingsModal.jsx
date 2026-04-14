@@ -39,20 +39,10 @@ const SettingsModalInner = ({ onClose }) => {
 
     const { progressSettings, updateProgressSettings } = useRootProgressSettings(activeRootId);
     const progressEnabled = progressSettings?.enabled !== false;
-    const progressDefaultAggregation = progressSettings?.default_aggregation ?? '';
 
     const handleProgressEnabledToggle = async (e) => {
         try {
             await updateProgressSettings({ ...(progressSettings || {}), enabled: e.target.checked });
-        } catch (err) {
-            notify.error(`Failed to update progress settings: ${formatError(err)}`);
-        }
-    };
-
-    const handleProgressDefaultAggregation = async (e) => {
-        const value = e.target.value || null;
-        try {
-            await updateProgressSettings({ ...(progressSettings || {}), default_aggregation: value });
         } catch (err) {
             notify.error(`Failed to update progress settings: ${formatError(err)}`);
         }
@@ -270,27 +260,6 @@ const SettingsModalInner = ({ onClose }) => {
                                                         When disabled, no progress comparisons are computed for this fractal
                                                     </span>
                                                 </label>
-                                            </div>
-
-                                            <div className={styles.themeRow}>
-                                                <label className={styles.checkboxLabel} style={{ marginBottom: 4 }}>
-                                                    Default comparison method
-                                                    <span className={styles.checkboxDescription}>
-                                                        Used for new metrics that don&apos;t have a specific method configured
-                                                    </span>
-                                                </label>
-                                                <select
-                                                    value={progressDefaultAggregation}
-                                                    onChange={handleProgressDefaultAggregation}
-                                                    className={styles.selectInput}
-                                                    disabled={!progressEnabled}
-                                                >
-                                                    <option value="">Not set (use per-metric defaults)</option>
-                                                    <option value="last">Last value</option>
-                                                    <option value="sum">Sum across sets</option>
-                                                    <option value="max">Best set</option>
-                                                    <option value="yield">Yield (volume)</option>
-                                                </select>
                                             </div>
 
                                             <div className={styles.themeRow}>

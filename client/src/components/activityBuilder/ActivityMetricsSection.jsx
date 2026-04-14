@@ -58,7 +58,6 @@ function ActivityMetricsSection({
     rootId,
     metrics,
     hasSets,
-    activityProgressAggregation,
     onAddMetric,
     onRemoveMetric,
     onMetricChange,
@@ -102,9 +101,6 @@ function ActivityMetricsSection({
                 {metrics.map((metric, idx) => {
                     const linked = fractalMetrics.find((m) => m.id === metric.fractal_metric_id);
                     const metricTracksProgress = metric.track_progress !== false;
-                    const metricAggregation = metric.progress_aggregation || '';
-                    const usesMultiplicativeMath = linked?.is_multiplicative ?? (metric.is_multiplicative !== false);
-                    const isAdditive = linked?.is_additive !== false;
                     return (
                         <div key={idx} className={styles.metricCard}>
                             <div className={styles.metricRow}>
@@ -167,28 +163,11 @@ function ActivityMetricsSection({
                                     </div>
                                 )}
 
-                                <div className={metricStyles.progressTrackingRow}>
-                                    <span className={metricStyles.progressTrackingLabel}>Compare by</span>
-                                    <select
-                                        className={metricStyles.progressAggregationSelect}
-                                        value={metricAggregation}
-                                        onChange={(e) => onMetricChange(idx, 'progress_aggregation', e.target.value || null)}
-                                        aria-label={`Metric ${idx + 1} compare by`}
-                                        disabled={!metricTracksProgress}
-                                    >
-                                        <option value="">Use activity default ({activityProgressAggregation || 'last'})</option>
-                                        <option value="last">Last value</option>
-                                        {hasSets && isAdditive && <option value="sum">Sum across sets</option>}
-                                        {hasSets && <option value="max">Best set</option>}
-                                        {hasSets && usesMultiplicativeMath && <option value="yield">Yield (x)</option>}
-                                    </select>
-                                </div>
-
-                                <div className={metricStyles.progressTrackingPreview}>
-                                    {metricTracksProgress
-                                        ? `Resolved method: ${metricAggregation || activityProgressAggregation || 'last'}`
-                                        : 'Progress comparisons disabled for this metric'}
-                                </div>
+                                {!metricTracksProgress && (
+                                    <div className={metricStyles.progressTrackingPreview}>
+                                        Progress comparisons disabled for this metric
+                                    </div>
+                                )}
                             </div>
                         </div>
                     );
@@ -218,7 +197,6 @@ ActivityMetricsSection.propTypes = {
     rootId: PropTypes.string.isRequired,
     metrics: PropTypes.array.isRequired,
     hasSets: PropTypes.bool,
-    activityProgressAggregation: PropTypes.string,
     onAddMetric: PropTypes.func.isRequired,
     onRemoveMetric: PropTypes.func.isRequired,
     onMetricChange: PropTypes.func.isRequired,

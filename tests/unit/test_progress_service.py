@@ -103,13 +103,13 @@ def _build_instance(db_session, *, root_id, session_id, activity_id, created_at,
 
 @pytest.mark.unit
 class TestProgressService:
-    def test_does_not_auto_switch_to_yield_without_explicit_request(self, db_session, sample_ultimate_goal):
+    def test_auto_adds_yield_comparison_for_multiple_multiplicative_metrics(self, db_session, sample_ultimate_goal):
         activity, metrics = _build_activity_with_metrics(
             db_session,
             sample_ultimate_goal.id,
             metric_specs=[
-                {'name': 'Weight', 'unit': 'lbs', 'is_multiplicative': True, 'progress_aggregation': 'last'},
-                {'name': 'Reps', 'unit': 'reps', 'is_multiplicative': True, 'progress_aggregation': 'last'},
+                {'name': 'Weight', 'unit': 'lbs', 'is_multiplicative': True},
+                {'name': 'Reps', 'unit': 'reps', 'is_multiplicative': True},
             ],
         )
         prev_session = _build_session(
@@ -144,17 +144,19 @@ class TestProgressService:
 
         result = ProgressService(db_session).compute_live_comparison(current_instance.id)
 
-        assert result['comparison_type'] == 'flat_metrics'
-        assert len(result['metric_comparisons']) == 2
-        assert all(item.get('type') != 'yield' for item in result['metric_comparisons'])
+        yield_comparison = next(item for item in result['metric_comparisons'] if item.get('type') == 'yield')
 
-    def test_uses_yield_only_when_explicitly_requested(self, db_session, sample_ultimate_goal):
+        assert result['comparison_type'] == 'yield'
+        assert yield_comparison['current_value'] == 525.0
+        assert yield_comparison['previous_value'] == 500.0
+        assert result['derived_summary']['auto_aggregations']['total_yield'] == 525.0
+
+    def test_auto_uses_sum_for_additive_set_metrics(self, db_session, sample_ultimate_goal):
         activity, metrics = _build_activity_with_metrics(
             db_session,
             sample_ultimate_goal.id,
             metric_specs=[
-                {'name': 'Weight', 'unit': 'lbs', 'is_multiplicative': True, 'progress_aggregation': 'yield'},
-                {'name': 'Reps', 'unit': 'reps', 'is_multiplicative': True, 'progress_aggregation': 'last'},
+                {'name': 'Distance', 'unit': 'm', 'is_multiplicative': False},
             ],
         )
         prev_session = _build_session(
@@ -175,7 +177,13 @@ class TestProgressService:
             session_id=prev_session.id,
             activity_id=activity.id,
             created_at=datetime(2026, 2, 1, 10, 0, tzinfo=timezone.utc),
-            values={metrics[0].id: 100, metrics[1].id: 5},
+            values={},
+            data={
+                'sets': [
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 400}]},
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 500}]},
+                ],
+            },
         )
         current_instance = _build_instance(
             db_session,
@@ -183,16 +191,25 @@ class TestProgressService:
             session_id=current_session.id,
             activity_id=activity.id,
             created_at=datetime(2026, 2, 2, 10, 0, tzinfo=timezone.utc),
-            values={metrics[0].id: 105, metrics[1].id: 5},
+            values={},
+            data={
+                'sets': [
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 450}]},
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 550}]},
+                ],
+            },
         )
         db_session.commit()
 
         result = ProgressService(db_session).compute_live_comparison(current_instance.id)
 
-        assert result['comparison_type'] == 'yield'
-        assert result['metric_comparisons'][0]['type'] == 'yield'
-        assert result['metric_comparisons'][0]['current_value'] == 525.0
-        assert result['metric_comparisons'][0]['previous_value'] == 500.0
+        metric_comparison = result['metric_comparisons'][0]
+
+        assert result['comparison_type'] == 'set_metrics'
+        assert metric_comparison['aggregation'] == 'sum'
+        assert metric_comparison['current_value'] == 1000.0
+        assert metric_comparison['previous_value'] == 900.0
+        assert result['derived_summary']['auto_aggregations']['additive_totals'][metrics[0].id] == 1000.0
 
     def test_respects_lower_is_better_and_skips_untracked_metrics(self, db_session, sample_ultimate_goal):
         duration_metric = FractalMetricDefinition(
@@ -261,12 +278,59 @@ class TestProgressService:
         assert result['metric_comparisons'][0]['improved'] is True
         assert result['has_improvement'] is True
 
+    def test_auto_aggregations_only_use_tracked_metrics(self, db_session, sample_ultimate_goal):
+        activity, metrics = _build_activity_with_metrics(
+            db_session,
+            sample_ultimate_goal.id,
+            metric_specs=[
+                {'name': 'Weight', 'unit': 'lbs', 'is_multiplicative': True, 'track_progress': True},
+                {'name': 'Reps', 'unit': 'reps', 'is_multiplicative': True, 'track_progress': False},
+            ],
+        )
+        prev_session = _build_session(
+            db_session,
+            sample_ultimate_goal.id,
+            'Previous Session',
+            datetime(2026, 3, 3, tzinfo=timezone.utc),
+        )
+        current_session = _build_session(
+            db_session,
+            sample_ultimate_goal.id,
+            'Current Session',
+            datetime(2026, 3, 4, tzinfo=timezone.utc),
+        )
+        _build_instance(
+            db_session,
+            root_id=sample_ultimate_goal.id,
+            session_id=prev_session.id,
+            activity_id=activity.id,
+            created_at=datetime(2026, 3, 3, 10, 0, tzinfo=timezone.utc),
+            values={metrics[0].id: 100, metrics[1].id: 5},
+        )
+        current_instance = _build_instance(
+            db_session,
+            root_id=sample_ultimate_goal.id,
+            session_id=current_session.id,
+            activity_id=activity.id,
+            created_at=datetime(2026, 3, 4, 10, 0, tzinfo=timezone.utc),
+            values={metrics[0].id: 105, metrics[1].id: 6},
+        )
+        db_session.commit()
+
+        result = ProgressService(db_session).compute_live_comparison(current_instance.id)
+
+        assert result['comparison_type'] == 'flat_metrics'
+        assert len(result['metric_comparisons']) == 1
+        assert result['metric_comparisons'][0]['metric_name'] == 'Weight'
+        assert all(item.get('type') != 'yield' for item in result['metric_comparisons'])
+        assert result['derived_summary']['auto_aggregations']['total_yield'] is None
+
     def test_keeps_previous_metric_baseline_when_current_value_is_empty(self, db_session, sample_ultimate_goal):
         activity, metrics = _build_activity_with_metrics(
             db_session,
             sample_ultimate_goal.id,
             metric_specs=[
-                {'name': 'Quality', 'unit': 'rating', 'is_multiplicative': False, 'progress_aggregation': 'last'},
+                {'name': 'Quality', 'unit': 'rating', 'is_multiplicative': False},
             ],
         )
         prev_session = _build_session(
@@ -316,7 +380,7 @@ class TestProgressService:
             db_session,
             sample_ultimate_goal.id,
             metric_specs=[
-                {'name': 'Speed', 'unit': 'BPM', 'is_multiplicative': False, 'progress_aggregation': 'last'},
+                {'name': 'Speed', 'unit': 'BPM', 'is_multiplicative': False},
             ],
         )
         prev_session = _build_session(
@@ -366,17 +430,18 @@ class TestProgressService:
         assert result['comparison_type'] == 'set_metrics'
         assert len(result['metric_comparisons']) == 1
         assert result['metric_comparisons'][0]['metric_name'] == 'Speed'
-        assert result['metric_comparisons'][0]['previous_value'] == 120.0
-        assert result['metric_comparisons'][0]['current_value'] == 130.0
-        assert result['metric_comparisons'][0]['delta'] == 10.0
-        assert result['metric_comparisons'][0]['pct_change'] == pytest.approx(8.3, abs=0.1)
+        assert result['metric_comparisons'][0]['aggregation'] == 'sum'
+        assert result['metric_comparisons'][0]['previous_value'] == 220.0
+        assert result['metric_comparisons'][0]['current_value'] == 240.0
+        assert result['metric_comparisons'][0]['delta'] == 20.0
+        assert result['metric_comparisons'][0]['pct_change'] == pytest.approx(9.1, abs=0.1)
 
     def test_progress_history_backfills_missing_records_for_completed_instances(self, db_session, sample_ultimate_goal):
         activity, metrics = _build_activity_with_metrics(
             db_session,
             sample_ultimate_goal.id,
             metric_specs=[
-                {'name': 'Speed', 'unit': 'BPM', 'is_multiplicative': False, 'progress_aggregation': 'last'},
+                {'name': 'Speed', 'unit': 'BPM', 'is_multiplicative': False},
             ],
         )
         prev_session = _build_session(
@@ -424,7 +489,7 @@ class TestProgressService:
             db_session,
             sample_ultimate_goal.id,
             metric_specs=[
-                {'name': 'Speed', 'unit': 'BPM', 'is_multiplicative': False, 'progress_aggregation': 'last'},
+                {'name': 'Speed', 'unit': 'BPM', 'is_multiplicative': False},
             ],
         )
         prev_session = _build_session(
@@ -474,7 +539,8 @@ class TestProgressService:
 
         assert result['is_first_instance'] is False
         assert len(result['metric_comparisons']) == 1
-        assert result['metric_comparisons'][0]['previous_value'] == 120.0
+        assert result['metric_comparisons'][0]['aggregation'] == 'sum'
+        assert result['metric_comparisons'][0]['previous_value'] == 220.0
         assert result['metric_comparisons'][0]['current_value'] is None
 
     def test_ignores_blank_set_values_when_computing_progress(self, db_session, sample_ultimate_goal):
@@ -482,7 +548,7 @@ class TestProgressService:
             db_session,
             sample_ultimate_goal.id,
             metric_specs=[
-                {'name': 'Speed', 'unit': 'BPM', 'is_multiplicative': False, 'progress_aggregation': 'last'},
+                {'name': 'Speed', 'unit': 'BPM', 'is_multiplicative': False},
             ],
         )
         prev_session = _build_session(
@@ -533,7 +599,8 @@ class TestProgressService:
 
         assert result['is_first_instance'] is False
         assert len(result['metric_comparisons']) == 1
-        assert result['metric_comparisons'][0]['previous_value'] == 120.0
+        assert result['metric_comparisons'][0]['aggregation'] == 'sum'
+        assert result['metric_comparisons'][0]['previous_value'] == 220.0
         assert result['metric_comparisons'][0]['current_value'] is None
 
     def test_recompute_progress_for_activity_rebases_downstream_instances(self, db_session, sample_ultimate_goal):
@@ -541,7 +608,7 @@ class TestProgressService:
             db_session,
             sample_ultimate_goal.id,
             metric_specs=[
-                {'name': 'Speed', 'unit': 'BPM', 'is_multiplicative': False, 'progress_aggregation': 'last'},
+                {'name': 'Speed', 'unit': 'BPM', 'is_multiplicative': False},
             ],
         )
         session_a = _build_session(
@@ -610,7 +677,6 @@ class TestProgressService:
             name='Duration',
             unit='seconds',
             higher_is_better=False,
-            default_progress_aggregation='max',
             created_at=datetime.now(timezone.utc),
         )
         activity, metrics = _build_activity_with_metrics(
@@ -622,14 +688,12 @@ class TestProgressService:
                     'unit': 'seconds',
                     'fractal_metric': duration_metric,
                     'is_multiplicative': False,
-                    'progress_aggregation': 'max',
                     'is_best_set_metric': True,
                 },
                 {
                     'name': 'Accuracy',
                     'unit': 'score',
                     'is_multiplicative': False,
-                    'progress_aggregation': 'max',
                 },
             ],
         )

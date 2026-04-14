@@ -6,8 +6,8 @@ import { useFractalTree } from './useGoalQueries';
 /**
  * Read and write progress_settings for the active root goal.
  *
- * progressSettings shape: { enabled: bool, default_aggregation: string|null }
- * null means "use defaults" (enabled=true, no default aggregation).
+ * progressSettings shape: { enabled: bool }
+ * null means "use defaults" (enabled=true).
  */
 export function useRootProgressSettings(rootId) {
     const queryClient = useQueryClient();

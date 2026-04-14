@@ -75,7 +75,6 @@ describe('buildActivityPayload', () => {
                 is_best_set_metric: true,
                 is_multiplicative: false,
                 track_progress: true,
-                progress_aggregation: null,
             }],
             splits: [{
                 id: 'split-1',
@@ -88,7 +87,6 @@ describe('buildActivityPayload', () => {
             group_id: 'group-1',
             goal_ids: ['goal-1', 'goal-2'],
             track_progress: true,
-            progress_aggregation: null,
         });
     });
 });
@@ -111,7 +109,6 @@ describe('prepareActivityDefinitionCopy', () => {
             has_splits: true,
             group_id: { id: 'group-1' },
             track_progress: false,
-            progress_aggregation: 'max',
             associated_goal_ids: ['goal-1'],
             metric_definitions: [{
                 id: 'metric-1',
@@ -120,7 +117,6 @@ describe('prepareActivityDefinitionCopy', () => {
                 is_best_set_metric: true,
                 is_multiplicative: false,
                 track_progress: false,
-                progress_aggregation: 'sum',
             }],
             split_definitions: [{ id: 'split-1', name: 'Left Hand' }],
         };
@@ -138,7 +134,6 @@ describe('prepareActivityDefinitionCopy', () => {
             has_splits: true,
             group_id: 'group-1',
             track_progress: false,
-            progress_aggregation: 'max',
             associated_goal_ids: ['goal-1'],
             metric_definitions: [{
                 id: undefined,
@@ -147,7 +142,6 @@ describe('prepareActivityDefinitionCopy', () => {
                 is_best_set_metric: true,
                 is_multiplicative: false,
                 track_progress: false,
-                progress_aggregation: 'sum',
             }],
             split_definitions: [{ id: undefined, name: 'Left Hand' }],
         });
