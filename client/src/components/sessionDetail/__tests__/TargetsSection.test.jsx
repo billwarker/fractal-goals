@@ -23,8 +23,8 @@ describe('TargetsSection', () => {
                 hierarchy={[
                     {
                         id: 'goal-1',
-                        name: 'Micro 1',
-                        type: 'MicroGoal',
+                        name: 'Immediate 1',
+                        type: 'ImmediateGoal',
                         completed: true,
                         attributes: {
                             targets: [

@@ -147,7 +147,7 @@ export function GoalLevelsProvider({ children }) {
             const lvl = getLevelByName(goal.level_name);
             if (lvl?.icon) return lvl.icon;
         }
-        // Try type field (e.g. 'MicroGoal') as a name lookup fallback
+        // Try type field (e.g. 'ImmediateGoal') as a name lookup fallback
         if (goal?.type) {
             const normalizedName = goal.type.replace(/([A-Z])/g, ' $1').trim();
             const lvl = getLevelByName(normalizedName) || getLevelByName(goal.type);

@@ -38,6 +38,7 @@ from blueprints.dashboards_api import dashboards_bp
 from blueprints.logs_api import logs_api
 from blueprints.auth_api import auth_bp
 from blueprints.pages import pages_bp
+from services.completion_handlers import clear_achievement_context, clear_live_progress
 from services import init_services
 from services.db_migration_service import apply_startup_migrations
 
@@ -161,10 +162,23 @@ from models import get_engine, remove_session
 get_engine()
 logger.info("Database engine initialized with connection pooling")
 
+@app.before_request
+def reset_request_scoped_contexts():
+    """Prevent request-local thread state from leaking across requests."""
+    clear_achievement_context()
+    clear_live_progress()
+
+
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     """Clean up database session at the end of each request."""
     remove_session()
+
+
+@app.teardown_request
+def clear_request_scoped_contexts(exception=None):
+    clear_achievement_context()
+    clear_live_progress()
 
 
 @app.after_request

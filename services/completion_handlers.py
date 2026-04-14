@@ -10,10 +10,12 @@ These handlers subscribe to the event bus and react to completion-related events
 """
 
 import logging
+import threading
 from datetime import datetime, timezone
 import json
 
 from services.events import event_bus, Event, Events
+from services.progress_service import ProgressService
 from services.goal_target_rules import (
     check_metric_value as _check_metric_value,
     check_metrics_meet_target as _check_metrics_meet_target,
@@ -193,10 +195,16 @@ def handle_session_completed(event: Event):
             session_id,
             pending_events=pending_events,
         )
-        
+
+        # Compute and persist progress records for all completed instances
+        try:
+            ProgressService(db_session).compute_progress_for_session(session_id)
+        except Exception as progress_err:
+            logger.warning("Error computing progress for session %s: %s", session_id, progress_err)
+
         db_session.commit()
         _emit_pending_events(pending_events)
-        
+
     except Exception as e:
         db_session.rollback()
         logger.exception(f"Error handling session completion: {e}")
@@ -205,8 +213,29 @@ def handle_session_completed(event: Event):
 
 
 # Thread-local storage for tracking achievements during a request
-import threading
 _achievement_context = threading.local()
+
+# Thread-local storage for live progress comparisons during a request
+_live_progress_context = threading.local()
+
+
+def set_live_progress(instance_id: str, comparison):
+    """Store a live progress comparison for the current request."""
+    if not hasattr(_live_progress_context, 'comparisons'):
+        _live_progress_context.comparisons = {}
+    _live_progress_context.comparisons[instance_id] = comparison
+
+
+def get_live_progress(instance_id: str):
+    """Retrieve a live progress comparison stored during the current request."""
+    if not hasattr(_live_progress_context, 'comparisons'):
+        return None
+    return _live_progress_context.comparisons.get(instance_id)
+
+
+def clear_live_progress():
+    """Clear all live progress comparisons. Should be called at the start of a request."""
+    _live_progress_context.comparisons = {}
 
 
 def get_recent_achievements():
@@ -543,6 +572,7 @@ def handle_activity_metrics_updated(event: Event):
     instance_id = event.data.get('instance_id')
     root_id = event.data.get('root_id')
     session_id = event.data.get('session_id')
+    activity_definition_id = event.data.get('activity_definition_id')
 
     if not all([instance_id, root_id, session_id]):
         return
@@ -562,11 +592,57 @@ def handle_activity_metrics_updated(event: Event):
             root_id,
             pending_events=pending_events,
         )
+        comparison = None
+        try:
+            progress_service = ProgressService(db_session)
+            if activity_definition_id:
+                progress_service.recompute_progress_for_activity(activity_definition_id, root_id)
+            else:
+                progress_service.recompute_progress_for_instance(instance_id)
+            comparison = progress_service.get_progress_for_instance(instance_id)
+        except Exception as progress_err:
+            logger.warning("Error recomputing persisted progress timeline for instance %s: %s", instance_id, progress_err)
+
         db_session.commit()
         _emit_pending_events(pending_events)
+        set_live_progress(instance_id, comparison)
     except Exception as e:
         db_session.rollback()
         logger.exception(f"Error handling activity metrics update: {e}")
+    finally:
+        _close_if_owned(db_session, owns_session)
+
+
+@event_bus.on(Events.SESSION_DELETED)
+def handle_session_deleted(event: Event):
+    """Recompute progress timelines for activities affected by a deleted session."""
+    session_id = event.data.get('session_id')
+    root_id = event.data.get('root_id')
+    if not all([session_id, root_id]):
+        return
+
+    db_session, owns_session = _resolve_db_session(event)
+    try:
+        activity_ids = [
+            activity_id
+            for (activity_id,) in (
+                db_session.query(ActivityInstance.activity_definition_id)
+                .filter(
+                    ActivityInstance.session_id == session_id,
+                    ActivityInstance.deleted_at == None,
+                )
+                .distinct()
+                .all()
+            )
+            if activity_id
+        ]
+        progress_service = ProgressService(db_session)
+        for activity_id in activity_ids:
+            progress_service.recompute_progress_for_activity(activity_id, root_id)
+        db_session.commit()
+    except Exception as exc:
+        db_session.rollback()
+        logger.exception("Error recomputing progress after session deletion: %s", exc)
     finally:
         _close_if_owned(db_session, owns_session)
 

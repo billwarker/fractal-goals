@@ -31,8 +31,6 @@ const GOAL_LEVEL_ORDER = {
     MidTermGoal: 2,
     ShortTermGoal: 3,
     ImmediateGoal: 4,
-    MicroGoal: 5,
-    NanoGoal: 6,
 };
 
 function getGoalId(goal) {
@@ -87,15 +85,11 @@ function isTimestampWithinSession(timestamp, sessionStart, sessionEnd) {
 
 const AccomplishmentsSection = memo(function AccomplishmentsSection({
     completedGoals,
-    nanoGoalsCompleted,
     getGoalColor,
     getGoalSecondaryColor,
     getGoalIcon
 }) {
-    const hasCompletedGoals = completedGoals.length > 0;
-    const hasNanoGoals = nanoGoalsCompleted > 0;
-
-    if (!hasCompletedGoals && !hasNanoGoals) {
+    if (completedGoals.length === 0) {
         return null;
     }
 
@@ -120,15 +114,6 @@ const AccomplishmentsSection = memo(function AccomplishmentsSection({
                         />
                     );
                 })}
-                {hasNanoGoals && (
-                    <GoalAccomplishmentChip
-                        className={styles.accomplishmentChip}
-                        label={`${nanoGoalsCompleted} Nano Goal${nanoGoalsCompleted === 1 ? '' : 's'} Completed`}
-                        color={getGoalColor('NanoGoal')}
-                        secondaryColor={getGoalSecondaryColor('NanoGoal')}
-                        shape={getGoalIcon('NanoGoal')}
-                    />
-                )}
             </div>
         </div>
     );
@@ -157,7 +142,6 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     const sessionEnd = sessionData?.session_end || session?.session_end || session?.attributes?.session_end;
     const shortTermGoals = session.short_term_goals || [];
     const immediateGoals = session.immediate_goals || [];
-    const microGoals = session.micro_goals || [];
 
     // Calculate all associated goals (including from activities)
     const allGoals = useMemo(() => {
@@ -175,7 +159,6 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
         // 1. Direct session goals (short-term and immediate)
         shortTermGoals.forEach(addGoal);
         immediateGoals.forEach(addGoal);
-        microGoals.forEach(addGoal);
 
         // 2. Goals from activity definitions currently used in this session
         const activityDefIds = new Set(
@@ -201,23 +184,23 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
         });
 
         return collectUniqueGoals(goals);
-    }, [shortTermGoals, immediateGoals, microGoals, sessionActivityInstances, activities]);
+    }, [shortTermGoals, immediateGoals, sessionActivityInstances, activities]);
 
     const achievedTargets = useMemo(() => {
-        const allAchievables = [...shortTermGoals, ...immediateGoals, ...microGoals];
+        const allAchievables = [...shortTermGoals, ...immediateGoals];
         const allAchieved = getAchievedTargetsForSession(session, allAchievables);
         // Filter specifically for targets achieved in THIS session (relational check)
         return allAchieved.filter(achieved => {
             // Check if it's explicitly linked to this session
             if (achieved.target.completed_session_id === session.id) return true;
 
-            // Or if it was calculated as achieved in this session by front-end logic 
+            // Or if it was calculated as achieved in this session by front-end logic
             // and is currently marked as completed.
             return achieved.target.completed;
         });
-    }, [session, shortTermGoals, immediateGoals, microGoals]);
+    }, [session, shortTermGoals, immediateGoals]);
 
-    const { completedGoals, nanoGoalsCompleted } = useMemo(() => {
+    const completedGoals = useMemo(() => {
         const sessionTargetGoalIds = new Set(achievedTargets.map((target) => String(target.goalId)));
 
         const directlyCompletedGoalIds = new Set(
@@ -244,7 +227,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
             })
         );
 
-        const completed = allGoals
+        return allGoals
             .filter((goal) => {
                 const goalId = getGoalId(goal);
                 const isCompleted = goal.completed || goal.attributes?.completed;
@@ -258,31 +241,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 if (levelA !== levelB) return levelA - levelB;
                 return getGoalName(goalA).localeCompare(getGoalName(goalB));
             });
-
-        const completedNanoGoalIds = new Set(
-            completed
-                .filter((goal) => getGoalType(goal) === 'NanoGoal')
-                .map((goal) => getGoalId(goal))
-                .filter(Boolean)
-                .map(String)
-        );
-
-        const completedNanoNotes = Array.isArray(session.notes)
-            ? session.notes.filter((note) => note?.is_nano_goal && note?.nano_goal_completed)
-            : [];
-
-        let nanoCount = completedNanoGoalIds.size;
-        completedNanoNotes.forEach((note) => {
-            const noteGoalId = note.nano_goal_id ? String(note.nano_goal_id) : null;
-            if (noteGoalId && completedNanoGoalIds.has(noteGoalId)) return;
-            nanoCount += 1;
-        });
-
-        return {
-            completedGoals: completed.filter((goal) => getGoalType(goal) !== 'NanoGoal'),
-            nanoGoalsCompleted: nanoCount,
-        };
-    }, [achievedTargets, allGoals, session.notes, sessionEnd, sessionStart]);
+    }, [achievedTargets, allGoals, session.id, sessionEnd, sessionStart]);
 
     // Memoize duration calculation
     const duration = useMemo(() => {
@@ -421,7 +380,6 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
             {/* Session Accomplishments Section */}
             <AccomplishmentsSection
                 completedGoals={completedGoals}
-                nanoGoalsCompleted={nanoGoalsCompleted}
                 getGoalColor={getGoalColor}
                 getGoalSecondaryColor={getGoalSecondaryColor}
                 getGoalIcon={getGoalIcon}

@@ -20,7 +20,6 @@ class Note(Base):
     session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=True, index=True)
     activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True, index=True)
     activity_definition_id = Column(String, ForeignKey('activity_definitions.id', ondelete='SET NULL'), nullable=True, index=True)
-    nano_goal_id = Column(String, ForeignKey('goals.id', ondelete='SET NULL'), nullable=True, index=True)
     goal_id = Column(String, ForeignKey('goals.id', ondelete='SET NULL'), nullable=True, index=True)
 
     set_index = Column(Integer, nullable=True)
@@ -36,7 +35,6 @@ class Note(Base):
     session = relationship("Session", backref="notes_list")
     activity_instance = relationship("ActivityInstance", backref="notes_list")
     activity_definition = relationship("ActivityDefinition", backref="notes_list")
-    nano_goal = relationship("Goal", foreign_keys=[nano_goal_id])
     goal = relationship("Goal", foreign_keys=[goal_id])
 
 class AnalyticsDashboard(Base):

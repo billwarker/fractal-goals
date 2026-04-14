@@ -261,8 +261,7 @@ const GoalCharacteristicsSettings = () => {
 
                             {/* Value + Unit Controls */}
                             <div className={styles.valueUnitControls}>
-                                {(current.name !== 'MicroGoal' && current.name !== 'NanoGoal') ? (
-                                    <div>
+                                <div>
                                         <label className={styles.inputLabelSecondary}>
                                             Deadline Range
                                         </label>
@@ -300,16 +299,6 @@ const GoalCharacteristicsSettings = () => {
                                             </select>
                                         </div>
                                     </div>
-                                ) : (
-                                    <div>
-                                        <label className={styles.inputLabelMuted}>
-                                            Deadline Range
-                                        </label>
-                                        <div className={styles.emptyDeadlineMeta}>
-                                            Deadlines not supported for transient goals
-                                        </div>
-                                    </div>
-                                )}
                                 <div>
                                     <label className={styles.inputLabelSecondary}>
                                         Max Children <span className={styles.subText}>(blank = unlimited)</span>
@@ -323,8 +312,7 @@ const GoalCharacteristicsSettings = () => {
                                         className={`${styles.numberInput} ${styles.mediumNumberInput}`}
                                     />
                                 </div>
-                                {(current.name !== 'MicroGoal' && current.name !== 'NanoGoal') && (
-                                    <div>
+                                <div>
                                         <label className={styles.inputLabelSecondary}>
                                             Default Deadline Offset
                                         </label>
@@ -346,7 +334,6 @@ const GoalCharacteristicsSettings = () => {
                                             </select>
                                         </div>
                                     </div>
-                                )}
                                 <div>
                                     <label className={styles.inputLabelSecondary}>
                                         Sort Children By

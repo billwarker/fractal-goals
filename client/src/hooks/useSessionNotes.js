@@ -77,9 +77,7 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
             }
             // Also invalidate to be sure
             queryClient.invalidateQueries({ queryKey: sessionNotesKey });
-            if (!newNote?.is_nano_goal) {
-                notify.success('Note added');
-            }
+            notify.success('Note added');
         },
         onError: (error) => {
             notify.error(`Failed to add note: ${formatError(error)}`);
@@ -94,9 +92,7 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
                 old.map(n => n.id === updatedNote.id ? updatedNote : n)
             );
             queryClient.invalidateQueries({ queryKey: sessionNotesKey });
-            if (!updatedNote?.is_nano_goal) {
-                notify.success('Note updated');
-            }
+            notify.success('Note updated');
         },
         onError: (error) => {
             notify.error(`Failed to update note: ${formatError(error)}`);
@@ -105,20 +101,12 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
 
     const deleteNoteMutation = useMutation({
         mutationFn: (noteId) => fractalApi.deleteNote(rootId, noteId),
-        onMutate: async (noteId) => {
-            const notes = queryClient.getQueryData(sessionNotesKey);
-            return {
-                deletedNote: Array.isArray(notes) ? notes.find((note) => note.id === noteId) : null,
-            };
-        },
-        onSuccess: (_, noteId, context) => {
+        onSuccess: (_, noteId) => {
             queryClient.setQueryData(sessionNotesKey, (old = []) =>
                 old.filter(n => n.id !== noteId)
             );
             queryClient.invalidateQueries({ queryKey: sessionNotesKey });
-            if (!context?.deletedNote?.is_nano_goal) {
-                notify.success('Note deleted');
-            }
+            notify.success('Note deleted');
         },
         onError: (error) => {
             notify.error(`Failed to delete note: ${formatError(error)}`);

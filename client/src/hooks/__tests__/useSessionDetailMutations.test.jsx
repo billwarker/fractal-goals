@@ -9,10 +9,12 @@ import { useSessionDetailMutations } from '../useSessionDetailMutations';
 const {
     createGoal,
     addActivityToSession,
+    updateActivityInstance,
     notify,
 } = vi.hoisted(() => ({
     createGoal: vi.fn(),
     addActivityToSession: vi.fn(),
+    updateActivityInstance: vi.fn(),
     notify: {
         success: vi.fn(),
         error: vi.fn(),
@@ -23,6 +25,7 @@ vi.mock('../../utils/api', () => ({
     fractalApi: {
         createGoal: (...args) => createGoal(...args),
         addActivityToSession: (...args) => addActivityToSession(...args),
+        updateActivityInstance: (...args) => updateActivityInstance(...args),
     },
 }));
 
@@ -50,7 +53,6 @@ function createBaseOptions(queryClient, overrides = {}) {
         },
         activityInstances: [{ id: 'inst-1', duration_seconds: 30, activity_definition_id: 'act-1' }],
         activities: [{ id: 'act-1', name: 'Activity 1' }],
-        microGoals: [],
         queryClient,
         sessionKey: queryKeys.session('root-1', 'session-1'),
         sessionActivitiesKey: queryKeys.sessionActivities('root-1', 'session-1'),
@@ -155,5 +157,43 @@ describe('useSessionDetailMutations', () => {
         ]);
         expect(draftState.sections[0].activity_ids).toEqual(['inst-1', 'inst-2']);
         expect(selectorState[0]).toBe(false);
+    });
+
+    it('invalidates progress history and session summary after activity metric-like updates', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+        queryClient.setQueryData(queryKeys.sessionActivities('root-1', 'session-1'), [
+            { id: 'inst-1', activity_definition_id: 'act-1' },
+        ]);
+        updateActivityInstance.mockResolvedValueOnce({
+            data: {
+                id: 'inst-1',
+                activity_definition_id: 'act-1',
+                progress_comparison: {
+                    activity_instance_id: 'inst-1',
+                    metric_comparisons: [],
+                },
+            },
+        });
+
+        const { result } = renderHook(
+            () => useSessionDetailMutations(createBaseOptions(queryClient)),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.updateInstance('inst-1', {
+                sets: [{ metrics: [{ metric_id: 'm1', value: 110 }] }],
+            });
+        });
+
+        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.progressComparison('inst-1') });
+        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['progress', 'history', 'act-1'] });
+        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessionProgressSummary('session-1') });
     });
 });

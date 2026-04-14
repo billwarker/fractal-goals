@@ -261,6 +261,8 @@ function Sessions() {
 
             queryClient.removeQueries({ queryKey: queryKeys.session(rootId, sessionToDelete.id) });
             queryClient.invalidateQueries({ queryKey: ['sessions', rootId] });
+            queryClient.invalidateQueries({ queryKey: ['activity-history', rootId] });
+            queryClient.invalidateQueries({ queryKey: ['progress'] });
 
             notify.success('Session deleted');
         } catch (err) {

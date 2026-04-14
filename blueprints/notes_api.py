@@ -13,7 +13,7 @@ from blueprints.api_utils import get_db_session, internal_error
 from blueprints.auth_api import token_required
 from models import get_engine, get_session
 from services.note_service import NoteService
-from validators import NanoGoalNoteCreateSchema, NoteCreateSchema, NoteUpdateSchema, validate_request
+from validators import NoteCreateSchema, NoteUpdateSchema, validate_request
 
 logger = logging.getLogger(__name__)
 
@@ -140,24 +140,6 @@ def create_note(current_user, root_id, validated_data):
         db_session.rollback()
         logger.exception("Error creating note")
         return internal_error(logger, "Error creating note")
-    finally:
-        db_session.close()
-
-
-@notes_bp.route('/<root_id>/nano-goal-notes', methods=['POST'])
-@token_required
-@validate_request(NanoGoalNoteCreateSchema)
-def create_nano_goal_note(current_user, root_id, validated_data):
-    db_session, note_service = _with_note_service()
-    try:
-        payload, error, status = note_service.create_nano_goal_note(root_id, current_user.id, validated_data)
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload), status
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error creating nano goal note")
-        return internal_error(logger, "Error creating nano goal note")
     finally:
         db_session.close()
 

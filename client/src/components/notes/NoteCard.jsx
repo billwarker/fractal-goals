@@ -50,8 +50,6 @@ function NoteCard({
     onDelete,
     onPin,
     onUnpin,
-    onToggleNanoGoal,
-    nanoToggleDisabled = false,
     showContext = false,
     compact = false,
     variant = 'card',
@@ -258,9 +256,6 @@ function NoteCard({
                                     <span className={styles.contextPrimary}>{primaryContextLabel}</span>
                                 )}
                             </div>
-                            {note.is_nano_goal && (
-                                <span className={styles.nanoBadge}>Nano Goal</span>
-                            )}
                         </div>
                         {secondaryContextBadges.length > 0 && (
                             <div className={styles.contextBadges}>
@@ -343,22 +338,8 @@ function NoteCard({
                     </div>
                 ) : (
                     !isImageOnly && (
-                        <div className={[
-                            styles.content,
-                            note.nano_goal_completed ? styles.completedContent : '',
-                        ].filter(Boolean).join(' ')}>
+                        <div className={styles.content}>
                             <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
-                            {note.is_nano_goal && onToggleNanoGoal && (
-                                <input
-                                    type="checkbox"
-                                    checked={note.nano_goal_completed || false}
-                                    onChange={(e) => onToggleNanoGoal(note.nano_goal_id, e.target.checked)}
-                                    className={styles.nanoCheckbox}
-                                    onClick={(e) => e.stopPropagation()}
-                                    disabled={nanoToggleDisabled}
-                                    title={note.nano_goal_completed ? 'Mark incomplete' : 'Mark complete'}
-                                />
-                            )}
                         </div>
                     )
                 )}

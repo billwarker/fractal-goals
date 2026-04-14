@@ -5,14 +5,13 @@ import GoalIcon from '../atoms/GoalIcon';
 import styles from '../ActivityBuilder.module.css';
 import { buildGoalAssociationSummary } from './activityBuilderUtils';
 
-const GOAL_TYPE_ORDER = ['UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal', 'ImmediateGoal', 'MicroGoal'];
+const GOAL_TYPE_ORDER = ['UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal', 'ImmediateGoal'];
 const GOAL_TYPE_LABELS = {
     UltimateGoal: 'Ultimate',
     LongTermGoal: 'Long Term',
     MidTermGoal: 'Mid Term',
     ShortTermGoal: 'Short Term',
     ImmediateGoal: 'Immediate',
-    MicroGoal: 'Micro',
 };
 
 function ActivityAssociationsField({

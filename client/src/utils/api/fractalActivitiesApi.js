@@ -37,4 +37,8 @@ export const fractalActivitiesApi = {
     updateActivityInstance: (rootId, instanceId, data) =>
         axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}`, data),
     getActivityInstances: (rootId) => axios.get(`${API_BASE}/${rootId}/activity-instances`),
+    getActivityInstanceProgress: (rootId, instanceId) =>
+        axios.get(`${API_BASE}/${rootId}/activity-instances/${instanceId}/progress`),
+    getActivityProgressHistory: (rootId, activityDefId, params = {}) =>
+        axios.get(`${API_BASE}/${rootId}/activities/${activityDefId}/progress-history`, { params }),
 };

@@ -126,12 +126,38 @@
     gap: 8px;
 }
 
+.historyMetricRow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+
 .historyMetric {
     padding: 3px 8px;
     background: var(--color-bg-input);
     border-radius: 4px;
     font-size: 12px;
     color: var(--color-text-secondary);
+}
+
+.historyProgressIndicator {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.historyProgressImproved {
+    color: var(--color-brand-success);
+}
+
+.historyProgressRegressed {
+    color: var(--color-brand-danger);
+}
+
+.historyProgressNeutral {
+    color: var(--color-text-muted);
 }
 
 .historyCardNotes {

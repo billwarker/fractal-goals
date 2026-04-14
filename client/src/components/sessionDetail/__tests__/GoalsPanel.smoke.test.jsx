@@ -12,7 +12,6 @@ let activeSessionMock = {
     achievedTargetIds: new Set(),
     createGoal: vi.fn(),
     refreshSession: vi.fn(),
-    microGoals: [],
     sessionGoalsView: null,
 };
 
@@ -80,16 +79,6 @@ describe('GoalsPanel smoke', () => {
             achievedTargetIds: new Set(),
             createGoal: vi.fn(),
             refreshSession: vi.fn(),
-            microGoals: [
-                {
-                    id: 'micro-1',
-                    name: 'Micro 1',
-                    parent_id: 'ig-1',
-                    activity_definition_id: 'activity-1',
-                    completed: false,
-                    children: [{ id: 'nano-1', name: 'Nano 1', completed: false }]
-                }
-            ],
             sessionGoalsView: {
                 goal_tree: {
                     id: 'root-1',
@@ -102,16 +91,6 @@ describe('GoalsPanel smoke', () => {
                 session_goal_ids: ['ig-1'],
                 activity_goal_ids_by_activity: { 'activity-1': ['ig-1'] },
                 session_activity_ids: ['activity-1'],
-                micro_goals: [
-                    {
-                        id: 'micro-1',
-                        name: 'Micro 1',
-                        parent_id: 'ig-1',
-                        activity_definition_id: 'activity-1',
-                        completed: false,
-                        children: [{ id: 'nano-1', name: 'Nano 1', completed: false }]
-                    }
-                ]
             }
         };
     });
@@ -136,79 +115,6 @@ describe('GoalsPanel smoke', () => {
             expect(screen.getByText('Session')).toBeInTheDocument();
         });
         expect(screen.queryByText('Session Focus')).not.toBeInTheDocument();
-    });
-
-    it('renders micro and nano goals in session hierarchy', async () => {
-        renderWithProviders(
-            <GoalsPanel
-                selectedActivity={null}
-                onGoalClick={vi.fn()}
-                onGoalCreated={vi.fn()}
-                onOpenGoals={vi.fn()}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false
-            }
-        );
-
-        await waitFor(() => {
-            expect(screen.getByText('Micro 1')).toBeInTheDocument();
-            expect(screen.getByText('Nano 1')).toBeInTheDocument();
-        });
-    });
-
-    it('does not leak legacy micro goals into activity mode when they are only descendants of an associated parent', async () => {
-        activeSessionMock = {
-            ...activeSessionMock,
-            microGoals: [
-                {
-                    id: 'micro-legacy',
-                    name: 'Legacy Micro',
-                    parent_id: 'ig-1',
-                    completed: false,
-                    children: [{ id: 'nano-new', name: 'Nano New', completed: false }]
-                }
-            ],
-            sessionGoalsView: {
-                ...(activeSessionMock.sessionGoalsView || {}),
-                micro_goals: [
-                    {
-                        id: 'micro-legacy',
-                        name: 'Legacy Micro',
-                        parent_id: 'ig-1',
-                        completed: false,
-                        children: [{ id: 'nano-new', name: 'Nano New', completed: false }]
-                    }
-                ]
-            }
-        };
-
-        renderWithProviders(
-            <GoalsPanel
-                selectedActivity={{
-                    id: 'instance-1',
-                    activity_definition_id: 'activity-1',
-                    name: 'Pull Up'
-                }}
-                onGoalClick={vi.fn()}
-                onGoalCreated={vi.fn()}
-                onOpenGoals={vi.fn()}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false
-            }
-        );
-
-        await waitFor(() => {
-            expect(screen.queryByText('Legacy Micro')).not.toBeInTheDocument();
-            expect(screen.queryByText('Nano New')).not.toBeInTheDocument();
-        });
     });
 
     it('defaults new activity contexts to activity mode without a sync effect', async () => {

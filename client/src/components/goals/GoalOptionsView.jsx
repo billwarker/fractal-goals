@@ -26,10 +26,8 @@ function getNodeLevelId(node) {
 // string used by GoalLevelsContext (e.g. "LongTermGoal").
 const toCanonicalType = (levelName) => levelName?.replace(/\s+/g, '') ?? null;
 
-// Execution-tier types that cannot be the source of a level conversion.
-const NON_CONVERTIBLE_TYPES = new Set(['ImmediateGoal', 'MicroGoal', 'NanoGoal']);
-// Execution-tier types that cannot be targets of a level conversion.
-const MICRO_NANO_TYPES = new Set(['MicroGoal', 'NanoGoal']);
+// ImmediateGoal cannot be the source of a level conversion.
+const NON_CONVERTIBLE_TYPES = new Set(['ImmediateGoal']);
 
 
 function GoalOptionsView({
@@ -71,7 +69,7 @@ function GoalOptionsView({
         const currentLevel = levelsById.get(currentLevelId);
         const currentCanonicalType = toCanonicalType(currentLevel?.name);
 
-        // ImmediateGoal, MicroGoal, NanoGoal cannot be converted (execution tier + boundary)
+        // ImmediateGoal cannot be converted (leaf boundary)
         // but ImmediateGoal IS a valid conversion target for higher-ranked macro goals.
         const isConvertible = currentCanonicalType ? !NON_CONVERTIBLE_TYPES.has(currentCanonicalType) : true;
 
@@ -95,8 +93,6 @@ function GoalOptionsView({
 
         const eligibleLevels = isConvertible ? [...goalLevels]
             .filter((level) => level.id !== currentLevelId)
-            // Exclude Micro/Nano from conversion targets (ImmediateGoal is a valid target)
-            .filter((level) => !MICRO_NANO_TYPES.has(toCanonicalType(level.name)))
             // Must be strictly below root tier (cannot be same rank as fractal root)
             .filter((level) => rootLevelRank == null || level.rank > rootLevelRank)
             // Must be strictly below parent rank

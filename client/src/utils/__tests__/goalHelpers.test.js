@@ -23,19 +23,8 @@ describe('getValidChildTypes', () => {
         expect(types).toEqual(['ImmediateGoal']);
     });
 
-    // Execution tier strict enforcement
-    it('returns only MicroGoal for ImmediateGoal', () => {
+    it('returns empty array for ImmediateGoal (leaf node)', () => {
         const types = getValidChildTypes('ImmediateGoal');
-        expect(types).toEqual(['MicroGoal']);
-    });
-
-    it('returns only NanoGoal for MicroGoal', () => {
-        const types = getValidChildTypes('MicroGoal');
-        expect(types).toEqual(['NanoGoal']);
-    });
-
-    it('returns empty array for NanoGoal (leaf node)', () => {
-        const types = getValidChildTypes('NanoGoal');
         expect(types).toEqual([]);
     });
 
@@ -53,15 +42,7 @@ describe('getChildType (shim)', () => {
         expect(getChildType('ShortTermGoal')).toBe('ImmediateGoal');
     });
 
-    it('returns MicroGoal for ImmediateGoal', () => {
-        expect(getChildType('ImmediateGoal')).toBe('MicroGoal');
-    });
-
-    it('returns NanoGoal for MicroGoal', () => {
-        expect(getChildType('MicroGoal')).toBe('NanoGoal');
-    });
-
-    it('returns null for NanoGoal', () => {
-        expect(getChildType('NanoGoal')).toBeNull();
+    it('returns null for ImmediateGoal', () => {
+        expect(getChildType('ImmediateGoal')).toBeNull();
     });
 });

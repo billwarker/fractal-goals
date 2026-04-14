@@ -118,7 +118,6 @@ describe('useSessionDetailGoalAssociations', () => {
         ]);
         queryClient.setQueryData(queryKeys.sessionGoalsView('root-1', 'session-1'), {
             goal_tree: { id: 'session-root' },
-            micro_goals: [],
             activity_goal_ids_by_activity: {
                 'activity-1': ['goal-old'],
             },

@@ -91,25 +91,6 @@ def create_goal(current_user, validated_data):
         db_session.close()
 
 
-@goals_bp.route('/fractal/<root_id>/sessions/<session_id>/micro-goals', methods=['GET'])
-@token_required
-def get_session_micro_goals(current_user, root_id, session_id):
-    """Get all micro goals linked to a session, including their nano children."""
-    db_session = get_db_session()
-    try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
-        micro_goals, error, status = service.get_session_micro_goals(root_id, session_id, current_user.id)
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify([serialize_goal(goal) for goal in micro_goals]), status
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error fetching session micro goals")
-        return internal_error(logger, "Goals API request failed")
-    finally:
-        db_session.close()
-
-
 @goals_bp.route('/fractal/<root_id>/sessions/<session_id>/goals-view', methods=['GET'])
 @token_required
 def get_session_goals_view(current_user, root_id, session_id):

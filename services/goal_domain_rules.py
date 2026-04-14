@@ -18,14 +18,6 @@ def is_goal_type(goal, canonical_type: str) -> bool:
         return False
 
 
-def is_nano_goal(goal) -> bool:
-    return get_goal_level_name(goal) == "Nano Goal" or is_goal_type(goal, "NanoGoal")
-
-
-def is_micro_goal(goal) -> bool:
-    return get_goal_level_name(goal) == "Micro Goal" or is_goal_type(goal, "MicroGoal")
-
-
 def goal_uses_child_completion(goal) -> bool:
     if getattr(goal, "completed_via_children", False):
         return True
@@ -42,11 +34,7 @@ def resolve_completed_via_children(data, level_obj) -> bool:
 def should_inherit_parent_activities(goal, parent_goal, explicit_value=None) -> bool:
     if explicit_value is not None:
         return bool(explicit_value)
-    return bool(
-        parent_goal
-        and getattr(goal, "parent_id", None)
-        and is_nano_goal(goal)
-    )
+    return False
 
 
 def active_targets(goal) -> list:

@@ -7,33 +7,14 @@ const {
     updateInstance,
     updateTimer,
     removeActivity,
-    toggleGoalCompletion,
-    deleteGoal,
-    createNanoGoalNote,
     getActivityModes,
+    useProgressComparison,
 } = vi.hoisted(() => ({
     updateInstance: vi.fn(() => Promise.resolve()),
     updateTimer: vi.fn(),
     removeActivity: vi.fn(),
-    toggleGoalCompletion: vi.fn(() => Promise.resolve()),
-    deleteGoal: vi.fn(() => Promise.resolve()),
-    createNanoGoalNote: vi.fn(() => Promise.resolve({
-        data: {
-            goal: {
-                id: 'nano-1',
-                name: 'Do one strict rep',
-                attributes: { type: 'NanoGoal' }
-            },
-            note: {
-                id: 'note-1',
-                session_id: 'session-1',
-                content: 'Do one strict rep',
-                nano_goal_id: 'nano-1',
-                is_nano_goal: true
-            }
-        }
-    })),
     getActivityModes: vi.fn(() => Promise.resolve({ data: [] })),
+    useProgressComparison: vi.fn(() => ({ progressComparison: null })),
 }));
 
 vi.mock('../../../contexts/ActiveSessionContext', () => ({
@@ -53,32 +34,23 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
         ],
         parentGoals: [],
         immediateGoals: [{ id: 'ig-1', name: 'Immediate' }],
-        microGoals: [
-            {
-                id: 'micro-1',
-                name: 'Micro Goal',
-                parent_id: 'ig-1',
-                completed: false,
-                attributes: { session_id: 'session-1' },
-                children: []
-            }
-        ],
         session: { immediate_goals: [{ id: 'ig-1' }] },
     }),
     useActiveSessionActions: () => ({
         updateInstance,
         updateTimer,
         removeActivity,
-        toggleGoalCompletion
     })
 }));
 
 vi.mock('../../../utils/api', () => ({
     fractalApi: {
-        deleteGoal,
-        createNanoGoalNote,
         getActivityModes,
     }
+}));
+
+vi.mock('../../../hooks/useProgressComparison', () => ({
+    useProgressComparison: (...args) => useProgressComparison(...args),
 }));
 
 vi.mock('../../../contexts/TimezoneContext', async (importOriginal) => {
@@ -122,122 +94,15 @@ vi.mock('../../../contexts/GoalLevelsContext', async (importOriginal) => {
     };
 });
 
-describe('SessionActivityItem nano note flow', () => {
+describe('SessionActivityItem metric and timer editing', () => {
     beforeEach(() => {
         updateInstance.mockClear();
         updateTimer.mockClear();
         removeActivity.mockClear();
-        toggleGoalCompletion.mockClear();
-        deleteGoal.mockClear();
-        createNanoGoalNote.mockClear();
         getActivityModes.mockClear();
         getActivityModes.mockResolvedValue({ data: [] });
-    });
-
-    it('creates a nano goal note without runtime errors', async () => {
-        renderWithProviders(
-            <SessionActivityItem
-                exercise={{
-                    id: 'instance-1',
-                    session_id: 'session-1',
-                    activity_definition_id: 'activity-1',
-                    sets: [],
-                    metrics: [],
-                    time_start: null,
-                    time_stop: null,
-                    duration_seconds: 0
-                }}
-                onFocus={vi.fn()}
-                isSelected={false}
-                onReorder={vi.fn()}
-                canMoveUp={false}
-                canMoveDown={false}
-                showReorderButtons={false}
-                onNoteCreated={vi.fn()}
-                allNotes={[]}
-                onAddNote={vi.fn()}
-                onUpdateNote={vi.fn()}
-                onDeleteNote={vi.fn()}
-                onOpenGoals={vi.fn()}
-                isDragging={false}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false
-            }
-        );
-
-        const textarea = screen.getByPlaceholderText('Add a nano goal / sub-step...');
-        fireEvent.change(textarea, { target: { value: 'Do one strict rep' } });
-        fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' });
-
-        await waitFor(() => {
-            expect(createNanoGoalNote).toHaveBeenCalledTimes(1);
-        });
-        expect(createNanoGoalNote).toHaveBeenCalledWith('root-1', {
-            name: 'Do one strict rep',
-            parent_id: 'micro-1',
-            session_id: 'session-1',
-            activity_instance_id: 'instance-1',
-            activity_definition_id: 'activity-1',
-            set_index: null,
-        });
-    });
-
-    it('shows a single failure when nano goal creation fails', async () => {
-        createNanoGoalNote.mockImplementationOnce(() => Promise.reject(new Error('nano failed')));
-
-        renderWithProviders(
-            <SessionActivityItem
-                exercise={{
-                    id: 'instance-1',
-                    session_id: 'session-1',
-                    activity_definition_id: 'activity-1',
-                    sets: [],
-                    metrics: [],
-                    time_start: null,
-                    time_stop: null,
-                    duration_seconds: 0
-                }}
-                onFocus={vi.fn()}
-                isSelected={false}
-                onReorder={vi.fn()}
-                canMoveUp={false}
-                canMoveDown={false}
-                showReorderButtons={false}
-                onNoteCreated={vi.fn()}
-                allNotes={[]}
-                onAddNote={vi.fn()}
-                onUpdateNote={vi.fn()}
-                onDeleteNote={vi.fn()}
-                onOpenGoals={vi.fn()}
-                isDragging={false}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false
-            }
-        );
-
-        const textarea = screen.getByPlaceholderText('Add a nano goal / sub-step...');
-        fireEvent.change(textarea, { target: { value: 'Do one strict rep' } });
-        fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' });
-
-        await waitFor(() => {
-            expect(createNanoGoalNote).toHaveBeenCalledWith('root-1', {
-                name: 'Do one strict rep',
-                parent_id: 'micro-1',
-                session_id: 'session-1',
-                activity_instance_id: 'instance-1',
-                activity_definition_id: 'activity-1',
-                set_index: null,
-            });
-        });
-        expect(deleteGoal).not.toHaveBeenCalled();
+        useProgressComparison.mockReset();
+        useProgressComparison.mockReturnValue({ progressComparison: null });
     });
 
     it('buffers single metric edits and commits on blur', async () => {
@@ -384,9 +249,11 @@ describe('SessionActivityItem quick mode', () => {
         updateInstance.mockClear();
         updateTimer.mockClear();
         removeActivity.mockClear();
+        useProgressComparison.mockReset();
+        useProgressComparison.mockReturnValue({ progressComparison: null });
     });
 
-    it('renders timer controls, notes, delete button, and micro goal icon in regular mode', () => {
+    it('renders timer controls, notes, and delete button in regular mode', () => {
         renderWithProviders(
             <SessionActivityItem
                 exercise={baseExercise}
@@ -412,10 +279,8 @@ describe('SessionActivityItem quick mode', () => {
             }
         );
 
-        expect(screen.getByTitle('Micro Goal: Micro Goal')).toBeInTheDocument();
         expect(screen.getByTitle('Start timer')).toBeInTheDocument();
         expect(screen.getByTitle('Instant complete (0s duration)')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText('Add a nano goal / sub-step...')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Delete activity' })).toBeInTheDocument();
     });
 
@@ -453,7 +318,7 @@ describe('SessionActivityItem quick mode', () => {
         expect(descriptionLink).toHaveAttribute('href', description);
     });
 
-    it('renders completion button, hides timer controls, notes, delete button, and micro goal icon in quick mode', () => {
+    it('renders completion button and hides timer controls in quick mode', () => {
         renderWithProviders(
             <SessionActivityItem
                 exercise={{ ...baseExercise, metrics: [] }}
@@ -471,9 +336,7 @@ describe('SessionActivityItem quick mode', () => {
 
         expect(screen.queryByTitle('Start timer')).not.toBeInTheDocument();
         expect(screen.queryByTitle('Instant complete (0s duration)')).not.toBeInTheDocument();
-        expect(screen.queryByPlaceholderText('Add a nano goal / sub-step...')).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: '×' })).not.toBeInTheDocument();
-        expect(screen.queryByTitle('Micro Goal: Micro Goal')).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Mark Complete' })).toBeInTheDocument();
         expect(screen.getByText('Mark this activity complete when finished.')).toBeInTheDocument();
     });
@@ -515,6 +378,192 @@ describe('SessionActivityItem quick mode', () => {
 
         expect(screen.getByText('Weight')).toBeInTheDocument();
         expect(screen.getByDisplayValue('190')).toBeInTheDocument();
+    });
+
+    it('renders progress inline beside the metric unit without summary badges', () => {
+        useProgressComparison.mockReturnValue({
+            progressComparison: {
+                is_first_instance: false,
+                metric_comparisons: [
+                    {
+                        metric_id: 'm1',
+                        metric_name: 'Weight',
+                        unit: 'lbs',
+                        previous_value: 185,
+                        current_value: 190,
+                        delta: 5,
+                        pct_change: 2.7,
+                        improved: true,
+                        regressed: false,
+                    },
+                ],
+            },
+        });
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={baseExercise}
+                isSelected={false}
+                activityDefinition={quickModeDefinition}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.getByText('lbs')).toBeInTheDocument();
+        expect(screen.getByText('(last 185)')).toBeInTheDocument();
+        expect(screen.queryByText(/new personal best/i)).not.toBeInTheDocument();
+    });
+
+    it('shows previous metric references before the user enters a value', () => {
+        useProgressComparison.mockReturnValue({
+            progressComparison: {
+                is_first_instance: false,
+                metric_comparisons: [
+                    {
+                        metric_id: 'm1',
+                        metric_name: 'Weight',
+                        unit: 'lbs',
+                        previous_value: 185,
+                        current_value: null,
+                        delta: null,
+                        pct_change: null,
+                        improved: false,
+                        regressed: false,
+                    },
+                ],
+            },
+        });
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{ ...baseExercise, metrics: [] }}
+                isSelected={false}
+                activityDefinition={quickModeDefinition}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.getByText('(last 185)')).toBeInTheDocument();
+    });
+
+    it('hydrates persisted progress for completed activities after refresh', () => {
+        useProgressComparison.mockReturnValue({
+            progressComparison: {
+                is_first_instance: false,
+                metric_comparisons: [
+                    {
+                        metric_definition_id: 'm1',
+                        metric_name: 'Weight',
+                        unit: 'lbs',
+                        previous_value: 185,
+                        current_value: 190,
+                        delta: 5,
+                        pct_change: 2.7,
+                        improved: true,
+                        regressed: false,
+                    },
+                ],
+            },
+        });
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    ...baseExercise,
+                    completed: true,
+                    time_start: '2026-04-10T17:38:58Z',
+                    time_stop: '2026-04-10T17:39:58Z',
+                }}
+                isSelected={false}
+                activityDefinition={quickModeDefinition}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(useProgressComparison).toHaveBeenCalledWith(
+            'root-1',
+            'quick-instance-1',
+            { enabled: true }
+        );
+        expect(screen.getByText('(▲2.7%)')).toBeInTheDocument();
+    });
+
+    it('shows a last-aggregation progress hint only on the driving set row', () => {
+        useProgressComparison.mockReturnValue({
+            progressComparison: {
+                is_first_instance: false,
+                metric_comparisons: [
+                    {
+                        metric_id: 'm1',
+                        metric_name: 'Speed',
+                        aggregation: 'last',
+                        previous_value: 20,
+                        current_value: 23,
+                        delta: 3,
+                        pct_change: 15,
+                        improved: true,
+                        regressed: false,
+                    },
+                ],
+            },
+        });
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'set-instance-1',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    completed: true,
+                    sets: [
+                        { instance_id: 'set-1', metrics: [{ metric_id: 'm1', value: '400' }] },
+                        { instance_id: 'set-2', metrics: [{ metric_id: 'm1', value: '23' }] },
+                    ],
+                    time_start: '2026-04-10T17:38:58Z',
+                    time_stop: '2026-04-10T17:39:58Z',
+                    duration_seconds: 60,
+                }}
+                isSelected={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Bernth Pinky Control Exercise',
+                    has_sets: true,
+                    has_metrics: true,
+                    metric_definitions: [
+                        {
+                            id: 'm1',
+                            name: 'Speed',
+                            unit: 'BPM',
+                            progress_aggregation: 'last',
+                        },
+                    ],
+                    split_definitions: [],
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.getAllByText('(▲15%)')).toHaveLength(1);
     });
 
     it('opens the modes modal and saves checked activity modes', async () => {

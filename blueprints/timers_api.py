@@ -7,7 +7,8 @@ from pydantic import ValidationError
 from models import get_session
 from blueprints.auth_api import token_required
 from blueprints.api_utils import get_db_session, parse_optional_pagination, internal_error
-from services.completion_handlers import get_recent_achievements
+from services.completion_handlers import get_recent_achievements, get_live_progress
+from services.progress_service import ProgressService
 from services.timer_service import TimerService
 from validators import (
     validate_request,
@@ -101,7 +102,14 @@ def start_activity_timer(current_user, root_id, instance_id):
         if error:
             return jsonify({"error": error}), status
 
-        return jsonify(payload["serialized"]), status
+        response_data = dict(payload["serialized"])
+        if payload.get("instance") and getattr(payload["instance"], "completed", False):
+            response_data["progress_comparison"] = (
+                get_live_progress(instance_id)
+                or ProgressService(db_session).get_progress_for_instance(instance_id)
+            )
+
+        return jsonify(response_data), status
 
     except SQLAlchemyError:
         db_session.rollback()
@@ -141,6 +149,8 @@ def complete_activity_instance(current_user, root_id, instance_id):
             achievements = get_recent_achievements()
             result['achieved_targets'] = achievements.get('achieved_targets', [])
             result['completed_goals'] = achievements.get('completed_goals', [])
+
+        result['progress_comparison'] = ProgressService(db_session).get_progress_for_instance(instance_id)
         
         return jsonify(result), status
 
@@ -169,7 +179,14 @@ def update_activity_instance(current_user, root_id, instance_id, validated_data)
         if error:
             return jsonify({"error": error}), status
 
-        return jsonify(payload["serialized"]), status
+        response_data = dict(payload["serialized"])
+        if payload.get("instance") and getattr(payload["instance"], "completed", False):
+            response_data["progress_comparison"] = (
+                get_live_progress(instance_id)
+                or ProgressService(db_session).get_progress_for_instance(instance_id)
+            )
+
+        return jsonify(response_data), status
 
     except SQLAlchemyError:
         db_session.rollback()

@@ -23,9 +23,11 @@ from services.serializers import (
 )
 from services.goal_type_utils import get_canonical_goal_type
 from services.owned_entity_queries import get_owned_activity_definition
+from services.owned_entity_queries import get_owned_activity_instance
 from services.activity_service import (
     ActivityService,
 )
+from services.progress_service import ProgressService
 
 logger = logging.getLogger(__name__)
 
@@ -618,6 +620,71 @@ def link_goal_activity_group(current_user, root_id, goal_id, group_id):
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error linking goal activity group")
+        return internal_error(logger, "Activity API request failed")
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activity-instances/<instance_id>/progress', methods=['GET'])
+@token_required
+def get_activity_instance_progress(current_user, root_id, instance_id):
+    """Get the progress comparison for a specific activity instance."""
+    session = get_db_session()
+    try:
+        root = require_owned_root(session, root_id, current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
+        instance = get_owned_activity_instance(session, root_id, instance_id)
+        if not instance:
+            return jsonify({"error": "Activity instance not found"}), 404
+
+        service = ProgressService(session)
+        result = service.get_progress_for_instance(instance.id)
+        if result is None:
+            return jsonify({"error": "Activity instance not found"}), 404
+        return jsonify(result)
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Error getting activity instance progress")
+        return internal_error(logger, "Activity API request failed")
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_def_id>/progress-history', methods=['GET'])
+@token_required
+def get_activity_progress_history(current_user, root_id, activity_def_id):
+    """Get paginated progress history for an activity definition."""
+    session = get_db_session()
+    try:
+        root = require_owned_root(session, root_id, current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
+        activity = get_owned_activity_definition(session, root_id, activity_def_id)
+        if not activity:
+            return jsonify({"error": "Activity not found"}), 404
+
+        try:
+            limit = min(int(request.args.get('limit', 20)), 100)
+            offset = int(request.args.get('offset', 0))
+            exclude_session_id = request.args.get('exclude_session')
+        except ValueError:
+            return jsonify({"error": "Invalid pagination parameters"}), 400
+
+        service = ProgressService(session)
+        records = service.get_progress_history(
+            activity.id,
+            root_id,
+            limit=limit,
+            offset=offset,
+            exclude_session_id=exclude_session_id,
+        )
+        return jsonify(records)
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Error getting activity progress history")
         return internal_error(logger, "Activity API request failed")
     finally:
         session.close()

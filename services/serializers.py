@@ -39,7 +39,7 @@ def calculate_smart_status(goal):
         "measurable": is_measurable,
         "achievable": is_achievable,
         "relevant": bool(goal.relevance_statement and goal.relevance_statement.strip()),
-        "time_bound": goal.deadline is not None or get_canonical_goal_type(goal) in ['MicroGoal', 'NanoGoal']
+        "time_bound": goal.deadline is not None
     }
 
 def serialize_target(target):
@@ -122,6 +122,7 @@ def serialize_fractal_metric(metric):
         "min_value": metric.min_value,
         "max_value": metric.max_value,
         "description": metric.description,
+        "default_progress_aggregation": metric.default_progress_aggregation,
         "sort_order": metric.sort_order,
         "activity_count": getattr(metric, '_activity_count', 0),
         "created_at": format_utc(metric.created_at),
@@ -479,11 +480,9 @@ def serialize_session(session, include_image_data=False):
             
         result["short_term_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if get_type(g) == 'ShortTermGoal']
         result["immediate_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if get_type(g) == 'ImmediateGoal']
-        result["micro_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if get_type(g) == 'MicroGoal']
     else:
         result["short_term_goals"] = []
         result["immediate_goals"] = []
-        result["micro_goals"] = []
 
     # Add Program Info if associated
     if hasattr(session, 'program_day') and session.program_day:
@@ -583,11 +582,14 @@ def serialize_metric_definition(metric):
         "is_active": metric.is_active,
         "is_top_set_metric": metric.is_top_set_metric,
         "is_multiplicative": is_multiplicative,
+        "track_progress": metric.track_progress,
+        "progress_aggregation": metric.progress_aggregation,
         # Extra fields from fractal metric (None when not linked)
         "is_additive": fm.is_additive if fm else None,
         "input_type": fm.input_type if fm else "number",
         "default_value": fm.default_value if fm else None,
         "higher_is_better": fm.higher_is_better if fm else None,
+        "default_progress_aggregation": fm.default_progress_aggregation if fm else None,
         "predefined_values": fm.predefined_values if fm else None,
         "min_value": fm.min_value if fm else None,
         "max_value": fm.max_value if fm else None,
@@ -702,7 +704,6 @@ def serialize_note(note, include_image=False):
     resolved_note_type = derive_note_type(
         note.context_type,
         note.set_index,
-        is_nano_goal=note.nano_goal_id is not None,
     )
     result = {
         "id": note.id,
@@ -718,9 +719,6 @@ def serialize_note(note, include_image=False):
         "has_image": note.image_data is not None and len(note.image_data) > 0,
         "created_at": format_utc(note.created_at),
         "updated_at": format_utc(note.updated_at),
-        "nano_goal_id": note.nano_goal_id,
-        "is_nano_goal": note.nano_goal_id is not None,
-        "nano_goal_completed": note.nano_goal.completed if getattr(note, 'nano_goal', None) else False,
         "goal_id": note.goal_id,
         "pinned_at": format_utc(note.pinned_at) if note.pinned_at else None,
         "is_pinned": note.pinned_at is not None,
@@ -730,10 +728,8 @@ def serialize_note(note, include_image=False):
     return result
 
 
-def derive_note_type(context_type, set_index=None, *, is_nano_goal=False):
+def derive_note_type(context_type, set_index=None):
     """Derive a semantic note type from the stored note context."""
-    if is_nano_goal:
-        return "goal_note"
     if context_type == "root":
         return "fractal_note"
     if context_type == "goal":
@@ -780,11 +776,6 @@ def serialize_note_display(note, include_image=False):
         result["goal_name"] = note.goal.name
         result["goal_type"] = get_canonical_goal_type(note.goal)
         result["goal_is_smart"] = bool(all(calculate_smart_status(note.goal).values()))
-
-    if note.nano_goal:
-        result["goal_name"] = note.nano_goal.name
-        result["goal_type"] = get_canonical_goal_type(note.nano_goal) or "NanoGoal"
-        result["goal_is_smart"] = bool(all(calculate_smart_status(note.nano_goal).values()))
 
     if note.activity_definition:
         result["activity_definition_name"] = note.activity_definition.name

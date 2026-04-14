@@ -6,7 +6,7 @@
 import React from 'react';
 import NoteCard from '../notes/NoteCard';
 
-function NoteItem({ note, onUpdate, onDelete, onPin, onUnpin, onToggleNanoGoal, nanoToggleDisabled = false, compact = false, isSelected, onSelect }) {
+function NoteItem({ note, onUpdate, onDelete, onPin, onUnpin, compact = false, isSelected, onSelect }) {
     return (
         <NoteCard
             note={note}
@@ -14,8 +14,6 @@ function NoteItem({ note, onUpdate, onDelete, onPin, onUnpin, onToggleNanoGoal, 
             onDelete={onDelete}
             onPin={onPin}
             onUnpin={onUnpin}
-            onToggleNanoGoal={onToggleNanoGoal}
-            nanoToggleDisabled={nanoToggleDisabled}
             compact={compact}
             isSelected={isSelected}
             onSelect={onSelect}

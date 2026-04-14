@@ -7,7 +7,6 @@ import {
     getGoalNodeId,
     getGoalNodeName,
     getGoalNodeType,
-    isExecutionGoalType,
     normalizeGoalNode,
 } from '../../utils/goalNodeModel';
 import { isSMART } from '../../utils/smartHelpers';
@@ -65,8 +64,7 @@ export const convertTreeToFlow = (
     onNodeClick,
     onAddChild,
     selectedNodeId = null,
-    completedGoalColor = '#FFD700',
-    showMicroNanoGoals = false
+    completedGoalColor = '#FFD700'
 ) => {
     const nodes = [];
     const edges = [];
@@ -86,9 +84,6 @@ export const convertTreeToFlow = (
         if (lineagePath && !lineagePath.has(nodeId)) return;
 
         const nodeType = getGoalNodeType(normalizedNode);
-        if (!showMicroNanoGoals && isExecutionGoalType(nodeType)) {
-            return;
-        }
 
         addedNodeIds.add(nodeId);
         visibleNodeIds.add(nodeId);
@@ -109,10 +104,7 @@ export const convertTreeToFlow = (
         }
 
         const validChildren = getValidChildTypes(nodeType);
-        // For macro goals with multiple valid child levels, use a generic label.
-        // For execution-tier strict single-child types, show the specific name.
-        // ImmediateGoal children (MicroGoal) are created through sessions, not the goals page.
-        const hasAddChild = validChildren.length > 0 && nodeType !== 'ImmediateGoal';
+        const hasAddChild = validChildren.length > 0;
         const childTypeName = hasAddChild
             ? (validChildren.length === 1 ? validChildren[0].replace(/([A-Z])/g, ' $1').trim() : 'Child Goal')
             : null;
@@ -244,8 +236,7 @@ export const buildGraphPresentation = ({
         onNodeClick,
         onAddChild,
         selectedNodeId,
-        completedGoalColor,
-        normalizedSettings.showMicroNanoGoals
+        completedGoalColor
     );
 
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, rawEdges, 'TB', isMobile);

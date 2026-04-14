@@ -30,8 +30,6 @@ from services.events import event_bus, Event, Events
 from services.goal_domain_rules import (
     goal_allows_manual_completion,
     goal_requires_smart_validation,
-    is_micro_goal,
-    is_nano_goal,
     resolve_completed_via_children,
     should_inherit_parent_activities,
 )
@@ -59,8 +57,6 @@ _TYPE_TO_LEVEL_NAME = {
     'MidTermGoal': 'Mid Term Goal',
     'ShortTermGoal': 'Short Term Goal',
     'ImmediateGoal': 'Immediate Goal',
-    'MicroGoal': 'Micro Goal',
-    'NanoGoal': 'Nano Goal',
 }
 
 
@@ -367,12 +363,6 @@ class GoalService:
         ).all():
             target.deleted_at = deleted_at
 
-        for note in self.db_session.query(Note).filter(
-            Note.nano_goal_id.in_(subtree_ids),
-            Note.deleted_at.is_(None),
-        ).all():
-            note.deleted_at = deleted_at
-
         return subtree
 
     def _soft_delete_root_entities(self, root_id: str, deleted_at: datetime) -> None:
@@ -466,8 +456,6 @@ class GoalService:
             Long Term (rank 1) → Short Term (rank 3) → Mid Term (rank 2)
 
         Returns an error message string if validation fails, or None if valid.
-        Execution-tier goals (MicroGoal/NanoGoal) are handled by validators.py
-        and should not be passed here.
         """
         if not parent_goal or not new_level_obj:
             return None
@@ -566,8 +554,6 @@ class GoalService:
         if 'name' in data and data['name'] is not None:
             goal.name = data['name']
         if 'description' in data and data['description'] is not None:
-            if is_nano_goal(goal) and data['description'].strip():
-                return None, ("NanoGoal cannot have a description", 400)
             goal.description = data['description']
 
         if 'targets' in data:
@@ -754,8 +740,7 @@ class GoalService:
         level_id = resolve_level_id(self.db_session, data.get('type'))
         level_obj = self.db_session.query(GoalLevel).filter_by(id=level_id).first() if level_id else None
 
-        goal_type = data.get('type', '')
-        if parent and goal_type not in ('MicroGoal', 'NanoGoal'):
+        if parent:
             monotonicity_error = self._validate_ancestor_rank_monotonicity(level_obj, parent)
             if monotonicity_error:
                 return None, monotonicity_error, 400
@@ -797,17 +782,6 @@ class GoalService:
             if data.get('targets'):
                 self.sync_targets(self.db_session, new_goal, data['targets'])
                 new_goal.targets = None
-
-            if data.get('session_id') and (data.get('type') == 'MicroGoal' or is_micro_goal(new_goal)):
-                self.db_session.execute(session_goals.insert().values(
-                    **session_goal_insert_values(
-                        self.db_session,
-                        data['session_id'],
-                        new_goal.id,
-                        'MicroGoal',
-                        'micro_goal',
-                    )
-                ))
 
             if activity:
                 self._associate_goal_with_activity(new_goal.id, activity.id)
@@ -878,11 +852,9 @@ class GoalService:
             if parent_capacity_error:
                 return None, parent_capacity_error, 400
 
-            goal_type = data.get('type', '')
-            if goal_type not in ('MicroGoal', 'NanoGoal'):
-                monotonicity_error = self._validate_ancestor_rank_monotonicity(level_obj, parent_goal)
-                if monotonicity_error:
-                    return None, monotonicity_error, 400
+            monotonicity_error = self._validate_ancestor_rank_monotonicity(level_obj, parent_goal)
+            if monotonicity_error:
+                return None, monotonicity_error, 400
 
         completed_via_children = resolve_completed_via_children(data, level_obj)
         goal_defaults = Goal(parent_id=parent_id)
@@ -916,17 +888,6 @@ class GoalService:
             if data.get('targets'):
                 self.sync_targets(self.db_session, new_goal, data['targets'])
                 new_goal.targets = None
-
-            if data.get('session_id') and (data.get('type') == 'MicroGoal' or is_micro_goal(new_goal)):
-                self.db_session.execute(session_goals.insert().values(
-                    **session_goal_insert_values(
-                        self.db_session,
-                        data['session_id'],
-                        new_goal.id,
-                        'MicroGoal',
-                        'micro_goal',
-                    )
-                ))
 
             if activity:
                 self._associate_goal_with_activity(new_goal.id, activity.id)
@@ -1059,38 +1020,6 @@ class GoalService:
         if metrics is None:
             return None, "Goal not found", 404
         return metrics, None, 200
-
-    def get_session_micro_goals(self, root_id, session_id, current_user_id) -> ServiceResult[list[Goal]]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        session_obj = self.db_session.query(Session).filter(
-            Session.id == session_id,
-            Session.root_id == root_id,
-            Session.deleted_at == None,
-        ).first()
-        if not session_obj:
-            return None, "Session not found in this fractal", 404
-
-        micro_goals = (
-            self.db_session.query(Goal)
-            .join(session_goals, Goal.id == session_goals.c.goal_id)
-            .outerjoin(GoalLevel, Goal.level_id == GoalLevel.id)
-            .filter(
-                session_goals.c.session_id == session_id,
-                Goal.root_id == root_id,
-                Goal.deleted_at == None,
-                or_(
-                    GoalLevel.name == 'Micro Goal',
-                    session_goals.c.goal_type == 'MicroGoal',
-                ),
-            )
-            .options(selectinload(Goal.children))
-            .all()
-        )
-
-        return micro_goals, None, 200
 
     def delete_fractal_goal(self, root_id, goal_id, current_user_id, *, emit_event=True) -> ServiceResult[Goal]:
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -1471,7 +1400,7 @@ class GoalService:
 
         goal_type = get_canonical_goal_type(goal)
 
-        if goal_type not in {'MicroGoal', 'NanoGoal'} and not self._goals_share_same_tier(current_parent, new_parent):
+        if not self._goals_share_same_tier(current_parent, new_parent):
             return None, "Can only move a goal under a parent on the same tier as its current parent", 400
 
         # Prevent circular references — walk up from new_parent
@@ -1553,23 +1482,15 @@ class GoalService:
             if not candidate.level:
                 continue
 
-            # Execution tier: strict parent rules
-            if goal_type == 'MicroGoal':
-                if get_canonical_goal_type(candidate) != 'ImmediateGoal':
-                    continue
-            elif goal_type == 'NanoGoal':
-                if get_canonical_goal_type(candidate) != 'MicroGoal':
-                    continue
-            else:
-                if current_parent and not self._goals_share_same_tier(candidate, current_parent):
-                    continue
-                # Macro goal: candidate must have lower rank
-                if not goal.level or candidate.level.rank >= goal.level.rank:
-                    continue
-                # Full monotonicity check
-                error = self._validate_ancestor_rank_monotonicity(goal.level, candidate)
-                if error:
-                    continue
+            if current_parent and not self._goals_share_same_tier(candidate, current_parent):
+                continue
+            # Candidate must have lower rank
+            if not goal.level or candidate.level.rank >= goal.level.rank:
+                continue
+            # Full monotonicity check
+            error = self._validate_ancestor_rank_monotonicity(goal.level, candidate)
+            if error:
+                continue
 
             # Optional search filter
             if search and search.lower() not in candidate.name.lower():
@@ -1604,16 +1525,11 @@ class GoalService:
         if not new_level:
             return None, "Goal level not found", 404
 
-        # Execution-tier goals (Immediate, Micro, Nano) cannot be converted
-        EXECUTION_TIER_NAMES = {'Immediate Goal', 'Micro Goal', 'Nano Goal'}
+        # Execution-tier goals (Immediate) cannot be converted
+        EXECUTION_TIER_NAMES = {'Immediate Goal'}
         current_level_name = getattr(goal.level, 'name', None)
         if current_level_name in EXECUTION_TIER_NAMES:
             return None, f"Cannot convert an execution-tier goal ('{current_level_name}')", 400
-
-        # Cannot convert to Micro or Nano levels
-        MICRO_NANO_NAMES = {'Micro Goal', 'Nano Goal'}
-        if new_level.name in MICRO_NANO_NAMES:
-            return None, f"Cannot convert a goal to execution tier level '{new_level.name}'", 400
 
         root_level_rank = self._get_goal_level_rank(root)
         if root_level_rank is not None and new_level.rank <= root_level_rank:

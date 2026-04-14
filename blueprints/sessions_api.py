@@ -14,9 +14,12 @@ from validators import (
     ActivityMetricsUpdateSchema, ActivityReorderSchema
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import get_db_session, parse_optional_pagination, etag_json_response, internal_error
+from blueprints.api_utils import get_db_session, parse_optional_pagination, etag_json_response, internal_error, require_owned_root
 from services.serializers import serialize_activity_instance
 from services.session_service import SessionService
+from services.progress_service import ProgressService
+from services.completion_handlers import get_live_progress
+from services.owned_entity_queries import get_owned_session
 
 # Create blueprint
 sessions_bp = Blueprint('sessions', __name__, url_prefix='/api')
@@ -346,11 +349,38 @@ def update_activity_metrics(current_user, root_id, session_id, instance_id, vali
             if isinstance(error, dict):
                 return jsonify(error), status
             return jsonify({"error": error}), status
-        return jsonify(payload["serialized"])
-        
+        response_data = dict(payload["serialized"])
+        response_data['progress_comparison'] = get_live_progress(instance_id)
+        return jsonify(response_data)
+
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error updating activity metrics")
         return internal_error(logger, "Error updating activity metrics")
+    finally:
+        db_session.close()
+
+
+@sessions_bp.route('/<root_id>/sessions/<session_id>/progress-summary', methods=['GET'])
+@token_required
+def get_session_progress_summary(current_user, root_id, session_id):
+    """Get progress records for all activity instances in a session."""
+    db_session = get_db_session()
+    try:
+        root = require_owned_root(db_session, root_id, current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
+        session = get_owned_session(db_session, root_id, session_id)
+        if not session:
+            return jsonify({"error": "Session not found"}), 404
+
+        service = ProgressService(db_session)
+        records = service.get_progress_summary_for_session(session.id)
+        return jsonify(records)
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error getting session progress summary")
+        return internal_error(logger, "Error getting session progress summary")
     finally:
         db_session.close()

@@ -11,16 +11,13 @@ from models import (
     Goal,
     Note,
     Session,
-    session_goals,
     validate_root_goal,
 )
 from services.events import Event, Events, event_bus
-from services.goal_service import GoalService, sync_goal_targets
 from services.owned_entity_queries import get_owned_activity_instance, get_owned_session
 from services.payload_normalizers import normalize_note_payload
-from services.goal_type_utils import get_canonical_goal_type
 from services.service_types import JsonDict, JsonList, ServiceResult
-from services.serializers import derive_note_type, serialize_goal, serialize_note_display
+from services.serializers import derive_note_type, serialize_note_display
 from services.session_runtime import is_quick_session
 from services.view_serializers import (
     serialize_activity_history_entry,
@@ -63,7 +60,6 @@ class NoteService:
             selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
             selectinload(Note.activity_definition),
-            selectinload(Note.nano_goal),
         ).order_by(
             Note.pinned_at.desc().nullslast(),
             Note.created_at.desc(),
@@ -83,7 +79,6 @@ class NoteService:
             selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
             selectinload(Note.activity_definition),
-            selectinload(Note.nano_goal),
         ).order_by(
             Note.pinned_at.desc().nullslast(),
             Note.created_at.desc(),
@@ -131,7 +126,6 @@ class NoteService:
             selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
             selectinload(Note.activity_definition),
-            selectinload(Note.nano_goal),
         ).order_by(Note.created_at.desc()).all()
 
         results = []
@@ -157,7 +151,6 @@ class NoteService:
             selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
             selectinload(Note.activity_definition),
-            selectinload(Note.nano_goal),
         )
 
         if exclude_session_id:
@@ -180,16 +173,22 @@ class NoteService:
         if error:
             return None, *error
 
-        query = self.db_session.query(ActivityInstance).filter(
+        query = self.db_session.query(ActivityInstance).join(
+            Session,
+            ActivityInstance.session_id == Session.id,
+        ).filter(
             ActivityInstance.root_id == root_id,
             ActivityInstance.activity_definition_id == activity_id,
             ActivityInstance.deleted_at.is_(None),
+            Session.deleted_at.is_(None),
         )
 
         if exclude_session_id:
             query = query.filter(ActivityInstance.session_id != exclude_session_id)
 
-        instances = query.order_by(ActivityInstance.created_at.desc()).limit(limit).all()
+        instances = query.options(
+            selectinload(ActivityInstance.session).selectinload(Session.template),
+        ).order_by(ActivityInstance.created_at.desc()).limit(limit).all()
         instance_ids = [instance.id for instance in instances]
         notes = []
 
@@ -201,7 +200,6 @@ class NoteService:
                 selectinload(Note.session).selectinload(Session.template),
                 selectinload(Note.goal),
                 selectinload(Note.activity_definition),
-                selectinload(Note.nano_goal),
             ).order_by(
                 Note.pinned_at.desc().nullslast(),
                 Note.created_at.desc(),
@@ -216,86 +214,6 @@ class NoteService:
             results.append(serialize_activity_history_entry(instance, instance_notes))
 
         return results, None, 200
-
-    def _goal_looks_like_type(self, goal, canonical_type):
-        resolved_type = get_canonical_goal_type(goal)
-        if resolved_type:
-            return resolved_type == canonical_type
-
-        ancestor_count = 0
-        current = goal
-        while current and current.parent_id:
-            ancestor_count += 1
-            current = self.db_session.query(Goal).filter(Goal.id == current.parent_id).first()
-
-        fallback_by_depth = {
-            0: 'UltimateGoal',
-            1: 'LongTermGoal',
-            2: 'MidTermGoal',
-            3: 'ShortTermGoal',
-            4: 'ImmediateGoal',
-            5: 'MicroGoal',
-            6: 'NanoGoal',
-        }
-        return fallback_by_depth.get(ancestor_count) == canonical_type
-
-    def _validate_note_creation_relations(self, root_id, session_id, nano_goal_id, activity_instance_id):
-        effective_session_id = session_id
-
-        if session_id:
-            session_obj = self.db_session.query(Session).filter(
-                Session.id == session_id,
-                Session.root_id == root_id,
-                Session.deleted_at.is_(None),
-            ).first()
-            if not session_obj:
-                return "Session not found in this fractal", 400
-
-        if activity_instance_id:
-            instance = self.db_session.query(ActivityInstance).filter(
-                ActivityInstance.id == activity_instance_id,
-                ActivityInstance.root_id == root_id,
-                ActivityInstance.deleted_at.is_(None),
-            ).first()
-            if not instance:
-                return "Activity instance not found in this fractal", 400
-            if session_id and instance.session_id != session_id:
-                return "Activity instance does not belong to the provided session", 400
-            effective_session_id = effective_session_id or instance.session_id
-
-        if not nano_goal_id:
-            return None
-
-        nano_goal = self.db_session.query(Goal).filter(
-            Goal.id == nano_goal_id,
-            Goal.root_id == root_id,
-            Goal.deleted_at.is_(None),
-        ).first()
-        if not nano_goal:
-            return "Nano goal not found in this fractal", 400
-        if not self._goal_looks_like_type(nano_goal, 'NanoGoal'):
-            return "nano_goal_id must reference a NanoGoal", 400
-
-        if not effective_session_id:
-            return None
-
-        ancestor_ids = []
-        current = nano_goal
-        while current and current.parent_id:
-            ancestor_ids.append(current.parent_id)
-            current = self.db_session.query(Goal).filter(Goal.id == current.parent_id).first()
-
-        has_session_link = False
-        if ancestor_ids:
-            has_session_link = self.db_session.query(session_goals).filter(
-                session_goals.c.session_id == effective_session_id,
-                session_goals.c.goal_id.in_(ancestor_ids),
-            ).first() is not None
-
-        if not has_session_link:
-            return "nano_goal_id is not linked to the provided session", 400
-
-        return None
 
     def _validate_note_context(
         self,
@@ -399,16 +317,12 @@ class NoteService:
 
         notes = self.db_session.query(Note).filter(
             Note.root_id == root_id,
-            or_(
-                Note.goal_id.in_(goal_ids),
-                Note.nano_goal_id.in_(goal_ids),
-            ),
+            Note.goal_id.in_(goal_ids),
             Note.deleted_at.is_(None),
         ).options(
             selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
             selectinload(Note.activity_definition),
-            selectinload(Note.nano_goal),
         ).order_by(
             Note.pinned_at.desc().nullslast(),
             Note.created_at.desc(),
@@ -447,7 +361,6 @@ class NoteService:
             selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
             selectinload(Note.activity_definition),
-            selectinload(Note.nano_goal),
         )
 
         note_types = filters.get('note_types') or []
@@ -457,12 +370,7 @@ class NoteService:
 
         filter_goal_id = filters.get('goal_id')
         if filter_goal_id:
-            query = query.filter(
-                or_(
-                    Note.goal_id == filter_goal_id,
-                    Note.nano_goal_id == filter_goal_id,
-                )
-            )
+            query = query.filter(Note.goal_id == filter_goal_id)
 
         filter_activity_definition_ids = filters.get('activity_definition_ids') or []
         filter_activity_group_ids = filters.get('activity_group_ids') or []
@@ -578,7 +486,6 @@ class NoteService:
         content = data.get('content', '')
 
         session_id = data.get('session_id')
-        nano_goal_id = data.get('nano_goal_id')
         activity_instance_id = data.get('activity_instance_id')
         goal_id = data.get('goal_id')
         activity_definition_id = data.get('activity_definition_id')
@@ -607,15 +514,6 @@ class NoteService:
             if not activity_definition_id:
                 activity_definition_id = activity_instance.activity_definition_id
 
-        relation_error = self._validate_note_creation_relations(
-            root_id,
-            session_id,
-            nano_goal_id,
-            activity_instance_id,
-        )
-        if relation_error:
-            return None, *relation_error
-
         note_session = self._resolve_note_session(
             root_id,
             session_id=session_id,
@@ -636,7 +534,6 @@ class NoteService:
                 goal_id=goal_id,
                 set_index=data.get('set_index'),
                 content=content,
-                nano_goal_id=nano_goal_id,
             )
             self.db_session.add(note)
 
@@ -652,94 +549,11 @@ class NoteService:
                 'root_id': root_id,
                 'session_id': note.session_id,
                 'activity_instance_id': note.activity_instance_id,
-                'nano_goal_id': note.nano_goal_id,
                 'goal_id': note.goal_id,
             },
             source='note_service.create_note',
         ))
         return serialize_note_display(note, include_image=True), None, 201
-
-    def create_nano_goal_note(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        goal_service = GoalService(self.db_session, sync_targets=sync_goal_targets)
-        new_goal, goal_error, goal_status = goal_service.create_fractal_goal_record(
-            root_id,
-            current_user_id,
-            {
-                "name": data["name"],
-                "type": "NanoGoal",
-                "parent_id": data["parent_id"],
-                "session_id": data["session_id"],
-            },
-        )
-        if goal_error:
-            return None, goal_error, goal_status
-
-        relation_error = self._validate_note_creation_relations(
-            root_id,
-            data["session_id"],
-            new_goal.id,
-            data["activity_instance_id"],
-        )
-        if relation_error:
-            self.db_session.rollback()
-            return None, *relation_error
-
-        note = Note(
-            id=str(uuid.uuid4()),
-            root_id=root_id,
-            context_type='activity_instance',
-            context_id=data["activity_instance_id"],
-            session_id=data["session_id"],
-            activity_instance_id=data["activity_instance_id"],
-            activity_definition_id=data.get("activity_definition_id"),
-            set_index=data.get("set_index"),
-            content=data["name"],
-            nano_goal_id=new_goal.id,
-        )
-        self.db_session.add(note)
-        self.db_session.commit()
-        self.db_session.refresh(new_goal)
-        self.db_session.refresh(note)
-        event_bus.emit(Event(
-            Events.NOTE_CREATED,
-            {
-                'note_id': note.id,
-                'note_content': note.content,
-                'context_type': note.context_type,
-                'context_id': note.context_id,
-                'root_id': root_id,
-                'session_id': note.session_id,
-                'activity_instance_id': note.activity_instance_id,
-                'nano_goal_id': note.nano_goal_id,
-            },
-            source='note_service.create_nano_goal_note',
-        ))
-        event_bus.emit(Event(
-            Events.GOAL_CREATED,
-            {
-                'goal_id': new_goal.id,
-                'goal_name': new_goal.name,
-                'goal_type': get_canonical_goal_type(new_goal),
-                'parent_id': new_goal.parent_id,
-                'root_id': root_id,
-            },
-            source='note_service.create_nano_goal_note',
-        ))
-
-        logger.info(
-            "Created nano goal %s with note %s for activity instance %s",
-            new_goal.id,
-            note.id,
-            data["activity_instance_id"],
-        )
-        return {
-            "goal": serialize_goal(new_goal, include_children=False),
-            "note": serialize_note_display(note, include_image=True),
-        }, None, 201
 
     def update_note(self, root_id, note_id, current_user_id, data) -> ServiceResult[JsonDict]:
         data = normalize_note_payload(data, partial=True)
@@ -778,7 +592,6 @@ class NoteService:
                 'root_id': root_id,
                 'session_id': note.session_id,
                 'activity_instance_id': note.activity_instance_id,
-                'nano_goal_id': note.nano_goal_id,
                 'updated_fields': list(data.keys()),
             },
             source='note_service.update_note',
@@ -803,7 +616,6 @@ class NoteService:
         context_id = note.context_id
         session_id = note.session_id
         activity_instance_id = note.activity_instance_id
-        nano_goal_id = note.nano_goal_id
         note.deleted_at = datetime.now(timezone.utc)
         self.db_session.commit()
         logger.info("Deleted note %s", note_id)
@@ -817,7 +629,6 @@ class NoteService:
                 'root_id': root_id,
                 'session_id': session_id,
                 'activity_instance_id': activity_instance_id,
-                'nano_goal_id': nano_goal_id,
             },
             source='note_service.delete_note',
         ))

@@ -18,6 +18,17 @@ from services.service_types import JsonDict, JsonList, ServiceResult
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_PROGRESS_AGGREGATIONS = {'last', 'sum', 'max', 'yield'}
+
+
+def _normalize_progress_aggregation(value):
+    if value in (None, ''):
+        return None
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower()
+    return normalized or None
+
 
 def _validate_and_normalize_metrics(metrics_data):
     """Require metrics to include both name and unit if provided."""
@@ -36,7 +47,21 @@ def _validate_and_normalize_metrics(metrics_data):
             continue
         if not name or not unit:
             return None, f"Metric at index {idx} must include both name and unit"
-        normalized.append({**metric, 'name': name, 'unit': unit})
+
+        progress_aggregation = _normalize_progress_aggregation(metric.get('progress_aggregation'))
+        if progress_aggregation not in ALLOWED_PROGRESS_AGGREGATIONS and progress_aggregation is not None:
+            return None, (
+                f"Metric at index {idx} has invalid progress_aggregation. "
+                f"Expected one of: {', '.join(sorted(ALLOWED_PROGRESS_AGGREGATIONS))}"
+            )
+
+        normalized.append({
+            **metric,
+            'name': name,
+            'unit': unit,
+            'track_progress': metric.get('track_progress') is not False,
+            'progress_aggregation': progress_aggregation,
+        })
     return normalized, None
 
 
@@ -445,6 +470,19 @@ class ActivityService:
         if input_type not in ('number', 'integer', 'duration'):
             return None, "input_type must be 'number', 'integer', or 'duration'", 400
 
+        default_progress_aggregation = _normalize_progress_aggregation(
+            data.get('default_progress_aggregation')
+        )
+        if (
+            default_progress_aggregation not in ALLOWED_PROGRESS_AGGREGATIONS
+            and default_progress_aggregation is not None
+        ):
+            return None, (
+                "default_progress_aggregation must be one of: "
+                + ", ".join(sorted(ALLOWED_PROGRESS_AGGREGATIONS)),
+                400,
+            )
+
         metric = FractalMetricDefinition(
             root_id=root_id,
             name=name,
@@ -458,6 +496,7 @@ class ActivityService:
             min_value=data.get('min_value'),
             max_value=data.get('max_value'),
             description=(data.get('description') or '').strip() or None,
+            default_progress_aggregation=default_progress_aggregation,
             sort_order=data.get('sort_order') if data.get('sort_order') is not None else (max_order or 0) + 1,
         )
         self.db_session.add(metric)
@@ -510,6 +549,20 @@ class ActivityService:
             if input_type not in ('number', 'integer', 'duration'):
                 return None, "input_type must be 'number', 'integer', or 'duration'", 400
             metric.input_type = input_type
+        if 'default_progress_aggregation' in data:
+            default_progress_aggregation = _normalize_progress_aggregation(
+                data.get('default_progress_aggregation')
+            )
+            if (
+                default_progress_aggregation not in ALLOWED_PROGRESS_AGGREGATIONS
+                and default_progress_aggregation is not None
+            ):
+                return None, (
+                    "default_progress_aggregation must be one of: "
+                    + ", ".join(sorted(ALLOWED_PROGRESS_AGGREGATIONS)),
+                    400,
+                )
+            metric.default_progress_aggregation = default_progress_aggregation
         if 'default_value' in data:
             metric.default_value = data['default_value']
         if 'higher_is_better' in data:
@@ -1030,7 +1083,9 @@ class ActivityService:
                     name=m['name'],
                     unit=m['unit'],
                     is_top_set_metric=m.get('is_top_set_metric', False),
-                    is_multiplicative=m.get('is_multiplicative', True)
+                    is_multiplicative=m.get('is_multiplicative', True),
+                    track_progress=m.get('track_progress', True),
+                    progress_aggregation=m.get('progress_aggregation'),
                 )
                 self.db_session.add(new_metric)
 
@@ -1107,6 +1162,8 @@ class ActivityService:
                         existing_metric.unit = m['unit']
                         existing_metric.is_top_set_metric = m.get('is_top_set_metric', False)
                         existing_metric.is_multiplicative = m.get('is_multiplicative', True)
+                        existing_metric.track_progress = m.get('track_progress', True)
+                        existing_metric.progress_aggregation = m.get('progress_aggregation')
                         updated_metric_ids.add(metric_id)
                     else:
                         matched_metric = None
@@ -1121,6 +1178,8 @@ class ActivityService:
                             matched_metric.fractal_metric_id = m.get('fractal_metric_id')
                             matched_metric.is_top_set_metric = m.get('is_top_set_metric', False)
                             matched_metric.is_multiplicative = m.get('is_multiplicative', True)
+                            matched_metric.track_progress = m.get('track_progress', True)
+                            matched_metric.progress_aggregation = m.get('progress_aggregation')
                             updated_metric_ids.add(matched_metric.id)
                         else:
                             new_metric = MetricDefinition(
@@ -1130,7 +1189,9 @@ class ActivityService:
                                 name=m['name'],
                                 unit=m['unit'],
                                 is_top_set_metric=m.get('is_top_set_metric', False),
-                                is_multiplicative=m.get('is_multiplicative', True)
+                                is_multiplicative=m.get('is_multiplicative', True),
+                                track_progress=m.get('track_progress', True),
+                                progress_aggregation=m.get('progress_aggregation'),
                             )
                             self.db_session.add(new_metric)
 

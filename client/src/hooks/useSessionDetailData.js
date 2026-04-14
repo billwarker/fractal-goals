@@ -162,7 +162,6 @@ export function useSessionDetailData({ rootId, sessionId, isDeletingSession }) {
         enabled: Boolean(rootId && sessionId),
     });
 
-    const microGoals = useMemo(() => sessionGoalsView?.micro_goals || [], [sessionGoalsView]);
 
     const normalizedSessionData = useMemo(() => {
         if (!session) return null;
@@ -214,7 +213,6 @@ export function useSessionDetailData({ rootId, sessionId, isDeletingSession }) {
         activityGroups,
         sessionGoalsView,
         sessionGoalsViewLoading,
-        microGoals,
         normalizedSessionData,
         groupMap,
         groupedActivities,

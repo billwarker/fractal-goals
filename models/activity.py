@@ -5,6 +5,30 @@ import uuid
 from .base import Base, utc_now, JSON_TYPE
 
 
+class ProgressRecord(Base):
+    __tablename__ = 'progress_records'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    activity_definition_id = Column(String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), nullable=False)
+    activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False, unique=True)
+    session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=False)
+    previous_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True)
+    is_first_instance = Column(Boolean, default=False, nullable=False)
+    has_change = Column(Boolean, default=False, nullable=False)
+    has_improvement = Column(Boolean, default=False, nullable=False)
+    has_regression = Column(Boolean, default=False, nullable=False)
+    comparison_type = Column(String, nullable=True)  # 'flat_metrics' | 'set_metrics' | 'yield' | 'first_instance'
+    metric_comparisons = Column(JSON_TYPE, nullable=True)  # list of per-metric dicts
+    derived_summary = Column(JSON_TYPE, nullable=True)  # UI-facing aggregates
+    created_at = Column(DateTime, default=utc_now)
+
+    __table_args__ = (
+        sa.Index('ix_progress_records_root_activity_created', 'root_id', 'activity_definition_id', 'created_at'),
+        sa.Index('ix_progress_records_session', 'session_id'),
+    )
+
+
 class FractalMetricDefinition(Base):
     __tablename__ = 'fractal_metric_definitions'
 
@@ -22,6 +46,7 @@ class FractalMetricDefinition(Base):
     max_value = Column(Float, nullable=True)
     description = Column(String, nullable=True)
     sort_order = Column(Integer, default=0)
+    default_progress_aggregation = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
@@ -98,6 +123,8 @@ class MetricDefinition(Base):
     is_top_set_metric = Column(Boolean, default=False)
     is_multiplicative = Column(Boolean, default=True)
     sort_order = Column(Integer, default=0)
+    track_progress = Column(Boolean, default=True, nullable=False)
+    progress_aggregation = Column(String, nullable=True)  # 'last' | 'sum' | 'max' | 'yield'
 
     fractal_metric = relationship("FractalMetricDefinition", lazy="joined")
 

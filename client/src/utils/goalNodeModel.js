@@ -1,4 +1,4 @@
-const EXECUTION_GOAL_TYPES = new Set(['MicroGoal', 'NanoGoal']);
+const EXECUTION_GOAL_TYPES = new Set();
 
 export const getGoalNodeId = (goal) => {
     if (!goal) return null;
@@ -154,14 +154,6 @@ export const flattenSessionGoalsViewGoals = (sessionGoalsView) => {
             stack.push(children[index]);
         }
     }
-
-    const microGoals = Array.isArray(sessionGoalsView.micro_goals) ? sessionGoalsView.micro_goals : [];
-    microGoals.forEach((goal) => {
-        const goalId = getGoalNodeId(goal);
-        if (goalId && seenIds.has(goalId)) return;
-        flattened.push(goal);
-        if (goalId) seenIds.add(goalId);
-    });
 
     return flattened;
 };

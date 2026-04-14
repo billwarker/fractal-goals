@@ -3,10 +3,8 @@ import { createPortal } from 'react-dom';
 
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
-import notify from '../../utils/notify';
 import { useSessionGoalsViewModel } from '../../hooks/useSessionGoalsViewModel';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
-import MicroGoalModal from '../MicroGoalModal';
 import HierarchySection from './HierarchySection';
 import TargetsSection from './TargetsSection';
 import styles from './GoalsPanel.module.css';
@@ -33,8 +31,6 @@ function GoalsPanel({
     const { createGoal } = useActiveSessionActions();
     const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
 
-    const [showMicroTargetBuilder, setShowMicroTargetBuilder] = useState(false);
-    const [targetBuilderGoal, setTargetBuilderGoal] = useState(null);
     const [viewModeOverrides, setViewModeOverrides] = useState({});
     const [createSubGoalParent, setCreateSubGoalParent] = useState(null);
 
@@ -69,42 +65,6 @@ function GoalsPanel({
         targetAchievements,
         achievedTargetIds,
     });
-
-    const handleAddTargetForGoal = useCallback((goalNode) => {
-        setTargetBuilderGoal(goalNode);
-        setShowMicroTargetBuilder(true);
-    }, []);
-
-    const handleSaveMicroGoal = useCallback(async ({ goalName, target, description }) => {
-        if (!targetBuilderGoal || !rootId) return;
-        const parentId = targetBuilderGoal.id || targetBuilderGoal.attributes?.id;
-        if (!parentId) return;
-
-        try {
-            const enrichedTarget = { ...target };
-            if (activeActivityDef && selectedActivity?.id) {
-                enrichedTarget.activity_instance_id = selectedActivity.id;
-            }
-
-            await createGoal({
-                name: goalName,
-                type: 'MicroGoal',
-                parent_id: parentId,
-                session_id: sessionId,
-                activity_definition_id: activeActivityDef?.id || undefined,
-                targets: [enrichedTarget],
-                description: description || '',
-            });
-            notify.success(`Micro goal created: ${goalName}`);
-            if (onGoalCreated) onGoalCreated(goalName);
-        } catch (err) {
-            console.error('Failed to create MicroGoal', err);
-            throw err;
-        }
-
-        setShowMicroTargetBuilder(false);
-        setTargetBuilderGoal(null);
-    }, [targetBuilderGoal, rootId, activeActivityDef, selectedActivity, createGoal, sessionId, onGoalCreated]);
 
     const handleStartSubGoalCreation = useCallback((node) => {
         setCreateSubGoalParent(node);
@@ -169,7 +129,6 @@ function GoalsPanel({
                                     activityDefinition: activeActivityDef,
                                     initialSelectedGoalIds: sessionGoalsView?.activity_goal_ids_by_activity?.[activeActivityDef?.id] || []
                                 })}
-                                onAddTargetForGoal={handleAddTargetForGoal}
                             />
 
                             <TargetsSection
@@ -208,18 +167,6 @@ function GoalsPanel({
                     </div>
                 )}
             </div>
-
-            <MicroGoalModal
-                isOpen={showMicroTargetBuilder}
-                onClose={() => {
-                    setShowMicroTargetBuilder(false);
-                    setTargetBuilderGoal(null);
-                }}
-                onSave={handleSaveMicroGoal}
-                activityDefinitions={activityDefinitions}
-                preselectedActivityId={activeActivityDef?.id}
-                parentGoalName={targetBuilderGoal?.name || targetBuilderGoal?.attributes?.name}
-            />
 
             {createSubGoalParent && createPortal(
                 <React.Suspense fallback={<div>Loading Details...</div>}>

@@ -31,7 +31,7 @@ describe('TargetCard', () => {
                     metric_definitions: [{ id: 'm1', name: 'Quality', unit: '%' }]
                 }]}
                 isCompleted={true}
-                goalType="MicroGoal"
+                goalType="ImmediateGoal"
             />
         );
 
@@ -50,7 +50,7 @@ describe('TargetCard', () => {
                 }}
                 activityDefinitions={[]}
                 isCompleted={false}
-                goalType="MicroGoal"
+                goalType="ImmediateGoal"
             />
         );
 
@@ -69,7 +69,7 @@ describe('TargetCard', () => {
                 activityDefinitions={[]}
                 isCompleted={false}
                 isEditMode={true}
-                goalType="MicroGoal"
+                goalType="ImmediateGoal"
             />
         );
 

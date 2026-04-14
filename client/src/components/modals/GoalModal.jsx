@@ -182,20 +182,18 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
                         />
                     </div>
 
-                    {goalType !== 'MicroGoal' && goalType !== 'NanoGoal' && (
-                        <div className={styles.formGroup}>
-                            <label className={styles.label} style={{ color: themeColor }}>
-                                Deadline
-                            </label>
-                            <Input
-                                type="date"
-                                value={deadline}
-                                onChange={e => setDeadline(e.target.value)}
-                                max={parent?.attributes?.deadline?.split('T')[0] || parent?.deadline?.split('T')[0]}
-                                fullWidth
-                            />
-                        </div>
-                    )}
+                    <div className={styles.formGroup}>
+                        <label className={styles.label} style={{ color: themeColor }}>
+                            Deadline
+                        </label>
+                        <Input
+                            type="date"
+                            value={deadline}
+                            onChange={e => setDeadline(e.target.value)}
+                            max={parent?.attributes?.deadline?.split('T')[0] || parent?.deadline?.split('T')[0]}
+                            fullWidth
+                        />
+                    </div>
                 </ModalBody>
 
                 <ModalFooter>

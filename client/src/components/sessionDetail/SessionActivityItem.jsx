@@ -1,18 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 
 import { useActiveSessionData, useActiveSessionActions } from '../../contexts/ActiveSessionContext';
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';
-import { queryKeys } from '../../hooks/queryKeys';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatForInput, localToISO } from '../../utils/dateUtils';
-import { fractalApi } from '../../utils/api';
 import { getGroupBreadcrumb } from '../../utils/manageActivities';
-import notify from '../../utils/notify';
 import ActivityCompletionButton from '../common/ActivityCompletionButton';
 import MetaField from '../common/MetaField';
 import Linkify from '../atoms/Linkify';
-import GoalIcon from '../atoms/GoalIcon';
 import Button from '../atoms/Button';
 import ActivityInstanceModesModal from '../modals/ActivityInstanceModesModal';
 import { DeletedBadge } from '../ui/DeletedEntityFallback';
@@ -20,6 +14,7 @@ import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import styles from './SessionActivityItem.module.css';
 import useMetricDrafts from './useMetricDrafts';
+import { useProgressComparison } from '../../hooks/useProgressComparison';
 
 /**
  * Format duration in seconds to MM:SS format
@@ -29,6 +24,33 @@ function formatDuration(seconds) {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function formatMetricNumber(value) {
+    if (value == null || Number.isNaN(Number(value))) return null;
+    const numericValue = Number(value);
+    if (Number.isInteger(numericValue)) {
+        return String(numericValue);
+    }
+    return numericValue.toFixed(1).replace(/\.0$/, '');
+}
+
+function formatInlineProgressValue(comparison) {
+    if (!comparison) return null;
+
+    if (comparison.pct_change != null) {
+        const magnitude = formatMetricNumber(Math.abs(comparison.pct_change));
+        if (comparison.improved) return `▲${magnitude}%`;
+        if (comparison.regressed) return `▼${magnitude}%`;
+        return '0%';
+    }
+
+    if (comparison.delta == null) return null;
+    const delta = Number(comparison.delta);
+    const magnitude = formatMetricNumber(Math.abs(delta));
+    if (delta > 0) return `+${magnitude}`;
+    if (delta < 0) return `-${magnitude}`;
+    return '0';
 }
 
 const MAX_VISIBLE_MODE_BADGES = 2;
@@ -85,16 +107,13 @@ function SessionActivityItem({
         sessionId,
         activities,
         activityGroups,
-        microGoals,
         session,
-        goalAchievements,
     } = useActiveSessionData();
 
     const {
         updateInstance,
         updateTimer,
         removeActivity,
-        toggleGoalCompletion,
     } = useActiveSessionActions();
 
     const activityDefinition = activityDefinitionProp
@@ -110,13 +129,6 @@ function SessionActivityItem({
 
     // Get timezone from context
     const { timezone } = useTimezone();
-    const queryClient = useQueryClient();
-    const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
-    const sessionNotesKey = queryKeys.sessionNotes(rootId, sessionId);
-    const sessionKey = queryKeys.session(rootId, sessionId);
-    const fractalTreeKey = queryKeys.fractalTree(rootId);
-    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
-
     const handleUpdateSets = useCallback((newSets) => {
         onUpdate('sets', newSets);
     }, [onUpdate]);
@@ -135,37 +147,12 @@ function SessionActivityItem({
         metric?.split_id || metric?.split_definition_id || null
     ), []);
 
-    // Find active micro goal for this activity in the current session
-    // Include completed ones so they show as green icons rather than disappearing
-    const activeMicroGoal = microGoals.find(mg =>
-        (mg.attributes?.session_id === sessionId || mg.session_id === sessionId) &&
-        (activityDefinition?.associated_goal_ids?.includes(mg.parent_id) || activityDefinition?.associated_goal_ids?.includes(mg.id))
-    );
-    const activeMicroGoalCompleted = activeMicroGoal
-        ? Boolean(
-            goalAchievements?.get(activeMicroGoal.id)?.allAchieved
-            ?? activeMicroGoal.completed
-            ?? activeMicroGoal.attributes?.completed
-        )
-        : false;
-
-    const [nanoModeOverrides, setNanoModeOverrides] = useState({});
-    const nanoModeKey = activeMicroGoal?.id || 'none';
-    const nanoMode = nanoModeOverrides[nanoModeKey] ?? Boolean(activeMicroGoal);
-
-    const handleToggleNanoMode = useCallback(() => {
-        setNanoModeOverrides((prev) => ({
-            ...prev,
-            [nanoModeKey]: !nanoMode,
-        }));
-    }, [nanoMode, nanoModeKey]);
-
     // Local draft state for editing datetime fields. `null` means "show current query value".
     const [startTimeDraft, setStartTimeDraft] = useState(null);
     const [stopTimeDraft, setStopTimeDraft] = useState(null);
+    // Progress comparison: stored from completion mutation response or fetched live
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
     const [realtimeDuration, setRealtimeDuration] = useState(0);
-    const [pendingNanoGoalIds, setPendingNanoGoalIds] = useState(() => new Set());
     const [isModesModalOpen, setIsModesModalOpen] = useState(false);
     const [draftModeIds, setDraftModeIds] = useState([]);
 
@@ -242,12 +229,6 @@ function SessionActivityItem({
     const handleAddNote = async (content) => {
         if (!content.trim() || !onAddNote || !exercise.id) return;
 
-        // NEW: Check if in nano mode
-        if (nanoMode && activeMicroGoal) {
-            await handleAddNanoNote(content);
-            return;
-        }
-
         try {
             await onAddNote({
                 context_type: 'activity_instance',
@@ -259,86 +240,10 @@ function SessionActivityItem({
                 content: content.trim(),
             });
             if (onNoteCreated) onNoteCreated();
-
-            // Optional: Deselect set after adding note?
-            // setSelectedSetIndex(null); 
         } catch (err) {
             console.error("Failed to create note", err);
         }
     };
-
-    const handleAddNanoNote = async (content) => {
-        if (!content.trim()) return;
-        try {
-            const response = await fractalApi.createNanoGoalNote(rootId, {
-                name: content.trim(),
-                parent_id: activeMicroGoal.id,
-                session_id: sessionId || exercise.session_id,
-                activity_instance_id: exercise.id,
-                activity_definition_id: activityDefinition?.id,
-                set_index: selectedSetIndex,
-            });
-            const createdGoal = response?.data?.goal;
-            const createdNote = response?.data?.note;
-
-            if (createdGoal?.id) {
-                queryClient.setQueryData(sessionGoalsViewKey, (old) => {
-                    if (!old || !Array.isArray(old.micro_goals)) return old;
-                    return {
-                        ...old,
-                        micro_goals: old.micro_goals.map((micro) => {
-                            if (micro.id !== activeMicroGoal.id) return micro;
-                            if ((micro.children || []).some((child) => child.id === createdGoal.id)) {
-                                return micro;
-                            }
-                            return {
-                                ...micro,
-                                children: [...(micro.children || []), createdGoal],
-                            };
-                        }),
-                    };
-                });
-                notify.success(`Created Nano Goal: ${createdGoal.name || content.trim()}`);
-            }
-
-            if (createdNote?.id) {
-                queryClient.setQueryData(sessionNotesKey, (old = []) => {
-                    if (!Array.isArray(old)) return old;
-                    if (old.some((note) => note.id === createdNote.id)) return old;
-                    return [createdNote, ...old];
-                });
-            }
-
-            if (onNoteCreated) onNoteCreated();
-            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
-            queryClient.invalidateQueries({ queryKey: sessionKey });
-            queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
-        } catch (err) {
-            console.error("Failed to create nano goal", err);
-            notify.error(err?.response?.data?.error || "Failed to create nano goal");
-        }
-    };
-
-    const handleToggleNanoGoal = useCallback(async (nanoGoalId, completed) => {
-        if (!toggleGoalCompletion || !nanoGoalId || pendingNanoGoalIds.has(nanoGoalId)) return;
-        setPendingNanoGoalIds((prev) => {
-            const next = new Set(prev);
-            next.add(nanoGoalId);
-            return next;
-        });
-        try {
-            await toggleGoalCompletion({ goalId: nanoGoalId, completed });
-        } catch (err) {
-            console.error("Failed to toggle nano goal completion", err);
-            notify.error("Failed to update nano goal");
-        } finally {
-            setPendingNanoGoalIds((prev) => {
-                const next = new Set(prev);
-                next.delete(nanoGoalId);
-                return next;
-            });
-        }
-    }, [toggleGoalCompletion, pendingNanoGoalIds]);
 
     const localStartTime = startTimeDraft ?? (exercise.time_start ? formatForInput(exercise.time_start, timezone) : '');
     const localStopTime = stopTimeDraft ?? (exercise.time_stop ? formatForInput(exercise.time_stop, timezone) : '');
@@ -364,6 +269,157 @@ function SessionActivityItem({
         exercise,
         updateExercise: onUpdate,
     });
+    // Fetch live progress comparison while the activity is incomplete and no completion result yet
+    const isCompleted = Boolean(exercise.time_stop);
+    const activityProgress = exercise?.progress_comparison || null;
+    const { progressComparison: liveProgressComparison } = useProgressComparison(
+        rootId,
+        exercise.id,
+        { enabled: Boolean(rootId && exercise.id && hasMetrics && !activityProgress) }
+    );
+
+    // The displayed progress: prefer completion result, fall back to live query
+    const activeProgress = activityProgress || liveProgressComparison;
+    const metricDefinitionsById = useMemo(() => new Map(
+        (def.metric_definitions || []).map((metric) => [metric.id, metric])
+    ), [def.metric_definitions]);
+    const metricProgressById = useMemo(() => {
+        const items = activeProgress?.metric_comparisons || [];
+        return new Map(
+            items
+                .flatMap((item) => {
+                    const metricId = item?.metric_id || item?.metric_definition_id;
+                    return metricId ? [[metricId, item]] : [];
+                })
+        );
+    }, [activeProgress]);
+    const setProgressVisibility = useMemo(() => {
+        if (!hasSets || !Array.isArray(exercise.sets)) {
+            return new Map();
+        }
+
+        const visibilityMap = new Map();
+
+        for (const metric of (def.metric_definitions || [])) {
+            const comparison = metricProgressById.get(metric.id);
+            if (!comparison) continue;
+
+            const aggregation = comparison.aggregation
+                || metric.progress_aggregation
+                || metric.default_progress_aggregation
+                || 'last';
+
+            const presentSetValues = exercise.sets
+                .map((set, setIndex) => {
+                    const rawValue = getMetricValue(set.metrics, metric.id);
+                    if (rawValue == null || String(rawValue).trim() === '') return null;
+                    const numericValue = Number(rawValue);
+                    if (Number.isNaN(numericValue)) return null;
+                    return { setIndex, value: numericValue };
+                })
+                .filter(Boolean);
+
+            if (presentSetValues.length === 0) {
+                visibilityMap.set(metric.id, new Set(exercise.sets.map((_, index) => index)));
+                continue;
+            }
+
+            if (aggregation === 'last') {
+                visibilityMap.set(metric.id, new Set([presentSetValues[presentSetValues.length - 1].setIndex]));
+                continue;
+            }
+
+            if (aggregation === 'max') {
+                const maxValue = Math.max(...presentSetValues.map((entry) => entry.value));
+                visibilityMap.set(
+                    metric.id,
+                    new Set(presentSetValues.filter((entry) => entry.value === maxValue).map((entry) => entry.setIndex))
+                );
+                continue;
+            }
+
+            visibilityMap.set(metric.id, new Set([presentSetValues[presentSetValues.length - 1].setIndex]));
+        }
+
+        return visibilityMap;
+    }, [def.metric_definitions, exercise.sets, getMetricValue, hasSets, metricProgressById]);
+
+    const renderMetricProgress = useCallback((metricId, options = {}) => {
+        if (!metricId || !activeProgress || activeProgress.is_first_instance) {
+            return null;
+        }
+
+        const comparison = metricProgressById.get(metricId);
+        if (!comparison) {
+            return null;
+        }
+
+        // For set-based activities, use per-set comparison data if available
+        if (hasSets && options.setIndex != null) {
+            const setComps = comparison.set_comparisons;
+            if (Array.isArray(setComps) && setComps.length > 0) {
+                const setComp = setComps.find((sc) => sc.set_index === options.setIndex);
+                if (!setComp || setComp.previous_value == null) {
+                    return null;
+                }
+                if (isCompleted) {
+                    const inlineValue = formatInlineProgressValue(setComp);
+                    if (!inlineValue) return null;
+                    const progressClassName = setComp.improved
+                        ? styles.metricInlineProgressImproved
+                        : setComp.regressed
+                            ? styles.metricInlineProgressRegressed
+                            : styles.metricInlineProgressNeutral;
+                    return (
+                        <span className={`${styles.metricInlineProgress} ${progressClassName}`}>
+                            ({inlineValue})
+                        </span>
+                    );
+                }
+                return (
+                    <span className={styles.metricInlinePrevious}>
+                        (last {formatMetricNumber(setComp.previous_value)})
+                    </span>
+                );
+            }
+
+            // Fallback: only show hint on the driving set row
+            const visibleIndexes = setProgressVisibility.get(metricId);
+            if (visibleIndexes && !visibleIndexes.has(options.setIndex)) {
+                return null;
+            }
+        }
+
+        if (isCompleted) {
+            const inlineValue = formatInlineProgressValue(comparison);
+            if (!inlineValue) {
+                return null;
+            }
+
+            const progressClassName = comparison.improved
+                ? styles.metricInlineProgressImproved
+                : comparison.regressed
+                    ? styles.metricInlineProgressRegressed
+                    : styles.metricInlineProgressNeutral;
+
+            return (
+                <span className={`${styles.metricInlineProgress} ${progressClassName}`}>
+                    ({inlineValue})
+                </span>
+            );
+        }
+
+        if (comparison.previous_value == null) {
+            return null;
+        }
+
+        return (
+            <span className={styles.metricInlinePrevious}>
+                (last {formatMetricNumber(comparison.previous_value)})
+            </span>
+        );
+    }, [activeProgress, hasSets, isCompleted, metricProgressById, setProgressVisibility]);
+
     const groupLabel = useMemo(() => {
         const groupId = activityDefinition?.group_id || exercise.group_id || null;
         if (groupId && Array.isArray(activityGroups) && activityGroups.length > 0) {
@@ -542,16 +598,6 @@ function SessionActivityItem({
                         className={styles.activityNameContainer}
                     >
                         <div className={`${styles.activityName} ${styles.activityNameFlex}`}>
-                            {!quickMode && activeMicroGoal && (
-                                <div title={`Micro Goal: ${activeMicroGoal.name}`}>
-                                    <GoalIcon
-                                        shape={getGoalIcon(activeMicroGoal)}
-                                        color={activeMicroGoalCompleted ? getGoalColor('Completed') : getGoalColor(activeMicroGoal)}
-                                        secondaryColor={activeMicroGoalCompleted ? getGoalSecondaryColor('Completed') : getGoalSecondaryColor(activeMicroGoal)}
-                                        size={14}
-                                    />
-                                </div>
-                            )}
                             <span className={styles.activityNameFlex}>
                                 {def.name}
                                 {!activityDefinition && <DeletedBadge />}
@@ -795,7 +841,10 @@ function SessionActivityItem({
                                                                     if (e.key === 'Enter') e.currentTarget.blur();
                                                                 }}
                                                             />
-                                                            <span className={styles.metricUnit}>{m.unit}</span>
+                                                            <span className={styles.metricMeta}>
+                                                                <span className={styles.metricUnit}>{m.unit}</span>
+                                                                {renderMetricProgress(m.id, { setIndex: setIdx })}
+                                                            </span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -815,7 +864,10 @@ function SessionActivityItem({
                                                             if (e.key === 'Enter') e.currentTarget.blur();
                                                         }}
                                                     />
-                                                    <span className={styles.metricUnitLarge}>{m.unit}</span>
+                                                    <span className={`${styles.metricMeta} ${styles.metricMetaLarge}`}>
+                                                        <span className={styles.metricUnitLarge}>{m.unit}</span>
+                                                        {renderMetricProgress(m.id, { setIndex: setIdx })}
+                                                    </span>
                                                 </div>
                                             ))
                                         )
@@ -901,7 +953,10 @@ function SessionActivityItem({
                                                             if (e.key === 'Enter') e.currentTarget.blur();
                                                         }}
                                                     />
-                                                    <span className={styles.metricUnitLarge}>{m.unit}</span>
+                                                    <span className={`${styles.metricMeta} ${styles.metricMetaLarge}`}>
+                                                        <span className={styles.metricUnitLarge}>{m.unit}</span>
+                                                        {renderMetricProgress(m.id)}
+                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
@@ -924,7 +979,10 @@ function SessionActivityItem({
                                                 if (e.key === 'Enter') e.currentTarget.blur();
                                             }}
                                         />
-                                        <span className={styles.metricUnitLarge}>{m.unit}</span>
+                                        <span className={`${styles.metricMeta} ${styles.metricMetaLarge}`}>
+                                            <span className={styles.metricUnitLarge}>{m.unit}</span>
+                                            {renderMetricProgress(m.id)}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
@@ -946,24 +1004,16 @@ function SessionActivityItem({
                                     notes={activityNotes}
                                     onUpdate={onUpdateNote}
                                     onDelete={onDeleteNote}
-                                    onToggleNanoGoal={handleToggleNanoGoal}
-                                    pendingNanoGoalIds={pendingNanoGoalIds}
                                     compact={false}
                                 />
                             </div>
                         )}
                         <NoteQuickAdd
                             onSubmit={handleAddNote}
-                            placeholder={nanoMode
-                                ? "Add a nano goal / sub-step..."
-                                : (selectedSetIndex !== null
-                                    ? `Note for Set #${selectedSetIndex + 1}...`
-                                    : "Add a note about this activity...")
+                            placeholder={selectedSetIndex !== null
+                                ? `Note for Set #${selectedSetIndex + 1}...`
+                                : "Add a note about this activity..."
                             }
-                            buttonLabel={nanoMode ? "Add Nano" : "Add Note"}
-                            isNanoMode={nanoMode}
-                            hasMicroGoal={!!activeMicroGoal}
-                            onToggleNanoMode={handleToggleNanoMode}
                         />
                     </div>
                 )}

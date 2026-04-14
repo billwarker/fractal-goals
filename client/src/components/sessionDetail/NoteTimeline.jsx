@@ -12,8 +12,6 @@ function NoteTimeline({
     onDelete,
     onPin,
     onUnpin,
-    onToggleNanoGoal,
-    pendingNanoGoalIds = new Set(),
     compact = false,
     selectedNoteId,
     onNoteSelect,
@@ -27,8 +25,6 @@ function NoteTimeline({
             onDelete={onDelete}
             onPin={onPin}
             onUnpin={onUnpin}
-            onToggleNanoGoal={onToggleNanoGoal}
-            pendingNanoGoalIds={pendingNanoGoalIds}
             compact={compact}
             selectedNoteId={selectedNoteId}
             onNoteSelect={(note) => onNoteSelect && onNoteSelect(note.id)}

@@ -40,7 +40,6 @@ export const queryKeys = {
     session: (rootId, sessionId) => ['session', rootId, sessionId],
     sessionActivities: (rootId, sessionId) => ['session-activities', rootId, sessionId],
     sessionGoalsView: (rootId, sessionId) => ['session-goals-view', rootId, sessionId],
-    sessionMicroGoals: (rootId) => ['session-micro-goals', rootId],
     sessionNotes: (rootId, sessionId) => ['session-notes', rootId, sessionId],
     sessionTemplates: (rootId) => ['session-templates', rootId],
     previousSessionNotes: (rootId, sessionId) => ['previous-session-notes', rootId, sessionId],
@@ -52,4 +51,7 @@ export const queryKeys = {
     sessionsPaginated: (rootId) => ['sessions', rootId, 'paginated'],
     goalNotes: (rootId, goalId, includeDescendants = false) => ['goal-notes', rootId, goalId, includeDescendants],
     allNotes: (rootId, filters = {}) => ['all-notes', rootId, filters],
+    progressComparison: (instanceId) => ['progress', 'comparison', instanceId],
+    progressHistory: (activityDefId, excludeSessionId = null) => ['progress', 'history', activityDefId, excludeSessionId],
+    sessionProgressSummary: (sessionId) => ['progress', 'session', sessionId],
 };

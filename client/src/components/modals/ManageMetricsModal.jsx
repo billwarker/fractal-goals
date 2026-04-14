@@ -23,6 +23,14 @@ const INPUT_TYPES = [
     { value: 'duration', label: 'Duration (MM:SS)' },
 ];
 
+const DEFAULT_PROGRESS_OPTIONS = [
+    { value: '', label: 'App default (Last value)' },
+    { value: 'last', label: 'Last value' },
+    { value: 'sum', label: 'Sum across sets' },
+    { value: 'max', label: 'Best set' },
+    { value: 'yield', label: 'Yield (combined multiplicative output)' },
+];
+
 const EMPTY_FORM = {
     name: '',
     unit: '',
@@ -31,6 +39,7 @@ const EMPTY_FORM = {
     input_type: 'number',
     default_value: '',
     higher_is_better: null,
+    default_progress_aggregation: '',
     predefined_values: '',
     min_value: '',
     max_value: '',
@@ -79,6 +88,7 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
             input_type: metric.input_type || 'number',
             default_value: metric.default_value != null ? String(metric.default_value) : '',
             higher_is_better: metric.higher_is_better ?? null,
+            default_progress_aggregation: metric.default_progress_aggregation || '',
             predefined_values: metric.predefined_values ? metric.predefined_values.join(', ') : '',
             min_value: metric.min_value != null ? String(metric.min_value) : '',
             max_value: metric.max_value != null ? String(metric.max_value) : '',
@@ -97,6 +107,7 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
             input_type: metric.input_type || 'number',
             default_value: metric.default_value != null ? String(metric.default_value) : '',
             higher_is_better: metric.higher_is_better ?? null,
+            default_progress_aggregation: metric.default_progress_aggregation || '',
             predefined_values: metric.predefined_values ? metric.predefined_values.join(', ') : '',
             min_value: metric.min_value != null ? String(metric.min_value) : '',
             max_value: metric.max_value != null ? String(metric.max_value) : '',
@@ -127,6 +138,7 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
             input_type: form.input_type,
             default_value: form.default_value !== '' ? Number(form.default_value) : null,
             higher_is_better: form.higher_is_better,
+            default_progress_aggregation: form.default_progress_aggregation || null,
             predefined_values: predefined,
             min_value: form.min_value !== '' ? Number(form.min_value) : null,
             max_value: form.max_value !== '' ? Number(form.max_value) : null,
@@ -316,6 +328,21 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
                                     placeholder="Pre-fill session input"
                                     fullWidth
                                 />
+
+                                <div className={styles.fieldGroup}>
+                                    <label className={styles.fieldLabel}>Default comparison</label>
+                                    <select
+                                        className={styles.select}
+                                        value={form.default_progress_aggregation}
+                                        onChange={(e) => setField('default_progress_aggregation', e.target.value)}
+                                    >
+                                        {DEFAULT_PROGRESS_OPTIONS.map((option) => (
+                                            <option key={option.value || 'default'} value={option.value}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
 
                                 <Input
                                     label="Predefined values"

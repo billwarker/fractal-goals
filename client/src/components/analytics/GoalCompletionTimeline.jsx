@@ -20,9 +20,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
         'LongTermGoal',   // Level 1
         'MidTermGoal',    // Level 2
         'ShortTermGoal',  // Level 3
-        'ImmediateGoal',  // Level 4
-        'MicroGoal',      // Level 5
-        'NanoGoal'        // Level 6 - Top of stack
+        'ImmediateGoal',  // Level 4 - Top of stack
     ];
 
     // Process goals to build cumulative completion data
@@ -108,7 +106,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
         }
 
         // Build Chart.js datasets in hierarchy order
-        // Parents (UltimateGoal) at bottom, children (NanoGoal) at top
+        // Parents (UltimateGoal) at bottom, children (ImmediateGoal) at top
         // Chart.js stacks in order of array, so first dataset = bottom layer
         const datasets = goalTypesHierarchy
             .filter(type => {

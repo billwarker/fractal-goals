@@ -60,7 +60,7 @@ function GoalEditForm({
                 {errors.name && <div className={styles.errorText}>{errors.name}</div>}
             </div>
 
-            {goalType !== 'NanoGoal' && (
+            {(
                 <div className={styles.fieldGroup}>
                     <label className={styles.label} style={{ color: goalColor }}>
                         Description
@@ -75,7 +75,7 @@ function GoalEditForm({
             )}
 
             {/* Relevance Statement - SMART "R" Criterion */}
-            {goalType !== 'NanoGoal' && ((goal?.attributes?.parent_id || mode === 'create' && parentGoalName) || goalType === 'UltimateGoal') && (
+            {((goal?.attributes?.parent_id || mode === 'create' && parentGoalName) || goalType === 'UltimateGoal') && (
                 <div className={styles.fieldGroup}>
                     <label className={styles.label} style={{ color: goalColor }}>
                         Relevance (SMART)
@@ -114,7 +114,7 @@ function GoalEditForm({
             )}
 
             {/* How is progress measured? */}
-            {goalType !== 'NanoGoal' && (
+            {(
                 <div className={styles.progressBox}>
                     <label className={styles.label} style={{ marginBottom: '10px', color: goalColor }}>
                         How is progress measured? (Select all that apply)
@@ -168,7 +168,7 @@ function GoalEditForm({
             )}
 
             {/* Associated Activities Section - Edit/Create Mode */}
-            {trackActivities && goalType !== 'NanoGoal' && (
+            {trackActivities && (
                 <Suspense fallback={null}>
                     <ActivityAssociator
                         associatedActivities={associatedActivities}
@@ -199,7 +199,7 @@ function GoalEditForm({
             )}
 
             {/* Targets Section - Edit/Create Mode */}
-            {trackActivities && goalType !== 'NanoGoal' && (
+            {trackActivities && (
                 <Suspense fallback={null}>
                     <TargetManager
                         targets={targets}

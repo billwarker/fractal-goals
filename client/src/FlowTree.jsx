@@ -144,7 +144,6 @@ const CustomNode = ({ data }) => {
                     className={`${styles.nodeLabel} ${isUltimate ? styles.nodeLabelUltimate : ''} ${data.label.length > 30 ? styles.nodeLabelLongText : ''}`}
                     style={{
                         color: isCompleted ? fillColor : 'var(--color-text-primary)',
-                        fontStyle: data.type === 'NanoGoal' ? 'italic' : undefined,
                     }}
                     onClick={data.onClick}
                 >

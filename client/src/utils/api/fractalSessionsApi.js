@@ -13,8 +13,6 @@ export const fractalSessionsApi = {
     resumeSession: (rootId, sessionId) => axios.post(`${API_BASE}/${rootId}/timers/session/${sessionId}/resume`),
     addSessionGoal: (rootId, sessionId, goalId, goalType = 'immediate') =>
         axios.post(`${API_BASE}/${rootId}/sessions/${sessionId}/goals`, { goal_id: goalId, goal_type: goalType }),
-    getSessionMicroGoals: (rootId, sessionId) =>
-        axios.get(`${API_BASE}/fractal/${rootId}/sessions/${sessionId}/micro-goals`),
     getSessionGoalsView: (rootId, sessionId) =>
         axios.get(`${API_BASE}/fractal/${rootId}/sessions/${sessionId}/goals-view`),
     getSessionActivities: (rootId, sessionId) => axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}/activities`),
@@ -31,4 +29,6 @@ export const fractalSessionsApi = {
         axios.put(`${API_BASE}/${rootId}/session-templates/${templateId}`, data),
     deleteSessionTemplate: (rootId, templateId) =>
         axios.delete(`${API_BASE}/${rootId}/session-templates/${templateId}`),
+    getSessionProgressSummary: (rootId, sessionId) =>
+        axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}/progress-summary`),
 };

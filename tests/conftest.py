@@ -45,6 +45,7 @@ from blueprints.dashboards_api import dashboards_bp
 from blueprints.logs_api import logs_api
 from blueprints.auth_api import auth_bp
 from blueprints.goal_levels_api import goal_levels_bp
+from services.completion_handlers import clear_achievement_context, clear_live_progress
 
 
 @pytest.fixture(scope='function')
@@ -88,6 +89,16 @@ def app():
     def shutdown_session(exception=None):
         from models import remove_session
         remove_session()
+
+    @test_app.before_request
+    def reset_request_scoped_contexts():
+        clear_achievement_context()
+        clear_live_progress()
+
+    @test_app.teardown_request
+    def clear_request_scoped_contexts(exception=None):
+        clear_achievement_context()
+        clear_live_progress()
     
     # Ensure usage of test database
     if not config.DATABASE_URL or 'test' not in config.DATABASE_URL:

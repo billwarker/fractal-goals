@@ -47,8 +47,7 @@ const ActivityAssociationModal = ({
             'LongTermGoal': [],
             'MidTermGoal': [],
             'ShortTermGoal': [],
-            'ImmediateGoal': [],
-            'MicroGoal': []
+            'ImmediateGoal': []
         };
 
         filteredGoals.forEach(g => {
@@ -138,7 +137,6 @@ const ActivityAssociationModal = ({
             case 'MidTermGoal': return 'Mid Term Goals';
             case 'ShortTermGoal': return 'Short Term Goals';
             case 'ImmediateGoal': return 'Immediate Goals';
-            case 'MicroGoal': return 'Micro Goals';
             default: return 'Other Goals';
         }
     };
@@ -334,7 +332,6 @@ const ActivityAssociationModal = ({
                     {renderSection('MidTermGoal', groupedGoals['MidTermGoal'])}
                     {renderSection('ShortTermGoal', groupedGoals['ShortTermGoal'])}
                     {renderSection('ImmediateGoal', groupedGoals['ImmediateGoal'])}
-                    {renderSection('MicroGoal', groupedGoals['MicroGoal'])}
                     {renderSection('Other', groupedGoals['Other'])}
 
                     {filteredGoals.length === 0 && (

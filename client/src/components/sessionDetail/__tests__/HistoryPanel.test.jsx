@@ -8,9 +8,18 @@ const useActivityHistory = vi.fn(() => ({
     loading: false,
     error: null,
 }));
+const useProgressHistory = vi.fn(() => ({
+    progressHistory: [],
+    isLoading: false,
+    error: null,
+}));
 
 vi.mock('../../../hooks/useActivityHistory', () => ({
     useActivityHistory: (...args) => useActivityHistory(...args),
+}));
+
+vi.mock('../../../hooks/useProgressHistory', () => ({
+    useProgressHistory: (...args) => useProgressHistory(...args),
 }));
 
 vi.mock('../../../contexts/TimezoneContext', async (importOriginal) => {
@@ -29,9 +38,15 @@ const sessionActivityDefs = [
 describe('HistoryPanel', () => {
     beforeEach(() => {
         useActivityHistory.mockClear();
+        useProgressHistory.mockClear();
         useActivityHistory.mockReturnValue({
             history: [],
             loading: false,
+            error: null,
+        });
+        useProgressHistory.mockReturnValue({
+            progressHistory: [],
+            isLoading: false,
             error: null,
         });
     });
@@ -53,7 +68,11 @@ describe('HistoryPanel', () => {
         );
 
         expect(screen.getByRole('combobox')).toHaveValue('activity-def-2');
-        expect(useActivityHistory).toHaveBeenCalledWith('root-1', 'activity-def-2', 'session-1');
+        expect(useActivityHistory).toHaveBeenCalledWith('root-1', 'activity-def-2', 'session-1', { limit: 10 });
+        expect(useProgressHistory).toHaveBeenCalledWith('root-1', 'activity-def-2', {
+            limit: 10,
+            excludeSessionId: 'session-1',
+        });
     });
 
     it('preserves manual selection until the chosen activity disappears, then falls back', () => {
@@ -88,5 +107,65 @@ describe('HistoryPanel', () => {
         );
 
         expect(screen.getByRole('combobox')).toHaveValue('activity-def-1');
+    });
+
+    it('renders saved progress indicators alongside history metrics', () => {
+        useActivityHistory.mockReturnValue({
+            history: [
+                {
+                    id: 'instance-1',
+                    created_at: '2026-04-10T12:00:00.000Z',
+                    metric_values: [
+                        { metric_definition_id: 'm1', metric_id: 'm1', name: 'Quality', value: 11, unit: 'rating' },
+                    ],
+                    sets: [],
+                    notes: [],
+                },
+            ],
+            loading: false,
+            error: null,
+        });
+        useProgressHistory.mockReturnValue({
+            progressHistory: [
+                {
+                    activity_instance_id: 'instance-1',
+                    metric_comparisons: [
+                        {
+                            metric_id: 'm1',
+                            metric_name: 'Quality',
+                            pct_change: 10,
+                            improved: true,
+                            regressed: false,
+                        },
+                    ],
+                },
+            ],
+            isLoading: false,
+            error: null,
+        });
+
+        renderWithProviders(
+            <HistoryPanel
+                rootId="root-1"
+                sessionId="session-1"
+                selectedActivity={{ activity_definition_id: 'activity-def-1' }}
+                sessionActivityDefs={[
+                    {
+                        id: 'activity-def-1',
+                        name: 'Scales',
+                        metric_definitions: [{ id: 'm1', name: 'Quality', unit: 'rating' }],
+                    },
+                ]}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.getByText(/Quality: 11 rating/i)).toBeInTheDocument();
+        expect(screen.getByText('(▲10%)')).toBeInTheDocument();
     });
 });

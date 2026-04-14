@@ -306,7 +306,7 @@ class UserDeleteSchema(BaseModel):
 
 VALID_GOAL_TYPES = [
     'UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal',
-    'ImmediateGoal', 'MicroGoal', 'NanoGoal'
+    'ImmediateGoal'
 ]
 
 VALID_ROOT_GOAL_TYPES = [
@@ -346,23 +346,6 @@ class GoalCreateSchema(BaseModel):
     
     @model_validator(mode='after')
     def validate_parent_type_constraints(self):
-        if self.type == 'MicroGoal' and not self.parent_id:
-            raise ValueError('MicroGoal must have a parent_id (ImmediateGoal)')
-        if self.type == 'NanoGoal' and not self.parent_id:
-            raise ValueError('NanoGoal must have a parent_id (MicroGoal)')
-            
-        # Transient Goal Constraints (Micro & Nano)
-        if self.type in ('MicroGoal', 'NanoGoal') and self.deadline:
-            raise ValueError(f'{self.type} goals are transient and cannot have deadlines')
-            
-        # Nano Goal property restrictions
-        if self.type == 'NanoGoal':
-            if self.description and self.description.strip():
-                raise ValueError('NanoGoal cannot have a description')
-            self.track_activities = False
-            self.completed_via_children = False
-            self.allow_manual_completion = True
-            
         return self
     
     @field_validator('name')
@@ -614,7 +597,7 @@ class SessionGoalAssociationSchema(BaseModel):
     goal_id: str = Field(..., min_length=1)
     goal_type: Optional[str] = Field(
         'ImmediateGoal',
-        pattern=r'^(UltimateGoal|LongTermGoal|MidTermGoal|ShortTermGoal|ImmediateGoal|MicroGoal|NanoGoal)$'
+        pattern=r'^(UltimateGoal|LongTermGoal|MidTermGoal|ShortTermGoal|ImmediateGoal)$'
     )
 
 
@@ -850,6 +833,7 @@ class ActivityModeUpdateSchema(BaseModel):
 # =============================================================================
 
 VALID_INPUT_TYPES = {'number', 'integer', 'duration'}
+VALID_PROGRESS_AGGREGATIONS = {'last', 'sum', 'max', 'yield'}
 
 
 class FractalMetricCreateSchema(BaseModel):
@@ -867,6 +851,7 @@ class FractalMetricCreateSchema(BaseModel):
     min_value: Optional[float] = None
     max_value: Optional[float] = None
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
+    default_progress_aggregation: Optional[str] = None
     sort_order: Optional[int] = Field(None, ge=0)
 
     @field_validator('name', 'unit')
@@ -880,6 +865,19 @@ class FractalMetricCreateSchema(BaseModel):
         if v not in VALID_INPUT_TYPES:
             raise ValueError(f"input_type must be one of: {', '.join(sorted(VALID_INPUT_TYPES))}")
         return v
+
+    @field_validator('default_progress_aggregation')
+    @classmethod
+    def validate_progress_aggregation(cls, v: Optional[str]) -> Optional[str]:
+        if v in (None, ''):
+            return None
+        candidate = v.strip().lower()
+        if candidate not in VALID_PROGRESS_AGGREGATIONS:
+            raise ValueError(
+                "default_progress_aggregation must be one of: "
+                + ', '.join(sorted(VALID_PROGRESS_AGGREGATIONS))
+            )
+        return candidate
 
     @field_validator('description')
     @classmethod
@@ -904,6 +902,7 @@ class FractalMetricUpdateSchema(BaseModel):
     min_value: Optional[float] = None
     max_value: Optional[float] = None
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
+    default_progress_aggregation: Optional[str] = None
     sort_order: Optional[int] = Field(None, ge=0)
 
     @field_validator('name', 'unit')
@@ -921,6 +920,19 @@ class FractalMetricUpdateSchema(BaseModel):
         if v not in VALID_INPUT_TYPES:
             raise ValueError(f"input_type must be one of: {', '.join(sorted(VALID_INPUT_TYPES))}")
         return v
+
+    @field_validator('default_progress_aggregation')
+    @classmethod
+    def validate_progress_aggregation(cls, v: Optional[str]) -> Optional[str]:
+        if v in (None, ''):
+            return None
+        candidate = v.strip().lower()
+        if candidate not in VALID_PROGRESS_AGGREGATIONS:
+            raise ValueError(
+                "default_progress_aggregation must be one of: "
+                + ', '.join(sorted(VALID_PROGRESS_AGGREGATIONS))
+            )
+        return candidate
 
     @field_validator('description')
     @classmethod
@@ -946,9 +958,7 @@ class NoteCreateSchema(BaseModel):
     activity_definition_id: Optional[str] = None
     goal_id: Optional[str] = None
     set_index: Optional[int] = Field(None, ge=0)
-    nano_goal_id: Optional[str] = None
-    is_nano_goal: Optional[bool] = False
-    
+
     @field_validator('content')
     @classmethod
     def sanitize_content(cls, v: str) -> str:
@@ -966,23 +976,6 @@ class NoteUpdateSchema(BaseModel):
         if v is None:
             return v
         return sanitize_note_content(v)
-
-
-class NanoGoalNoteCreateSchema(BaseModel):
-    """Schema for atomically creating a nano goal and note entry for a session activity."""
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
-    parent_id: str = Field(..., min_length=1)
-    session_id: str = Field(..., min_length=1)
-    activity_instance_id: str = Field(..., min_length=1)
-    activity_definition_id: Optional[str] = None
-    set_index: Optional[int] = Field(None, ge=0)
-
-    @field_validator('name')
-    @classmethod
-    def sanitize_name(cls, v: str) -> str:
-        return sanitize_string(v)
 
 
 # =============================================================================

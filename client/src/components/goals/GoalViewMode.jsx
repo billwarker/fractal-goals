@@ -63,7 +63,7 @@ function GoalViewMode({
                     const isManualAllowed = levelConfig.allow_manual_completion !== false;
                     const canShowManual = allowManualCompletion && isManualAllowed && !isFrozen;
                     const canToggleCompletion = !isFrozen && (isCompleted || canShowManual);
-                    const isTargetsAllowed = levelConfig.track_activities !== false && goalType !== 'NanoGoal';
+                    const isTargetsAllowed = levelConfig.track_activities !== false;
                     const isChildrenAllowed = !isExecutionGoalType(goalType);
 
                     return (
@@ -122,7 +122,7 @@ function GoalViewMode({
                         }}
                         className={styles.btnAction}
                         disabled={goalType === 'ImmediateGoal'}
-                        title={goalType === 'ImmediateGoal' ? "MicroGoals can only be created from the Session Detail page" : ""}
+                        title=""
                         style={{
                             background: 'transparent',
                             border: `1px solid ${childGoalColor}`,
@@ -302,7 +302,7 @@ function GoalViewMode({
             )}
 
             {/* Targets Section - View Mode (Read-only) */}
-            {trackActivities && levelConfig.track_activities !== false && goalType !== 'NanoGoal' && (
+            {trackActivities && levelConfig.track_activities !== false && (
                 <Suspense fallback={null}>
                     <TargetManager
                         targets={targets}
@@ -332,15 +332,13 @@ function GoalViewMode({
             )}
 
             {/* Associated Children Section */}
-            {goalType !== 'NanoGoal' && (
-                <GoalChildrenList
-                    treeData={treeData}
-                    goalId={goalId}
-                    goalColor={goalColor}
-                    childType={childType}
-                    onGoalSelect={onGoalSelect}
-                />
-            )}
+            <GoalChildrenList
+                treeData={treeData}
+                goalId={goalId}
+                goalColor={goalColor}
+                childType={childType}
+                onGoalSelect={onGoalSelect}
+            />
         </div>
     );
 }

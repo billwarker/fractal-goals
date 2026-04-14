@@ -174,27 +174,4 @@ describe('useSessionNotes', () => {
         expect(notify.success).toHaveBeenCalledWith('Note deleted');
     });
 
-    it('skips the generic success toast for nano-goal notes', async () => {
-        const queryClient = createQueryClient();
-
-        getSessionNotes.mockResolvedValueOnce({ data: [] });
-        createNote.mockResolvedValue({
-            data: { id: 'note-2', content: 'Nano note', session_id: 'session-1', is_nano_goal: true }
-        });
-
-        const { result } = renderHook(
-            () => useSessionNotes('root-1', 'session-1', 'activity-1'),
-            { wrapper: createWrapper(queryClient) }
-        );
-
-        await waitFor(() => {
-            expect(result.current.notes).toEqual([]);
-        });
-
-        await act(async () => {
-            await result.current.addNote({ session_id: 'session-1', content: 'Nano note' });
-        });
-
-        expect(notify.success).not.toHaveBeenCalledWith('Note added');
-    });
 });

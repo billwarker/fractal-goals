@@ -19,7 +19,6 @@ export function useSessionDetailMutations({
     session,
     activityInstances,
     activities,
-    microGoals,
     queryClient,
     sessionKey,
     sessionActivitiesKey,
@@ -121,6 +120,8 @@ export function useSessionDetailMutations({
             invalidateSessionListQueries();
             queryClient.removeQueries({ queryKey: sessionKey });
             queryClient.removeQueries({ queryKey: sessionActivitiesKey });
+            queryClient.invalidateQueries({ queryKey: ['activity-history', rootId] });
+            queryClient.invalidateQueries({ queryKey: ['progress'] });
             notify.success('Session deleted successfully');
         },
         onError: () => {
@@ -264,6 +265,7 @@ export function useSessionDetailMutations({
         },
         onSuccess: (response, { instanceId, updates }) => {
             instanceRollbackRef.current.delete(instanceId);
+            const activityDefinitionId = response?.data?.activity_definition_id;
             if (response?.data) {
                 queryClient.setQueryData(sessionActivitiesKey, (previous = []) =>
                     previous.map((instance) => instance.id === instanceId ? response.data : instance)
@@ -281,6 +283,15 @@ export function useSessionDetailMutations({
             ) {
                 queryClient.invalidateQueries({ queryKey: sessionKey });
                 queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+            }
+
+            // Invalidate progress comparison when metrics are updated
+            if (updates?.metrics !== undefined || updates?.sets !== undefined) {
+                queryClient.invalidateQueries({ queryKey: queryKeys.progressComparison(instanceId) });
+                if (activityDefinitionId) {
+                    queryClient.invalidateQueries({ queryKey: ['progress', 'history', activityDefinitionId] });
+                }
+                queryClient.invalidateQueries({ queryKey: queryKeys.sessionProgressSummary(sessionId) });
             }
         }
     });
@@ -462,33 +473,6 @@ export function useSessionDetailMutations({
 
         try {
             if (newCompleted) {
-                const uncompletedInstanceMicroGoals = microGoals.filter((goal) =>
-                    !goal.completed &&
-                    goal.attributes?.targets?.some((target) => target.activity_instance_id)
-                );
-
-                if (uncompletedInstanceMicroGoals.length > 0) {
-                    const carryForward = window.confirm(
-                        "You have uncompleted Micro Goals bound to this session's activities. " +
-                        "Would you like to carry them forward to the next time you do these activities?"
-                    );
-
-                    if (carryForward) {
-                        for (const microGoal of uncompletedInstanceMicroGoals) {
-                            const updatedTargets = (microGoal.attributes?.targets || []).map((target) => ({
-                                ...target,
-                                activity_instance_id: null,
-                                session_id: null
-                            }));
-
-                            await fractalApi.updateGoal(rootId, microGoal.id, {
-                                session_id: null,
-                                targets: updatedTargets
-                            });
-                        }
-                    }
-                }
-
                 updatePayload.session_end = new Date().toISOString();
                 for (const instance of activityInstances) {
                     if (instance.time_start && !instance.time_stop) {
@@ -498,12 +482,15 @@ export function useSessionDetailMutations({
             }
 
             await updateSession(updatePayload);
+            if (newCompleted) {
+                queryClient.invalidateQueries({ queryKey: queryKeys.sessionProgressSummary(sessionId) });
+            }
             notify.success(newCompleted ? 'Session completed!' : 'Session marked as incomplete');
         } catch (error) {
             console.error('Failed to toggle session completion', error);
             notify.error(`Failed to update session completion: ${error?.response?.data?.error || error?.message || 'Unknown error'}`);
         }
-    }, [activityInstances, handleUpdateTimer, microGoals, rootId, session, updateSession]);
+    }, [activityInstances, handleUpdateTimer, rootId, session, updateSession]);
 
     const calculateTotalDuration = useCallback(() => {
         return activityInstances.reduce((sum, instance) => sum + (instance.duration_seconds || 0), 0);

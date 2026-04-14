@@ -1,17 +1,13 @@
 /**
  * NoteQuickAdd - Quick input for adding notes
- * 
+ *
  * Simple text input with Enter key to submit.
  */
 
 import React, { useState, useRef } from 'react';
-import GoalIcon from '../atoms/GoalIcon';
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import styles from './NoteQuickAdd.module.css';
 
-function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = false, hasMicroGoal = false, onToggleNanoMode }) {
-    const { getGoalColor, getGoalIcon } = useGoalLevels();
-    const nanoColor = getGoalColor('NanoGoal');
+function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
     const [content, setContent] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const inputRef = useRef(null);
@@ -59,20 +55,6 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = fa
     return (
         <form className={styles.noteQuickAdd} onSubmit={handleSubmit}>
             <div className={styles.noteInputRow}>
-                {hasMicroGoal && (
-                    <button
-                        type="button"
-                        className={`${styles.nanoToggleBtn} ${isNanoMode ? styles.nanoModeActive : ''}`}
-                        onClick={onToggleNanoMode}
-                        title={isNanoMode ? "Switch to regular note" : "Create as Nano Goal"}
-                    >
-                        <GoalIcon
-                            shape={getGoalIcon('NanoGoal')}
-                            color={isNanoMode ? getGoalColor('NanoGoal') : 'var(--color-text-muted)'}
-                            size={18}
-                        />
-                    </button>
-                )}
                 <textarea
                     ref={inputRef}
                     value={content}
@@ -80,9 +62,8 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", isNanoMode = fa
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
                     disabled={isSubmitting}
-                    className={`${styles.quickAddTextarea} ${isNanoMode ? styles.nanoModeInput : ''}`}
+                    className={styles.quickAddTextarea}
                     rows={1}
-                    style={isNanoMode ? { '--nano-goal-color': nanoColor, fontStyle: 'italic' } : undefined}
                 />
                 <button
                     type="submit"

@@ -136,6 +136,7 @@ describe('ActivityBuilder', () => {
         fireEvent.change(screen.getByLabelText('Activity Name'), {
             target: { value: 'Scale Practice' },
         });
+        fireEvent.click(screen.getByLabelText('Track Sets'));
         fireEvent.change(screen.getByLabelText('Metric 1'), {
             target: { value: 'metric-fractal-1' },
         });
@@ -149,6 +150,38 @@ describe('ActivityBuilder', () => {
                         fractal_metric_id: 'metric-fractal-1',
                         name: 'Speed',
                         unit: 'bpm',
+                    }),
+                ],
+            }));
+        });
+    });
+
+    it('includes progress tracking settings in the saved metric payload', async () => {
+        render(
+            <ActivityBuilder
+                isOpen={true}
+                onClose={vi.fn()}
+                editingActivity={null}
+                rootId="root-1"
+                onSave={vi.fn()}
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText('Activity Name'), {
+            target: { value: 'Scale Practice' },
+        });
+        fireEvent.change(screen.getByLabelText('Metric 1'), {
+            target: { value: 'metric-fractal-1' },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Create Activity' }));
+
+        await waitFor(() => {
+            expect(mockCreateActivity).toHaveBeenCalledWith('root-1', expect.objectContaining({
+                metrics: [
+                    expect.objectContaining({
+                        track_progress: true,
+                        progress_aggregation: null,
                     }),
                 ],
             }));

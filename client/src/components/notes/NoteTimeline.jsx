@@ -60,8 +60,6 @@ function NoteTimeline({
     onDelete,
     onPin,
     onUnpin,
-    onToggleNanoGoal,
-    nanoToggleDisabled = false,
     showContext = false,
     compact = false,
     variant = 'card', // 'card' (filled) or 'flat' (transparent, for session detail)
@@ -71,7 +69,6 @@ function NoteTimeline({
     onLoadMore,
     emptyMessage = 'No notes yet.',
     groupByDate = true,
-    pendingNanoGoalIds,
 }) {
     const { timezone } = useTimezone();
 
@@ -91,8 +88,6 @@ function NoteTimeline({
             onDelete={onDelete}
             onPin={onPin}
             onUnpin={onUnpin}
-            onToggleNanoGoal={onToggleNanoGoal}
-            nanoToggleDisabled={nanoToggleDisabled || (pendingNanoGoalIds && pendingNanoGoalIds.has(note.nano_goal_id))}
             showContext={showContext}
             compact={compact}
             variant={variant}

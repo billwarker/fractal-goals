@@ -15,7 +15,6 @@ export const fractalNotesApi = {
             `${API_BASE}/${rootId}/activities/${activityId}/history${buildQueryString(options, { excludeSession: 'exclude_session' })}`
         ),
     createNote: (rootId, data) => axios.post(`${API_BASE}/${rootId}/notes`, data),
-    createNanoGoalNote: (rootId, data) => axios.post(`${API_BASE}/${rootId}/nano-goal-notes`, data),
     updateNote: (rootId, noteId, data) => axios.put(`${API_BASE}/${rootId}/notes/${noteId}`, data),
     deleteNote: (rootId, noteId) => axios.delete(`${API_BASE}/${rootId}/notes/${noteId}`),
     getGoalNotes: (rootId, goalId, options = {}) =>

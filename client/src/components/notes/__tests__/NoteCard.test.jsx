@@ -106,39 +106,4 @@ describe('NoteCard', () => {
         expect(screen.getByText('Standard Practice Session')).toBeInTheDocument();
     });
 
-    it('renders nano goal notes as goal notes with the header goal icon', () => {
-        const { container } = renderWithProviders(
-            <NoteCard
-                note={{
-                    id: 'note-4',
-                    content: 'Smooth',
-                    created_at: '2026-04-04T13:37:00Z',
-                    updated_at: '2026-04-04T13:37:00Z',
-                    context_type: 'activity_instance',
-                    context_id: 'instance-1',
-                    session_id: 'session-1',
-                    activity_instance_id: 'instance-1',
-                    activity_definition_id: 'activity-1',
-                    activity_definition_name: 'Performance',
-                    note_type: 'goal_note',
-                    note_type_label: 'Goal Note',
-                    goal_name: 'Smooth',
-                    goal_type: 'NanoGoal',
-                    goal_is_smart: true,
-                    nano_goal_id: 'goal-1',
-                    is_nano_goal: true,
-                    nano_goal_completed: false,
-                    goal_id: null,
-                    pinned_at: null,
-                    is_pinned: false,
-                }}
-            />,
-        );
-
-        expect(screen.getByText('Goal Note')).toBeInTheDocument();
-        expect(screen.getAllByText('Smooth')).toHaveLength(2);
-        expect(screen.getByText('Nano Goal')).toBeInTheDocument();
-        expect(container.querySelector('svg')).not.toBeNull();
-        expect(container.querySelector('svg')?.childElementCount).toBeGreaterThan(1);
-    });
 });

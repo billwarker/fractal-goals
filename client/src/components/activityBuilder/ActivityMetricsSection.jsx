@@ -64,6 +64,13 @@ function ActivityMetricsSection({
 }) {
     const { fractalMetrics = [] } = useFractalMetrics(rootId);
     const [showCreator, setShowCreator] = useState(false);
+    const multiplicativeMetricCount = metrics.filter((candidate) => {
+        const linkedMetric = fractalMetrics.find((m) => m.id === candidate.fractal_metric_id);
+        if (linkedMetric) {
+            return linkedMetric.is_multiplicative;
+        }
+        return candidate?.is_multiplicative !== false;
+    }).length;
 
     const handleSelectMetric = (idx, fractalMetricId) => {
         if (fractalMetricId === '__create__') {
@@ -100,6 +107,15 @@ function ActivityMetricsSection({
             <div className={styles.metricsList}>
                 {metrics.map((metric, idx) => {
                     const linked = fractalMetrics.find((m) => m.id === metric.fractal_metric_id);
+                    const effectiveAggregation = (
+                        metric.progress_aggregation
+                        || linked?.default_progress_aggregation
+                        || 'last'
+                    );
+                    const metricIsMultiplicative = linked
+                        ? linked.is_multiplicative
+                        : metric?.is_multiplicative !== false;
+                    const isYieldAvailable = hasSets && metricIsMultiplicative && multiplicativeMetricCount >= 2;
                     return (
                         <div key={idx} className={styles.metricCard}>
                             <div className={styles.metricRow}>
@@ -147,7 +163,41 @@ function ActivityMetricsSection({
                                         className={styles.subFlagLabel}
                                     />
                                 )}
+                                <Checkbox
+                                    label="Track progress"
+                                    checked={metric.track_progress !== false}
+                                    onChange={(e) => onMetricChange(idx, 'track_progress', e.target.checked)}
+                                    className={styles.subFlagLabel}
+                                />
                             </div>
+
+                            {metric.track_progress !== false && (
+                                <div className={metricStyles.progressTrackingSection}>
+                                    <div className={metricStyles.progressTrackingRow}>
+                                        <label className={metricStyles.progressTrackingLabel}>Compare by</label>
+                                        <select
+                                            className={metricStyles.progressAggregationSelect}
+                                            value={effectiveAggregation}
+                                            onChange={(e) => onMetricChange(idx, 'progress_aggregation', e.target.value)}
+                                        >
+                                            <option value="last">Last value</option>
+                                            {hasSets && <option value="sum">Sum across sets</option>}
+                                            {hasSets && <option value="max">Best set</option>}
+                                            {(isYieldAvailable || effectiveAggregation === 'yield') && (
+                                                <option value="yield" disabled={!isYieldAvailable}>
+                                                    {isYieldAvailable ? 'Yield (×)' : 'Yield (requires 2 multiplicative metrics)'}
+                                                </option>
+                                            )}
+                                        </select>
+                                    </div>
+                                    <div className={metricStyles.progressTrackingPreview}>
+                                        {effectiveAggregation === 'last' && 'Compares last recorded value'}
+                                        {effectiveAggregation === 'sum' && 'Compares total across all sets'}
+                                        {effectiveAggregation === 'max' && 'Compares best set value'}
+                                        {effectiveAggregation === 'yield' && 'Compares combined yield across multiplicative metrics'}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     );
                 })}

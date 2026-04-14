@@ -94,7 +94,7 @@ describe('useSessionDetailData', () => {
             data: [{ id: 'group-1', name: 'Strength' }],
         });
         getSessionGoalsView.mockResolvedValueOnce({
-            data: { micro_goals: [] },
+            data: { session_goal_ids: [] },
         });
 
         const { result } = renderHook(
@@ -117,7 +117,7 @@ describe('useSessionDetailData', () => {
             { id: 'group-1', name: 'Strength' },
         ]);
         expect(queryClient.getQueryData(queryKeys.sessionGoalsView('root-1', 'session-1'))).toEqual({
-            micro_goals: [],
+            session_goal_ids: [],
         });
         expect(result.current.normalizedSessionData.sections[0].activity_ids).toEqual(['instance-1']);
         expect(result.current.groupedActivities['group-1']).toEqual([
@@ -187,14 +187,6 @@ describe('useSessionDetailData', () => {
                         },
                     ],
                 },
-                micro_goals: [
-                    {
-                        id: 'micro-goal',
-                        attributes: {
-                            targets: [{ id: 'target-2', activity_id: 'activity-2' }],
-                        },
-                    },
-                ],
             },
         });
 
@@ -205,12 +197,10 @@ describe('useSessionDetailData', () => {
 
         await waitFor(() => {
             const [, goalsArg] = useTargetAchievementsMock.mock.lastCall || [];
-            expect(goalsArg?.map((goal) => goal.id)).toEqual(['root-goal', 'immediate-goal', 'micro-goal']);
+            expect(goalsArg?.map((goal) => goal.id)).toEqual(['root-goal', 'immediate-goal']);
         });
 
         const [, goalsArg] = useTargetAchievementsMock.mock.lastCall;
-        expect(goalsArg.map((goal) => goal.id)).toEqual(['root-goal', 'immediate-goal', 'micro-goal']);
-        expect(goalsArg.map((goal) => goal.id)).not.toContain('session-stale-goal');
-        expect(goalsArg.map((goal) => goal.id)).not.toContain('session-stale-immediate-goal');
+        expect(goalsArg.map((goal) => goal.id)).toEqual(['root-goal', 'immediate-goal']);
     });
 });

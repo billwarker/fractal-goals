@@ -102,7 +102,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
 
         // Sort goals by type hierarchy: children first (bottom of stack), parents last (top of stack)
         const goalTypesHierarchy = [
-            'NanoGoal', 'MicroGoal', 'ImmediateGoal',
+            'ImmediateGoal',
             'ShortTermGoal', 'MidTermGoal', 'LongTermGoal', 'UltimateGoal'
         ];
 

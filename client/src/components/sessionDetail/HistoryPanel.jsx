@@ -6,9 +6,19 @@
 
 import React, { useMemo, useState } from 'react';
 import { useActivityHistory } from '../../hooks/useActivityHistory';
+import { useProgressHistory } from '../../hooks/useProgressHistory';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import MarkdownNoteContent from '../notes/MarkdownNoteContent';
 import styles from './HistoryPanel.module.css';
+
+const HISTORY_LIMIT = 10;
+
+function formatMetricNumber(value) {
+    if (value == null || Number.isNaN(Number(value))) return null;
+    const numericValue = Number(value);
+    if (Number.isInteger(numericValue)) return String(numericValue);
+    return numericValue.toFixed(1).replace(/\.0$/, '');
+}
 
 function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs }) {
     const [manualSelectedActivityId, setManualSelectedActivityId] = useState(null);
@@ -30,8 +40,23 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
     const { history, loading, error } = useActivityHistory(
         rootId,
         selectedActivityId,
-        sessionId // Exclude current session
+        sessionId, // Exclude current session
+        { limit: HISTORY_LIMIT }
     );
+    const {
+        progressHistory,
+        isLoading: progressLoading,
+        error: progressError,
+    } = useProgressHistory(
+        rootId,
+        selectedActivityId,
+        { limit: HISTORY_LIMIT, excludeSessionId: sessionId }
+    );
+    const progressByInstanceId = useMemo(() => new Map(
+        (progressHistory || [])
+            .filter((record) => record?.activity_instance_id)
+            .map((record) => [record.activity_instance_id, record])
+    ), [progressHistory]);
 
     const { timezone } = useTimezone();
 
@@ -80,10 +105,10 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
                     <div className={styles.historyEmpty}>
                         Select an activity to view previous sessions
                     </div>
-                ) : loading ? (
+                ) : (loading || progressLoading) ? (
                     <div className={styles.historyLoading}>Loading history...</div>
-                ) : error ? (
-                    <div className={styles.historyError}>Error: {error}</div>
+                ) : (error || progressError) ? (
+                    <div className={styles.historyError}>Error: {error || progressError?.message || progressError}</div>
                 ) : history.length > 0 ? (
                     <div className={styles.historyList}>
                         {history.map(instance => (
@@ -91,6 +116,12 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
                                 key={instance.id}
                                 instance={instance}
                                 activityDef={selectedDef}
+                                progressRecord={
+                                    progressByInstanceId.get(instance.id)
+                                    || progressByInstanceId.get(instance.activity_instance_id)
+                                    || progressByInstanceId.get(instance.instance_id)
+                                    || null
+                                }
                                 formatDate={formatDate}
                                 timezone={timezone}
                             />
@@ -109,7 +140,7 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
 /**
  * ActivityHistoryCard - Display a previous activity instance
  */
-function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
+function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate, timezone }) {
     // Parse sets from instance data
     const sets = instance.sets || [];
     const hasMetrics = instance.metric_values && instance.metric_values.length > 0;
@@ -147,6 +178,58 @@ function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
         return instance.duration_seconds ? formatDuration(instance.duration_seconds) : null;
     })();
 
+    const progressComparisons = Array.isArray(progressRecord?.metric_comparisons)
+        ? progressRecord.metric_comparisons
+        : [];
+
+    const renderProgressIndicator = (metricId, metricName) => {
+        const comparison = progressComparisons.find((item) => (
+            item?.metric_id === metricId
+            || item?.metric_definition_id === metricId
+            || item?.metric_name === metricName
+        ));
+        if (!comparison) return null;
+
+        const pctChange = comparison.pct_change ?? comparison.percent_delta;
+        const improved = comparison.improved ?? comparison.is_improvement ?? false;
+        const regressed = comparison.regressed ?? comparison.is_regression ?? false;
+
+        if (pctChange != null) {
+            const formatted = formatMetricNumber(Math.abs(pctChange));
+            if (improved) return { label: `(▲${formatted}%)`, tone: 'improved' };
+            if (regressed) return { label: `(▼${formatted}%)`, tone: 'regressed' };
+            return { label: '(0%)', tone: 'neutral' };
+        }
+
+        const deltaValue = comparison.delta ?? comparison.value_delta;
+        if (deltaValue == null) return null;
+
+        const delta = Number(deltaValue);
+        const formatted = formatMetricNumber(Math.abs(delta));
+        if (delta > 0) return { label: `(+${formatted})`, tone: 'improved' };
+        if (delta < 0) return { label: `(-${formatted})`, tone: 'regressed' };
+        return { label: '(0)', tone: 'neutral' };
+    };
+
+    const renderMetricRow = (label, indicator) => {
+        const indicatorClassName = indicator?.tone === 'improved'
+            ? styles.historyProgressImproved
+            : indicator?.tone === 'regressed'
+                ? styles.historyProgressRegressed
+                : styles.historyProgressNeutral;
+
+        return (
+            <span className={styles.historyMetricRow}>
+                <span className={styles.historyMetric}>{label}</span>
+                {indicator ? (
+                    <span className={`${styles.historyProgressIndicator} ${indicatorClassName}`}>
+                        {indicator.label}
+                    </span>
+                ) : null}
+            </span>
+        );
+    };
+
     return (
         <div className={styles.historyCard}>
             <div className={styles.historyCardHeader}>
@@ -173,12 +256,17 @@ function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
                             <div className={styles.historySetMetrics}>
                                 {set.metrics?.map((m, mIdx) => {
                                     const def = activityDef?.metric_definitions?.find(d => d.id === m.metric_id);
-                                    return (
-                                        <span key={mIdx} className={styles.historyMetric}>
+                                    const metricLabel = (
+                                        <>
                                             {def?.name && <span className={styles.metricLabel}>{def.name}:</span>}
                                             {m.value}
                                             {def?.unit && <span className={styles.metricUnit}>{def.unit}</span>}
-                                        </span>
+                                        </>
+                                    );
+                                    return (
+                                        <React.Fragment key={mIdx}>
+                                            {renderMetricRow(metricLabel, renderProgressIndicator(m.metric_id, def?.name))}
+                                        </React.Fragment>
                                     );
                                 })}
                             </div>
@@ -191,9 +279,12 @@ function ActivityHistoryCard({ instance, activityDef, formatDate, timezone }) {
             {sets.length === 0 && hasMetrics && (
                 <div className={styles.historyCardMetrics}>
                     {instance.metric_values.map((mv, idx) => (
-                        <span key={idx} className={styles.historyMetric}>
-                            {mv.name}: {mv.value} {mv.unit}
-                        </span>
+                        <React.Fragment key={idx}>
+                            {renderMetricRow(
+                                <>{mv.name}: {mv.value} {mv.unit}</>,
+                                renderProgressIndicator(mv.metric_definition_id || mv.metric_id, mv.name)
+                            )}
+                        </React.Fragment>
                     ))}
                 </div>
             )}

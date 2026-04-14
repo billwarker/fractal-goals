@@ -57,15 +57,11 @@ function collectDescendants(node) {
     return result;
 }
 
-const MICRO_NANO_TYPES = new Set(['MicroGoal', 'NanoGoal']);
-
-function filterTree(node, hideCompleted, hideMicroNano) {
+function filterTree(node, hideCompleted) {
     if (!node) return null;
     if (hideCompleted && node.completed) return null;
-    const goalType = node.goal_type || node.type || '';
-    if (hideMicroNano && MICRO_NANO_TYPES.has(goalType)) return null;
     const filteredChildren = (node.children || [])
-        .map(child => filterTree(child, hideCompleted, hideMicroNano))
+        .map(child => filterTree(child, hideCompleted))
         .filter(Boolean);
     return { ...node, children: filteredChildren };
 }
@@ -170,22 +166,19 @@ export default function GoalTreePicker({
     onSelectionChange,
     showHideCompleted = false,
     defaultHideCompleted = false,
-    showHideMicroNano = false,
-    defaultHideMicroNano = false,
     allowLineageSelection = false,
     getGoalColor,
     getGoalIcon,
     getGoalSecondaryColor,
 }) {
     const [hideCompleted, setHideCompleted] = useState(defaultHideCompleted);
-    const [hideMicroNano, setHideMicroNano] = useState(defaultHideMicroNano);
     const [activeNodeId, setActiveNodeId] = useState(null);
 
     // Pre-compute maps for fast ancestor/descendant lookups
     const ancestorMap = useMemo(() => treeData ? buildAncestorMap(treeData) : {}, [treeData]);
     const nodeMap = useMemo(() => treeData ? buildNodeMap(treeData) : {}, [treeData]);
 
-    const filteredTree = useMemo(() => filterTree(treeData, hideCompleted, hideMicroNano), [treeData, hideCompleted, hideMicroNano]);
+    const filteredTree = useMemo(() => filterTree(treeData, hideCompleted), [treeData, hideCompleted]);
 
     const getNames = (ids) => ids.map(id => nodeMap[id]?.name).filter(Boolean);
 
@@ -231,30 +224,17 @@ export default function GoalTreePicker({
 
     return (
         <div className={styles.picker}>
-            {(showHideCompleted || showHideMicroNano) && (
+            {showHideCompleted && (
                 <div className={styles.toggleRow}>
-                    {showHideCompleted && (
-                        <label className={styles.hideCompletedToggle}>
-                            <input
-                                type="checkbox"
-                                checked={hideCompleted}
-                                onChange={e => setHideCompleted(e.target.checked)}
-                                className={styles.hideCompletedCheckbox}
-                            />
-                            <span>Hide completed</span>
-                        </label>
-                    )}
-                    {showHideMicroNano && (
-                        <label className={styles.hideCompletedToggle}>
-                            <input
-                                type="checkbox"
-                                checked={hideMicroNano}
-                                onChange={e => setHideMicroNano(e.target.checked)}
-                                className={styles.hideCompletedCheckbox}
-                            />
-                            <span>Hide micro &amp; nano</span>
-                        </label>
-                    )}
+                    <label className={styles.hideCompletedToggle}>
+                        <input
+                            type="checkbox"
+                            checked={hideCompleted}
+                            onChange={e => setHideCompleted(e.target.checked)}
+                            className={styles.hideCompletedCheckbox}
+                        />
+                        <span>Hide completed</span>
+                    </label>
                 </div>
             )}
 

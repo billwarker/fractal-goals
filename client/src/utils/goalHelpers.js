@@ -2,12 +2,11 @@
  * Goal Helpers - Utilities for goal hierarchy management
  *
  * IMPORTANT: Sessions are NO LONGER part of the goal hierarchy.
- * Hierarchy is now: UltimateGoal → LongTermGoal → MidTermGoal → ShortTermGoal → ImmediateGoal → MicroGoal → NanoGoal
+ * Hierarchy is: UltimateGoal → LongTermGoal → MidTermGoal → ShortTermGoal → ImmediateGoal
  *
  * Macro goals (Ultimate through Immediate) support flexible hierarchy: a child may be
  * any lower-rank macro level, not just the immediately adjacent one. Level ordering is
- * enforced by rank on the backend. The execution tier (Immediate → Micro → Nano) remains
- * strictly enforced.
+ * enforced by rank on the backend.
  */
 
 import {
@@ -21,7 +20,6 @@ import {
 // Canonical type key derived from a GoalLevel name (e.g. "Mid Term Goal" → "MidTermGoal")
 const levelNameToType = (name) => name.replace(/\s+/g, '');
 
-const EXECUTION_TYPES = new Set(['MicroGoal', 'NanoGoal']);
 const MACRO_TYPES_BY_RANK = [
     'UltimateGoal',   // rank 0
     'LongTermGoal',   // rank 1
@@ -34,24 +32,15 @@ const MACRO_TYPES_BY_RANK = [
  * Returns all valid child types for a given parent type.
  *
  * For macro goals: any lower-rank macro level (flexible hierarchy).
- * For ImmediateGoal: only MicroGoal (execution tier entry point).
- * For MicroGoal: only NanoGoal.
- * For NanoGoal: empty (leaf node).
+ * For ImmediateGoal: empty (leaf node — execution tier removed).
  *
  * @param {string} parentType - canonical goal type string
  * @returns {string[]} - ordered list of valid child type strings (closest first)
  */
 export const getValidChildTypes = (parentType) => {
-    if (parentType === 'NanoGoal') return [];
-    if (parentType === 'MicroGoal') return ['NanoGoal'];
-    if (parentType === 'ImmediateGoal') return ['MicroGoal'];
-
     const parentIndex = MACRO_TYPES_BY_RANK.indexOf(parentType);
     if (parentIndex === -1) return [];
 
-    // Return all macro types with a higher rank index (lower in the tree),
-    // excluding ImmediateGoal's execution-tier children — those are entered via ImmediateGoal only.
-    // ImmediateGoal is included as a valid macro child.
     return MACRO_TYPES_BY_RANK.slice(parentIndex + 1);
 };
 
@@ -72,8 +61,6 @@ export const isAboveShortTermGoal = (type) => {
         'MidTermGoal': 3,
         'ShortTermGoal': 4,
         'ImmediateGoal': 5,
-        'MicroGoal': 6,
-        'NanoGoal': 7
     };
     return levels[type] < 4;
 };
@@ -85,8 +72,6 @@ export const getTypeDisplayName = (type) => {
         'MidTermGoal': 'Mid Term Goal',
         'ShortTermGoal': 'Short Term Goal',
         'ImmediateGoal': 'Immediate Goal',
-        'MicroGoal': 'Micro Goal',
-        'NanoGoal': 'Nano Goal',
         'Session': 'Session'  // For display purposes only
     };
     return names[type] || type;

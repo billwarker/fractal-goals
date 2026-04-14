@@ -1,11 +1,9 @@
 import logging
 from sqlalchemy.orm import selectinload, with_loader_criteria
-from sqlalchemy import select, or_
+from sqlalchemy import select
 
-import models
 from models import Goal, Session, ActivityInstance, session_goals
 from services.serializers import serialize_goal
-from services.goal_type_utils import get_canonical_goal_type
 from services.view_serializers import serialize_session_goals_view_payload
 
 logger = logging.getLogger(__name__)
@@ -131,40 +129,14 @@ class GoalTreeService:
             for goal_ids in activity_goal_ids_by_activity.values()
             for goal_id in goal_ids
         }
-        structural_goal_ids = {
-            goal_id for goal_id in (set(session_goal_ids) | associated_goal_ids)
-            if goal_id in goals_by_id and get_canonical_goal_type(goals_by_id[goal_id]) not in {'MicroGoal', 'NanoGoal'}
-        }
+        structural_goal_ids = set(session_goal_ids) | associated_goal_ids
         visible_goal_ids = self._collect_goal_ids_with_ancestors(
-            set(session_goal_ids) | associated_goal_ids,
+            structural_goal_ids,
             goals_by_id
         )
-        visible_goal_ids = {
-            goal_id for goal_id in visible_goal_ids
-            if goal_id == root_id or (
-                goal_id in goals_by_id and get_canonical_goal_type(goals_by_id[goal_id]) not in {'MicroGoal', 'NanoGoal'}
-            )
-        }
         visible_goal_ids |= self._collect_goal_ids_with_ancestors(structural_goal_ids, goals_by_id)
         visible_goal_ids.add(root_id)
         pruned_goal_tree = self._prune_tree_to_goal_ids(root_tree, visible_goal_ids) or root_tree
-
-        micro_stmt = (
-            select(Goal)
-            .join(session_goals, Goal.id == session_goals.c.goal_id)
-            .outerjoin(models.GoalLevel, Goal.level_id == models.GoalLevel.id)
-            .where(session_goals.c.session_id == session_id)
-            .where(Goal.root_id == root_id)
-            .where(Goal.deleted_at == None)
-            .where(
-                or_(
-                    models.GoalLevel.name == 'Micro Goal',
-                    session_goals.c.goal_type == 'MicroGoal'
-                )
-            )
-            .options(selectinload(Goal.children))
-        )
-        micro_goals = self.db_session.execute(micro_stmt).scalars().all()
 
         payload = serialize_session_goals_view_payload(
             goal_tree=pruned_goal_tree,
@@ -172,7 +144,6 @@ class GoalTreeService:
             session_goal_sources=session_goal_sources,
             session_activity_ids=session_activity_ids,
             activity_goal_ids_by_activity=activity_goal_ids_by_activity,
-            micro_goals=micro_goals,
         )
         
         return payload, None, 200

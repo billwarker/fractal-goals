@@ -10,7 +10,7 @@ session_goals = Table(
     Column('session_id', String, ForeignKey('sessions.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_type', String, nullable=False),  # legacy type mapping or level
-    Column('association_source', String, nullable=False, default='manual'),  # manual, activity, micro_goal
+    Column('association_source', String, nullable=False, default='manual'),  # manual, activity
     Column('created_at', DateTime, default=utc_now),
     Column('deleted_at', DateTime, nullable=True)
 )
@@ -55,7 +55,7 @@ class GoalLevel(Base):
     __tablename__ = 'goal_levels'
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String, nullable=False) # e.g. "Long Term Goal", "Nano Goal"
+    name = Column(String, nullable=False) # e.g. "Long Term Goal", "Immediate Goal"
     rank = Column(Integer, nullable=False, default=0) # 0 is highest level
     color = Column(String, nullable=True)
     secondary_color = Column(String, nullable=True)

@@ -12,7 +12,8 @@ from .goal import (
 )
 from .activity import (
     ActivityGroup, ActivityDefinition, MetricDefinition, FractalMetricDefinition,
-    SplitDefinition, ActivityMode, ActivityInstanceMode, ActivityInstance, MetricValue
+    SplitDefinition, ActivityMode, ActivityInstanceMode, ActivityInstance, MetricValue,
+    ProgressRecord,
 )
 from .session import (
     Session, SessionTemplate, get_session_by_id, get_all_sessions,

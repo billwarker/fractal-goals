@@ -28,6 +28,8 @@ function sanitizeMetric(metric) {
         unit,
         is_top_set_metric: Boolean(metric?.is_top_set_metric),
         is_multiplicative: metric?.is_multiplicative !== false,
+        track_progress: metric?.track_progress !== false,
+        progress_aggregation: metric?.progress_aggregation || null,
     };
 
     const metricId = normalizeOptionalId(metric?.id);

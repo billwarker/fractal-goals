@@ -3,7 +3,6 @@ import moment from 'moment';
 
 import { getDatePart, getISOYMDInTimezone, formatLiteralDate } from '../utils/dateUtils';
 
-const NON_DEADLINE_GOAL_TYPES = new Set(['MicroGoal', 'NanoGoal']);
 
 function getLocalDateString(dateTimeStr, timezone) {
     return getISOYMDInTimezone(dateTimeStr, timezone);
@@ -151,11 +150,6 @@ export function useProgramDayViewModel({
         const goalsById = new Map((goals || []).map((goal) => [goal.id, goal]));
 
         return (goals || []).filter((goal) => {
-            const goalType = goal.attributes?.type || goal.type || '';
-            if (NON_DEADLINE_GOAL_TYPES.has(goalType)) {
-                return false;
-            }
-
             const parentId = goal.parent_id || goal.attributes?.parent_id;
             if (!parentId) {
                 return true;

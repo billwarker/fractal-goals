@@ -19,28 +19,28 @@ describe('goalNodeModel', () => {
             activity_definition_id: 'activity-1',
             attributes: {
                 name: 'Canonical Goal',
-                type: 'MicroGoal',
+                type: 'ImmediateGoal',
                 description: 'Desc',
                 completed: true,
                 created_at: '2026-03-01T00:00:00Z',
                 completed_at: '2026-03-02T00:00:00Z',
                 targets: JSON.stringify([{ id: 'target-1' }]),
             },
-            children: [{ id: 'nano-1', type: 'NanoGoal', children: [] }],
+            children: [{ id: 'child-1', type: 'ShortTermGoal', children: [] }],
         };
 
         expect(normalizeGoalNode(node, { depth: 3, isLinked: true })).toEqual(expect.objectContaining({
             id: 'goal-1',
             name: 'Canonical Goal',
-            type: 'MicroGoal',
-            goalCategory: 'execution',
+            type: 'ImmediateGoal',
+            goalCategory: 'structural',
             description: 'Desc',
             completed: true,
             depth: 3,
             isLinked: true,
             activity_definition_id: 'activity-1',
             parent_id: 'parent-1',
-            childrenIds: ['nano-1'],
+            childrenIds: ['child-1'],
             targets: [{ id: 'target-1' }],
         }));
     });
@@ -78,11 +78,11 @@ describe('goalNodeModel', () => {
         ]);
     });
 
-    it('distinguishes execution goals explicitly', () => {
-        expect(getGoalNodeCategory('MicroGoal')).toBe('execution');
+    it('all goal types are structural', () => {
         expect(getGoalNodeCategory('ImmediateGoal')).toBe('structural');
-        expect(isExecutionGoalNode({ type: 'NanoGoal' })).toBe(true);
-        expect(isExecutionGoalNode({ type: 'ShortTermGoal' })).toBe(false);
+        expect(getGoalNodeCategory('ShortTermGoal')).toBe('structural');
+        expect(isExecutionGoalNode({ type: 'ImmediateGoal' })).toBe(false);
+        expect(isExecutionGoalNode({ type: 'UltimateGoal' })).toBe(false);
     });
 
     it('finds nodes by canonical goal id and safely parses target payloads', () => {
@@ -115,18 +115,11 @@ describe('goalNodeModel', () => {
                     },
                 ],
             },
-            micro_goals: [
-                { id: 'micro-1', parent_id: 'immediate' },
-                { id: 'immediate', parent_id: 'root' },
-                { id: 'micro-2', parent_id: 'immediate' },
-            ],
         };
 
         expect(flattenSessionGoalsViewGoals(sessionGoalsView).map((goal) => goal.id)).toEqual([
             'root',
             'immediate',
-            'micro-1',
-            'micro-2',
         ]);
     });
 });

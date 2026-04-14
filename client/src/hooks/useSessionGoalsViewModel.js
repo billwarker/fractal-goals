@@ -1,27 +1,15 @@
 import { useMemo } from 'react';
 import {
-    isExecutionGoalNode,
     normalizeGoalNode,
     parseGoalTargets,
 } from '../utils/goalNodeModel';
 import { getGoalStatus, getTargetStatus } from '../utils/sessionGoalStatus';
 
 /**
- * Iteratively flattens the backend nested tree into a normalized array,
- * injecting micro/nano goals where they belong.
+ * Iteratively flattens the backend nested tree into a normalized array.
  */
-function buildNormalizedTree(rootNode, sessionGoalIdsSet, microGoals) {
+function buildNormalizedTree(rootNode, sessionGoalIdsSet) {
     if (!rootNode) return [];
-
-    // Group micro goals by their parent ID
-    const microGoalsByParent = {};
-    (microGoals || []).forEach(mg => {
-        const pid = mg.parent_id || mg.attributes?.parent_id;
-        if (pid) {
-            if (!microGoalsByParent[pid]) microGoalsByParent[pid] = [];
-            microGoalsByParent[pid].push(mg);
-        }
-    });
 
     const result = [];
     const stack = [{ node: rootNode, depth: 0, parentId: null }];
@@ -38,10 +26,6 @@ function buildNormalizedTree(rootNode, sessionGoalIdsSet, microGoals) {
 
         const children = [...(node.children || [])];
 
-        // Inject micro goals as children of this node
-        const childMicros = microGoalsByParent[node.id] || [];
-        children.push(...childMicros);
-
         // Push children to stack in reverse order so they process left-to-right
         for (let i = children.length - 1; i >= 0; i--) {
             stack.push({ node: children[i], depth: depth + 1, parentId: node.id });
@@ -51,24 +35,14 @@ function buildNormalizedTree(rootNode, sessionGoalIdsSet, microGoals) {
     return result;
 }
 
-function buildRelationshipMaps(nodes) {
+function buildParentMap(nodes) {
     const parentMap = {};
-    const childrenMap = {};
-
     nodes.forEach((node) => {
-        if (!childrenMap[node.id]) {
-            childrenMap[node.id] = [];
-        }
         if (node.parent_id) {
             parentMap[node.id] = node.parent_id;
-            if (!childrenMap[node.parent_id]) {
-                childrenMap[node.parent_id] = [];
-            }
-            childrenMap[node.parent_id].push(node.id);
         }
     });
-
-    return { parentMap, childrenMap };
+    return parentMap;
 }
 export function useSessionGoalsViewModel({
     sessionGoalsView,
@@ -81,8 +55,7 @@ export function useSessionGoalsViewModel({
         if (!sessionGoalsView?.goal_tree) return [];
         return buildNormalizedTree(
             sessionGoalsView.goal_tree,
-            new Set(sessionGoalsView.session_goal_ids || []),
-            sessionGoalsView.micro_goals || []
+            new Set(sessionGoalsView.session_goal_ids || [])
         );
     }, [sessionGoalsView]);
 
@@ -104,33 +77,7 @@ export function useSessionGoalsViewModel({
         const associatedGoalIds = new Set(
             sessionGoalsView.activity_goal_ids_by_activity?.[activeActivityDefId] || []
         );
-        const { parentMap, childrenMap } = buildRelationshipMaps(normalizedTree);
-        const nodeById = new Map(normalizedTree.map((node) => [node.id, node]));
-
-        const relevantMicroIds = new Set();
-        (sessionGoalsView.micro_goals || []).forEach(microGoal => {
-            const microTargets = parseGoalTargets(microGoal);
-            const instanceBoundTargetIds = microTargets.map(t => t.activity_instance_id).filter(Boolean);
-            const isInstanceBound = instanceBoundTargetIds.length > 0;
-            const hasInstanceBoundTargetForFocusedActivity = Boolean(
-                activeActivityInstanceId && microTargets.some(t => t.activity_instance_id === activeActivityInstanceId)
-            );
-            const hasDefinitionScopedTargetForFocusedActivity = microTargets.some(t =>
-                t.activity_id === activeActivityDefId && !t.activity_instance_id
-            );
-
-            if (hasInstanceBoundTargetForFocusedActivity) {
-                relevantMicroIds.add(microGoal.id);
-            } else if (!isInstanceBound) {
-                if (microGoal.activity_definition_id === activeActivityDefId) relevantMicroIds.add(microGoal.id);
-                else if (hasDefinitionScopedTargetForFocusedActivity) relevantMicroIds.add(microGoal.id);
-                else {
-                    if (associatedGoalIds.has(microGoal.id)) {
-                        relevantMicroIds.add(microGoal.id);
-                    }
-                }
-            }
-        });
+        const parentMap = buildParentMap(normalizedTree);
 
         const relevantIds = new Set();
 
@@ -142,34 +89,8 @@ export function useSessionGoalsViewModel({
             }
         };
 
-        const markExecutionDescendants = (id) => {
-            const stack = [...(childrenMap[id] || [])];
-            const visited = new Set();
-            while (stack.length > 0) {
-                const currentId = stack.pop();
-                if (!currentId || visited.has(currentId)) continue;
-                visited.add(currentId);
-
-                const currentNode = nodeById.get(currentId);
-                if (!currentNode) continue;
-
-                if (isExecutionGoalNode(currentNode)) {
-                    relevantIds.add(currentId);
-                }
-
-                (childrenMap[currentId] || []).forEach((childId) => {
-                    stack.push(childId);
-                });
-            }
-        };
-
         associatedGoalIds.forEach((id) => {
             markAncestors(id);
-        });
-
-        relevantMicroIds.forEach((id) => {
-            markAncestors(id);
-            markExecutionDescendants(id);
         });
 
         if (normalizedTree[0]) {
