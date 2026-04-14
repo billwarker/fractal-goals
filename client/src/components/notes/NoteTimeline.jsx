@@ -62,6 +62,7 @@ function NoteTimeline({
     onUnpin,
     showContext = false,
     compact = false,
+    minimal = false,
     variant = 'card', // 'card' (filled) or 'flat' (transparent, for session detail)
     selectedNoteId,
     onNoteSelect,
@@ -90,6 +91,7 @@ function NoteTimeline({
             onUnpin={onUnpin}
             showContext={showContext}
             compact={compact}
+            minimal={minimal}
             variant={variant}
             isSelected={selectedNoteId === note.id}
             onSelect={() => onNoteSelect && onNoteSelect(note)}

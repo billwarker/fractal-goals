@@ -1,7 +1,7 @@
 import pytest
 import json
 import uuid
-from models import SessionTemplate
+from models import ActivityInstance, SessionTemplate
 from services.events import Events
 
 @pytest.fixture
@@ -209,3 +209,69 @@ class TestSessionTemplates:
 
         assert response.status_code == 200
         assert Events.SESSION_TEMPLATE_DELETED in [event.name for event in emitted]
+
+    def test_create_template_from_session(self, authed_client, db_session, sample_practice_session, sample_activity_definition):
+        root_id = sample_practice_session.root_id
+        sample_practice_session.attributes = {
+            'session_type': 'normal',
+            'sections': [
+                {
+                    'name': 'Main Block',
+                    'estimated_duration_minutes': 15,
+                    'activity_ids': ['instance-1'],
+                }
+            ]
+        }
+        db_session.add(ActivityInstance(
+            id='instance-1',
+            session_id=sample_practice_session.id,
+            activity_definition_id=sample_activity_definition.id,
+            root_id=root_id,
+        ))
+        db_session.commit()
+
+        response = authed_client.post(
+            f'/api/{root_id}/sessions/{sample_practice_session.id}/create-template',
+            json={'name': 'From Session'}
+        )
+
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data['name'] == 'From Session'
+        assert data['template_data']['sections'][0]['name'] == 'Main Block'
+        assert data['template_data']['sections'][0]['activities'][0]['activity_id'] == sample_activity_definition.id
+
+    def test_create_template_from_session_preserves_section_metadata(self, authed_client, db_session, sample_practice_session, sample_activity_definition):
+        root_id = sample_practice_session.root_id
+        sample_practice_session.attributes = {
+            'session_type': 'normal',
+            'sections': [
+                {
+                    'name': 'Main Block',
+                    'estimated_duration_minutes': 15,
+                    'notes': 'keep this',
+                    'theme': 'focus',
+                    'activity_ids': ['instance-2'],
+                }
+            ]
+        }
+        db_session.add(ActivityInstance(
+            id='instance-2',
+            session_id=sample_practice_session.id,
+            activity_definition_id=sample_activity_definition.id,
+            root_id=root_id,
+        ))
+        db_session.commit()
+
+        response = authed_client.post(
+            f'/api/{root_id}/sessions/{sample_practice_session.id}/create-template',
+            json={'name': 'From Session Metadata'}
+        )
+
+        assert response.status_code == 201
+        data = response.get_json()
+        section = data['template_data']['sections'][0]
+        assert section['name'] == 'Main Block'
+        assert section['notes'] == 'keep this'
+        assert section['theme'] == 'focus'
+        assert section['duration_minutes'] == 15

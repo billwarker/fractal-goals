@@ -7,7 +7,7 @@ import SectionHeader from '../common/SectionHeader';
 import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../../contexts/ActiveSessionContext';
 import useIsMobile from '../../hooks/useIsMobile';
 import ActivitySelectorPanel from '../common/ActivitySelectorPanel';
-import ActivityModeSelector from '../common/ActivityModeSelector';
+
 import { prepareActivityDefinitionCopy } from '../../utils/activityBuilder';
 import { calculateSectionDurationFromInstanceIds, formatClockDuration } from '../../utils/sessionTime';
 import { buildDefinitionMap, buildInstanceMap, buildPositionMap } from '../../utils/sessionSection';
@@ -53,7 +53,6 @@ const SessionSection = ({
     } = useActiveSessionActions();
 
     const [isDragOver, setIsDragOver] = useState(false);
-    const [selectedModeIds, setSelectedModeIds] = useState([]);
     const instanceById = useMemo(() => {
         return buildInstanceMap(activityInstances || []);
     }, [activityInstances]);
@@ -109,7 +108,6 @@ const SessionSection = ({
     const isSelectorOpen = Boolean(showActivitySelector[sectionIndex]);
     const closeSelector = () => {
         setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
-        setSelectedModeIds([]);
     };
 
     const openActivityBuilder = (activityDefinition = null) => {
@@ -122,26 +120,16 @@ const SessionSection = ({
     };
 
     const selectorContent = (
-        <>
-            <div className={styles.modeSelectorWrap}>
-                <div className={styles.modeSelectorLabel}>Modes for the next activity</div>
-                <ActivityModeSelector
-                    rootId={rootId}
-                    selectedModeIds={selectedModeIds}
-                    onChange={setSelectedModeIds}
-                />
-            </div>
-            <ActivitySelectorPanel
-                activities={activities}
-                activityGroups={activityGroups}
-                onClose={closeSelector}
-                onSelectActivity={(activity) => addActivity(sectionIndex, activity.id, activity, selectedModeIds)}
-                onCreateActivityDefinition={handleCreateActivityDefinition}
-                onCopyActivityDefinition={(activity) => openActivityBuilder(prepareActivityDefinitionCopy(activity))}
-                allowCreate={true}
-                allowCopy={true}
-            />
-        </>
+        <ActivitySelectorPanel
+            activities={activities}
+            activityGroups={activityGroups}
+            onClose={closeSelector}
+            onSelectActivity={(activity) => addActivity(sectionIndex, activity.id, activity)}
+            onCreateActivityDefinition={handleCreateActivityDefinition}
+            onCopyActivityDefinition={(activity) => openActivityBuilder(prepareActivityDefinitionCopy(activity))}
+            allowCreate={true}
+            allowCopy={true}
+        />
     );
 
     return (

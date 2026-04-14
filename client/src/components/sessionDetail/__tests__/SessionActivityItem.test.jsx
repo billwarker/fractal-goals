@@ -7,13 +7,11 @@ const {
     updateInstance,
     updateTimer,
     removeActivity,
-    getActivityModes,
     useProgressComparison,
 } = vi.hoisted(() => ({
     updateInstance: vi.fn(() => Promise.resolve()),
     updateTimer: vi.fn(),
     removeActivity: vi.fn(),
-    getActivityModes: vi.fn(() => Promise.resolve({ data: [] })),
     useProgressComparison: vi.fn(() => ({ progressComparison: null })),
 }));
 
@@ -41,12 +39,6 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
         updateTimer,
         removeActivity,
     })
-}));
-
-vi.mock('../../../utils/api', () => ({
-    fractalApi: {
-        getActivityModes,
-    }
 }));
 
 vi.mock('../../../hooks/useProgressComparison', () => ({
@@ -99,8 +91,6 @@ describe('SessionActivityItem metric and timer editing', () => {
         updateInstance.mockClear();
         updateTimer.mockClear();
         removeActivity.mockClear();
-        getActivityModes.mockClear();
-        getActivityModes.mockResolvedValue({ data: [] });
         useProgressComparison.mockReset();
         useProgressComparison.mockReturnValue({ progressComparison: null });
     });
@@ -652,57 +642,4 @@ describe('SessionActivityItem quick mode', () => {
         expect(within(setRows[1]).getByText('(last 7)')).toBeInTheDocument();
     });
 
-    it('opens the modes modal and saves checked activity modes', async () => {
-        getActivityModes.mockResolvedValue({
-            data: [
-                { id: 'mode-1', name: 'Standing', color: '#4488EE' },
-                { id: 'mode-2', name: 'Tempo', color: '#55AA66' },
-                { id: 'mode-3', name: 'Quality', color: '#DD8844' },
-                { id: 'mode-4', name: 'Balance', color: '#AA66CC' },
-            ],
-        });
-
-        renderWithProviders(
-            <SessionActivityItem
-                exercise={{
-                    ...baseExercise,
-                    modes: [
-                        { id: 'mode-1', name: 'Standing', color: '#4488EE' },
-                        { id: 'mode-2', name: 'Tempo', color: '#55AA66' },
-                        { id: 'mode-3', name: 'Quality', color: '#DD8844' },
-                    ],
-                    mode_ids: ['mode-1', 'mode-2', 'mode-3'],
-                }}
-                isSelected={false}
-                activityDefinition={quickModeDefinition}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false,
-            }
-        );
-
-        expect(screen.getAllByText('Standing').length).toBeGreaterThan(0);
-        expect(screen.getByText('Tempo')).toBeInTheDocument();
-        const hiddenModesButton = screen.getByRole('button', {
-            name: 'Hidden modes: Quality. Click to edit modes.',
-        });
-        expect(hiddenModesButton).toHaveTextContent('+1 mode');
-        expect(hiddenModesButton).toHaveAttribute('title', 'Quality');
-        expect(screen.queryByText('Quality')).not.toBeInTheDocument();
-
-        fireEvent.click(hiddenModesButton);
-
-        const balanceCheckbox = await screen.findByLabelText('Balance');
-        fireEvent.click(balanceCheckbox);
-        fireEvent.click(screen.getByRole('button', { name: 'Save Modes' }));
-
-        await waitFor(() => {
-            expect(updateInstance).toHaveBeenCalledWith('quick-instance-1', {
-                mode_ids: ['mode-1', 'mode-2', 'mode-3', 'mode-4'],
-            });
-        });
-    });
 });

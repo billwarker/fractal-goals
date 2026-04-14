@@ -4,10 +4,14 @@ import uuid
 import models
 
 from blueprints.api_utils import require_owned_root
-from models import SessionTemplate
+from models import Session, SessionTemplate
+from sqlalchemy.orm import selectinload, with_loader_criteria
 from services.events import Event, Events, event_bus
 from services.owned_entity_queries import get_owned_session_template
+from services.session_runtime import is_quick_session
+from services.session_structure import build_template_data_from_session
 from services.service_types import JsonList, ServiceResult
+from validators import validate_session_template_data
 
 
 class TemplateService:
@@ -48,7 +52,11 @@ class TemplateService:
         if error:
             return None, *error
 
-        template_data = data.get('template_data')
+        try:
+            template_data = validate_session_template_data(data.get('template_data') or {})
+        except ValueError as exc:
+            return None, str(exc), 400
+
         new_template = SessionTemplate(
             id=str(uuid.uuid4()),
             name=data['name'],
@@ -69,6 +77,33 @@ class TemplateService:
             source='template_service.create_template',
         ))
         return new_template, None, 201
+
+    def create_template_from_session(self, root_id, session_id, name, current_user_id) -> ServiceResult[SessionTemplate]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        session = self.db_session.query(Session).options(
+            selectinload(Session.template),
+            selectinload(Session.activity_instances).selectinload(models.ActivityInstance.definition),
+            with_loader_criteria(models.ActivityInstance, models.ActivityInstance.deleted_at == None, include_aliases=True),
+        ).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at.is_(None),
+        ).first()
+        if not session:
+            return None, "Session not found", 404
+
+        template_data = build_template_data_from_session(session)
+        if is_quick_session(session) and not template_data.get('activities'):
+            return None, "Quick sessions must include at least one activity", 400
+
+        return self.create_template(root_id, current_user_id, {
+            'name': name,
+            'description': session.description or '',
+            'template_data': template_data,
+        })
 
     def update_template(self, root_id, template_id, current_user_id, data) -> ServiceResult[SessionTemplate]:
         template, error, status = self.get_template(root_id, template_id, current_user_id)

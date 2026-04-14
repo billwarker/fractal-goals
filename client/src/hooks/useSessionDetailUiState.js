@@ -11,6 +11,7 @@ export function useSessionDetailUiState({ isMobile, addActivity, setSidePaneMode
     const [showAssociationModal, setShowAssociationModal] = useState(false);
     const [associationContext, setAssociationContext] = useState(null);
     const [isMobilePaneOpen, setIsMobilePaneOpen] = useState(false);
+    const [showOptionsModal, setShowOptionsModal] = useState(false);
 
     const handleActivityFocus = (instance, setIndex = null) => {
         setSelectedActivity(instance);
@@ -79,6 +80,8 @@ export function useSessionDetailUiState({ isMobile, addActivity, setSidePaneMode
         handleOpenActivityBuilder,
         handleCloseActivityBuilder,
         handleActivityCreated,
+        showOptionsModal,
+        setShowOptionsModal,
     };
 }
 

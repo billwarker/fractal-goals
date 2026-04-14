@@ -434,14 +434,13 @@ export function useSessionDetailMutations({
         });
     }, [updateSessionDataDraft]);
 
-    const handleAddActivity = useCallback(async (sectionIndex, activityId, activityObject = null, modeIds = []) => {
+    const handleAddActivity = useCallback(async (sectionIndex, activityId, activityObject = null) => {
         const activityDefinition = activityObject || activities.find((entry) => entry.id === activityId);
         if (!activityDefinition) return;
 
         try {
             const response = await addActivityMutation.mutateAsync({
                 activity_definition_id: activityDefinition.id,
-                mode_ids: modeIds,
             });
             const newInstance = response.data;
 

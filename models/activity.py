@@ -142,36 +142,6 @@ class SplitDefinition(Base):
     deleted_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
-class ActivityMode(Base):
-    __tablename__ = 'activity_modes'
-
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
-    name = Column(String, nullable=False)
-    description = Column(String, nullable=True)
-    color = Column(String, nullable=True)
-    sort_order = Column(Integer, default=0)
-    created_at = Column(DateTime, default=utc_now)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
-    deleted_at = Column(DateTime, nullable=True)
-
-class ActivityInstanceMode(Base):
-    __tablename__ = 'activity_instance_modes'
-
-    activity_instance_id = Column(
-        String,
-        ForeignKey('activity_instances.id', ondelete='CASCADE'),
-        primary_key=True,
-        nullable=False,
-    )
-    activity_mode_id = Column(
-        String,
-        ForeignKey('activity_modes.id', ondelete='CASCADE'),
-        primary_key=True,
-        nullable=False,
-    )
-    created_at = Column(DateTime, default=utc_now)
-
 class ActivityInstance(Base):
     __tablename__ = 'activity_instances'
 
@@ -193,7 +163,6 @@ class ActivityInstance(Base):
 
     metric_values = relationship("MetricValue", backref="activity_instance", cascade="all, delete-orphan")
     definition = relationship("ActivityDefinition")
-    modes = relationship("ActivityMode", secondary="activity_instance_modes", lazy="selectin")
     progress_record = relationship(
         "ProgressRecord",
         primaryjoin="ActivityInstance.id == ProgressRecord.activity_instance_id",

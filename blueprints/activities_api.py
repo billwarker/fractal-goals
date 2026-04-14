@@ -11,14 +11,14 @@ from validators import (
     validate_request,
     ActivityGroupCreateSchema, ActivityGroupUpdateSchema,
     ActivityDefinitionCreateSchema, ActivityDefinitionUpdateSchema,
-    ActivityGoalsSetSchema, ActivityModeCreateSchema, ActivityModeUpdateSchema,
+    ActivityGoalsSetSchema,
     GoalAssociationBatchSchema, GroupReorderSchema,
     FractalMetricCreateSchema, FractalMetricUpdateSchema,
 )
 from blueprints.auth_api import token_required
 from blueprints.api_utils import get_db_session, parse_optional_pagination, require_owned_root, etag_json_response, internal_error
 from services.serializers import (
-    serialize_activity_group, serialize_activity_definition, serialize_activity_mode,
+    serialize_activity_group, serialize_activity_definition,
     serialize_fractal_metric,
 )
 from services.goal_type_utils import get_canonical_goal_type
@@ -91,80 +91,6 @@ def _parse_activity_payload(schema_class):
         )
 
 # ============================================================================
-# ============================================================================
-# ACTIVITY MODE ENDPOINTS
-# ============================================================================
-
-@activities_bp.route('/<root_id>/activity-modes', methods=['GET'])
-@token_required
-def get_activity_modes(current_user, root_id):
-    session = get_db_session()
-    try:
-        service = ActivityService(session)
-        modes, error, status = service.list_modes_for_root(root_id, current_user.id)
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify([serialize_activity_mode(mode) for mode in modes])
-    finally:
-        session.close()
-
-
-@activities_bp.route('/<root_id>/activity-modes', methods=['POST'])
-@token_required
-@validate_request(ActivityModeCreateSchema)
-def create_activity_mode(current_user, root_id, validated_data):
-    session = get_db_session()
-    try:
-        service = ActivityService(session)
-        mode, error, status = service.create_mode(root_id, current_user.id, validated_data)
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(serialize_activity_mode(mode)), status
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error creating activity mode")
-        return internal_error(logger, "Activity API request failed")
-    finally:
-        session.close()
-
-
-@activities_bp.route('/<root_id>/activity-modes/<mode_id>', methods=['PUT'])
-@token_required
-@validate_request(ActivityModeUpdateSchema)
-def update_activity_mode(current_user, root_id, mode_id, validated_data):
-    session = get_db_session()
-    try:
-        service = ActivityService(session)
-        mode, error, status = service.update_mode(root_id, mode_id, current_user.id, validated_data)
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(serialize_activity_mode(mode)), status
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error updating activity mode")
-        return internal_error(logger, "Activity API request failed")
-    finally:
-        session.close()
-
-
-@activities_bp.route('/<root_id>/activity-modes/<mode_id>', methods=['DELETE'])
-@token_required
-def delete_activity_mode(current_user, root_id, mode_id):
-    session = get_db_session()
-    try:
-        service = ActivityService(session)
-        payload, error, status = service.delete_mode(root_id, mode_id, current_user.id)
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload), status
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error deleting activity mode")
-        return internal_error(logger, "Activity API request failed")
-    finally:
-        session.close()
-
-
 # ============================================================================
 # FRACTAL METRIC ENDPOINTS
 # ============================================================================

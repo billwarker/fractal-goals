@@ -119,6 +119,8 @@ def app():
     
     with engine.begin() as connection:
         connection.execute(text('DROP TABLE IF EXISTS visualization_annotations CASCADE'))
+        connection.execute(text('DROP TABLE IF EXISTS activity_instance_modes CASCADE'))
+        connection.execute(text('DROP TABLE IF EXISTS activity_modes CASCADE'))
 
     # Reset Database
     # Drop all tables and recreate them to ensure a clean state

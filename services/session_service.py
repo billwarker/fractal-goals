@@ -14,7 +14,6 @@ from models import (
 )
 import models
 from services import event_bus, Event, Events
-from services.activity_mode_assignments import attach_template_modes, replace_instance_modes
 from services.payload_normalizers import normalize_session_payload
 from services.owned_entity_queries import (
     get_owned_activity_definition,
@@ -30,6 +29,10 @@ from services.session_runtime import (
     get_template_color,
     get_template_session_type,
     is_quick_session,
+)
+from services.session_structure import (
+    build_duplicate_session_data,
+    extract_activity_definition_id,
 )
 logger = logging.getLogger(__name__)
 
@@ -78,7 +81,6 @@ class SessionService:
             selectinload(Session.template),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.modes),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.progress_record),
@@ -90,7 +92,6 @@ class SessionService:
     def _session_activity_read_options():
         return (
             joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
-            selectinload(ActivityInstance.modes),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split),
         )
@@ -98,31 +99,7 @@ class SessionService:
     @staticmethod
     def _extract_activity_definition_id(raw_item) -> str | None:
         """Extract activity definition id from legacy/current template exercise shapes."""
-        if isinstance(raw_item, str):
-            return raw_item
-        if not isinstance(raw_item, dict):
-            return None
-
-        direct_keys = (
-            'activity_id',
-            'activity_definition_id',
-            'activityId',
-            'activityDefinitionId',
-            'definition_id',
-            'id',
-        )
-        for key in direct_keys:
-            value = raw_item.get(key)
-            if isinstance(value, str) and value.strip():
-                return value
-
-        nested = raw_item.get('activity')
-        if isinstance(nested, dict):
-            for key in ('id', 'activity_id', 'activity_definition_id'):
-                value = nested.get(key)
-                if isinstance(value, str) and value.strip():
-                    return value
-        return None
+        return extract_activity_definition_id(raw_item)
 
     @classmethod
     def _normalize_template_activities(cls, raw_items) -> list[tuple[dict | str, str]]:
@@ -682,16 +659,6 @@ class SessionService:
         self.db_session.add(instance)
         self.db_session.flush()
 
-        valid_modes, invalid_mode_ids = replace_instance_modes(
-            self.db_session,
-            root_id,
-            instance.id,
-            data.get('mode_ids'),
-        )
-        if invalid_mode_ids:
-            self.db_session.rollback()
-            return None, f"Mode(s) not found in this fractal: {', '.join(invalid_mode_ids)}", 404
-
         associated_goals = [goal for goal in (activity_def.associated_goals or []) if not goal.deleted_at]
         program_goal_ids = set()
         if session.program_day_id:
@@ -731,7 +698,6 @@ class SessionService:
 
         self.db_session.commit()
         self.db_session.refresh(instance)
-        instance.modes = valid_modes
         activity_name = activity_def.name if activity_def else 'Unknown'
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_CREATED,
@@ -796,21 +762,8 @@ class SessionService:
             instance.notes = data['notes']
         if 'completed' in data:
             instance.completed = data.get('completed')
-        if 'mode_ids' in data:
-            valid_modes, invalid_mode_ids = replace_instance_modes(
-                self.db_session,
-                root_id,
-                instance.id,
-                data.get('mode_ids'),
-            )
-            if invalid_mode_ids:
-                self.db_session.rollback()
-                return None, f"Mode(s) not found in this fractal: {', '.join(invalid_mode_ids)}", 404
-
         self.db_session.commit()
         self.db_session.refresh(instance)
-        if 'mode_ids' in data:
-            instance.modes = valid_modes
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_UPDATED,
             {
@@ -951,6 +904,40 @@ class SessionService:
             "serialized": serialize_activity_instance(instance),
         }, None, 200
 
+    def duplicate_session(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
+
+        session = self.db_session.query(Session).options(
+            *self._session_read_options(),
+        ).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at == None,
+        ).first()
+        if not session:
+            return None, "Session not found", 404
+
+        template_id = None
+        if getattr(session, 'template', None) and getattr(session.template, 'deleted_at', None) is None:
+            template_id = session.template_id
+
+        goal_ids = [goal.id for goal in (session.goals or []) if not goal.deleted_at]
+        if not goal_ids:
+            goal_ids = [goal.id for goal in self._derive_session_goals_from_activities(session)]
+
+        duplicate_payload = {
+            'name': session.name,
+            'description': session.description or '',
+            'template_id': template_id,
+            'goal_ids': goal_ids,
+            'session_start': models.utc_now().isoformat(),
+            'session_data': build_duplicate_session_data(session),
+        }
+
+        return self.create_session(root_id, current_user_id, duplicate_payload)
+
     def create_session(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         """Create a new session with automatic goal inheritance."""
         data = normalize_session_payload(data)
@@ -1089,7 +1076,6 @@ class SessionService:
                 )
                 self.db_session.add(instance)
                 self.db_session.flush()
-                attach_template_modes(self.db_session, root_id, instance.id, raw_item)
                 created_activity_ids.append(instance_id)
 
             session_data_dict['activity_ids'] = created_activity_ids
@@ -1138,7 +1124,6 @@ class SessionService:
                         )
                         self.db_session.add(instance)
                         self.db_session.flush()
-                        attach_template_modes(self.db_session, root_id, instance.id, exercise)
                         section_activity_ids.append(instance_id)
 
                     section['activity_ids'] = section_activity_ids

@@ -651,14 +651,12 @@ class ActivityInstanceCreateSchema(BaseModel):
     session_id: Optional[str] = None
     activity_definition_id: str = Field(..., min_length=1)
     instance_id: Optional[str] = None
-    mode_ids: Optional[List[str]] = Field(default_factory=list)
 
 
 class ActivityInstanceUpdateSchema(BaseModel):
     """Schema for updating an activity instance."""
     notes: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     completed: Optional[bool] = None
-    mode_ids: Optional[List[str]] = Field(default_factory=list)
     
     @field_validator('notes')
     @classmethod
@@ -685,7 +683,6 @@ class TimerActivityInstanceManualUpdateSchema(BaseModel):
     completed: Optional[bool] = None
     notes: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     sets: Optional[List[Dict[str, Any]]] = None
-    mode_ids: Optional[List[str]] = Field(default_factory=list)
 
     @field_validator('notes')
     @classmethod
@@ -846,72 +843,6 @@ class ActivityGoalsSetSchema(BaseModel):
 class GroupReorderSchema(BaseModel):
     """Schema for reordering activity groups."""
     group_ids: List[str] = Field(..., min_length=1)
-
-
-class ActivityModeCreateSchema(BaseModel):
-    """Schema for creating an activity mode."""
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
-    description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
-    color: Optional[str] = Field(None, max_length=7)
-    sort_order: Optional[int] = Field(None, ge=0)
-
-    @field_validator('name')
-    @classmethod
-    def sanitize_name(cls, v: str) -> str:
-        return sanitize_string(v)
-
-    @field_validator('description')
-    @classmethod
-    def sanitize_description(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        return sanitize_string(v)
-
-    @field_validator('color')
-    @classmethod
-    def validate_color(cls, v: Optional[str]) -> Optional[str]:
-        if v in (None, ''):
-            return None
-        candidate = v.strip()
-        if not HEX_COLOR_RE.match(candidate):
-            raise ValueError('color must be a valid #RRGGBB hex color or null')
-        return candidate
-
-
-class ActivityModeUpdateSchema(BaseModel):
-    """Schema for updating an activity mode."""
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
-    description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
-    color: Optional[str] = Field(None, max_length=7)
-    sort_order: Optional[int] = Field(None, ge=0)
-
-    @field_validator('name')
-    @classmethod
-    def sanitize_name(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        return sanitize_string(v)
-
-    @field_validator('description')
-    @classmethod
-    def sanitize_description(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        return sanitize_string(v)
-
-    @field_validator('color')
-    @classmethod
-    def validate_color(cls, v: Optional[str]) -> Optional[str]:
-        if v in (None, ''):
-            return None
-        candidate = v.strip()
-        if not HEX_COLOR_RE.match(candidate):
-            raise ValueError('color must be a valid #RRGGBB hex color or null')
-        return candidate
 
 
 # =============================================================================
@@ -1408,6 +1339,18 @@ class SessionTemplateCreateSchema(BaseModel):
     @classmethod
     def validate_template_data(cls, v: Dict[str, Any]) -> Dict[str, Any]:
         return validate_session_template_data(v)
+
+
+class SessionTemplateFromSessionSchema(BaseModel):
+    """Schema for creating a session template from a session."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
+
+    @field_validator('name')
+    @classmethod
+    def sanitize_name(cls, v: str) -> str:
+        return sanitize_string(v)
 
 
 class SessionTemplateUpdateSchema(BaseModel):

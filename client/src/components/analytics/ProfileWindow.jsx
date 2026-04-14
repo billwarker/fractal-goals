@@ -11,7 +11,7 @@ import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import Button from '../atoms/Button';
 import Select from '../atoms/Select';
 import { Heading } from '../atoms/Typography';
-import ActivityModeSelector from '../common/ActivityModeSelector';
+
 import ActivityGraphSelector from './ActivityGraphSelector';
 import { DISABLED_CHART_ANIMATION } from './ChartJSWrapper';
 import styles from './ProfileWindow.module.css';
@@ -81,7 +81,6 @@ function ProfileWindow({
         selectedMetricY2,
         setsHandling,
         selectedSplit,
-        selectedModeIds,
         selectedGoal,
         selectedGoalChart,
         heatmapMonths,
@@ -94,7 +93,6 @@ function ProfileWindow({
     const setSelectedMetricY2 = (value) => updateWindowState({ selectedMetricY2: value });
     const setSetsHandling = (value) => updateWindowState({ setsHandling: value });
     const setSelectedSplit = (value) => updateWindowState({ selectedSplit: value });
-    const setSelectedModeIds = (value) => updateWindowState({ selectedModeIds: value });
     const setSelectedGoal = (value) => updateWindowState({ selectedGoal: value });
     const setSelectedGoalChart = (value) => updateWindowState({ selectedGoalChart: value });
     const setHeatmapMonths = (value) => updateWindowState({ heatmapMonths: value });
@@ -108,7 +106,6 @@ function ProfileWindow({
                 selectedCategory: category,
                 selectedVisualization: null,
                 selectedActivity: null,
-                selectedModeIds: [],
                 selectedGoal: null,
             });
         }
@@ -119,7 +116,6 @@ function ProfileWindow({
             updateWindowState({
                 selectedVisualization: null,
                 selectedActivity: null,
-                selectedModeIds: [],
                 selectedGoal: null,
             });
         } else if (selectedCategory) {
@@ -167,21 +163,7 @@ function ProfileWindow({
         return getGoalColor(type);
     };
 
-    const filteredActivityInstances = useMemo(() => {
-        if (!Array.isArray(selectedModeIds) || selectedModeIds.length === 0) {
-            return activityInstances;
-        }
-
-        return Object.fromEntries(
-            Object.entries(activityInstances || {}).map(([activityId, instances]) => [
-                activityId,
-                (instances || []).filter((instance) => (
-                    Array.isArray(instance?.modes)
-                    && instance.modes.some((mode) => selectedModeIds.includes(mode.id))
-                )),
-            ])
-        );
-    }, [activityInstances, selectedModeIds]);
+    const filteredActivityInstances = activityInstances;
 
     const activityCounts = useMemo(() => Object.fromEntries(
         activities.map((activity) => [activity.id, filteredActivityInstances[activity.id]?.length || 0])
@@ -532,15 +514,6 @@ function ProfileWindow({
                         </Select>
                     )}
 
-                    {effectiveSelectedActivity ? (
-                        <ActivityModeSelector
-                            rootId={rootId}
-                            selectedModeIds={selectedModeIds}
-                            onChange={setSelectedModeIds}
-                            showAllOption
-                            allLabel="All Modes"
-                        />
-                    ) : null}
                 </div>
             );
         }

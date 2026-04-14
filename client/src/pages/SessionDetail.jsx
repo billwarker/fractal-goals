@@ -75,7 +75,13 @@ function SessionDetailContent() {
         handleOpenActivityBuilder,
         handleCloseActivityBuilder,
         handleActivityCreated,
-        handleConfirmDelete
+        handleConfirmDelete,
+        showOptionsModal,
+        setShowOptionsModal,
+        handleCreateTemplate,
+        handleDuplicateSession,
+        isSavingTemplate,
+        isDuplicatingSession,
     } = useSessionDetailController({ rootId, sessionId, navigate, isMobile });
 
     if (loading) {
@@ -189,6 +195,13 @@ function SessionDetailContent() {
                 associationContext={associationContext}
                 allAvailableGoals={allAvailableGoals}
                 onAssociateActivity={handleAssociateActivity}
+                showOptionsModal={showOptionsModal}
+                onCloseOptionsModal={() => setShowOptionsModal(false)}
+                sessionName={session?.name}
+                onCreateTemplate={handleCreateTemplate}
+                onDuplicateSession={handleDuplicateSession}
+                isSavingTemplate={isSavingTemplate}
+                isDuplicatingSession={isDuplicatingSession}
             />
 
             {autoSaveStatus && (

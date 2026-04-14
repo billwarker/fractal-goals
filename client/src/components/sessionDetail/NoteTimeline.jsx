@@ -30,6 +30,7 @@ function NoteTimeline({
             onNoteSelect={(note) => onNoteSelect && onNoteSelect(note.id)}
             groupByDate={false}
             showContext={false}
+            minimal
             variant="flat"
         />
     );

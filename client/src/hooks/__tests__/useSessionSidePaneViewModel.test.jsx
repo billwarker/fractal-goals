@@ -55,7 +55,7 @@ describe('useSessionSidePaneViewModel', () => {
 
     it('builds a narrow side-pane model with derived notes and history inputs', () => {
         const onModeChange = vi.fn();
-        const onSave = vi.fn();
+        const onOptions = vi.fn();
         const onDelete = vi.fn();
         const onNoteAdded = vi.fn();
         const onGoalClick = vi.fn();
@@ -78,7 +78,7 @@ describe('useSessionSidePaneViewModel', () => {
             addNote,
             updateNote,
             deleteNote,
-            onSave,
+            onOptions,
             onDelete,
             onOpenGoals,
             mode: 'details',
@@ -91,7 +91,7 @@ describe('useSessionSidePaneViewModel', () => {
             isCompleted: false,
             isPaused: false,
             onToggleComplete: toggleSessionComplete,
-            onSave,
+            onOptions,
             onDelete,
         });
         expect(result.current.details.notesPanelProps).toMatchObject({
@@ -151,7 +151,7 @@ describe('useSessionSidePaneViewModel', () => {
             addNote: vi.fn(),
             updateNote: vi.fn(),
             deleteNote: vi.fn(),
-            onSave: vi.fn(),
+            onOptions: vi.fn(),
             onDelete: vi.fn(),
             onOpenGoals: vi.fn(),
             mode: 'details',

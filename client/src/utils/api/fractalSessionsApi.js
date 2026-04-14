@@ -25,10 +25,14 @@ export const fractalSessionsApi = {
     getSessionTemplates: (rootId) => axios.get(`${API_BASE}/${rootId}/session-templates`),
     getSessionTemplate: (rootId, templateId) => axios.get(`${API_BASE}/${rootId}/session-templates/${templateId}`),
     createSessionTemplate: (rootId, data) => axios.post(`${API_BASE}/${rootId}/session-templates`, data),
+    createTemplateFromSession: (rootId, sessionId, data) =>
+        axios.post(`${API_BASE}/${rootId}/sessions/${sessionId}/create-template`, data),
     updateSessionTemplate: (rootId, templateId, data) =>
         axios.put(`${API_BASE}/${rootId}/session-templates/${templateId}`, data),
     deleteSessionTemplate: (rootId, templateId) =>
         axios.delete(`${API_BASE}/${rootId}/session-templates/${templateId}`),
+    duplicateSession: (rootId, sessionId) =>
+        axios.post(`${API_BASE}/${rootId}/sessions/${sessionId}/duplicate`, {}),
     getSessionProgressSummary: (rootId, sessionId) =>
         axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}/progress-summary`),
 };

@@ -81,7 +81,53 @@
     margin-top: var(--spacing-lg);
 }
 
-/* Button styles replaced by Atom */
+.completePendingButton {
+    background: #dff5df;
+    border-color: #9fd49f;
+    color: #245c2f;
+}
+
+.completePendingButton:hover:not(:disabled) {
+    background: #d3efd3;
+    border-color: #84c284;
+    color: #1f4f29;
+}
+
+.optionsButton {
+    background: #e5f0ff;
+    border-color: #76a7eb;
+    color: #255a9f;
+}
+
+.optionsButton:hover:not(:disabled) {
+    background: #d7e7ff;
+    border-color: #5f97e4;
+    color: #1f4d89;
+}
+
+.pauseButton {
+    background: #fff0d9;
+    border-color: #efb15b;
+    color: #9a5600;
+}
+
+.pauseButton:hover:not(:disabled) {
+    background: #ffe5bf;
+    border-color: #e29b3c;
+    color: #814600;
+}
+
+.deleteButton {
+    background: #ffe2e2;
+    border-color: #ef8585;
+    color: #b13838;
+}
+
+.deleteButton:hover:not(:disabled) {
+    background: #ffd4d4;
+    border-color: #e36f6f;
+    color: #992c2c;
+}
 
 /* The missing inline style */
 .divider {

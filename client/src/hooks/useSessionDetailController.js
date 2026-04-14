@@ -1,5 +1,5 @@
-import notify from '../utils/notify';
 import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../contexts/ActiveSessionContext';
+import useSessionOptionsMutations from './useSessionOptionsMutations';
 import { useSessionDetailGoalAssociations } from './useSessionDetailGoalAssociations';
 import useSessionDetailNotes from './useSessionDetailNotes';
 import useSessionDetailUiState from './useSessionDetailUiState';
@@ -22,6 +22,12 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         deleteSession,
     } = useActiveSessionActions();
     const { sidePaneMode, setSidePaneMode: setSidePaneModeUi } = useActiveSessionUi();
+    const {
+        isSavingTemplate,
+        isDuplicatingSession,
+        createTemplateFromSession,
+        duplicateSession,
+    } = useSessionOptionsMutations(rootId, sessionId);
 
     const {
         showDeleteConfirm,
@@ -43,6 +49,8 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         handleOpenActivityBuilder,
         handleCloseActivityBuilder,
         handleActivityCreated,
+        showOptionsModal,
+        setShowOptionsModal,
     } = useSessionDetailUiState({
         isMobile,
         addActivity,
@@ -85,9 +93,17 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         });
     };
 
-    const handleSaveSession = () => {
-        notify.success('Session saved successfully');
-        navigate(`/${rootId}/sessions`);
+    const handleCreateTemplate = async (name) => {
+        const createdTemplate = await createTemplateFromSession(name);
+        setShowOptionsModal(false);
+        return createdTemplate;
+    };
+
+    const handleDuplicateSession = async () => {
+        const duplicatedSession = await duplicateSession();
+        setShowOptionsModal(false);
+        navigate(`/${rootId}/session/${duplicatedSession.id}`);
+        return duplicatedSession;
     };
 
     const sidePaneModel = useSessionSidePaneViewModel({
@@ -102,7 +118,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         addNote,
         updateNote,
         deleteNote,
-        onSave: handleSaveSession,
+        onOptions: () => setShowOptionsModal(true),
         onDelete: () => setShowDeleteConfirm(true),
         onOpenGoals: handleOpenGoals,
         mode: sidePaneMode,
@@ -151,6 +167,11 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         handleCloseActivityBuilder,
         handleActivityCreated,
         handleConfirmDelete,
-        handleSaveSession
+        showOptionsModal,
+        setShowOptionsModal,
+        handleCreateTemplate,
+        handleDuplicateSession,
+        isSavingTemplate,
+        isDuplicatingSession,
     };
 }

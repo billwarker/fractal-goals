@@ -17,7 +17,7 @@ import json
 from models import (
     Goal, GoalLevel, Session, session_goals,
     ActivityGroup, ActivityDefinition, MetricDefinition,
-    ActivityInstance, ActivityMode, MetricValue
+    ActivityInstance, MetricValue
 )
 from services.serializers import (
     serialize_goal, serialize_session, serialize_activity_instance, 
@@ -275,31 +275,6 @@ class TestActivityInstance:
         assert 'session_id' in instance_dict
         assert 'activity_definition_id' in instance_dict
 
-    def test_activity_instance_to_dict_filters_deleted_modes(self, db_session, sample_activity_instance):
-        active_mode = ActivityMode(
-            id=str(uuid.uuid4()),
-            root_id=sample_activity_instance.root_id,
-            name='Strength',
-            color='#5511AA',
-            created_at=datetime.utcnow(),
-        )
-        deleted_mode = ActivityMode(
-            id=str(uuid.uuid4()),
-            root_id=sample_activity_instance.root_id,
-            name='Tempo',
-            color='#11AA55',
-            created_at=datetime.utcnow(),
-            deleted_at=datetime.utcnow(),
-        )
-        db_session.add_all([active_mode, deleted_mode])
-        db_session.flush()
-        sample_activity_instance.modes = [active_mode, deleted_mode]
-        db_session.commit()
-
-        instance_dict = serialize_activity_instance(sample_activity_instance)
-
-        assert instance_dict['mode_ids'] == [active_mode.id]
-        assert [mode['name'] for mode in instance_dict['modes']] == ['Strength']
 
 
 @pytest.mark.unit

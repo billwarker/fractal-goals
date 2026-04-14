@@ -211,6 +211,25 @@ def delete_session_endpoint(current_user, root_id, session_id):
         db_session.close()
 
 
+@sessions_bp.route('/<root_id>/sessions/<session_id>/duplicate', methods=['POST'])
+@token_required
+def duplicate_session_endpoint(current_user, root_id, session_id):
+    """Duplicate a session into a new active session."""
+    db_session = get_db_session()
+    service = SessionService(db_session)
+    try:
+        result, error, status = service.duplicate_session(root_id, session_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(result), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error duplicating session")
+        return internal_error(logger, "Error duplicating session")
+    finally:
+        db_session.close()
+
+
 # ============================================================================
 # SESSION ACTIVITY INSTANCE ENDPOINTS (Database-Only Architecture)
 # ============================================================================

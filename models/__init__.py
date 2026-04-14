@@ -12,7 +12,7 @@ from .goal import (
 )
 from .activity import (
     ActivityGroup, ActivityDefinition, MetricDefinition, FractalMetricDefinition,
-    SplitDefinition, ActivityMode, ActivityInstanceMode, ActivityInstance, MetricValue,
+    SplitDefinition, ActivityInstance, MetricValue,
     ProgressRecord,
 )
 from .session import (

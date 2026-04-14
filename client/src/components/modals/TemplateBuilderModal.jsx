@@ -9,12 +9,12 @@ import Input from '../atoms/Input';
 import Select from '../atoms/Select';
 import TextArea from '../atoms/TextArea';
 import ActivitySelectorPanel from '../common/ActivitySelectorPanel';
-import ActivityInstanceModesModal from './ActivityInstanceModesModal';
+
 import EmptyState from '../common/EmptyState';
 import SectionHeader from '../common/SectionHeader';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
-import { useActivityModes } from '../../hooks/useActivityQueries';
+
 import {
     DEFAULT_TEMPLATE_COLOR,
     SESSION_TYPE_NORMAL,
@@ -37,7 +37,6 @@ function buildActivityPreview(activity) {
         activity_id: activity.id,
         name: activity.name,
         type: activity.type,
-        mode_ids: [],
     };
 }
 
@@ -54,7 +53,6 @@ function buildInitialTemplate(editingTemplate) {
         ...section,
         activities: (section.activities || section.exercises || []).map((activity) => ({
             ...activity,
-            mode_ids: Array.isArray(activity?.mode_ids) ? activity.mode_ids : [],
         })),
     }));
 
@@ -66,7 +64,6 @@ function buildInitialTemplate(editingTemplate) {
         sections,
         quickActivities: (editingTemplate.template_data?.activities || []).map((activity) => ({
             ...activity,
-            mode_ids: Array.isArray(activity?.mode_ids) ? activity.mode_ids : [],
         })),
     };
 }
@@ -92,42 +89,6 @@ function TemplateBuilderModalContent({
     });
     const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '' });
 
-    // Modes modal state: { type: 'quick'|'section', sectionIndex?: number, activityIndex: number }
-    const [modesModalTarget, setModesModalTarget] = useState(null);
-    const [draftModeIds, setDraftModeIds] = useState([]);
-
-    const { activityModes = [] } = useActivityModes(rootId);
-    const modeById = useMemo(() => Object.fromEntries(activityModes.map((m) => [m.id, m])), [activityModes]);
-
-    const handleOpenModesModal = useCallback((target, currentModeIds) => {
-        setDraftModeIds(Array.isArray(currentModeIds) ? currentModeIds : []);
-        setModesModalTarget(target);
-    }, []);
-
-    const renderModeBadges = (modeIds) => {
-        const activeModes = (modeIds || []).map((id) => modeById[id]).filter(Boolean);
-        if (!activeModes.length) return null;
-        const visible = activeModes.slice(0, 2);
-        const hiddenCount = activeModes.length - visible.length;
-        return (
-            <div className={styles.modeBadgeList}>
-                {visible.map((mode) => (
-                    <span
-                        key={mode.id}
-                        className={styles.modeBadge}
-                        style={mode.color ? { borderColor: mode.color } : undefined}
-                        title={mode.description || mode.name}
-                    >
-                        {mode.color ? <span className={styles.modeBadgeDot} style={{ backgroundColor: mode.color }} /> : null}
-                        <span>{mode.name}</span>
-                    </span>
-                ))}
-                {hiddenCount > 0 ? (
-                    <span className={`${styles.modeBadge} ${styles.modeBadgeSummary}`}>
-                        +{hiddenCount} mode{hiddenCount === 1 ? '' : 's'}
-                    </span>
-                ) : null}
-            </div>
         );
     };
 
@@ -351,48 +312,6 @@ function TemplateBuilderModalContent({
         });
     };
 
-    const handleUpdateQuickActivityModes = (activityIndex, modeIds) => {
-        setCurrentTemplate((previous) => ({
-            ...previous,
-            quickActivities: previous.quickActivities.map((activity, index) => (
-                index === activityIndex ? { ...activity, mode_ids: modeIds } : activity
-            )),
-        }));
-    };
-
-    const handleUpdateSectionActivityModes = (sectionIndex, activityIndex, modeIds) => {
-        setCurrentTemplate((previous) => {
-            const updatedSections = [...previous.sections];
-            const section = updatedSections[sectionIndex];
-            if (!section) {
-                return previous;
-            }
-
-            updatedSections[sectionIndex] = {
-                ...section,
-                activities: (section.activities || []).map((activity, index) => (
-                    index === activityIndex ? { ...activity, mode_ids: modeIds } : activity
-                )),
-            };
-
-            return {
-                ...previous,
-                sections: updatedSections,
-            };
-        });
-    };
-
-    const handleSaveModes = () => {
-        if (!modesModalTarget) return;
-        if (modesModalTarget.type === 'quick') {
-            handleUpdateQuickActivityModes(modesModalTarget.activityIndex, draftModeIds);
-        } else {
-            handleUpdateSectionActivityModes(modesModalTarget.sectionIndex, modesModalTarget.activityIndex, draftModeIds);
-        }
-        setModesModalTarget(null);
-        setDraftModeIds([]);
-    };
-
     const handleSave = () => {
         if (!currentTemplate.name.trim()) {
             setAlertModal({ show: true, title: 'Validation Error', message: 'Template name is required' });
@@ -557,18 +476,6 @@ function TemplateBuilderModalContent({
                                                         )}
                                                         actions={(
                                                             <div className={styles.sectionControls}>
-                                                                {activityModes.length > 0 ? (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="secondary"
-                                                                        onClick={() => handleOpenModesModal(
-                                                                            { type: 'quick', activityIndex },
-                                                                            activity.mode_ids,
-                                                                        )}
-                                                                    >
-                                                                        Modes
-                                                                    </Button>
-                                                                ) : null}
                                                                 <Button
                                                                     size="sm"
                                                                     variant="secondary"
@@ -595,7 +502,6 @@ function TemplateBuilderModalContent({
                                                             </div>
                                                         )}
                                                     />
-                                                    {renderModeBadges(activity.mode_ids)}
                                                 </div>
                                             ))}
                                         </div>
@@ -706,21 +612,8 @@ function TemplateBuilderModalContent({
                                                                             {activity.type}
                                                                         </div>
                                                                     )}
-                                                                    {renderModeBadges(activity.mode_ids)}
                                                                 </div>
                                                                 <div className={styles.activityActions}>
-                                                                    {activityModes.length > 0 ? (
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="secondary"
-                                                                            onClick={() => handleOpenModesModal(
-                                                                                { type: 'section', sectionIndex, activityIndex },
-                                                                                activity.mode_ids,
-                                                                            )}
-                                                                        >
-                                                                            Modes
-                                                                        </Button>
-                                                                    ) : null}
                                                                     <div className={styles.miniMoveGroup}>
                                                                         <button
                                                                             type="button"
@@ -848,17 +741,6 @@ function TemplateBuilderModalContent({
                         </div>
                     </div>
                 </div>
-            )}
-
-            {modesModalTarget && (
-                <ActivityInstanceModesModal
-                    isOpen={true}
-                    onClose={() => { setModesModalTarget(null); setDraftModeIds([]); }}
-                    rootId={rootId}
-                    selectedModeIds={draftModeIds}
-                    onChange={setDraftModeIds}
-                    onSave={handleSaveModes}
-                />
             )}
 
             {alertModal.show && (

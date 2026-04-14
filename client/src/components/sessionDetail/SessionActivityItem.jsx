@@ -8,7 +8,7 @@ import ActivityCompletionButton from '../common/ActivityCompletionButton';
 import MetaField from '../common/MetaField';
 import Linkify from '../atoms/Linkify';
 import Button from '../atoms/Button';
-import ActivityInstanceModesModal from '../modals/ActivityInstanceModesModal';
+
 import { DeletedBadge } from '../ui/DeletedEntityFallback';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
@@ -53,7 +53,6 @@ function formatInlineProgressValue(comparison) {
     return '0';
 }
 
-const MAX_VISIBLE_MODE_BADGES = 2;
 
 function getBestSetIndexes(sets, anchorMetricId, higherIsBetter, getMetricValue) {
     if (!Array.isArray(sets) || !anchorMetricId) {
@@ -171,12 +170,6 @@ function SessionActivityItem({
         onUpdate('sets', newSets);
     }, [onUpdate]);
 
-    const selectedModeIds = useMemo(() => (
-        Array.isArray(exercise.mode_ids)
-            ? exercise.mode_ids
-            : (Array.isArray(exercise.modes) ? exercise.modes.map((mode) => mode.id) : [])
-    ), [exercise.mode_ids, exercise.modes]);
-
     const resolveMetricId = useCallback((metric) => (
         metric?.metric_id || metric?.metric_definition_id || null
     ), []);
@@ -191,8 +184,6 @@ function SessionActivityItem({
     // Progress comparison: stored from completion mutation response or fetched live
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
     const [realtimeDuration, setRealtimeDuration] = useState(0);
-    const [isModesModalOpen, setIsModesModalOpen] = useState(false);
-    const [draftModeIds, setDraftModeIds] = useState([]);
 
 
 
@@ -472,73 +463,11 @@ function SessionActivityItem({
         }
         return exercise.group_name || null;
     }, [activityDefinition?.group_id, activityGroups, exercise.group_id, exercise.group_name]);
-    const activeModes = useMemo(
-        () => (Array.isArray(exercise.modes) ? exercise.modes.filter(Boolean) : []),
-        [exercise.modes]
-    );
-    const visibleModes = useMemo(
-        () => activeModes.slice(0, MAX_VISIBLE_MODE_BADGES),
-        [activeModes]
-    );
-    const hiddenModes = useMemo(
-        () => activeModes.slice(MAX_VISIBLE_MODE_BADGES),
-        [activeModes]
-    );
-    const hiddenModeCount = Math.max(0, activeModes.length - visibleModes.length);
-    const hiddenModesLabel = useMemo(
-        () => hiddenModes.map((mode) => mode.name).join(', '),
-        [hiddenModes]
-    );
-
     const handleAddSet = () => {
         const newSet = buildEmptySet(def, hasSplits);
         const newSets = [...applyAllSetDrafts(latestSetsRef.current), newSet];
         handleUpdateSets(newSets);
         clearSetDrafts();
-    };
-
-    const handleOpenModesModal = useCallback((event) => {
-        event.stopPropagation();
-        setDraftModeIds(selectedModeIds);
-        setIsModesModalOpen(true);
-    }, [selectedModeIds]);
-
-    const renderModeBadgeRow = () => {
-        if (!activeModes.length) {
-            return null;
-        }
-
-        return (
-            <div className={styles.modeBadgeList}>
-                {visibleModes.map((mode) => (
-                    <span
-                        key={mode.id}
-                        className={styles.modeBadge}
-                        style={mode.color ? { borderColor: mode.color } : undefined}
-                        title={mode.description || mode.name}
-                    >
-                        {mode.color ? (
-                            <span
-                                className={styles.modeBadgeDot}
-                                style={{ backgroundColor: mode.color }}
-                            />
-                        ) : null}
-                        <span>{mode.name}</span>
-                    </span>
-                ))}
-                {hiddenModeCount > 0 ? (
-                    <button
-                        type="button"
-                        className={`${styles.modeBadge} ${styles.modeBadgeSummary} ${styles.modeBadgeSummaryButton}`}
-                        title={hiddenModesLabel}
-                        aria-label={`Hidden modes: ${hiddenModesLabel}. Click to edit modes.`}
-                        onClick={handleOpenModesModal}
-                    >
-                        +{hiddenModeCount} mode{hiddenModeCount === 1 ? '' : 's'}
-                    </button>
-                ) : null}
-            </div>
-        );
     };
 
     const handleRemoveSet = (setIndex) => {
@@ -674,17 +603,6 @@ function SessionActivityItem({
                                     }}
                                     completed={exercise.completed}
                                 />
-                            </div>
-                            <div className={styles.modeActionRow}>
-                                {renderModeBadgeRow()}
-                                <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    className={styles.modesButton}
-                                    onClick={handleOpenModesModal}
-                                >
-                                    Modes
-                                </Button>
                             </div>
                         </div>
                     ) : (
@@ -825,17 +743,6 @@ function SessionActivityItem({
                                         </>
                                     )}
                                 </div>
-                            </div>
-                            <div className={styles.modeActionRow}>
-                                {renderModeBadgeRow()}
-                                <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    className={styles.modesButton}
-                                    onClick={handleOpenModesModal}
-                                >
-                                    Modes
-                                </Button>
                             </div>
                         </div>
                     )}
@@ -1063,17 +970,6 @@ function SessionActivityItem({
                 )}
             </div>
 
-            <ActivityInstanceModesModal
-                isOpen={isModesModalOpen}
-                onClose={() => setIsModesModalOpen(false)}
-                rootId={rootId}
-                selectedModeIds={draftModeIds}
-                onChange={setDraftModeIds}
-                onSave={() => {
-                    onUpdate('mode_ids', draftModeIds);
-                    setIsModesModalOpen(false);
-                }}
-            />
         </div>
     );
 }

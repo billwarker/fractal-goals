@@ -74,19 +74,22 @@ function SessionSidePane({
                                 onClick={details?.onToggleComplete}
                                 completed={details?.isCompleted}
                                 title="Mark Session Complete"
+                                className={!details?.isCompleted ? styles.completePendingButton : ''}
                             />
                             <Button
-                                onClick={details?.onSave}
-                                variant="primary" // Blue
-                                title="Save & Exit"
+                                onClick={details?.onOptions}
+                                variant="primary"
+                                title="Session Options"
+                                className={styles.optionsButton}
                             >
-                                Save
+                                Options
                             </Button>
                             <Button
                                 onClick={details?.onPauseResume}
                                 variant="secondary"
                                 title={details?.isPaused ? "Resume Session" : "Pause Session"}
                                 disabled={details?.isCompleted}
+                                className={styles.pauseButton}
                             >
                                 {details?.isPaused ? "Resume" : "Pause"}
                             </Button>
@@ -94,6 +97,7 @@ function SessionSidePane({
                                 onClick={details?.onDelete}
                                 variant="danger" // Red
                                 title="Delete Session"
+                                className={styles.deleteButton}
                             >
                                 Delete
                             </Button>

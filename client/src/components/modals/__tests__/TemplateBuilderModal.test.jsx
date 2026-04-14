@@ -3,28 +3,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import TemplateBuilderModal from '../TemplateBuilderModal';
 
-vi.mock('../../../hooks/useActivityQueries', () => ({
-    useActivityModes: () => ({
-        activityModes: [{ id: 'mode-0', name: 'Strength', color: null, description: null }],
-        isLoading: false,
-    }),
-}));
-
-vi.mock('../ActivityInstanceModesModal', () => ({
-    default: ({ isOpen, onClose, selectedModeIds = [], onChange, onSave }) => {
-        if (!isOpen) return null;
-        return (
-            <div>
-                <button type="button" onClick={() => onChange(['mode-1'])}>
-                    Modes:{selectedModeIds.join(',')}
-                </button>
-                <button type="button" onClick={onSave}>Save Modes</button>
-                <button type="button" onClick={onClose}>Close Modes</button>
-            </div>
-        );
-    },
-}));
-
 describe('TemplateBuilderModal', () => {
     it('adds a selected activity to a section once', () => {
         render(
@@ -73,55 +51,4 @@ describe('TemplateBuilderModal', () => {
         expect(screen.getAllByText('Squat')).toHaveLength(1);
     });
 
-    it('saves updated mode ids for quick template activities', () => {
-        const onSave = vi.fn();
-
-        render(
-            <TemplateBuilderModal
-                isOpen={true}
-                onClose={vi.fn()}
-                onSave={onSave}
-                editingTemplate={{
-                    id: 'template-quick-1',
-                    name: 'Quick Strength',
-                    description: '',
-                    template_data: {
-                        session_type: 'quick',
-                        activities: [
-                            {
-                                activity_id: 'activity-1',
-                                name: 'Squat',
-                                mode_ids: ['mode-0'],
-                            },
-                        ],
-                    },
-                }}
-                activities={[]}
-                activityGroups={[]}
-                rootId="root-1"
-            />
-        );
-
-        // Open the modes modal, change modes, then save
-        fireEvent.click(screen.getByRole('button', { name: 'Modes' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Modes:mode-0' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Save Modes' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Update Template' }));
-
-        expect(onSave).toHaveBeenCalledWith({
-            name: 'Quick Strength',
-            description: '',
-            template_data: {
-                session_type: 'quick',
-                template_color: '#4A90E2',
-                activities: [
-                    {
-                        activity_id: 'activity-1',
-                        name: 'Squat',
-                        mode_ids: ['mode-1'],
-                    },
-                ],
-            },
-        }, 'template-quick-1');
-    });
 });

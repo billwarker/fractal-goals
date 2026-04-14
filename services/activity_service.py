@@ -3,7 +3,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy import func, select
 from models import (
     ActivityDefinition, MetricDefinition, FractalMetricDefinition,
-    SplitDefinition, ActivityGroup, ActivityMode, Goal,
+    SplitDefinition, ActivityGroup, Goal,
     activity_goal_associations, goal_activity_group_associations,
     validate_root_goal, utc_now
 )
@@ -242,13 +242,6 @@ class ActivityService:
             ActivityGroup.deleted_at.is_(None),
         ).first()
 
-    def _get_active_mode(self, root_id, mode_id) -> ActivityMode | None:
-        return self.db_session.query(ActivityMode).filter(
-            ActivityMode.id == mode_id,
-            ActivityMode.root_id == root_id,
-            ActivityMode.deleted_at.is_(None),
-        ).first()
-
     def _get_group_subtree(self, root_id, group_id) -> list[ActivityGroup]:
         groups = self.db_session.query(ActivityGroup).filter(
             ActivityGroup.root_id == root_id,
@@ -290,124 +283,6 @@ class ActivityService:
             ActivityGroup.created_at,
         ).all()
         return groups, None, 200
-
-    def list_modes_for_root(self, root_id, current_user_id) -> ServiceResult[list[ActivityMode]]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        modes = self.db_session.query(ActivityMode).filter(
-            ActivityMode.root_id == root_id,
-            ActivityMode.deleted_at.is_(None),
-        ).order_by(
-            ActivityMode.sort_order,
-            ActivityMode.created_at,
-        ).all()
-        return modes, None, 200
-
-    def create_mode(self, root_id, current_user_id, data) -> ServiceResult[ActivityMode]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        name = (data.get('name') or '').strip()
-        if not name:
-            return None, "Name is required", 400
-
-        existing = self.db_session.query(ActivityMode).filter(
-            ActivityMode.root_id == root_id,
-            ActivityMode.name == name,
-            ActivityMode.deleted_at.is_(None),
-        ).first()
-        if existing:
-            return None, "A mode with this name already exists in this fractal", 409
-
-        max_order = self.db_session.query(func.max(ActivityMode.sort_order)).filter(
-            ActivityMode.root_id == root_id,
-            ActivityMode.deleted_at.is_(None),
-        ).scalar()
-        mode = ActivityMode(
-            root_id=root_id,
-            name=name,
-            description=(data.get('description') or '').strip() or None,
-            color=(data.get('color') or '').strip() or None,
-            sort_order=data.get('sort_order') if data.get('sort_order') is not None else (max_order or 0) + 1,
-        )
-        self.db_session.add(mode)
-        self.db_session.commit()
-        self.db_session.refresh(mode)
-
-        event_bus.emit(Event(Events.ACTIVITY_MODE_CREATED, {
-            'mode_id': mode.id,
-            'name': mode.name,
-            'root_id': root_id,
-        }, source='activity_service.create_mode'))
-
-        return mode, None, 201
-
-    def update_mode(self, root_id, mode_id, current_user_id, data) -> ServiceResult[ActivityMode]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        mode = self._get_active_mode(root_id, mode_id)
-        if not mode:
-            return None, "Mode not found", 404
-
-        if 'name' in data:
-            name = (data.get('name') or '').strip()
-            if not name:
-                return None, "Name is required", 400
-            conflict = self.db_session.query(ActivityMode).filter(
-                ActivityMode.root_id == root_id,
-                ActivityMode.name == name,
-                ActivityMode.id != mode_id,
-                ActivityMode.deleted_at.is_(None),
-            ).first()
-            if conflict:
-                return None, "A mode with this name already exists in this fractal", 409
-            mode.name = name
-
-        if 'description' in data:
-            mode.description = (data.get('description') or '').strip() or None
-
-        if 'color' in data:
-            mode.color = (data.get('color') or '').strip() or None
-
-        if 'sort_order' in data and data.get('sort_order') is not None:
-            mode.sort_order = data.get('sort_order')
-
-        self.db_session.commit()
-        self.db_session.refresh(mode)
-
-        event_bus.emit(Event(Events.ACTIVITY_MODE_UPDATED, {
-            'mode_id': mode.id,
-            'name': mode.name,
-            'root_id': root_id,
-            'updated_fields': list(data.keys()),
-        }, source='activity_service.update_mode'))
-
-        return mode, None, 200
-
-    def delete_mode(self, root_id, mode_id, current_user_id) -> ServiceResult[JsonDict]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        mode = self._get_active_mode(root_id, mode_id)
-        if not mode:
-            return None, "Mode not found", 404
-
-        mode.deleted_at = utc_now()
-        self.db_session.commit()
-
-        event_bus.emit(Event(Events.ACTIVITY_MODE_DELETED, {
-            'mode_id': mode.id,
-            'name': mode.name,
-            'root_id': root_id,
-        }, source='activity_service.delete_mode'))
-
-        return {"message": "Mode deleted"}, None, 200
 
     # ── Fractal Metrics ─────────────────────────────────────────────────────
 

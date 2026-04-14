@@ -5,7 +5,7 @@ import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks
 import { useAllSessions } from '../hooks/useSessionQueries';
 import ActivityBuilder from '../components/ActivityBuilder';
 import ActivityCard from '../components/ActivityCard';
-import ActivityModesModal from '../components/modals/ActivityModesModal';
+
 import ManageMetricsModal from '../components/modals/ManageMetricsModal';
 
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
@@ -40,7 +40,6 @@ function ManageActivities() {
     const [showGroupBuilder, setShowGroupBuilder] = useState(false);
     const [editingGroup, setEditingGroup] = useState(null);
     const [groupToDelete, setGroupToDelete] = useState(null);
-    const [showModesModal, setShowModesModal] = useState(false);
     const [showMetricsModal, setShowMetricsModal] = useState(false);
 
     // Collapsed state for groups (Set of group IDs)
@@ -395,12 +394,6 @@ function ManageActivities() {
                             Manage Metrics
                         </button>
                         <button
-                            onClick={() => setShowModesModal(true)}
-                            className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
-                        >
-                            Manage Modes
-                        </button>
-                        <button
                             onClick={handleCreateGroup}
                             className={`${headerStyles.actionButton} ${headerStyles.tertiaryActionButton}`}
                         >
@@ -511,12 +504,6 @@ function ManageActivities() {
                 title="Delete Activity Group"
                 message={`Are you sure you want to delete "${groupToDelete?.name}"? Nested groups will be deleted. Activities will become ungrouped.`}
                 confirmText="Delete Group"
-            />
-
-            <ActivityModesModal
-                isOpen={showModesModal}
-                onClose={() => setShowModesModal(false)}
-                rootId={rootId}
             />
 
             <ManageMetricsModal

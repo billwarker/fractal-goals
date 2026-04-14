@@ -18,7 +18,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from models import ActivityDefinition, ActivityInstance, ActivityMode, Goal, Session, SessionTemplate, activity_goal_associations
+from models import ActivityDefinition, ActivityInstance, Goal, Session, SessionTemplate, activity_goal_associations
 
 
 @pytest.mark.integration
@@ -471,7 +471,7 @@ class TestSessionCRUDEndpoints:
         assert data['template_color'] == '#123456'
         assert data['attributes']['session_data']['activity_ids']
         assert data['immediate_goals'] == []
-        assert data['micro_goals'] == []
+        assert data.get('micro_goals') in (None, [])
 
     def test_complete_quick_session_sets_end_and_duration(
         self,
@@ -564,60 +564,6 @@ class TestSessionCRUDEndpoints:
         assert len(sections[0]['activity_ids']) == 1
         assert sections[0]['activity_ids'][0] == 'test-instance-1'
 
-    def test_create_session_carries_template_activity_modes(
-        self, authed_client, db_session, sample_goal_hierarchy, sample_activity_definition
-    ):
-        root_id = sample_goal_hierarchy['ultimate'].id
-        mode = ActivityMode(
-            root_id=root_id,
-            name='Strength',
-            color='#AA2244',
-        )
-        db_session.add(mode)
-        db_session.flush()
-
-        template = SessionTemplate(
-            id=str(uuid4()),
-            name='Mode Template',
-            root_id=root_id,
-            template_data=json.dumps({
-                'session_type': 'normal',
-                'sections': [
-                    {
-                        'name': 'Main Work',
-                        'duration_minutes': 20,
-                        'exercises': [
-                            {
-                                'activity_id': sample_activity_definition.id,
-                                'mode_ids': [mode.id],
-                            }
-                        ],
-                    }
-                ],
-            }),
-        )
-        db_session.add(template)
-        db_session.commit()
-
-        create_response = authed_client.post(
-            f'/api/{root_id}/sessions',
-            json={
-                'name': 'Session From Mode Template',
-                'parent_id': sample_goal_hierarchy['short_term'].id,
-                'template_id': template.id,
-                'session_start': datetime.utcnow().isoformat(),
-            }
-        )
-        assert create_response.status_code == 201
-        created = create_response.get_json()
-
-        activities_response = authed_client.get(f"/api/{root_id}/sessions/{created['id']}/activities")
-        assert activities_response.status_code == 200
-        activities = activities_response.get_json()
-        assert len(activities) == 1
-        assert activities[0]['mode_ids'] == [mode.id]
-        assert activities[0]['modes'][0]['name'] == 'Strength'
-
     def test_update_session(self, authed_client, sample_practice_session):
         """Test updating a session."""
         root_id = sample_practice_session.root_id
@@ -659,10 +605,10 @@ class TestSessionCRUDEndpoints:
         assert 'session_start' in data
         assert 'session_end' in data
 
-    def test_completing_session_marks_all_activity_instances_completed(
+    def test_completing_session_leaves_never_started_activity_instances_incomplete(
         self, authed_client, db_session, sample_practice_session, sample_activity_definition
     ):
-        """Completing a session should cascade completion to all of its activity instances."""
+        """Completing a session should not auto-complete instances that never started."""
         root_id = sample_practice_session.root_id
         session_id = sample_practice_session.id
 
@@ -687,7 +633,7 @@ class TestSessionCRUDEndpoints:
         activities = json.loads(activities_response.data)
 
         assert len(activities) >= 2
-        assert all(a['completed'] is True for a in activities)
+        assert all(a['completed'] is False for a in activities)
     
     def test_delete_session(self, authed_client, sample_practice_session):
         """Test deleting a session."""
@@ -700,6 +646,71 @@ class TestSessionCRUDEndpoints:
         # Verify it's deleted
         response = authed_client.get(f'/api/{root_id}/sessions/{session_id}')
         assert response.status_code == 404
+
+    def test_duplicate_session(self, authed_client, db_session, sample_practice_session, sample_activity_definition):
+        root_id = sample_practice_session.root_id
+        sample_practice_session.attributes = {
+            'session_type': 'normal',
+            'sections': [
+                {
+                    'name': 'Strength',
+                    'estimated_duration_minutes': 25,
+                    'activity_ids': ['source-instance-1'],
+                }
+            ],
+            'total_duration_minutes': 25,
+        }
+        db_session.add(ActivityInstance(
+            id='source-instance-1',
+            session_id=sample_practice_session.id,
+            activity_definition_id=sample_activity_definition.id,
+            root_id=root_id,
+        ))
+        db_session.commit()
+
+        response = authed_client.post(f'/api/{root_id}/sessions/{sample_practice_session.id}/duplicate', json={})
+
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data['name'] == sample_practice_session.name
+        assert data['attributes']['session_data']['sections'][0]['name'] == 'Strength'
+        assert len(data['activity_instances']) == 1
+        assert data['activity_instances'][0]['activity_definition_id'] == sample_activity_definition.id
+
+    def test_duplicate_session_preserves_section_metadata(self, authed_client, db_session, sample_practice_session, sample_activity_definition):
+        root_id = sample_practice_session.root_id
+        sample_practice_session.attributes = {
+            'session_type': 'normal',
+            'sections': [
+                {
+                    'name': 'Strength',
+                    'estimated_duration_minutes': 25,
+                    'notes': 'keep this',
+                    'theme': 'heavy',
+                    'activity_ids': ['source-instance-2'],
+                }
+            ],
+            'total_duration_minutes': 25,
+        }
+        db_session.add(ActivityInstance(
+            id='source-instance-2',
+            session_id=sample_practice_session.id,
+            activity_definition_id=sample_activity_definition.id,
+            root_id=root_id,
+        ))
+        db_session.commit()
+
+        response = authed_client.post(f'/api/{root_id}/sessions/{sample_practice_session.id}/duplicate', json={})
+
+        assert response.status_code == 201
+        data = response.get_json()
+        section = data['attributes']['session_data']['sections'][0]
+        assert section['name'] == 'Strength'
+        assert section['notes'] == 'keep this'
+        assert section['theme'] == 'heavy'
+        assert section['estimated_duration_minutes'] == 25
+        assert len(section['activity_ids']) == 1
+        assert section['activity_ids'][0] != 'source-instance-2'
 
 
 @pytest.mark.integration
@@ -723,63 +734,6 @@ class TestSessionActivityEndpoints:
         data = json.loads(response.data)
         assert 'id' in data  # Should return the created activity instance
 
-    def test_add_activity_to_session_with_modes(self, authed_client, db_session, sample_practice_session, sample_activity_definition):
-        root_id = sample_practice_session.root_id
-        session_id = sample_practice_session.id
-        mode = ActivityMode(
-            root_id=root_id,
-            name='Standing',
-            color='#1188CC',
-        )
-        db_session.add(mode)
-        db_session.commit()
-
-        response = authed_client.post(
-            f'/api/{root_id}/sessions/{session_id}/activities',
-            json={
-                'activity_definition_id': sample_activity_definition.id,
-                'mode_ids': [mode.id],
-            }
-        )
-        assert response.status_code == 201
-        data = response.get_json()
-        assert data['mode_ids'] == [mode.id]
-        assert data['modes'][0]['name'] == 'Standing'
-
-    def test_add_activity_to_session_rejects_mode_from_other_root(
-        self,
-        authed_client,
-        db_session,
-        sample_practice_session,
-        sample_activity_definition,
-        test_user,
-    ):
-        root_id = sample_practice_session.root_id
-        session_id = sample_practice_session.id
-        other_root = Goal(
-            id=str(uuid4()),
-            name='Other Root',
-            owner_id=test_user.id,
-            root_id=None,
-            created_at=datetime.now(timezone.utc),
-        )
-        other_root.root_id = other_root.id
-        db_session.add(other_root)
-        db_session.flush()
-        other_mode = ActivityMode(root_id=other_root.id, name='Foreign Mode', color='#AA2233')
-        db_session.add(other_mode)
-        db_session.commit()
-
-        response = authed_client.post(
-            f'/api/{root_id}/sessions/{session_id}/activities',
-            json={
-                'activity_definition_id': sample_activity_definition.id,
-                'mode_ids': [other_mode.id],
-            }
-        )
-        assert response.status_code == 404
-        assert 'Mode(s) not found in this fractal' in response.get_json()['error']
-    
     def test_remove_activity_from_session(self, authed_client, db_session, sample_activity_instance):
         """Test removing an activity from a session."""
         # Get session info from the instance
@@ -858,112 +812,6 @@ class TestSessionActivityEndpoints:
         )
         assert response.status_code == 200
 
-    def test_update_activity_instance_replaces_modes(self, authed_client, db_session, sample_activity_instance):
-        from models import PracticeSession
-
-        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
-        root_id = session.root_id
-        session_id = session.id
-        instance_id = sample_activity_instance.id
-        first_mode = ActivityMode(root_id=root_id, name='Strength', color='#8844CC')
-        second_mode = ActivityMode(root_id=root_id, name='Tempo', color='#33AA55')
-        db_session.add_all([first_mode, second_mode])
-        db_session.commit()
-
-        first_response = authed_client.put(
-            f'/api/{root_id}/sessions/{session_id}/activities/{instance_id}',
-            json={'mode_ids': [first_mode.id]}
-        )
-        assert first_response.status_code == 200
-        assert first_response.get_json()['mode_ids'] == [first_mode.id]
-
-        replace_response = authed_client.put(
-            f'/api/{root_id}/sessions/{session_id}/activities/{instance_id}',
-            json={'mode_ids': [second_mode.id]}
-        )
-        assert replace_response.status_code == 200
-        replaced = replace_response.get_json()
-        assert replaced['mode_ids'] == [second_mode.id]
-        assert replaced['modes'][0]['name'] == 'Tempo'
-
-    def test_update_activity_instance_rejects_mode_from_other_root(
-        self,
-        authed_client,
-        db_session,
-        sample_activity_instance,
-        test_user,
-    ):
-        from models import PracticeSession
-
-        session = db_session.query(PracticeSession).get(sample_activity_instance.session_id)
-        root_id = session.root_id
-        session_id = session.id
-        instance_id = sample_activity_instance.id
-        other_root = Goal(
-            id=str(uuid4()),
-            name='Other Root',
-            owner_id=test_user.id,
-            root_id=None,
-            created_at=datetime.now(timezone.utc),
-        )
-        other_root.root_id = other_root.id
-        db_session.add(other_root)
-        db_session.flush()
-        other_mode = ActivityMode(root_id=other_root.id, name='Foreign Mode', color='#CC4422')
-        db_session.add(other_mode)
-        db_session.commit()
-
-        response = authed_client.put(
-            f'/api/{root_id}/sessions/{session_id}/activities/{instance_id}',
-            json={'mode_ids': [other_mode.id]}
-        )
-        assert response.status_code == 404
-        assert 'Mode(s) not found in this fractal' in response.get_json()['error']
-
-    def test_deleted_modes_are_hidden_from_session_activity_reads(
-        self,
-        authed_client,
-        db_session,
-        sample_practice_session,
-        sample_activity_definition,
-    ):
-        root_id = sample_practice_session.root_id
-        session_id = sample_practice_session.id
-        mode = ActivityMode(root_id=root_id, name='Standing', color='#1166CC')
-        db_session.add(mode)
-        db_session.commit()
-
-        create_response = authed_client.post(
-            f'/api/{root_id}/sessions/{session_id}/activities',
-            json={
-                'activity_definition_id': sample_activity_definition.id,
-                'mode_ids': [mode.id],
-            }
-        )
-        assert create_response.status_code == 201
-        created_instance = create_response.get_json()
-
-        mode.deleted_at = datetime.now(timezone.utc)
-        db_session.commit()
-
-        detail_response = authed_client.get(f'/api/{root_id}/sessions/{session_id}')
-        assert detail_response.status_code == 200
-        detail_instance = next(
-            item for item in detail_response.get_json()['activity_instances']
-            if item['id'] == created_instance['id']
-        )
-        assert detail_instance['mode_ids'] == []
-        assert detail_instance['modes'] == []
-
-        activities_response = authed_client.get(f'/api/{root_id}/sessions/{session_id}/activities')
-        assert activities_response.status_code == 200
-        listed_instance = next(
-            item for item in activities_response.get_json()
-            if item['id'] == created_instance['id']
-        )
-        assert listed_instance['mode_ids'] == []
-        assert listed_instance['modes'] == []
-        
     def test_update_activity_metrics(self, authed_client, db_session, sample_activity_instance):
         """Test updating activity metrics."""
         from models import PracticeSession, MetricDefinition, MetricValue

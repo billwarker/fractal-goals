@@ -1,0 +1,61 @@
+.content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+.optionCard {
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-card);
+    padding: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.optionHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+}
+
+.optionCopy {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.optionTitle {
+    margin: 0;
+}
+
+.optionDescription {
+    margin: 0;
+    color: var(--color-text-secondary);
+}
+
+.inlineForm {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--color-border);
+}
+
+.inlineActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+}
+
+@media (max-width: 640px) {
+    .optionHeader {
+        flex-direction: column;
+    }
+
+    .inlineActions {
+        flex-direction: column-reverse;
+    }
+}

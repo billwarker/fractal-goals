@@ -79,10 +79,6 @@ vi.mock('../SessionActivityItem', () => ({
     default: () => <div>session activity item</div>,
 }));
 
-vi.mock('../../common/ActivityModeSelector', () => ({
-    default: () => null,
-}));
-
 describe('SessionSection', () => {
     beforeEach(() => {
         vi.clearAllMocks();

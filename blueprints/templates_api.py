@@ -5,7 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from models import get_session
 from validators import (
     validate_request,
-    SessionTemplateCreateSchema, SessionTemplateUpdateSchema
+    SessionTemplateCreateSchema, SessionTemplateUpdateSchema, SessionTemplateFromSessionSchema
 )
 from blueprints.auth_api import token_required
 from blueprints.api_utils import get_db_session, parse_optional_pagination, internal_error, etag_json_response
@@ -14,6 +14,7 @@ from services.template_service import TemplateService
 
 # Create blueprint
 templates_bp = Blueprint('templates', __name__, url_prefix='/api')
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # SESSION TEMPLATE ENDPOINTS (Fractal-Scoped)
@@ -74,6 +75,32 @@ def create_session_template(current_user, root_id, validated_data):
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error creating session template")
+        return internal_error(logger, "Template API request failed")
+    finally:
+        session.close()
+
+
+@templates_bp.route('/<root_id>/sessions/<session_id>/create-template', methods=['POST'])
+@token_required
+@validate_request(SessionTemplateFromSessionSchema)
+def create_template_from_session(current_user, root_id, session_id, validated_data):
+    """Create a session template from an existing session."""
+    session = get_db_session()
+    try:
+        service = TemplateService(session)
+        template, error, status = service.create_template_from_session(
+            root_id,
+            session_id,
+            validated_data['name'],
+            current_user.id,
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_session_template(template)), status
+
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Error creating session template from session")
         return internal_error(logger, "Template API request failed")
     finally:
         session.close()

@@ -52,6 +52,7 @@ function NoteCard({
     onUnpin,
     showContext = false,
     compact = false,
+    minimal = false,
     variant = 'card',
     isSelected = false,
     onSelect,
@@ -238,36 +239,38 @@ function NoteCard({
 
                 {/* Top row: timestamp + badges + options */}
                 <div className={styles.topRow}>
-                    <div className={styles.metaStack}>
-                        <div className={styles.metaRow}>
-                            <div className={styles.contextSummary}>
-                                {resolvedNoteType === 'goal_note' && note.goal_type ? (
-                                    <span className={styles.goalContext}>
-                                        <GoalIcon
-                                            shape={getGoalIcon(note.goal_type)}
-                                            color={getGoalColor(note.goal_type)}
-                                            secondaryColor={getGoalSecondaryColor(note.goal_type)}
-                                            isSmart={Boolean(note.goal_is_smart)}
-                                            size={12}
-                                        />
+                    {!minimal && (
+                        <div className={styles.metaStack}>
+                            <div className={styles.metaRow}>
+                                <div className={styles.contextSummary}>
+                                    {resolvedNoteType === 'goal_note' && note.goal_type ? (
+                                        <span className={styles.goalContext}>
+                                            <GoalIcon
+                                                shape={getGoalIcon(note.goal_type)}
+                                                color={getGoalColor(note.goal_type)}
+                                                secondaryColor={getGoalSecondaryColor(note.goal_type)}
+                                                isSmart={Boolean(note.goal_is_smart)}
+                                                size={12}
+                                            />
+                                            <span className={styles.contextPrimary}>{primaryContextLabel}</span>
+                                        </span>
+                                    ) : (
                                         <span className={styles.contextPrimary}>{primaryContextLabel}</span>
-                                    </span>
-                                ) : (
-                                    <span className={styles.contextPrimary}>{primaryContextLabel}</span>
-                                )}
+                                    )}
+                                </div>
                             </div>
+                            {secondaryContextBadges.length > 0 && (
+                                <div className={styles.contextBadges}>
+                                    {secondaryContextBadges.map((badge, index) => (
+                                        <span key={`${badge}-${index}`} className={styles.contextBadge}>{badge}</span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                        {secondaryContextBadges.length > 0 && (
-                            <div className={styles.contextBadges}>
-                                {secondaryContextBadges.map((badge, index) => (
-                                    <span key={`${badge}-${index}`} className={styles.contextBadge}>{badge}</span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    )}
 
                     <div className={styles.headerActions}>
-                        <span className={styles.noteTypePill}>{resolvedNoteTypeLabel}</span>
+                        {!minimal && <span className={styles.noteTypePill}>{resolvedNoteTypeLabel}</span>}
                         <span className={styles.timestamp}>
                             {formatDate(note.created_at)}
                             {note.isPast && note.session_name && resolvedNoteType !== 'session_note' && (

@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 
 import ConfirmationModal from '../ConfirmationModal';
+import SessionOptionsModal from './SessionOptionsModal';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
 const ActivityBuilder = lazyWithRetry(() => import('../ActivityBuilder'), 'components/ActivityBuilder');
@@ -27,6 +28,13 @@ function SessionDetailModals({
     associationContext,
     allAvailableGoals,
     onAssociateActivity,
+    showOptionsModal,
+    onCloseOptionsModal,
+    sessionName,
+    onCreateTemplate,
+    onDuplicateSession,
+    isSavingTemplate,
+    isDuplicatingSession,
 }) {
     return (
         <>
@@ -79,6 +87,16 @@ function SessionDetailModals({
                     />
                 </Suspense>
             )}
+
+            <SessionOptionsModal
+                isOpen={showOptionsModal}
+                onClose={onCloseOptionsModal}
+                sessionName={sessionName}
+                onCreateTemplate={onCreateTemplate}
+                onDuplicateSession={onDuplicateSession}
+                isSavingTemplate={isSavingTemplate}
+                isDuplicatingSession={isDuplicatingSession}
+            />
         </>
     );
 }
