@@ -10,6 +10,7 @@ import TextArea from '../atoms/TextArea';
 import { buildActivityPayload } from '../../utils/activityBuilder';
 import { getGroupBreadcrumb, sortGroupsTreeOrder } from '../../utils/manageActivities';
 import styles from '../ActivityBuilder.module.css';
+import metricStyles from './ActivityMetricsSection.module.css';
 import ActivityAssociationsField from './ActivityAssociationsField';
 import ActivityMetricsSection from './ActivityMetricsSection';
 import ActivitySplitsSection from './ActivitySplitsSection';
@@ -49,6 +50,8 @@ function ActivityBuilderForm({
     const [splits, setSplits] = useState(initialState.splits);
     const [groupId, setGroupId] = useState(initialState.groupId);
     const [selectedGoalIds, setSelectedGoalIds] = useState(initialState.selectedGoalIds);
+    const [trackProgress, setTrackProgress] = useState(initialState.trackProgress);
+    const [progressAggregation, setProgressAggregation] = useState(initialState.progressAggregation);
 
     const resetForm = () => {
         setError(null);
@@ -62,6 +65,8 @@ function ActivityBuilderForm({
         setSplits(DEFAULT_SPLITS);
         setGroupId('');
         setSelectedGoalIds([]);
+        setTrackProgress(true);
+        setProgressAggregation('last');
         setPendingSubmission(null);
         setShowMetricWarning(false);
         setMetricWarningMessage('');
@@ -87,15 +92,22 @@ function ActivityBuilderForm({
 
     const handleMetricChange = (index, field, value) => {
         setMetrics((currentMetrics) => currentMetrics.map((metric, metricIndex) => {
-            if (field === 'is_top_set_metric' && value === true && metricIndex !== index) {
-                return { ...metric, is_top_set_metric: false };
+            if (field === 'is_best_set_metric' && value === true && metricIndex !== index) {
+                return { ...metric, is_best_set_metric: false };
             }
 
             if (metricIndex !== index) {
                 return metric;
             }
 
-            return { ...metric, [field]: value };
+            const nextMetric = { ...metric, [field]: value };
+            if (field === 'track_progress' && value === false) {
+                nextMetric.is_best_set_metric = false;
+            }
+            if (field === 'is_best_set_metric' && value === true) {
+                nextMetric.track_progress = true;
+            }
+            return nextMetric;
         }));
     };
 
@@ -141,6 +153,8 @@ function ActivityBuilderForm({
                 hasSplits,
                 groupId,
                 selectedGoalIds,
+                trackProgress,
+                progressAggregation,
             });
 
             const result = editingActivity?.id
@@ -187,6 +201,8 @@ function ActivityBuilderForm({
             hasSplits,
             groupId,
             selectedGoalIds,
+            trackProgress,
+            progressAggregation,
         });
 
         const persistedMetrics = editingActivity?.id
@@ -289,6 +305,26 @@ function ActivityBuilderForm({
                             checked={hasMetrics}
                             onChange={(event) => setHasMetrics(event.target.checked)}
                         />
+                        <div className={styles.trackProgressFlag}>
+                            <Checkbox
+                                label="Track Progress"
+                                checked={trackProgress}
+                                onChange={(event) => setTrackProgress(event.target.checked)}
+                            />
+                            {trackProgress && (
+                                <select
+                                    className={metricStyles.progressAggregationSelect}
+                                    value={progressAggregation}
+                                    onChange={(e) => setProgressAggregation(e.target.value)}
+                                    aria-label="Compare by"
+                                >
+                                    <option value="last">Last value</option>
+                                    {hasSets && <option value="sum">Sum across sets</option>}
+                                    {hasSets && <option value="max">Best set</option>}
+                                    {hasSets && metricsMultiplicative && <option value="yield">Yield (×)</option>}
+                                </select>
+                            )}
+                        </div>
                     </div>
 
                     {hasSplits && (
@@ -305,6 +341,7 @@ function ActivityBuilderForm({
                             rootId={rootId}
                             metrics={metrics}
                             hasSets={hasSets}
+                            activityProgressAggregation={progressAggregation}
                             onAddMetric={handleAddMetric}
                             onRemoveMetric={handleRemoveMetric}
                             onMetricChange={handleMetricChange}

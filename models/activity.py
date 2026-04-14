@@ -95,6 +95,8 @@ class ActivityDefinition(Base):
     metrics_multiplicative = Column(Boolean, default=False)
     has_splits = Column(Boolean, default=False)
     group_id = Column(String, ForeignKey('activity_groups.id'), nullable=True, index=True)
+    track_progress = Column(Boolean, nullable=True)       # null → treat as True (backward compat)
+    progress_aggregation = Column(String, nullable=True)  # 'last' | 'sum' | 'max' | 'yield'
 
     group = relationship("ActivityGroup", backref="activities")
     metric_definitions = relationship("MetricDefinition", backref="activity_definition", cascade="all, delete-orphan")
@@ -120,7 +122,7 @@ class MetricDefinition(Base):
     deleted_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     is_active = Column(Boolean, default=True)
-    is_top_set_metric = Column(Boolean, default=False)
+    is_best_set_metric = Column(Boolean, default=False)
     is_multiplicative = Column(Boolean, default=True)
     sort_order = Column(Integer, default=0)
     track_progress = Column(Boolean, default=True, nullable=False)
@@ -192,6 +194,13 @@ class ActivityInstance(Base):
     metric_values = relationship("MetricValue", backref="activity_instance", cascade="all, delete-orphan")
     definition = relationship("ActivityDefinition")
     modes = relationship("ActivityMode", secondary="activity_instance_modes", lazy="selectin")
+    progress_record = relationship(
+        "ProgressRecord",
+        primaryjoin="ActivityInstance.id == ProgressRecord.activity_instance_id",
+        foreign_keys="[ProgressRecord.activity_instance_id]",
+        uselist=False,
+        lazy="noload",
+    )
 
     completed = Column(Boolean, default=False)
     notes = Column(String, nullable=True)

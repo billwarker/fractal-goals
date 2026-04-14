@@ -44,6 +44,7 @@ def _build_activity_with_metrics(db_session, root_id, *, metric_specs):
             fractal_metric_id=fractal_metric_id,
             name=spec['name'],
             unit=spec['unit'],
+            is_best_set_metric=spec.get('is_best_set_metric', False),
             is_multiplicative=spec.get('is_multiplicative', True),
             track_progress=spec.get('track_progress', True),
             progress_aggregation=spec.get('progress_aggregation'),
@@ -601,3 +602,98 @@ class TestProgressService:
         assert latest_progress['metric_comparisons'][0]['previous_value'] == 130.0
         assert latest_progress['metric_comparisons'][0]['current_value'] == 120.0
         assert latest_progress['metric_comparisons'][0]['delta'] == -10.0
+
+    def test_best_set_uses_lower_is_better_anchor_and_targets_only_best_row(self, db_session, sample_ultimate_goal):
+        duration_metric = FractalMetricDefinition(
+            id=str(uuid4()),
+            root_id=sample_ultimate_goal.id,
+            name='Duration',
+            unit='seconds',
+            higher_is_better=False,
+            default_progress_aggregation='max',
+            created_at=datetime.now(timezone.utc),
+        )
+        activity, metrics = _build_activity_with_metrics(
+            db_session,
+            sample_ultimate_goal.id,
+            metric_specs=[
+                {
+                    'name': 'Duration',
+                    'unit': 'seconds',
+                    'fractal_metric': duration_metric,
+                    'is_multiplicative': False,
+                    'progress_aggregation': 'max',
+                    'is_best_set_metric': True,
+                },
+                {
+                    'name': 'Accuracy',
+                    'unit': 'score',
+                    'is_multiplicative': False,
+                    'progress_aggregation': 'max',
+                },
+            ],
+        )
+        prev_session = _build_session(
+            db_session,
+            sample_ultimate_goal.id,
+            'Previous Session',
+            datetime(2026, 4, 11, tzinfo=timezone.utc),
+        )
+        current_session = _build_session(
+            db_session,
+            sample_ultimate_goal.id,
+            'Current Session',
+            datetime(2026, 4, 12, tzinfo=timezone.utc),
+        )
+        _build_instance(
+            db_session,
+            root_id=sample_ultimate_goal.id,
+            session_id=prev_session.id,
+            activity_id=activity.id,
+            created_at=datetime(2026, 4, 11, 10, 0, tzinfo=timezone.utc),
+            values={},
+            data={
+                'sets': [
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 40}, {'metric_id': metrics[1].id, 'value': 70}]},
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 30}, {'metric_id': metrics[1].id, 'value': 75}]},
+                ],
+            },
+        )
+        current_instance = _build_instance(
+            db_session,
+            root_id=sample_ultimate_goal.id,
+            session_id=current_session.id,
+            activity_id=activity.id,
+            created_at=datetime(2026, 4, 12, 10, 0, tzinfo=timezone.utc),
+            values={},
+            data={
+                'sets': [
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 28}, {'metric_id': metrics[1].id, 'value': 82}]},
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 35}, {'metric_id': metrics[1].id, 'value': 78}]},
+                ],
+            },
+        )
+        db_session.commit()
+
+        result = ProgressService(db_session).compute_live_comparison(current_instance.id)
+
+        duration_comparison = next(item for item in result['metric_comparisons'] if item['metric_id'] == metrics[0].id)
+        accuracy_comparison = next(item for item in result['metric_comparisons'] if item['metric_id'] == metrics[1].id)
+
+        assert duration_comparison['current_value'] == 28.0
+        assert duration_comparison['previous_value'] == 30.0
+        assert duration_comparison['improved'] is True
+        assert len(duration_comparison['set_comparisons']) == 1
+        best_set_comparison = duration_comparison['set_comparisons'][0]
+        assert best_set_comparison['set_index'] == 0
+        assert best_set_comparison['comparison_basis'] == 'best_set'
+        assert best_set_comparison['previous_set_index'] == 1
+        assert best_set_comparison['current_value'] == 28.0
+        assert best_set_comparison['previous_value'] == 30.0
+        assert best_set_comparison['delta'] == -2.0
+        assert best_set_comparison['pct_change'] == pytest.approx(-6.7, abs=0.1)
+        assert best_set_comparison['improved'] is True
+        assert best_set_comparison['regressed'] is False
+        assert accuracy_comparison['current_value'] == 82.0
+        assert accuracy_comparison['previous_value'] == 75.0
+        assert accuracy_comparison['set_comparisons'][0]['set_index'] == 0

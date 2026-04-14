@@ -5,6 +5,7 @@ from models import _safe_load_json
 from .goal_type_utils import get_canonical_goal_type
 from .goal_domain_rules import goal_uses_child_completion
 from .session_runtime import get_template_color, get_template_session_type
+from .progress_service import serialize_progress_record
 
 def format_utc(dt):
     """Format a datetime or date object to ISO string with UTC indicator."""
@@ -173,7 +174,8 @@ def serialize_activity_instance(instance):
         "modes": modes,
         "mode_ids": [mode["id"] for mode in modes],
         "metric_values": metric_values_list,
-        "metrics": metric_values_list  # Frontend alias
+        "metrics": metric_values_list,  # Frontend alias
+        "progress_comparison": serialize_progress_record(instance.progress_record) if getattr(instance, 'progress_record', None) else None,
     }
 
 
@@ -255,6 +257,7 @@ def serialize_goal(goal, include_children=True):
             "associated_activity_ids": [a.id for a in goal.associated_activities] if goal.associated_activities else [],
             "associated_activity_group_ids": [g.id for g in goal.associated_activity_groups] if goal.associated_activity_groups else [],
             "session_id": goal.sessions[0].id if goal.sessions else None,
+            "progress_settings": getattr(goal, 'progress_settings', None),
         },
         "children": []
     }
@@ -560,6 +563,8 @@ def serialize_activity_definition(activity):
         "has_metrics": activity.has_metrics,
         "metrics_multiplicative": activity.metrics_multiplicative,
         "has_splits": activity.has_splits,
+        "track_progress": activity.track_progress,
+        "progress_aggregation": activity.progress_aggregation,
         "created_at": format_utc(activity.created_at),
         "metric_definitions": [serialize_metric_definition(m) for m in activity.metric_definitions if not m.deleted_at],
         "split_definitions": [serialize_split_definition(s) for s in activity.split_definitions if not s.deleted_at],
@@ -580,7 +585,7 @@ def serialize_metric_definition(metric):
         "name": name,
         "unit": unit,
         "is_active": metric.is_active,
-        "is_top_set_metric": metric.is_top_set_metric,
+        "is_best_set_metric": metric.is_best_set_metric,
         "is_multiplicative": is_multiplicative,
         "track_progress": metric.track_progress,
         "progress_aggregation": metric.progress_aggregation,

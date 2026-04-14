@@ -170,18 +170,78 @@ describe('ActivityBuilder', () => {
         fireEvent.change(screen.getByLabelText('Activity Name'), {
             target: { value: 'Scale Practice' },
         });
+        fireEvent.click(screen.getByLabelText('Track Sets'));
         fireEvent.change(screen.getByLabelText('Metric 1'), {
             target: { value: 'metric-fractal-1' },
+        });
+        fireEvent.click(screen.getAllByLabelText('Track Progress')[1]);
+        fireEvent.change(screen.getByLabelText('Compare by'), {
+            target: { value: 'sum' },
         });
 
         fireEvent.click(screen.getByRole('button', { name: 'Create Activity' }));
 
         await waitFor(() => {
             expect(mockCreateActivity).toHaveBeenCalledWith('root-1', expect.objectContaining({
+                track_progress: true,
+                progress_aggregation: 'sum',
                 metrics: [
                     expect.objectContaining({
-                        track_progress: true,
+                        track_progress: false,
                         progress_aggregation: null,
+                    }),
+                ],
+            }));
+        });
+    });
+
+    it('preserves existing per-metric progress settings when editing an activity', async () => {
+        render(
+            <ActivityBuilder
+                isOpen={true}
+                onClose={vi.fn()}
+                editingActivity={{
+                    id: 'activity-1',
+                    name: 'Scale Practice',
+                    description: '',
+                    has_sets: true,
+                    has_metrics: true,
+                    metrics_multiplicative: false,
+                    has_splits: false,
+                    group_id: null,
+                    associated_goal_ids: [],
+                    track_progress: true,
+                    progress_aggregation: 'max',
+                    metric_definitions: [
+                        {
+                            id: 'metric-1',
+                            fractal_metric_id: 'metric-fractal-1',
+                            name: 'Speed',
+                            unit: 'bpm',
+                            is_best_set_metric: true,
+                            track_progress: false,
+                            progress_aggregation: 'sum',
+                        },
+                    ],
+                    split_definitions: [],
+                }}
+                rootId="root-1"
+                onSave={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save Activity' }));
+
+        await waitFor(() => {
+            expect(mockUpdateActivity).toHaveBeenCalledWith('root-1', 'activity-1', expect.objectContaining({
+                track_progress: true,
+                progress_aggregation: 'max',
+                metrics: [
+                    expect.objectContaining({
+                        id: 'metric-1',
+                        track_progress: false,
+                        progress_aggregation: 'sum',
+                        is_best_set_metric: true,
                     }),
                 ],
             }));
@@ -243,6 +303,8 @@ describe('ActivityBuilder', () => {
                     has_splits: false,
                     group_id: null,
                     associated_goal_ids: [],
+                    track_progress: false,
+                    progress_aggregation: 'max',
                     metric_definitions: [
                         { id: undefined, name: 'Speed', unit: 'bpm' },
                     ],
@@ -261,6 +323,8 @@ describe('ActivityBuilder', () => {
         await waitFor(() => {
             expect(mockCreateActivity).toHaveBeenCalledWith('root-1', expect.objectContaining({
                 has_metrics: false,
+                track_progress: false,
+                progress_aggregation: 'max',
             }));
         });
 

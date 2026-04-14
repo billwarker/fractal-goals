@@ -81,6 +81,7 @@ class SessionService:
             selectinload(Session.activity_instances).selectinload(ActivityInstance.modes),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.progress_record),
             selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program),
             with_loader_criteria(ActivityInstance, ActivityInstance.deleted_at == None, include_aliases=True),
         )

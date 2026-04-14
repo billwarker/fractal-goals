@@ -41,4 +41,6 @@ export const fractalActivitiesApi = {
         axios.get(`${API_BASE}/${rootId}/activity-instances/${instanceId}/progress`),
     getActivityProgressHistory: (rootId, activityDefId, params = {}) =>
         axios.get(`${API_BASE}/${rootId}/activities/${activityDefId}/progress-history`, { params }),
+    recomputeAllProgress: (rootId) =>
+        axios.post(`${API_BASE}/${rootId}/progress/recompute-all`),
 };

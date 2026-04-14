@@ -725,12 +725,18 @@ def handle_activity_instance_completed(event: Event):
 @event_bus.on(Events.ACTIVITY_INSTANCE_DELETED)
 def handle_activity_instance_deleted(event: Event):
     """
-    When an activity instance is deleted, revert any targets achieved by it.
+    When an activity instance is deleted:
+    - revert any targets achieved by it
+    - recompute progress history so downstream records rebase against the next
+      available previous instance
     """
     instance_id = event.data.get('instance_id')
     if not instance_id:
         return
-        
+
+    activity_definition_id = event.data.get('activity_definition_id')
+    root_id = event.data.get('root_id')
+
     db_session, owns_session = _resolve_db_session(event)
     pending_events = []
     try:
@@ -742,6 +748,21 @@ def handle_activity_instance_deleted(event: Event):
         logger.exception(f"Error handling activity instance deletion: {e}")
     finally:
         _close_if_owned(db_session, owns_session)
+
+    if activity_definition_id and root_id:
+        recompute_db, owns_recompute = _resolve_db_session(event)
+        try:
+            ProgressService(recompute_db).recompute_progress_for_activity(activity_definition_id, root_id)
+            recompute_db.commit()
+        except Exception:
+            recompute_db.rollback()
+            logger.exception(
+                "Error recomputing progress after instance deletion: activity=%s root=%s",
+                activity_definition_id,
+                root_id,
+            )
+        finally:
+            _close_if_owned(recompute_db, owns_recompute)
 
 def _revert_achievements_for_instance(db_session, instance_id: str, pending_events=None):
     """Internal helper to find and revert targets tied to an instance."""

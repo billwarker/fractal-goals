@@ -586,6 +586,19 @@ class ActivityService:
             MetricDefinition.deleted_at.is_(None),
         ).scalar() or 0
 
+        progress_affecting_keys = {'higher_is_better', 'default_progress_aggregation', 'is_multiplicative'}
+        if progress_affecting_keys.intersection(data.keys()):
+            from services.progress_service import ProgressService
+            ps = ProgressService(self.db_session)
+            affected_activity_ids = [
+                row[0] for row in self.db_session.query(MetricDefinition.activity_id).filter(
+                    MetricDefinition.fractal_metric_id == metric_id,
+                    MetricDefinition.deleted_at.is_(None),
+                ).distinct().all()
+            ]
+            for activity_id in affected_activity_ids:
+                ps.recompute_progress_for_activity(activity_id, root_id)
+
         event_bus.emit(Event(Events.FRACTAL_METRIC_UPDATED, {
             'metric_id': metric.id,
             'name': metric.name,
@@ -1067,7 +1080,9 @@ class ActivityService:
             has_metrics=data.get('has_metrics', True),
             metrics_multiplicative=data.get('metrics_multiplicative', False),
             has_splits=data.get('has_splits', False),
-            group_id=group_id
+            group_id=group_id,
+            track_progress=data.get('track_progress', None),
+            progress_aggregation=data.get('progress_aggregation', None),
         )
         self.db_session.add(new_activity)
         self.db_session.flush() # Get ID
@@ -1082,7 +1097,7 @@ class ActivityService:
                     fractal_metric_id=m.get('fractal_metric_id'),
                     name=m['name'],
                     unit=m['unit'],
-                    is_top_set_metric=m.get('is_top_set_metric', False),
+                    is_best_set_metric=m.get('is_best_set_metric', False),
                     is_multiplicative=m.get('is_multiplicative', True),
                     track_progress=m.get('track_progress', True),
                     progress_aggregation=m.get('progress_aggregation'),
@@ -1140,6 +1155,10 @@ class ActivityService:
             activity.has_splits = data['has_splits']
         if 'group_id' in data:
             activity.group_id = data['group_id']
+        if 'track_progress' in data:
+            activity.track_progress = data['track_progress']
+        if 'progress_aggregation' in data:
+            activity.progress_aggregation = data['progress_aggregation']
 
         # Update metrics if provided
         if 'metrics' in data:
@@ -1160,7 +1179,7 @@ class ActivityService:
                         existing_metric.fractal_metric_id = m.get('fractal_metric_id')
                         existing_metric.name = m['name']
                         existing_metric.unit = m['unit']
-                        existing_metric.is_top_set_metric = m.get('is_top_set_metric', False)
+                        existing_metric.is_best_set_metric = m.get('is_best_set_metric', False)
                         existing_metric.is_multiplicative = m.get('is_multiplicative', True)
                         existing_metric.track_progress = m.get('track_progress', True)
                         existing_metric.progress_aggregation = m.get('progress_aggregation')
@@ -1176,7 +1195,7 @@ class ActivityService:
 
                         if matched_metric:
                             matched_metric.fractal_metric_id = m.get('fractal_metric_id')
-                            matched_metric.is_top_set_metric = m.get('is_top_set_metric', False)
+                            matched_metric.is_best_set_metric = m.get('is_best_set_metric', False)
                             matched_metric.is_multiplicative = m.get('is_multiplicative', True)
                             matched_metric.track_progress = m.get('track_progress', True)
                             matched_metric.progress_aggregation = m.get('progress_aggregation')
@@ -1188,7 +1207,7 @@ class ActivityService:
                                 fractal_metric_id=m.get('fractal_metric_id'),
                                 name=m['name'],
                                 unit=m['unit'],
-                                is_top_set_metric=m.get('is_top_set_metric', False),
+                                is_best_set_metric=m.get('is_best_set_metric', False),
                                 is_multiplicative=m.get('is_multiplicative', True),
                                 track_progress=m.get('track_progress', True),
                                 progress_aggregation=m.get('progress_aggregation'),
@@ -1240,6 +1259,11 @@ class ActivityService:
         self.db_session.refresh(activity)
         if 'goal_ids' in data:
             self.db_session.expire(activity, ['associated_goals'])
+
+        progress_affecting_keys = {'track_progress', 'progress_aggregation', 'metrics'}
+        if progress_affecting_keys.intersection(data.keys()):
+            from services.progress_service import ProgressService
+            ProgressService(self.db_session).recompute_progress_for_activity(activity.id, root_id)
 
         event_bus.emit(Event(Events.ACTIVITY_UPDATED, {
             'activity_id': activity.id,

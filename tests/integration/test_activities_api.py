@@ -283,7 +283,7 @@ class TestActivities:
             'group_id': sample_activity_group.id,
             'has_sets': True,
             'metrics': [
-                {'name': 'Weight', 'unit': 'lbs', 'is_top_set_metric': True},
+                {'name': 'Weight', 'unit': 'lbs', 'is_best_set_metric': True},
                 {'name': 'Reps', 'unit': 'count'}
             ],
             'has_splits': True,

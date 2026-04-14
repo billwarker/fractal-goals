@@ -46,7 +46,7 @@ describe('buildActivityPayload', () => {
             fractal_metric_id: { id: 'metric-lib-1' },
             name: ' Weight ',
             unit: ' lbs ',
-            is_top_set_metric: true,
+            is_best_set_metric: true,
             is_multiplicative: false,
         };
         cyclicMetric.self = cyclicMetric;
@@ -72,8 +72,10 @@ describe('buildActivityPayload', () => {
                 fractal_metric_id: 'metric-lib-1',
                 name: 'Weight',
                 unit: 'lbs',
-                is_top_set_metric: true,
+                is_best_set_metric: true,
                 is_multiplicative: false,
+                track_progress: true,
+                progress_aggregation: null,
             }],
             splits: [{
                 id: 'split-1',
@@ -85,6 +87,8 @@ describe('buildActivityPayload', () => {
             has_splits: true,
             group_id: 'group-1',
             goal_ids: ['goal-1', 'goal-2'],
+            track_progress: true,
+            progress_aggregation: null,
         });
     });
 });
@@ -106,8 +110,18 @@ describe('prepareActivityDefinitionCopy', () => {
             metrics_multiplicative: false,
             has_splits: true,
             group_id: { id: 'group-1' },
+            track_progress: false,
+            progress_aggregation: 'max',
             associated_goal_ids: ['goal-1'],
-            metric_definitions: [{ id: 'metric-1', name: 'Speed', unit: 'bpm' }],
+            metric_definitions: [{
+                id: 'metric-1',
+                name: 'Speed',
+                unit: 'bpm',
+                is_best_set_metric: true,
+                is_multiplicative: false,
+                track_progress: false,
+                progress_aggregation: 'sum',
+            }],
             split_definitions: [{ id: 'split-1', name: 'Left Hand' }],
         };
 
@@ -123,13 +137,17 @@ describe('prepareActivityDefinitionCopy', () => {
             metrics_multiplicative: false,
             has_splits: true,
             group_id: 'group-1',
+            track_progress: false,
+            progress_aggregation: 'max',
             associated_goal_ids: ['goal-1'],
             metric_definitions: [{
                 id: undefined,
                 name: 'Speed',
                 unit: 'bpm',
-                is_top_set_metric: false,
-                is_multiplicative: true,
+                is_best_set_metric: true,
+                is_multiplicative: false,
+                track_progress: false,
+                progress_aggregation: 'sum',
             }],
             split_definitions: [{ id: undefined, name: 'Left Hand' }],
         });

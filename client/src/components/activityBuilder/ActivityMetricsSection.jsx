@@ -58,19 +58,13 @@ function ActivityMetricsSection({
     rootId,
     metrics,
     hasSets,
+    activityProgressAggregation,
     onAddMetric,
     onRemoveMetric,
     onMetricChange,
 }) {
     const { fractalMetrics = [] } = useFractalMetrics(rootId);
     const [showCreator, setShowCreator] = useState(false);
-    const multiplicativeMetricCount = metrics.filter((candidate) => {
-        const linkedMetric = fractalMetrics.find((m) => m.id === candidate.fractal_metric_id);
-        if (linkedMetric) {
-            return linkedMetric.is_multiplicative;
-        }
-        return candidate?.is_multiplicative !== false;
-    }).length;
 
     const handleSelectMetric = (idx, fractalMetricId) => {
         if (fractalMetricId === '__create__') {
@@ -95,7 +89,7 @@ function ActivityMetricsSection({
             onMetricChange(emptyIdx, 'unit', newMetric.unit);
             onMetricChange(emptyIdx, 'is_multiplicative', newMetric.is_multiplicative);
         } else if (metrics.length < 3) {
-            onAddMetric({ fractal_metric_id: newMetric.id, name: newMetric.name, unit: newMetric.unit, is_multiplicative: newMetric.is_multiplicative, is_top_set_metric: false });
+            onAddMetric({ fractal_metric_id: newMetric.id, name: newMetric.name, unit: newMetric.unit, is_multiplicative: newMetric.is_multiplicative, is_best_set_metric: false });
         }
     };
 
@@ -107,15 +101,10 @@ function ActivityMetricsSection({
             <div className={styles.metricsList}>
                 {metrics.map((metric, idx) => {
                     const linked = fractalMetrics.find((m) => m.id === metric.fractal_metric_id);
-                    const effectiveAggregation = (
-                        metric.progress_aggregation
-                        || linked?.default_progress_aggregation
-                        || 'last'
-                    );
-                    const metricIsMultiplicative = linked
-                        ? linked.is_multiplicative
-                        : metric?.is_multiplicative !== false;
-                    const isYieldAvailable = hasSets && metricIsMultiplicative && multiplicativeMetricCount >= 2;
+                    const metricTracksProgress = metric.track_progress !== false;
+                    const metricAggregation = metric.progress_aggregation || '';
+                    const usesMultiplicativeMath = linked?.is_multiplicative ?? (metric.is_multiplicative !== false);
+                    const isAdditive = linked?.is_additive !== false;
                     return (
                         <div key={idx} className={styles.metricCard}>
                             <div className={styles.metricRow}>
@@ -149,55 +138,58 @@ function ActivityMetricsSection({
                                 <div className={metricStyles.metricMeta}>
                                     {linked.is_multiplicative && <span className={metricStyles.metaBadgeMultiplicative}>Multiplicative</span>}
                                     {linked.is_additive && <span className={metricStyles.metaBadgeAdditive}>Additive</span>}
+                                    {linked.higher_is_better === false
+                                        ? <span className={metricStyles.metaBadge}>Lower is better</span>
+                                        : <span className={metricStyles.metaBadge}>Higher is better</span>}
                                     {linked.input_type !== 'number' && <span className={metricStyles.metaBadge}>{linked.input_type}</span>}
                                     {linked.description && <span className={metricStyles.metaDesc}>{linked.description}</span>}
                                 </div>
                             )}
 
-                            <div className={styles.metricFlags}>
-                                {hasSets && (
+                            <div className={metricStyles.progressTrackingSection}>
+                                <div className={styles.metricFlags}>
                                     <Checkbox
-                                        label="Top Set Metric"
-                                        checked={metric.is_top_set_metric || false}
-                                        onChange={(e) => onMetricChange(idx, 'is_top_set_metric', e.target.checked)}
+                                        label="Track Progress"
+                                        checked={metricTracksProgress}
+                                        onChange={(e) => onMetricChange(idx, 'track_progress', e.target.checked)}
                                         className={styles.subFlagLabel}
                                     />
-                                )}
-                                <Checkbox
-                                    label="Track progress"
-                                    checked={metric.track_progress !== false}
-                                    onChange={(e) => onMetricChange(idx, 'track_progress', e.target.checked)}
-                                    className={styles.subFlagLabel}
-                                />
-                            </div>
-
-                            {metric.track_progress !== false && (
-                                <div className={metricStyles.progressTrackingSection}>
-                                    <div className={metricStyles.progressTrackingRow}>
-                                        <label className={metricStyles.progressTrackingLabel}>Compare by</label>
-                                        <select
-                                            className={metricStyles.progressAggregationSelect}
-                                            value={effectiveAggregation}
-                                            onChange={(e) => onMetricChange(idx, 'progress_aggregation', e.target.value)}
-                                        >
-                                            <option value="last">Last value</option>
-                                            {hasSets && <option value="sum">Sum across sets</option>}
-                                            {hasSets && <option value="max">Best set</option>}
-                                            {(isYieldAvailable || effectiveAggregation === 'yield') && (
-                                                <option value="yield" disabled={!isYieldAvailable}>
-                                                    {isYieldAvailable ? 'Yield (×)' : 'Yield (requires 2 multiplicative metrics)'}
-                                                </option>
-                                            )}
-                                        </select>
-                                    </div>
-                                    <div className={metricStyles.progressTrackingPreview}>
-                                        {effectiveAggregation === 'last' && 'Compares last recorded value'}
-                                        {effectiveAggregation === 'sum' && 'Compares total across all sets'}
-                                        {effectiveAggregation === 'max' && 'Compares best set value'}
-                                        {effectiveAggregation === 'yield' && 'Compares combined yield across multiplicative metrics'}
-                                    </div>
                                 </div>
-                            )}
+
+                                {hasSets && (
+                                    <div className={styles.metricFlags}>
+                                        <Checkbox
+                                            label="Best Set Metric"
+                                            checked={metric.is_best_set_metric || false}
+                                            onChange={(e) => onMetricChange(idx, 'is_best_set_metric', e.target.checked)}
+                                            className={styles.subFlagLabel}
+                                        />
+                                    </div>
+                                )}
+
+                                <div className={metricStyles.progressTrackingRow}>
+                                    <span className={metricStyles.progressTrackingLabel}>Compare by</span>
+                                    <select
+                                        className={metricStyles.progressAggregationSelect}
+                                        value={metricAggregation}
+                                        onChange={(e) => onMetricChange(idx, 'progress_aggregation', e.target.value || null)}
+                                        aria-label={`Metric ${idx + 1} compare by`}
+                                        disabled={!metricTracksProgress}
+                                    >
+                                        <option value="">Use activity default ({activityProgressAggregation || 'last'})</option>
+                                        <option value="last">Last value</option>
+                                        {hasSets && isAdditive && <option value="sum">Sum across sets</option>}
+                                        {hasSets && <option value="max">Best set</option>}
+                                        {hasSets && usesMultiplicativeMath && <option value="yield">Yield (x)</option>}
+                                    </select>
+                                </div>
+
+                                <div className={metricStyles.progressTrackingPreview}>
+                                    {metricTracksProgress
+                                        ? `Resolved method: ${metricAggregation || activityProgressAggregation || 'last'}`
+                                        : 'Progress comparisons disabled for this metric'}
+                                </div>
+                            </div>
                         </div>
                     );
                 })}
@@ -226,6 +218,7 @@ ActivityMetricsSection.propTypes = {
     rootId: PropTypes.string.isRequired,
     metrics: PropTypes.array.isRequired,
     hasSets: PropTypes.bool,
+    activityProgressAggregation: PropTypes.string,
     onAddMetric: PropTypes.func.isRequired,
     onRemoveMetric: PropTypes.func.isRequired,
     onMetricChange: PropTypes.func.isRequired,

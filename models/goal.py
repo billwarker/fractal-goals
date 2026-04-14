@@ -135,6 +135,7 @@ class Goal(Base):
     frozen = Column(Boolean, default=False)
     frozen_at = Column(DateTime, nullable=True)
     targets = Column(JSON_TYPE, nullable=True) # Legacy JSON column
+    progress_settings = Column(JSON_TYPE, nullable=True)  # Root-level progress config (ignored on non-root goals)
     
     __table_args__ = (
         sa.Index('ix_goals_root_deleted_level', 'root_id', 'deleted_at', 'level_id'),

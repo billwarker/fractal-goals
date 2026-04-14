@@ -205,8 +205,47 @@ function LineGraph({
         }
     };
 
-    // Find the metric designated as the "top set" metric
-    const topSetMetric = metrics.find(m => m.is_top_set_metric) || metrics[0];
+    // Find the metric designated as the "best set" metric
+    const bestSetMetric = metrics.find(m => m.is_best_set_metric) || metrics[0];
+
+    const getBestSetIndex = React.useCallback((sets) => {
+        if (!Array.isArray(sets) || !bestSetMetric) {
+            return -1;
+        }
+
+        const higherIsBetter = bestSetMetric.higher_is_better !== false;
+        let topSetIndex = -1;
+        let topSetValue = null;
+
+        sets.forEach((set, setIdx) => {
+            if (!set.metrics) {
+                return;
+            }
+
+            const metricValue = set.metrics.find(m =>
+                m.metric_id === bestSetMetric.id && shouldIncludeMetric(m)
+            );
+            if (!metricValue || !metricValue.value) {
+                return;
+            }
+
+            const value = parseFloat(metricValue.value);
+            if (Number.isNaN(value)) {
+                return;
+            }
+
+            if (
+                topSetValue === null
+                || (higherIsBetter && value > topSetValue)
+                || (!higherIsBetter && value < topSetValue)
+            ) {
+                topSetValue = value;
+                topSetIndex = setIdx;
+            }
+        });
+
+        return topSetIndex;
+    }, [bestSetMetric, shouldIncludeMetric]);
 
     // Collect data points with timestamps for both Y1 and Y2
     const collectDataPoints = (metricToPlot, isProductMetric) => {
@@ -222,27 +261,9 @@ function LineGraph({
             // For activities with sets
             if (instance.has_sets && instance.sets) {
                 if (setsHandling === 'top') {
-                    // Find the top set based on the designated top_set_metric
-                    let topSetIndex = -1;
-                    let topSetValue = -Infinity;
+                    const topSetIndex = getBestSetIndex(instance.sets);
 
-                    instance.sets.forEach((set, setIdx) => {
-                        if (set.metrics) {
-                            const metricValue = set.metrics.find(m =>
-                                m.metric_id === (isProductMetric ? topSetMetric.id : metricToPlot.id) &&
-                                shouldIncludeMetric(m)
-                            );
-                            if (metricValue && metricValue.value) {
-                                const value = parseFloat(metricValue.value);
-                                if (value > topSetValue) {
-                                    topSetValue = value;
-                                    topSetIndex = setIdx;
-                                }
-                            }
-                        }
-                    });
-
-                    // Now get the value from the top set
+                    // Now get the value from the best set selected by the anchor metric
                     if (topSetIndex >= 0) {
                         const topSet = instance.sets[topSetIndex];
                         const value = extractMetricValue(topSet.metrics, metricToPlot, isProductMetric);

@@ -641,8 +641,6 @@ def get_activity_instance_progress(current_user, root_id, instance_id):
 
         service = ProgressService(session)
         result = service.get_progress_for_instance(instance.id)
-        if result is None:
-            return jsonify({"error": "Activity instance not found"}), 404
         return jsonify(result)
     except SQLAlchemyError:
         session.rollback()
@@ -685,6 +683,33 @@ def get_activity_progress_history(current_user, root_id, activity_def_id):
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error getting activity progress history")
+        return internal_error(logger, "Activity API request failed")
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/progress/recompute-all', methods=['POST'])
+@token_required
+def recompute_all_progress(current_user, root_id):
+    """Bulk recompute all progress records for a root goal.
+
+    Deletes and rebuilds ProgressRecords for every activity definition
+    in the root. Returns the count of activity definitions processed.
+    """
+    session = get_db_session()
+    try:
+        root = require_owned_root(session, root_id, current_user.id)
+        if not root:
+            return jsonify({'error': 'Root goal not found'}), 404
+
+        service = ProgressService(session)
+        result = service.recompute_progress_for_root(root_id)
+        session.commit()
+        return jsonify(result), 200
+
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Error during bulk progress recompute")
         return internal_error(logger, "Activity API request failed")
     finally:
         session.close()

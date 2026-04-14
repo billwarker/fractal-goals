@@ -3,11 +3,12 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useGoals } from '../../contexts/GoalsContext';
-import { authApi } from '../../utils/api';
+import { authApi, fractalApi } from '../../utils/api';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import GoalCharacteristicsSettings from '../GoalCharacteristicsSettings';
 import useIsMobile from '../../hooks/useIsMobile';
+import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
 import styles from './SettingsModal.module.css';
 
 function getAvailableTimezones() {
@@ -34,6 +35,48 @@ const SettingsModalInner = ({ onClose }) => {
     const { activeRootId } = useGoals();
     const isMobile = useIsMobile();
     const [availableTimezones] = useState(getAvailableTimezones);
+    const [recomputeLoading, setRecomputeLoading] = useState(false);
+
+    const { progressSettings, updateProgressSettings } = useRootProgressSettings(activeRootId);
+    const progressEnabled = progressSettings?.enabled !== false;
+    const progressDefaultAggregation = progressSettings?.default_aggregation ?? '';
+
+    const handleProgressEnabledToggle = async (e) => {
+        try {
+            await updateProgressSettings({ ...(progressSettings || {}), enabled: e.target.checked });
+        } catch (err) {
+            notify.error(`Failed to update progress settings: ${formatError(err)}`);
+        }
+    };
+
+    const handleProgressDefaultAggregation = async (e) => {
+        const value = e.target.value || null;
+        try {
+            await updateProgressSettings({ ...(progressSettings || {}), default_aggregation: value });
+        } catch (err) {
+            notify.error(`Failed to update progress settings: ${formatError(err)}`);
+        }
+    };
+
+    const handleRecomputeAll = async () => {
+        if (!activeRootId) return;
+        setRecomputeLoading(true);
+        try {
+            const res = await fractalApi.recomputeAllProgress(activeRootId);
+            const failedCount = Array.isArray(res?.data?.failed) ? res.data.failed.length : 0;
+            if (failedCount > 0) {
+                notify.error(
+                    `Progress recalculated for ${res.data.recomputed} activities, ${failedCount} failed`
+                );
+            } else {
+                notify.success(`Progress recalculated for ${res.data.recomputed} activities`);
+            }
+        } catch (err) {
+            notify.error(`Failed to recalculate progress: ${formatError(err)}`);
+        } finally {
+            setRecomputeLoading(false);
+        }
+    };
 
     const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '' });
     const [emailData, setEmailData] = useState({ email: '', password: '' });
@@ -206,6 +249,65 @@ const SettingsModalInner = ({ onClose }) => {
                                         </label>
                                     </div>
                                 </section>
+
+                                {activeRootId && (
+                                    <section>
+                                        <h3 className={styles.sectionTitle}>
+                                            Progress Tracking
+                                        </h3>
+                                        <div className={styles.sectionContentStack}>
+                                            <div className={styles.checkboxRow}>
+                                                <input
+                                                    type="checkbox"
+                                                    id="progress-enabled-toggle"
+                                                    checked={progressEnabled}
+                                                    onChange={handleProgressEnabledToggle}
+                                                    className={styles.checkboxInput}
+                                                />
+                                                <label htmlFor="progress-enabled-toggle" className={styles.checkboxLabel}>
+                                                    Enable progress comparisons
+                                                    <span className={styles.checkboxDescription}>
+                                                        When disabled, no progress comparisons are computed for this fractal
+                                                    </span>
+                                                </label>
+                                            </div>
+
+                                            <div className={styles.themeRow}>
+                                                <label className={styles.checkboxLabel} style={{ marginBottom: 4 }}>
+                                                    Default comparison method
+                                                    <span className={styles.checkboxDescription}>
+                                                        Used for new metrics that don&apos;t have a specific method configured
+                                                    </span>
+                                                </label>
+                                                <select
+                                                    value={progressDefaultAggregation}
+                                                    onChange={handleProgressDefaultAggregation}
+                                                    className={styles.selectInput}
+                                                    disabled={!progressEnabled}
+                                                >
+                                                    <option value="">Not set (use per-metric defaults)</option>
+                                                    <option value="last">Last value</option>
+                                                    <option value="sum">Sum across sets</option>
+                                                    <option value="max">Best set</option>
+                                                    <option value="yield">Yield (volume)</option>
+                                                </select>
+                                            </div>
+
+                                            <div className={styles.themeRow}>
+                                                <button
+                                                    onClick={handleRecomputeAll}
+                                                    disabled={recomputeLoading || !progressEnabled}
+                                                    className={styles.secondaryButton}
+                                                >
+                                                    {recomputeLoading ? 'Recalculating…' : 'Recalculate All Progress'}
+                                                </button>
+                                                <span className={styles.checkboxDescription} style={{ marginTop: 4 }}>
+                                                    Rebuilds all progress records from scratch using current activity data
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </section>
+                                )}
                             </div>
                         )}
 

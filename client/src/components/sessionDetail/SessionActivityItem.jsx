@@ -55,6 +55,44 @@ function formatInlineProgressValue(comparison) {
 
 const MAX_VISIBLE_MODE_BADGES = 2;
 
+function getBestSetIndexes(sets, anchorMetricId, higherIsBetter, getMetricValue) {
+    if (!Array.isArray(sets) || !anchorMetricId) {
+        return [];
+    }
+
+    let bestValue = null;
+    const bestIndexes = [];
+
+    sets.forEach((set, setIndex) => {
+        const rawValue = getMetricValue(set.metrics, anchorMetricId);
+        if (rawValue == null || String(rawValue).trim() === '') {
+            return;
+        }
+
+        const numericValue = Number(rawValue);
+        if (Number.isNaN(numericValue)) {
+            return;
+        }
+
+        if (
+            bestValue == null
+            || (higherIsBetter && numericValue > bestValue)
+            || (!higherIsBetter && numericValue < bestValue)
+        ) {
+            bestValue = numericValue;
+            bestIndexes.length = 0;
+            bestIndexes.push(setIndex);
+            return;
+        }
+
+        if (numericValue === bestValue) {
+            bestIndexes.push(setIndex);
+        }
+    });
+
+    return bestIndexes;
+}
+
 function buildEmptySet(definition, hasSplits) {
     if (!Array.isArray(definition?.metric_definitions)) {
         return { instance_id: crypto.randomUUID(), completed: false, metrics: [] };
@@ -330,10 +368,16 @@ function SessionActivityItem({
             }
 
             if (aggregation === 'max') {
-                const maxValue = Math.max(...presentSetValues.map((entry) => entry.value));
+                const anchorMetric = (def.metric_definitions || []).find((candidate) => candidate.is_best_set_metric) || metric;
+                const bestIndexes = getBestSetIndexes(
+                    exercise.sets,
+                    anchorMetric?.id,
+                    anchorMetric?.higher_is_better !== false,
+                    getMetricValue
+                );
                 visibilityMap.set(
                     metric.id,
-                    new Set(presentSetValues.filter((entry) => entry.value === maxValue).map((entry) => entry.setIndex))
+                    new Set(bestIndexes)
                 );
                 continue;
             }

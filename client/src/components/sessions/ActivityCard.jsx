@@ -19,6 +19,69 @@ function getMetricInfo(metricId, activityDefinition) {
     return metric || { name: '', unit: '' };
 }
 
+function formatProgressValue(comparison) {
+    if (!comparison) return null;
+    if (comparison.pct_change != null) {
+        const magnitude = Math.abs(comparison.pct_change);
+        const formatted = Number.isInteger(magnitude) ? String(magnitude) : magnitude.toFixed(1).replace(/\.0$/, '');
+        if (comparison.improved) return `▲${formatted}%`;
+        if (comparison.regressed) return `▼${formatted}%`;
+        return '0%';
+    }
+    if (comparison.delta == null) return null;
+    const delta = Number(comparison.delta);
+    const magnitude = Math.abs(delta);
+    const formatted = Number.isInteger(magnitude) ? String(magnitude) : magnitude.toFixed(1).replace(/\.0$/, '');
+    if (delta > 0) return `+${formatted}`;
+    if (delta < 0) return `-${formatted}`;
+    return '0';
+}
+
+function ProgressHint({ metricId, setIndex = null, progressComparison }) {
+    if (!progressComparison || progressComparison.is_first_instance) return null;
+
+    const metricComp = progressComparison.metric_comparisons?.find(
+        (mc) => mc.metric_id === metricId
+    );
+    if (!metricComp) return null;
+
+    // For set rows: prefer per-set data, fall back to aggregate on all sets
+    if (setIndex != null) {
+        const setComps = metricComp.set_comparisons;
+        if (Array.isArray(setComps) && setComps.length > 0) {
+            const setComp = setComps.find((sc) => sc.set_index === setIndex);
+            if (!setComp || setComp.previous_value == null) return null;
+            const value = formatProgressValue(setComp);
+            if (!value) return null;
+            const cls = setComp.improved
+                ? styles.progressHintImproved
+                : setComp.regressed
+                    ? styles.progressHintRegressed
+                    : styles.progressHintNeutral;
+            return <span className={`${styles.progressHint} ${cls}`}>({value})</span>;
+        }
+        // No per-set data (older record) — show aggregate hint on every set row
+        const value = formatProgressValue(metricComp);
+        if (!value) return null;
+        const cls = metricComp.improved
+            ? styles.progressHintImproved
+            : metricComp.regressed
+                ? styles.progressHintRegressed
+                : styles.progressHintNeutral;
+        return <span className={`${styles.progressHint} ${cls}`}>({value})</span>;
+    }
+
+    // Single metric (no sets)
+    const value = formatProgressValue(metricComp);
+    if (!value) return null;
+    const cls = metricComp.improved
+        ? styles.progressHintImproved
+        : metricComp.regressed
+            ? styles.progressHintRegressed
+            : styles.progressHintNeutral;
+    return <span className={`${styles.progressHint} ${cls}`}>({value})</span>;
+}
+
 /**
  * Helper to get split definition info
  */
@@ -31,7 +94,7 @@ function getSplitInfo(splitId, activityDefinition) {
 /**
  * Renders a single set with metrics
  */
-function SetRow({ set, setIdx, activityDefinition, hasSplits }) {
+function SetRow({ set, setIdx, activityDefinition, hasSplits, progressComparison }) {
     const metricsToDisplay = useMemo(() => {
         return set.metrics?.filter(m => {
             const mInfo = getMetricInfo(m.metric_id, activityDefinition);
@@ -70,6 +133,11 @@ function SetRow({ set, setIdx, activityDefinition, hasSplits }) {
                                             <div key={m.metric_id} className={styles.metricItem}>
                                                 <span className={styles.metricName}>{mInfo.name}:</span>
                                                 <span className={styles.metricValue}>{m.value} {mInfo.unit}</span>
+                                                <ProgressHint
+                                                    metricId={m.metric_id}
+                                                    setIndex={setIdx}
+                                                    progressComparison={progressComparison}
+                                                />
                                             </div>
                                         );
                                     })}
@@ -92,6 +160,11 @@ function SetRow({ set, setIdx, activityDefinition, hasSplits }) {
                     <div key={m.metric_id} className={styles.metricItem}>
                         <span className={styles.metricName}>{mInfo.name}:</span>
                         <span className={styles.metricValue}>{m.value} {mInfo.unit}</span>
+                        <ProgressHint
+                            metricId={m.metric_id}
+                            setIndex={setIdx}
+                            progressComparison={progressComparison}
+                        />
                     </div>
                 );
             })}
@@ -102,7 +175,7 @@ function SetRow({ set, setIdx, activityDefinition, hasSplits }) {
 /**
  * Renders single metrics (no sets)
  */
-function SingleMetrics({ activity, activityDefinition }) {
+function SingleMetrics({ activity, activityDefinition, progressComparison }) {
     const hasSplits = activityDefinition?.has_splits && activityDefinition?.split_definitions?.length > 0;
 
     const filteredMetrics = useMemo(() => {
@@ -128,6 +201,10 @@ function SingleMetrics({ activity, activityDefinition }) {
                             {sInfo.name ? `${sInfo.name} - ${mInfo.name}` : mInfo.name}:
                         </span>
                         <span className={styles.metricValue}>{m.value} {mInfo.unit}</span>
+                        <ProgressHint
+                            metricId={m.metric_id}
+                            progressComparison={progressComparison}
+                        />
                     </div>
                 );
             })}
@@ -145,6 +222,7 @@ const ActivityCard = memo(function ActivityCard({
     const hasSplits = activityDefinition?.has_splits && activityDefinition?.split_definitions?.length > 0;
     const isActivity = activity.type === 'activity';
     const hasSets = activity.has_sets ?? Boolean(activity.sets?.length);
+    const progressComparison = activity.progress_comparison || null;
 
     return (
         <div className={`${styles.activityCard} ${isActivity ? styles.activityCardInstance : ''}`}>
@@ -182,6 +260,7 @@ const ActivityCard = memo(function ActivityCard({
                                             setIdx={setIdx}
                                             activityDefinition={activityDefinition}
                                             hasSplits={hasSplits}
+                                            progressComparison={progressComparison}
                                         />
                                     ))}
                                 </div>
@@ -192,6 +271,7 @@ const ActivityCard = memo(function ActivityCard({
                                 <SingleMetrics
                                     activity={activity}
                                     activityDefinition={activityDefinition}
+                                    progressComparison={progressComparison}
                                 />
                             )}
                         </div>

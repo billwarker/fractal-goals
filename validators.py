@@ -402,6 +402,7 @@ class GoalUpdateSchema(BaseModel):
     inherit_parent_activities: Optional[bool] = None
     allow_manual_completion: Optional[bool] = None
     track_activities: Optional[bool] = None
+    progress_settings: Optional[Dict[str, Any]] = None
     
     @field_validator('name')
     @classmethod
@@ -435,6 +436,46 @@ class GoalUpdateSchema(BaseModel):
             return v
         except ValueError:
             raise ValueError("Invalid deadline format. Use YYYY-MM-DD")
+
+    @field_validator('progress_settings')
+    @classmethod
+    def validate_progress_settings(cls, v: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if v is None:
+            return None
+        if not isinstance(v, dict):
+            raise ValueError("progress_settings must be an object")
+
+        allowed_keys = {'enabled', 'default_aggregation'}
+        unknown_keys = sorted(set(v.keys()) - allowed_keys)
+        if unknown_keys:
+            raise ValueError(
+                "progress_settings only supports: " + ', '.join(sorted(allowed_keys))
+            )
+
+        normalized: Dict[str, Any] = {}
+
+        if 'enabled' in v:
+            enabled = v.get('enabled')
+            if not isinstance(enabled, bool):
+                raise ValueError("progress_settings.enabled must be a boolean")
+            normalized['enabled'] = enabled
+
+        if 'default_aggregation' in v:
+            default_aggregation = v.get('default_aggregation')
+            if default_aggregation in (None, ''):
+                normalized['default_aggregation'] = None
+            elif isinstance(default_aggregation, str):
+                candidate = default_aggregation.strip().lower()
+                if candidate not in VALID_PROGRESS_AGGREGATIONS:
+                    raise ValueError(
+                        "progress_settings.default_aggregation must be one of: "
+                        + ', '.join(sorted(VALID_PROGRESS_AGGREGATIONS))
+                    )
+                normalized['default_aggregation'] = candidate
+            else:
+                raise ValueError("progress_settings.default_aggregation must be a string or null")
+
+        return normalized
 
 
 class GoalCompletionUpdateSchema(BaseModel):
@@ -702,10 +743,25 @@ class MetricDefinitionSchema(BaseModel):
     id: Optional[str] = None
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     unit: Optional[str] = Field(None, max_length=50)
-    is_top_set_metric: Optional[bool] = False
+    is_best_set_metric: Optional[bool] = False
     is_multiplicative: Optional[bool] = True
+    track_progress: Optional[bool] = True
+    progress_aggregation: Optional[str] = None
     is_active: Optional[bool] = True
     sort_order: Optional[int] = Field(None, ge=0)
+
+    @field_validator('progress_aggregation')
+    @classmethod
+    def validate_progress_aggregation(cls, v: Optional[str]) -> Optional[str]:
+        if v in (None, ''):
+            return None
+        candidate = v.strip().lower()
+        if candidate not in VALID_PROGRESS_AGGREGATIONS:
+            raise ValueError(
+                "progress_aggregation must be one of: "
+                + ', '.join(sorted(VALID_PROGRESS_AGGREGATIONS))
+            )
+        return candidate
 
 
 class SplitDefinitionSchema(BaseModel):
@@ -729,17 +785,32 @@ class ActivityDefinitionCreateSchema(BaseModel):
     metrics: Optional[List[Dict[str, Any]]] = None
     splits: Optional[List[Dict[str, Any]]] = None
     goal_ids: Optional[List[str]] = None
-    
+    track_progress: Optional[bool] = None
+    progress_aggregation: Optional[str] = None
+
     @field_validator('name')
     @classmethod
     def sanitize_name(cls, v: str) -> str:
         return sanitize_string(v)
 
+    @field_validator('progress_aggregation')
+    @classmethod
+    def validate_progress_aggregation(cls, v: Optional[str]) -> Optional[str]:
+        if v in (None, ''):
+            return None
+        candidate = v.strip().lower()
+        if candidate not in VALID_PROGRESS_AGGREGATIONS:
+            raise ValueError(
+                "progress_aggregation must be one of: "
+                + ', '.join(sorted(VALID_PROGRESS_AGGREGATIONS))
+            )
+        return candidate
+
 
 class ActivityDefinitionUpdateSchema(BaseModel):
     """Schema for updating an activity definition."""
     model_config = ConfigDict(str_strip_whitespace=True)
-    
+
     name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     group_id: Optional[str] = None
@@ -750,6 +821,21 @@ class ActivityDefinitionUpdateSchema(BaseModel):
     metrics: Optional[List[Dict[str, Any]]] = None
     splits: Optional[List[Dict[str, Any]]] = None
     goal_ids: Optional[List[str]] = None
+    track_progress: Optional[bool] = None
+    progress_aggregation: Optional[str] = None
+
+    @field_validator('progress_aggregation')
+    @classmethod
+    def validate_progress_aggregation(cls, v: Optional[str]) -> Optional[str]:
+        if v in (None, ''):
+            return None
+        candidate = v.strip().lower()
+        if candidate not in VALID_PROGRESS_AGGREGATIONS:
+            raise ValueError(
+                "progress_aggregation must be one of: "
+                + ', '.join(sorted(VALID_PROGRESS_AGGREGATIONS))
+            )
+        return candidate
 
 
 class ActivityGoalsSetSchema(BaseModel):

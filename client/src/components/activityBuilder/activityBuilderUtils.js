@@ -1,8 +1,10 @@
 export const DEFAULT_METRIC = {
     name: '',
     unit: '',
-    is_top_set_metric: false,
+    is_best_set_metric: false,
     is_multiplicative: true,
+    track_progress: true,
+    progress_aggregation: null,
 };
 
 export const DEFAULT_SPLITS = [
@@ -138,6 +140,8 @@ export function getInitialActivityBuilderState(editingActivity) {
             splits: DEFAULT_SPLITS,
             groupId: '',
             selectedGoalIds: [],
+            trackProgress: true,
+            progressAggregation: 'last',
         };
     }
 
@@ -153,8 +157,10 @@ export function getInitialActivityBuilderState(editingActivity) {
                 fractal_metric_id: metric.fractal_metric_id || null,
                 name: metric.name,
                 unit: metric.unit,
-                is_top_set_metric: metric.is_top_set_metric || false,
+                is_best_set_metric: metric.is_best_set_metric || false,
                 is_multiplicative: metric.is_multiplicative !== undefined ? metric.is_multiplicative : true,
+                track_progress: metric.track_progress !== false,
+                progress_aggregation: metric.progress_aggregation || null,
             }))
             : [DEFAULT_METRIC],
         hasSets: editingActivity.has_sets,
@@ -166,5 +172,7 @@ export function getInitialActivityBuilderState(editingActivity) {
             : DEFAULT_SPLITS,
         groupId: editingActivity.group_id || '',
         selectedGoalIds: editingActivity.associated_goal_ids || [],
+        trackProgress: editingActivity.track_progress !== false,
+        progressAggregation: editingActivity.progress_aggregation || 'last',
     };
 }

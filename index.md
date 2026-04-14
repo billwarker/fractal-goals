@@ -7,7 +7,7 @@
 
 Fractal Goals is a full-stack goal and practice-tracking application built around a hierarchical "fractal" model of work:
 
-- Goals flow from `Ultimate` down through `Nano`
+- Goals flow from `Ultimate` down through `Immediate`
 - Sessions capture real execution work
 - Activities, templates, and programs structure recurring practice
 - Analytics, annotations, and logs explain what happened over time
@@ -79,15 +79,13 @@ Important frontend design choices:
 
 ### Goals
 
-Goals are the core domain object. The app supports a 7-level hierarchy:
+Goals are the core domain object. The app supports a 5-level hierarchy:
 
 - `UltimateGoal`
 - `LongTermGoal`
 - `MidTermGoal`
 - `ShortTermGoal`
 - `ImmediateGoal`
-- `MicroGoal`
-- `NanoGoal`
 
 Key supporting backend pieces:
 
@@ -115,7 +113,6 @@ Sessions support:
 - linked goals
 - activity instances
 - timers and manual duration updates
-- session-specific micro/nano goal flows
 
 Key backend pieces:
 
@@ -141,7 +138,6 @@ They support:
 - session and activity-instance notes
 - image notes
 - pinning and timeline-style browsing
-- nano-goal note creation flows
 
 Key backend pieces:
 
@@ -169,6 +165,7 @@ They support:
 - metrics
 - splits
 - goal associations
+- progress tracking and comparison settings
 
 Key backend pieces:
 
@@ -181,6 +178,36 @@ Key frontend pieces:
 - `client/src/components/ActivityBuilder.jsx`
 - `client/src/components/common/ActivitySearchWidget.jsx`
 - `client/src/pages/ManageActivities.jsx`
+
+### Progress Tracking
+
+Progress comparisons are a first-class activity/session feature.
+
+They support:
+
+- persisted `ProgressRecord` history for completed instances
+- live comparison hints while a session is still in progress
+- activity-level and metric-level aggregation configuration
+- root-level progress settings and full-root recomputation
+- historical progress APIs for session and activity views
+
+Key backend pieces:
+
+- `services/progress_service.py`
+- `services/completion_handlers.py`
+- `blueprints/activities_api.py`
+- `blueprints/sessions_api.py`
+- `blueprints/timers_api.py`
+
+Key frontend pieces:
+
+- `client/src/hooks/useProgressComparison.js`
+- `client/src/hooks/useProgressHistory.js`
+- `client/src/hooks/useSessionProgressSummary.js`
+- `client/src/hooks/useRootProgressSettings.js`
+- `client/src/components/sessionDetail/SessionActivityItem.jsx`
+- `client/src/components/sessionDetail/HistoryPanel.jsx`
+- `client/src/components/modals/SettingsModal.jsx`
 
 ### Programs and Templates
 

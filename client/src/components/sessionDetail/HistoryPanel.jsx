@@ -182,7 +182,7 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
         ? progressRecord.metric_comparisons
         : [];
 
-    const renderProgressIndicator = (metricId, metricName) => {
+    const renderProgressIndicator = (metricId, metricName, setIndex) => {
         const comparison = progressComparisons.find((item) => (
             item?.metric_id === metricId
             || item?.metric_definition_id === metricId
@@ -190,9 +190,22 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
         ));
         if (!comparison) return null;
 
-        const pctChange = comparison.pct_change ?? comparison.percent_delta;
-        const improved = comparison.improved ?? comparison.is_improvement ?? false;
-        const regressed = comparison.regressed ?? comparison.is_regression ?? false;
+        // For set rows, try to use per-set comparison if available
+        let pctChange, improved, regressed;
+        if (setIndex != null && Array.isArray(comparison.set_comparisons) && comparison.set_comparisons.length > 0) {
+            const setComp = comparison.set_comparisons.find((sc) => sc.set_index === setIndex);
+            if (setComp) {
+                pctChange = setComp.pct_change;
+                improved = setComp.improved ?? false;
+                regressed = setComp.regressed ?? false;
+            } else {
+                return null;
+            }
+        } else {
+            pctChange = comparison.pct_change ?? comparison.percent_delta;
+            improved = comparison.improved ?? comparison.is_improvement ?? false;
+            regressed = comparison.regressed ?? comparison.is_regression ?? false;
+        }
 
         if (pctChange != null) {
             const formatted = formatMetricNumber(Math.abs(pctChange));
@@ -265,7 +278,7 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
                                     );
                                     return (
                                         <React.Fragment key={mIdx}>
-                                            {renderMetricRow(metricLabel, renderProgressIndicator(m.metric_id, def?.name))}
+                                            {renderMetricRow(metricLabel, renderProgressIndicator(m.metric_id, def?.name, idx))}
                                         </React.Fragment>
                                     );
                                 })}

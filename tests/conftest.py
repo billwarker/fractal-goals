@@ -343,7 +343,7 @@ def sample_activity_definition(db_session, sample_ultimate_goal, sample_activity
         root_id=sample_ultimate_goal.id,
         name="Weight",
         unit="lbs",
-        is_top_set_metric=True,
+        is_best_set_metric=True,
         is_multiplicative=False,
         is_active=True,
         created_at=datetime.now(timezone.utc)
@@ -354,7 +354,7 @@ def sample_activity_definition(db_session, sample_ultimate_goal, sample_activity
         root_id=sample_ultimate_goal.id,
         name="Reps",
         unit="reps",
-        is_top_set_metric=False,
+        is_best_set_metric=False,
         is_multiplicative=False,
         is_active=True,
         created_at=datetime.now(timezone.utc)

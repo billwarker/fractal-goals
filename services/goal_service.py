@@ -586,6 +586,14 @@ class GoalService:
                 goal.allow_manual_completion = data['allow_manual_completion']
             if 'track_activities' in data:
                 goal.track_activities = data['track_activities']
+            if 'progress_settings' in data and goal.parent_id is None:
+                # Only allow setting progress_settings on root goals
+                settings = data['progress_settings']
+                if settings is None:
+                    goal.progress_settings = None
+                elif isinstance(settings, dict):
+                    current = goal.progress_settings or {}
+                    goal.progress_settings = {**current, **settings}
 
         return goal, None
 

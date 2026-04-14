@@ -17,6 +17,31 @@ from models import (
 
 @pytest.mark.integration
 class TestProgressApi:
+    def test_root_progress_settings_update_round_trips(self, authed_client, db_session, sample_ultimate_goal):
+        response = authed_client.put(
+            f'/api/{sample_ultimate_goal.id}/goals/{sample_ultimate_goal.id}',
+            json={
+                'progress_settings': {
+                    'enabled': False,
+                    'default_aggregation': 'sum',
+                },
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['attributes']['progress_settings'] == {
+            'enabled': False,
+            'default_aggregation': 'sum',
+        }
+
+        db_session.expire_all()
+        root = db_session.query(Goal).filter_by(id=sample_ultimate_goal.id).first()
+        assert root.progress_settings == {
+            'enabled': False,
+            'default_aggregation': 'sum',
+        }
+
     def test_activity_creation_persists_progress_settings(self, authed_client, db_session, sample_ultimate_goal):
         root_id = sample_ultimate_goal.id
 
@@ -171,6 +196,46 @@ class TestProgressApi:
         assert payload['id'] == record.id
         assert payload['derived_summary']['summary_line'] == 'Persisted summary'
         assert payload['created_at'] is not None
+
+    def test_instance_progress_returns_null_when_root_progress_is_disabled(self, authed_client, db_session, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+        sample_ultimate_goal.progress_settings = {'enabled': False}
+        activity = ActivityDefinition(
+            id=str(uuid4()),
+            root_id=root_id,
+            name='Muted Progress Activity',
+            description='',
+            has_metrics=True,
+            created_at=datetime.now(timezone.utc),
+        )
+        session = Session(
+            id=str(uuid4()),
+            name='Disabled Progress Session',
+            description='',
+            root_id=root_id,
+            session_start=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc),
+            attributes=json.dumps({}),
+        )
+        instance = ActivityInstance(
+            id=str(uuid4()),
+            root_id=root_id,
+            session_id=session.id,
+            activity_definition_id=activity.id,
+            created_at=datetime.now(timezone.utc),
+            completed=True,
+            time_start=datetime.now(timezone.utc),
+            time_stop=datetime.now(timezone.utc),
+            duration_seconds=0,
+            data=json.dumps({}),
+        )
+        db_session.add_all([activity, session, instance])
+        db_session.commit()
+
+        response = authed_client.get(f'/api/{root_id}/activity-instances/{instance.id}/progress')
+
+        assert response.status_code == 200
+        assert response.get_json() is None
 
     def test_completed_metric_updates_refresh_persisted_progress(self, authed_client, db_session, sample_ultimate_goal):
         root_id = sample_ultimate_goal.id

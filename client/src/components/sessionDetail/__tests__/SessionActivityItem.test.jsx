@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import SessionActivityItem from '../SessionActivityItem';
 
@@ -564,6 +564,92 @@ describe('SessionActivityItem quick mode', () => {
         );
 
         expect(screen.getAllByText('(▲15%)')).toHaveLength(1);
+    });
+
+    it('uses the lower-is-better best-set anchor when placing max hints across set rows', () => {
+        useProgressComparison.mockReturnValue({
+            progressComparison: {
+                is_first_instance: false,
+                metric_comparisons: [
+                    {
+                        metric_id: 'm2',
+                        metric_name: 'Reps',
+                        aggregation: 'max',
+                        previous_value: 7,
+                        current_value: null,
+                        delta: null,
+                        pct_change: null,
+                        improved: false,
+                        regressed: false,
+                        set_comparisons: [],
+                    },
+                ],
+            },
+        });
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'set-instance-2',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    completed: false,
+                    sets: [
+                        {
+                            instance_id: 'set-1',
+                            metrics: [
+                                { metric_id: 'm1', value: '60' },
+                                { metric_id: 'm2', value: '10' },
+                            ],
+                        },
+                        {
+                            instance_id: 'set-2',
+                            metrics: [
+                                { metric_id: 'm1', value: '55' },
+                                { metric_id: 'm2', value: '8' },
+                            ],
+                        },
+                    ],
+                    time_start: '2026-04-10T17:38:58Z',
+                    time_stop: null,
+                    duration_seconds: null,
+                }}
+                isSelected={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Interval Drill',
+                    has_sets: true,
+                    has_metrics: true,
+                    metric_definitions: [
+                        {
+                            id: 'm1',
+                            name: 'Time',
+                            unit: 's',
+                            is_best_set_metric: true,
+                            higher_is_better: false,
+                        },
+                        {
+                            id: 'm2',
+                            name: 'Reps',
+                            unit: 'reps',
+                            progress_aggregation: 'max',
+                        },
+                    ],
+                    split_definitions: [],
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        const setRows = screen.getAllByText(/^#\d+$/).map((label) => label.parentElement);
+        expect(setRows).toHaveLength(2);
+        expect(within(setRows[0]).queryByText('(last 7)')).not.toBeInTheDocument();
+        expect(within(setRows[1]).getByText('(last 7)')).toBeInTheDocument();
     });
 
     it('opens the modes modal and saves checked activity modes', async () => {
