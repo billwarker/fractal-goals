@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState } from 'react';
 
 import styles from './TemplateBuilderModal.module.css';
 import Modal from '../atoms/Modal';
@@ -74,7 +74,6 @@ function TemplateBuilderModalContent({
     editingTemplate,
     activities,
     activityGroups = [],
-    rootId,
     initialTemplate,
 }) {
     const [currentTemplate, setCurrentTemplate] = useState(initialTemplate);
@@ -88,9 +87,6 @@ function TemplateBuilderModalContent({
         activities: [],
     });
     const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '' });
-
-        );
-    };
 
     const isExistingTemplate = Boolean(editingTemplate?.id);
     const isQuickTemplate = currentTemplate.sessionType === SESSION_TYPE_QUICK;
