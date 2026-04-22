@@ -108,6 +108,20 @@ class TimerService:
         return None
 
     @staticmethod
+    def _normalize_target_duration(value):
+        if value is None:
+            return None, None
+        if isinstance(value, bool):
+            return None, "target_duration_seconds must be a positive integer"
+        try:
+            target_duration = int(value)
+        except (TypeError, ValueError):
+            return None, "target_duration_seconds must be a positive integer"
+        if target_duration <= 0:
+            return None, "target_duration_seconds must be greater than 0"
+        return target_duration, None
+
+    @staticmethod
     def _activity_event_payload(instance, root_id, activity_name, *, updated_fields=None) -> JsonDict:
         payload = {
             'instance_id': instance.id,
@@ -248,6 +262,13 @@ class TimerService:
         instance.time_start = start_time
         instance.time_stop = None
         instance.duration_seconds = None
+
+        target_duration = data.get('target_duration_seconds')
+        if target_duration is not None:
+            normalized_target, target_error = self._normalize_target_duration(target_duration)
+            if target_error:
+                return None, target_error, 400
+            instance.target_duration_seconds = normalized_target
 
         if session_record and session_record.is_paused:
             instance.is_paused = True
@@ -396,10 +417,15 @@ class TimerService:
         if 'completed' in data:
             instance.completed = bool(data['completed'])
 
+        if 'target_duration_seconds' in data:
+            normalized_target, target_error = self._normalize_target_duration(data['target_duration_seconds'])
+            if target_error:
+                return None, target_error, 400
+            instance.target_duration_seconds = normalized_target  # accepts None to clear
+
         if 'notes' in data:
             instance.notes = data['notes']
 
-        valid_modes = None
         current_data = models._safe_load_json(instance.data, {})
         if 'sets' in data:
             current_data['sets'] = data['sets']

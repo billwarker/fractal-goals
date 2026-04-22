@@ -89,6 +89,36 @@ describe('useGoalAssociationMutations', () => {
         expect(setActivityGoals).not.toHaveBeenCalled();
     });
 
+    it('preserves builder-selected goals when attaching an inline-created activity in edit mode', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            }
+        });
+
+        const { result } = renderHook(() => useGoalAssociationMutations({
+            rootId: 'root-1',
+            goalId: 'goal-current',
+            mode: 'edit',
+            isOpen: true,
+            activityGroupsRaw: [],
+            fetchedActivities: [],
+            fetchedGroups: [],
+        }), { wrapper: createWrapper(queryClient) });
+
+        await act(async () => {
+            await result.current.attachInlineCreatedActivity({
+                id: 'activity-2',
+                name: 'Inline Created',
+                associated_goal_ids: ['goal-other'],
+            });
+        });
+
+        expect(setActivityGoals).toHaveBeenCalledWith('root-1', 'activity-2', ['goal-other', 'goal-current']);
+        expect(invalidateGoalAssociationQueries).toHaveBeenCalledWith(queryClient, 'root-1', 'goal-current');
+    });
+
     it('persists only direct activity associations when inherited activities are present', async () => {
         const queryClient = new QueryClient({
             defaultOptions: {

@@ -24,7 +24,7 @@ import styles from './GoalDetailModal.module.css';
 
 const TargetManager = lazyWithRetry(() => import('./goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
 const ActivityAssociator = lazyWithRetry(() => import('./goalDetail/ActivityAssociator'), 'components/goalDetail/ActivityAssociator');
-const InlineActivityBuilder = lazyWithRetry(() => import('./goalDetail/InlineActivityBuilder'), 'components/goalDetail/InlineActivityBuilder');
+const InlineActivityBuilder = lazyWithRetry(() => import('./goalDetail/InlineActivityBuilderModal'), 'components/goalDetail/InlineActivityBuilderModal');
 const GenericGraphModal = lazyWithRetry(() => import('./analytics/GenericGraphModal'), 'components/analytics/GenericGraphModal');
 const GoalOptionsView = lazyWithRetry(() => import('./goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./goalDetail/GoalNotesView'), 'components/goalDetail/GoalNotesView');
@@ -600,14 +600,13 @@ function GoalDetailModal({
                     rootId={rootId}
                     goalId={goalId}
                     activityGroups={activityGroups}
-                    onSuccess={async (newActivity, newActivityName) => {
-                        // Automatically associate with this goal
+                    onSuccess={async (newActivity) => {
                         if (newActivity && newActivity.id) {
                             await attachInlineCreatedActivity(newActivity);
-                            notify.success(`Created activity "${newActivity.name || newActivityName}"${goalId ? ' and associated with goal' : ''}`);
+                            if (goalId) {
+                                notify.success(`Associated "${newActivity.name}" with goal`);
+                            }
                         }
-
-                        // Go back to activity-associator view
                         setViewState('activity-associator');
                     }}
                     onCancel={() => setViewState('activity-associator')}

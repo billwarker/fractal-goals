@@ -199,6 +199,26 @@ def get_goal_notes(current_user, root_id, goal_id):
         db_session.close()
 
 
+@notes_bp.route('/<root_id>/nano-goal-notes', methods=['POST'])
+@token_required
+def create_nano_goal_note(current_user, root_id):
+    db_session, note_service = _with_note_service()
+    try:
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify({"error": "Validation failed"}), 400
+        payload, error, status = note_service.create_nano_goal_note(root_id, current_user.id, data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error creating nano goal note")
+        return internal_error(logger, "Error creating nano goal note")
+    finally:
+        db_session.close()
+
+
 @notes_bp.route('/<root_id>/notes', methods=['GET'])
 @token_required
 def get_all_notes(current_user, root_id):

@@ -306,7 +306,7 @@ class UserDeleteSchema(BaseModel):
 
 VALID_GOAL_TYPES = [
     'UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal',
-    'ImmediateGoal'
+    'ImmediateGoal', 'MicroGoal', 'NanoGoal'
 ]
 
 VALID_ROOT_GOAL_TYPES = [
@@ -346,6 +346,14 @@ class GoalCreateSchema(BaseModel):
     
     @model_validator(mode='after')
     def validate_parent_type_constraints(self):
+        if self.type == 'MicroGoal' and not self.parent_id:
+            raise ValueError("MicroGoal must have a parent_id")
+        if self.type == 'NanoGoal' and not self.parent_id:
+            raise ValueError("NanoGoal must have a parent_id")
+        if self.type == 'MicroGoal' and self.deadline:
+            raise ValueError("MicroGoal cannot have deadlines")
+        if self.type == 'NanoGoal' and self.description:
+            raise ValueError("NanoGoal cannot have a description")
         return self
     
     @field_validator('name')
@@ -445,7 +453,7 @@ class GoalUpdateSchema(BaseModel):
         if not isinstance(v, dict):
             raise ValueError("progress_settings must be an object")
 
-        allowed_keys = {'enabled', 'default_aggregation'}
+        allowed_keys = {'enabled', 'default_aggregation', 'delta_display_mode'}
         unknown_keys = sorted(set(v.keys()) - allowed_keys)
         if unknown_keys:
             raise ValueError(
@@ -459,6 +467,15 @@ class GoalUpdateSchema(BaseModel):
             if not isinstance(enabled, bool):
                 raise ValueError("progress_settings.enabled must be a boolean")
             normalized['enabled'] = enabled
+
+        if 'delta_display_mode' in v:
+            ddm = v.get('delta_display_mode')
+            if ddm in (None, ''):
+                normalized['delta_display_mode'] = None
+            elif ddm in ('percent', 'absolute'):
+                normalized['delta_display_mode'] = ddm
+            else:
+                raise ValueError("progress_settings.delta_display_mode must be 'percent' or 'absolute'")
 
         if 'default_aggregation' in v:
             default_aggregation = v.get('default_aggregation')
@@ -670,6 +687,16 @@ class ActivityTimerStartSchema(BaseModel):
     """Schema for starting a timer when creation details may be provided."""
     session_id: Optional[str] = None
     activity_definition_id: Optional[str] = None
+    target_duration_seconds: Optional[int] = None
+
+    @field_validator('target_duration_seconds')
+    @classmethod
+    def validate_target_duration_seconds(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return None
+        if v <= 0:
+            raise ValueError("target_duration_seconds must be greater than 0")
+        return v
 
 
 class TimerActivityInstanceManualUpdateSchema(BaseModel):
@@ -683,6 +710,16 @@ class TimerActivityInstanceManualUpdateSchema(BaseModel):
     completed: Optional[bool] = None
     notes: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     sets: Optional[List[Dict[str, Any]]] = None
+    target_duration_seconds: Optional[int] = None
+
+    @field_validator('target_duration_seconds')
+    @classmethod
+    def validate_target_duration_seconds(cls, v: Optional[int]) -> Optional[int]:
+        if v is None:
+            return None
+        if v <= 0:
+            raise ValueError("target_duration_seconds must be greater than 0")
+        return v
 
     @field_validator('notes')
     @classmethod
@@ -784,6 +821,7 @@ class ActivityDefinitionCreateSchema(BaseModel):
     goal_ids: Optional[List[str]] = None
     track_progress: Optional[bool] = None
     progress_aggregation: Optional[str] = None
+    delta_display_mode: Optional[str] = None
 
     @field_validator('name')
     @classmethod
@@ -803,6 +841,16 @@ class ActivityDefinitionCreateSchema(BaseModel):
             )
         return candidate
 
+    @field_validator('delta_display_mode')
+    @classmethod
+    def validate_delta_display_mode(cls, v: Optional[str]) -> Optional[str]:
+        if v in (None, ''):
+            return None
+        candidate = v.strip().lower()
+        if candidate not in ('percent', 'absolute'):
+            raise ValueError("delta_display_mode must be 'percent' or 'absolute'")
+        return candidate
+
 
 class ActivityDefinitionUpdateSchema(BaseModel):
     """Schema for updating an activity definition."""
@@ -820,6 +868,7 @@ class ActivityDefinitionUpdateSchema(BaseModel):
     goal_ids: Optional[List[str]] = None
     track_progress: Optional[bool] = None
     progress_aggregation: Optional[str] = None
+    delta_display_mode: Optional[str] = None
 
     @field_validator('progress_aggregation')
     @classmethod
@@ -832,6 +881,16 @@ class ActivityDefinitionUpdateSchema(BaseModel):
                 "progress_aggregation must be one of: "
                 + ', '.join(sorted(VALID_PROGRESS_AGGREGATIONS))
             )
+        return candidate
+
+    @field_validator('delta_display_mode')
+    @classmethod
+    def validate_delta_display_mode(cls, v: Optional[str]) -> Optional[str]:
+        if v in (None, ''):
+            return None
+        candidate = v.strip().lower()
+        if candidate not in ('percent', 'absolute'):
+            raise ValueError("delta_display_mode must be 'percent' or 'absolute'")
         return candidate
 
 
@@ -974,6 +1033,7 @@ class NoteCreateSchema(BaseModel):
     activity_instance_id: Optional[str] = None
     activity_definition_id: Optional[str] = None
     goal_id: Optional[str] = None
+    nano_goal_id: Optional[str] = None
     set_index: Optional[int] = Field(None, ge=0)
 
     @field_validator('content')

@@ -4,6 +4,7 @@ import { useActiveSessionData, useActiveSessionActions } from '../../contexts/Ac
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatForInput, localToISO } from '../../utils/dateUtils';
 import { getGroupBreadcrumb } from '../../utils/manageActivities';
+import { playCompletionSound } from '../../utils/playCompletionSound';
 import ActivityCompletionButton from '../common/ActivityCompletionButton';
 import MetaField from '../common/MetaField';
 import Linkify from '../atoms/Linkify';
@@ -15,6 +16,8 @@ import NoteTimeline from './NoteTimeline';
 import styles from './SessionActivityItem.module.css';
 import useMetricDrafts from './useMetricDrafts';
 import { useProgressComparison } from '../../hooks/useProgressComparison';
+import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
+import { useEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
 import {
     computeAutoAggregations,
     filterTrackedMetricDefs,
@@ -32,6 +35,18 @@ function formatDuration(seconds) {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+function parseMMSS(value) {
+    const trimmed = value?.trim();
+    if (!trimmed) return null;
+    const match = trimmed.match(/^(\d+):(\d{1,2})$/);
+    if (!match) return null;
+    const mins = Number(match[1]);
+    const secs = Number(match[2]);
+    if (!Number.isInteger(mins) || !Number.isInteger(secs) || secs > 59) return null;
+    const totalSeconds = mins * 60 + secs;
+    return totalSeconds > 0 ? totalSeconds : null;
+}
+
 function formatMetricNumber(value) {
     if (value == null || Number.isNaN(Number(value))) return null;
     const numericValue = Number(value);
@@ -41,8 +56,17 @@ function formatMetricNumber(value) {
     return numericValue.toFixed(1).replace(/\.0$/, '');
 }
 
-function formatInlineProgressValue(comparison) {
+function formatInlineProgressValue(comparison, displayMode = 'percent') {
     if (!comparison) return null;
+
+    if (displayMode === 'absolute') {
+        if (comparison.delta == null) return null;
+        const delta = Number(comparison.delta);
+        const magnitude = formatMetricNumber(Math.abs(delta));
+        if (delta > 0) return `+${magnitude}`;
+        if (delta < 0) return `-${magnitude}`;
+        return '0';
+    }
 
     if (comparison.pct_change != null) {
         const magnitude = formatMetricNumber(Math.abs(comparison.pct_change));
@@ -101,7 +125,7 @@ function getBestSetIndexes(sets, anchorMetricId, higherIsBetter, getMetricValue)
 /**
  * Progress summary shown below sets: additive totals, yield, best set.
  */
-function SessionActivityProgressSummary({ sets, metricDefs, activeProgress }) {
+function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, displayMode = 'percent' }) {
     const trackedMetricDefs = useMemo(() => filterTrackedMetricDefs(metricDefs), [metricDefs]);
     const autoAgg = useMemo(() => {
         const fromRecord = activeProgress?.derived_summary?.auto_aggregations;
@@ -162,7 +186,7 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress }) {
                             <span className={styles.progressSummaryValue}>
                                 {formatAggValue(autoAgg.total_yield)}
                                 {!isFirstInstance && prevYield != null && autoAgg.total_yield != null && (
-                                    <SummaryDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter styles={styles} />
+                                    <SummaryDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter styles={styles} displayMode={displayMode} />
                                 )}
                             </span>
                         </>
@@ -178,15 +202,20 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress }) {
     );
 }
 
-function SummaryDelta({ current, previous, higherIsBetter = true, styles }) {
+function SummaryDelta({ current, previous, higherIsBetter = true, styles, displayMode = 'percent' }) {
     if (previous == null || current == null) return null;
     const delta = current - previous;
     if (delta === 0) return null;
     const improved = (delta > 0 && higherIsBetter) || (delta < 0 && !higherIsBetter);
-    const pct = previous !== 0 ? Math.abs(delta / previous * 100) : null;
-    const label = pct != null
-        ? `${improved ? '▲' : '▼'}${formatAggValue(pct)}%`
-        : `${improved ? '+' : ''}${formatAggValue(delta)}`;
+    let label;
+    if (displayMode === 'absolute') {
+        label = `${delta > 0 ? '+' : ''}${formatAggValue(delta)}`;
+    } else {
+        const pct = previous !== 0 ? Math.abs(delta / previous * 100) : null;
+        label = pct != null
+            ? `${improved ? '▲' : '▼'}${formatAggValue(pct)}%`
+            : `${delta > 0 ? '+' : ''}${formatAggValue(delta)}`;
+    }
     const cls = improved ? styles.metricInlineProgressImproved : styles.metricInlineProgressRegressed;
     return <span className={`${styles.metricInlineProgress} ${cls}`}> ({label})</span>;
 }
@@ -255,9 +284,9 @@ function SessionActivityItem({
     const activityDefinition = activityDefinitionProp
         || (Array.isArray(activities) ? activities.find(a => a.id === exercise.activity_definition_id) : null);
     const onDelete = () => removeActivity(exercise.id);
-    const onUpdate = useCallback((key, value) => {
+    const onUpdate = useCallback((key, value, extraData = {}) => {
         if (key === 'timer_action') {
-            updateTimer(exercise.id, value);
+            updateTimer(exercise.id, value, extraData);
         } else {
             updateInstance(exercise.id, { [key]: value });
         }
@@ -283,7 +312,18 @@ function SessionActivityItem({
     // Progress comparison: stored from completion mutation response or fetched live
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
     const [realtimeDuration, setRealtimeDuration] = useState(() => exercise.duration_seconds ?? 0);
-
+    // Pre-start duration input (MM:SS) — if set before Start, enables countdown mode
+    const [targetDurationInput, setTargetDurationInput] = useState('');
+    const [targetDurationError, setTargetDurationError] = useState('');
+    const autoCompletedRef = React.useRef(false);
+    const hasTargetDurationInput = Boolean(targetDurationInput.trim());
+    const parsedTargetDuration = useMemo(() => parseMMSS(targetDurationInput), [targetDurationInput]);
+    const countdownPreview = !exercise.time_start
+        && hasTargetDurationInput
+        && parsedTargetDuration
+        && !targetDurationError
+        ? `Countdown ${formatDuration(parsedTargetDuration)}`
+        : null;
 
 
     // Real-time timer effect
@@ -295,18 +335,14 @@ function SessionActivityItem({
                 const start = new Date(exercise.time_start).getTime();
                 const now = Date.now();
 
-                // Account for paused time tied to the activity instance
                 const totalPaused = exercise.total_paused_seconds || 0;
 
-                // Also account for session-level pause state if it relates to this activity
-                // Note: If the session pauses, we probably just stop this local timer from advancing.
                 const isSessionPaused = session?.is_paused || session?.attributes?.is_paused || false;
                 const sessionLastPausedAt = session?.last_paused_at || session?.attributes?.last_paused_at;
 
                 let currentPausedStraggler = 0;
                 if (isSessionPaused && sessionLastPausedAt) {
                     const pausedTime = new Date(sessionLastPausedAt).getTime();
-                    // Has to be after activity start
                     if (pausedTime > start) {
                         currentPausedStraggler = Math.floor((now - pausedTime) / 1000);
                     }
@@ -315,17 +351,22 @@ function SessionActivityItem({
                 const diffSeconds = Math.floor((now - start) / 1000);
                 const activeSeconds = Math.max(0, diffSeconds - totalPaused - currentPausedStraggler);
                 setRealtimeDuration(activeSeconds);
+
+                // Auto-complete when countdown hits 0
+                const target = exercise.target_duration_seconds;
+                if (target && activeSeconds >= target && !autoCompletedRef.current) {
+                    autoCompletedRef.current = true;
+                    playCompletionSound();
+                    onUpdate('timer_action', 'complete');
+                }
             }
         };
 
         if (exercise.time_start && !exercise.time_stop) {
-            // Initial update
             updateTimerLocal();
 
-            // Only tick if not paused
             const isSessionPaused = session?.is_paused || session?.attributes?.is_paused || false;
             if (!isSessionPaused) {
-                // Start interval
                 intervalId = setInterval(updateTimerLocal, 1000);
             }
         }
@@ -338,14 +379,18 @@ function SessionActivityItem({
         exercise.time_stop,
         exercise.duration_seconds,
         exercise.total_paused_seconds,
+        exercise.target_duration_seconds,
         session?.is_paused,
         session?.attributes?.is_paused,
         session?.last_paused_at,
-        session?.attributes?.last_paused_at
+        session?.attributes?.last_paused_at,
+        onUpdate,
     ]);
-    const displayedDuration = exercise.time_start && !exercise.time_stop
-        ? realtimeDuration
-        : (exercise.duration_seconds ?? 0);
+    const isRunning = Boolean(exercise.time_start && !exercise.time_stop);
+    const effectiveTarget = exercise.target_duration_seconds;
+    const isCountingDown = isRunning && Boolean(effectiveTarget);
+    const countdownRemaining = isCountingDown ? Math.max(0, effectiveTarget - realtimeDuration) : null;
+    const displayedDuration = isRunning ? realtimeDuration : (exercise.duration_seconds ?? 0);
 
     // Filter notes for this activity
     const activityNotes = Array.isArray(activityNotesProp)
@@ -406,6 +451,8 @@ function SessionActivityItem({
 
     // The displayed progress: prefer completion result, fall back to live query
     const activeProgress = activityProgress || liveProgressComparison;
+    const { progressSettings } = useRootProgressSettings(rootId);
+    const deltaDisplayMode = useEffectiveDeltaDisplayMode(activityDefinition, progressSettings);
     const trackedMetricDefs = useMemo(() => filterTrackedMetricDefs(def.metric_definitions || []), [def.metric_definitions]);
     const metricProgressById = useMemo(() => {
         const items = activeProgress?.metric_comparisons || [];
@@ -517,7 +564,7 @@ function SessionActivityItem({
                     return null;
                 }
                 if (isCompleted) {
-                    const inlineValue = formatInlineProgressValue(setComp);
+                    const inlineValue = formatInlineProgressValue(setComp, deltaDisplayMode);
                     if (!inlineValue) return null;
                     const progressClassName = setComp.improved
                         ? styles.metricInlineProgressImproved
@@ -550,7 +597,7 @@ function SessionActivityItem({
         }
 
         if (isCompleted) {
-            const inlineValue = formatInlineProgressValue(comparison);
+            const inlineValue = formatInlineProgressValue(comparison, deltaDisplayMode);
             if (!inlineValue) {
                 return null;
             }
@@ -577,7 +624,7 @@ function SessionActivityItem({
                 (last {formatMetricNumber(comparison.previous_value)})
             </span>
         );
-    }, [activeProgress, hasSets, isCompleted, metricProgressById, setProgressVisibility]);
+    }, [activeProgress, deltaDisplayMode, hasSets, isCompleted, metricProgressById, setProgressVisibility]);
 
     const groupLabel = useMemo(() => {
         const groupId = activityDefinition?.group_id || exercise.group_id || null;
@@ -788,17 +835,42 @@ function SessionActivityItem({
                                         />
                                     </div>
 
-                                    {/* Duration Display */}
+                                    {/* Duration Display / Pre-start target input */}
                                     <div className={styles.timerFieldContainer}>
-                                        <MetaField
-                                            className={styles.durationMetaField}
-                                            label="Duration"
-                                            value={formatDuration(displayedDuration)}
-                                            valueClassName={[
-                                                styles.durationDisplay,
-                                                (exercise.time_start && !exercise.time_stop) ? styles.durationActive : styles.durationInactive,
-                                            ].join(' ')}
-                                        />
+                                        {!exercise.time_start ? (
+                                            <>
+                                                <label className={styles.timerLabel}>Duration</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="MM:SS"
+                                                    value={targetDurationInput}
+                                                    onChange={(e) => {
+                                                        setTargetDurationInput(e.target.value);
+                                                        setTargetDurationError('');
+                                                    }}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className={`${styles.timerInput} ${targetDurationError ? styles.timerInputError : ''}`}
+                                                    title="Optional: set a target duration to enable countdown mode"
+                                                />
+                                                {targetDurationError && (
+                                                    <div className={styles.timerValidationError}>{targetDurationError}</div>
+                                                )}
+                                                {countdownPreview && (
+                                                    <div className={styles.timerModeHint}>{countdownPreview}</div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <MetaField
+                                                className={styles.durationMetaField}
+                                                label={isCountingDown ? 'Remaining' : 'Duration'}
+                                                value={isCountingDown ? formatDuration(countdownRemaining) : formatDuration(displayedDuration)}
+                                                valueClassName={[
+                                                    styles.durationDisplay,
+                                                    isRunning ? styles.durationActive : styles.durationInactive,
+                                                    isCountingDown && countdownRemaining <= 10 ? styles.durationCountdownAlert : '',
+                                                ].join(' ')}
+                                            />
+                                        )}
                                     </div>
                                 </div>
 
@@ -808,7 +880,16 @@ function SessionActivityItem({
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    onUpdate('timer_action', 'start');
+                                                    autoCompletedRef.current = false;
+                                                    const extras = {};
+                                                    if (hasTargetDurationInput && !parsedTargetDuration) {
+                                                        setTargetDurationError('Use MM:SS, seconds 00-59');
+                                                        return;
+                                                    }
+                                                    if (parsedTargetDuration) {
+                                                        extras.target_duration_seconds = parsedTargetDuration;
+                                                    }
+                                                    onUpdate('timer_action', 'start', extras);
                                                 }}
                                                 className={styles.startButton}
                                                 title="Start timer"
@@ -841,6 +922,9 @@ function SessionActivityItem({
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
+                                                    autoCompletedRef.current = false;
+                                                    setTargetDurationInput('');
+                                                    setTargetDurationError('');
                                                     onUpdate('timer_action', 'reset');
                                                 }}
                                                 className={styles.resetButton}
@@ -857,6 +941,9 @@ function SessionActivityItem({
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
+                                                    autoCompletedRef.current = false;
+                                                    setTargetDurationInput('');
+                                                    setTargetDurationError('');
                                                     onUpdate('timer_action', 'reset');
                                                 }}
                                                 className={styles.resetButton}
@@ -993,6 +1080,7 @@ function SessionActivityItem({
                                                     previous={prevYieldBySetIndex[setIdx]}
                                                     higherIsBetter
                                                     styles={styles}
+                                                    displayMode={deltaDisplayMode}
                                                 />
                                             )}
                                         </span>
@@ -1012,6 +1100,7 @@ function SessionActivityItem({
                             sets={exercise.sets}
                             metricDefs={def.metric_definitions}
                             activeProgress={activeProgress}
+                            displayMode={deltaDisplayMode}
                         />
                     </div>
                 ) : (

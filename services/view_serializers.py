@@ -142,6 +142,7 @@ def serialize_session_goals_view_payload(
     session_goal_sources,
     session_activity_ids,
     activity_goal_ids_by_activity,
+    micro_goals=None,
 ):
     return {
         "goal_tree": goal_tree,
@@ -149,4 +150,5 @@ def serialize_session_goals_view_payload(
         "session_goal_sources": dict(session_goal_sources),
         "session_activity_ids": list(session_activity_ids),
         "activity_goal_ids_by_activity": dict(activity_goal_ids_by_activity),
+        "micro_goals": list(micro_goals or []),
     }

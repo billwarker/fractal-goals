@@ -17,6 +17,8 @@ def get_canonical_goal_type(goal):
         "midtermgoal": "MidTermGoal",
         "shorttermgoal": "ShortTermGoal",
         "immediategoal": "ImmediateGoal",
+        "microgoal": "MicroGoal",
+        "nanogoal": "NanoGoal",
     }
 
     level = getattr(goal, 'level', None)
@@ -28,9 +30,13 @@ def get_canonical_goal_type(goal):
     goal_id = getattr(goal, 'id', '<unknown>')
     depth = 0
     current = goal
-    while current and getattr(current, 'parent_id', None):
+    while current:
+        parent_id = getattr(current, 'parent_id', None)
+        parent = getattr(current, 'parent', None)
+        if not parent_id and parent is None:
+            break
         depth += 1
-        current = getattr(current, 'parent', None)
+        current = parent
         if current is None:
             break
 
@@ -40,6 +46,8 @@ def get_canonical_goal_type(goal):
         2: "MidTermGoal",
         3: "ShortTermGoal",
         4: "ImmediateGoal",
+        5: "MicroGoal",
+        6: "NanoGoal",
     }
     fallback = fallback_by_depth.get(depth)
     if fallback:
@@ -77,5 +85,7 @@ def get_canonical_goal_level_name(goal):
         "MidTermGoal": "Mid Term Goal",
         "ShortTermGoal": "Short Term Goal",
         "ImmediateGoal": "Immediate Goal",
+        "MicroGoal": "Micro Goal",
+        "NanoGoal": "Nano Goal",
     }
     return name_map.get(canonical_type)

@@ -17,7 +17,8 @@ import styles from './SessionSectionGrid.module.css';
 const SectionColumn = memo(function SectionColumn({
     section,
     activities,
-    activityInstances = []
+    activityInstances = [],
+    deltaDisplayMode = 'percent',
 }) {
     const sectionActivities = useMemo(() => {
         const instanceIds = section.activity_ids || [];
@@ -71,6 +72,7 @@ const SectionColumn = memo(function SectionColumn({
                                 key={activityIndex}
                                 activity={activity}
                                 activityDefinition={actDef}
+                                deltaDisplayMode={deltaDisplayMode}
                             />
                         );
                     })}
@@ -86,7 +88,8 @@ const SectionColumn = memo(function SectionColumn({
 const SessionSectionGrid = memo(function SessionSectionGrid({
     sections,
     activities,
-    activityInstances = []
+    activityInstances = [],
+    deltaDisplayMode = 'percent',
 }) {
     const isMobile = useIsMobile();
 
@@ -105,6 +108,7 @@ const SessionSectionGrid = memo(function SessionSectionGrid({
                     section={section}
                     activities={activities}
                     activityInstances={activityInstances}
+                    deltaDisplayMode={deltaDisplayMode}
                 />
             ))}
         </div>

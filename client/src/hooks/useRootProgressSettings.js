@@ -23,7 +23,21 @@ export function useRootProgressSettings(rootId) {
             });
             return res.data;
         },
-        onSuccess: () => {
+        onSuccess: (updatedGoal) => {
+            if (updatedGoal) {
+                queryClient.setQueryData(queryKeys.fractalTree(rootId), (old) => {
+                    if (!old) return old;
+                    return {
+                        ...old,
+                        attributes: {
+                            ...old.attributes,
+                            progress_settings: 'attributes' in updatedGoal
+                                ? updatedGoal.attributes?.progress_settings
+                                : old.attributes?.progress_settings,
+                        },
+                    };
+                });
+            }
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(rootId) });
         },
     });

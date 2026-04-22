@@ -1248,7 +1248,15 @@ class SessionService:
 
         return serialize_session(new_session), None, 201
 
-    def update_session(self, root_id, session_id, current_user_id, data) -> ServiceResult[JsonDict]:
+    def update_session(
+        self,
+        root_id,
+        session_id,
+        current_user_id,
+        data,
+        *,
+        complete_unstarted_instances=True,
+    ) -> ServiceResult[JsonDict]:
         """Update session details."""
         data = normalize_session_payload(data, partial=True)
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
@@ -1284,9 +1292,8 @@ class SessionService:
                         from sqlalchemy.orm.attributes import flag_modified
                         flag_modified(session, "attributes")
 
-                # Stop any activity instances with active timers when the session is completed.
-                # Instances that were never started are left untouched — only the user's
-                # explicit completion gesture (or an active timer) confirms an activity was done.
+                # Completing a session is an explicit completion gesture for every
+                # unfinished instance; active timers are stopped before marking done.
                 instances = self.db_session.query(ActivityInstance).filter(
                     ActivityInstance.session_id == session.id,
                     ActivityInstance.deleted_at == None
@@ -1295,9 +1302,12 @@ class SessionService:
                     if instance.completed:
                         continue
                     if not instance.time_start:
-                        # Never started — leave as-is, do not auto-complete.
-                        continue
-                    if not instance.time_stop:
+                        if not complete_unstarted_instances:
+                            continue
+                        instance.time_start = completion_time
+                        instance.time_stop = completion_time
+                        instance.duration_seconds = 0
+                    elif not instance.time_stop:
                         # Active timer: stop it and mark complete.
                         instance.time_stop = completion_time
 
@@ -1311,7 +1321,7 @@ class SessionService:
                         duration = (instance.time_stop - instance.time_start).total_seconds()
                         active_duration = max(0, duration - (instance.total_paused_seconds or 0))
                         instance.duration_seconds = int(active_duration)
-                        instance.completed = True
+                    instance.completed = True
             else:
                 session.completed_at = None
                 session.session_end = None

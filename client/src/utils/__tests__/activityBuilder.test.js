@@ -87,6 +87,7 @@ describe('buildActivityPayload', () => {
             group_id: 'group-1',
             goal_ids: ['goal-1', 'goal-2'],
             track_progress: true,
+            delta_display_mode: null,
         });
     });
 });
@@ -109,6 +110,7 @@ describe('prepareActivityDefinitionCopy', () => {
             has_splits: true,
             group_id: { id: 'group-1' },
             track_progress: false,
+            delta_display_mode: 'absolute',
             associated_goal_ids: ['goal-1'],
             metric_definitions: [{
                 id: 'metric-1',
@@ -134,6 +136,7 @@ describe('prepareActivityDefinitionCopy', () => {
             has_splits: true,
             group_id: 'group-1',
             track_progress: false,
+            delta_display_mode: 'absolute',
             associated_goal_ids: ['goal-1'],
             metric_definitions: [{
                 id: undefined,

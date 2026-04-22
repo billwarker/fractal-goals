@@ -263,6 +263,30 @@ const SettingsModalInner = ({ onClose }) => {
                                             </div>
 
                                             <div className={styles.themeRow}>
+                                                <label className={styles.checkboxLabel} style={{ marginBottom: 4 }}>
+                                                    Delta display format
+                                                    <span className={styles.checkboxDescription}>
+                                                        How instance-to-instance progress changes are shown
+                                                    </span>
+                                                </label>
+                                                <select
+                                                    value={progressSettings?.delta_display_mode || 'percent'}
+                                                    onChange={async (e) => {
+                                                        try {
+                                                            await updateProgressSettings({ ...(progressSettings || {}), delta_display_mode: e.target.value });
+                                                        } catch (err) {
+                                                            notify.error(`Failed to update progress settings: ${formatError(err)}`);
+                                                        }
+                                                    }}
+                                                    disabled={!progressEnabled}
+                                                    className={styles.selectInput}
+                                                >
+                                                    <option value="percent">Percent (▲12%)</option>
+                                                    <option value="absolute">Absolute (+5)</option>
+                                                </select>
+                                            </div>
+
+                                            <div className={styles.themeRow}>
                                                 <button
                                                     onClick={handleRecomputeAll}
                                                     disabled={recomputeLoading || !progressEnabled}

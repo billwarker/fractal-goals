@@ -7,6 +7,8 @@
 import React, { useMemo, useState } from 'react';
 import { useActivityHistory } from '../../hooks/useActivityHistory';
 import { useProgressHistory } from '../../hooks/useProgressHistory';
+import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
+import { useEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import MarkdownNoteContent from '../notes/MarkdownNoteContent';
 import {
@@ -64,6 +66,7 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
     ), [progressHistory]);
 
     const { timezone } = useTimezone();
+    const { progressSettings } = useRootProgressSettings(rootId);
 
     const formatDate = (isoString) => {
         if (!isoString) return '';
@@ -82,6 +85,7 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
 
     // Get selected activity definition name
     const selectedDef = sessionActivityDefs.find(d => d.id === selectedActivityId);
+    const deltaDisplayMode = useEffectiveDeltaDisplayMode(selectedDef, progressSettings);
 
     return (
         <div className={styles.historyPanel}>
@@ -129,6 +133,7 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
                                 }
                                 formatDate={formatDate}
                                 timezone={timezone}
+                                deltaDisplayMode={deltaDisplayMode}
                             />
                         ))}
                     </div>
@@ -145,7 +150,7 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
 /**
  * ActivityHistoryCard - Display a previous activity instance
  */
-function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate, timezone }) {
+function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate, timezone, deltaDisplayMode = 'percent' }) {
     // Parse sets from instance data
     const sets = useMemo(() => instance.sets || [], [instance.sets]);
     const hasMetrics = instance.metric_values && instance.metric_values.length > 0;
@@ -246,6 +251,18 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
             regressed = comparison.regressed ?? comparison.is_regression ?? false;
         }
 
+        const deltaValue = comparison.delta ?? comparison.value_delta;
+
+        if (deltaDisplayMode === 'absolute') {
+            if (deltaValue == null) return null;
+            const delta = Number(deltaValue);
+            const formatted = formatMetricNumber(Math.abs(delta));
+            const tone = improved ? 'improved' : regressed ? 'regressed' : 'neutral';
+            if (delta > 0) return { label: `(+${formatted})`, tone };
+            if (delta < 0) return { label: `(-${formatted})`, tone };
+            return { label: '(0)', tone: 'neutral' };
+        }
+
         if (pctChange != null) {
             const formatted = formatMetricNumber(Math.abs(pctChange));
             if (improved) return { label: `(▲${formatted}%)`, tone: 'improved' };
@@ -253,9 +270,7 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
             return { label: '(0%)', tone: 'neutral' };
         }
 
-        const deltaValue = comparison.delta ?? comparison.value_delta;
         if (deltaValue == null) return null;
-
         const delta = Number(deltaValue);
         const formatted = formatMetricNumber(Math.abs(delta));
         if (delta > 0) return { label: `(+${formatted})`, tone: 'improved' };
@@ -266,7 +281,12 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
     const renderYieldDelta = (current, previous) => {
         if (previous == null || current == null) return null;
         const delta = current - previous;
-        if (Math.abs(delta) < 0.001) return { label: '(0%)', tone: 'neutral' };
+        if (Math.abs(delta) < 0.001) return { label: deltaDisplayMode === 'absolute' ? '(0)' : '(0%)', tone: 'neutral' };
+        if (deltaDisplayMode === 'absolute') {
+            const formatted = formatMetricNumber(Math.abs(delta));
+            if (delta > 0) return { label: `(+${formatted})`, tone: 'improved' };
+            return { label: `(-${formatted})`, tone: 'regressed' };
+        }
         if (previous === 0) {
             const formatted = formatMetricNumber(Math.abs(delta));
             if (delta > 0) return { label: `(+${formatted})`, tone: 'improved' };

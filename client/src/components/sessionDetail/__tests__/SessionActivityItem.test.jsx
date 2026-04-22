@@ -274,6 +274,52 @@ describe('SessionActivityItem quick mode', () => {
         expect(screen.getByRole('button', { name: 'Delete activity' })).toBeInTheDocument();
     });
 
+    it('starts countdown mode when a valid MM:SS target is entered', () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={baseExercise}
+                isSelected={false}
+                activityDefinition={quickModeDefinition}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        fireEvent.change(screen.getByPlaceholderText('MM:SS'), { target: { value: '01:30' } });
+        expect(screen.getByText('Countdown 01:30')).toBeInTheDocument();
+        fireEvent.click(screen.getByTitle('Start timer'));
+
+        expect(updateTimer).toHaveBeenCalledWith('quick-instance-1', 'start', {
+            target_duration_seconds: 90,
+        });
+    });
+
+    it('rejects invalid countdown targets before starting', () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={baseExercise}
+                isSelected={false}
+                activityDefinition={quickModeDefinition}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        fireEvent.change(screen.getByPlaceholderText('MM:SS'), { target: { value: '01:99' } });
+        fireEvent.click(screen.getByTitle('Start timer'));
+
+        expect(updateTimer).not.toHaveBeenCalled();
+        expect(screen.getByText('Use MM:SS, seconds 00-59')).toBeInTheDocument();
+    });
+
     it('truncates long descriptions to one line and exposes the full value in a tooltip', () => {
         const description = 'https://my.pickupmusic.com/lesson/35e8b87f-c2a5-46d8-baa9-c8352f1444ef';
 

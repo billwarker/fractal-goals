@@ -11,13 +11,16 @@ from models import (
     Goal,
     Note,
     Session,
+    session_goals,
     validate_root_goal,
 )
 from services.events import Event, Events, event_bus
+from services.goal_domain_rules import is_nano_goal
+from services.goal_service import GoalService, sync_goal_targets
 from services.owned_entity_queries import get_owned_activity_instance, get_owned_session
 from services.payload_normalizers import normalize_note_payload
 from services.service_types import JsonDict, JsonList, ServiceResult
-from services.serializers import derive_note_type, serialize_note_display
+from services.serializers import derive_note_type, serialize_goal, serialize_note_display
 from services.session_runtime import is_quick_session
 from services.view_serializers import (
     serialize_activity_history_entry,
@@ -150,6 +153,7 @@ class NoteService:
         ).options(
             selectinload(Note.session).selectinload(Session.template),
             selectinload(Note.goal),
+            selectinload(Note.nano_goal),
             selectinload(Note.activity_definition),
         )
 
@@ -296,6 +300,37 @@ class NoteService:
 
         return None, ("Unsupported note context_type", 400)
 
+    def _validate_nano_goal_link(self, root_id, nano_goal_id, *, session_id=None, activity_instance_id=None):
+        nano_goal = self.db_session.query(Goal).options(
+            selectinload(Goal.parent),
+        ).filter(
+            Goal.id == nano_goal_id,
+            Goal.root_id == root_id,
+            Goal.deleted_at.is_(None),
+        ).first()
+        if not nano_goal or not is_nano_goal(nano_goal):
+            return None, "nano_goal_id must reference a NanoGoal in this fractal", 400
+
+        note_session = self._resolve_note_session(
+            root_id,
+            session_id=session_id,
+            activity_instance_id=activity_instance_id,
+        )
+        if note_session:
+            linked_goal_ids = {
+                goal_id for (goal_id,) in self.db_session.query(session_goals.c.goal_id).filter(
+                    session_goals.c.session_id == note_session.id,
+                ).all()
+            }
+            cursor = nano_goal
+            while cursor:
+                if cursor.id in linked_goal_ids:
+                    return nano_goal, None, None
+                cursor = cursor.parent
+            return None, "nano_goal_id is not linked to the provided session", 400
+
+        return nano_goal, None, None
+
     def get_goal_notes(
         self, root_id, goal_id, current_user_id, include_descendants=False
     ) -> ServiceResult[JsonList]:
@@ -370,7 +405,7 @@ class NoteService:
 
         filter_goal_id = filters.get('goal_id')
         if filter_goal_id:
-            query = query.filter(Note.goal_id == filter_goal_id)
+            query = query.filter(or_(Note.goal_id == filter_goal_id, Note.nano_goal_id == filter_goal_id))
 
         filter_activity_definition_ids = filters.get('activity_definition_ids') or []
         filter_activity_group_ids = filters.get('activity_group_ids') or []
@@ -452,7 +487,7 @@ class NoteService:
         if not note:
             return None, "Note not found", 404
 
-        if derive_note_type(note.context_type, note.set_index) == 'activity_set_note':
+        if derive_note_type(note.context_type, note.set_index, is_nano_goal=bool(note.nano_goal_id)) == 'activity_set_note':
             return None, "Activity set notes cannot be pinned", 400
 
         note.pinned_at = datetime.now(timezone.utc)
@@ -488,9 +523,21 @@ class NoteService:
         session_id = data.get('session_id')
         activity_instance_id = data.get('activity_instance_id')
         goal_id = data.get('goal_id')
+        nano_goal_id = data.get('nano_goal_id')
         activity_definition_id = data.get('activity_definition_id')
         context_type = data['context_type']
         context_id = data['context_id']
+
+        nano_goal = None
+        if nano_goal_id:
+            nano_goal, nano_error, nano_status = self._validate_nano_goal_link(
+                root_id,
+                nano_goal_id,
+                session_id=session_id,
+                activity_instance_id=activity_instance_id,
+            )
+            if nano_error:
+                return None, nano_error, nano_status
 
         context_payload, context_error = self._validate_note_context(
             root_id=root_id,
@@ -532,6 +579,7 @@ class NoteService:
                 activity_instance_id=activity_instance_id,
                 activity_definition_id=activity_definition_id,
                 goal_id=goal_id,
+                nano_goal_id=nano_goal.id if nano_goal else None,
                 set_index=data.get('set_index'),
                 content=content,
             )
@@ -550,10 +598,112 @@ class NoteService:
                 'session_id': note.session_id,
                 'activity_instance_id': note.activity_instance_id,
                 'goal_id': note.goal_id,
+                'nano_goal_id': note.nano_goal_id,
             },
             source='note_service.create_note',
         ))
         return serialize_note_display(note, include_image=True), None, 201
+
+    def create_nano_goal_note(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+
+        name = (data.get('name') or '').strip()
+        parent_id = data.get('parent_id')
+        session_id = data.get('session_id')
+        activity_instance_id = data.get('activity_instance_id')
+        activity_definition_id = data.get('activity_definition_id')
+        if not name:
+            return None, "name is required", 400
+        if not parent_id:
+            return None, "parent_id is required", 400
+
+        instance = None
+        if activity_instance_id:
+            instance = get_owned_activity_instance(self.db_session, root_id, activity_instance_id)
+            if not instance:
+                return None, "Activity instance not found in this fractal", 400
+            if session_id and instance.session_id != session_id:
+                return None, "Activity instance does not belong to the provided session", 400
+            if activity_definition_id and instance.activity_definition_id != activity_definition_id:
+                return None, "activity_definition_id does not match the activity instance", 400
+            session_id = session_id or instance.session_id
+            activity_definition_id = activity_definition_id or instance.activity_definition_id
+
+        note_session = self._resolve_note_session(
+            root_id,
+            session_id=session_id,
+            activity_instance_id=activity_instance_id,
+        )
+        if note_session and is_quick_session(note_session):
+            return None, "Quick sessions do not support notes", 400
+
+        goal_service = GoalService(self.db_session, sync_targets=sync_goal_targets)
+        try:
+            goal, goal_error, goal_status = goal_service.create_fractal_goal_record(
+                root_id,
+                current_user_id,
+                {
+                    'name': name,
+                    'type': 'NanoGoal',
+                    'parent_id': parent_id,
+                },
+            )
+            if goal_error:
+                return None, goal_error, goal_status
+
+            note = Note(
+                id=str(uuid.uuid4()),
+                root_id=root_id,
+                context_type='activity_instance' if activity_instance_id else 'goal',
+                context_id=activity_instance_id or goal.id,
+                session_id=session_id,
+                activity_instance_id=activity_instance_id,
+                activity_definition_id=activity_definition_id,
+                goal_id=None,
+                nano_goal_id=goal.id,
+                content=data.get('content') or name,
+            )
+            self.db_session.add(note)
+            self.db_session.flush()
+        except Exception:
+            self.db_session.rollback()
+            raise
+
+        self.db_session.commit()
+        self.db_session.refresh(goal)
+        self.db_session.refresh(note)
+
+        note_payload = serialize_note_display(note, include_image=True)
+        goal_payload = serialize_goal(goal, include_children=False)
+        event_bus.emit(Event(
+            Events.NOTE_CREATED,
+            {
+                'note_id': note.id,
+                'note_content': note.content,
+                'context_type': note.context_type,
+                'context_id': note.context_id,
+                'root_id': root_id,
+                'session_id': note.session_id,
+                'activity_instance_id': note.activity_instance_id,
+                'goal_id': note.goal_id,
+                'nano_goal_id': note.nano_goal_id,
+            },
+            source='note_service.create_nano_goal_note',
+        ))
+        event_bus.emit(Event(
+            Events.GOAL_CREATED,
+            {
+                'goal_id': goal.id,
+                'goal_name': goal.name,
+                'goal_type': 'NanoGoal',
+                'parent_id': goal.parent_id,
+                'root_id': goal.root_id,
+            },
+            source='note_service.create_nano_goal_note',
+        ))
+        return {'goal': goal_payload, 'note': note_payload}, None, 201
 
     def update_note(self, root_id, note_id, current_user_id, data) -> ServiceResult[JsonDict]:
         data = normalize_note_payload(data, partial=True)

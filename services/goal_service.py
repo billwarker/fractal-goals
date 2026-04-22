@@ -57,6 +57,18 @@ _TYPE_TO_LEVEL_NAME = {
     'MidTermGoal': 'Mid Term Goal',
     'ShortTermGoal': 'Short Term Goal',
     'ImmediateGoal': 'Immediate Goal',
+    'MicroGoal': 'Micro Goal',
+    'NanoGoal': 'Nano Goal',
+}
+
+_DEFAULT_LEVEL_RANKS = {
+    'Ultimate Goal': 0,
+    'Long Term Goal': 1,
+    'Mid Term Goal': 2,
+    'Short Term Goal': 3,
+    'Immediate Goal': 4,
+    'Micro Goal': 5,
+    'Nano Goal': 6,
 }
 
 
@@ -71,6 +83,13 @@ def resolve_level_id(db_session, type_value) -> str | None:
     level = db_session.query(GoalLevel).filter_by(name=level_name, owner_id=None).first()
     if not level:
         level = db_session.query(GoalLevel).filter_by(name=level_name).first()
+    if not level and level_name in _DEFAULT_LEVEL_RANKS:
+        level = GoalLevel(name=level_name, rank=_DEFAULT_LEVEL_RANKS[level_name])
+        db_session.add(level)
+        db_session.flush()
+    if level and getattr(level, 'deleted_at', None) is not None:
+        level.deleted_at = None
+        db_session.flush()
     return level.id if level else None
 
 
@@ -716,6 +735,12 @@ class GoalService:
         data = normalize_goal_payload(data)
         parent = None
         parent_id = data.get('parent_id')
+        if data.get('type') in {'MicroGoal', 'NanoGoal'} and not parent_id:
+            return None, "parent_id is required for MicroGoal and NanoGoal", 400
+        if data.get('type') == 'MicroGoal' and data.get('deadline'):
+            return None, "MicroGoal cannot have deadlines", 400
+        if data.get('type') == 'NanoGoal' and data.get('description'):
+            return None, "NanoGoal cannot have a description", 400
         if parent_id:
             parent = get_goal_by_id(self.db_session, parent_id)
             if not parent:
@@ -732,6 +757,16 @@ class GoalService:
             activity, activity_error = self._get_activity_for_goal_association(target_root_id, activity_definition_id)
             if activity_error:
                 return None, *activity_error
+
+        session_id = data.get('session_id')
+        linked_session = None
+        if session_id:
+            linked_session = self.db_session.query(Session).filter(
+                Session.id == session_id,
+                Session.deleted_at.is_(None),
+            ).first()
+            if not linked_session or (target_root_id and linked_session.root_id != target_root_id):
+                return None, "Session not found in this fractal", 400
 
         deadline, deadline_error = self._parse_deadline(data.get('deadline'))
         if deadline_error:
@@ -794,6 +829,17 @@ class GoalService:
             if activity:
                 self._associate_goal_with_activity(new_goal.id, activity.id)
 
+            if linked_session:
+                self.db_session.execute(session_goals.insert().values(
+                    **session_goal_insert_values(
+                        self.db_session,
+                        linked_session.id,
+                        new_goal.id,
+                        data.get('type', 'Goal'),
+                        'micro_goal' if data.get('type') == 'MicroGoal' else 'manual',
+                    )
+                ))
+
         self.db_session.commit()
         self.db_session.refresh(new_goal)
         event_bus.emit(Event(Events.GOAL_CREATED, {
@@ -834,6 +880,17 @@ class GoalService:
             if activity_error:
                 return None, *activity_error
 
+        session_id = data.get('session_id')
+        linked_session = None
+        if session_id:
+            linked_session = self.db_session.query(Session).filter(
+                Session.id == session_id,
+                Session.root_id == root_id,
+                Session.deleted_at.is_(None),
+            ).first()
+            if not linked_session:
+                return None, "Session not found in this fractal", 400
+
         deadline, deadline_error = self._parse_deadline(data.get('deadline'))
         if deadline_error:
             return None, deadline_error, 400
@@ -846,6 +903,12 @@ class GoalService:
             return None, description_error, 400
 
         parent_id = data.get('parent_id')
+        if data.get('type') in {'MicroGoal', 'NanoGoal'} and not parent_id:
+            return None, "parent_id is required for MicroGoal and NanoGoal", 400
+        if data.get('type') == 'MicroGoal' and data.get('deadline'):
+            return None, "MicroGoal cannot have deadlines", 400
+        if data.get('type') == 'NanoGoal' and data.get('description'):
+            return None, "NanoGoal cannot have a description", 400
         parent_goal = None
         if parent_id:
             parent_goal = self.db_session.query(Goal).options(
@@ -899,6 +962,17 @@ class GoalService:
 
             if activity:
                 self._associate_goal_with_activity(new_goal.id, activity.id)
+
+            if linked_session:
+                self.db_session.execute(session_goals.insert().values(
+                    **session_goal_insert_values(
+                        self.db_session,
+                        linked_session.id,
+                        new_goal.id,
+                        data.get('type', 'Goal'),
+                        'micro_goal' if data.get('type') == 'MicroGoal' else 'manual',
+                    )
+                ))
 
         return new_goal, None, 201
 
@@ -1408,9 +1482,6 @@ class GoalService:
 
         goal_type = get_canonical_goal_type(goal)
 
-        if not self._goals_share_same_tier(current_parent, new_parent):
-            return None, "Can only move a goal under a parent on the same tier as its current parent", 400
-
         # Prevent circular references — walk up from new_parent
         current = new_parent
         while current.parent_id:
@@ -1533,11 +1604,15 @@ class GoalService:
         if not new_level:
             return None, "Goal level not found", 404
 
-        # Execution-tier goals (Immediate) cannot be converted
-        EXECUTION_TIER_NAMES = {'Immediate Goal'}
+        # Execution-tier goals cannot be converted, and Micro/Nano are not
+        # structural conversion targets.
+        EXECUTION_TIER_NAMES = {'Immediate Goal', 'Micro Goal', 'Nano Goal'}
+        TARGET_EXECUTION_TIER_NAMES = {'Micro Goal', 'Nano Goal'}
         current_level_name = getattr(goal.level, 'name', None)
         if current_level_name in EXECUTION_TIER_NAMES:
             return None, f"Cannot convert an execution-tier goal ('{current_level_name}')", 400
+        if new_level.name in TARGET_EXECUTION_TIER_NAMES:
+            return None, f"Cannot convert a goal to execution tier level '{new_level.name}'", 400
 
         root_level_rank = self._get_goal_level_rank(root)
         if root_level_rank is not None and new_level.rank <= root_level_rank:

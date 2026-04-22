@@ -3,15 +3,15 @@ import { render, screen } from '@testing-library/react';
 
 import PageHeader from '../PageHeader';
 
-const useIsMobileMock = vi.fn();
+const isMobileMock = vi.fn();
 
 vi.mock('../../../hooks/useIsMobile', () => ({
-    default: () => useIsMobileMock(),
+    default: () => isMobileMock(),
 }));
 
 describe('PageHeader', () => {
     beforeEach(() => {
-        useIsMobileMock.mockReturnValue(false);
+        isMobileMock.mockReturnValue(false);
     });
 
     it('renders the header copy on desktop', () => {
@@ -22,7 +22,7 @@ describe('PageHeader', () => {
     });
 
     it('hides the header copy on mobile by default', () => {
-        useIsMobileMock.mockReturnValue(true);
+        isMobileMock.mockReturnValue(true);
 
         render(<PageHeader title="Notes" subtitle="72 notes" actions={<button type="button">Write</button>} />);
 

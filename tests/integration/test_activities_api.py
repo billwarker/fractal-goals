@@ -244,6 +244,23 @@ class TestActivities:
         assert len(data['split_definitions']) == 2
         assert data['has_splits'] is True
 
+    def test_create_activity_with_goal_ids_persists_associations(self, authed_client, sample_goal_hierarchy):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal_ids = [sample_goal_hierarchy['mid_term'].id, sample_goal_hierarchy['short_term'].id]
+
+        response = authed_client.post(
+            f'/api/{root_id}/activities',
+            json={
+                'name': 'Goal Linked Activity',
+                'metrics': [{'name': 'Reps', 'unit': 'reps'}],
+                'goal_ids': goal_ids,
+            },
+        )
+
+        assert response.status_code == 201
+        associated_goal_ids = {goal['id'] for goal in response.get_json()['associated_goals']}
+        assert associated_goal_ids == set(goal_ids)
+
     def test_create_activity_allows_duplicate_names(self, authed_client, sample_ultimate_goal):
         """Activities with the same name should be allowed (different IDs)."""
         root_id = sample_ultimate_goal.id

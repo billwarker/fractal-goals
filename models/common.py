@@ -21,6 +21,7 @@ class Note(Base):
     activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True, index=True)
     activity_definition_id = Column(String, ForeignKey('activity_definitions.id', ondelete='SET NULL'), nullable=True, index=True)
     goal_id = Column(String, ForeignKey('goals.id', ondelete='SET NULL'), nullable=True, index=True)
+    nano_goal_id = Column(String, ForeignKey('goals.id', ondelete='SET NULL'), nullable=True, index=True)
 
     set_index = Column(Integer, nullable=True)
 
@@ -36,6 +37,7 @@ class Note(Base):
     activity_instance = relationship("ActivityInstance", backref="notes_list")
     activity_definition = relationship("ActivityDefinition", backref="notes_list")
     goal = relationship("Goal", foreign_keys=[goal_id])
+    nano_goal = relationship("Goal", foreign_keys=[nano_goal_id])
 
 class AnalyticsDashboard(Base):
     __tablename__ = 'analytics_dashboards'

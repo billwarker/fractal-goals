@@ -50,6 +50,7 @@ function ActivityBuilderForm({
     const [groupId, setGroupId] = useState(initialState.groupId);
     const [selectedGoalIds, setSelectedGoalIds] = useState(initialState.selectedGoalIds);
     const [trackProgress, setTrackProgress] = useState(initialState.trackProgress);
+    const [deltaDisplayMode, setDeltaDisplayMode] = useState(initialState.deltaDisplayMode);
 
     const resetForm = () => {
         setError(null);
@@ -64,6 +65,7 @@ function ActivityBuilderForm({
         setGroupId('');
         setSelectedGoalIds([]);
         setTrackProgress(true);
+        setDeltaDisplayMode(null);
         setPendingSubmission(null);
         setShowMetricWarning(false);
         setMetricWarningMessage('');
@@ -151,6 +153,7 @@ function ActivityBuilderForm({
                 groupId,
                 selectedGoalIds,
                 trackProgress,
+                deltaDisplayMode,
             });
 
             const result = editingActivity?.id
@@ -198,6 +201,7 @@ function ActivityBuilderForm({
             groupId,
             selectedGoalIds,
             trackProgress,
+            deltaDisplayMode,
         });
 
         const persistedMetrics = editingActivity?.id
@@ -308,6 +312,21 @@ function ActivityBuilderForm({
                             />
                         </div>
                     </div>
+
+                    {trackProgress && (
+                        <div>
+                            <Select
+                                label="Delta display (overrides root setting)"
+                                value={deltaDisplayMode || ''}
+                                onChange={(event) => setDeltaDisplayMode(event.target.value || null)}
+                                fullWidth
+                            >
+                                <option value="">Inherit from root</option>
+                                <option value="percent">Percent (▲12%)</option>
+                                <option value="absolute">Absolute (+5)</option>
+                            </Select>
+                        </div>
+                    )}
 
                     {hasSplits && (
                         <ActivitySplitsSection

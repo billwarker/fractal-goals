@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from models import (
     ActivityDefinition,
@@ -86,6 +87,18 @@ class TestProgressApi:
         assert persisted_metric is not None
         assert persisted_metric.track_progress is False
         assert persisted_metric.progress_aggregation == 'sum'
+
+    def test_activity_delta_display_mode_database_constraint_rejects_invalid_values(
+        self,
+        db_session,
+        sample_activity_definition,
+    ):
+        sample_activity_definition.delta_display_mode = 'ratio'
+
+        with pytest.raises(IntegrityError):
+            db_session.commit()
+
+        db_session.rollback()
 
     def test_progress_endpoints_enforce_root_scoping(self, authed_client, db_session, sample_ultimate_goal, test_user):
         other_root = Goal(

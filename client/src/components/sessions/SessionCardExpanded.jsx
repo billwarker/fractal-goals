@@ -16,6 +16,8 @@ import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import GoalAccomplishmentChip from '../common/GoalAccomplishmentChip';
 import MetaField from '../common/MetaField';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
+import { useEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
 import SessionSectionGrid from './SessionSectionGrid';
 import ActivityCard from './ActivityCard';
 import styles from './SessionCardExpanded.module.css';
@@ -134,6 +136,8 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     formatDate
 }) {
     const { getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
+    const { progressSettings } = useRootProgressSettings(rootId);
+    const deltaDisplayMode = useEffectiveDeltaDisplayMode(null, progressSettings);
     const sessionData = session.attributes?.session_data;
     const quickSession = isQuickSession(session);
     const templateColor = getTemplateColor(session);
@@ -398,6 +402,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                                         key={activity.instance_id || activity.id || `${activity.name}-${index}`}
                                         activity={activity}
                                         activityDefinition={activityDefinition}
+                                        deltaDisplayMode={deltaDisplayMode}
                                     />
                                 );
                             })}
@@ -413,6 +418,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                             sections={sessionData.sections}
                             activities={activities}
                             activityInstances={sessionActivityInstances}
+                            deltaDisplayMode={deltaDisplayMode}
                         />
 
                         {/* Session Notes */}

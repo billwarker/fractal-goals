@@ -168,4 +168,65 @@ describe('HistoryPanel', () => {
         expect(screen.getByText(/Quality: 11 rating/i)).toBeInTheDocument();
         expect(screen.getByText('(▲10%)')).toBeInTheDocument();
     });
+
+    it('uses progress tone, not delta sign, for absolute history indicators', () => {
+        useActivityHistory.mockReturnValue({
+            history: [
+                {
+                    id: 'instance-1',
+                    created_at: '2026-04-10T12:00:00.000Z',
+                    metric_values: [
+                        { metric_definition_id: 'm1', metric_id: 'm1', name: 'Time', value: 55, unit: 's' },
+                    ],
+                    sets: [],
+                    notes: [],
+                },
+            ],
+            loading: false,
+            error: null,
+        });
+        useProgressHistory.mockReturnValue({
+            progressHistory: [
+                {
+                    activity_instance_id: 'instance-1',
+                    metric_comparisons: [
+                        {
+                            metric_id: 'm1',
+                            metric_name: 'Time',
+                            delta: -5,
+                            improved: true,
+                            regressed: false,
+                        },
+                    ],
+                },
+            ],
+            isLoading: false,
+            error: null,
+        });
+
+        renderWithProviders(
+            <HistoryPanel
+                rootId="root-1"
+                sessionId="session-1"
+                selectedActivity={{ activity_definition_id: 'activity-def-1' }}
+                sessionActivityDefs={[
+                    {
+                        id: 'activity-def-1',
+                        name: 'Intervals',
+                        delta_display_mode: 'absolute',
+                        metric_definitions: [{ id: 'm1', name: 'Time', unit: 's' }],
+                    },
+                ]}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        const indicator = screen.getByText('(-5)');
+        expect(indicator.className).toMatch(/historyProgressImproved/);
+    });
 });

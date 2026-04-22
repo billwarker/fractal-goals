@@ -117,7 +117,9 @@ function GoalOptionsView({
             }
             setViewState('goal');
             setIsEditing(true);
-        } catch {}
+        } catch {
+            // Mutation helpers surface errors via their own notification layer.
+        }
     };
 
     const handleFreeze = async () => {
@@ -125,7 +127,9 @@ function GoalOptionsView({
             const nextFrozen = !isFrozen;
             await freezeGoal(nextFrozen);
             setViewState('goal');
-        } catch {}
+        } catch {
+            // Mutation helpers surface errors via their own notification layer.
+        }
     };
 
     const handleMove = async (newParentId) => {
@@ -137,7 +141,9 @@ function GoalOptionsView({
             await moveGoal(newParentId);
             setSubView('main');
             setViewState('goal');
-        } catch {}
+        } catch {
+            // Mutation helpers surface errors via their own notification layer.
+        }
     };
 
     const handleConvertLevel = async (levelId) => {
@@ -145,7 +151,9 @@ function GoalOptionsView({
             await convertGoalLevel(levelId);
             setSubView('main');
             setViewState('goal');
-        } catch {}
+        } catch {
+            // Mutation helpers surface errors via their own notification layer.
+        }
     };
 
     if (subView === 'move') {

@@ -33,34 +33,41 @@ export function renderWithProviders(
         withTheme = true
     } = {}
 ) {
-    let wrappedUi = (
-        <Routes>
-            <Route path={path} element={ui} />
-        </Routes>
-    );
+    const wrapUi = (element) => {
+        let wrappedUi = (
+            <Routes>
+                <Route path={path} element={element} />
+            </Routes>
+        );
 
-    if (withTheme) {
-        wrappedUi = <ThemeProvider>{wrappedUi}</ThemeProvider>;
-    }
-    if (withGoalLevels) {
-        wrappedUi = <GoalLevelsProvider>{wrappedUi}</GoalLevelsProvider>;
-    }
-    if (withAuth) {
-        wrappedUi = <AuthProvider>{wrappedUi}</AuthProvider>;
-    }
-    if (withTimezone) {
-        wrappedUi = <TimezoneProvider>{wrappedUi}</TimezoneProvider>;
-    }
+        if (withTheme) {
+            wrappedUi = <ThemeProvider>{wrappedUi}</ThemeProvider>;
+        }
+        if (withGoalLevels) {
+            wrappedUi = <GoalLevelsProvider>{wrappedUi}</GoalLevelsProvider>;
+        }
+        if (withAuth) {
+            wrappedUi = <AuthProvider>{wrappedUi}</AuthProvider>;
+        }
+        if (withTimezone) {
+            wrappedUi = <TimezoneProvider>{wrappedUi}</TimezoneProvider>;
+        }
 
-    return {
-        queryClient,
-        ...render(
+        return (
             <QueryClientProvider client={queryClient}>
                 <MemoryRouter initialEntries={[route]}>
                     {wrappedUi}
                 </MemoryRouter>
             </QueryClientProvider>
-        )
+        );
+    };
+
+    const result = render(wrapUi(ui));
+
+    return {
+        queryClient,
+        ...result,
+        rerender: (nextUi) => result.rerender(wrapUi(nextUi)),
     };
 }
 

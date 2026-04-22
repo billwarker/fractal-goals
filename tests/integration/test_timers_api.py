@@ -14,6 +14,8 @@ from datetime import datetime, timedelta
 import time
 from uuid import uuid4
 
+from sqlalchemy.exc import IntegrityError
+
 from models import Goal, SessionTemplate
 
 
@@ -84,6 +86,44 @@ class TestTimerStartStop:
         data = json.loads(response.data)
         assert data['time_start'] is not None
         assert data['time_stop'] is None
+
+    def test_start_timer_persists_countdown_target(self, authed_client, db_session, sample_activity_instance):
+        """Starting with a target duration stores countdown metadata."""
+        from models import Session
+        session = db_session.query(Session).get(sample_activity_instance.session_id)
+        root_id = session.root_id
+
+        response = authed_client.post(
+            f'/api/{root_id}/activity-instances/{sample_activity_instance.id}/start',
+            json={'target_duration_seconds': 90},
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['target_duration_seconds'] == 90
+
+    def test_start_timer_rejects_invalid_countdown_target(self, authed_client, db_session, sample_activity_instance):
+        """Countdown targets must be positive durations."""
+        from models import Session
+        session = db_session.query(Session).get(sample_activity_instance.session_id)
+        root_id = session.root_id
+
+        response = authed_client.post(
+            f'/api/{root_id}/activity-instances/{sample_activity_instance.id}/start',
+            json={'target_duration_seconds': -30},
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'
+
+    def test_target_duration_database_constraint_rejects_non_positive_values(self, db_session, sample_activity_instance):
+        """The database should reject invalid countdown targets even outside the API."""
+        sample_activity_instance.target_duration_seconds = 0
+
+        with pytest.raises(IntegrityError):
+            db_session.commit()
+
+        db_session.rollback()
     
     def test_stop_timer(self, authed_client, db_session, sample_activity_instance):
         """Test stopping an activity timer."""

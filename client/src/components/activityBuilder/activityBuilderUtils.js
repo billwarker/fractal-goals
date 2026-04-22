@@ -140,6 +140,7 @@ export function getInitialActivityBuilderState(editingActivity) {
             groupId: '',
             selectedGoalIds: [],
             trackProgress: true,
+            deltaDisplayMode: null,
         };
     }
 
@@ -170,5 +171,6 @@ export function getInitialActivityBuilderState(editingActivity) {
         groupId: editingActivity.group_id || '',
         selectedGoalIds: editingActivity.associated_goal_ids || [],
         trackProgress: editingActivity.track_progress !== false,
+        deltaDisplayMode: editingActivity.delta_display_mode || null,
     };
 }

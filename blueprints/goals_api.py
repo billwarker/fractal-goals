@@ -87,6 +87,10 @@ def create_goal(current_user, validated_data):
         db_session.rollback()
         logger.exception("Error creating goal")
         return internal_error(logger, "Error creating goal")
+    except Exception:
+        db_session.rollback()
+        logger.exception("Unexpected error creating goal")
+        return internal_error(logger, "Error creating goal")
     finally:
         db_session.close()
 
@@ -107,6 +111,27 @@ def get_session_goals_view(current_user, root_id, session_id):
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error fetching session goals view")
+        return internal_error(logger, "Goals API request failed")
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/fractal/<root_id>/sessions/<session_id>/micro-goals', methods=['GET'])
+@token_required
+def get_session_micro_goals(current_user, root_id, session_id):
+    """Return MicroGoal entries linked to a specific session."""
+    from services.goal_tree_service import GoalTreeService
+
+    db_session = get_db_session()
+    try:
+        service = GoalTreeService(db_session)
+        payload, error_dict, status_code = service.get_session_micro_goals(current_user, root_id, session_id)
+        if error_dict:
+            return jsonify(error_dict), status_code
+        return jsonify(payload)
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching session micro goals")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
@@ -421,6 +446,10 @@ def create_fractal_goal(current_user, root_id, validated_data):
         db_session.rollback()
         logger.exception("Error creating fractal goal")
         return internal_error(logger, "Error creating fractal goal")
+    except Exception:
+        db_session.rollback()
+        logger.exception("Unexpected error creating fractal goal")
+        return internal_error(logger, "Error creating fractal goal")
     finally:
         db_session.close()
 
@@ -646,6 +675,35 @@ def move_goal_endpoint(current_user, root_id: str, goal_id: str, validated_data)
     db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
+        _, root_error = service._validate_owned_root(root_id, current_user.id)
+        if root_error:
+            error, status = root_error
+            return jsonify({"error": error}), status
+
+        goal = db_session.query(models.Goal).filter_by(
+            id=goal_id,
+            root_id=root_id,
+            deleted_at=None,
+        ).first()
+        current_parent = (
+            db_session.query(models.Goal).filter_by(
+                id=goal.parent_id,
+                root_id=root_id,
+                deleted_at=None,
+            ).first()
+            if goal and goal.parent_id
+            else None
+        )
+        new_parent = db_session.query(models.Goal).filter_by(
+            id=validated_data['new_parent_id'],
+            root_id=root_id,
+            deleted_at=None,
+        ).first()
+        if current_parent and new_parent and not service._goals_share_same_tier(new_parent, current_parent):
+            return jsonify({
+                "error": "Can only move a goal under a parent on the same tier as its current parent"
+            }), 400
+
         goal, error, status = service.move_goal(
             root_id,
             goal_id,

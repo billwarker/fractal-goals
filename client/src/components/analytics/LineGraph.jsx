@@ -208,7 +208,7 @@ function LineGraph({
     // Find the metric designated as the "best set" metric
     const bestSetMetric = metrics.find(m => m.is_best_set_metric) || metrics[0];
 
-    const getBestSetIndex = React.useCallback((sets) => {
+    const getBestSetIndex = (sets) => {
         if (!Array.isArray(sets) || !bestSetMetric) {
             return -1;
         }
@@ -245,7 +245,7 @@ function LineGraph({
         });
 
         return topSetIndex;
-    }, [bestSetMetric, shouldIncludeMetric]);
+    };
 
     // Collect data points with timestamps for both Y1 and Y2
     const collectDataPoints = (metricToPlot, isProductMetric) => {

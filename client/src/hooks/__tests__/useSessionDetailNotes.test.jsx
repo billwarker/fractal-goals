@@ -6,13 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSessionDetailNotes } from '../useSessionDetailNotes';
 
 const {
-    useSessionNotes,
+    sessionNotesMock,
 } = vi.hoisted(() => ({
-    useSessionNotes: vi.fn(),
+    sessionNotesMock: vi.fn(),
 }));
 
 vi.mock('../useSessionNotes', () => ({
-    default: (...args) => useSessionNotes(...args),
+    default: (...args) => sessionNotesMock(...args),
 }));
 
 function createWrapper(queryClient) {
@@ -28,7 +28,7 @@ function createWrapper(queryClient) {
 describe('useSessionDetailNotes', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        useSessionNotes.mockReturnValue({
+        sessionNotesMock.mockReturnValue({
             notes: [
                 {
                     id: 'note-1',
@@ -67,6 +67,6 @@ describe('useSessionDetailNotes', () => {
             await result.current.deleteNote('note-1');
         });
 
-        expect(useSessionNotes.mock.results[0].value.deleteNote).toHaveBeenCalledWith('note-1');
+        expect(sessionNotesMock.mock.results[0].value.deleteNote).toHaveBeenCalledWith('note-1');
     });
 });

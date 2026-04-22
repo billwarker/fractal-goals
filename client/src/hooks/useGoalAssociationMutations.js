@@ -172,7 +172,12 @@ export function useGoalAssociationMutations({
         }
 
         if (goalId) {
-            await fractalApi.setActivityGoals(rootId, newActivity.id, [goalId]);
+            const existingGoalIds = [
+                ...(Array.isArray(newActivity.associated_goal_ids) ? newActivity.associated_goal_ids : []),
+                ...(Array.isArray(newActivity.associated_goals) ? newActivity.associated_goals.map((goal) => goal?.id) : []),
+            ].filter(Boolean);
+            const nextGoalIds = Array.from(new Set([...existingGoalIds, goalId]));
+            await fractalApi.setActivityGoals(rootId, newActivity.id, nextGoalIds);
             await refreshAssociations();
             return { associatedImmediately: true };
         }

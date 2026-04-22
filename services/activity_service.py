@@ -958,6 +958,7 @@ class ActivityService:
             group_id=group_id,
             track_progress=data.get('track_progress', None),
             progress_aggregation=data.get('progress_aggregation', None),
+            delta_display_mode=data.get('delta_display_mode', None),
         )
         self.db_session.add(new_activity)
         self.db_session.flush() # Get ID
@@ -994,13 +995,7 @@ class ActivityService:
         # Handle Goal Associations
         goal_ids = data.get('goal_ids', [])
         if goal_ids:
-            goals = self.db_session.query(Goal).filter(
-                Goal.id.in_(goal_ids), 
-                Goal.root_id == root_id
-            ).all()
-            new_activity.associated_goals.extend(
-                [g for g in goals if g not in new_activity.associated_goals]
-            )
+            self._replace_activity_goal_associations(new_activity.id, root_id, goal_ids)
 
         self.db_session.commit()
         self.db_session.refresh(new_activity)
@@ -1034,6 +1029,8 @@ class ActivityService:
             activity.track_progress = data['track_progress']
         if 'progress_aggregation' in data:
             activity.progress_aggregation = data['progress_aggregation']
+        if 'delta_display_mode' in data:
+            activity.delta_display_mode = data['delta_display_mode'] or None
 
         # Update metrics if provided
         if 'metrics' in data:

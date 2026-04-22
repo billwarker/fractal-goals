@@ -234,6 +234,7 @@
     flex-direction: column;
     gap: 2px;
     min-width: 0;
+    position: relative;
 }
 
 .durationMetaField {
@@ -256,6 +257,30 @@
     width: 138px;
     font-family: var(--font-family-mono);
     min-width: 0;
+}
+
+.timerInputError {
+    border-color: var(--color-brand-danger);
+}
+
+.timerValidationError {
+    color: var(--color-brand-danger);
+    font-size: 10px;
+    line-height: 1.2;
+    max-width: 138px;
+}
+
+.timerModeHint {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 8px;
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-style: italic;
+    font-weight: normal;
+    line-height: 1.2;
+    max-width: 138px;
 }
 
 .timerInputDisabled {
@@ -837,4 +862,14 @@
     font-weight: 400;
     font-style: italic;
     margin-left: 8px;
+}
+
+.durationCountdownAlert {
+    color: var(--color-brand-danger) !important;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
 }

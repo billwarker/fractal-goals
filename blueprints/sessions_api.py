@@ -161,7 +161,13 @@ def update_session(current_user, root_id, session_id, validated_data):
     db_session = get_db_session()
     service = SessionService(db_session)
     try:
-        result, error, status = service.update_session(root_id, session_id, current_user.id, validated_data)
+        result, error, status = service.update_session(
+            root_id,
+            session_id,
+            current_user.id,
+            validated_data,
+            complete_unstarted_instances=False,
+        )
         if error:
             return jsonify({"error": error}), status
         return jsonify(result), status

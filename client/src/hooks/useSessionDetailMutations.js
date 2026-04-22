@@ -342,7 +342,7 @@ export function useSessionDetailMutations({
         return queue.enqueue(updates);
     }, [applyInstanceOptimisticUpdate, getInstanceQueue]);
 
-    const handleUpdateTimer = useCallback(async (instanceId, action) => {
+    const handleUpdateTimer = useCallback(async (instanceId, action, extraData = {}) => {
         const instance = activityInstances.find((entry) => entry.id === instanceId);
         if (!instance) return;
 
@@ -351,7 +351,8 @@ export function useSessionDetailMutations({
             if (action === 'start') {
                 response = await fractalApi.startActivityTimer(rootId, instanceId, {
                     session_id: sessionId,
-                    activity_definition_id: instance.activity_definition_id
+                    activity_definition_id: instance.activity_definition_id,
+                    ...extraData,
                 });
             } else if (action === 'complete') {
                 response = await fractalApi.completeActivityInstance(rootId, instanceId, {
@@ -365,6 +366,7 @@ export function useSessionDetailMutations({
                     time_start: null,
                     time_stop: null,
                     duration_seconds: null,
+                    target_duration_seconds: null,
                     completed: false
                 });
             }

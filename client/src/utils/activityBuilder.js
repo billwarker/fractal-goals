@@ -84,6 +84,7 @@ export function buildActivityPayload({
     groupId,
     selectedGoalIds,
     trackProgress,
+    deltaDisplayMode,
 }) {
     const sanitizedMetrics = (metrics || [])
         .map((metric) => sanitizeMetric(metric))
@@ -104,6 +105,7 @@ export function buildActivityPayload({
         group_id: normalizeOptionalId(groupId),
         goal_ids: sanitizeGoalIds(selectedGoalIds),
         track_progress: trackProgress !== false,
+        delta_display_mode: deltaDisplayMode || null,
     };
 }
 
@@ -139,6 +141,7 @@ export function prepareActivityDefinitionCopy(activity) {
         has_splits: Boolean(activity.has_splits ?? splitDefinitions.length > 0),
         group_id: normalizeOptionalId(activity.group_id),
         track_progress: activity.track_progress !== false,
+        delta_display_mode: activity.delta_display_mode || null,
         metric_definitions: metricDefinitions,
         split_definitions: splitDefinitions,
         associated_goal_ids: sanitizeGoalIds(activity.associated_goal_ids),

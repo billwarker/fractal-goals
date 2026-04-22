@@ -97,6 +97,7 @@ class ActivityDefinition(Base):
     group_id = Column(String, ForeignKey('activity_groups.id'), nullable=True, index=True)
     track_progress = Column(Boolean, nullable=True)       # null → treat as True (backward compat)
     progress_aggregation = Column(String, nullable=True)  # 'last' | 'sum' | 'max' | 'yield'
+    delta_display_mode = Column(String(16), nullable=True)  # null = inherit from root; 'percent' | 'absolute'
 
     group = relationship("ActivityGroup", backref="activities")
     metric_definitions = relationship("MetricDefinition", backref="activity_definition", cascade="all, delete-orphan")
@@ -107,6 +108,13 @@ class ActivityDefinition(Base):
         secondary="activity_goal_associations",
         back_populates="associated_activities",
         viewonly=True
+    )
+
+    __table_args__ = (
+        sa.CheckConstraint(
+            "delta_display_mode IS NULL OR delta_display_mode IN ('percent', 'absolute')",
+            name='ck_activity_definitions_delta_display_mode',
+        ),
     )
 
 class MetricDefinition(Base):
@@ -157,6 +165,7 @@ class ActivityInstance(Base):
     is_paused = Column(Boolean, nullable=False, server_default=sa.text('false'), default=False)
     last_paused_at = Column(DateTime, nullable=True)
     total_paused_seconds = Column(Integer, nullable=False, server_default=sa.text('0'), default=0)
+    target_duration_seconds = Column(Integer, nullable=True)
     deleted_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     sort_order = Column(Integer, default=0)
@@ -176,6 +185,10 @@ class ActivityInstance(Base):
     data = Column(JSON_TYPE, nullable=True)
     
     __table_args__ = (
+        sa.CheckConstraint(
+            'target_duration_seconds IS NULL OR target_duration_seconds > 0',
+            name='ck_activity_instances_target_duration_positive',
+        ),
         sa.Index('ix_activity_instances_session_deleted', 'session_id', 'deleted_at'),
     )
 

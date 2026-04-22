@@ -8,6 +8,7 @@
 import React, { memo, useMemo } from 'react';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import { formatShortDuration } from '../../hooks/useSessionDuration';
+import { resolveEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
 import {
     computeAutoAggregations,
     filterTrackedMetricDefs,
@@ -24,8 +25,17 @@ function getMetricInfo(metricId, activityDefinition) {
     return metric || { name: '', unit: '' };
 }
 
-function formatProgressValue(comparison) {
+function formatProgressValue(comparison, displayMode = 'percent') {
     if (!comparison) return null;
+    if (displayMode === 'absolute') {
+        if (comparison.delta == null) return null;
+        const delta = Number(comparison.delta);
+        const magnitude = Math.abs(delta);
+        const formatted = Number.isInteger(magnitude) ? String(magnitude) : magnitude.toFixed(1).replace(/\.0$/, '');
+        if (delta > 0) return `+${formatted}`;
+        if (delta < 0) return `-${formatted}`;
+        return '0';
+    }
     if (comparison.pct_change != null) {
         const magnitude = Math.abs(comparison.pct_change);
         const formatted = Number.isInteger(magnitude) ? String(magnitude) : magnitude.toFixed(1).replace(/\.0$/, '');
@@ -42,7 +52,7 @@ function formatProgressValue(comparison) {
     return '0';
 }
 
-function ProgressHint({ metricId, setIndex = null, progressComparison }) {
+function ProgressHint({ metricId, setIndex = null, progressComparison, displayMode = 'percent' }) {
     if (!progressComparison || progressComparison.is_first_instance) return null;
 
     const metricComp = progressComparison.metric_comparisons?.find(
@@ -56,7 +66,7 @@ function ProgressHint({ metricId, setIndex = null, progressComparison }) {
         if (Array.isArray(setComps) && setComps.length > 0) {
             const setComp = setComps.find((sc) => sc.set_index === setIndex);
             if (!setComp || setComp.previous_value == null) return null;
-            const value = formatProgressValue(setComp);
+            const value = formatProgressValue(setComp, displayMode);
             if (!value) return null;
             const cls = setComp.improved
                 ? styles.progressHintImproved
@@ -66,7 +76,7 @@ function ProgressHint({ metricId, setIndex = null, progressComparison }) {
             return <span className={`${styles.progressHint} ${cls}`}>({value})</span>;
         }
         // No per-set data (older record) — show aggregate hint on every set row
-        const value = formatProgressValue(metricComp);
+        const value = formatProgressValue(metricComp, displayMode);
         if (!value) return null;
         const cls = metricComp.improved
             ? styles.progressHintImproved
@@ -77,7 +87,7 @@ function ProgressHint({ metricId, setIndex = null, progressComparison }) {
     }
 
     // Single metric (no sets)
-    const value = formatProgressValue(metricComp);
+    const value = formatProgressValue(metricComp, displayMode);
     if (!value) return null;
     const cls = metricComp.improved
         ? styles.progressHintImproved
@@ -91,7 +101,7 @@ function ProgressHint({ metricId, setIndex = null, progressComparison }) {
  * Progress summary bar: totals, yield, and best set.
  * Rendered below set rows for set-based activities.
  */
-function ActivityProgressSummary({ sets, activityDefinition, progressComparison, precomputedAutoAgg }) {
+function ActivityProgressSummary({ sets, activityDefinition, progressComparison, precomputedAutoAgg, displayMode = 'percent' }) {
     const metricDefs = useMemo(() => activityDefinition?.metric_definitions || [], [activityDefinition?.metric_definitions]);
     const trackedMetricDefs = useMemo(() => filterTrackedMetricDefs(metricDefs), [metricDefs]);
 
@@ -141,7 +151,7 @@ function ActivityProgressSummary({ sets, activityDefinition, progressComparison,
                     <span className={styles.progressSummaryValue}>
                         {formatAggValue(autoAgg.total_yield)}
                         {prevYield != null && autoAgg.total_yield != null && (
-                            <TotalDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter />
+                            <TotalDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter displayMode={displayMode} />
                         )}
                     </span>
                     {hasBestSet && bestSetLabel && (
@@ -178,15 +188,20 @@ function ActivityProgressSummary({ sets, activityDefinition, progressComparison,
     );
 }
 
-function TotalDelta({ current, previous, higherIsBetter = true }) {
+function TotalDelta({ current, previous, higherIsBetter = true, displayMode = 'percent' }) {
     if (previous == null || current == null) return null;
     const delta = current - previous;
     if (delta === 0) return null;
     const improved = (delta > 0 && higherIsBetter) || (delta < 0 && !higherIsBetter);
-    const pct = previous !== 0 ? Math.abs(delta / previous * 100) : null;
-    const label = pct != null
-        ? `${improved ? '▲' : '▼'}${formatAggValue(pct)}%`
-        : `${improved ? '+' : ''}${formatAggValue(delta)}`;
+    let label;
+    if (displayMode === 'absolute') {
+        label = `${delta > 0 ? '+' : ''}${formatAggValue(delta)}`;
+    } else {
+        const pct = previous !== 0 ? Math.abs(delta / previous * 100) : null;
+        label = pct != null
+            ? `${improved ? '▲' : '▼'}${formatAggValue(pct)}%`
+            : `${delta > 0 ? '+' : ''}${formatAggValue(delta)}`;
+    }
     const cls = improved ? styles.progressHintImproved : styles.progressHintRegressed;
     return <span className={`${styles.progressHint} ${cls}`}> ({label})</span>;
 }
@@ -203,7 +218,7 @@ function getSplitInfo(splitId, activityDefinition) {
 /**
  * Renders a single set with metrics
  */
-function SetRow({ set, setIdx, activityDefinition, hasSplits, progressComparison, setYield }) {
+function SetRow({ set, setIdx, activityDefinition, hasSplits, progressComparison, setYield, displayMode = 'percent' }) {
     const metricsToDisplay = useMemo(() => {
         return set.metrics?.filter(m => {
             const mInfo = getMetricInfo(m.metric_id, activityDefinition);
@@ -246,6 +261,7 @@ function SetRow({ set, setIdx, activityDefinition, hasSplits, progressComparison
                                                     metricId={m.metric_id}
                                                     setIndex={setIdx}
                                                     progressComparison={progressComparison}
+                                                    displayMode={displayMode}
                                                 />
                                             </div>
                                         );
@@ -273,6 +289,7 @@ function SetRow({ set, setIdx, activityDefinition, hasSplits, progressComparison
                             metricId={m.metric_id}
                             setIndex={setIdx}
                             progressComparison={progressComparison}
+                            displayMode={displayMode}
                         />
                     </div>
                 );
@@ -287,7 +304,7 @@ function SetRow({ set, setIdx, activityDefinition, hasSplits, progressComparison
 /**
  * Renders single metrics (no sets)
  */
-function SingleMetrics({ activity, activityDefinition, progressComparison }) {
+function SingleMetrics({ activity, activityDefinition, progressComparison, displayMode = 'percent' }) {
     const hasSplits = activityDefinition?.has_splits && activityDefinition?.split_definitions?.length > 0;
 
     const filteredMetrics = useMemo(() => {
@@ -316,6 +333,7 @@ function SingleMetrics({ activity, activityDefinition, progressComparison }) {
                         <ProgressHint
                             metricId={m.metric_id}
                             progressComparison={progressComparison}
+                            displayMode={displayMode}
                         />
                     </div>
                 );
@@ -329,8 +347,13 @@ function SingleMetrics({ activity, activityDefinition, progressComparison }) {
  */
 const ActivityCard = memo(function ActivityCard({
     activity,
-    activityDefinition
+    activityDefinition,
+    deltaDisplayMode = 'percent',
 }) {
+    const effectiveDeltaDisplayMode = resolveEffectiveDeltaDisplayMode(
+        activityDefinition,
+        { delta_display_mode: deltaDisplayMode },
+    );
     const hasSplits = activityDefinition?.has_splits && activityDefinition?.split_definitions?.length > 0;
     const isActivity = activity.type === 'activity';
     const hasSets = activity.has_sets ?? Boolean(activity.sets?.length);
@@ -393,6 +416,7 @@ const ActivityCard = memo(function ActivityCard({
                                             hasSplits={hasSplits}
                                             progressComparison={progressComparison}
                                             setYield={yieldBySetIndex?.[setIdx] ?? null}
+                                            displayMode={effectiveDeltaDisplayMode}
                                         />
                                     ))}
                                     <ActivityProgressSummary
@@ -400,6 +424,7 @@ const ActivityCard = memo(function ActivityCard({
                                         activityDefinition={activityDefinition}
                                         progressComparison={progressComparison}
                                         precomputedAutoAgg={autoAgg}
+                                        displayMode={effectiveDeltaDisplayMode}
                                     />
                                 </div>
                             )}
@@ -410,6 +435,7 @@ const ActivityCard = memo(function ActivityCard({
                                     activity={activity}
                                     activityDefinition={activityDefinition}
                                     progressComparison={progressComparison}
+                                    displayMode={effectiveDeltaDisplayMode}
                                 />
                             )}
                         </div>
