@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { fractalApi } from './utils/api';
 import { HeaderProvider, useHeader } from './contexts/HeaderContext';
+import { useRootGoal } from './hooks/useGoalQueries';
 import useIsMobile from './hooks/useIsMobile';
 import { lazyWithRetry } from './utils/lazyWithRetry';
 import { getViewportMetaContent, shouldAllowZoom } from './utils/viewportMeta';
@@ -33,8 +33,6 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { headerActions } = useHeader();
-    const [fractalName, setFractalName] = useState('Fractal Goals');
-    const [fractalNameCache, setFractalNameCache] = useState({});
     const isMobile = useIsMobile();
     const navRef = useRef(null);
 
@@ -42,31 +40,13 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
     const pathParts = location.pathname.split('/');
     const rootId = pathParts[1]; // First part after /
 
-    useEffect(() => {
-        if (rootId && rootId !== 'assets' && rootId !== 'vite.svg' && rootId !== 'session' && rootId !== 'manage-activities' && rootId !== 'manage-session-templates' && rootId !== 'create-session' && rootId !== 'analytics' && rootId !== 'logs') {
-            if (fractalNameCache[rootId]) {
-                setFractalName(fractalNameCache[rootId]);
-            } else {
-                fractalApi.getGoal(rootId, rootId) // Fetch root goal to get name
-                    .then(res => {
-                        if (res.data && res.data.name) {
-                            const name = res.data.name;
-                            setFractalName(name);
-                            // Update cache
-                            setFractalNameCache(prev => ({
-                                ...prev,
-                                [rootId]: name
-                            }));
-                        }
-                    })
-                    .catch(err => {
-                        console.error('Failed to fetch fractal name:', err);
-                    });
-            }
-        } else if (!rootId || rootId === '') {
-            setFractalName('Fractal Goals');
-        }
-    }, [rootId]); // Remove fractalNameCache from dependencies
+    const isFractalRoute = Boolean(
+        rootId &&
+        !['', 'assets', 'vite.svg', 'session', 'manage-activities', 'manage-session-templates', 'create-session', 'analytics', 'logs'].includes(rootId)
+    );
+
+    const { data: rootGoal } = useRootGoal(rootId, { enabled: isFractalRoute });
+    const fractalName = rootGoal?.name || 'Fractal Goals';
 
     useEffect(() => {
         if (typeof onHeightChange !== 'function') {

@@ -48,6 +48,7 @@ function GoalDetailModal({
     onUpdate,
     activityDefinitions: activityDefinitionsRaw = [],
     sessions: sessionsRaw = [],
+    evidenceGoalIds: evidenceGoalIdsRaw = null,
     onToggleCompletion,
     onDelete,
     onAddChild,  // Handler for adding child goals
@@ -82,6 +83,15 @@ function GoalDetailModal({
         () => (Array.isArray(sessionsRaw) ? sessionsRaw : []),
         [sessionsRaw]
     );
+    const evidenceGoalIds = useMemo(() => {
+        if (evidenceGoalIdsRaw instanceof Set) {
+            return evidenceGoalIdsRaw;
+        }
+        if (Array.isArray(evidenceGoalIdsRaw)) {
+            return new Set(evidenceGoalIdsRaw.map((goalId) => String(goalId)).filter(Boolean));
+        }
+        return null;
+    }, [evidenceGoalIdsRaw]);
     const activityGroupsFromProps = useMemo(
         () => (Array.isArray(activityGroupsRaw) ? activityGroupsRaw : []),
         [activityGroupsRaw]
@@ -290,7 +300,7 @@ function GoalDetailModal({
             return 'active';
         }
 
-        const hasSignalInputs = sessions.length > 0
+        const hasSignalInputs = evidenceGoalIds !== null
             || activityDefinitions.length > 0
             || activityGroupsFromProps.length > 0;
         if (!hasSignalInputs) {
@@ -301,14 +311,14 @@ function GoalDetailModal({
         const parentById = new Map(
             flattenedTree.map((node) => [String(node.id), node.parent_id ? String(node.parent_id) : null])
         );
-        const evidenceGoalIds = deriveEvidenceGoalIds(sessions, activityDefinitions, activityGroupsFromProps);
-        if (evidenceGoalIds.size === 0) {
+        const activeEvidenceGoalIds = evidenceGoalIds || deriveEvidenceGoalIds(sessions, activityDefinitions, activityGroupsFromProps);
+        if (activeEvidenceGoalIds.size === 0) {
             return 'inactive';
         }
 
-        const activeLineageIds = getActiveLineageIds(evidenceGoalIds, parentById);
+        const activeLineageIds = getActiveLineageIds(activeEvidenceGoalIds, parentById);
         return activeLineageIds.has(String(depGoalId)) ? 'active' : 'inactive';
-    }, [activityDefinitions, activityGroupsFromProps, depGoalId, isFrozen, mode, sessions, treeData]);
+    }, [activityDefinitions, activityGroupsFromProps, depGoalId, evidenceGoalIds, isFrozen, mode, sessions, treeData]);
 
     const goalForSmart = {
         ...goal,

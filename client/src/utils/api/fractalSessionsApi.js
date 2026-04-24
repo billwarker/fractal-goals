@@ -5,8 +5,15 @@ export const fractalSessionsApi = {
         axios.get(`${API_BASE}/${rootId}/sessions${buildQueryString(options)}`),
     getSessionsHeatmap: (rootId, options = {}) =>
         axios.get(`${API_BASE}/${rootId}/sessions/heatmap${buildQueryString(options)}`),
+    getActivityInstantiationSummary: (rootId) =>
+        axios.get(`${API_BASE}/${rootId}/sessions/activity-instantiation-summary`),
+    getSessionEvidenceGoals: (rootId, options = {}) =>
+        axios.get(`${API_BASE}/${rootId}/sessions/evidence-goals${buildQueryString(options)}`),
+    getFlowtreeSessionMetrics: (rootId, options = {}) =>
+        axios.get(`${API_BASE}/${rootId}/sessions/flowtree-metrics${buildQueryString(options)}`),
     getSession: (rootId, sessionId) => axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}`),
     createSession: (rootId, data) => axios.post(`${API_BASE}/${rootId}/sessions`, data),
+    completeQuickSession: (rootId, data) => axios.post(`${API_BASE}/${rootId}/sessions/quick-complete`, data),
     updateSession: (rootId, sessionId, data) => axios.put(`${API_BASE}/${rootId}/sessions/${sessionId}`, data),
     deleteSession: (rootId, sessionId) => axios.delete(`${API_BASE}/${rootId}/sessions/${sessionId}`),
     pauseSession: (rootId, sessionId) => axios.post(`${API_BASE}/${rootId}/timers/session/${sessionId}/pause`),

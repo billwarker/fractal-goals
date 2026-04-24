@@ -154,6 +154,66 @@ function sanitizeSets(sets) {
     }));
 }
 
+function buildTemplateSessionPayload(template, selectedProgramDay) {
+    const quickTemplate = isQuickSession(template);
+    const sessionDataPayload = quickTemplate
+        ? {
+            template_id: template.id,
+            template_name: template.name,
+            template_color: template.template_color || template.template_data?.template_color,
+            session_type: 'quick',
+            program_context: null,
+        }
+        : {
+            template_id: template.id,
+            template_name: template.name,
+            template_color: template.template_color || template.template_data?.template_color,
+            session_type: 'normal',
+            program_context: selectedProgramDay ? {
+                program_id: selectedProgramDay.program_id,
+                program_name: selectedProgramDay.program_name,
+                block_id: selectedProgramDay.block_id,
+                block_name: selectedProgramDay.block_name,
+                day_id: selectedProgramDay.day_id,
+                day_name: selectedProgramDay.day_name,
+            } : null,
+            sections: (template.template_data?.sections || []).map((section) => {
+                const templateItems = section.activities || section.exercises || [];
+                const exercises = templateItems
+                    .map((activity) => {
+                        const activityId = extractActivityId(activity);
+                        if (!activityId) return null;
+                        const name = typeof activity === 'object' ? activity.name : null;
+                        return {
+                            type: 'activity',
+                            name: name || 'Activity',
+                            activity_id: activityId,
+                            instance_id: crypto.randomUUID(),
+                            completed: false,
+                            notes: '',
+                        };
+                    })
+                    .filter(Boolean);
+
+                return {
+                    ...section,
+                    exercises,
+                    estimated_duration_minutes: section.estimated_duration_minutes || section.duration_minutes,
+                };
+            }),
+            total_duration_minutes: template.template_data?.total_duration_minutes || 0,
+        };
+
+    return {
+        name: template.name,
+        description: template.description || '',
+        template_id: template.id,
+        duration_minutes: quickTemplate ? 0 : (template.template_data?.total_duration_minutes || 0),
+        session_start: getLocalISOString(),
+        session_data: sessionDataPayload,
+    };
+}
+
 /**
  * Create Session Page
  * Enhanced flow: Select from program day OR select template → Associate with goal → Create session
@@ -325,65 +385,8 @@ function CreateSession() {
         setCreating(true);
 
         try {
-            const sessionStart = getLocalISOString();
             const quickTemplate = isQuickSession(template);
-            const sessionDataPayload = quickTemplate
-                ? {
-                    template_id: template.id,
-                    template_name: template.name,
-                    template_color: template.template_color || template.template_data?.template_color,
-                    session_type: 'quick',
-                    program_context: null,
-                }
-                : {
-                    template_id: template.id,
-                    template_name: template.name,
-                    template_color: template.template_color || template.template_data?.template_color,
-                    session_type: 'normal',
-                    program_context: selectedProgramDay ? {
-                        program_id: selectedProgramDay.program_id,
-                        program_name: selectedProgramDay.program_name,
-                        block_id: selectedProgramDay.block_id,
-                        block_name: selectedProgramDay.block_name,
-                        day_id: selectedProgramDay.day_id,
-                        day_name: selectedProgramDay.day_name
-                    } : null,
-                    sections: (template.template_data?.sections || []).map((section) => {
-                        const templateItems = section.activities || section.exercises || [];
-                        const exercises = templateItems
-                            .map((activity) => {
-                                const activityId = extractActivityId(activity);
-                                if (!activityId) return null;
-                                const name = typeof activity === 'object' ? activity.name : null;
-                                return {
-                                    type: 'activity',
-                                    name: name || 'Activity',
-                                    activity_id: activityId,
-                                    instance_id: crypto.randomUUID(),
-                                    completed: false,
-                                    notes: ''
-                                };
-                            })
-                            .filter(Boolean);
-
-                        return {
-                            ...section,
-                            exercises,
-                            estimated_duration_minutes: section.estimated_duration_minutes || section.duration_minutes
-                        };
-                    }),
-                    total_duration_minutes: template.template_data?.total_duration_minutes || 0
-                };
-
-            const sessionData = {
-                name: template.name,
-                description: template.description || '',
-                template_id: template.id,
-                duration_minutes: quickTemplate ? 0 : (template.template_data?.total_duration_minutes || 0),
-                session_start: sessionStart,
-                session_data: sessionDataPayload,
-            };
-
+            const sessionData = buildTemplateSessionPayload(template, selectedProgramDay);
             const response = await fractalApi.createSession(rootId, sessionData);
             const createdSession = response.data;
 
@@ -414,53 +417,27 @@ function CreateSession() {
         }
         await Promise.resolve();
 
-        const createdSession = await createSessionFromTemplate(selectedTemplate);
-        if (!createdSession?.id) {
-            return;
-        }
-
         try {
-            const response = await fractalApi.getSessionActivities(rootId, createdSession.id);
-            const persistedInstances = Array.isArray(response.data) ? response.data : [];
-            const persistedByDefinitionId = new Map(
-                persistedInstances.map((instance) => [instance.activity_definition_id, instance])
-            );
+            const quickSessionPayload = {
+                ...buildTemplateSessionPayload(selectedTemplate, null),
+                activity_instances: (queuedQuickSession.activityInstances || []).map((draftInstance) => ({
+                    activity_definition_id: draftInstance.activity_definition_id,
+                    completed: Boolean(draftInstance.completed),
+                    has_sets: Boolean(draftInstance.has_sets),
+                    notes: draftInstance.notes || '',
+                    metrics: sanitizeMetrics(draftInstance.metrics),
+                    sets: sanitizeSets(draftInstance.sets),
+                })),
+            };
 
-            for (const draftInstance of queuedQuickSession.activityInstances || []) {
-                const persistedInstance = persistedByDefinitionId.get(draftInstance.activity_definition_id);
-                if (!persistedInstance) continue;
-
-                if (draftInstance.has_sets) {
-                    await fractalApi.updateActivityInstance(rootId, persistedInstance.id, {
-                        session_id: createdSession.id,
-                        activity_definition_id: persistedInstance.activity_definition_id,
-                        completed: Boolean(draftInstance.completed),
-                        sets: sanitizeSets(draftInstance.sets),
-                    });
-                } else {
-                    const metricsPayload = sanitizeMetrics(draftInstance.metrics);
-                    if (metricsPayload.length > 0) {
-                        await fractalApi.updateActivityMetrics(rootId, createdSession.id, persistedInstance.id, {
-                            metrics: metricsPayload,
-                        });
-                    }
-                    await fractalApi.updateActivityInstance(rootId, persistedInstance.id, {
-                        session_id: createdSession.id,
-                        activity_definition_id: persistedInstance.activity_definition_id,
-                        completed: Boolean(draftInstance.completed),
-                    });
-                }
-            }
-
-            await fractalApi.updateSession(rootId, createdSession.id, { completed: true });
-            const completedSessionResponse = await fractalApi.getSession(rootId, createdSession.id);
+            const completedSessionResponse = await fractalApi.completeQuickSession(rootId, quickSessionPayload);
             const completedSession = completedSessionResponse.data;
 
             updateCreatedSessionCaches(completedSession);
-            queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivities(rootId, createdSession.id) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivities(rootId, completedSession.id) });
 
             setQueuedQuickSession(null);
-            setActiveQuickSessionId(createdSession.id);
+            setActiveQuickSessionId(completedSession.id);
             notify.success('Quick session completed.');
         } catch (err) {
             console.error('Error completing queued quick session:', err);

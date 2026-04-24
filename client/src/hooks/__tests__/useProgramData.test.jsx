@@ -6,18 +6,16 @@ import { useProgramData } from '../useProgramData';
 import { queryKeys } from '../queryKeys';
 
 const getProgram = vi.fn();
-const getGoal = vi.fn();
+const getGoals = vi.fn();
 const getActivities = vi.fn();
 const getActivityGroups = vi.fn();
-const getSessions = vi.fn();
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
         getProgram: (...args) => getProgram(...args),
-        getGoal: (...args) => getGoal(...args),
+        getGoals: (...args) => getGoals(...args),
         getActivities: (...args) => getActivities(...args),
         getActivityGroups: (...args) => getActivityGroups(...args),
-        getSessions: (...args) => getSessions(...args),
     },
 }));
 
@@ -44,11 +42,28 @@ describe('useProgramData', () => {
         const queryClient = createQueryClient();
         const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
 
-        getProgram.mockResolvedValueOnce({ data: { id: 'program-1', blocks: [] } });
-        getGoal.mockResolvedValueOnce({ data: { id: 'root-1', children: [] } });
+        getProgram.mockResolvedValueOnce({
+            data: {
+                id: 'program-1',
+                blocks: [
+                    {
+                        id: 'block-1',
+                        days: [
+                            {
+                                id: 'day-1',
+                                sessions: [
+                                    { id: 'session-1', name: 'Session 1' },
+                                    { id: 'session-1', name: 'Session 1' },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+        });
+        getGoals.mockResolvedValueOnce({ data: { id: 'root-1', children: [] } });
         getActivities.mockResolvedValueOnce({ data: [] });
         getActivityGroups.mockResolvedValueOnce({ data: [] });
-        getSessions.mockResolvedValueOnce({ data: [] });
 
         const { result } = renderHook(
             () => useProgramData('root-1', 'program-1'),
@@ -61,6 +76,7 @@ describe('useProgramData', () => {
 
         await result.current.refreshData();
 
+        expect(result.current.sessions).toEqual([{ id: 'session-1', name: 'Session 1' }]);
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.program('root-1', 'program-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.programs('root-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.activeProgramDays('root-1') });

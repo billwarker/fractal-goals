@@ -4,6 +4,28 @@ import { fractalApi } from '../utils/api';
 
 import { flattenGoals } from '../utils/goalHelpers';
 import { queryKeys } from './queryKeys';
+import { useFractalTree } from './useGoalQueries';
+
+function flattenProgramSessions(program) {
+    if (!program?.blocks?.length) {
+        return [];
+    }
+
+    const sessionsById = new Map();
+
+    program.blocks.forEach((block) => {
+        (block.days || []).forEach((day) => {
+            (day.sessions || []).forEach((session) => {
+                if (!session?.id || sessionsById.has(session.id)) {
+                    return;
+                }
+                sessionsById.set(session.id, session);
+            });
+        });
+    });
+
+    return Array.from(sessionsById.values());
+}
 
 export function useProgramData(rootId, programId) {
     const queryClient = useQueryClient();
@@ -25,14 +47,7 @@ export function useProgramData(rootId, programId) {
     });
 
     // 2. Goals (Tree) Query
-    const goalsQuery = useQuery({
-        queryKey: queryKeys.goalsTree(rootId),
-        queryFn: async () => {
-            const res = await fractalApi.getGoal(rootId, rootId);
-            return res.data;
-        },
-        enabled: !!rootId,
-    });
+    const goalsQuery = useFractalTree(rootId);
 
     // 3. Activities Query
     const activitiesQuery = useQuery({
@@ -54,36 +69,26 @@ export function useProgramData(rootId, programId) {
         enabled: !!rootId,
     });
 
-    // 5. Sessions Query
-    const sessionsQuery = useQuery({
-        queryKey: queryKeys.sessionsAll(rootId),
-        queryFn: async () => {
-            const res = await fractalApi.getSessions(rootId, { limit: 1000 });
-            return res.data.sessions || res.data || [];
-        },
-        enabled: !!rootId,
-    });
-
     // Derived State: Flattened Goals
     const flattenedGoals = useMemo(() => {
         if (!goalsQuery.data) return [];
         return flattenGoals([goalsQuery.data]);
     }, [goalsQuery.data]);
 
+    const sessions = useMemo(() => flattenProgramSessions(programQuery.data), [programQuery.data]);
+
     // Aggregate Loading State
     const isLoading =
         programQuery.isLoading ||
         goalsQuery.isLoading ||
         activitiesQuery.isLoading ||
-        groupsQuery.isLoading ||
-        sessionsQuery.isLoading;
+        groupsQuery.isLoading;
 
     const isError =
         programQuery.isError ||
         goalsQuery.isError ||
         activitiesQuery.isError ||
-        groupsQuery.isError ||
-        sessionsQuery.isError;
+        groupsQuery.isError;
 
     // Refresh Function (invalidates all queries)
     const refreshProgramQueries = useCallback(async () => {
@@ -138,7 +143,7 @@ export function useProgramData(rootId, programId) {
         treeData: goalsQuery.data || null,
         activities: activitiesQuery.data || [],
         activityGroups: groupsQuery.data || [],
-        sessions: sessionsQuery.data || [],
+        sessions,
 
         // State
         loading: isLoading,
@@ -161,7 +166,6 @@ export function useProgramData(rootId, programId) {
             goals: goalsQuery,
             activities: activitiesQuery,
             groups: groupsQuery,
-            sessions: sessionsQuery
-        }
+        },
     };
 }

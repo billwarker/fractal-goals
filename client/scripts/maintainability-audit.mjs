@@ -49,7 +49,7 @@ const checks = [
   {
     type: 'require-substring',
     file: 'src/hooks/useProgramsPageData.js',
-    substrings: ['useQuery', "queryKey: ['programs'", "queryKey: ['goals-tree'"],
+    substrings: ['useQuery', 'queryKeys.programs(', 'useFractalTree('],
     reason: 'Programs page data hook should remain React Query based.',
   },
 ];

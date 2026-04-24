@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useTargetAchievements } from './useTargetAchievements';
+import { useActivities, useActivityGroups } from './useActivityQueries';
 import { queryKeys } from './queryKeys';
 import { fractalApi } from '../utils/api';
 import { flattenSessionGoalsViewGoals } from '../utils/goalNodeModel';
@@ -22,25 +23,32 @@ export function normalizeSectionActivityIds(data, instances) {
     const sections = Array.isArray(data.sections) ? data.sections : [];
     if (sections.length === 0) return data;
 
-    const idsByDef = (instances || []).reduce((acc, instance) => {
-        const definitionId = instance?.activity_definition_id;
-        if (!definitionId || !instance?.id) return acc;
-        if (!acc[definitionId]) acc[definitionId] = [];
-        acc[definitionId].push(instance.id);
-        return acc;
-    }, {});
+    const idsByDef = new Map();
+    const allInstanceIds = [];
+    const allInstanceIdSet = new Set();
 
-    const allInstanceIds = (instances || []).map((instance) => instance.id).filter(Boolean);
+    (instances || []).forEach((instance) => {
+        const definitionId = instance?.activity_definition_id;
+        const instanceId = instance?.id;
+        if (!definitionId || !instanceId) return;
+        const normalizedDefinitionId = String(definitionId);
+        if (!idsByDef.has(normalizedDefinitionId)) idsByDef.set(normalizedDefinitionId, []);
+        idsByDef.get(normalizedDefinitionId).push(instanceId);
+        allInstanceIds.push(instanceId);
+        allInstanceIdSet.add(instanceId);
+    });
+
     const used = new Set();
 
     const normalizedSections = sections.map((section) => {
         if (!section || typeof section !== 'object') return section;
 
         const existing = Array.isArray(section.activity_ids)
-            ? section.activity_ids.filter((id) => allInstanceIds.includes(id) && !used.has(id))
+            ? section.activity_ids.filter((id) => allInstanceIdSet.has(id) && !used.has(id))
             : [];
 
         let activityIds = [...existing];
+        const sectionActivityIdSet = new Set(activityIds);
 
         if (activityIds.length === 0) {
             const rawItems = section.exercises || section.activities || [];
@@ -48,8 +56,9 @@ export function normalizeSectionActivityIds(data, instances) {
             for (const item of rawItems) {
                 if (!item || typeof item !== 'object') continue;
                 const instanceId = item.instance_id;
-                if (instanceId && allInstanceIds.includes(instanceId) && !used.has(instanceId) && !activityIds.includes(instanceId)) {
+                if (instanceId && allInstanceIdSet.has(instanceId) && !used.has(instanceId) && !sectionActivityIdSet.has(instanceId)) {
                     activityIds.push(instanceId);
+                    sectionActivityIdSet.add(instanceId);
                 }
             }
 
@@ -57,9 +66,12 @@ export function normalizeSectionActivityIds(data, instances) {
                 for (const item of rawItems) {
                     const definitionId = extractDefinitionId(item);
                     if (!definitionId) continue;
-                    const candidates = idsByDef[definitionId] || [];
-                    const candidate = candidates.find((id) => !used.has(id) && !activityIds.includes(id));
-                    if (candidate) activityIds.push(candidate);
+                    const candidates = idsByDef.get(String(definitionId)) || [];
+                    const candidate = candidates.find((id) => !used.has(id) && !sectionActivityIdSet.has(id));
+                    if (candidate) {
+                        activityIds.push(candidate);
+                        sectionActivityIdSet.add(candidate);
+                    }
                 }
             }
         }
@@ -88,8 +100,6 @@ export function useSessionDetailData({ rootId, sessionId, isDeletingSession }) {
     const sessionKey = queryKeys.session(rootId, sessionId);
     const sessionActivitiesKey = queryKeys.sessionActivities(rootId, sessionId);
     const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
-    const activitiesKey = queryKeys.activities(rootId);
-    const activityGroupsKey = queryKeys.activityGroups(rootId);
 
     const {
         data: session,
@@ -128,27 +138,8 @@ export function useSessionDetailData({ rootId, sessionId, isDeletingSession }) {
         enabled: Boolean(rootId && sessionId && !isDeletingSession),
     });
 
-    const {
-        data: activities = [],
-        isLoading: activitiesLoading,
-    } = useQuery({
-        queryKey: activitiesKey,
-        queryFn: async () => {
-            const response = await fractalApi.getActivities(rootId);
-            return response.data || [];
-        },
-        enabled: Boolean(rootId),
-        staleTime: 60 * 1000,
-    });
-
-    const { data: activityGroups = [] } = useQuery({
-        queryKey: activityGroupsKey,
-        queryFn: async () => {
-            const response = await fractalApi.getActivityGroups(rootId);
-            return response.data || [];
-        },
-        enabled: Boolean(rootId),
-    });
+    const { activities = [], isLoading: activitiesLoading } = useActivities(rootId);
+    const { activityGroups = [] } = useActivityGroups(rootId);
 
     const {
         data: sessionGoalsView = null,

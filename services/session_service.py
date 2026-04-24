@@ -21,7 +21,7 @@ from services.owned_entity_queries import (
     get_owned_session,
 )
 from services.service_types import JsonDict, ServiceResult
-from services.serializers import serialize_activity_instance, serialize_session
+from services.serializers import format_utc, serialize_activity_instance, serialize_session
 from services.goal_type_utils import get_canonical_goal_type
 from services.session_runtime import (
     DEFAULT_TEMPLATE_COLOR,
@@ -41,6 +41,7 @@ VALID_SESSION_SORT_FIELDS = {"session_start", "updated_at"}
 VALID_SESSION_SORT_ORDERS = {"asc", "desc"}
 VALID_SESSION_DURATION_OPERATORS = {"gt", "lt"}
 VALID_SESSION_HEATMAP_METRICS = {"count", "duration"}
+MAX_FLOWTREE_WINDOW_DAYS = 90
 
 def _program_goal_ids(db_session, program_id) -> set[str]:
     if not program_id:
@@ -230,6 +231,33 @@ class SessionService:
     @staticmethod
     def _effective_session_timestamp():
         return func.coalesce(Session.session_start, Session.created_at)
+
+    @staticmethod
+    def _effective_activity_completion_timestamp():
+        return func.coalesce(ActivityInstance.time_stop, ActivityInstance.updated_at, ActivityInstance.created_at)
+
+    @staticmethod
+    def _normalize_window_days(raw_days, default=7, max_days=MAX_FLOWTREE_WINDOW_DAYS) -> int:
+        try:
+            days = int(raw_days or default)
+        except (TypeError, ValueError):
+            return default
+        return max(1, min(days, max_days))
+
+    @staticmethod
+    def _empty_flowtree_session_metrics(window_days: int) -> JsonDict:
+        return {
+            "window_days": window_days,
+            "completed_sessions_count": 0,
+            "completed_instances_count": 0,
+            "total_session_duration_seconds": 0,
+            "total_instance_duration_seconds": 0,
+            "recent_sessions_count": 0,
+            "recent_instances_count": 0,
+            "recent_session_duration_seconds": 0,
+            "program_sessions_count": 0,
+            "recent_program_sessions_count": 0,
+        }
 
     @staticmethod
     def _normalize_id_list(values) -> list[str]:
@@ -569,6 +597,203 @@ class SessionService:
             "max_value": max_value,
             "days": days,
         }, None, 200
+
+    def get_activity_instantiation_summary(self, root_id, current_user_id) -> ServiceResult[JsonDict]:
+        """Return the most recent session timestamp for each instantiated activity."""
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
+
+        rows = self.db_session.query(
+            ActivityInstance.activity_definition_id,
+            func.max(self._effective_session_timestamp()).label("latest_timestamp"),
+        ).join(
+            Session,
+            Session.id == ActivityInstance.session_id,
+        ).filter(
+            Session.root_id == root_id,
+            Session.deleted_at == None,
+            ActivityInstance.root_id == root_id,
+            ActivityInstance.deleted_at == None,
+        ).group_by(
+            ActivityInstance.activity_definition_id,
+        ).all()
+
+        latest_by_activity = {}
+        for activity_definition_id, latest_timestamp in rows:
+            if activity_definition_id and latest_timestamp:
+                latest_by_activity[str(activity_definition_id)] = format_utc(latest_timestamp)
+
+        return {"latest_by_activity": latest_by_activity}, None, 200
+
+    def get_recent_evidence_goal_ids(self, root_id, current_user_id, days=7) -> ServiceResult[JsonDict]:
+        """Return goal ids with recent completed activity evidence."""
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
+
+        window_days = self._normalize_window_days(days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
+
+        recent_activity_ids = [
+            activity_definition_id
+            for (activity_definition_id,) in self.db_session.query(
+                ActivityInstance.activity_definition_id,
+            ).join(
+                Session,
+                Session.id == ActivityInstance.session_id,
+            ).filter(
+                Session.root_id == root_id,
+                Session.deleted_at == None,
+                ActivityInstance.root_id == root_id,
+                ActivityInstance.deleted_at == None,
+                ActivityInstance.completed.is_(True),
+                self._effective_activity_completion_timestamp() >= cutoff,
+            ).distinct().all()
+            if activity_definition_id
+        ]
+
+        effective_goals_by_activity = self._get_effective_activity_goals(root_id, recent_activity_ids)
+        goal_ids = set()
+        for activity_id in recent_activity_ids:
+            for goal in effective_goals_by_activity.get(activity_id, []):
+                goal_ids.add(str(goal.id))
+
+        return {
+            "goal_ids": sorted(goal_ids),
+            "window_days": window_days,
+            "cutoff": format_utc(cutoff),
+        }, None, 200
+
+    def get_flowtree_session_metrics(self, root_id, current_user_id, goal_ids=None, days=7) -> ServiceResult[JsonDict]:
+        """Return session and instance metrics for the requested goal scope."""
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
+
+        window_days = self._normalize_window_days(days)
+        visible_goal_ids = set(self._normalize_id_list(goal_ids))
+        if not visible_goal_ids:
+            return self._empty_flowtree_session_metrics(window_days), None, 200
+
+        matching_activity_ids = self._get_activity_definition_ids_for_goal_filter(root_id, list(visible_goal_ids))
+        relevant_session_ids = set()
+
+        if matching_activity_ids:
+            relevant_session_ids.update(
+                session_id
+                for (session_id,) in self.db_session.query(
+                    ActivityInstance.session_id,
+                ).join(
+                    Session,
+                    Session.id == ActivityInstance.session_id,
+                ).filter(
+                    Session.root_id == root_id,
+                    Session.deleted_at == None,
+                    ActivityInstance.root_id == root_id,
+                    ActivityInstance.deleted_at == None,
+                    ActivityInstance.activity_definition_id.in_(matching_activity_ids),
+                ).distinct().all()
+                if session_id
+            )
+
+        relevant_session_ids.update(
+            session_id
+            for (session_id,) in self.db_session.query(
+                session_goals.c.session_id,
+            ).join(
+                Session,
+                Session.id == session_goals.c.session_id,
+            ).filter(
+                Session.root_id == root_id,
+                Session.deleted_at == None,
+                session_goals.c.goal_id.in_(visible_goal_ids),
+            ).distinct().all()
+            if session_id
+        )
+
+        summary = self._empty_flowtree_session_metrics(window_days)
+        if not relevant_session_ids:
+            return summary, None, 200
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
+        sessions = self.db_session.query(
+            Session.id,
+            Session.total_duration_seconds,
+            Session.duration_minutes,
+            Session.session_start,
+            Session.session_end,
+            Session.completed_at,
+            Session.created_at,
+            Session.program_day_id,
+        ).filter(
+            Session.root_id == root_id,
+            Session.deleted_at == None,
+            Session.completed.is_(True),
+            Session.id.in_(relevant_session_ids),
+        ).all()
+
+        for (
+            _session_id,
+            total_duration_seconds,
+            duration_minutes,
+            session_start,
+            session_end,
+            completed_at,
+            created_at,
+            program_day_id,
+        ) in sessions:
+            session_seconds = self._session_duration_seconds_from_row(
+                total_duration_seconds,
+                duration_minutes,
+                session_start,
+                session_end,
+            )
+            summary["completed_sessions_count"] += 1
+            summary["total_session_duration_seconds"] += session_seconds
+
+            recent_timestamp = _as_utc_datetime(session_end or completed_at or created_at)
+            if recent_timestamp and recent_timestamp >= cutoff:
+                summary["recent_sessions_count"] += 1
+                summary["recent_session_duration_seconds"] += session_seconds
+
+            if program_day_id:
+                summary["program_sessions_count"] += 1
+                if recent_timestamp and recent_timestamp >= cutoff:
+                    summary["recent_program_sessions_count"] += 1
+
+        if not matching_activity_ids:
+            return summary, None, 200
+
+        instances = self.db_session.query(
+            ActivityInstance.duration_seconds,
+            ActivityInstance.completed,
+            ActivityInstance.time_stop,
+            ActivityInstance.updated_at,
+            ActivityInstance.created_at,
+        ).join(
+            Session,
+            Session.id == ActivityInstance.session_id,
+        ).filter(
+            Session.root_id == root_id,
+            Session.deleted_at == None,
+            ActivityInstance.root_id == root_id,
+            ActivityInstance.deleted_at == None,
+            ActivityInstance.activity_definition_id.in_(matching_activity_ids),
+            ActivityInstance.session_id.in_(relevant_session_ids),
+        ).all()
+
+        for duration_seconds, completed, time_stop, updated_at, created_at in instances:
+            if not completed:
+                continue
+            summary["completed_instances_count"] += 1
+            summary["total_instance_duration_seconds"] += int(duration_seconds or 0)
+
+            completed_timestamp = _as_utc_datetime(time_stop or updated_at or created_at)
+            if completed_timestamp and completed_timestamp >= cutoff:
+                summary["recent_instances_count"] += 1
+
+        return summary, None, 200
 
     def get_all_sessions(self, current_user_id, limit=None, offset=0) -> ServiceResult[list[JsonDict]]:
         """Get all sessions across fractals for the current user."""
@@ -1247,6 +1472,95 @@ class SessionService:
         }, source='session_service.create_session'))
 
         return serialize_session(new_session), None, 201
+
+    def create_completed_quick_session(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
+        create_payload = {key: value for key, value in data.items() if key != 'activity_instances'}
+        created_session, error, status = self.create_session(root_id, current_user_id, create_payload)
+        if error:
+            return None, error, status
+
+        session_id = created_session.get('id')
+        if not session_id:
+            return None, "Quick session creation returned no session id", 500
+
+        persisted_instances = self.db_session.query(ActivityInstance).filter(
+            ActivityInstance.session_id == session_id,
+            ActivityInstance.root_id == root_id,
+            ActivityInstance.deleted_at == None,
+        ).order_by(ActivityInstance.created_at.asc()).all()
+
+        instances_by_definition_id = {}
+        for instance in persisted_instances:
+            instances_by_definition_id.setdefault(instance.activity_definition_id, []).append(instance)
+
+        from services.timer_service import TimerService
+        timer_service = TimerService(self.db_session)
+
+        for draft_instance in data.get('activity_instances', []):
+            activity_definition_id = draft_instance.get('activity_definition_id')
+            persisted_candidates = instances_by_definition_id.get(activity_definition_id) or []
+            if not persisted_candidates:
+                continue
+
+            persisted_instance = persisted_candidates.pop(0)
+            notes = draft_instance.get('notes')
+
+            if draft_instance.get('has_sets'):
+                update_payload = {
+                    'completed': bool(draft_instance.get('completed')),
+                    'sets': draft_instance.get('sets', []),
+                }
+                if notes is not None:
+                    update_payload['notes'] = notes
+
+                _, instance_error, instance_status = timer_service.update_activity_instance(
+                    root_id,
+                    persisted_instance.id,
+                    current_user_id,
+                    update_payload,
+                )
+                if instance_error:
+                    return None, instance_error, instance_status
+                continue
+
+            metric_payload = draft_instance.get('metrics', [])
+            if metric_payload:
+                _, metrics_error, metrics_status = self.update_activity_metrics(
+                    root_id,
+                    session_id,
+                    persisted_instance.id,
+                    current_user_id,
+                    metric_payload,
+                )
+                if metrics_error:
+                    return None, metrics_error, metrics_status
+
+            instance_payload = {
+                'completed': bool(draft_instance.get('completed')),
+            }
+            if notes is not None:
+                instance_payload['notes'] = notes
+
+            _, instance_error, instance_status = timer_service.update_activity_instance(
+                root_id,
+                persisted_instance.id,
+                current_user_id,
+                instance_payload,
+            )
+            if instance_error:
+                return None, instance_error, instance_status
+
+        completed_session, complete_error, complete_status = self.update_session(
+            root_id,
+            session_id,
+            current_user_id,
+            {'completed': True},
+            complete_unstarted_instances=False,
+        )
+        if complete_error:
+            return None, complete_error, complete_status
+
+        return completed_session, None, 201
 
     def update_session(
         self,

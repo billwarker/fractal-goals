@@ -337,6 +337,163 @@ export const deriveGraphMetrics = (
     };
 };
 
+export const getDefaultFlowTreeSessionMetricsSummary = (windowDays = ACTIVE_GOAL_WINDOW_DAYS) => ({
+    window_days: windowDays,
+    completed_sessions_count: 0,
+    completed_instances_count: 0,
+    total_session_duration_seconds: 0,
+    total_instance_duration_seconds: 0,
+    recent_sessions_count: 0,
+    recent_instances_count: 0,
+    recent_session_duration_seconds: 0,
+    program_sessions_count: 0,
+    recent_program_sessions_count: 0,
+});
+
+export const buildGraphMetricsFromSummary = (
+    rawNodes,
+    visibleNodeIds,
+    activeLineageIds,
+    inactiveNodeIds,
+    activities,
+    activityGroups,
+    programs,
+    sessionMetricsSummary = getDefaultFlowTreeSessionMetricsSummary()
+) => {
+    const safeActivities = Array.isArray(activities) ? activities : [];
+    const safeActivityGroups = Array.isArray(activityGroups) ? activityGroups : [];
+    const safePrograms = Array.isArray(programs) ? programs : [];
+    const summary = {
+        ...getDefaultFlowTreeSessionMetricsSummary(),
+        ...(sessionMetricsSummary || {}),
+    };
+
+    const totalGoals = rawNodes.length;
+    const completedGoals = rawNodes.filter((n) => n.data.completed).length;
+    const pctCompleted = totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
+    const smartGoals = rawNodes.filter((n) => n.data.isSmart).length;
+    const pctSmart = totalGoals > 0 ? Math.round((smartGoals / totalGoals) * 100) : 0;
+
+    const goalsByActivityId = new Map();
+    const groupIdByActivityId = new Map();
+    safeActivities.forEach((activity) => {
+        const activityId = toId(activity?.id);
+        if (!activityId) return;
+        goalsByActivityId.set(
+            activityId,
+            Array.isArray(activity?.associated_goal_ids) ? activity.associated_goal_ids.map(toId) : []
+        );
+        if (activity?.group_id) {
+            groupIdByActivityId.set(activityId, toId(activity.group_id));
+        }
+    });
+
+    const goalsByGroupId = new Map();
+    safeActivityGroups.forEach((group) => {
+        const groupId = toId(group?.id);
+        if (!groupId) return;
+        goalsByGroupId.set(
+            groupId,
+            Array.isArray(group?.associated_goal_ids) ? group.associated_goal_ids.map(toId) : []
+        );
+    });
+
+    const activeVisibleNodesCount = rawNodes.filter((node) => (
+        visibleNodeIds.has(node.id) && activeLineageIds.has(node.id)
+    )).length;
+    const inactiveVisibleNodesCount = rawNodes.filter((node) => (
+        visibleNodeIds.has(node.id) && inactiveNodeIds.has(node.id)
+    )).length;
+
+    const now = new Date();
+    const sevenDaysAgo = getRecentActivityCutoff(now);
+    const recentCompletedGoalsCount = rawNodes.filter((node) => {
+        if (!visibleNodeIds.has(node.id) || !node.data.completed_at) return false;
+        const completedAt = new Date(node.data.completed_at);
+        return !Number.isNaN(completedAt.getTime()) && completedAt >= sevenDaysAgo;
+    }).length;
+
+    const activeProgramGoalIds = new Set();
+    safePrograms.forEach((prog) => {
+        if (!prog.is_active) return;
+        const blocks = Array.isArray(prog.blocks) ? prog.blocks : [];
+        blocks.forEach((block) => {
+            const goalIds = Array.isArray(block.goal_ids) ? block.goal_ids : [];
+            goalIds.forEach((id) => activeProgramGoalIds.add(toId(id)));
+        });
+        const programGoalIds = Array.isArray(prog.goal_ids) ? prog.goal_ids : [];
+        programGoalIds.forEach((id) => activeProgramGoalIds.add(toId(id)));
+    });
+
+    const goalsInActiveProgramCount = rawNodes.filter((node) => (
+        visibleNodeIds.has(node.id) && activeProgramGoalIds.has(node.id)
+    )).length;
+
+    const formatDuration = (seconds) => {
+        if (!seconds) return '0h';
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        return `${minutes}m`;
+    };
+
+    let associatedActivitiesCount = 0;
+    safeActivities.forEach((activity) => {
+        const activityId = toId(activity?.id);
+        if (!activityId) return;
+
+        const directGoalIds = goalsByActivityId.get(activityId) || [];
+        if (directGoalIds.some((goalId) => visibleNodeIds.has(goalId))) {
+            associatedActivitiesCount += 1;
+            return;
+        }
+
+        const groupId = groupIdByActivityId.get(activityId);
+        if (!groupId) return;
+
+        const groupGoalIds = goalsByGroupId.get(groupId) || [];
+        if (groupGoalIds.some((goalId) => visibleNodeIds.has(goalId))) {
+            associatedActivitiesCount += 1;
+        }
+    });
+
+    const programFocusEfficiency = summary.recent_sessions_count > 0
+        ? Math.round((summary.recent_program_sessions_count / summary.recent_sessions_count) * 100)
+        : 0;
+
+    return {
+        row1: {
+            totalGoals,
+            completedGoals,
+            pctCompleted,
+            smartGoals,
+            pctSmart,
+        },
+        row2: {
+            completedSessionsCount: summary.completed_sessions_count,
+            associatedActivitiesCount,
+            completedInstancesCount: summary.completed_instances_count,
+            totalSessionDuration: formatDuration(summary.total_session_duration_seconds),
+            totalInstanceDuration: formatDuration(summary.total_instance_duration_seconds),
+        },
+        row3: {
+            activeVisibleNodesCount,
+            inactiveVisibleNodesCount,
+        },
+        row4: {
+            recentSessionsCount: summary.recent_sessions_count,
+            recentInstancesCount: summary.recent_instances_count,
+            recentSessionDuration: formatDuration(summary.recent_session_duration_seconds),
+            recentCompletedGoalsCount,
+        },
+        row5: {
+            goalsInActiveProgramCount,
+            programSessionsCount: summary.program_sessions_count,
+            programFocusEfficiency,
+        },
+    };
+};
+
 export function useFlowTreeMetrics(props) {
     const {
         rawNodes,

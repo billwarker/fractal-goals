@@ -1,6 +1,6 @@
 import dagre from 'dagre';
 
-import { deriveEvidenceGoalIds, getActiveLineageIds, getInactiveNodeIds, deriveGraphMetrics } from '../../hooks/useFlowTreeMetrics';
+import { buildGraphMetricsFromSummary, deriveEvidenceGoalIds, getActiveLineageIds, getInactiveNodeIds } from '../../hooks/useFlowTreeMetrics';
 import { getValidChildTypes } from '../../utils/goalHelpers';
 import {
     getGoalNodeChildren,
@@ -212,6 +212,8 @@ export const buildGraphPresentation = ({
     completedGoalColor,
     viewSettings,
     sessions,
+    evidenceGoalIds,
+    metricsSummary,
     activities,
     activityGroups,
     programs,
@@ -227,9 +229,9 @@ export const buildGraphPresentation = ({
     };
 
     const treeMaps = buildTreeMaps(treeData);
-    const evidenceGoalIds = deriveEvidenceGoalIds(sessions, activities, activityGroups);
-    const activeLineageIds = getActiveLineageIds(evidenceGoalIds, treeMaps.parentById);
-    const inactiveNodeIds = getInactiveNodeIds(treeMaps.nodeById, treeMaps.childrenById, evidenceGoalIds);
+    const effectiveEvidenceGoalIds = evidenceGoalIds || deriveEvidenceGoalIds(sessions, activities, activityGroups);
+    const activeLineageIds = getActiveLineageIds(effectiveEvidenceGoalIds, treeMaps.parentById);
+    const inactiveNodeIds = getInactiveNodeIds(treeMaps.nodeById, treeMaps.childrenById, effectiveEvidenceGoalIds);
 
     const { nodes: rawNodes, edges: rawEdges, visibleNodeIds } = convertTreeToFlow(
         treeData,
@@ -340,15 +342,15 @@ export const buildGraphPresentation = ({
         }
     }
 
-    const metrics = deriveGraphMetrics(
+    const metrics = buildGraphMetricsFromSummary(
         rawNodes,
         visibleNodeIds,
         activeLineageIds,
         inactiveNodeIds,
-        sessions,
         activities,
         activityGroups,
-        programs || []
+        programs || [],
+        metricsSummary
     );
 
     return {

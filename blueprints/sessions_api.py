@@ -11,7 +11,8 @@ from validators import (
     validate_request,
     SessionCreateSchema, SessionUpdateSchema,
     ActivityInstanceCreateSchema, ActivityInstanceUpdateSchema,
-    ActivityMetricsUpdateSchema, ActivityReorderSchema
+    ActivityMetricsUpdateSchema, ActivityReorderSchema,
+    QuickSessionCompleteSchema,
 )
 from blueprints.auth_api import token_required
 from blueprints.api_utils import get_db_session, parse_optional_pagination, etag_json_response, internal_error, require_owned_root
@@ -58,6 +59,14 @@ def _get_session_query_filters():
         'activity_ids': _parse_multi_value_arg('activity_ids'),
         'goal_ids': _parse_multi_value_arg('goal_ids'),
     }
+
+
+def _parse_window_days(default=7):
+    raw_days = request.args.get('days', default)
+    try:
+        return int(raw_days)
+    except (TypeError, ValueError):
+        return default
 
 @sessions_bp.route('/practice-sessions', methods=['GET'])
 @token_required
@@ -133,6 +142,72 @@ def get_session_heatmap(current_user, root_id):
         db_session.close()
 
 
+@sessions_bp.route('/<root_id>/sessions/activity-instantiation-summary', methods=['GET'])
+@token_required
+def get_activity_instantiation_summary(current_user, root_id):
+    """Get the latest session timestamp for each activity definition."""
+    db_session = get_db_session()
+    service = SessionService(db_session)
+    try:
+        result, error, status = service.get_activity_instantiation_summary(root_id, current_user.id)
+        if error:
+            return jsonify(error if isinstance(error, dict) else {"error": error}), status
+        return etag_json_response(result)
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error in get_activity_instantiation_summary")
+        return internal_error(logger, "Error in get_activity_instantiation_summary")
+    finally:
+        db_session.close()
+
+
+@sessions_bp.route('/<root_id>/sessions/evidence-goals', methods=['GET'])
+@token_required
+def get_recent_evidence_goal_ids(current_user, root_id):
+    """Get goal ids with recent activity evidence."""
+    db_session = get_db_session()
+    service = SessionService(db_session)
+    try:
+        result, error, status = service.get_recent_evidence_goal_ids(
+            root_id,
+            current_user.id,
+            days=_parse_window_days(),
+        )
+        if error:
+            return jsonify(error if isinstance(error, dict) else {"error": error}), status
+        return etag_json_response(result)
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error in get_recent_evidence_goal_ids")
+        return internal_error(logger, "Error in get_recent_evidence_goal_ids")
+    finally:
+        db_session.close()
+
+
+@sessions_bp.route('/<root_id>/sessions/flowtree-metrics', methods=['GET'])
+@token_required
+def get_flowtree_session_metrics(current_user, root_id):
+    """Get scoped FlowTree session metrics for a visible goal set."""
+    db_session = get_db_session()
+    service = SessionService(db_session)
+    try:
+        result, error, status = service.get_flowtree_session_metrics(
+            root_id,
+            current_user.id,
+            goal_ids=_parse_multi_value_arg('goal_ids'),
+            days=_parse_window_days(),
+        )
+        if error:
+            return jsonify(error if isinstance(error, dict) else {"error": error}), status
+        return etag_json_response(result)
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error in get_flowtree_session_metrics")
+        return internal_error(logger, "Error in get_flowtree_session_metrics")
+    finally:
+        db_session.close()
+
+
 @sessions_bp.route('/<root_id>/sessions', methods=['POST'])
 @token_required
 @validate_request(SessionCreateSchema)
@@ -149,6 +224,26 @@ def create_fractal_session(current_user, root_id, validated_data):
         db_session.rollback()
         logger.exception("Error creating session")
         return internal_error(logger, "Error creating session")
+    finally:
+        db_session.close()
+
+
+@sessions_bp.route('/<root_id>/sessions/quick-complete', methods=['POST'])
+@token_required
+@validate_request(QuickSessionCompleteSchema)
+def complete_quick_session(current_user, root_id, validated_data):
+    """Create and complete a quick session in one request."""
+    db_session = get_db_session()
+    service = SessionService(db_session)
+    try:
+        result, error, status = service.create_completed_quick_session(root_id, current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(result), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error completing quick session")
+        return internal_error(logger, "Error completing quick session")
     finally:
         db_session.close()
 

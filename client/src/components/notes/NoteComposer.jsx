@@ -9,11 +9,9 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useQuery } from '@tanstack/react-query';
+import { useActivities, useActivityGroups } from '../../hooks/useActivityQueries';
 import { useFractalTree } from '../../hooks/useGoalQueries';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
-import { queryKeys } from '../../hooks/queryKeys';
-import { fractalApi } from '../../utils/api';
 import GoalTreePicker from '../common/GoalTreePicker';
 import styles from './NoteComposer.module.css';
 
@@ -54,17 +52,8 @@ function NoteComposer({
     const selectedActivityName = controlledActivityName !== undefined ? controlledActivityName : internalActivityName;
 
     const { data: treeData } = useFractalTree(rootId, { enabled: !prelinkedGoalId });
+    const { activities: internalActivities = [] } = useActivities(rootId);
     const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
-
-    // For the internal (non-hoisted) activity list
-    const { data: internalActivities = [] } = useQuery({
-        queryKey: queryKeys.activities(rootId),
-        queryFn: async () => {
-            const res = await fractalApi.getActivities(rootId);
-            return res.data || [];
-        },
-        enabled: Boolean(rootId) && !hideLinkPanel && !prelinkedGoalId,
-    });
 
     const adjustHeight = (el) => {
         if (!el) return;
@@ -312,24 +301,9 @@ export function ComposeLinkPanel({
     const [linkTab, setLinkTab] = useState('goal');
     const [browseGroupId, setBrowseGroupId] = useState(null);
     const { data: treeData } = useFractalTree(rootId);
+    const { activities = [] } = useActivities(rootId);
+    const { activityGroups = [] } = useActivityGroups(rootId);
     const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
-
-    const { data: activities = [] } = useQuery({
-        queryKey: queryKeys.activities(rootId),
-        queryFn: async () => {
-            const res = await fractalApi.getActivities(rootId);
-            return res.data || [];
-        },
-        enabled: Boolean(rootId),
-    });
-    const { data: activityGroups = [] } = useQuery({
-        queryKey: queryKeys.activityGroups(rootId),
-        queryFn: async () => {
-            const res = await fractalApi.getActivityGroups(rootId);
-            return res.data || [];
-        },
-        enabled: Boolean(rootId),
-    });
 
     const groupMap = useMemo(() => Object.fromEntries(activityGroups.map(g => [g.id, g])), [activityGroups]);
     const childGroupsByParent = useMemo(() => {

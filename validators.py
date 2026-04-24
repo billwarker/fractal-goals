@@ -633,6 +633,38 @@ class SessionCreateSchema(BaseModel):
         return self
 
 
+class QuickSessionMetricValueSchema(BaseModel):
+    metric_id: str = Field(..., min_length=1)
+    split_id: Optional[str] = None
+    value: float
+
+
+class QuickSessionSetSchema(BaseModel):
+    instance_id: Optional[str] = None
+    completed: Optional[bool] = False
+    metrics: List[QuickSessionMetricValueSchema] = Field(default_factory=list)
+
+
+class QuickSessionActivityInstanceSchema(BaseModel):
+    activity_definition_id: str = Field(..., min_length=1)
+    completed: Optional[bool] = False
+    has_sets: Optional[bool] = False
+    notes: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
+    metrics: List[QuickSessionMetricValueSchema] = Field(default_factory=list)
+    sets: List[QuickSessionSetSchema] = Field(default_factory=list)
+
+    @field_validator('notes')
+    @classmethod
+    def sanitize_notes(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitize_string(v)
+
+
+class QuickSessionCompleteSchema(SessionCreateSchema):
+    activity_instances: List[QuickSessionActivityInstanceSchema] = Field(default_factory=list)
+
+
 
 
 class SessionUpdateSchema(BaseModel):

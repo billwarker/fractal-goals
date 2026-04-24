@@ -1,25 +1,7 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { ACTIVE_GOAL_WINDOW_DAYS } from './useFlowTreeMetrics';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
-
-async function fetchAllSessions(rootId, pageSize = 100) {
-    if (!rootId) return [];
-
-    let offset = 0;
-    const all = [];
-
-    while (true) {
-        const res = await fractalApi.getSessions(rootId, { limit: pageSize, offset });
-        const pageSessions = res.data?.sessions || [];
-        all.push(...pageSessions);
-
-        if (!res.data?.pagination?.has_more) break;
-
-        offset = (res.data.pagination.offset || 0) + (res.data.pagination.limit || pageSize);
-    }
-
-    return all;
-}
 
 export function useSessions(rootId) {
     const isReady = Boolean(rootId);
@@ -35,12 +17,49 @@ export function useSessions(rootId) {
     });
 }
 
-export function useAllSessions(rootId) {
+export function useActivityInstantiationSummary(rootId) {
     const isReady = Boolean(rootId);
 
     return useQuery({
-        queryKey: queryKeys.sessionsAll(rootId),
-        queryFn: () => fetchAllSessions(rootId),
+        queryKey: queryKeys.activityInstantiationSummary(rootId),
+        queryFn: async () => {
+            const res = await fractalApi.getActivityInstantiationSummary(rootId);
+            return res.data?.latest_by_activity || {};
+        },
+        enabled: isReady,
+        staleTime: 2 * 60 * 1000,
+    });
+}
+
+export function useFlowTreeEvidence(rootId, days = ACTIVE_GOAL_WINDOW_DAYS) {
+    const isReady = Boolean(rootId);
+
+    return useQuery({
+        queryKey: queryKeys.sessionsEvidenceGoals(rootId, days),
+        queryFn: async () => {
+            const res = await fractalApi.getSessionEvidenceGoals(rootId, { days });
+            return res.data || { goal_ids: [], window_days: days };
+        },
+        enabled: isReady,
+        staleTime: 60 * 1000,
+    });
+}
+
+export function useFlowtreeSessionMetrics(rootId, goalIds = [], options = {}) {
+    const normalizedGoalIds = Array.isArray(goalIds)
+        ? [...new Set(goalIds.map((goalId) => String(goalId)).filter(Boolean))].sort()
+        : [];
+    const isReady = Boolean(rootId) && normalizedGoalIds.length > 0 && options.enabled !== false;
+
+    return useQuery({
+        queryKey: queryKeys.sessionsFlowtreeMetrics(rootId, normalizedGoalIds, ACTIVE_GOAL_WINDOW_DAYS),
+        queryFn: async () => {
+            const res = await fractalApi.getFlowtreeSessionMetrics(rootId, {
+                goal_ids: normalizedGoalIds,
+                days: ACTIVE_GOAL_WINDOW_DAYS,
+            });
+            return res.data;
+        },
         enabled: isReady,
         staleTime: 60 * 1000,
     });

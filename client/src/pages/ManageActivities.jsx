@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useActivities } from '../contexts/ActivitiesContext';
 import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
-import { useAllSessions } from '../hooks/useSessionQueries';
+import { useActivityInstantiationSummary } from '../hooks/useSessionQueries';
 import ActivityBuilder from '../components/ActivityBuilder';
 import ActivityCard from '../components/ActivityCard';
 
@@ -14,7 +14,7 @@ import Linkify from '../components/atoms/Linkify';
 import PageHeader from '../components/layout/PageHeader';
 import headerStyles from '../components/layout/PageHeader.module.css';
 import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
-import { buildGroupReorderPayload, buildLastInstantiatedMap } from '../utils/manageActivities';
+import { buildGroupReorderPayload } from '../utils/manageActivities';
 import styles from './ManageActivities.module.css'; // Import CSS Module
 
 /**
@@ -26,9 +26,7 @@ function ManageActivities() {
     const { updateActivity, deleteActivity, deleteActivityGroup, reorderActivityGroups } = useActivities();
     const { activities = [], isLoading: activitiesLoading } = useActivitiesQuery(rootId);
     const { activityGroups = [], isLoading: activityGroupsLoading } = useActivityGroups(rootId);
-
-    const { data: sessionsData } = useAllSessions(rootId);
-    const sessions = useMemo(() => (Array.isArray(sessionsData) ? sessionsData : []), [sessionsData]);
+    const { data: lastInstantiatedSummary = {} } = useActivityInstantiationSummary(rootId);
 
     const [error, setError] = useState(null);
     const creating = false;
@@ -56,8 +54,8 @@ function ManageActivities() {
     }, [rootId, navigate]);
 
     const lastInstantiatedByActivity = useMemo(() => {
-        return buildLastInstantiatedMap(sessions);
-    }, [sessions]);
+        return new Map(Object.entries(lastInstantiatedSummary || {}));
+    }, [lastInstantiatedSummary]);
 
     const groupChildrenMap = useMemo(() => {
         const map = new Map();

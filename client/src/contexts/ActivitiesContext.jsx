@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { withNotify } from '../utils/mutationNotify';
@@ -8,11 +8,6 @@ const ActivitiesContext = createContext();
 
 export function ActivitiesProvider({ children }) {
     const queryClient = useQueryClient();
-
-    const emitActivityEvent = useCallback((eventName, detail) => {
-        if (typeof window === 'undefined') return;
-        window.dispatchEvent(new CustomEvent(eventName, { detail }));
-    }, []);
 
     const createActivity = useMemo(() => withNotify(
         async (rootId, activityData) => {
@@ -25,9 +20,6 @@ export function ActivitiesProvider({ children }) {
                 next.push(created);
                 return next;
             });
-
-            emitActivityEvent('activity.created', { rootId, activity: created });
-            emitActivityEvent('activities.changed', { rootId, action: 'created', activity: created });
             return created;
         },
         {
@@ -37,7 +29,7 @@ export function ActivitiesProvider({ children }) {
                 console.error('Failed to create activity:', err);
             },
         },
-    ), [queryClient, emitActivityEvent]);
+    ), [queryClient]);
 
     const updateActivity = useMemo(() => withNotify(
         async (rootId, activityId, updates) => {
@@ -48,9 +40,6 @@ export function ActivitiesProvider({ children }) {
                 if (!Array.isArray(prev)) return prev;
                 return prev.map((item) => item.id === activityId ? { ...item, ...updated } : item);
             });
-
-            emitActivityEvent('activity.updated', { rootId, activityId, activity: updated });
-            emitActivityEvent('activities.changed', { rootId, action: 'updated', activityId, activity: updated });
             return updated;
         },
         {
@@ -65,7 +54,7 @@ export function ActivitiesProvider({ children }) {
                 console.error('Failed to update activity:', err);
             },
         },
-    ), [queryClient, emitActivityEvent]);
+    ), [queryClient]);
 
     const deleteActivity = useMemo(() => withNotify(
         async (rootId, activityId) => {
@@ -80,9 +69,6 @@ export function ActivitiesProvider({ children }) {
                 if (!Array.isArray(prev)) return prev;
                 return prev.filter((item) => item.id !== activityId);
             });
-
-            emitActivityEvent('activity.deleted', { rootId, activityId, activity: deletedActivity || null });
-            emitActivityEvent('activities.changed', { rootId, action: 'deleted', activityId, activity: deletedActivity || null });
             return deletedActivity;
         },
         {
@@ -92,7 +78,7 @@ export function ActivitiesProvider({ children }) {
                 console.error('Failed to delete activity:', err);
             },
         },
-    ), [queryClient, emitActivityEvent]);
+    ), [queryClient]);
 
     const createActivityGroup = useMemo(() => withNotify(
         async (rootId, data) => {

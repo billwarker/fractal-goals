@@ -25,6 +25,7 @@ const Sidebar = ({
     // Data props needed for enhanced features
     treeData,
     sessions = [],
+    evidenceGoalIds = null,
     activityDefinitions = [],
     activityGroups = [],
     programs = [],
@@ -69,6 +70,7 @@ const Sidebar = ({
                 onAddChild={onAddChild}
                 onDelete={onDelete}
                 sessions={sessions}
+                evidenceGoalIds={evidenceGoalIds}
                 rootId={selectedRootId}
                 treeData={treeData}
                 displayMode="panel"

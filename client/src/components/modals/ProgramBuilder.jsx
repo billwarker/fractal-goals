@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { fractalApi } from '../../utils/api';
-import { flattenGoals } from '../../utils/goalHelpers';
-import { queryKeys } from '../../hooks/queryKeys';
 import moment from 'moment';
+import { useParams } from 'react-router-dom';
+
+import { flattenGoals } from '../../utils/goalHelpers';
+import { useFractalTree } from '../../hooks/useGoalQueries';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
@@ -50,14 +49,7 @@ function ProgramBuilderInner({ onClose, onSave, initialData = null }) {
         return weeks > 0 ? weeks : 0;
     };
 
-    const goalsTreeQuery = useQuery({
-        queryKey: queryKeys.goalsTree(rootId),
-        queryFn: async () => {
-            const response = await fractalApi.getGoals(rootId);
-            return response.data || null;
-        },
-        enabled: Boolean(rootId),
-    });
+    const goalsTreeQuery = useFractalTree(rootId);
 
     const goals = useMemo(() => {
         if (!goalsTreeQuery.data) {

@@ -9,10 +9,11 @@ import Checkbox from '../components/atoms/Checkbox';
 import { useGoals } from '../contexts/GoalsContext';
 import { useDebug } from '../contexts/DebugContext';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
+import { buildTreeMaps, getLineagePath } from '../components/flowTree/flowTreeTreeUtils';
 import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
-import { useAllSessions } from '../hooks/useSessionQueries';
 import { ACTIVE_GOAL_WINDOW_DAYS } from '../hooks/useFlowTreeMetrics';
+import { useFlowTreeEvidence, useFlowtreeSessionMetrics } from '../hooks/useSessionQueries';
 import { getChildType } from '../utils/goalHelpers';
 import { findGoalNodeById, getGoalNodeId, getGoalNodeName, getGoalNodeType } from '../utils/goalNodeModel';
 import { usePrograms } from '../hooks/useProgramQueries';
@@ -51,10 +52,7 @@ function FractalGoals() {
         data: fractalData,
         isLoading: goalsLoading
     } = useFractalTree(rootId);
-
-    const { data: sessionsData } = useAllSessions(rootId);
-
-    const sessions = useMemo(() => (Array.isArray(sessionsData) ? sessionsData : []), [sessionsData]);
+    const { data: evidenceData, isLoading: evidenceLoading } = useFlowTreeEvidence(rootId);
 
     const { activities = [], isLoading: activitiesLoading } = useActivitiesQuery(rootId);
     const { activityGroups = [], isLoading: activityGroupsLoading } = useActivityGroups(rootId);
@@ -65,7 +63,7 @@ function FractalGoals() {
 
     const { programs = [] } = usePrograms(rootId);
 
-    const loading = goalsLoading || activitiesLoading || activityGroupsLoading;
+    const loading = goalsLoading || activitiesLoading || activityGroupsLoading || evidenceLoading;
 
     // Sidebar state
     const [sidebarMode, setSidebarMode] = useState(null);
@@ -86,6 +84,23 @@ function FractalGoals() {
         showMetricsOverlay: false,
     };
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
+    const selectedNodeId = viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null;
+    const evidenceGoalIds = useMemo(() => {
+        if (!evidenceData) return null;
+        return new Set((evidenceData.goal_ids || []).map((goalId) => String(goalId)));
+    }, [evidenceData]);
+    const visibleGoalIds = useMemo(() => {
+        if (!fractalData) return [];
+        if (selectedNodeId) {
+            return Array.from(getLineagePath(fractalData, selectedNodeId));
+        }
+        return Array.from(buildTreeMaps(fractalData).nodeById.keys());
+    }, [fractalData, selectedNodeId]);
+    const { data: flowtreeMetricsSummary } = useFlowtreeSessionMetrics(
+        rootId,
+        visibleGoalIds,
+        { enabled: viewSettings.showMetricsOverlay }
+    );
 
     useEffect(() => {
         if (!rootId) {
@@ -283,13 +298,14 @@ function FractalGoals() {
                     </div>
                     <FractalView
                         treeData={fractalData}
-                        sessions={sessions}
+                        evidenceGoalIds={evidenceGoalIds}
+                        metricsSummary={flowtreeMetricsSummary}
                         activities={activities}
                         activityGroups={activityGroups}
                         programs={programs}
                         viewSettings={viewSettings}
                         onNodeClick={handleGoalNameClick}
-                        selectedNodeId={viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null}
+                        selectedNodeId={selectedNodeId}
                         onAddChild={handleAddChildClick}
                         sidebarOpen={isSidebarOpen && !(isMobile && isMobilePanelCollapsed)}
                         key={rootId}
@@ -368,7 +384,7 @@ function FractalGoals() {
                                             }}
                                             onToggleCompletion={handleToggleCompletion}
                                             treeData={fractalData}
-                                            sessions={sessions}
+                                            evidenceGoalIds={evidenceGoalIds}
                                             activityDefinitions={activities}
                                             activityGroups={activityGroups}
                                             programs={programs}
