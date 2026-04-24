@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import ReactFlow, {
     useNodesState,
     useEdgesState,
@@ -191,14 +191,16 @@ const nodeTypes = {
     custom: CustomNode,
 };
 
+const EMPTY_ARRAY = [];
+
 const FlowTree = React.forwardRef(({
     treeData,
-    sessions = [],
+    sessions = EMPTY_ARRAY,
     evidenceGoalIds = null,
     metricsSummary = null,
-    activities = [],
-    activityGroups = [],
-    programs = [],
+    activities = EMPTY_ARRAY,
+    activityGroups = EMPTY_ARRAY,
+    programs = EMPTY_ARRAY,
     viewSettings = DEFAULT_VIEW_SETTINGS,
     onNodeClick,
     onAddChild,
@@ -252,6 +254,10 @@ const FlowTree = React.forwardRef(({
 
     const [nodes, setNodes, onNodesChange] = useNodesState(graphNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(graphEdges);
+
+    const handleReactFlowInit = useCallback((instance) => {
+        setRfInstance((currentInstance) => currentInstance || instance);
+    }, []);
 
     useEffect(() => {
         setNodes(graphNodes);
@@ -309,7 +315,7 @@ const FlowTree = React.forwardRef(({
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 nodeTypes={nodeTypes}
-                onInit={setRfInstance}
+                onInit={handleReactFlowInit}
                 fitView
                 fitViewOptions={{ padding: isMobile ? 0.08 : 0.2 }}
                 attributionPosition="bottom-left"

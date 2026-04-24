@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useEffect, useMemo } from 'react';
+import React, { Suspense, useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import Sidebar from '../components/Sidebar';
@@ -30,8 +30,16 @@ const GoalDetailModal = lazyWithRetry(() => import('../components/GoalDetailModa
  * NOTE: Sessions are NO LONGER displayed in the goal tree.
  * They are managed separately via the /sessions page.
  */
+const FLOWTREE_SETTINGS_STORAGE_KEY = 'flowtree-view-settings';
+const DEFAULT_VIEW_SETTINGS = {
+    highlightActiveBranches: false,
+    fadeInactiveBranches: false,
+    showCompletionJourney: false,
+    showMetricsOverlay: false,
+};
+const EMPTY_ARRAY = [];
+
 function FractalGoals() {
-    const FLOWTREE_SETTINGS_STORAGE_KEY = 'flowtree-view-settings';
     const activeBranchTooltip = `Marks goal paths with at least one associated completed activity instance in the last ${ACTIVE_GOAL_WINDOW_DAYS} days.`;
     const inactiveBranchTooltip = `Dims branches with no associated completed activity instances in the last ${ACTIVE_GOAL_WINDOW_DAYS} days.`;
 
@@ -54,14 +62,14 @@ function FractalGoals() {
     } = useFractalTree(rootId);
     const { data: evidenceData, isLoading: evidenceLoading } = useFlowTreeEvidence(rootId);
 
-    const { activities = [], isLoading: activitiesLoading } = useActivitiesQuery(rootId);
-    const { activityGroups = [], isLoading: activityGroupsLoading } = useActivityGroups(rootId);
+    const { activities = EMPTY_ARRAY, isLoading: activitiesLoading } = useActivitiesQuery(rootId);
+    const { activityGroups = EMPTY_ARRAY, isLoading: activityGroupsLoading } = useActivityGroups(rootId);
 
     const { debugMode } = useDebug();
     const { getGoalColor } = useGoalLevels();
     const isMobile = useIsMobile();
 
-    const { programs = [] } = usePrograms(rootId);
+    const { programs = EMPTY_ARRAY } = usePrograms(rootId);
 
     const loading = goalsLoading || activitiesLoading || activityGroupsLoading || evidenceLoading;
 
@@ -77,12 +85,6 @@ function FractalGoals() {
 
     // Alert state
     const [alertData, setAlertData] = useState({ isOpen: false, title: '', message: '' });
-    const DEFAULT_VIEW_SETTINGS = {
-        highlightActiveBranches: false,
-        fadeInactiveBranches: false,
-        showCompletionJourney: false,
-        showMetricsOverlay: false,
-    };
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
     const selectedNodeId = viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null;
     const evidenceGoalIds = useMemo(() => {
@@ -149,19 +151,19 @@ function FractalGoals() {
     }, [fractalData, viewingGoal]);
 
     // Helper to show alert
-    const showAlert = (title, message) => {
+    const showAlert = useCallback((title, message) => {
         setAlertData({ isOpen: true, title, message });
-    };
+    }, []);
 
     // Handlers
 
-    const handleGoalNameClick = (nodeDatum) => {
+    const handleGoalNameClick = useCallback((nodeDatum) => {
         setViewingGoal(nodeDatum);
         setSidebarMode('goal-details');
         if (isMobile) setIsMobilePanelCollapsed(false);
-    };
+    }, [isMobile]);
 
-    const handleAddChildClick = (nodeDatum) => {
+    const handleAddChildClick = useCallback((nodeDatum) => {
         const parentType = nodeDatum.attributes?.type || nodeDatum.type;
         const childType = getChildType(parentType);
 
@@ -174,7 +176,7 @@ function FractalGoals() {
         setSelectedParent(nodeDatum);
         setShowGoalModal(true);
         if (isMobile) setIsMobilePanelCollapsed(false);
-    };
+    }, [isMobile, showAlert]);
 
     const handleCreateGoal = async (goalData) => {
         try {
