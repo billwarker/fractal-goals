@@ -57,8 +57,6 @@ _TYPE_TO_LEVEL_NAME = {
     'MidTermGoal': 'Mid Term Goal',
     'ShortTermGoal': 'Short Term Goal',
     'ImmediateGoal': 'Immediate Goal',
-    'MicroGoal': 'Micro Goal',
-    'NanoGoal': 'Nano Goal',
 }
 
 _DEFAULT_LEVEL_RANKS = {
@@ -67,28 +65,27 @@ _DEFAULT_LEVEL_RANKS = {
     'Mid Term Goal': 2,
     'Short Term Goal': 3,
     'Immediate Goal': 4,
-    'Micro Goal': 5,
-    'Nano Goal': 6,
 }
 
 
 def resolve_level_id(db_session, type_value) -> str | None:
-    level_name = _TYPE_TO_LEVEL_NAME.get(
-        type_value,
-        type_value.replace('Goal', ' Goal') if isinstance(type_value, str) else None,
-    )
+    level_name = _TYPE_TO_LEVEL_NAME.get(type_value)
     if not level_name:
         return None
 
-    level = db_session.query(GoalLevel).filter_by(name=level_name, owner_id=None).first()
+    level = db_session.query(GoalLevel).filter_by(
+        name=level_name,
+        owner_id=None,
+        deleted_at=None,
+    ).first()
     if not level:
-        level = db_session.query(GoalLevel).filter_by(name=level_name).first()
+        level = db_session.query(GoalLevel).filter_by(
+            name=level_name,
+            deleted_at=None,
+        ).first()
     if not level and level_name in _DEFAULT_LEVEL_RANKS:
         level = GoalLevel(name=level_name, rank=_DEFAULT_LEVEL_RANKS[level_name])
         db_session.add(level)
-        db_session.flush()
-    if level and getattr(level, 'deleted_at', None) is not None:
-        level.deleted_at = None
         db_session.flush()
     return level.id if level else None
 
@@ -735,12 +732,6 @@ class GoalService:
         data = normalize_goal_payload(data)
         parent = None
         parent_id = data.get('parent_id')
-        if data.get('type') in {'MicroGoal', 'NanoGoal'} and not parent_id:
-            return None, "parent_id is required for MicroGoal and NanoGoal", 400
-        if data.get('type') == 'MicroGoal' and data.get('deadline'):
-            return None, "MicroGoal cannot have deadlines", 400
-        if data.get('type') == 'NanoGoal' and data.get('description'):
-            return None, "NanoGoal cannot have a description", 400
         if parent_id:
             parent = get_goal_by_id(self.db_session, parent_id)
             if not parent:
@@ -781,6 +772,8 @@ class GoalService:
                 }, 400
 
         level_id = resolve_level_id(self.db_session, data.get('type'))
+        if not level_id:
+            return None, "Invalid goal type", 400
         level_obj = self.db_session.query(GoalLevel).filter_by(id=level_id).first() if level_id else None
 
         if parent:
@@ -836,7 +829,7 @@ class GoalService:
                         linked_session.id,
                         new_goal.id,
                         data.get('type', 'Goal'),
-                        'micro_goal' if data.get('type') == 'MicroGoal' else 'manual',
+                        'manual',
                     )
                 ))
 
@@ -896,6 +889,8 @@ class GoalService:
             return None, deadline_error, 400
 
         level_id = resolve_level_id(self.db_session, data.get('type'))
+        if not level_id:
+            return None, "Invalid goal type", 400
         level_obj = self.db_session.query(GoalLevel).filter_by(id=level_id).first() if level_id else None
 
         description_error = self._validate_description_required(level_obj, data.get('description'))
@@ -903,12 +898,6 @@ class GoalService:
             return None, description_error, 400
 
         parent_id = data.get('parent_id')
-        if data.get('type') in {'MicroGoal', 'NanoGoal'} and not parent_id:
-            return None, "parent_id is required for MicroGoal and NanoGoal", 400
-        if data.get('type') == 'MicroGoal' and data.get('deadline'):
-            return None, "MicroGoal cannot have deadlines", 400
-        if data.get('type') == 'NanoGoal' and data.get('description'):
-            return None, "NanoGoal cannot have a description", 400
         parent_goal = None
         if parent_id:
             parent_goal = self.db_session.query(Goal).options(
@@ -970,7 +959,7 @@ class GoalService:
                         linked_session.id,
                         new_goal.id,
                         data.get('type', 'Goal'),
-                        'micro_goal' if data.get('type') == 'MicroGoal' else 'manual',
+                        'manual',
                     )
                 ))
 
@@ -1604,15 +1593,10 @@ class GoalService:
         if not new_level:
             return None, "Goal level not found", 404
 
-        # Execution-tier goals cannot be converted, and Micro/Nano are not
-        # structural conversion targets.
-        EXECUTION_TIER_NAMES = {'Immediate Goal', 'Micro Goal', 'Nano Goal'}
-        TARGET_EXECUTION_TIER_NAMES = {'Micro Goal', 'Nano Goal'}
+        EXECUTION_TIER_NAMES = {'Immediate Goal'}
         current_level_name = getattr(goal.level, 'name', None)
         if current_level_name in EXECUTION_TIER_NAMES:
             return None, f"Cannot convert an execution-tier goal ('{current_level_name}')", 400
-        if new_level.name in TARGET_EXECUTION_TIER_NAMES:
-            return None, f"Cannot convert a goal to execution tier level '{new_level.name}'", 400
 
         root_level_rank = self._get_goal_level_rank(root)
         if root_level_rank is not None and new_level.rank <= root_level_rank:

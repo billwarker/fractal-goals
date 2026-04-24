@@ -306,7 +306,7 @@ class UserDeleteSchema(BaseModel):
 
 VALID_GOAL_TYPES = [
     'UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal',
-    'ImmediateGoal', 'MicroGoal', 'NanoGoal'
+    'ImmediateGoal'
 ]
 
 VALID_ROOT_GOAL_TYPES = [
@@ -346,14 +346,6 @@ class GoalCreateSchema(BaseModel):
     
     @model_validator(mode='after')
     def validate_parent_type_constraints(self):
-        if self.type == 'MicroGoal' and not self.parent_id:
-            raise ValueError("MicroGoal must have a parent_id")
-        if self.type == 'NanoGoal' and not self.parent_id:
-            raise ValueError("NanoGoal must have a parent_id")
-        if self.type == 'MicroGoal' and self.deadline:
-            raise ValueError("MicroGoal cannot have deadlines")
-        if self.type == 'NanoGoal' and self.description:
-            raise ValueError("NanoGoal cannot have a description")
         return self
     
     @field_validator('name')
@@ -1065,7 +1057,6 @@ class NoteCreateSchema(BaseModel):
     activity_instance_id: Optional[str] = None
     activity_definition_id: Optional[str] = None
     goal_id: Optional[str] = None
-    nano_goal_id: Optional[str] = None
     set_index: Optional[int] = Field(None, ge=0)
 
     @field_validator('content')

@@ -15,7 +15,7 @@ import uuid
 import json
 
 from models import (
-    Goal, GoalLevel, Session, session_goals,
+    Goal, Session,
     ActivityGroup, ActivityDefinition, MetricDefinition,
     ActivityInstance, MetricValue
 )
@@ -146,47 +146,6 @@ class TestSession:
         assert 'session_start' in session_dict['attributes']
         # Should include session_data with hydrated activities in attributes
         assert 'attributes' in session_dict
-
-    def test_session_serialization_includes_micro_goals(self, db_session, sample_practice_session, sample_goal_hierarchy):
-        """Test session serialization exposes session-linked micro goals."""
-        micro_level = db_session.query(GoalLevel).filter(GoalLevel.name == 'Micro Goal').first()
-        if micro_level is None:
-            micro_level = GoalLevel(
-                id=str(uuid.uuid4()),
-                name='Micro Goal',
-                rank=5,
-            )
-            db_session.add(micro_level)
-            db_session.flush()
-
-        micro_goal = Goal(
-            id=str(uuid.uuid4()),
-            level_id=micro_level.id,
-            name='Refine phrase loop',
-            parent_id=sample_goal_hierarchy['short_term'].id,
-            root_id=sample_goal_hierarchy['ultimate'].id,
-            created_at=datetime.utcnow(),
-        )
-        db_session.add(micro_goal)
-        db_session.flush()
-
-        db_session.execute(
-            session_goals.insert().values(
-                session_id=sample_practice_session.id,
-                goal_id=micro_goal.id,
-                goal_type='MicroGoal',
-                association_source='micro_goal',
-            )
-        )
-        db_session.commit()
-
-        session = db_session.query(Session).filter(Session.id == sample_practice_session.id).first()
-        session_dict = serialize_session(session)
-
-        assert 'micro_goals' in session_dict
-        assert len(session_dict['micro_goals']) == 1
-        assert session_dict['micro_goals'][0]['id'] == micro_goal.id
-
 
 @pytest.mark.unit
 class TestActivityDefinition:

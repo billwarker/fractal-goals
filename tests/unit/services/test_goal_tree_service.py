@@ -82,7 +82,7 @@ def test_session_goal_payload_keeps_structural_ancestors_for_activity_derived_go
     assert sample_goal_hierarchy["short_term"].id in tree_ids
 
 
-def test_session_goal_payload_separates_micro_goals_from_structural_tree(
+def test_session_goal_payload_keeps_session_goals_in_structural_tree(
     db_session,
     test_user,
     sample_goal_hierarchy,
@@ -95,21 +95,21 @@ def test_session_goal_payload_separates_micro_goals_from_structural_tree(
         root_id=sample_goal_hierarchy["ultimate"].id,
         created_at=datetime.now(timezone.utc),
     )
-    micro_goal = Goal(
+    immediate_child = Goal(
         id=str(uuid4()),
-        name="Micro Focus Cue",
+        name="Second Practice Step",
         parent_id=immediate_goal.id,
         root_id=sample_goal_hierarchy["ultimate"].id,
         created_at=datetime.now(timezone.utc),
     )
-    db_session.add_all([immediate_goal, micro_goal])
+    db_session.add_all([immediate_goal, immediate_child])
     db_session.flush()
 
     link_values = SessionService(db_session)._session_goal_insert_values(
         sample_practice_session.id,
-        micro_goal.id,
-        "MicroGoal",
-        "micro_goal",
+        immediate_child.id,
+        "ImmediateGoal",
+        "manual",
     )
     db_session.execute(session_goals.insert().values(**link_values))
     db_session.commit()
@@ -123,11 +123,11 @@ def test_session_goal_payload_separates_micro_goals_from_structural_tree(
 
     assert error is None
     assert status == 200
-    assert payload["micro_goals"][0]["id"] == micro_goal.id
+    assert "micro_goals" not in payload
 
     tree_ids = _collect_tree_ids(payload["goal_tree"])
     assert immediate_goal.id in tree_ids
-    assert micro_goal.id not in tree_ids
+    assert immediate_child.id in tree_ids
 
 
 def test_session_goal_payload_includes_group_inherited_activity_associations(

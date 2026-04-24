@@ -173,9 +173,7 @@ def _setup_convert_levels(db_session, hierarchy):
     mid_level = GoalLevel(id=str(uuid.uuid4()), name='Mid Term Goal', rank=2)
     short_level = GoalLevel(id=str(uuid.uuid4()), name='Short Term Goal', rank=3)
     imm_level = GoalLevel(id=str(uuid.uuid4()), name='Immediate Goal', rank=4)
-    micro_level = GoalLevel(id=str(uuid.uuid4()), name='Micro Goal', rank=5)
-    nano_level = GoalLevel(id=str(uuid.uuid4()), name='Nano Goal', rank=6)
-    db_session.add_all([root_level, long_level, mid_level, short_level, imm_level, micro_level, nano_level])
+    db_session.add_all([root_level, long_level, mid_level, short_level, imm_level])
     db_session.flush()
 
     hierarchy['ultimate'].level_id = root_level.id
@@ -190,8 +188,6 @@ def _setup_convert_levels(db_session, hierarchy):
         'mid': mid_level,
         'short': short_level,
         'immediate': imm_level,
-        'micro': micro_level,
-        'nano': nano_level,
     }
 
 
@@ -254,7 +250,7 @@ def test_convert_goal_level_rejects_child_rank_violation(db_session, test_user, 
 
 
 def test_convert_goal_level_rejects_execution_tier_goal(db_session, test_user, sample_goal_hierarchy):
-    """Execution-tier goals (Immediate, Micro, Nano) cannot be converted."""
+    """Execution-tier goals cannot be converted."""
     levels = _setup_convert_levels(db_session, sample_goal_hierarchy)
     service = GoalService(db_session, sync_targets=sync_goal_targets)
 
@@ -273,18 +269,22 @@ def test_convert_goal_level_rejects_execution_tier_goal(db_session, test_user, s
     assert "execution-tier" in error
 
 
-def test_convert_goal_level_rejects_target_micro_nano(db_session, test_user, sample_goal_hierarchy):
-    """Cannot convert any goal to a Micro Goal or Nano Goal level."""
-    levels = _setup_convert_levels(db_session, sample_goal_hierarchy)
+def test_create_fractal_goal_record_rejects_removed_goal_types(db_session, test_user, sample_goal_hierarchy):
+    """Direct service calls cannot recreate removed Micro/Nano levels."""
+    _setup_convert_levels(db_session, sample_goal_hierarchy)
     service = GoalService(db_session, sync_targets=sync_goal_targets)
 
     root = sample_goal_hierarchy['ultimate']
-    mid_term = sample_goal_hierarchy['mid_term']
-
-    for exec_level in [levels['micro'], levels['nano']]:
-        result, error, status = service.convert_goal_level(
-            root.id, mid_term.id, test_user.id, exec_level.id,
+    for removed_type in ['MicroGoal', 'NanoGoal']:
+        result, error, status = service.create_fractal_goal_record(
+            root.id,
+            test_user.id,
+            {
+                'name': removed_type,
+                'type': removed_type,
+                'parent_id': sample_goal_hierarchy['short_term'].id,
+            },
         )
         assert result is None
         assert status == 400
-        assert "execution tier level" in error
+        assert error == "Invalid goal type"

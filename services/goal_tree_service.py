@@ -43,60 +43,6 @@ class GoalTreeService:
 
         return None
 
-    def get_session_micro_goals(self, current_user, root_id, session_id):
-        from services.session_service import SessionService
-
-        root = self.db_session.query(Goal.id).filter(
-            Goal.id == root_id,
-            Goal.parent_id == None,
-            Goal.owner_id == current_user.id,
-            Goal.deleted_at == None,
-        ).first()
-        if not root:
-            return None, {"error": "Fractal not found or access denied"}, 404
-
-        session_obj = self.db_session.query(Session.id).filter(
-            Session.id == session_id,
-            Session.root_id == root_id,
-            Session.deleted_at == None,
-        ).first()
-        if not session_obj:
-            return None, {"error": "Session not found in this fractal"}, 404
-
-        session_service = SessionService(self.db_session)
-        session_goal_select = select(session_goals.c.goal_id)
-        includes_source = session_service._session_goals_supports_source()
-        if includes_source:
-            session_goal_select = select(session_goals.c.goal_id, session_goals.c.association_source)
-
-        rows = self.db_session.execute(
-            session_goal_select.where(session_goals.c.session_id == session_id)
-        ).all()
-        session_goal_ids = [row.goal_id for row in rows]
-        session_goal_sources = {
-            row.goal_id: (getattr(row, 'association_source', None) if includes_source else None) or 'manual'
-            for row in rows
-        }
-        if not session_goal_ids:
-            return [], None, 200
-
-        goals = self.db_session.query(Goal).options(
-            selectinload(Goal.children),
-        ).filter(
-            Goal.id.in_(session_goal_ids),
-            Goal.root_id == root_id,
-            Goal.deleted_at == None,
-        ).all()
-        micro_goals = [
-            goal
-            for goal in goals
-            if session_goal_sources.get(goal.id) == 'micro_goal'
-            or get_canonical_goal_type(goal) == 'MicroGoal'
-        ]
-        micro_goals.sort(key=lambda goal: session_goal_ids.index(goal.id))
-
-        return [serialize_goal(goal, include_children=True) for goal in micro_goals], None, 200
-
     def get_session_goals_view_payload(self, current_user, root_id, session_id):
         from services.session_service import SessionService
         from blueprints.api_utils import require_owned_root
@@ -184,31 +130,10 @@ class GoalTreeService:
             for goal_ids in activity_goal_ids_by_activity.values()
             for goal_id in goal_ids
         }
-        execution_goal_ids = set()
-        for goal_id in session_goal_ids:
-            goal = goals_by_id.get(goal_id)
-            if session_goal_sources.get(goal_id) in {'micro_goal', 'nano_goal'}:
-                execution_goal_ids.add(goal_id)
-            elif goal and get_canonical_goal_type(goal) in {'MicroGoal', 'NanoGoal'}:
-                execution_goal_ids.add(goal_id)
-        micro_goals = [
-            serialize_goal(goals_by_id[goal_id], include_children=True)
-            for goal_id in session_goal_ids
-            if goal_id in goals_by_id
-            and (
-                session_goal_sources.get(goal_id) == 'micro_goal'
-                or get_canonical_goal_type(goals_by_id[goal_id]) == 'MicroGoal'
-            )
-        ]
-
-        structural_goal_ids = (set(session_goal_ids) - execution_goal_ids) | associated_goal_ids
+        structural_goal_ids = set(session_goal_ids) | associated_goal_ids
         visible_goal_ids = self._collect_goal_ids_with_ancestors(
             structural_goal_ids,
             goals_by_id
-        )
-        visible_goal_ids |= (
-            self._collect_goal_ids_with_ancestors(execution_goal_ids, goals_by_id)
-            - execution_goal_ids
         )
         visible_goal_ids.add(root_id)
         pruned_goal_tree = self._prune_tree_to_goal_ids(root_tree, visible_goal_ids) or root_tree
@@ -219,7 +144,6 @@ class GoalTreeService:
             session_goal_sources=session_goal_sources,
             session_activity_ids=session_activity_ids,
             activity_goal_ids_by_activity=activity_goal_ids_by_activity,
-            micro_goals=micro_goals,
         )
         
         return payload, None, 200

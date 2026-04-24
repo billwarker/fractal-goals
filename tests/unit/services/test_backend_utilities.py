@@ -61,9 +61,9 @@ def _make_goal(level_name=None, parent=None):
 
 
 def test_goal_type_utils_prefers_explicit_level():
-    goal = _make_goal(level_name="Micro Goal")
-    assert get_canonical_goal_type(goal) == "MicroGoal"
-    assert get_canonical_goal_level_name(goal) == "Micro Goal"
+    goal = _make_goal(level_name="Immediate Goal")
+    assert get_canonical_goal_type(goal) == "ImmediateGoal"
+    assert get_canonical_goal_level_name(goal) == "Immediate Goal"
 
 
 def test_goal_type_utils_uses_depth_fallback():
@@ -72,17 +72,13 @@ def test_goal_type_utils_uses_depth_fallback():
     mid_term = _make_goal(parent=long_term)
     short_term = _make_goal(parent=mid_term)
     immediate = _make_goal(parent=short_term)
-    micro = _make_goal(parent=immediate)
-    nano = _make_goal(parent=micro)
 
     assert get_canonical_goal_type(root) == "UltimateGoal"
     assert get_canonical_goal_type(long_term) == "LongTermGoal"
     assert get_canonical_goal_type(mid_term) == "MidTermGoal"
     assert get_canonical_goal_type(short_term) == "ShortTermGoal"
     assert get_canonical_goal_type(immediate) == "ImmediateGoal"
-    assert get_canonical_goal_type(micro) == "MicroGoal"
-    assert get_canonical_goal_type(nano) == "NanoGoal"
-    assert get_canonical_goal_level_name(nano) == "Nano Goal"
+    assert get_canonical_goal_type(_make_goal(parent=immediate)) is None
 
 
 def test_goal_type_utils_unknown_level_name_falls_back_to_depth():

@@ -244,7 +244,6 @@ function NoteComposer({
                                             }
                                         }}
                                         showHideCompleted={true}
-                                        showHideMicroNano={true}
                                         allowLineageSelection={false}
                                         getGoalColor={getGoalColor}
                                         getGoalIcon={getGoalIcon}
@@ -367,7 +366,6 @@ export function ComposeLinkPanel({
                                 onGoalSelect(ids[0] || null, names[0] || null);
                             }}
                             showHideCompleted={true}
-                            showHideMicroNano={true}
                             allowLineageSelection={false}
                             getGoalColor={getGoalColor}
                             getGoalIcon={getGoalIcon}

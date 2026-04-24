@@ -4,8 +4,6 @@ from services.goal_domain_rules import (
     all_active_targets_completed,
     goal_allows_manual_completion,
     goal_uses_child_completion,
-    is_micro_goal,
-    is_nano_goal,
     resolve_completed_via_children,
     should_inherit_parent_activities,
 )
@@ -42,19 +40,13 @@ def test_resolve_completed_via_children_prefers_explicit_or_level_default():
     assert resolve_completed_via_children({}, None) is False
 
 
-def test_nano_and_micro_goal_detection():
-    assert is_nano_goal(_goal(level_name="Nano Goal")) is True
-    assert is_micro_goal(_goal(level_name="Micro Goal")) is True
-
-
-def test_should_inherit_parent_activities_only_for_nano_children():
+def test_should_inherit_parent_activities_uses_explicit_value():
     parent = _goal(level_name="Immediate Goal")
-    nano = _goal(level_name="Nano Goal", parent_id="parent-1")
-    micro = _goal(level_name="Micro Goal", parent_id="parent-1")
+    goal = _goal(level_name="Immediate Goal", parent_id="parent-1")
 
-    assert should_inherit_parent_activities(nano, parent) is True
-    assert should_inherit_parent_activities(micro, parent) is False
-    assert should_inherit_parent_activities(micro, parent, explicit_value=True) is True
+    assert should_inherit_parent_activities(goal, parent) is False
+    assert should_inherit_parent_activities(goal, parent, explicit_value=True) is True
+    assert should_inherit_parent_activities(goal, parent, explicit_value=False) is False
 
 
 def test_all_active_targets_completed_ignores_deleted_targets():

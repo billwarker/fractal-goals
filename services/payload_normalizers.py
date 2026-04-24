@@ -127,7 +127,7 @@ def normalize_note_payload(data, *, partial=False):
     if 'content' in normalized or not partial:
         normalized['content'] = sanitize_note_content(normalized.get('content') or '')
 
-    for key in ('session_id', 'activity_instance_id', 'activity_definition_id', 'goal_id', 'nano_goal_id', 'context_id'):
+    for key in ('session_id', 'activity_instance_id', 'activity_definition_id', 'goal_id', 'context_id'):
         if key in normalized or not partial:
             normalized[key] = _normalize_optional_string(normalized.get(key))
 

@@ -17,8 +17,6 @@ def get_canonical_goal_type(goal):
         "midtermgoal": "MidTermGoal",
         "shorttermgoal": "ShortTermGoal",
         "immediategoal": "ImmediateGoal",
-        "microgoal": "MicroGoal",
-        "nanogoal": "NanoGoal",
     }
 
     level = getattr(goal, 'level', None)
@@ -46,8 +44,6 @@ def get_canonical_goal_type(goal):
         2: "MidTermGoal",
         3: "ShortTermGoal",
         4: "ImmediateGoal",
-        5: "MicroGoal",
-        6: "NanoGoal",
     }
     fallback = fallback_by_depth.get(depth)
     if fallback:
@@ -85,7 +81,5 @@ def get_canonical_goal_level_name(goal):
         "MidTermGoal": "Mid Term Goal",
         "ShortTermGoal": "Short Term Goal",
         "ImmediateGoal": "Immediate Goal",
-        "MicroGoal": "Micro Goal",
-        "NanoGoal": "Nano Goal",
     }
     return name_map.get(canonical_type)

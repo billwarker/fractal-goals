@@ -1,7 +1,7 @@
 import json
 import uuid
 
-from models import Goal, GoalLevel, Note, session_goals
+from models import Goal, Note
 from services.serializers import derive_note_type
 from services.events import Events
 from services.note_service import NoteService
@@ -75,66 +75,6 @@ def test_delete_note_emits_note_deleted_event(db_session, sample_ultimate_goal, 
     assert emitted[0].data['note_content'] == 'Remove me'
 
 
-def test_create_nano_goal_note_emits_note_and_goal_events(
-    db_session,
-    sample_goal_hierarchy,
-    sample_activity_instance,
-    test_user,
-    monkeypatch,
-):
-    root = sample_goal_hierarchy['ultimate']
-    emitted = []
-    monkeypatch.setattr('services.note_service.event_bus.emit', lambda event: emitted.append(event))
-
-    def fake_create_fractal_goal_record(self, root_id, current_user_id, data):
-        nano_level = db_session.query(GoalLevel).filter_by(name='Nano Goal').first()
-        if nano_level is None:
-            nano_level = GoalLevel(name='Nano Goal', rank=6)
-            db_session.add(nano_level)
-            db_session.flush()
-
-        goal = Goal(
-            id=str(uuid.uuid4()),
-            name=data['name'],
-            parent_id=data['parent_id'],
-            root_id=root_id,
-            owner_id=current_user_id,
-            level_id=nano_level.id,
-        )
-        db_session.add(goal)
-        db_session.commit()
-        db_session.refresh(goal)
-        return goal, None, 201
-
-    monkeypatch.setattr(
-        'services.note_service.GoalService.create_fractal_goal_record',
-        fake_create_fractal_goal_record,
-    )
-
-    db_session.execute(session_goals.insert().values(
-        session_id=sample_activity_instance.session_id,
-        goal_id=sample_goal_hierarchy['short_term'].id,
-        goal_type='ShortTermGoal',
-    ))
-    db_session.commit()
-
-    service = NoteService(db_session)
-    payload, error, status = service.create_nano_goal_note(root.id, test_user.id, {
-        'name': 'Nano note goal',
-        'parent_id': sample_goal_hierarchy['short_term'].id,
-        'session_id': sample_activity_instance.session_id,
-        'activity_instance_id': sample_activity_instance.id,
-        'activity_definition_id': sample_activity_instance.activity_definition_id,
-    })
-
-    assert error is None
-    assert status == 201
-    assert payload['note']['nano_goal_id'] == payload['goal']['id']
-    assert [event.name for event in emitted] == [Events.NOTE_CREATED, Events.GOAL_CREATED]
-    assert emitted[0].data['note_id'] == payload['note']['id']
-    assert emitted[1].data['goal_id'] == payload['goal']['id']
-
-
 def test_create_note_rejects_blank_content_after_normalization(db_session, sample_ultimate_goal, test_user):
     service = NoteService(db_session)
 
@@ -170,7 +110,7 @@ def test_create_activity_instance_note_hydrates_session_and_activity_definition(
     assert payload['activity_definition_id'] == sample_activity_instance.activity_definition_id
 
 
-def test_create_note_rejects_unlinked_nano_goal_for_activity_instance(
+def test_create_note_ignores_removed_nano_goal_id_field(
     db_session,
     sample_goal_hierarchy,
     sample_activity_instance,
@@ -184,35 +124,21 @@ def test_create_note_rejects_unlinked_nano_goal_for_activity_instance(
         parent_id=sample_goal_hierarchy['short_term'].id,
         root_id=root.id,
     )
-    micro = Goal(
-        id=str(uuid.uuid4()),
-        name='Micro Goal',
-        owner_id=test_user.id,
-        parent_id=immediate.id,
-        root_id=root.id,
-    )
-    nano = Goal(
-        id=str(uuid.uuid4()),
-        name='Nano Goal',
-        owner_id=test_user.id,
-        parent_id=micro.id,
-        root_id=root.id,
-    )
-    db_session.add_all([immediate, micro, nano])
+    db_session.add(immediate)
     db_session.commit()
 
     service = NoteService(db_session)
     payload, error, status = service.create_note(root.id, test_user.id, {
-        'content': 'Nano note',
+        'content': 'Regular note',
         'context_type': 'activity_instance',
         'context_id': sample_activity_instance.id,
         'activity_instance_id': sample_activity_instance.id,
-        'nano_goal_id': nano.id,
+        'nano_goal_id': immediate.id,
     })
 
-    assert payload is None
-    assert status == 400
-    assert error == 'nano_goal_id is not linked to the provided session'
+    assert error is None
+    assert status == 201
+    assert 'nano_goal_id' not in payload
 
 
 def test_get_goal_notes_returns_display_context_and_images(db_session, sample_goal_hierarchy, test_user):
@@ -245,7 +171,7 @@ def test_get_goal_notes_returns_display_context_and_images(db_session, sample_go
 def test_derive_note_type_distinguishes_activity_set_notes():
     assert derive_note_type('activity_instance', None) == 'activity_instance_note'
     assert derive_note_type('activity_instance', 0) == 'activity_set_note'
-    assert derive_note_type('activity_instance', None, is_nano_goal=True) == 'goal_note'
+    assert derive_note_type('goal', None) == 'goal_note'
 
 
 def test_pin_note_rejects_activity_set_notes(db_session, sample_goal_hierarchy, sample_activity_instance, test_user):
@@ -308,46 +234,29 @@ def test_get_session_notes_includes_session_template_name(
     assert payload[0]['session_template_name'] == 'Standard Practice Session'
 
 
-def test_get_all_notes_treats_nano_goal_notes_as_goal_notes(
+def test_get_all_notes_filters_regular_goal_notes_by_goal_id(
     db_session,
     sample_goal_hierarchy,
     sample_activity_instance,
     test_user,
 ):
     root = sample_goal_hierarchy['ultimate']
-    immediate = Goal(
+    goal = Goal(
         id=str(uuid.uuid4()),
         name='Immediate Goal',
         owner_id=test_user.id,
         parent_id=sample_goal_hierarchy['short_term'].id,
         root_id=root.id,
     )
-    micro = Goal(
-        id=str(uuid.uuid4()),
-        name='Micro Goal',
-        owner_id=test_user.id,
-        parent_id=immediate.id,
-        root_id=root.id,
-    )
-    nano = Goal(
-        id=str(uuid.uuid4()),
-        name='Smooth',
-        owner_id=test_user.id,
-        parent_id=micro.id,
-        root_id=root.id,
-    )
-    db_session.add_all([immediate, micro, nano])
+    db_session.add(goal)
     db_session.flush()
 
-    nano_note = Note(
+    goal_note = Note(
         id=str(uuid.uuid4()),
         root_id=root.id,
-        context_type='activity_instance',
-        context_id=sample_activity_instance.id,
-        session_id=sample_activity_instance.session_id,
-        activity_instance_id=sample_activity_instance.id,
-        activity_definition_id=sample_activity_instance.activity_definition_id,
-        nano_goal_id=nano.id,
+        context_type='goal',
+        context_id=goal.id,
+        goal_id=goal.id,
         content='Smooth',
     )
     activity_note = Note(
@@ -360,7 +269,7 @@ def test_get_all_notes_treats_nano_goal_notes_as_goal_notes(
         activity_definition_id=sample_activity_instance.activity_definition_id,
         content='Technique note',
     )
-    db_session.add_all([nano_note, activity_note])
+    db_session.add_all([goal_note, activity_note])
     db_session.commit()
 
     service = NoteService(db_session)
@@ -374,17 +283,17 @@ def test_get_all_notes_treats_nano_goal_notes_as_goal_notes(
     assert error is None
     assert status == 200
     assert payload['total'] == 1
-    assert payload['notes'][0]['id'] == nano_note.id
+    assert payload['notes'][0]['id'] == goal_note.id
     assert payload['notes'][0]['note_type'] == 'goal_note'
-    assert payload['notes'][0]['goal_name'] == 'Smooth'
+    assert payload['notes'][0]['goal_name'] == 'Immediate Goal'
 
     payload, error, status = service.get_all_notes(
         root.id,
         test_user.id,
-        filters={'goal_id': nano.id},
+        filters={'goal_id': goal.id},
     )
 
     assert error is None
     assert status == 200
     assert payload['total'] == 1
-    assert payload['notes'][0]['id'] == nano_note.id
+    assert payload['notes'][0]['id'] == goal_note.id

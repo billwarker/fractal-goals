@@ -116,27 +116,6 @@ def get_session_goals_view(current_user, root_id, session_id):
         db_session.close()
 
 
-@goals_bp.route('/fractal/<root_id>/sessions/<session_id>/micro-goals', methods=['GET'])
-@token_required
-def get_session_micro_goals(current_user, root_id, session_id):
-    """Return MicroGoal entries linked to a specific session."""
-    from services.goal_tree_service import GoalTreeService
-
-    db_session = get_db_session()
-    try:
-        service = GoalTreeService(db_session)
-        payload, error_dict, status_code = service.get_session_micro_goals(current_user, root_id, session_id)
-        if error_dict:
-            return jsonify(error_dict), status_code
-        return jsonify(payload)
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error fetching session micro goals")
-        return internal_error(logger, "Goals API request failed")
-    finally:
-        db_session.close()
-
-
 @goals_bp.route('/goals/<goal_id>', methods=['DELETE'])
 @token_required
 def delete_goal_endpoint(current_user, goal_id: str):

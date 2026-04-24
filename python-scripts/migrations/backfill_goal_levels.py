@@ -15,8 +15,6 @@ DEFAULT_LEVELS = [
     {"name": "Mid Term Goal", "rank": 2, "color": "cyan", "icon": "calendar"},
     {"name": "Short Term Goal", "rank": 3, "color": "green", "icon": "check-circle"},
     {"name": "Immediate Goal", "rank": 4, "color": "yellow", "icon": "zap"},
-    {"name": "Micro Goal", "rank": 5, "color": "orange", "icon": "target"},
-    {"name": "Nano Goal", "rank": 6, "color": "red", "icon": "activity"},
 ]
 
 def run_migration():

@@ -464,11 +464,9 @@ def serialize_session(session, include_image_data=False):
             
         result["short_term_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if get_type(g) == 'ShortTermGoal']
         result["immediate_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if get_type(g) == 'ImmediateGoal']
-        result["micro_goals"] = [serialize_goal(g, include_children=True) for g in goals_source if get_type(g) == 'MicroGoal']
     else:
         result["short_term_goals"] = []
         result["immediate_goals"] = []
-        result["micro_goals"] = []
 
     # Add Program Info if associated
     if hasattr(session, 'program_day') and session.program_day:
@@ -690,12 +688,7 @@ def serialize_program_day(day):
 
 def serialize_note(note, include_image=False):
     """Serialize a Note object."""
-    is_nano_goal_note = bool(getattr(note, 'nano_goal_id', None))
-    resolved_note_type = derive_note_type(
-        note.context_type,
-        note.set_index,
-        is_nano_goal=is_nano_goal_note,
-    )
+    resolved_note_type = derive_note_type(note.context_type, note.set_index)
     result = {
         "id": note.id,
         "context_type": note.context_type,
@@ -711,8 +704,6 @@ def serialize_note(note, include_image=False):
         "created_at": format_utc(note.created_at),
         "updated_at": format_utc(note.updated_at),
         "goal_id": note.goal_id,
-        "nano_goal_id": getattr(note, 'nano_goal_id', None),
-        "is_nano_goal": is_nano_goal_note,
         "pinned_at": format_utc(note.pinned_at) if note.pinned_at else None,
         "is_pinned": note.pinned_at is not None,
     }
@@ -721,10 +712,8 @@ def serialize_note(note, include_image=False):
     return result
 
 
-def derive_note_type(context_type, set_index=None, *, is_nano_goal=False):
+def derive_note_type(context_type, set_index=None):
     """Derive a semantic note type from the stored note context."""
-    if is_nano_goal:
-        return "goal_note"
     if context_type == "root":
         return "fractal_note"
     if context_type == "goal":
@@ -767,7 +756,7 @@ def serialize_note_display(note, include_image=False):
             template_name = note.session.template.name
         result["session_template_name"] = template_name or note.session.name
 
-    display_goal = getattr(note, 'nano_goal', None) or note.goal
+    display_goal = note.goal
     if display_goal:
         result["goal_name"] = display_goal.name
         result["goal_type"] = get_canonical_goal_type(display_goal)

@@ -4,11 +4,10 @@ Tests for flexible goal hierarchy (Idea 2).
 Validates that:
 - Macro goals can skip intermediate levels (e.g. UltimateGoal → ShortTermGoal)
 - The ancestor rank sequence must be strictly increasing (monotonicity)
-- Execution-tier goals (MicroGoal, NanoGoal) remain strictly enforced
+- Immediate goals remain the execution tier
 """
 import uuid
 import pytest
-from sqlalchemy.orm import selectinload
 
 from models import Goal, GoalLevel
 from services.goal_service import GoalService, sync_goal_targets
@@ -24,8 +23,6 @@ LEVEL_DEFS = [
     {"name": "Mid Term Goal",   "rank": 2},
     {"name": "Short Term Goal", "rank": 3},
     {"name": "Immediate Goal",  "rank": 4},
-    {"name": "Micro Goal",      "rank": 5},
-    {"name": "Nano Goal",       "rank": 6},
 ]
 
 
@@ -241,15 +238,9 @@ class TestCreateFractalGoalFlexibleHierarchy:
         assert error is not None
         assert status == 400
 
-    def test_execution_tier_bypasses_monotonicity_check(
+    def test_removed_execution_goal_types_are_rejected(
         self, db_session, service, test_user, ultimate_goal, levels
     ):
-        """
-        MicroGoal creation bypasses the monotonicity validator — it uses the
-        execution-tier validator in validators.py instead.
-        The service should not reject a MicroGoal on rank grounds.
-        """
-        # First create an ImmediateGoal as required parent for MicroGoal
         immediate, _, _ = service.create_fractal_goal_record(
             root_id=ultimate_goal.id,
             current_user_id=test_user.id,
@@ -270,5 +261,6 @@ class TestCreateFractalGoalFlexibleHierarchy:
                 "parent_id": immediate.id,
             },
         )
-        assert error is None, f"Unexpected error: {error}"
-        assert status == 201
+        assert micro is None
+        assert error == "Invalid goal type"
+        assert status == 400

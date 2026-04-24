@@ -6,7 +6,7 @@ import styles from './GoalsPanel.module.css';
 
 /**
  * TargetsSection - Displays a list of targets aggregated from the goal hierarchy.
- * Targets are sorted by goal depth (deepest first, e.g., Nano -> Micro -> Immediate -> ShortTerm).
+ * Targets are sorted by goal depth (deepest first, e.g., Immediate -> ShortTerm).
  */
 function TargetsSection({
     rootId, hierarchy, activeActivityId, activeActivityInstanceId,

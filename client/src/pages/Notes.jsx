@@ -59,7 +59,6 @@ function GoalPickerModal({ rootId, selectedGoalId, onSelect, onClose }) {
                             onClose();
                         }}
                         showHideCompleted={true}
-                        showHideMicroNano={true}
                         allowLineageSelection={false}
                         getGoalColor={getGoalColor}
                         getGoalIcon={getGoalIcon}

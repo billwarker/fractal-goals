@@ -72,21 +72,7 @@ describe('useSessionDetailGoalAssociations', () => {
                                                 name: 'Immediate Goal',
                                                 type: 'ImmediateGoal',
                                                 targets: [{ activity_id: 'activity-1' }],
-                                                children: [
-                                                    {
-                                                        id: 'micro-1',
-                                                        name: 'Micro Goal',
-                                                        type: 'MicroGoal',
-                                                        children: [
-                                                            {
-                                                                id: 'nano-1',
-                                                                name: 'Nano Goal',
-                                                                type: 'NanoGoal',
-                                                                children: [],
-                                                            },
-                                                        ],
-                                                    },
-                                                ],
+                                                children: [],
                                             },
                                         ],
                                     },
