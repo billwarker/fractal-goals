@@ -1,6 +1,8 @@
-from typing import Any
+from typing import Any, TypeAlias, TypeVar
 
-type JsonDict = dict[str, Any]
-type JsonList = list[JsonDict]
-type ErrorPayload = str | JsonDict
-type ServiceResult[T] = tuple[T | None, ErrorPayload | None, int]
+T = TypeVar("T")
+
+JsonDict: TypeAlias = dict[str, Any]
+JsonList: TypeAlias = list[JsonDict]
+ErrorPayload: TypeAlias = str | JsonDict
+ServiceResult: TypeAlias = tuple[T | None, ErrorPayload | None, int]
