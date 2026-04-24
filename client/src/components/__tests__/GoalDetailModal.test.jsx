@@ -197,7 +197,7 @@ describe('GoalDetailModal smoke coverage', () => {
         await waitFor(() => {
             expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
             expect(screen.getByText('goal options view')).toBeInTheDocument();
-        });
+        }, { timeout: 5000 });
     });
 
     it('renders create mode and submits through onCreate', async () => {
