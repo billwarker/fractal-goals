@@ -205,7 +205,7 @@ run_verify() {
     print_message "$GREEN" "Running cheap repo verification..."
     ensure_frontend_tools
     bash -n "$ROOT_DIR/run-tests.sh"
-    frontend_vitest
+    frontend_vitest --reporter=dot
     frontend_npm_script check:responsive
 }
 
