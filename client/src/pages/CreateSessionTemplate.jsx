@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from '../hooks/queryKeys';
+import { useActivities, useActivityGroups } from '../hooks/useActivityQueries';
+import { useSessionTemplates } from '../hooks/useSessionTemplateQueries';
 import notify from '../utils/notify';
 import TemplateCard from '../components/TemplateCard';
 import TemplateBuilderModal from '../components/modals/TemplateBuilderModal';
@@ -33,34 +35,9 @@ function CreateSessionTemplate() {
         }
     }, [rootId, navigate]);
 
-    const isReady = Boolean(rootId);
-
-    const templatesQuery = useQuery({
-        queryKey: queryKeys.sessionTemplates(rootId),
-        queryFn: async () => {
-            const response = await fractalApi.getSessionTemplates(rootId);
-            return response.data || [];
-        },
-        enabled: isReady,
-    });
-
-    const activitiesQuery = useQuery({
-        queryKey: queryKeys.activities(rootId),
-        queryFn: async () => {
-            const response = await fractalApi.getActivities(rootId);
-            return response.data || [];
-        },
-        enabled: isReady,
-    });
-
-    const activityGroupsQuery = useQuery({
-        queryKey: queryKeys.activityGroups(rootId),
-        queryFn: async () => {
-            const response = await fractalApi.getActivityGroups(rootId);
-            return response.data || [];
-        },
-        enabled: isReady,
-    });
+    const { sessionTemplates: templates = [], isLoading: templatesLoading, error: templatesError } = useSessionTemplates(rootId);
+    const { activities = [], isLoading: activitiesLoading, error: activitiesError } = useActivities(rootId);
+    const { activityGroups = [], isLoading: activityGroupsLoading, error: activityGroupsError } = useActivityGroups(rootId);
 
     const saveTemplateMutation = useMutation({
         mutationFn: async ({ payload, templateId }) => {
@@ -92,11 +69,8 @@ function CreateSessionTemplate() {
         },
     });
 
-    const templates = templatesQuery.data || [];
-    const activities = activitiesQuery.data || [];
-    const activityGroups = activityGroupsQuery.data || [];
-    const loading = templatesQuery.isLoading || activitiesQuery.isLoading || activityGroupsQuery.isLoading;
-    const loadError = templatesQuery.error || activitiesQuery.error || activityGroupsQuery.error;
+    const loading = templatesLoading || activitiesLoading || activityGroupsLoading;
+    const loadError = templatesError || activitiesError || activityGroupsError;
 
     const handleCreateClick = () => {
         setEditingTemplate(null);

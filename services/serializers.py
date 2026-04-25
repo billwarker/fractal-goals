@@ -160,6 +160,29 @@ def serialize_activity_instance(instance):
     }
 
 
+def serialize_activity_instance_for_analytics(instance, *, session_name=None, session_date=None):
+    """Serialize the subset of activity-instance fields needed by analytics views."""
+    data_dict = _safe_load_json(instance.data, {})
+    metric_values_list = [serialize_metric_value(m) for m in instance.metric_values]
+
+    return {
+        "id": instance.id,
+        "session_id": instance.session_id,
+        "activity_definition_id": instance.activity_definition_id,
+        "session_name": session_name,
+        "session_date": format_utc(session_date) if session_date else None,
+        "created_at": format_utc(instance.created_at),
+        "time_start": format_utc(instance.time_start),
+        "time_stop": format_utc(instance.time_stop),
+        "duration_seconds": instance.duration_seconds,
+        "completed": instance.completed,
+        "has_sets": bool(getattr(instance.definition, "has_sets", False) or data_dict.get('sets')),
+        "sets": data_dict.get('sets', []),
+        "metric_values": metric_values_list,
+        "metrics": metric_values_list,
+    }
+
+
 def _active_session_instances(session):
     return [
         instance
@@ -188,6 +211,18 @@ def _merge_legacy_activity_payload(serialized_instance, legacy_item):
         serialized_instance["data"] = data_dict
 
     return serialized_instance
+
+
+def serialize_session_for_analytics(session):
+    """Serialize the subset of session fields needed by analytics views."""
+    return {
+        "id": session.id,
+        "name": session.name,
+        "session_start": format_utc(session.session_start),
+        "created_at": format_utc(session.created_at),
+        "completed": bool(session.completed),
+        "total_duration_seconds": session.total_duration_seconds,
+    }
 
 def serialize_goal(goal, include_children=True):
     """Serialize a Goal object."""

@@ -1,17 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
-import AnalyticsViewNameModal from '../components/analytics/AnalyticsViewNameModal';
-import AnalyticsViewsModal from '../components/analytics/AnalyticsViewsModal';
-import '../components/analytics/ChartJSWrapper';
 import {
     createDashboardLayoutPayload,
     getDefaultWindowState,
     getHighestWindowIndex,
     sanitizeDashboardLayoutPayload,
 } from '../components/analytics/dashboardState';
-import ProfileWindow from '../components/analytics/ProfileWindow';
 import ProfileWindowLayout, {
     countWindows,
     getWindowIds,
@@ -23,6 +19,10 @@ import { useAnalyticsViews } from '../hooks/useDashboardQueries';
 import '../App.css';
 import notify from '../utils/notify';
 
+const AnalyticsViewNameModal = lazy(() => import('../components/analytics/AnalyticsViewNameModal'));
+const AnalyticsViewsModal = lazy(() => import('../components/analytics/AnalyticsViewsModal'));
+const ProfileWindow = lazy(() => import('../components/analytics/ProfileWindow'));
+
 const MAX_WINDOWS = 4;
 const DEFAULT_LAYOUT = { type: 'window', id: 'window-1' };
 const DEFAULT_SELECTED_WINDOW_ID = 'window-1';
@@ -30,6 +30,11 @@ const DEFAULT_WINDOW_STATES = {
     'window-1': getDefaultWindowState(),
 };
 const EMPTY_VIEW_NAME = 'Empty View';
+const analyticsFallback = (
+    <div style={{ height: '100%', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
+        Loading analytics panel...
+    </div>
+);
 
 const formatDuration = (seconds) => {
     if (!seconds || seconds === 0) return '0m';
@@ -267,21 +272,23 @@ function Analytics() {
         const canClose = windowCount > 1;
 
         return (
-            <ProfileWindow
-                key={windowId}
-                windowId={windowId}
-                canSplit={canSplit}
-                onSplit={(direction) => handleSplit(windowId, direction)}
-                canClose={canClose}
-                onClose={() => handleCloseWindow(windowId)}
-                data={sharedData}
-                windowState={windowStates[windowId] || getDefaultWindowState()}
-                updateWindowState={createWindowStateUpdater(windowId)}
-                isSelected={selectedWindowId === windowId}
-                onSelect={() => setSelectedWindowId(windowId)}
-                globalDateRange={globalDateRange}
-                onGlobalDateRangeChange={handleDateRangeChange}
-            />
+            <Suspense fallback={analyticsFallback}>
+                <ProfileWindow
+                    key={windowId}
+                    windowId={windowId}
+                    canSplit={canSplit}
+                    onSplit={(direction) => handleSplit(windowId, direction)}
+                    canClose={canClose}
+                    onClose={() => handleCloseWindow(windowId)}
+                    data={sharedData}
+                    windowState={windowStates[windowId] || getDefaultWindowState()}
+                    updateWindowState={createWindowStateUpdater(windowId)}
+                    isSelected={selectedWindowId === windowId}
+                    onSelect={() => setSelectedWindowId(windowId)}
+                    globalDateRange={globalDateRange}
+                    onGlobalDateRangeChange={handleDateRangeChange}
+                />
+            </Suspense>
         );
     }, [
         createWindowStateUpdater,
@@ -339,21 +346,25 @@ function Analytics() {
             </div>
 
             {isViewsModalOpen && (
-                <AnalyticsViewsModal
-                    views={analyticsViews}
-                    selectedViewId={selectedViewId}
-                    onSelectView={handleSelectAnalyticsView}
-                    onDeleteView={handleDeleteView}
-                    onClose={() => setIsViewsModalOpen(false)}
-                />
+                <Suspense fallback={null}>
+                    <AnalyticsViewsModal
+                        views={analyticsViews}
+                        selectedViewId={selectedViewId}
+                        onSelectView={handleSelectAnalyticsView}
+                        onDeleteView={handleDeleteView}
+                        onClose={() => setIsViewsModalOpen(false)}
+                    />
+                </Suspense>
             )}
 
             {isSaveModalOpen && (
-                <AnalyticsViewNameModal
-                    initialName=""
-                    onConfirm={handleCreateView}
-                    onClose={() => setIsSaveModalOpen(false)}
-                />
+                <Suspense fallback={null}>
+                    <AnalyticsViewNameModal
+                        initialName=""
+                        onConfirm={handleCreateView}
+                        onClose={() => setIsSaveModalOpen(false)}
+                    />
+                </Suspense>
             )}
         </div>
     );

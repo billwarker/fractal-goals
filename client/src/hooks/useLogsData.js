@@ -14,17 +14,20 @@ export function useLogsData(rootId, { page, pageSize, eventType, startDate, endD
                 limit: pageSize,
                 offset,
                 event_type: eventType !== 'all' ? eventType : undefined,
-                start_date: startDate ? new Date(startDate).toISOString() : undefined,
-                end_date: endDate ? new Date(endDate).toISOString() : undefined
+                start_date: startDate || undefined,
+                end_date: endDate || undefined,
             });
             return response.data;
-        }
+        },
+        staleTime: 60 * 1000,
+        placeholderData: (previousData) => previousData,
     });
 
     const clearLogsMutation = useMutation({
         mutationFn: async () => fractalApi.clearLogs(rootId),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.logs(rootId) });
+            queryClient.removeQueries({ queryKey: ['logs', rootId, 'infinite'] });
         }
     });
 

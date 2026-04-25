@@ -1,6 +1,7 @@
 export const queryKeys = {
     activities: (rootId) => ['activities', rootId],
     activeProgramDays: (rootId) => ['active-program-days', rootId],
+    analyticsSummary: (rootId, limit = 50) => ['analytics-summary', rootId, limit],
     analyticsSessions: (rootId, limit = 50) => ['analytics-sessions', rootId, limit],
     activityHistory: (rootId, activityDefinitionId, excludeSessionId = null, limit = 10) => [
         'activity-history',
@@ -36,6 +37,7 @@ export const queryKeys = {
         startDate,
         endDate,
     ],
+    logsInfinite: (rootId, pageSize = 50) => ['logs', rootId, 'infinite', pageSize],
     program: (rootId, programId) => ['program', rootId, programId],
     programs: (rootId) => ['programs', rootId],
     session: (rootId, sessionId) => ['session', rootId, sessionId],

@@ -62,6 +62,28 @@ class TestLogsApi:
         assert payload["pagination"]["total"] == 1
         assert payload["logs"][0]["event_type"] == "goal.updated"
 
+    def test_get_logs_can_skip_event_type_metadata(self, authed_client, db_session, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+        db_session.add(
+            EventLog(
+                root_id=root_id,
+                event_type="goal.updated",
+                description="Updated a goal",
+                timestamp=datetime(2026, 1, 10, tzinfo=timezone.utc),
+            )
+        )
+        db_session.commit()
+
+        response = authed_client.get(
+            f"/api/{root_id}/logs",
+            query_string={"include_event_types": "false"},
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert "event_types" not in payload
+        assert payload["pagination"]["total"] == 1
+
     def test_clear_logs_removes_root_logs(self, authed_client, db_session, sample_ultimate_goal):
         root_id = sample_ultimate_goal.id
         db_session.add(

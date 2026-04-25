@@ -58,3 +58,20 @@ def test_get_session_goals_view_query_budget(
 
     assert response.status_code == 200
     assert query_counter["total"] <= 36
+
+
+@pytest.mark.integration
+def test_get_session_analytics_summary_query_budget(
+    authed_client,
+    query_counter,
+    sample_practice_session,
+    sample_activity_instance,
+):
+    """Analytics summary should stay bounded despite combining session and instance data."""
+    root_id = sample_practice_session.root_id
+
+    query_counter["total"] = 0
+    response = authed_client.get(f"/api/{root_id}/sessions/analytics-summary?limit=50")
+
+    assert response.status_code == 200
+    assert query_counter["total"] <= 12

@@ -6,6 +6,9 @@
     position: relative;
     transition: background 0.15s, border-color 0.15s;
     cursor: default;
+    content-visibility: auto;
+    contain: layout paint style;
+    contain-intrinsic-size: 180px;
 }
 
 /* Flat variant — transparent, border-bottom only (session detail style) */
@@ -319,6 +322,14 @@
 
 .markdownContent a {
     color: var(--color-link, #6c8ebf);
+}
+
+.previewContent {
+    color: var(--color-text-secondary);
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .noteCard.compact .markdownContent {

@@ -1,7 +1,11 @@
 import { useMemo } from 'react';
-import moment from 'moment';
-
-import { getDatePart, getISOYMDInTimezone, formatLiteralDate } from '../utils/dateUtils';
+import {
+    formatLiteralDate,
+    getDatePart,
+    getDayOfWeekIndex,
+    getISOYMDInTimezone,
+    isDateBeforeToday,
+} from '../utils/dateUtils';
 
 
 function getLocalDateString(dateTimeStr, timezone) {
@@ -18,7 +22,7 @@ export function useProgramDayViewModel({
     selectedBlockId = '',
 }) {
     const isPastDate = useMemo(() => {
-        return moment(date).isBefore(moment().startOf('day'), 'day');
+        return isDateBeforeToday(date);
     }, [date]);
 
     const blocksContainingDate = useMemo(() => {
@@ -51,7 +55,7 @@ export function useProgramDayViewModel({
                         if (dows.length > 0) {
                             const dayMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
                             const activeDays = dows.map((dayName) => dayMap[dayName]).filter((value) => value !== undefined);
-                            const targetDayOfWeek = moment(date).day();
+                            const targetDayOfWeek = getDayOfWeekIndex(date);
                             if (activeDays.includes(targetDayOfWeek)) {
                                 isScheduledForDate = true;
                             }

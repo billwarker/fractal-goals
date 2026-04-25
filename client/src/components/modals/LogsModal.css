@@ -126,6 +126,9 @@
     font-size: var(--font-size-base);
     align-items: start;
     transition: background 0.1s;
+    content-visibility: auto;
+    contain: layout paint style;
+    contain-intrinsic-size: 72px;
 }
 
 .log-item:hover {

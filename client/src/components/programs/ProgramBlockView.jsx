@@ -1,5 +1,4 @@
 import React from 'react';
-import moment from 'moment';
 import GoalIcon from '../atoms/GoalIcon';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { isBlockActive, ActiveBlockBadge } from '../../utils/programUtils';
@@ -11,7 +10,14 @@ import EmptyState from '../common/EmptyState';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { formatDateInTimezone } from '../../utils/dateUtils';
+import {
+    formatLiteralDate,
+    getDatePart,
+    getDaysRemaining,
+    getDurationDaysInclusive,
+    getISOYMDInTimezone,
+    getWeekdayName,
+} from '../../utils/dateUtils';
 
 // SVG icons as inline components to avoid extra imports
 function IconEdit() {
@@ -61,7 +67,7 @@ function ProgramBlockView({
 
     const formatDate = (dateString) => {
         if (!dateString) return '';
-        return formatDateInTimezone(dateString, timezone, {
+        return formatLiteralDate(dateString, {
             month: 'short',
             day: 'numeric',
             year: 'numeric'
@@ -93,14 +99,14 @@ function ProgramBlockView({
     return (
         <div className={styles.container}>
             {blocks.map(block => {
-                const start = moment(block.start_date);
-                const end = moment(block.end_date);
-                const durationDays = end.diff(start, 'days') + 1;
+                const durationDays = getDurationDaysInclusive(block.start_date, block.end_date);
                 const blockIsActive = isBlockActive(block);
-                const daysRemaining = Math.max(0, moment(block.end_date).startOf('day').diff(moment().startOf('day'), 'days'));
+                const daysRemaining = getDaysRemaining(block.end_date);
                 const blockColor = block.color || '#3A86FF';
                 const headerBg = `color-mix(in srgb, ${blockColor} 8%, var(--color-bg-card))`;
                 const associatedGoals = blockGoalsByBlockId?.get(block.id) || [];
+                const blockStartDate = getDatePart(block.start_date);
+                const blockEndDate = getDatePart(block.end_date);
 
                 return (
                     <Card
@@ -246,18 +252,16 @@ function ProgramBlockView({
                                                                 const dayStr = mapping.length === 7 ? 'Daily' : mapping.map(d => dayMap[d] || d.substring(0, 3)).join(' · ');
                                                                 return <div className={styles.daySubtext}>{dayStr}</div>;
                                                             } else if (day.date) {
-                                                                return <div className={styles.daySubtext}>{moment(day.date).format('dddd')}</div>;
+                                                                return <div className={styles.daySubtext}>{getWeekdayName(day.date)}</div>;
                                                             }
                                                             return null;
                                                         })()}
                                                     </div>
                                                     {(() => {
-                                                        const blockStart = moment(block.start_date).startOf('day');
-                                                        const blockEnd = moment(block.end_date).endOf('day');
                                                         const daySessions = sessions.filter(s => {
                                                             if (s.program_day_id !== day.id || !s.completed) return false;
-                                                            const sessDate = moment(s.session_start || s.created_at);
-                                                            return sessDate.isSameOrAfter(blockStart) && sessDate.isSameOrBefore(blockEnd);
+                                                            const sessionDate = getISOYMDInTimezone(s.session_start || s.created_at, timezone);
+                                                            return sessionDate >= blockStartDate && sessionDate <= blockEndDate;
                                                         });
 
                                                         const completedTemplateIds = new Set(daySessions.filter(s => s.template_id).map(s => s.template_id));
@@ -277,12 +281,10 @@ function ProgramBlockView({
 
                                                 <div className={styles.templatesList}>
                                                     {(() => {
-                                                        const blockStart = moment(block.start_date).startOf('day');
-                                                        const blockEnd = moment(block.end_date).endOf('day');
                                                         const daySessions = sessions.filter(s => {
                                                             if (s.program_day_id !== day.id || !s.completed) return false;
-                                                            const sessDate = moment(s.session_start || s.created_at);
-                                                            return sessDate.isSameOrAfter(blockStart) && sessDate.isSameOrBefore(blockEnd);
+                                                            const sessionDate = getISOYMDInTimezone(s.session_start || s.created_at, timezone);
+                                                            return sessionDate >= blockStartDate && sessionDate <= blockEndDate;
                                                         });
 
                                                         if (day.templates?.length > 0) {

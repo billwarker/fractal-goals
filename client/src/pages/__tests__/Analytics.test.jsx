@@ -59,7 +59,7 @@ describe('Analytics page', () => {
             fireEvent.click(screen.getByRole('button', { name: 'Save View' }));
         });
 
-        expect(screen.getByText('Save Analytics View')).toBeInTheDocument();
+        expect(await screen.findByText('Save Analytics View')).toBeInTheDocument();
 
         await act(async () => {
             fireEvent.change(screen.getByPlaceholderText('Enter a name'), {

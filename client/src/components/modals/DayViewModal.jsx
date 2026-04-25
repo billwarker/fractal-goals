@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { formatLiteralDate, getDatePart, getISOYMDInTimezone } from '../../utils/dateUtils';
+import {
+    formatDateValue,
+    formatDurationHuman,
+    formatLiteralDate,
+    getDatePart,
+    getISOYMDInTimezone,
+} from '../../utils/dateUtils';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
@@ -9,7 +15,6 @@ import Button from '../atoms/Button';
 import GoalAssociationPicker from '../goals/GoalAssociationPicker';
 import { useProgramDayViewModel } from '../../hooks/useProgramDayViewModel';
 import styles from './DayViewModal.module.css';
-import moment from 'moment';
 
 /**
  * DayViewModal - Modal for viewing and managing program days on a specific date
@@ -189,14 +194,14 @@ const DayViewModal = ({
                                                                                 const showSessionName = tSessions.length > 1 || s.name !== t.name;
                                                                                 return (
                                                                                     <div className={s.completed || s.attributes?.completed ? styles.sessionLinkCompleted : styles.sessionLink}>
-                                                                                        {moment.utc(s.session_start || s.start_time).local().format('h:mm A')}
+                                                                                        {formatDateValue(s.session_start || s.start_time, 'h:mm A')}
                                                                                         {showSessionName ? ` - ${s.name}` : ''}
                                                                                     </div>
                                                                                 );
                                                                             })()}
                                                                             {(s.completed || s.attributes?.completed) && (
                                                                                 <div className={styles.sessionDuration}>
-                                                                                    Duration: {s.total_duration_seconds ? moment.duration(s.total_duration_seconds, 'seconds').humanize() : 'Unknown'}
+                                                                                    Duration: {s.total_duration_seconds ? formatDurationHuman(s.total_duration_seconds) : 'Unknown'}
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -214,7 +219,7 @@ const DayViewModal = ({
                                             <div className={styles.unlinkedSessions}>
                                                 {unlinkedDaySessions.map(s => (
                                                     <div key={s.id} className={styles.dayOptionNotes}>
-                                                        ✓ {s.name} ({s.total_duration_seconds ? moment.duration(s.total_duration_seconds, 'seconds').humanize() : 'Unknown'})
+                                                        ✓ {s.name} ({s.total_duration_seconds ? formatDurationHuman(s.total_duration_seconds) : 'Unknown'})
                                                     </div>
                                                 ))}
                                             </div>
@@ -277,10 +282,10 @@ const DayViewModal = ({
                                 {looseCompletedSessions.map(session => (
                                     <div key={session.id} className={styles.card}>
                                         <div className={styles.cardTitle}>
-                                            {moment.utc(session.session_end || session.session_start).local().format('h:mm A')} - {session.name || 'Untitled Session'}
+                                            {formatDateValue(session.session_end || session.session_start, 'h:mm A')} - {session.name || 'Untitled Session'}
                                         </div>
                                         <div className={styles.sessionDuration}>
-                                            Duration: {session.total_duration_seconds ? moment.duration(session.total_duration_seconds, 'seconds').humanize() : 'Unknown'}
+                                            Duration: {session.total_duration_seconds ? formatDurationHuman(session.total_duration_seconds) : 'Unknown'}
                                         </div>
                                     </div>
                                 ))}

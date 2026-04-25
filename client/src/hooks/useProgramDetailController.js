@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import moment from 'moment';
+import { subtractDaysToDateString } from '../utils/dateUtils';
 
 export function useProgramDetailController({ goals = [] }) {
     const [showEditBuilder, setShowEditBuilder] = useState(false);
@@ -48,7 +48,7 @@ export function useProgramDetailController({ goals = [] }) {
             setBlockModalData({
                 name: '',
                 startDate: selectInfo.startStr,
-                endDate: moment(selectInfo.endStr).subtract(1, 'days').format('YYYY-MM-DD'),
+                endDate: subtractDaysToDateString(selectInfo.endStr, 1),
                 color: '#3A86FF',
             });
             setShowBlockModal(true);

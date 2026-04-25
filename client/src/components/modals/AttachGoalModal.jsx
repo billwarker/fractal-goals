@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import moment from 'moment';
 import notify from '../../utils/notify';
+import { formatLiteralDate } from '../../utils/dateUtils';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
@@ -64,7 +64,7 @@ const AttachGoalModalInner = ({ onClose, onSave, goals = [], block, associatedGo
                         associationLabel="Attached"
                         getAssociationMeta={(goal) => (
                             normalizeDateValue(goal.deadline)
-                                ? `Current deadline: ${moment(goal.deadline).format('MMM D, YYYY')}`
+                                ? `Current deadline: ${formatLiteralDate(goal.deadline)}`
                                 : null
                         )}
                         emptyState="No goals available in this program. Add goals to the program first."
@@ -75,7 +75,7 @@ const AttachGoalModalInner = ({ onClose, onSave, goals = [], block, associatedGo
                 {selectedGoalId && block && (
                     <div className={styles.section}>
                         <Text size="sm" weight="medium" style={{ marginBottom: '8px', display: 'block' }}>
-                            SET DEADLINE (Range: {moment(block.start_date).format('MMM D')} - {moment(block.end_date).format('MMM D')})
+                            SET DEADLINE (Range: {formatLiteralDate(block.start_date, { month: 'short', day: 'numeric' })} - {formatLiteralDate(block.end_date, { month: 'short', day: 'numeric' })})
                         </Text>
                         <Input
                             type="date"

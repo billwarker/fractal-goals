@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import moment from 'moment';
 
+import { addDaysToDateString, getTodayLocalDate, subtractDaysToDateString } from '../../utils/dateUtils';
 import { useProgramDetailViewModel } from '../useProgramDetailViewModel';
 
 describe('useProgramDetailViewModel', () => {
     it('derives sorted blocks, deadline-based block-goal state, active block metrics, and attached goal calendar events', () => {
-        const today = moment().format('YYYY-MM-DD');
-        const tomorrow = moment().add(1, 'day').format('YYYY-MM-DD');
-        const yesterday = moment().subtract(1, 'day').format('YYYY-MM-DD');
+        const today = getTodayLocalDate();
+        const tomorrow = addDaysToDateString(today, 1);
+        const yesterday = subtractDaysToDateString(today, 1);
 
         const program = {
             id: 'program-1',
@@ -18,7 +18,7 @@ describe('useProgramDetailViewModel', () => {
                     id: 'block-late',
                     name: 'Later Block',
                     start_date: tomorrow,
-                    end_date: moment().add(2, 'day').format('YYYY-MM-DD'),
+                    end_date: addDaysToDateString(today, 2),
                     color: '#123456',
                     goal_ids: [],
                     days: [],

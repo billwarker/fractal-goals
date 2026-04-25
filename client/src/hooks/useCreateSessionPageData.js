@@ -4,6 +4,7 @@ import { useQueries } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { flattenGoals } from '../utils/goalHelpers';
 import { queryKeys } from './queryKeys';
+import { fetchSessionTemplates } from './useSessionTemplateQueries';
 
 function dedupeProgramDays(programDays) {
     const seenKeys = new Set();
@@ -43,10 +44,7 @@ export function useCreateSessionPageData(rootId) {
         queries: [
             {
                 queryKey: queryKeys.sessionTemplates(rootId),
-                queryFn: async () => {
-                    const response = await fractalApi.getSessionTemplates(rootId);
-                    return response.data || [];
-                },
+                queryFn: () => fetchSessionTemplates(rootId),
                 enabled: Boolean(rootId),
             },
             {

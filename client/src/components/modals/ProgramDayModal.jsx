@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../../utils/api';
 import { queryKeys } from '../../hooks/queryKeys';
-import moment from 'moment';
+import { useActivityGroups, useActivities } from '../../hooks/useActivityQueries';
+import { useSessionTemplates } from '../../hooks/useSessionTemplateQueries';
+import { formatLiteralDate, getDatePart } from '../../utils/dateUtils';
 import TemplateBuilderModal from './TemplateBuilderModal';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
@@ -73,35 +75,13 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const isEdit = Boolean(initialData?.id);
-    const fixedDate = initialData?.date ? moment(initialData.date).format('YYYY-MM-DD') : '';
+    const fixedDate = initialData?.date ? getDatePart(initialData.date) : '';
 
-    const { data: sessionTemplates = [] } = useQuery({
-        queryKey: queryKeys.sessionTemplates(rootId),
-        queryFn: async () => {
-            const response = await fractalApi.getSessionTemplates(rootId);
-            return response.data || [];
-        },
-        enabled: Boolean(rootId),
-    });
+    const { sessionTemplates = [] } = useSessionTemplates(rootId);
     const availableProgramTemplates = sessionTemplates.filter((template) => !isQuickSession(template));
 
-    const { data: activities = [] } = useQuery({
-        queryKey: queryKeys.activities(rootId),
-        queryFn: async () => {
-            const response = await fractalApi.getActivities(rootId);
-            return response.data || [];
-        },
-        enabled: Boolean(rootId),
-    });
-
-    const { data: activityGroups = [] } = useQuery({
-        queryKey: queryKeys.activityGroups(rootId),
-        queryFn: async () => {
-            const response = await fractalApi.getActivityGroups(rootId);
-            return response.data || [];
-        },
-        enabled: Boolean(rootId),
-    });
+    const { activities = [] } = useActivities(rootId);
+    const { activityGroups = [] } = useActivityGroups(rootId);
 
     const saveTemplateMutation = useMutation({
         mutationFn: async ({ payload, templateId }) => {
@@ -195,7 +175,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                         {fixedDate && (
                             <Input
                                 label="Scheduled Date"
-                                value={moment(fixedDate).format('MMM D, YYYY')}
+                                value={formatLiteralDate(fixedDate)}
                                 readOnly
                                 fullWidth
                             />

@@ -49,6 +49,7 @@ vi.mock('../../hooks/useGoalQueries', () => ({
 
 vi.mock('../../components/sessions', () => ({
     SessionsQuerySidebar: () => <div data-testid="sessions-query-sidebar" />,
+    SessionCard: ({ session }) => <div>summary:{session.id}</div>,
     SessionCardExpanded: ({ sessionActivityInstances = [] }) => (
         <div>instances:{sessionActivityInstances.length}</div>
     )
@@ -103,6 +104,44 @@ describe('Sessions page data loading', () => {
         });
 
         expect(getSessionActivities).not.toHaveBeenCalled();
+    });
+
+    it('renders lightweight summary cards for non-selected sessions', async () => {
+        getSessions.mockResolvedValue({
+            data: {
+                sessions: [
+                    {
+                        id: 's1',
+                        name: 'Session 1',
+                        attributes: { completed: false, session_data: { sections: [] } },
+                        activity_instances: [{ id: 'i1' }],
+                        notes: []
+                    },
+                    {
+                        id: 's2',
+                        name: 'Session 2',
+                        attributes: { completed: false, session_data: { sections: [] } },
+                        activity_instances: [{ id: 'i2' }],
+                        notes: []
+                    }
+                ],
+                pagination: { limit: 10, offset: 0, total: 2, has_more: false }
+            }
+        });
+        getActivities.mockResolvedValue({ data: [] });
+
+        renderWithProviders(<Sessions />, {
+            route: '/root-1/sessions',
+            path: '/:rootId/sessions',
+            withTimezone: false,
+            withTheme: false
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText('instances:1')).toBeInTheDocument();
+        });
+
+        expect(screen.getByText('summary:s2')).toBeInTheDocument();
     });
 
     it('renders quick sessions in a sessions-page modal when quickSessionId is present in the route', async () => {

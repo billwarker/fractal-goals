@@ -11,6 +11,17 @@ import ImageViewerModal from '../sessionDetail/ImageViewerModal';
 import MarkdownNoteContent from './MarkdownNoteContent';
 import styles from './NoteCard.module.css';
 
+function buildPlainTextPreview(content) {
+    if (!content) return '';
+
+    return content
+        .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/[`*_>#~-]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 function deriveNoteType(note) {
     if (note.note_type) {
         return note.note_type;
@@ -64,6 +75,7 @@ function NoteCard({
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef(null);
     const textareaRef = useRef(null);
+    const cardRef = useRef(null);
     const { timezone } = useTimezone();
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const resolvedNoteType = deriveNoteType(note);
@@ -176,6 +188,40 @@ function NoteCard({
     const canPin = (!!onPin || !!onUnpin) && !note.isPast && resolvedNoteType !== 'activity_set_note';
     const canDelete = !!onDelete && !note.isPast;
     const hasMenu = canEdit || canPin || canDelete;
+    const shouldDeferRichContent = !hasImage && !note.is_pinned && !isSelected && !minimal && !compact;
+    const [shouldRenderRichContent, setShouldRenderRichContent] = useState(
+        typeof window === 'undefined' || typeof window.IntersectionObserver === 'undefined' || !shouldDeferRichContent
+    );
+    const previewContent = buildPlainTextPreview(note.content);
+
+    useEffect(() => {
+        if (!shouldDeferRichContent) {
+            setShouldRenderRichContent(true);
+            return;
+        }
+
+        if (typeof window === 'undefined' || typeof window.IntersectionObserver === 'undefined') {
+            setShouldRenderRichContent(true);
+            return;
+        }
+
+        if (shouldRenderRichContent || !cardRef.current) {
+            return;
+        }
+
+        const observer = new window.IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    setShouldRenderRichContent(true);
+                    observer.disconnect();
+                }
+            },
+            { rootMargin: '600px 0px' }
+        );
+
+        observer.observe(cardRef.current);
+        return () => observer.disconnect();
+    }, [shouldDeferRichContent, shouldRenderRichContent]);
 
     const primaryContextLabel = (() => {
         switch (resolvedNoteType) {
@@ -218,6 +264,7 @@ function NoteCard({
     return (
         <>
             <div
+                ref={cardRef}
                 className={[
                     styles.noteCard,
                     variant === 'flat' ? styles.flat : '',
@@ -342,7 +389,13 @@ function NoteCard({
                 ) : (
                     !isImageOnly && (
                         <div className={styles.content}>
-                            <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
+                            {shouldRenderRichContent ? (
+                                <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
+                            ) : (
+                                <div className={`${styles.markdownContent} ${styles.previewContent}`}>
+                                    {previewContent || ' '}
+                                </div>
+                            )}
                         </div>
                     )
                 )}

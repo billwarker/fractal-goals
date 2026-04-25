@@ -37,6 +37,7 @@ class LogService:
         event_type=None,
         start_date=None,
         end_date=None,
+        include_event_types=True,
     ) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
@@ -62,12 +63,8 @@ class LogService:
             stmt.order_by(desc(EventLog.timestamp)).limit(limit).offset(offset)
         ).scalars().all()
 
-        types_stmt = select(EventLog.event_type).where(EventLog.root_id == root_id).distinct()
-        event_types = sorted(t for t in self.db_session.execute(types_stmt).scalars().all())
-
-        return {
+        payload = {
             "logs": [serialize_event_log(log) for log in results],
-            "event_types": event_types,
             "pagination": {
                 "limit": limit,
                 "offset": offset,
@@ -75,7 +72,15 @@ class LogService:
                 "count": len(results),
                 "has_more": (offset + limit) < total_count,
             },
-        }, None, 200
+        }
+
+        if include_event_types:
+            types_stmt = select(EventLog.event_type).where(EventLog.root_id == root_id).distinct()
+            payload["event_types"] = sorted(
+                t for t in self.db_session.execute(types_stmt).scalars().all()
+            )
+
+        return payload, None, 200
 
     def clear_logs(self, root_id, current_user_id) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)

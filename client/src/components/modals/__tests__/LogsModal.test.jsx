@@ -68,7 +68,7 @@ describe('LogsModal', () => {
         vi.restoreAllMocks();
     });
 
-    it('stores fetched log pages under shared query keys and loads more pages from cache-backed queries', async () => {
+    it('loads more log pages through a single infinite query cache entry', async () => {
         const queryClient = createQueryClient();
         const firstPageLogs = Array.from({ length: 50 }, (_, index) => ({
             id: `log-${index + 1}`,
@@ -82,11 +82,25 @@ describe('LogsModal', () => {
             .mockResolvedValueOnce({
                 data: {
                     logs: firstPageLogs,
+                    pagination: {
+                        limit: 50,
+                        offset: 0,
+                        total: 51,
+                        count: 50,
+                        has_more: true,
+                    },
                 },
             })
             .mockResolvedValueOnce({
                 data: {
                     logs: [{ id: 'log-51', timestamp: '2026-03-08T13:01:00Z', event_type: 'goal.completed', description: 'Completed goal', source: 'system' }],
+                    pagination: {
+                        limit: 50,
+                        offset: 50,
+                        total: 51,
+                        count: 1,
+                        has_more: false,
+                    },
                 },
             });
 
@@ -96,9 +110,11 @@ describe('LogsModal', () => {
             expect(screen.getByText('Updated session')).toBeInTheDocument();
         });
 
-        expect(queryClient.getQueryData(queryKeys.logs('root-1', 1, 50))).toEqual({
-            logs: firstPageLogs,
-        });
+        expect(getLogs).toHaveBeenCalledWith('root-1', expect.objectContaining({
+            include_event_types: false,
+            limit: 50,
+            offset: 0,
+        }));
 
         fireEvent.click(screen.getByText('Load More'));
 
@@ -106,8 +122,17 @@ describe('LogsModal', () => {
             expect(screen.getByText('Completed goal')).toBeInTheDocument();
         });
 
-        expect(queryClient.getQueryData(queryKeys.logs('root-1', 2, 50))).toEqual({
-            logs: [{ id: 'log-51', timestamp: '2026-03-08T13:01:00Z', event_type: 'goal.completed', description: 'Completed goal', source: 'system' }],
+        expect(getLogs).toHaveBeenNthCalledWith(2, 'root-1', expect.objectContaining({
+            include_event_types: false,
+            limit: 50,
+            offset: 50,
+        }));
+
+        expect(queryClient.getQueryData(queryKeys.logsInfinite('root-1', 50))).toMatchObject({
+            pages: [
+                { logs: firstPageLogs },
+                { logs: [{ id: 'log-51', timestamp: '2026-03-08T13:01:00Z', event_type: 'goal.completed', description: 'Completed goal', source: 'system' }] },
+            ],
         });
     });
 });

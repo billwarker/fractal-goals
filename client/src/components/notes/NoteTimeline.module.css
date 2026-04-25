@@ -26,6 +26,9 @@
 
 .dateGroup {
     margin-bottom: 0;
+    content-visibility: auto;
+    contain: layout paint style;
+    contain-intrinsic-size: 320px;
 }
 
 .dateHeader {

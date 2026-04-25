@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import moment from 'moment';
 import { useParams } from 'react-router-dom';
 
 import { flattenGoals } from '../../utils/goalHelpers';
 import { useFractalTree } from '../../hooks/useGoalQueries';
+import { getWeeksSpanned } from '../../utils/dateUtils';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
@@ -43,9 +43,7 @@ function ProgramBuilderInner({ onClose, onSave, initialData = null }) {
     // Calculate number of weeks between dates
     const calculateWeeks = () => {
         if (!programData.startDate || !programData.endDate) return 0;
-        const start = moment(programData.startDate);
-        const end = moment(programData.endDate);
-        const weeks = Math.ceil(end.diff(start, 'weeks', true));
+        const weeks = getWeeksSpanned(programData.startDate, programData.endDate);
         return weeks > 0 ? weeks : 0;
     };
 

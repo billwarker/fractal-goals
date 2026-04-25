@@ -7,8 +7,7 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../../contexts/ThemeContext'
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { formatDateInTimezone } from '../../utils/dateUtils';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { getReadableTextColor, getTemplateColor } from '../../utils/sessionRuntime';
@@ -17,18 +16,22 @@ import './SessionCard.css';
 function SessionCard({
     session,
     rootId,
-    parentGoals = {},
     isSelected = false,
     onSelect,
     onNavigate
 }) {
     const navigate = useNavigate();
     const { timezone } = useTimezone();
-    const { getGoalColor, getGoalTextColor } = useGoalLevels();;
+    const { getGoalColor, getGoalTextColor } = useGoalLevels();
 
-    const sessionData = session.session_data || {};
+    const sessionData = session.attributes?.session_data || session.session_data || {};
     const templateColor = getTemplateColor(session);
     const templateTextColor = getReadableTextColor(templateColor);
+    const sessionGoals = [
+        ...(Array.isArray(session.short_term_goals) ? session.short_term_goals : []),
+        ...(Array.isArray(session.immediate_goals) ? session.immediate_goals : []),
+    ];
+    const notesCount = Array.isArray(session.notes) ? session.notes.length : (session.notes_count || 0);
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
@@ -67,25 +70,29 @@ function SessionCard({
 
     return (
         <div
-            className={`session-card ${isSelected ? 'selected' : ''} ${session.is_completed ? 'completed' : ''}`}
+            className={`session-card ${isSelected ? 'selected' : ''} ${session.completed ? 'completed' : ''}`}
             onClick={handleClick}
         >
             {/* Header Row */}
             <div className="session-card-header">
                 <div className="session-card-date">
-                    {formatDate(session.session_start)}
+                    {formatDate(session.session_start || sessionData.session_start || session.created_at)}
                 </div>
                 <div className="session-card-meta">
                     <span className="session-card-duration">
                         {formatDuration(totalSeconds)}
                     </span>
-                    {session.is_completed && (
+                    {session.completed && (
                         <span className="session-card-completed-badge">✓</span>
                     )}
                     <span className="session-card-notes-count">
-                        📝 {session.notes_count || 0}
+                        📝 {notesCount}
                     </span>
                 </div>
+            </div>
+
+            <div className="session-card-name">
+                {session.name || sessionData.template_name || 'Untitled Session'}
             </div>
 
             {/* Template Name */}
@@ -99,13 +106,12 @@ function SessionCard({
             )}
 
             {/* Associated Goals */}
-            {session.goals && session.goals.length > 0 && (
+            {sessionGoals.length > 0 && (
                 <div className="session-card-goals">
-                    {session.goals.slice(0, 3).map(goal => {
-                        const goalType = goal.goal_type || 'ImmediateGoal';
+                    {sessionGoals.slice(0, 3).map(goal => {
+                        const goalType = goal.type || goal.attributes?.type || 'ImmediateGoal';
                         const bgColor = getGoalColor(goalType);
                         const textColor = getGoalTextColor(goalType);
-                        const parentGoal = parentGoals[goal.parent_id];
 
                         return (
                             <span
@@ -115,15 +121,15 @@ function SessionCard({
                                     backgroundColor: bgColor,
                                     color: textColor
                                 }}
-                                title={parentGoal ? `${parentGoal.name} → ${goal.name}` : goal.name}
+                                title={goal.name}
                             >
                                 {goal.name}
                             </span>
                         );
                     })}
-                    {session.goals.length > 3 && (
+                    {sessionGoals.length > 3 && (
                         <span className="session-card-goals-more">
-                            +{session.goals.length - 3}
+                            +{sessionGoals.length - 3}
                         </span>
                     )}
                 </div>
@@ -131,6 +137,7 @@ function SessionCard({
 
             {/* Actions */}
             <button
+                type="button"
                 className="session-card-open-btn"
                 onClick={handleNavigate}
             >

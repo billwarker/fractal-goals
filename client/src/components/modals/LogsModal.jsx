@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
+import React, { useMemo } from 'react';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Linkify from '../atoms/Linkify';
 import { fractalApi } from '../../utils/api';
 import { queryKeys } from '../../hooks/queryKeys';
@@ -13,44 +13,44 @@ import './LogsModal.css';
  */
 function LogsModalInner({ onClose, rootId }) {
     const queryClient = useQueryClient();
-    const [pageCount, setPageCount] = useState(1);
     const limit = 50;
 
-    const logQueries = useQueries({
-        queries: rootId
-            ? Array.from({ length: pageCount }, (_, index) => {
-                const page = index + 1;
-                return {
-                    queryKey: queryKeys.logs(rootId, page, limit),
-                    queryFn: async () => {
-                        const res = await fractalApi.getLogs(rootId, {
-                            limit,
-                            offset: index * limit,
-                        });
-                        return res.data;
-                    },
-                    enabled: true,
-                };
-            })
-            : [],
+    const {
+        data,
+        isLoading,
+        isFetchingNextPage,
+        hasNextPage,
+        fetchNextPage,
+    } = useInfiniteQuery({
+        queryKey: queryKeys.logsInfinite(rootId, limit),
+        queryFn: async ({ pageParam = 0 }) => {
+            const res = await fractalApi.getLogs(rootId, {
+                limit,
+                offset: pageParam,
+                include_event_types: false,
+            });
+            return res.data;
+        },
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => {
+            if (!lastPage?.pagination?.has_more) return undefined;
+            return (lastPage.pagination.offset || 0) + (lastPage.pagination.limit || limit);
+        },
+        enabled: Boolean(rootId),
+        staleTime: 60 * 1000,
+        placeholderData: (previousData) => previousData,
     });
 
     const logs = useMemo(
-        () => logQueries.flatMap((query) => query.data?.logs || []),
-        [logQueries]
+        () => data?.pages?.flatMap((page) => page?.logs || []) || [],
+        [data]
     );
-    const loading = logQueries.some((query) => query.isLoading);
-    const lastPageLogs = logQueries[logQueries.length - 1]?.data?.logs || [];
-    const hasMore = lastPageLogs.length === limit;
+    const hasMore = Boolean(hasNextPage);
 
     const clearLogsMutation = useMutation({
         mutationFn: async () => fractalApi.clearLogs(rootId),
         onSuccess: async () => {
-            queryClient.setQueriesData(
-                { queryKey: queryKeys.logs(rootId) },
-                (current) => current ? { ...current, logs: [], pagination: { ...(current.pagination || {}), total: 0 } } : current
-            );
-            setPageCount(1);
+            queryClient.removeQueries({ queryKey: queryKeys.logsInfinite(rootId, limit) });
             await queryClient.invalidateQueries({ queryKey: queryKeys.logs(rootId) });
         },
     });
@@ -73,7 +73,7 @@ function LogsModalInner({ onClose, rootId }) {
             size="lg"
         >
             <ModalBody>
-                {loading && logs.length === 0 ? (
+                {isLoading && logs.length === 0 ? (
                     <div className="logs-loading">Loading logs...</div>
                 ) : logs.length === 0 ? (
                     <div className="logs-empty">No logs captured yet.</div>
@@ -108,10 +108,10 @@ function LogsModalInner({ onClose, rootId }) {
                         {hasMore && (
                             <button
                                 className="load-more-logs"
-                                onClick={() => setPageCount((current) => current + 1)}
-                                disabled={loading}
+                                onClick={() => fetchNextPage()}
+                                disabled={isFetchingNextPage}
                             >
-                                {loading ? 'Loading...' : 'Load More'}
+                                {isFetchingNextPage ? 'Loading...' : 'Load More'}
                             </button>
                         )}
                     </div>

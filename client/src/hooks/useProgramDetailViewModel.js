@@ -1,7 +1,12 @@
 import { useMemo } from 'react';
-import moment from 'moment';
 
-import { getDatePart, getISOYMDInTimezone } from '../utils/dateUtils';
+import {
+    addDaysToDateString,
+    getDatePart,
+    getDaysRemaining,
+    getISOYMDInTimezone,
+    getRecurringDatesWithinRange,
+} from '../utils/dateUtils';
 import { getGoalDeadline, isGoalAssociatedWithBlock } from '../utils/programGoalAssociations';
 import { isBlockActive } from '../utils/programUtils.jsx';
 
@@ -107,23 +112,18 @@ export function useProgramDetailViewModel({
                 }
 
                 if (day.day_of_week && day.day_of_week.length > 0 && block.start_date && block.end_date) {
-                    const start = moment(getDatePart(block.start_date));
-                    const end = moment(getDatePart(block.end_date));
                     const dayMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
 
                     const activeDays = [...new Set((Array.isArray(day.day_of_week) ? day.day_of_week : [day.day_of_week])
                         .map((dayName) => dayMap[dayName])
                         .filter((value) => value !== undefined))];
 
-                    activeDays.forEach((dayOfWeek) => {
-                        const current = start.clone().day(dayOfWeek);
-                        if (current.isBefore(start)) {
-                            current.add(7, 'days');
-                        }
-                        while (current.isSameOrBefore(end)) {
-                            addDayToDateGroup(current.format('YYYY-MM-DD'), day, block);
-                            current.add(7, 'days');
-                        }
+                    getRecurringDatesWithinRange(
+                        getDatePart(block.start_date),
+                        getDatePart(block.end_date),
+                        activeDays,
+                    ).forEach((dateStr) => {
+                        addDayToDateGroup(dateStr, day, block);
                     });
                 }
             });
@@ -287,7 +287,7 @@ export function useProgramDetailViewModel({
                 id: `block-bg-${block.id}`,
                 title: block.name,
                 start: getDatePart(block.start_date),
-                end: moment(getDatePart(block.end_date)).add(1, 'days').format('YYYY-MM-DD'),
+                end: addDaysToDateString(getDatePart(block.end_date), 1),
                 backgroundColor: block.color || '#3A86FF',
                 borderColor: block.color || '#3A86FF',
                 textColor: 'white',
@@ -353,7 +353,7 @@ export function useProgramDetailViewModel({
                 return goal && (goal.completed || goal.attributes?.completed);
             }).length,
             totalGoals: attachedGoalIds.size,
-            daysRemaining: Math.max(0, moment(program.end_date).startOf('day').diff(moment().startOf('day'), 'days')),
+            daysRemaining: getDaysRemaining(program.end_date),
         };
     }, [attachedGoalIds, getGoalDetails, program, programDaysMap, sessions]);
 
@@ -425,7 +425,7 @@ export function useProgramDetailViewModel({
             goalsMet: blockGoals.filter((goal) => goal && (goal.completed || goal.attributes?.completed)).length,
             totalGoals: blockGoals.length,
             totalDuration: blockSessions.reduce((sum, session) => sum + (session.total_duration_seconds || 0), 0),
-            daysRemaining: Math.max(0, moment(activeBlock.end_date).startOf('day').diff(moment().startOf('day'), 'days')),
+            daysRemaining: getDaysRemaining(activeBlock.end_date),
         };
     }, [activeBlock, blockGoalsByBlockId, programDaysMap, sessions]);
 

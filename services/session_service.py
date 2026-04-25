@@ -5,7 +5,7 @@ import uuid
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func, inspect, text
-from sqlalchemy.orm import selectinload, joinedload, with_loader_criteria
+from sqlalchemy.orm import selectinload, joinedload, with_loader_criteria, load_only
 from models import (
     ActivityDefinition, ActivityGroup, ActivityInstance,
     Goal, MetricDefinition,
@@ -21,7 +21,13 @@ from services.owned_entity_queries import (
     get_owned_session,
 )
 from services.service_types import JsonDict, ServiceResult
-from services.serializers import format_utc, serialize_activity_instance, serialize_session
+from services.serializers import (
+    format_utc,
+    serialize_activity_instance,
+    serialize_activity_instance_for_analytics,
+    serialize_session,
+    serialize_session_for_analytics,
+)
 from services.goal_type_utils import get_canonical_goal_type
 from services.session_runtime import (
     DEFAULT_TEMPLATE_COLOR,
@@ -95,6 +101,20 @@ class SessionService:
             joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split),
+        )
+
+    @staticmethod
+    def _analytics_session_read_options():
+        return (
+            load_only(
+                Session.id,
+                Session.name,
+                Session.session_start,
+                Session.created_at,
+                Session.completed,
+                Session.total_duration_seconds,
+                Session.attributes,
+            ),
         )
 
     @staticmethod
@@ -257,6 +277,26 @@ class SessionService:
             "recent_session_duration_seconds": 0,
             "program_sessions_count": 0,
             "recent_program_sessions_count": 0,
+        }
+
+    @staticmethod
+    def _build_analytics_legacy_instance(session_obj, exercise: JsonDict, fallback_id: str) -> JsonDict:
+        metric_values = exercise.get("metrics") if isinstance(exercise.get("metrics"), list) else []
+        return {
+            "id": exercise.get("instance_id") or fallback_id,
+            "session_id": session_obj.id,
+            "activity_definition_id": exercise.get("activity_id"),
+            "session_name": session_obj.name,
+            "session_date": format_utc(session_obj.session_start or session_obj.created_at),
+            "created_at": format_utc(session_obj.created_at),
+            "time_start": None,
+            "time_stop": None,
+            "duration_seconds": None,
+            "completed": bool(session_obj.completed),
+            "has_sets": bool(exercise.get("sets")),
+            "sets": copy.deepcopy(exercise.get("sets") or []),
+            "metric_values": copy.deepcopy(metric_values),
+            "metrics": copy.deepcopy(metric_values),
         }
 
     @staticmethod
@@ -506,6 +546,93 @@ class SessionService:
                 "total": total_count,
                 "has_more": offset + len(result) < total_count
             }
+        }, None, 200
+
+    def get_session_analytics_summary(self, root_id, current_user_id, limit=50) -> ServiceResult[JsonDict]:
+        """Return lightweight session and activity-instance data for analytics views."""
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
+
+        clamped_limit = max(1, min(int(limit or 50), 200))
+        ordering = self._build_session_ordering({
+            "sort_by": "session_start",
+            "sort_order": "desc",
+        })
+
+        sessions = self.db_session.query(Session).filter(
+            Session.root_id == root_id,
+            Session.deleted_at == None,
+        ).options(
+            *self._analytics_session_read_options(),
+        ).order_by(*ordering).limit(clamped_limit).all()
+
+        serialized_sessions = [serialize_session_for_analytics(session) for session in sessions]
+        session_lookup = {
+            session.id: {
+                "name": session.name,
+                "date": session.session_start or session.created_at,
+            }
+            for session in sessions
+        }
+        session_ids = list(session_lookup.keys())
+        instances_by_activity: dict[str, list[JsonDict]] = {}
+
+        if session_ids:
+            activity_instances = self.db_session.query(ActivityInstance).filter(
+                ActivityInstance.session_id.in_(session_ids),
+                ActivityInstance.deleted_at == None,
+            ).options(
+                *self._session_activity_read_options(),
+            ).all()
+
+            persisted_session_ids = set()
+            for instance in activity_instances:
+                if not instance.activity_definition_id:
+                    continue
+
+                persisted_session_ids.add(instance.session_id)
+                session_meta = session_lookup.get(instance.session_id) or {}
+                serialized_instance = serialize_activity_instance_for_analytics(
+                    instance,
+                    session_name=session_meta.get("name"),
+                    session_date=session_meta.get("date"),
+                )
+                instances_by_activity.setdefault(instance.activity_definition_id, []).append(serialized_instance)
+
+            for session in sessions:
+                if session.id in persisted_session_ids:
+                    continue
+
+                attrs = models._safe_load_json(getattr(session, "attributes", None), {})
+                session_data = attrs.get("session_data") if isinstance(attrs.get("session_data"), dict) else attrs
+                sections = session_data.get("sections") if isinstance(session_data, dict) else None
+                if not isinstance(sections, list):
+                    continue
+
+                legacy_counter = 0
+                for section in sections:
+                    exercises = section.get("exercises") if isinstance(section, dict) else None
+                    if not isinstance(exercises, list):
+                        continue
+
+                    for exercise in exercises:
+                        if not isinstance(exercise, dict):
+                            continue
+                        if exercise.get("type") != "activity" or not exercise.get("activity_id"):
+                            continue
+
+                        legacy_counter += 1
+                        activity_id = exercise["activity_id"]
+                        fallback_id = f"{session.id}-legacy-{legacy_counter}"
+                        instances_by_activity.setdefault(activity_id, []).append(
+                            self._build_analytics_legacy_instance(session, exercise, fallback_id)
+                        )
+
+        return {
+            "sessions": serialized_sessions,
+            "activity_instances": instances_by_activity,
+            "limit": clamped_limit,
         }, None, 200
 
     def get_session_heatmap(self, root_id, current_user_id, filters=None) -> ServiceResult[JsonDict]:

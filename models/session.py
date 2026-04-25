@@ -24,10 +24,6 @@ class Session(Base):
     last_paused_at = Column(DateTime, nullable=True)
     total_paused_seconds = Column(Integer, nullable=False, server_default=sa.text('0'), default=0)
     
-    __table_args__ = (
-        sa.Index('ix_sessions_root_deleted_completed', 'root_id', 'deleted_at', 'completed'),
-    )
-    
     template_id = Column(String, ForeignKey('session_templates.id'), nullable=True, index=True)
     program_day_id = Column(String, ForeignKey('program_days.id'), nullable=True, index=True)
     
@@ -39,6 +35,17 @@ class Session(Base):
     
     completed = Column(Boolean, default=False)
     completed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        sa.Index('ix_sessions_root_deleted_completed', 'root_id', 'deleted_at', 'completed'),
+        sa.Index('ix_sessions_root_deleted_updated_at', 'root_id', 'deleted_at', sa.text('updated_at DESC')),
+        sa.Index(
+            'ix_sessions_root_deleted_effective_start',
+            'root_id',
+            'deleted_at',
+            sa.text('COALESCE(session_start, created_at) DESC'),
+        ),
+    )
     
     # Relationships
     activity_instances = relationship(

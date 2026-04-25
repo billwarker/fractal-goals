@@ -190,6 +190,13 @@ class ActivityInstance(Base):
             name='ck_activity_instances_target_duration_positive',
         ),
         sa.Index('ix_activity_instances_session_deleted', 'session_id', 'deleted_at'),
+        sa.Index(
+            'ix_activity_instances_root_deleted_activity_session',
+            'root_id',
+            'deleted_at',
+            'activity_definition_id',
+            'session_id',
+        ),
     )
 
 class MetricValue(Base):

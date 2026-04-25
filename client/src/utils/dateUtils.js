@@ -1,3 +1,12 @@
+import {
+    addDays,
+    differenceInCalendarDays,
+    format as formatDateFns,
+    isBefore,
+    startOfDay,
+    subDays,
+} from 'date-fns';
+
 /**
  * Date/Time formatting utilities with timezone support
  * 
@@ -146,6 +155,135 @@ export const formatLiteralDate = (dateValue, options = {}) => {
     };
 
     return new Intl.DateTimeFormat('en-US', defaultOptions).format(date);
+};
+
+export const parseDateOnly = (dateValue) => {
+    const datePart = getDatePart(dateValue);
+    if (!datePart) return null;
+    const [year, month, day] = datePart.split('-').map(Number);
+    return new Date(year, month - 1, day);
+};
+
+const MOMENT_TO_DATE_FNS_TOKENS = {
+    'MMM D, YYYY': 'MMM d, yyyy',
+    'MMM D': 'MMM d',
+    dddd: 'EEEE',
+    'h:mm A': 'h:mm a',
+    'YYYY-MM-DD': 'yyyy-MM-dd',
+};
+
+const normalizeFormatToken = (formatString = 'MMM D, YYYY') => (
+    MOMENT_TO_DATE_FNS_TOKENS[formatString] || formatString
+);
+
+export const formatDateValue = (dateValue, formatString = 'MMM D, YYYY', timezone = null) => {
+    if (!dateValue) return '';
+
+    const shiftedDate = timezone
+        ? getShiftedDate(dateValue, timezone)
+        : (typeof dateValue === 'string' ? parseAnyDate(dateValue) : dateValue);
+
+    if (!(shiftedDate instanceof Date) || Number.isNaN(shiftedDate.getTime())) {
+        return '';
+    }
+
+    return formatDateFns(shiftedDate, normalizeFormatToken(formatString));
+};
+
+export const addDaysToDateString = (dateValue, amount) => {
+    const date = parseDateOnly(dateValue);
+    if (!date) return null;
+    return formatDateFns(addDays(date, amount), 'yyyy-MM-dd');
+};
+
+export const subtractDaysToDateString = (dateValue, amount) => {
+    const date = parseDateOnly(dateValue);
+    if (!date) return null;
+    return formatDateFns(subDays(date, amount), 'yyyy-MM-dd');
+};
+
+export const getDayOfWeekIndex = (dateValue) => {
+    const date = parseDateOnly(dateValue);
+    return date ? date.getDay() : null;
+};
+
+export const getWeekdayName = (dateValue) => {
+    const date = parseDateOnly(dateValue);
+    return date ? formatDateFns(date, 'EEEE') : '';
+};
+
+export const isDateBeforeToday = (dateValue, now = new Date()) => {
+    const date = parseDateOnly(dateValue);
+    if (!date) return false;
+    return isBefore(date, startOfDay(now));
+};
+
+export const getDaysRemaining = (dateValue, now = new Date()) => {
+    const date = parseDateOnly(dateValue);
+    if (!date) return 0;
+    return Math.max(0, differenceInCalendarDays(date, startOfDay(now)));
+};
+
+export const getDurationDaysInclusive = (startDateValue, endDateValue) => {
+    const start = parseDateOnly(startDateValue);
+    const end = parseDateOnly(endDateValue);
+    if (!start || !end) return 0;
+    return Math.max(0, differenceInCalendarDays(end, start) + 1);
+};
+
+export const getWeeksSpanned = (startDateValue, endDateValue) => {
+    const days = getDurationDaysInclusive(startDateValue, endDateValue);
+    if (days <= 1) {
+        return days > 0 ? 1 : 0;
+    }
+    return Math.ceil((days - 1) / 7);
+};
+
+export const getRecurringDatesWithinRange = (startDateValue, endDateValue, dayOfWeekIndexes = []) => {
+    const start = parseDateOnly(startDateValue);
+    const end = parseDateOnly(endDateValue);
+
+    if (!start || !end || dayOfWeekIndexes.length === 0) {
+        return [];
+    }
+
+    const activeDays = new Set(dayOfWeekIndexes);
+    const dates = [];
+
+    for (let current = start; current <= end; current = addDays(current, 1)) {
+        if (activeDays.has(current.getDay())) {
+            dates.push(formatDateFns(current, 'yyyy-MM-dd'));
+        }
+    }
+
+    return dates;
+};
+
+export const isDateWithinRange = (dateValue, startDateValue, endDateValue) => {
+    const date = getDatePart(dateValue);
+    const start = getDatePart(startDateValue);
+    const end = getDatePart(endDateValue);
+
+    if (!date || !start || !end) return false;
+    return date >= start && date <= end;
+};
+
+export const formatDurationHuman = (seconds) => {
+    if (!seconds || seconds <= 0) return '0 minutes';
+
+    if (seconds < 3600) {
+        const minutes = Math.max(1, Math.round(seconds / 60));
+        return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+    }
+
+    const hours = Math.floor(seconds / 3600);
+    const remainingMinutes = Math.round((seconds % 3600) / 60);
+
+    if (remainingMinutes === 0) {
+        return `${hours} hour${hours === 1 ? '' : 's'}`;
+    }
+
+    return `${hours} hour${hours === 1 ? '' : 's'} ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}`;
 };
 
 /**
@@ -299,8 +437,8 @@ export const localToISO = (localDateStr, timezone) => {
 
 /**
  * Create a Date object where the local time components match the wall time
- * in the specified timezone. This allows libraries like moment.js (without timezone support)
- * to format dates as if they were in the target timezone.
+ * in the specified timezone. This is useful when local formatting helpers
+ * need to reflect the wall time for a target timezone.
  * 
  * @param {Date|string} dateValue - The real date/time
  * @param {string} timezone - Target timezone IANA string

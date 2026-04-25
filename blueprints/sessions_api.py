@@ -142,6 +142,30 @@ def get_session_heatmap(current_user, root_id):
         db_session.close()
 
 
+@sessions_bp.route('/<root_id>/sessions/analytics-summary', methods=['GET'])
+@token_required
+def get_session_analytics_summary(current_user, root_id):
+    """Get lightweight session analytics payload for dashboard views."""
+    db_session = get_db_session()
+    service = SessionService(db_session)
+    try:
+        try:
+            limit = min(int(request.args.get('limit', 50)), 200)
+        except ValueError:
+            return jsonify({"error": "Invalid limit"}), 400
+
+        result, error, status = service.get_session_analytics_summary(root_id, current_user.id, limit=limit)
+        if error:
+            return jsonify(error if isinstance(error, dict) else {"error": error}), status
+        return etag_json_response(result)
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error in get_session_analytics_summary")
+        return internal_error(logger, "Error in get_session_analytics_summary")
+    finally:
+        db_session.close()
+
+
 @sessions_bp.route('/<root_id>/sessions/activity-instantiation-summary', methods=['GET'])
 @token_required
 def get_activity_instantiation_summary(current_user, root_id):
