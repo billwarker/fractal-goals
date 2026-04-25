@@ -9,7 +9,7 @@ import { useFractalTree } from '../hooks/useGoalQueries';
 import { useSessionsHeatmap, useSessionsSearch } from '../hooks/useSessionQueries';
 import useSessionsPageFilters from '../hooks/useSessionsPageFilters';
 import useIsMobile from '../hooks/useIsMobile';
-import { SessionCard, SessionCardExpanded, SessionsQuerySidebar } from '../components/sessions';
+import { SessionCardExpanded, SessionsQuerySidebar } from '../components/sessions';
 import { QuickSessionWorkspace } from '../components/sessionDetail';
 import CardCornerActionButton from '../components/common/CardCornerActionButton';
 import EmptyState from '../components/common/EmptyState';
@@ -329,29 +329,19 @@ function Sessions() {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {visibleSessions.map((session) => (
-                                selectedSessionId === session.id ? (
-                                    <SessionCardExpanded
-                                        key={session.id}
-                                        session={session}
-                                        rootId={rootId}
-                                        activities={activities}
-                                        isSelected={true}
-                                        onSelect={handleSessionSelect}
-                                        onRequestDelete={handleRequestDeleteSession}
-                                        getGoalColor={getGoalColor}
-                                        timezone={timezone}
-                                        formatDate={formatDate}
-                                        sessionActivityInstances={session.activity_instances || []}
-                                    />
-                                ) : (
-                                    <SessionCard
-                                        key={session.id}
-                                        session={session}
-                                        rootId={rootId}
-                                        isSelected={false}
-                                        onSelect={handleSessionSelect}
-                                    />
-                                )
+                                <SessionCardExpanded
+                                    key={session.id}
+                                    session={session}
+                                    rootId={rootId}
+                                    activities={activities}
+                                    isSelected={selectedSessionId === session.id}
+                                    onSelect={handleSessionSelect}
+                                    onRequestDelete={handleRequestDeleteSession}
+                                    getGoalColor={getGoalColor}
+                                    timezone={timezone}
+                                    formatDate={formatDate}
+                                    sessionActivityInstances={session.activity_instances || []}
+                                />
                             ))}
 
                             {hasNextPage && (

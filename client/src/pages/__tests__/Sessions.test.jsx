@@ -50,8 +50,8 @@ vi.mock('../../hooks/useGoalQueries', () => ({
 vi.mock('../../components/sessions', () => ({
     SessionsQuerySidebar: () => <div data-testid="sessions-query-sidebar" />,
     SessionCard: ({ session }) => <div>summary:{session.id}</div>,
-    SessionCardExpanded: ({ sessionActivityInstances = [] }) => (
-        <div>instances:{sessionActivityInstances.length}</div>
+    SessionCardExpanded: ({ session, sessionActivityInstances = [] }) => (
+        <div>expanded:{session.id}:instances:{sessionActivityInstances.length}</div>
     )
 }));
 
@@ -100,13 +100,13 @@ describe('Sessions page data loading', () => {
         });
 
         await waitFor(() => {
-            expect(screen.getByText('instances:1')).toBeInTheDocument();
+            expect(screen.getByText('expanded:s1:instances:1')).toBeInTheDocument();
         });
 
         expect(getSessionActivities).not.toHaveBeenCalled();
     });
 
-    it('renders lightweight summary cards for non-selected sessions', async () => {
+    it('renders expanded cards for every visible session', async () => {
         getSessions.mockResolvedValue({
             data: {
                 sessions: [
@@ -138,10 +138,10 @@ describe('Sessions page data loading', () => {
         });
 
         await waitFor(() => {
-            expect(screen.getByText('instances:1')).toBeInTheDocument();
+            expect(screen.getByText('expanded:s1:instances:1')).toBeInTheDocument();
         });
 
-        expect(screen.getByText('summary:s2')).toBeInTheDocument();
+        expect(screen.getByText('expanded:s2:instances:1')).toBeInTheDocument();
     });
 
     it('renders quick sessions in a sessions-page modal when quickSessionId is present in the route', async () => {
