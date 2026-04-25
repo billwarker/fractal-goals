@@ -1,6 +1,6 @@
 """remove_micro_nano_goals_final
 
-Revision ID: a2b3c4d5e6f7
+Revision ID: e7f8a9b0c1d2
 Revises: 9d4e5f6a7b8c
 Create Date: 2026-04-24 00:00:00.000000
 
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision: str = 'a2b3c4d5e6f7'
+revision: str = 'e7f8a9b0c1d2'
 down_revision: Union[str, Sequence[str], None] = '9d4e5f6a7b8c'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

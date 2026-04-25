@@ -265,10 +265,10 @@ class TestPhase1GoalConfidence:
         assert payload["summary"]["total_goals"] >= 1
         assert any(g["id"] == root_id and g["session_count"] >= 1 for g in payload["goals"])
 
-    def test_session_micro_goals_requires_auth(self, client, sample_goal_hierarchy):
+    def test_removed_session_micro_goals_endpoint_returns_not_found(self, client, sample_goal_hierarchy):
         root_id = sample_goal_hierarchy["ultimate"].id
         response = client.get(f"/api/fractal/{root_id}/sessions/{uuid.uuid4()}/micro-goals")
-        assert response.status_code == 401
+        assert response.status_code == 404
 
     def test_evaluate_targets_requires_auth(self, client, sample_goal_hierarchy):
         root_id = sample_goal_hierarchy["ultimate"].id

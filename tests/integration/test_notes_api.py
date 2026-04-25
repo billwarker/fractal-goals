@@ -3,14 +3,13 @@ import uuid
 import pytest
 
 from services.events import Events
-from models import Goal, Note, Session, SessionTemplate
+from models import Note, SessionTemplate
 
 
 @pytest.mark.integration
 class TestNotesApiNanoValidation:
-    def test_create_note_rejects_non_nano_goal_id(self, authed_client, db_session, test_user, sample_goal_hierarchy):
+    def test_create_note_rejects_removed_nano_goal_id_field(self, authed_client, sample_goal_hierarchy):
         root = sample_goal_hierarchy['ultimate']
-        non_nano_goal_id = sample_goal_hierarchy['short_term'].id
 
         response = authed_client.post(
             f"/api/{root.id}/notes",
@@ -18,154 +17,29 @@ class TestNotesApiNanoValidation:
                 "content": "Invalid note link",
                 "context_type": "root",
                 "context_id": root.id,
-                "nano_goal_id": non_nano_goal_id
+                "nano_goal_id": sample_goal_hierarchy['short_term'].id,
             }),
             content_type='application/json'
         )
 
         assert response.status_code == 400
-        assert "NanoGoal" in response.get_json().get("error", "")
-
-    def test_create_note_rejects_nano_goal_not_linked_to_session(self, authed_client, db_session, test_user, sample_goal_hierarchy, sample_activity_instance):
-        root = sample_goal_hierarchy['ultimate']
-
-        immediate = Goal(
-            id=str(uuid.uuid4()),
-            name="Immediate Goal",
-            owner_id=test_user.id,
-            parent_id=sample_goal_hierarchy['short_term'].id,
-            root_id=root.id
-        )
-        db_session.add(immediate)
-        db_session.commit()
-
-        micro_response = authed_client.post("/api/goals", json={
-            "name": "Micro Goal",
-            "type": "MicroGoal",
-            "parent_id": immediate.id
-        })
-        assert micro_response.status_code == 201
-        micro_id = micro_response.get_json()["id"]
-
-        nano_response = authed_client.post("/api/goals", json={
-            "name": "Nano Goal",
-            "type": "NanoGoal",
-            "parent_id": micro_id
-        })
-        assert nano_response.status_code == 201
-        nano_id = nano_response.get_json()["id"]
-
-        response = authed_client.post(
-            f"/api/{root.id}/notes",
-            data=json.dumps({
-                "content": "Nano note",
-                "context_type": "activity_instance",
-                "context_id": sample_activity_instance.id,
-                "session_id": sample_activity_instance.session_id,
-                "activity_instance_id": sample_activity_instance.id,
-                "activity_definition_id": sample_activity_instance.activity_definition_id,
-                "nano_goal_id": nano_id
-            }),
-            content_type='application/json'
-        )
-
-        assert response.status_code == 400
-        assert "not linked to the provided session" in response.get_json().get("error", "")
-
-    def test_create_note_accepts_session_linked_nano_goal(self, authed_client, db_session, test_user, sample_goal_hierarchy, sample_activity_instance):
-        root = sample_goal_hierarchy['ultimate']
-
-        immediate = Goal(
-            id=str(uuid.uuid4()),
-            name="Immediate Goal",
-            owner_id=test_user.id,
-            parent_id=sample_goal_hierarchy['short_term'].id,
-            root_id=root.id
-        )
-        db_session.add(immediate)
-        db_session.commit()
-
-        micro_response = authed_client.post("/api/goals", json={
-            "name": "Linked Micro",
-            "type": "MicroGoal",
-            "parent_id": immediate.id,
-            "session_id": sample_activity_instance.session_id
-        })
-        assert micro_response.status_code == 201
-        micro_id = micro_response.get_json()["id"]
-
-        nano_response = authed_client.post("/api/goals", json={
-            "name": "Linked Nano",
-            "type": "NanoGoal",
-            "parent_id": micro_id
-        })
-        assert nano_response.status_code == 201
-        nano_id = nano_response.get_json()["id"]
-
-        response = authed_client.post(
-            f"/api/{root.id}/notes",
-            data=json.dumps({
-                "content": "Valid nano note",
-                "context_type": "activity_instance",
-                "context_id": sample_activity_instance.id,
-                "session_id": sample_activity_instance.session_id,
-                "activity_instance_id": sample_activity_instance.id,
-                "activity_definition_id": sample_activity_instance.activity_definition_id,
-                "nano_goal_id": nano_id
-            }),
-            content_type='application/json'
-        )
-
-        assert response.status_code == 201
         data = response.get_json()
-        assert data["nano_goal_id"] == nano_id
-        assert data["is_nano_goal"] is True
+        messages = [error.get("message", "") for error in data.get("details", [])]
+        assert any("Extra inputs are not permitted" in message for message in messages)
 
-    def test_create_nano_goal_note_is_atomic(self, authed_client, db_session, sample_goal_hierarchy, sample_activity_instance):
+    def test_removed_nano_goal_note_endpoint_returns_not_found(self, authed_client, sample_goal_hierarchy):
         root = sample_goal_hierarchy['ultimate']
-        session_id = sample_activity_instance.session_id
-
-        immediate = Goal(
-            id=str(uuid.uuid4()),
-            name="Immediate Goal",
-            owner_id=root.owner_id,
-            parent_id=sample_goal_hierarchy['short_term'].id,
-            root_id=root.id,
-        )
-        db_session.add(immediate)
-        db_session.commit()
-
-        micro_response = authed_client.post(f"/api/{root.id}/goals", json={
-            "name": "Linked Micro",
-            "type": "MicroGoal",
-            "parent_id": immediate.id,
-            "session_id": session_id,
-        })
-        assert micro_response.status_code == 201
-        micro_id = micro_response.get_json()["id"]
 
         response = authed_client.post(
             f"/api/{root.id}/nano-goal-notes",
             data=json.dumps({
                 "name": "Do one strict rep",
-                "parent_id": micro_id,
-                "session_id": session_id,
-                "activity_instance_id": sample_activity_instance.id,
-                "activity_definition_id": sample_activity_instance.activity_definition_id,
+                "parent_id": sample_goal_hierarchy['short_term'].id,
             }),
             content_type='application/json'
         )
 
-        assert response.status_code == 201
-        payload = response.get_json()
-        assert payload["goal"]["name"] == "Do one strict rep"
-        assert payload["goal"]["attributes"]["type"] == "NanoGoal"
-        assert payload["note"]["nano_goal_id"] == payload["goal"]["id"]
-        assert payload["note"]["activity_instance_id"] == sample_activity_instance.id
-
-        created_note = db_session.query(Note).filter_by(id=payload["note"]["id"]).first()
-        assert created_note is not None
-        assert created_note.nano_goal_id == payload["goal"]["id"]
+        assert response.status_code == 404
 
     def test_note_crud_endpoints_emit_note_events_and_preserve_persistence(
         self,
@@ -208,102 +82,6 @@ class TestNotesApiNanoValidation:
         assert deleted_note is not None
         assert deleted_note.deleted_at is not None
 
-    def test_create_nano_goal_note_emits_note_and_goal_events(
-        self,
-        authed_client,
-        db_session,
-        sample_goal_hierarchy,
-        sample_activity_instance,
-        monkeypatch,
-    ):
-        root = sample_goal_hierarchy['ultimate']
-        session_id = sample_activity_instance.session_id
-
-        immediate = Goal(
-            id=str(uuid.uuid4()),
-            name="Immediate Goal",
-            owner_id=root.owner_id,
-            parent_id=sample_goal_hierarchy['short_term'].id,
-            root_id=root.id,
-        )
-        db_session.add(immediate)
-        db_session.commit()
-
-        micro_response = authed_client.post(f"/api/{root.id}/goals", json={
-            "name": "Linked Micro",
-            "type": "MicroGoal",
-            "parent_id": immediate.id,
-            "session_id": session_id,
-        })
-        assert micro_response.status_code == 201
-        micro_id = micro_response.get_json()["id"]
-
-        emitted = []
-        monkeypatch.setattr('services.note_service.event_bus.emit', lambda event: emitted.append(event))
-
-        response = authed_client.post(
-            f"/api/{root.id}/nano-goal-notes",
-            data=json.dumps({
-                "name": "Do one strict rep",
-                "parent_id": micro_id,
-                "session_id": session_id,
-                "activity_instance_id": sample_activity_instance.id,
-                "activity_definition_id": sample_activity_instance.activity_definition_id,
-            }),
-            content_type='application/json'
-        )
-
-        assert response.status_code == 201
-        payload = response.get_json()
-        assert payload["note"]["nano_goal_id"] == payload["goal"]["id"]
-        assert [event.name for event in emitted] == [Events.NOTE_CREATED, Events.GOAL_CREATED]
-        assert emitted[0].data['note_id'] == payload['note']['id']
-        assert emitted[1].data['goal_id'] == payload['goal']['id']
-
-    def test_create_nano_goal_note_rolls_back_on_invalid_activity_instance(
-        self,
-        authed_client,
-        db_session,
-        sample_goal_hierarchy,
-        sample_activity_instance,
-    ):
-        root = sample_goal_hierarchy['ultimate']
-        session_id = sample_activity_instance.session_id
-
-        immediate = Goal(
-            id=str(uuid.uuid4()),
-            name="Immediate Goal",
-            owner_id=root.owner_id,
-            parent_id=sample_goal_hierarchy['short_term'].id,
-            root_id=root.id,
-        )
-        db_session.add(immediate)
-        db_session.commit()
-
-        micro_response = authed_client.post(f"/api/{root.id}/goals", json={
-            "name": "Linked Micro",
-            "type": "MicroGoal",
-            "parent_id": immediate.id,
-            "session_id": session_id,
-        })
-        assert micro_response.status_code == 201
-        micro_id = micro_response.get_json()["id"]
-
-        response = authed_client.post(
-            f"/api/{root.id}/nano-goal-notes",
-            data=json.dumps({
-                "name": "Should Roll Back",
-                "parent_id": micro_id,
-                "session_id": session_id,
-                "activity_instance_id": str(uuid.uuid4()),
-                "activity_definition_id": sample_activity_instance.activity_definition_id,
-            }),
-            content_type='application/json'
-        )
-
-        assert response.status_code == 400
-        assert "Activity instance not found" in response.get_json().get("error", "")
-
     def test_create_note_rejects_quick_session(self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition):
         root_id = sample_ultimate_goal.id
         quick_template = SessionTemplate(
@@ -340,7 +118,3 @@ class TestNotesApiNanoValidation:
 
         assert response.status_code == 400
         assert 'Quick sessions do not support notes' in response.get_json()['error']
-
-        db_session.expire_all()
-        rolled_back_goal = db_session.query(Goal).filter_by(name="Should Roll Back").first()
-        assert rolled_back_goal is None

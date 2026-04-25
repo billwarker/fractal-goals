@@ -36,8 +36,6 @@ UltimateGoal
               └── ShortTermGoal
                     └── PracticeSession
                           └── ImmediateGoal
-                                └── MicroGoal
-                                      └── NanoGoal
 ```
 
 ### Project Structure

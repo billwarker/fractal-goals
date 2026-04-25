@@ -482,6 +482,8 @@ class NoteService:
 
     def create_note(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         data = normalize_note_payload(data)
+        if 'nano_goal_id' in data:
+            return None, "nano_goal_id is no longer supported", 400
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error

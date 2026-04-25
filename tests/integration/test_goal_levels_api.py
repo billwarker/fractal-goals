@@ -17,8 +17,8 @@ class TestGoalLevelsApi:
         )
         user_level = GoalLevel(
             id=str(uuid.uuid4()),
-            name="Micro Goal",
-            rank=5,
+            name="Immediate Goal",
+            rank=4,
             owner_id=test_user.id,
             root_id=None,
             color="#222222",
@@ -30,7 +30,7 @@ class TestGoalLevelsApi:
 
         assert response.status_code == 200
         payload = response.get_json()
-        assert [level["name"] for level in payload] == ["Short Term Goal", "Micro Goal"]
+        assert [level["name"] for level in payload] == ["Short Term Goal", "Immediate Goal"]
 
     def test_update_system_goal_level_creates_user_owned_clone(self, authed_client, db_session, test_user):
         system_level = GoalLevel(

@@ -111,7 +111,7 @@ open htmlcov/index.html  # View in browser
 ## Critical Test Scenarios
 
 ### ✅ Goal Hierarchy
-- Create complete hierarchy (UltimateGoal → NanoGoal)
+- Create complete hierarchy (UltimateGoal → ImmediateGoal)
 - Enforce parent-child type constraints
 - Delete goal cascades to children
 - Root ID propagation

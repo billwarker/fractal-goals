@@ -1048,7 +1048,7 @@ class FractalMetricUpdateSchema(BaseModel):
 
 class NoteCreateSchema(BaseModel):
     """Schema for creating a note."""
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
     
     content: str = Field(..., min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
     context_type: str = Field(..., pattern=r'^(root|goal|session|activity_instance|activity_definition)$')

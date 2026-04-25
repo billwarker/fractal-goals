@@ -471,7 +471,6 @@ class TestSessionCRUDEndpoints:
         assert data['template_color'] == '#123456'
         assert data['attributes']['session_data']['activity_ids']
         assert data['immediate_goals'] == []
-        assert data.get('micro_goals') in (None, [])
 
     def test_complete_quick_session_sets_end_and_duration(
         self,

@@ -110,7 +110,7 @@ def test_create_activity_instance_note_hydrates_session_and_activity_definition(
     assert payload['activity_definition_id'] == sample_activity_instance.activity_definition_id
 
 
-def test_create_note_ignores_removed_nano_goal_id_field(
+def test_create_note_rejects_removed_nano_goal_id_field(
     db_session,
     sample_goal_hierarchy,
     sample_activity_instance,
@@ -136,9 +136,9 @@ def test_create_note_ignores_removed_nano_goal_id_field(
         'nano_goal_id': immediate.id,
     })
 
-    assert error is None
-    assert status == 201
-    assert 'nano_goal_id' not in payload
+    assert payload is None
+    assert status == 400
+    assert error == 'nano_goal_id is no longer supported'
 
 
 def test_get_goal_notes_returns_display_context_and_images(db_session, sample_goal_hierarchy, test_user):

@@ -55,35 +55,26 @@ def test_deadline_cascade(authed_client, db_session, test_user):
     assert child_deadline_date == new_p_date
 
 def test_transient_goal_constraints(authed_client, db_session, test_user):
-    """Test focus/nano goal specific constraints."""
-    # Setup: need an ImmediateGoal as parent for MicroGoal
+    """Removed MicroGoal/NanoGoal types are rejected."""
     r = authed_client.post('/api/goals', json={"name": "Root", "type": "UltimateGoal"})
     root_id = r.get_json()["id"]
     r = authed_client.post('/api/goals', json={"name": "Imm", "type": "ImmediateGoal", "parent_id": root_id})
     imm_id = r.get_json()["id"]
 
-    # 1. MicroGoal cannot have deadline
     r = authed_client.post('/api/goals', json={
         "name": "Micro", "type": "MicroGoal", "parent_id": imm_id,
         "deadline": datetime.now().date().isoformat()
     })
     assert r.status_code == 400
     resp = r.get_json()
-    # Pydantic errors are in 'details'
     error_msgs = [err["message"] for err in resp.get("details", [])]
-    assert any("cannot have deadlines" in m for m in error_msgs)
+    assert any("Invalid goal type" in m for m in error_msgs)
 
-    # 2. NanoGoal cannot have description
     r = authed_client.post('/api/goals', json={
-        "name": "Micro", "type": "MicroGoal", "parent_id": imm_id
-    })
-    micro_id = r.get_json()["id"]
-    
-    r = authed_client.post('/api/goals', json={
-        "name": "Nano", "type": "NanoGoal", "parent_id": micro_id,
+        "name": "Nano", "type": "NanoGoal", "parent_id": imm_id,
         "description": "forbidden"
     })
     assert r.status_code == 400
     resp = r.get_json()
     error_msgs = [err["message"] for err in resp.get("details", [])]
-    assert any("cannot have a description" in m for m in error_msgs)
+    assert any("Invalid goal type" in m for m in error_msgs)
