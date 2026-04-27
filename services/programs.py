@@ -79,6 +79,59 @@ class ProgramService:
             raise ValueError(f"Invalid {field_name} format")
 
     @staticmethod
+    def _parse_program_datetime(raw_value: Any, field_name: str) -> datetime:
+        if not raw_value:
+            raise ValueError(f"{field_name} is required")
+        if isinstance(raw_value, datetime):
+            return raw_value
+        if isinstance(raw_value, date):
+            return datetime.combine(raw_value, datetime.min.time())
+        try:
+            return datetime.fromisoformat(str(raw_value).replace('Z', '+00:00'))
+        except ValueError:
+            raise ValueError(f"Invalid {field_name} format")
+
+    @staticmethod
+    def _date_part(value: Any) -> date | None:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        return ProgramService._parse_program_datetime(value, 'date').date()
+
+    @staticmethod
+    def _check_no_program_overlap(
+        session,
+        root_id: str,
+        start_date_value: Any,
+        end_date_value: Any,
+        exclude_program_id: str | None = None,
+    ):
+        start_date = ProgramService._date_part(start_date_value)
+        end_date = ProgramService._date_part(end_date_value)
+        if not start_date or not end_date:
+            return
+
+        overlapping_query = session.query(Program).filter(
+            Program.root_id == root_id,
+            Program.start_date <= end_date,
+            Program.end_date >= start_date,
+        )
+        if exclude_program_id:
+            overlapping_query = overlapping_query.filter(Program.id != exclude_program_id)
+
+        overlapping_program = overlapping_query.first()
+        if overlapping_program:
+            raise ValueError(
+                f"Programs cannot overlap in date range. "
+                f"Conflicts with {overlapping_program.name} "
+                f"({ProgramService._date_part(overlapping_program.start_date)} to "
+                f"{ProgramService._date_part(overlapping_program.end_date)})."
+            )
+
+    @staticmethod
     def _normalize_deadline_value(raw_value: Any) -> str:
         if not raw_value:
             raise ValueError("deadline is required")
@@ -392,8 +445,9 @@ class ProgramService:
         ProgramService._require_root_access(session, root_id, current_user_id)
         
         # Parse dates
-        start_date = datetime.fromisoformat(validated_data['start_date'].replace('Z', '+00:00'))
-        end_date = datetime.fromisoformat(validated_data['end_date'].replace('Z', '+00:00'))
+        start_date = ProgramService._parse_program_datetime(validated_data['start_date'], 'start_date')
+        end_date = ProgramService._parse_program_datetime(validated_data['end_date'], 'end_date')
+        ProgramService._check_no_program_overlap(session, root_id, start_date, end_date)
         
         schedule_list = validated_data.get('weeklySchedule', [])
         
@@ -405,19 +459,10 @@ class ProgramService:
             start_date=start_date,
             end_date=end_date,
             weekly_schedule=schedule_list,
-            is_active=validated_data.get('is_active', True)
         )
         
         goal_ids = validated_data.get('selectedGoals', [])
-        
-        # Enforce single active program constraint
-        if new_program.is_active:
-            session.query(Program).filter_by(root_id=root_id).update({'is_active': False})
-            # The new instance might be in the session dirty / identity map, 
-            # but update() is a bulk operation. It's safer to add valid one after or set it explicitly.
-            # However, since new_program is not flushed/added yet, the update works on DB.
-            # But if we create it with is_active=True, we should ensure it stays True.
-        
+
         session.add(new_program)
         session.flush()
         ProgramService._replace_program_goals(session, new_program.id, goal_ids, root_id)
@@ -441,15 +486,32 @@ class ProgramService:
         program = get_owned_program(session, root_id, program_id)
         if not program:
             return None
+
+        next_start_date = ProgramService._parse_program_datetime(
+            validated_data.get('start_date', program.start_date),
+            'start_date',
+        )
+        next_end_date = ProgramService._parse_program_datetime(
+            validated_data.get('end_date', program.end_date),
+            'end_date',
+        )
+        if 'start_date' in validated_data or 'end_date' in validated_data:
+            ProgramService._check_no_program_overlap(
+                session,
+                root_id,
+                next_start_date,
+                next_end_date,
+                exclude_program_id=program_id,
+            )
         
         if 'name' in validated_data:
             program.name = validated_data['name']
         if 'description' in validated_data:
             program.description = validated_data['description']
         if 'start_date' in validated_data:
-            program.start_date = datetime.fromisoformat(validated_data['start_date'].replace('Z', '+00:00'))
+            program.start_date = next_start_date
         if 'end_date' in validated_data:
-            program.end_date = datetime.fromisoformat(validated_data['end_date'].replace('Z', '+00:00'))
+            program.end_date = next_end_date
         if 'selectedGoals' in validated_data:
             goal_ids = validated_data['selectedGoals']
             ProgramService._replace_program_goals(session, program.id, goal_ids, root_id)
@@ -459,14 +521,6 @@ class ProgramService:
             program.weekly_schedule = schedule_list
             ProgramService._sync_program_structure(session, program, schedule_list)
             
-        if 'is_active' in validated_data:
-            program.is_active = validated_data['is_active']
-            if program.is_active:
-                session.query(Program).filter(
-                    Program.root_id == root_id,
-                    Program.id != program_id
-                ).update({'is_active': False})
-
         ProgramService._commit(session, program)
         
         event_bus.emit(Event(Events.PROGRAM_UPDATED, {
@@ -943,9 +997,10 @@ class ProgramService:
             selectinload(Program.blocks)
                 .selectinload(ProgramBlock.days)
                 .selectinload(ProgramDay.templates)
-        ).filter_by(
-            root_id=root_id,
-            is_active=True
+        ).filter(
+            Program.root_id == root_id,
+            Program.start_date <= today,
+            Program.end_date >= today,
         ).all()
         
         result = []

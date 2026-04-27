@@ -10,6 +10,7 @@ from models import (
     ActivityInstance,
     Goal,
     Note,
+    Program,
     Session,
     session_goals,
     validate_root_goal,
@@ -33,6 +34,25 @@ logger = logging.getLogger(__name__)
 class NoteService:
     def __init__(self, db_session):
         self.db_session = db_session
+
+    def _attach_program_names(self, notes_payload):
+        notes = notes_payload if isinstance(notes_payload, list) else [notes_payload]
+        program_ids = {
+            note.get('context_id')
+            for note in notes
+            if note.get('context_type') == 'program' and note.get('context_id')
+        }
+        if not program_ids:
+            return notes_payload
+
+        programs = self.db_session.query(Program.id, Program.name).filter(
+            Program.id.in_(program_ids),
+        ).all()
+        program_names = {program_id: name for program_id, name in programs}
+        for note in notes:
+            if note.get('context_type') == 'program':
+                note['program_name'] = program_names.get(note.get('context_id'))
+        return notes_payload
 
     def _resolve_note_session(self, root_id, session_id=None, activity_instance_id=None):
         if session_id:
@@ -273,6 +293,19 @@ class NoteService:
                 return None, ("session notes cannot include activity_instance_id", 400)
             return {'session': session_obj, 'activity_definition': activity}, None
 
+        if context_type == 'program':
+            if not context_id:
+                return None, ("program notes require a context_id", 400)
+            program = self.db_session.query(Program).filter(
+                Program.id == context_id,
+                Program.root_id == root_id,
+            ).first()
+            if not program:
+                return None, ("Program not found in this fractal", 400)
+            if session_id or activity_instance_id or goal_id or activity_definition_id:
+                return None, ("program notes cannot be linked to a goal, session, or activity", 400)
+            return {'program': program}, None
+
         if context_type == 'activity_instance':
             if not activity_instance_id or context_id != activity_instance_id:
                 return None, ("activity instance notes require matching context_id and activity_instance_id", 400)
@@ -370,6 +403,10 @@ class NoteService:
         if context_types:
             query = query.filter(Note.context_type.in_(context_types))
 
+        context_id = filters.get('context_id')
+        if context_id:
+            query = query.filter(Note.context_id == context_id)
+
         filter_goal_id = filters.get('goal_id')
         if filter_goal_id:
             query = query.filter(Note.goal_id == filter_goal_id)
@@ -425,6 +462,7 @@ class NoteService:
             total = len(filtered_results)
             start_index = page * page_size
             results = filtered_results[start_index:start_index + page_size]
+            self._attach_program_names(results)
         else:
             total = query.count()
             notes = query.order_by(
@@ -432,6 +470,7 @@ class NoteService:
                 Note.created_at.desc(),
             ).limit(page_size).offset(page * page_size).all()
             results = [serialize_note_display(note, include_image=True) for note in notes]
+            self._attach_program_names(results)
 
         return {
             'notes': results,
@@ -557,7 +596,7 @@ class NoteService:
             },
             source='note_service.create_note',
         ))
-        return serialize_note_display(note, include_image=True), None, 201
+        return self._attach_program_names(serialize_note_display(note, include_image=True)), None, 201
 
     def update_note(self, root_id, note_id, current_user_id, data) -> ServiceResult[JsonDict]:
         data = normalize_note_payload(data, partial=True)

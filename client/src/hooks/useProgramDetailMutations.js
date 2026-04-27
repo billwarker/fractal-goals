@@ -47,6 +47,7 @@ export function useProgramDetailMutations({
         } catch (error) {
             console.error('Failed to update program:', error);
             notify.error(`Failed to update program: ${formatError(error)}`);
+            throw error;
         }
     }, [actions, onProgramSaved]);
 

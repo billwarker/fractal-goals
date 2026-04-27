@@ -13,8 +13,7 @@ import Selection from './pages/Selection';
 
 // Lazy load non-critical pages
 const FractalGoals = lazyWithRetry(() => import('./pages/FractalGoals'), 'pages/FractalGoals');
-const Programs = lazyWithRetry(() => import('./pages/Programs'), 'pages/Programs');
-const ProgramDetail = lazyWithRetry(() => import('./pages/ProgramDetail'), 'pages/ProgramDetail');
+const ProgramCalendarPage = lazyWithRetry(() => import('./pages/ProgramCalendarPage'), 'pages/ProgramCalendarPage');
 const Sessions = lazyWithRetry(() => import('./pages/Sessions'), 'pages/Sessions');
 const SessionDetail = lazyWithRetry(() => import('./pages/SessionDetail'), 'pages/SessionDetail');
 const CreateSession = lazyWithRetry(() => import('./pages/CreateSession'), 'pages/CreateSession');
@@ -318,14 +317,21 @@ function App() {
                             <Route path="/:rootId/programs" element={
                                 <ComponentErrorBoundary>
                                     <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
-                                        <Programs />
-                                    </Suspense>
-                                </ComponentErrorBoundary>
+                                            <ProgramCalendarPage />
+                                        </Suspense>
+                                    </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/programs/:programId" element={
                                 <ComponentErrorBoundary>
                                     <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
-                                        <ProgramDetail />
+                                        <ProgramCalendarPage />
+                                    </Suspense>
+                                </ComponentErrorBoundary>
+                            } />
+                            <Route path="/:rootId/programs/:programId/blocks" element={
+                                <ComponentErrorBoundary>
+                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <ProgramCalendarPage />
                                     </Suspense>
                                 </ComponentErrorBoundary>
                             } />

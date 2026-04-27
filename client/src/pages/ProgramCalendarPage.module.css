@@ -1,0 +1,650 @@
+.container {
+    min-height: calc(100vh - var(--app-nav-height, 0px));
+    color: var(--color-text-primary);
+    background: var(--color-bg-app);
+}
+
+.workspace {
+    min-height: calc(100vh - var(--app-nav-height, 0px));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 390px;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+    background-image:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.workspaceNoSidePane {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.mainColumn {
+    min-width: 0;
+    min-height: calc(100vh - var(--app-nav-height, 0px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 24px 40px 20px;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-app);
+}
+
+.titleGroup {
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 22px;
+}
+
+.headerCopy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.titleRow {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.pageTitle {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: 0;
+    color: var(--color-text-primary);
+}
+
+.statusBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.statusBadgeActive {
+    border-color: color-mix(in srgb, var(--color-brand-success) 62%, var(--color-border));
+    background: color-mix(in srgb, var(--color-brand-success) 16%, transparent);
+    color: var(--color-brand-success);
+}
+
+.statusBadgeInactive {
+    border-color: var(--color-border);
+    background: color-mix(in srgb, var(--color-bg-card) 72%, transparent);
+    color: var(--color-text-muted);
+}
+
+.pageSubtitle {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.calendarPanel {
+    min-width: 0;
+    flex: 1;
+    min-height: 0;
+    margin: 32px;
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+    overflow: hidden;
+    background: var(--color-bg-app);
+}
+
+.blocksPanel {
+    height: 100%;
+    min-height: 680px;
+    padding: 24px;
+    overflow: auto;
+}
+
+.emptyBlocksPanel {
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    text-align: center;
+}
+
+.emptyBlocksPanel h2 {
+    margin: 0;
+    font-size: 22px;
+    line-height: 1.2;
+}
+
+.emptyBlocksPanel p {
+    margin: 0;
+    color: var(--color-text-secondary);
+}
+
+.loading {
+    min-height: 420px;
+    display: grid;
+    place-items: center;
+    color: var(--color-text-secondary);
+}
+
+.sidePane {
+    width: 390px;
+    min-width: 0;
+    flex-shrink: 0;
+    border-left: 1px solid var(--color-border);
+    border-radius: 0;
+    background: var(--color-bg-sidebar);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sidePaneHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+    background: linear-gradient(180deg, rgba(79, 156, 249, 0.1), transparent);
+}
+
+.sidePaneHeaderCopy {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+}
+
+.sidePaneViewToggle {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    gap: 8px;
+}
+
+.sidePaneViewButton {
+    flex: 1;
+    min-height: 36px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    text-align: center;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sidePaneViewButton:hover {
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
+}
+
+.sidePaneViewButtonActive {
+    border-color: var(--color-brand-success);
+    background: rgba(59, 197, 124, 0.12);
+    color: var(--color-brand-success);
+    box-shadow: 0 0 0 1px rgba(59, 197, 124, 0.24);
+}
+
+.sidePaneCollapseButton {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.sidePaneCollapseButton:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
+    color: var(--color-text-primary);
+}
+
+.description,
+.muted {
+    margin: 0;
+    color: var(--color-text-secondary);
+}
+
+.description {
+    margin: 14px 18px 0;
+    line-height: 1.5;
+}
+
+.sidePaneNotes {
+    min-height: 0;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    overflow: hidden;
+}
+
+.sidePaneNotesTimeline {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.sidePaneNotesStatus {
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    padding: 18px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-card);
+}
+
+.sidePaneNotesStatus h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.sidePaneNotesStatus p {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.headerActions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.viewToggle {
+    display: inline-flex;
+    padding: 4px;
+    border: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--color-bg-secondary) 72%, var(--color-bg-app));
+}
+
+.toggleButton {
+    min-height: 34px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.toggleButtonActive {
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+}
+
+.primaryButton,
+.secondaryButton {
+    min-height: 34px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0 16px;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+
+.primaryButton {
+    background: var(--color-brand-primary);
+    border-color: var(--color-brand-primary);
+    color: white;
+}
+
+.secondaryButton {
+    background: transparent;
+    border-color: var(--color-border);
+    color: var(--color-text-primary);
+}
+
+.secondaryButton:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
+}
+
+.optionsModalBody {
+    display: grid;
+    gap: 10px;
+}
+
+.optionButton {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.optionButton:hover:not(:disabled) {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-brand-primary);
+}
+
+.optionButton:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.optionButtonDanger:hover:not(:disabled) {
+    border-color: var(--color-brand-danger);
+}
+
+.optionButtonDanger .optionTitle {
+    color: var(--color-brand-danger);
+}
+
+.optionTitle {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.optionDescription {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.programPicker {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.backButton {
+    align-self: flex-start;
+    min-height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.backButton:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
+    color: var(--color-text-primary);
+}
+
+.programPickerEmpty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+}
+
+.programPickerEmpty p {
+    margin: 0;
+    color: var(--color-text-secondary);
+}
+
+.programPickerControls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.programPickerSearch {
+    width: 100%;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-size: 13px;
+}
+
+.programPickerSearch::placeholder {
+    color: var(--color-text-muted);
+}
+
+.programPickerSearch:focus {
+    border-color: var(--color-brand-primary);
+    outline: none;
+}
+
+.programPickerFilters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.programPickerFilterButton {
+    min-height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.programPickerFilterButton:hover {
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
+}
+
+.programPickerFilterButtonActive {
+    background: var(--color-brand-primary);
+    border-color: var(--color-brand-primary);
+    color: white;
+}
+
+.programPickerFilterButtonActive:hover {
+    background: var(--color-brand-primary);
+    color: white;
+}
+
+.programPickerGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.programPickerGroupTitle {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.programPickerList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.programPickerRow {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.programPickerRow:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-brand-primary);
+}
+
+.programPickerRowSelected {
+    border-color: var(--color-brand-primary);
+}
+
+.programPickerMain {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.programPickerName {
+    overflow: hidden;
+    color: var(--color-text-primary);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.programPickerDates {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.sidebarSlot {
+    min-height: 0;
+    flex: 1;
+}
+
+.embeddedSidebar {
+    width: 100%;
+    height: 100%;
+    border-right: none;
+    background: var(--color-bg-sidebar);
+}
+
+.emptySidePane {
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 18px;
+    padding: 18px;
+}
+
+.emptySidePane p {
+    margin: 0;
+    color: var(--color-text-secondary);
+}
+
+@media (max-width: 980px) {
+    .workspace {
+        grid-template-columns: 1fr;
+        padding: 0;
+    }
+
+    .mainColumn {
+        min-height: auto;
+        overflow: visible;
+    }
+
+    .header {
+        padding: 16px 12px 18px;
+        min-height: 0;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .titleGroup {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .calendarPanel {
+        min-height: 560px;
+        margin: 12px;
+    }
+
+    .blocksPanel {
+        min-height: 520px;
+        padding: 16px;
+    }
+
+    .headerActions {
+        justify-content: flex-start;
+        gap: 8px;
+    }
+
+    .programPickerRow {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .sidePane {
+        order: -1;
+        max-height: none;
+        border-left: none;
+        border-bottom: 1px solid var(--color-border);
+    }
+}

@@ -14,12 +14,13 @@
 }
 
 .topSection {
-    padding: 24px;
+    padding: 16px;
     border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
 }
 
 .compactTopSection {
-    padding: 14px 12px;
+    padding: 16px;
 }
 
 .compactMetricsBlock {
@@ -28,26 +29,29 @@
 
 .bottomSection {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
-    padding: 24px;
+    padding: 16px;
 }
 
 .sectionHeader {
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    font-size: 12px;
-    margin-bottom: 12px;
-    letter-spacing: 1px;
+    margin: 0 0 12px 0;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: 0;
+    text-transform: none;
 }
 
 .metricsScroll {
-    max-height: 220px;
-    overflow-y: auto;
+    max-height: none;
+    overflow: visible;
 }
 
 .goalsScroll {
-    max-height: 50vh;
-    overflow-y: auto;
+    max-height: none;
+    overflow: visible;
 }
 
 .metricsList {
@@ -106,16 +110,6 @@
 
     .bottomSection {
         padding: 12px 16px;
-    }
-
-    .metricsScroll {
-        /* Let it breathe inside the sheet */
-        max-height: 160px;
-    }
-
-    .goalsScroll {
-        /* Sheet is 75vh; leave room for topSection (~140px) */
-        max-height: calc(75vh - 200px);
     }
 
     .metricsList {

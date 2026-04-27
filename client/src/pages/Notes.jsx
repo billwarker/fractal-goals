@@ -26,6 +26,7 @@ import styles from './Notes.module.css';
 const NOTE_TYPE_OPTIONS = [
     { value: 'fractal_note', label: 'Fractal Notes' },
     { value: 'goal_note', label: 'Goal Notes' },
+    { value: 'program_note', label: 'Program Notes' },
     { value: 'session_note', label: 'Session Notes' },
     { value: 'activity_instance_note', label: 'Activity Notes' },
     { value: 'activity_set_note', label: 'Activity Set Notes' },
@@ -121,7 +122,7 @@ function Notes() {
     };
 
     const {
-        notes, total, hasMore, isLoading, isFetching,
+        notes, total, hasMore, isLoading,
         loadNextPage, createNote, updateNote, deleteNote, pinNote, unpinNote,
     } = useNotesPageQuery(rootId, filters);
 

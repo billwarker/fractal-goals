@@ -211,13 +211,13 @@ describe('ProgramDetail', () => {
         });
     });
 
-    it('loads only the active lazy modal for calendar day clicks', async () => {
+    it('loads only the active lazy modal for day view state', async () => {
         vi.resetModules();
         const { default: ProgramDetail } = await import('../ProgramDetail');
 
         render(<ProgramDetail />);
 
-        expect(screen.getByText('Calendar View')).toBeInTheDocument();
+        expect(screen.getByText('Block View')).toBeInTheDocument();
         await screen.findByText('Day View Modal');
 
         await waitFor(() => {
@@ -236,7 +236,7 @@ describe('ProgramDetail', () => {
 
         render(<ProgramDetail />);
 
-        expect(screen.getByText('Calendar View')).toBeInTheDocument();
+        expect(screen.getByText('Block View')).toBeInTheDocument();
         await screen.findByText('Program Block Modal');
 
         await waitFor(() => {

@@ -29,6 +29,7 @@ function deriveNoteType(note) {
     if (note.context_type === 'root') return 'fractal_note';
     if (note.context_type === 'goal') return 'goal_note';
     if (note.context_type === 'session') return 'session_note';
+    if (note.context_type === 'program') return 'program_note';
     if (note.context_type === 'activity_definition') return 'activity_definition_note';
     if (note.context_type === 'activity_instance') {
         return note.set_index !== null && note.set_index !== undefined
@@ -46,6 +47,7 @@ function deriveNoteTypeLabel(note) {
         fractal_note: 'Fractal Note',
         goal_note: 'Goal Note',
         session_note: 'Session Note',
+        program_note: 'Program Note',
         activity_instance_note: 'Activity Instance Note',
         activity_set_note: 'Activity Set Note',
         activity_definition_note: 'Activity Definition Note',
@@ -192,20 +194,15 @@ function NoteCard({
     const [shouldRenderRichContent, setShouldRenderRichContent] = useState(
         typeof window === 'undefined' || typeof window.IntersectionObserver === 'undefined' || !shouldDeferRichContent
     );
+    const shouldShowRichContent = !shouldDeferRichContent || shouldRenderRichContent;
     const previewContent = buildPlainTextPreview(note.content);
 
     useEffect(() => {
         if (!shouldDeferRichContent) {
-            setShouldRenderRichContent(true);
             return;
         }
 
-        if (typeof window === 'undefined' || typeof window.IntersectionObserver === 'undefined') {
-            setShouldRenderRichContent(true);
-            return;
-        }
-
-        if (shouldRenderRichContent || !cardRef.current) {
+        if (shouldShowRichContent || !cardRef.current) {
             return;
         }
 
@@ -221,7 +218,7 @@ function NoteCard({
 
         observer.observe(cardRef.current);
         return () => observer.disconnect();
-    }, [shouldDeferRichContent, shouldRenderRichContent]);
+    }, [shouldDeferRichContent, shouldShowRichContent]);
 
     const primaryContextLabel = (() => {
         switch (resolvedNoteType) {
@@ -231,6 +228,8 @@ function NoteCard({
                 return note.goal_name || note.content || 'Goal';
             case 'session_note':
                 return note.session_template_name || note.session_name || 'Session';
+            case 'program_note':
+                return note.program_name || 'Program';
             case 'activity_set_note':
                 return `${note.activity_definition_name || 'Activity'} · Set ${(note.set_index ?? 0) + 1}`;
             case 'activity_instance_note':
@@ -273,6 +272,7 @@ function NoteCard({
                     isSelected ? styles.selected : '',
                     note.isPast ? styles.pastNote : '',
                     note.is_pinned ? styles.pinned : '',
+                    menuOpen ? styles.menuOpen : '',
                 ].filter(Boolean).join(' ')}
                 onClick={(e) => {
                     e.stopPropagation();
@@ -389,7 +389,7 @@ function NoteCard({
                 ) : (
                     !isImageOnly && (
                         <div className={styles.content}>
-                            {shouldRenderRichContent ? (
+                            {shouldShowRichContent ? (
                                 <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
                             ) : (
                                 <div className={`${styles.markdownContent} ${styles.previewContent}`}>

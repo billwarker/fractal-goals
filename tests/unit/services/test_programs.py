@@ -59,19 +59,63 @@ def test_update_program(db_session, sample_program, sample_goal_hierarchy):
     
     data = {
         'name': 'Updated Program',
-        'start_date': datetime.now(timezone.utc).isoformat(),
-        'end_date': (datetime.now(timezone.utc) + timedelta(days=90)).isoformat(),
+        'start_date': (date.today() - timedelta(days=1)).isoformat(),
+        'end_date': (date.today() + timedelta(days=90)).isoformat(),
         'selectedGoals': [goal_id],
-        'is_active': False
     }
     
     result = ProgramService.update_program(db_session, root_id, sample_program.id, data)
     assert result['name'] == 'Updated Program'
-    assert result['is_active'] is False
+    assert result['is_active'] is True
     
     program_db = db_session.query(Program).get(result['id'])
     assert len(program_db.goals) == 1
     assert program_db.goals[0].id == goal_id
+
+
+def test_create_program_rejects_overlapping_program_dates(db_session, sample_program, sample_goal_hierarchy):
+    root_id = sample_goal_hierarchy['ultimate'].id
+
+    with pytest.raises(ValueError, match="Programs cannot overlap"):
+        ProgramService.create_program(db_session, root_id, {
+            'name': 'Overlap',
+            'start_date': sample_program.start_date.isoformat(),
+            'end_date': (sample_program.start_date + timedelta(days=7)).isoformat(),
+            'weeklySchedule': [],
+        })
+
+
+def test_create_program_allows_adjacent_non_overlapping_dates(db_session, sample_program, sample_goal_hierarchy):
+    root_id = sample_goal_hierarchy['ultimate'].id
+
+    result = ProgramService.create_program(db_session, root_id, {
+        'name': 'Adjacent Program',
+        'start_date': (sample_program.end_date + timedelta(days=1)).isoformat(),
+        'end_date': (sample_program.end_date + timedelta(days=14)).isoformat(),
+        'weeklySchedule': [],
+    })
+
+    assert result['name'] == 'Adjacent Program'
+
+
+def test_update_program_rejects_overlapping_program_dates(db_session, sample_program, sample_goal_hierarchy):
+    root_id = sample_goal_hierarchy['ultimate'].id
+    later_program = Program(
+        id=str(uuid.uuid4()),
+        root_id=root_id,
+        name="Later Program",
+        start_date=sample_program.end_date + timedelta(days=1),
+        end_date=sample_program.end_date + timedelta(days=14),
+        weekly_schedule=[],
+        is_active=False,
+    )
+    db_session.add(later_program)
+    db_session.commit()
+
+    with pytest.raises(ValueError, match="Programs cannot overlap"):
+        ProgramService.update_program(db_session, root_id, later_program.id, {
+            'start_date': (sample_program.end_date - timedelta(days=3)).isoformat(),
+        })
 
 
 def test_program_service_mutations_commit_without_caller_commit(db_session, sample_ultimate_goal):

@@ -1,9 +1,10 @@
 import json
 import uuid
+from datetime import datetime, timedelta
 import pytest
 
 from services.events import Events
-from models import Note, SessionTemplate
+from models import Note, Program, SessionTemplate
 
 
 @pytest.mark.integration
@@ -81,6 +82,44 @@ class TestNotesApiNanoValidation:
         deleted_note = db_session.query(Note).filter_by(id=created_note['id']).first()
         assert deleted_note is not None
         assert deleted_note.deleted_at is not None
+
+    def test_create_program_note(self, authed_client, db_session, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+        program = Program(
+            id=str(uuid.uuid4()),
+            root_id=root_id,
+            name='Program Notes API',
+            start_date=datetime.utcnow(),
+            end_date=datetime.utcnow() + timedelta(days=14),
+            weekly_schedule=[],
+        )
+        db_session.add(program)
+        db_session.commit()
+
+        response = authed_client.post(
+            f'/api/{root_id}/notes',
+            json={
+                'content': 'Keep the main constraint in view',
+                'context_type': 'program',
+                'context_id': program.id,
+            },
+        )
+
+        assert response.status_code == 201
+        payload = response.get_json()
+        assert payload['content'] == 'Keep the main constraint in view'
+        assert payload['context_type'] == 'program'
+        assert payload['context_id'] == program.id
+        assert payload['note_type'] == 'program_note'
+        assert payload['program_name'] == 'Program Notes API'
+
+        list_response = authed_client.get(
+            f'/api/{root_id}/notes?context_types=program&context_id={program.id}',
+        )
+
+        assert list_response.status_code == 200
+        notes = list_response.get_json()['notes']
+        assert notes[0]['program_name'] == 'Program Notes API'
 
     def test_create_note_rejects_quick_session(self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition):
         root_id = sample_ultimate_goal.id

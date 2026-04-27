@@ -645,13 +645,19 @@ def serialize_program(program):
     """Serialize a Program object."""
     # Build weekly_schedule from relational blocks (Source of Truth)
     schedule_from_db = [serialize_program_block(b) for b in (program.blocks or [])]
+    today = date.today()
+    start_date = getattr(program, 'start_date', None)
+    end_date = getattr(program, 'end_date', None)
+    start_day = start_date.date() if hasattr(start_date, 'date') else start_date
+    end_day = end_date.date() if hasattr(end_date, 'date') else end_date
+    is_active = bool(start_day and end_day and start_day <= today <= end_day)
 
     return {
         "id": program.id,
         "root_id": program.root_id,
         "name": program.name,
         "description": program.description,
-        "is_active": program.is_active,
+        "is_active": is_active,
         "is_completed": program.is_completed,
         "goals_completed": program.goals_completed,
         "goals_total": program.goals_total,
@@ -755,6 +761,8 @@ def derive_note_type(context_type, set_index=None):
         return "goal_note"
     if context_type == "session":
         return "session_note"
+    if context_type == "program":
+        return "program_note"
     if context_type == "activity_definition":
         return "activity_definition_note"
     if context_type == "activity_instance":
@@ -767,6 +775,7 @@ def note_type_label(note_type):
         "fractal_note": "Fractal Note",
         "goal_note": "Goal Note",
         "session_note": "Session Note",
+        "program_note": "Program Note",
         "activity_instance_note": "Activity Instance Note",
         "activity_set_note": "Activity Set Note",
         "activity_definition_note": "Activity Definition Note",

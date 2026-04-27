@@ -1,20 +1,19 @@
 import React, { Suspense } from 'react';
-import Linkify from '../components/atoms/Linkify';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { formatLiteralDate } from '../utils/dateUtils';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { useTimezone } from '../contexts/TimezoneContext';
 import ProgramSidebar from '../components/programs/ProgramSidebar';
-import ProgramCalendarView from '../components/programs/ProgramCalendarView';
 import ProgramBlockView from '../components/programs/ProgramBlockView';
+import PageHeader from '../components/layout/PageHeader';
+import headerStyles from '../components/layout/PageHeader.module.css';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useProgramData } from '../hooks/useProgramData';
 import { useProgramGoalSets } from '../hooks/useProgramGoalSets';
 import { useProgramDetailController } from '../hooks/useProgramDetailController';
 import { useProgramDetailMutations } from '../hooks/useProgramDetailMutations';
 import { useProgramDetailViewModel } from '../hooks/useProgramDetailViewModel';
-import useIsMobile from '../hooks/useIsMobile';
 import styles from './ProgramDetail.module.css';
 
 const ProgramBuilder = lazyWithRetry(() => import('../components/modals/ProgramBuilder'), 'components/modals/ProgramBuilder');
@@ -29,7 +28,6 @@ const ProgramDetail = () => {
     const { rootId, programId } = useParams();
     const navigate = useNavigate();
     const { timezone } = useTimezone();
-    const isMobile = useIsMobile();
 
     // Data hook manages program, goals, sessions, and supporting query state.
     const {
@@ -58,10 +56,6 @@ const ProgramDetail = () => {
     const {
         showEditBuilder,
         setShowEditBuilder,
-        viewMode,
-        setViewMode,
-        isSidebarOpen,
-        setIsSidebarOpen,
         showBlockModal,
         blockModalData,
         showDayModal,
@@ -69,8 +63,6 @@ const ProgramDetail = () => {
         dayModalInitialData,
         showAttachModal,
         attachBlockId,
-        blockCreationMode,
-        setBlockCreationMode,
         showDayViewModal,
         selectedDate,
         unscheduleConfirmOpen,
@@ -81,8 +73,6 @@ const ProgramDetail = () => {
         selectedParent,
         openGoalModal,
         closeGoalModal,
-        handleDateSelect,
-        handleDateClick,
         handleAddBlockClick,
         handleEditBlockClick,
         closeBlockModal,
@@ -100,7 +90,6 @@ const ProgramDetail = () => {
         handleUnscheduleDay,
         closeUnscheduleConfirm,
         handleUnscheduleSuccess,
-        handleEventClick,
         handleAddChildGoal,
     } = useProgramDetailController({ goals });
 
@@ -111,7 +100,6 @@ const ProgramDetail = () => {
     };
     const {
         sortedBlocks,
-        calendarEvents,
         programMetrics,
         activeBlock,
         blockMetrics,
@@ -177,119 +165,62 @@ const ProgramDetail = () => {
             programGoalSeeds={hierarchyGoalSeeds}
             onGoalClick={openGoalModal}
             getGoalDetails={getGoalDetails}
-            compact={isMobile}
+            compact
+            className={styles.embeddedSidebar}
         />
     );
 
     const contentPanel = (
-        <div className={`${styles.rightPanel} ${styles.calendarWrapper}`}>
-            {viewMode === 'calendar' ? (
-                <ProgramCalendarView
-                    calendarEvents={calendarEvents}
-                    blockCreationMode={blockCreationMode}
-                    setBlockCreationMode={setBlockCreationMode}
-                    onAddBlockClick={handleAddBlockClick}
-                    onDateSelect={handleDateSelect}
-                    onDateClick={handleDateClick}
-                    onEventClick={handleEventClick}
-                    isMobile={isMobile}
-                />
-            ) : (
-                <ProgramBlockView
-                    blocks={sortedBlocks}
-                    blockGoalsByBlockId={blockGoalsByBlockId}
-                    sessions={sessions}
-                    onEditDay={handleEditDay}
-                    onAttachGoal={handleAttachGoalClick}
-                    onEditBlock={handleEditBlockClick}
-                    onDeleteBlock={deleteBlock}
-                    onAddDay={handleAddDayClick}
-                    onGoalClick={openGoalModal}
-                />
-            )}
+        <div className={styles.rightPanel}>
+            <ProgramBlockView
+                blocks={sortedBlocks}
+                blockGoalsByBlockId={blockGoalsByBlockId}
+                sessions={sessions}
+                onEditDay={handleEditDay}
+                onAttachGoal={handleAttachGoalClick}
+                onEditBlock={handleEditBlockClick}
+                onDeleteBlock={deleteBlock}
+                onAddDay={handleAddDayClick}
+                onGoalClick={openGoalModal}
+            />
         </div>
     );
 
     return (
         <div className={styles.container}>
-            {/* Header */}
-            <div className={styles.header}>
-                <div className={styles.headerTopRow}>
+            <PageHeader
+                title={program.name}
+                subtitle={`${formatDate(program.start_date)} - ${formatDate(program.end_date)}`}
+                className={styles.header}
+                actions={(
+                    <div className={styles.headerActions}>
                     <button
                         onClick={() => navigate(`/${rootId}/programs?show_all=true`)}
-                        className={styles.backBtn}
+                            className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
                     >
-                        ← Back
+                            Back
                     </button>
-                    <div className={styles.headerCopy}>
-                        <h1 className={styles.programTitle}>{program.name}</h1>
-                        {!isMobile ? (
-                            <div className={styles.programMeta}>
-                                <span>{formatDate(program.start_date)} - {formatDate(program.end_date)}</span>
-                                {program.description && (
-                                    <>
-                                        <span>•</span>
-                                        <span className={styles.description}><Linkify>{program.description}</Linkify></span>
-                                    </>
-                                )}
-                            </div>
-                        ) : null}
-                    </div>
-                </div>
-                <div className={styles.headerActions}>
-                    <div className={styles.viewToggle}>
-                        <button
-                            onClick={() => setViewMode('calendar')}
-                            className={`${styles.toggleBtn} ${viewMode === 'calendar' ? styles.toggleBtnActive : ''}`}
-                        >
-                            Calendar
-                        </button>
-                        <button
-                            onClick={() => setViewMode('blocks')}
-                            className={`${styles.toggleBtn} ${viewMode === 'blocks' ? styles.toggleBtnActive : ''}`}
-                        >
-                            Blocks
-                        </button>
-                    </div>
                     <button
-                        onClick={() => setIsSidebarOpen((prev) => !prev)}
-                        className={styles.sidebarToggleBtn}
+                        onClick={handleAddBlockClick}
+                            className={`${headerStyles.actionButton} ${headerStyles.primaryActionButton}`}
                     >
-                        {isSidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
+                        Add Block
                     </button>
                     <button
                         onClick={() => setShowEditBuilder(true)}
-                        className={styles.editBtn}
+                            className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
                     >
                         Edit Program
                     </button>
-                </div>
-            </div>
-
-            {/* Main Content */}
-            <div className={styles.mainLayout}>
-                {isMobile ? (
-                    <>
-                        {contentPanel}
-                        {isSidebarOpen && (
-                            <div
-                                className={styles.sheetBackdrop}
-                                onClick={() => setIsSidebarOpen(false)}
-                                aria-hidden="true"
-                            />
-                        )}
-                        {isSidebarOpen && (
-                            <div className={styles.sidebarSheet}>
-                                {sidebarPanel}
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <>
-                        {isSidebarOpen && sidebarPanel}
-                        {contentPanel}
-                    </>
+                    </div>
                 )}
+            />
+
+            <div className={styles.mainLayout}>
+                {contentPanel}
+                <aside className={styles.sidePane} aria-label="Program metrics and goals">
+                    {sidebarPanel}
+                </aside>
             </div>
 
             {showEditBuilder && (

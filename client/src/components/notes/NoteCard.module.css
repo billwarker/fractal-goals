@@ -1,5 +1,5 @@
 .noteCard {
-    padding: 10px 14px;
+    padding: 10px 42px 10px 14px;
     background: var(--color-bg-surface);
     border: 1px solid var(--color-border);
     border-radius: 6px;
@@ -17,7 +17,7 @@
     border: none;
     border-bottom: 1px solid var(--color-border);
     border-radius: 0;
-    padding: 10px 0;
+    padding: 10px 34px 10px 0;
 }
 
 .noteCard:not(.flat):hover {
@@ -25,11 +25,18 @@
 }
 
 .noteCard.compact {
-    padding: 8px 10px;
+    padding: 8px 36px 8px 10px;
 }
 
 .noteCard.selected {
     background: var(--color-bg-hover);
+}
+
+.noteCard.menuOpen {
+    z-index: 100;
+    content-visibility: visible;
+    contain: layout style;
+    overflow: visible;
 }
 
 .noteCard.pinned {
@@ -142,8 +149,19 @@
 
 /* Options button + menu */
 .optionsWrapper {
-    position: relative;
-    flex-shrink: 0;
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    z-index: 20;
+}
+
+.noteCard.flat .optionsWrapper {
+    right: 0;
+}
+
+.noteCard.compact .optionsWrapper {
+    top: 8px;
+    right: 8px;
 }
 
 .optionsBtn {
@@ -156,12 +174,15 @@
     line-height: 1;
     border-radius: 4px;
     letter-spacing: 1px;
-    opacity: 0;
-    transition: opacity 0.15s;
+    opacity: 0.72;
+    transition: color 0.15s ease, opacity 0.15s ease, background 0.15s ease;
 }
 
-.noteCard:hover .optionsBtn {
+.noteCard:hover .optionsBtn,
+.optionsBtn:focus-visible {
     opacity: 1;
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
 }
 
 .optionsMenu {

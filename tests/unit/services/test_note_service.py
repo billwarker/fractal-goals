@@ -1,7 +1,8 @@
 import json
 import uuid
+from datetime import date, timedelta
 
-from models import Goal, Note
+from models import Goal, Note, Program
 from services.serializers import derive_note_type
 from services.events import Events
 from services.note_service import NoteService
@@ -172,6 +173,93 @@ def test_derive_note_type_distinguishes_activity_set_notes():
     assert derive_note_type('activity_instance', None) == 'activity_instance_note'
     assert derive_note_type('activity_instance', 0) == 'activity_set_note'
     assert derive_note_type('goal', None) == 'goal_note'
+    assert derive_note_type('program', None) == 'program_note'
+
+
+def test_create_program_note(db_session, sample_goal_hierarchy, test_user):
+    root = sample_goal_hierarchy['ultimate']
+    program = Program(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        name='Program with notes',
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=14),
+        weekly_schedule=[],
+    )
+    db_session.add(program)
+    db_session.commit()
+
+    service = NoteService(db_session)
+    payload, error, status = service.create_note(root.id, test_user.id, {
+        'content': 'Remember the intent',
+        'context_type': 'program',
+        'context_id': program.id,
+    })
+
+    assert error is None
+    assert status == 201
+    assert payload['note_type'] == 'program_note'
+    assert payload['program_name'] == 'Program with notes'
+
+    notes, error, status = service.get_all_notes(
+        root.id,
+        test_user.id,
+        filters={'context_types': ['program'], 'context_id': program.id},
+    )
+
+    assert error is None
+    assert status == 200
+    assert notes['total'] == 1
+    assert notes['notes'][0]['content'] == 'Remember the intent'
+    assert notes['notes'][0]['program_name'] == 'Program with notes'
+
+
+def test_get_all_notes_scopes_program_notes_to_selected_program(db_session, sample_goal_hierarchy, test_user):
+    root = sample_goal_hierarchy['ultimate']
+    first_program = Program(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        name='Previous Program',
+        start_date=date.today() - timedelta(days=30),
+        end_date=date.today() - timedelta(days=15),
+        weekly_schedule=[],
+    )
+    second_program = Program(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        name='Current Program',
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=14),
+        weekly_schedule=[],
+    )
+    db_session.add_all([first_program, second_program])
+    db_session.commit()
+
+    service = NoteService(db_session)
+    for program, content in (
+        (first_program, 'Past cycle reflection'),
+        (second_program, 'Current cycle focus'),
+    ):
+        payload, error, status = service.create_note(root.id, test_user.id, {
+            'content': content,
+            'context_type': 'program',
+            'context_id': program.id,
+        })
+        assert error is None
+        assert status == 201
+        assert payload['program_name'] == program.name
+
+    notes, error, status = service.get_all_notes(
+        root.id,
+        test_user.id,
+        filters={'context_types': ['program'], 'context_id': first_program.id},
+    )
+
+    assert error is None
+    assert status == 200
+    assert notes['total'] == 1
+    assert notes['notes'][0]['content'] == 'Past cycle reflection'
+    assert notes['notes'][0]['program_name'] == 'Previous Program'
 
 
 def test_pin_note_rejects_activity_set_notes(db_session, sample_goal_hierarchy, sample_activity_instance, test_user):

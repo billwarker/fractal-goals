@@ -19,8 +19,8 @@ const checks = [
     patterns: [/\.logs-grid-header/, /\.log-item/, /@media\s*\(max-width:\s*768px\)/],
   },
   {
-    file: 'src/pages/Programs.module.css',
-    patterns: [/\.grid/, /\.header/, /@media\s*\(max-width:\s*768px\)/],
+    file: 'src/pages/ProgramCalendarPage.module.css',
+    patterns: [/\.workspace/, /\.header/, /@media\s*\(max-width:\s*980px\)/],
   },
   {
     file: 'src/FlowTree.jsx',

@@ -211,6 +211,7 @@ def get_all_notes(current_user, root_id):
         filters = {
             'context_types': context_types,
             'note_types': note_types,
+            'context_id': request.args.get('context_id') or None,
             'goal_id': request.args.get('goal_id') or None,
             'activity_definition_ids': request.args.getlist('activity_definition_ids[]') or request.args.getlist('activity_definition_ids') or [],
             'activity_group_ids': request.args.getlist('activity_group_ids[]') or request.args.getlist('activity_group_ids') or [],

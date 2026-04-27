@@ -12,7 +12,9 @@ function ProgramSidebar({
     programGoalSeeds, // Top level goals to display
     onGoalClick, // (goal) => ...
     getGoalDetails, // Function to get full goal details by ID (needed for children)
-    compact = false
+    compact = false,
+    hideMetricsHeader = false,
+    className = ''
 }) {
     const {
         getGoalColor,
@@ -26,10 +28,10 @@ function ProgramSidebar({
     });
 
     return (
-        <div className={`${styles.sidebar} ${compact ? styles.compactSidebar : ''}`}>
+        <div className={`${styles.sidebar} ${compact ? styles.compactSidebar : ''} ${className}`}>
             {/* Fixed Top Section */}
             <div className={`${styles.topSection} ${compact ? styles.compactTopSection : ''}`}>
-                <h3 className={styles.sectionHeader}>Program Metrics</h3>
+                {hideMetricsHeader ? null : <h3 className={styles.sectionHeader}>Program Metrics</h3>}
                 <div className={styles.metricsScroll}>
                     {/* Program Metrics Section */}
                     {programMetrics && (

@@ -73,31 +73,36 @@ function ProgramCalendarView({
     onDateSelect,
     onDateClick,
     onEventClick,
-    isMobile = false
+    isMobile = false,
+    showBlockControls = true,
+    initialDate = new Date(),
+    onDatesSet
 }) {
     return (
         <div className={styles.calendarContainer}>
             {/* Block creation controls - positioned at top right of calendar area */}
-            <div className={styles.headerActions}>
-                <button
-                    onClick={() => setBlockCreationMode(!blockCreationMode)}
-                    className={`${styles.customBtn} ${styles.createModeBtn} ${blockCreationMode ? styles.createModeBtnActive : ''}`}
-                >
-                    {blockCreationMode ? '✓ Add Mode On' : (isMobile ? 'Add by Date' : 'Select Dates to Add Block')}
-                </button>
-                <button
-                    onClick={onAddBlockClick}
-                    className={`${styles.customBtn} ${styles.addBlockBtn}`}
-                >
-                    + Add Block
-                </button>
-            </div>
+            {showBlockControls ? (
+                <div className={styles.headerActions}>
+                    <button
+                        onClick={() => setBlockCreationMode(!blockCreationMode)}
+                        className={`${styles.customBtn} ${styles.createModeBtn} ${blockCreationMode ? styles.createModeBtnActive : ''}`}
+                    >
+                        {blockCreationMode ? '✓ Add Mode On' : (isMobile ? 'Add by Date' : 'Select Dates to Add Block')}
+                    </button>
+                    <button
+                        onClick={onAddBlockClick}
+                        className={`${styles.customBtn} ${styles.addBlockBtn}`}
+                    >
+                        + Add Block
+                    </button>
+                </div>
+            ) : null}
 
             <FullCalendar
                 plugins={[dayGridPlugin, interactionPlugin]}
                 initialView="dayGridMonth"
                 headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
-                initialDate={new Date()}
+                initialDate={initialDate}
                 events={calendarEvents}
                 height={isMobile ? 560 : '100%'}
                 dayMaxEvents={5}
@@ -107,6 +112,7 @@ function ProgramCalendarView({
                 dateClick={onDateClick}
                 eventClick={onEventClick}
                 eventContent={renderEventContent}
+                datesSet={onDatesSet}
             />
         </div>
     );

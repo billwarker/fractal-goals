@@ -1051,7 +1051,7 @@ class NoteCreateSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
     
     content: str = Field(..., min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
-    context_type: str = Field(..., pattern=r'^(root|goal|session|activity_instance|activity_definition)$')
+    context_type: str = Field(..., pattern=r'^(root|goal|session|program|activity_instance|activity_definition)$')
     context_id: str = Field(..., min_length=1)
     session_id: Optional[str] = None
     activity_instance_id: Optional[str] = None
@@ -1161,7 +1161,6 @@ class ProgramCreateSchema(BaseModel):
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     start_date: str = Field(...)  # Required
     end_date: str = Field(...)  # Required
-    is_active: Optional[bool] = True
     weeklySchedule: Optional[List[Dict[str, Any]]] = None
     selectedGoals: Optional[List[str]] = None
     
@@ -1202,7 +1201,6 @@ class ProgramUpdateSchema(BaseModel):
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     start_date: Optional[str] = None
     end_date: Optional[str] = None
-    is_active: Optional[bool] = None
     weeklySchedule: Optional[List[Dict[str, Any]]] = None
     selectedGoals: Optional[List[str]] = None
 

@@ -19,6 +19,7 @@ function normalizeNoteFilters(filters = {}) {
         note_types: Array.isArray(filters.note_types) && filters.note_types.length
             ? [...filters.note_types].filter(Boolean).sort()
             : undefined,
+        context_id: filters.context_id || undefined,
         goal_id: filters.goal_id || undefined,
         activity_definition_ids: Array.isArray(filters.activity_definition_ids) && filters.activity_definition_ids.length
             ? [...filters.activity_definition_ids].filter(Boolean).sort()

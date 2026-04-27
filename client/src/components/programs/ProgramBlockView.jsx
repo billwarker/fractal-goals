@@ -91,7 +91,8 @@ function ProgramBlockView({
         return (
             <EmptyState
                 className={styles.emptyState}
-                description="No blocks defined. Switch to Calendar to add blocks."
+                title="No blocks yet"
+                description="Add a block to start building this program."
             />
         );
     }

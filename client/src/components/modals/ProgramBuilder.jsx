@@ -11,14 +11,14 @@ import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import styles from './ProgramBuilder.module.css';
 
-function buildInitialProgramData(initialData) {
+function buildInitialProgramData(initialData, initialStartDate = '', initialEndDate = '') {
     if (!initialData) {
         return {
             name: '',
             description: '',
             selectedGoals: [],
-            startDate: '',
-            endDate: '',
+            startDate: initialStartDate,
+            endDate: initialEndDate,
         };
     }
 
@@ -34,11 +34,20 @@ function buildInitialProgramData(initialData) {
 /**
  * ProgramBuilder Modal - Program creation/editing (Metadata only)
  */
-function ProgramBuilderInner({ onClose, onSave, initialData = null }) {
+function ProgramBuilderInner({
+    onClose,
+    onSave,
+    initialData = null,
+    initialStartDate = '',
+    initialEndDate = '',
+    title,
+    submitLabel,
+}) {
     const { rootId } = useParams();
     const [errors, setErrors] = useState({});
+    const [isSaving, setIsSaving] = useState(false);
 
-    const [programData, setProgramData] = useState(() => buildInitialProgramData(initialData));
+    const [programData, setProgramData] = useState(() => buildInitialProgramData(initialData, initialStartDate, initialEndDate));
 
     // Calculate number of weeks between dates
     const calculateWeeks = () => {
@@ -89,10 +98,20 @@ function ProgramBuilderInner({ onClose, onSave, initialData = null }) {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (validateForm()) {
-            onSave(programData);
-            handleClose();
+            try {
+                setIsSaving(true);
+                await onSave(programData);
+                handleClose();
+            } catch (error) {
+                setErrors((currentErrors) => ({
+                    ...currentErrors,
+                    form: error?.response?.data?.error || error?.message || 'Failed to save program',
+                }));
+            } finally {
+                setIsSaving(false);
+            }
         }
     };
 
@@ -104,7 +123,7 @@ function ProgramBuilderInner({ onClose, onSave, initialData = null }) {
         <Modal
             isOpen={true}
             onClose={handleClose}
-            title={initialData ? 'Edit Program' : 'Create Program'}
+            title={title || (initialData ? 'Edit Program' : 'Create Program')}
             size="md"
         >
             <ModalBody>
@@ -233,6 +252,7 @@ function ProgramBuilderInner({ onClose, onSave, initialData = null }) {
                             </div>
                         </div>
                     )}
+                    {errors.form && <div className={styles.errorText}>{errors.form}</div>}
                 </div>
             </ModalBody>
 
@@ -240,26 +260,39 @@ function ProgramBuilderInner({ onClose, onSave, initialData = null }) {
                 <Button variant="secondary" onClick={handleClose}>
                     Cancel
                 </Button>
-                <Button variant="primary" onClick={handleSave}>
-                    {initialData ? 'Save Changes' : 'Create Program'}
+                <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : (submitLabel || (initialData ? 'Save Changes' : 'Create Program'))}
                 </Button>
             </ModalFooter>
         </Modal>
     );
 }
 
-function ProgramBuilder({ isOpen, onClose, onSave, initialData = null }) {
+function ProgramBuilder({
+    isOpen,
+    onClose,
+    onSave,
+    initialData = null,
+    initialStartDate = '',
+    initialEndDate = '',
+    title,
+    submitLabel,
+}) {
     if (!isOpen) {
         return null;
     }
 
-    const modalKey = initialData?.id || 'new-program';
+    const modalKey = `${initialData?.id || 'new-program'}-${initialStartDate}-${initialEndDate}-${title || ''}`;
     return (
         <ProgramBuilderInner
             key={modalKey}
             onClose={onClose}
             onSave={onSave}
             initialData={initialData}
+            initialStartDate={initialStartDate}
+            initialEndDate={initialEndDate}
+            title={title}
+            submitLabel={submitLabel}
         />
     );
 }

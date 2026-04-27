@@ -138,14 +138,15 @@ describe('Notes page', () => {
         render(<Notes />);
 
         expect(screen.getByRole('button', { name: 'Activity Set Notes' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Program Notes' })).toBeInTheDocument();
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Goal Notes' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Program Notes' }));
         });
 
         const latestCall = useNotesPageQueryMock.mock.calls.at(-1);
         expect(latestCall[1]).toMatchObject({
-            note_types: ['goal_note'],
+            note_types: ['program_note'],
         });
     });
 });

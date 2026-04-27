@@ -2,7 +2,7 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 
-import { useProgramsPageData } from '../useProgramsPageData';
+import { useProgramsCalendarData } from '../useProgramsCalendarData';
 import { queryKeys } from '../queryKeys';
 
 const getPrograms = vi.fn();
@@ -29,7 +29,7 @@ function createWrapper(queryClient) {
     };
 }
 
-describe('useProgramsPageData', () => {
+describe('useProgramsCalendarData', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
@@ -48,7 +48,7 @@ describe('useProgramsPageData', () => {
         });
 
         const { result } = renderHook(
-            () => useProgramsPageData('root-1'),
+            () => useProgramsCalendarData('root-1'),
             { wrapper: createWrapper(queryClient) }
         );
 
@@ -67,5 +67,6 @@ describe('useProgramsPageData', () => {
         });
         expect(result.current.goals).toHaveLength(1);
         expect(result.current.treeData?.id).toBe('root-1');
+        expect(result.current.calendarEvents).toEqual([]);
     });
 });

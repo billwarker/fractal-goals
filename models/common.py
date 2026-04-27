@@ -10,7 +10,7 @@ class Note(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
     
-    context_type = Column(String, nullable=False) # 'goal', 'session', 'activity_instance', 'activity_definition'
+    context_type = Column(String, nullable=False) # 'root', 'goal', 'session', 'program', 'activity_instance', 'activity_definition'
     context_id = Column(String, nullable=False, index=True)
     
     __table_args__ = (
