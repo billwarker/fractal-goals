@@ -742,7 +742,7 @@ function TemplateBuilderModalContent({
             {alertModal.show && (
                 <div
                     className={styles.secondaryModalOverlay}
-                    style={{ zIndex: 2000 }}
+                    style={{ zIndex: 3400 }}
                     onClick={() => setAlertModal((previous) => ({ ...previous, show: false }))}
                 >
                     <div
