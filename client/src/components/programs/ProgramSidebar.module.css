@@ -23,8 +23,14 @@
     padding: 16px;
 }
 
+.metricsBlock {
+    flex: 1;
+    min-width: 0;
+}
+
 .compactMetricsBlock {
-    margin-bottom: 12px !important;
+    flex: 1;
+    min-width: 0;
 }
 
 .bottomSection {
@@ -45,8 +51,16 @@
 }
 
 .metricsScroll {
-    max-height: none;
+    display: flex;
+    flex-direction: row;
+    gap: 0;
     overflow: visible;
+}
+
+.metricsBlock + .metricsBlock {
+    border-left: 1px solid var(--color-border);
+    padding-left: 12px;
+    margin-left: 12px;
 }
 
 .goalsScroll {
@@ -76,10 +90,9 @@
 
 .blockHeader {
     display: flex;
-    align-items: center;
-    gap: 6px;
+    flex-direction: column;
+    gap: 2px;
     margin-bottom: 8px;
-    flex-wrap: wrap;
 }
 
 .blockName {

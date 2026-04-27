@@ -68,14 +68,15 @@ function NotesPanel({
 
     return (
         <div className={styles.notesPanel}>
+            <div className={styles.notesSection}>
+                <h4>
+                    Session Notes
+                    {combinedNotes.length > 0 && ` (${combinedNotes.length})`}
+                </h4>
+            </div>
+
             {/* Unified Session Notes Timeline */}
             <div className={styles.notesListContainer}>
-                <div className={styles.notesSection}>
-                    <h4>
-                        Session Notes
-                        {combinedNotes.length > 0 && ` (${combinedNotes.length})`}
-                    </h4>
-                </div>
                 {combinedNotes.length > 0 ? (
                     <NoteTimeline
                         notes={combinedNotes}

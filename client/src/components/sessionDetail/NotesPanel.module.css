@@ -1,24 +1,33 @@
 /* NotesPanel.module.css */
 
 .notesPanel {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    height: 100%;
+    overflow: hidden;
+}
+
+.notesSection {
+    flex-shrink: 0;
+    padding: 14px var(--spacing-lg, 16px);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .notesSection h4 {
-    font-size: 11px;
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    margin-bottom: 10px;
-    letter-spacing: 0.5px;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    text-transform: none;
+    letter-spacing: 0;
 }
 
-/* Container for the scrollable list of notes */
 .notesListContainer {
-    display: flex;
-    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--spacing-lg, 16px);
 }
 
 .notesEmpty {
@@ -29,15 +38,9 @@
     font-style: italic;
 }
 
-/* Container for the quick add widget so it stays at the bottom */
 .notesInputContainer {
-    position: sticky;
-    bottom: calc(-1 * var(--spacing-lg, 24px));
-    margin-bottom: calc(-1 * var(--spacing-lg, 24px));
-    margin-left: calc(-1 * var(--spacing-lg, 24px));
-    margin-right: calc(-1 * var(--spacing-lg, 24px));
-    padding: var(--spacing-md, 16px) var(--spacing-lg, 24px) var(--spacing-lg, 24px);
+    flex-shrink: 0;
+    padding: var(--spacing-md, 12px) var(--spacing-lg, 16px) var(--spacing-lg, 16px);
     background: var(--color-bg-sidebar);
-    z-index: 10;
     border-top: 1px solid var(--color-border);
 }

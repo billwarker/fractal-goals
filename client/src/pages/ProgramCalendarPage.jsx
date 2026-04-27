@@ -12,7 +12,7 @@ import SidePaneHeader from '../components/common/SidePaneHeader';
 import SidePaneHeaderButton from '../components/common/SidePaneHeaderButton';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
-import { NoteComposer, NoteTimeline } from '../components/notes';
+import SidePaneNotePanel from '../components/common/SidePaneNotePanel';
 import { useGoals } from '../contexts/GoalsContext';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -195,91 +195,78 @@ function ProgramSidePane({
                     </SidePaneHeaderButton>
                 )}
             >
-                    <div className={styles.sidePaneViewToggle} aria-label="Program side pane view">
-                        <button
-                            type="button"
-                            className={`${styles.sidePaneViewButton} ${view === 'details' ? styles.sidePaneViewButtonActive : ''}`}
-                            onClick={() => onViewChange('details')}
-                        >
-                            Details
-                        </button>
-                        <button
-                            type="button"
-                            className={`${styles.sidePaneViewButton} ${view === 'notes' ? styles.sidePaneViewButtonActive : ''}`}
-                            onClick={() => onViewChange('notes')}
-                        >
-                            Notes
-                        </button>
-                    </div>
+                <div className={styles.sidePaneViewToggle} aria-label="Program side pane view">
+                    <button
+                        type="button"
+                        className={`${styles.sidePaneViewButton} ${view === 'details' ? styles.sidePaneViewButtonActive : ''}`}
+                        onClick={() => onViewChange('details')}
+                    >
+                        Details
+                    </button>
+                    <button
+                        type="button"
+                        className={`${styles.sidePaneViewButton} ${view === 'goals' ? styles.sidePaneViewButtonActive : ''}`}
+                        onClick={() => onViewChange('goals')}
+                    >
+                        Goals
+                    </button>
+                </div>
             </SidePaneHeader>
 
             {program && view === 'details' ? (
-                <>
+                <div className={styles.detailsPane}>
                     {program.description ? <p className={styles.description}>{program.description}</p> : null}
 
-                    <div className={styles.sidebarSlot}>
-                        <ProgramSidebar
-                            programMetrics={sidePaneData.programMetrics}
-                            activeBlock={sidePaneData.activeBlock}
-                            blockMetrics={sidePaneData.blockMetrics}
-                            programGoalSeeds={sidePaneData.programGoalSeeds}
-                            onGoalClick={onGoalClick || (() => {})}
-                            getGoalDetails={getGoalDetails}
-                            compact
-                            className={styles.embeddedSidebar}
-                        />
-                    </div>
-                </>
+                    <ProgramSidebar
+                        programMetrics={sidePaneData.programMetrics}
+                        activeBlock={sidePaneData.activeBlock}
+                        blockMetrics={sidePaneData.blockMetrics}
+                        programGoalSeeds={sidePaneData.programGoalSeeds}
+                        onGoalClick={onGoalClick || (() => {})}
+                        getGoalDetails={getGoalDetails}
+                        compact
+                        hideGoals
+                        className={styles.embeddedSidebarMetrics}
+                    />
+
+                    <SidePaneNotePanel
+                        notes={notes}
+                        isLoading={notesQuery.isLoading}
+                        error={notesQuery.error}
+                        onSubmit={onCreateNote}
+                        onEdit={notesQuery.updateNote}
+                        onDelete={notesQuery.deleteNote}
+                        onPin={notesQuery.pinNote}
+                        onUnpin={notesQuery.unpinNote}
+                        hasMore={notesQuery.hasMore}
+                        onLoadMore={notesQuery.loadNextPage}
+                        placeholder="Add a program note..."
+                        label="Program Notes"
+                    />
+                </div>
             ) : null}
 
-            {program && view === 'notes' ? (
-                <div className={styles.sidePaneNotes}>
-                    <NoteComposer
-                        rootId={rootId}
-                        onSubmit={onCreateNote}
-                        submitLabel="Save Program Note"
-                        hideLinkPanel
-                        bare
+            {program && view === 'goals' ? (
+                <div className={styles.goalsPane}>
+                    <ProgramSidebar
+                        programMetrics={sidePaneData.programMetrics}
+                        activeBlock={sidePaneData.activeBlock}
+                        blockMetrics={sidePaneData.blockMetrics}
+                        programGoalSeeds={sidePaneData.programGoalSeeds}
+                        onGoalClick={onGoalClick || (() => {})}
+                        getGoalDetails={getGoalDetails}
+                        compact
+                        hideMetrics
+                        className={styles.embeddedSidebar}
                     />
-                    <div className={styles.sidePaneNotesTimeline}>
-                        {notesQuery.isLoading ? (
-                            <div className={styles.sidePaneNotesStatus}>
-                                <h3>Loading notes</h3>
-                                <p>Pulling the latest notes for this program.</p>
-                            </div>
-                        ) : notesQuery.error ? (
-                            <div className={styles.sidePaneNotesStatus}>
-                                <h3>Notes unavailable</h3>
-                                <p>Program notes could not be loaded. Try refreshing or switching views.</p>
-                            </div>
-                        ) : (
-                            <NoteTimeline
-                                notes={notes}
-                                onEdit={notesQuery.updateNote}
-                                onDelete={notesQuery.deleteNote}
-                                onPin={notesQuery.pinNote}
-                                onUnpin={notesQuery.unpinNote}
-                                hasMore={notesQuery.hasMore}
-                                onLoadMore={notesQuery.loadNextPage}
-                                emptyMessage="No notes for this program yet."
-                                compact
-                            />
-                        )}
-                    </div>
                 </div>
             ) : null}
 
             {!program ? (
-                <>
-                    <div className={styles.emptySidePane}>
-                        <p>
-                            {view === 'notes'
-                                ? 'Select a program before writing notes.'
-                                : 'There is no program covering today.'}
-                        </p>
-                        <button className={styles.primaryButton} onClick={onCreate}>New Program</button>
-                    </div>
-                </>
+                <div className={styles.emptySidePane}>
+                    <p>There is no program covering today.</p>
+                    <button className={styles.primaryButton} onClick={onCreate}>New Program</button>
+                </div>
             ) : null}
         </aside>
     );
@@ -689,11 +676,6 @@ function ProgramCalendarPage() {
                     Blocks
                 </button>
             </div>
-            {viewMode === 'blocks' ? (
-                <HeaderButton variant="primary" onClick={handleAddBlockClick}>
-                    Add Block
-                </HeaderButton>
-            ) : null}
             <HeaderButton variant="secondary" onClick={() => setIsProgramOptionsOpen(true)}>
                 Program Options
             </HeaderButton>
@@ -721,9 +703,19 @@ function ProgramCalendarPage() {
                         subtitle={pageSubtitle}
                         hideTitleOnMobile={false}
                         titleAccessory={displayProgramStatus ? (
-                            <span className={`${styles.statusBadge} ${displayProgramStatus === 'active' ? styles.statusBadgeActive : styles.statusBadgeInactive}`}>
-                                {displayProgramStatus === 'active' ? 'Active' : 'Inactive'}
-                            </span>
+                            <>
+                                <span className={`${styles.statusBadge} ${displayProgramStatus === 'active' ? styles.statusBadgeActive : styles.statusBadgeInactive}`}>
+                                    {displayProgramStatus === 'active' ? 'Active' : 'Inactive'}
+                                </span>
+                                {blockMetrics ? (
+                                    <span
+                                        className={styles.blockBadge}
+                                        style={{ borderColor: blockMetrics.color, color: blockMetrics.color, background: `color-mix(in srgb, ${blockMetrics.color} 14%, transparent)` }}
+                                    >
+                                        {blockMetrics.name}
+                                    </span>
+                                ) : null}
+                            </>
                         ) : null}
                         actions={viewActions}
                     />
@@ -755,6 +747,7 @@ function ProgramCalendarPage() {
                                     onDeleteBlock={deleteBlock}
                                     onAddDay={handleAddDayClick}
                                     onGoalClick={openGoalModal}
+                                    onAddBlock={handleAddBlockClick}
                                 />
                             </div>
                         ) : (
@@ -945,15 +938,15 @@ function ProgramCalendarPage() {
                         <button
                             className={styles.optionButton}
                             onClick={() => {
-                                setSidePaneView('notes');
+                                setSidePaneView('goals');
                                 setIsSidePaneVisible(true);
                                 closeProgramOptions();
                             }}
                             disabled={!displayProgram}
                         >
-                            <span className={styles.optionTitle}>Program Notes</span>
+                            <span className={styles.optionTitle}>Program Goals</span>
                             <span className={styles.optionDescription}>
-                                Capture strategy, reflections, and planning notes for this program.
+                                View the goals associated with this program and track progress.
                             </span>
                         </button>
                     </div>

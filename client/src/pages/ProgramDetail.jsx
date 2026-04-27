@@ -182,6 +182,7 @@ const ProgramDetail = () => {
                 onDeleteBlock={deleteBlock}
                 onAddDay={handleAddDayClick}
                 onGoalClick={openGoalModal}
+                onAddBlock={handleAddBlockClick}
             />
         </div>
     );

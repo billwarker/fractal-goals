@@ -59,6 +59,7 @@ function ProgramBlockView({
     onDeleteBlock,
     onAddDay,
     onGoalClick,
+    onAddBlock,
 }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const { timezone } = useTimezone();
@@ -89,11 +90,12 @@ function ProgramBlockView({
 
     if (!blocks || blocks.length === 0) {
         return (
-            <EmptyState
-                className={styles.emptyState}
-                title="No blocks yet"
-                description="Add a block to start building this program."
-            />
+            <div className={styles.container}>
+                <button type="button" className={styles.addBlockButton} onClick={onAddBlock}>
+                    <span className={styles.addBlockIcon}>+</span>
+                    Add Block
+                </button>
+            </div>
         );
     }
 
@@ -337,6 +339,11 @@ function ProgramBlockView({
                     </Card>
                 );
             })}
+
+            <button type="button" className={styles.addBlockButton} onClick={onAddBlock}>
+                <span className={styles.addBlockIcon}>+</span>
+                Add Block
+            </button>
 
             <DeleteConfirmModal
                 isOpen={deleteModalOpen}

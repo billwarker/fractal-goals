@@ -1,0 +1,124 @@
+.panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.timelineHeader {
+    flex-shrink: 0;
+    padding: 14px var(--spacing-lg, 16px);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.notesList {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--spacing-lg, 16px);
+}
+
+.timelineLabel {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.empty {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    font-style: italic;
+    text-align: center;
+    padding: 8px 0;
+}
+
+.status {
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.status p {
+    margin: 0;
+}
+
+.composer {
+    flex-shrink: 0;
+    padding: var(--spacing-md, 12px) var(--spacing-lg, 16px) var(--spacing-lg, 16px);
+    background: var(--color-bg-sidebar);
+    border-top: 1px solid var(--color-border);
+}
+
+.composerForm {
+    background: var(--color-bg-secondary);
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+}
+
+.inputRow {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.textarea {
+    flex: 1;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border-hover);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--color-text-primary);
+    font-size: 14px;
+    resize: none;
+    line-height: 1.4;
+    min-height: 38px;
+    font-family: inherit;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.textarea:focus {
+    outline: none;
+    border-color: var(--color-brand-primary);
+    background: var(--color-bg-input);
+}
+
+.textarea::placeholder {
+    color: var(--color-text-muted);
+}
+
+.submitBtn {
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    color: var(--color-brand-primary);
+    width: 38px;
+    height: 38px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-size: 16px;
+    transition: background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.submitBtn:hover:not(:disabled) {
+    background: var(--color-bg-secondary);
+    border-color: var(--color-brand-primary);
+}
+
+.submitBtn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    color: var(--color-text-muted);
+}
+
+.hint {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--color-text-muted);
+    font-style: italic;
+}

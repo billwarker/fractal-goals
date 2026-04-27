@@ -47,6 +47,20 @@
     white-space: nowrap;
 }
 
+.blockBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border: 1px solid;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
 .statusBadgeActive {
     border-color: color-mix(in srgb, var(--color-brand-success) 62%, var(--color-border));
     background: color-mix(in srgb, var(--color-brand-success) 16%, transparent);
@@ -168,49 +182,7 @@
     line-height: 1.5;
 }
 
-.sidePaneNotes {
-    min-height: 0;
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: 14px;
-    padding: 16px;
-    overflow: hidden;
-}
 
-.sidePaneNotesTimeline {
-    min-height: 0;
-    flex: 1;
-    overflow-y: auto;
-    padding-right: 4px;
-}
-
-.sidePaneNotesStatus {
-    min-height: 120px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 6px;
-    padding: 18px;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    background: var(--color-bg-card);
-}
-
-.sidePaneNotesStatus h3 {
-    margin: 0;
-    color: var(--color-text-primary);
-    font-size: 15px;
-    font-weight: 700;
-    line-height: 1.25;
-}
-
-.sidePaneNotesStatus p {
-    margin: 0;
-    color: var(--color-text-secondary);
-    font-size: 13px;
-    line-height: 1.45;
-}
 
 .viewToggle {
     display: inline-flex;
@@ -498,6 +470,33 @@
     height: 100%;
     border-right: none;
     background: var(--color-bg-sidebar);
+}
+
+.embeddedSidebarMetrics {
+    width: 100%;
+    border-right: none;
+    background: var(--color-bg-sidebar);
+    flex-shrink: 0;
+}
+
+.detailsPane {
+    min-height: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.detailsPaneScroll {
+    flex-shrink: 0;
+}
+
+.goalsPane {
+    min-height: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .emptySidePane {

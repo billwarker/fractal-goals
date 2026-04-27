@@ -66,48 +66,50 @@ function SessionSidePane({
             <div className={styles.sidepaneContent}>
                 {mode === 'details' ? (
                     <div className={styles.detailsView}>
-                        {/* Session Metadata Panel */}
-                        <SessionInfoPanel />
+                        <div className={styles.detailsScroll}>
+                            {/* Session Metadata Panel */}
+                            <SessionInfoPanel />
 
-                        {/* Session Controls */}
-                        <div className={styles.sidebarActions}>
-                            <SessionCompletionButton
-                                onClick={details?.onToggleComplete}
-                                completed={details?.isCompleted}
-                                title="Mark Session Complete"
-                                className={!details?.isCompleted ? styles.completePendingButton : ''}
-                            />
-                            <Button
-                                onClick={details?.onOptions}
-                                variant="primary"
-                                title="Session Options"
-                                className={styles.optionsButton}
-                            >
-                                Options
-                            </Button>
-                            <Button
-                                onClick={details?.onPauseResume}
-                                variant="secondary"
-                                title={details?.isPaused ? "Resume Session" : "Pause Session"}
-                                disabled={details?.isCompleted}
-                                className={styles.pauseButton}
-                            >
-                                {details?.isPaused ? "Resume" : "Pause"}
-                            </Button>
-                            <Button
-                                onClick={details?.onDelete}
-                                variant="danger" // Red
-                                title="Delete Session"
-                                className={styles.deleteButton}
-                            >
-                                Delete
-                            </Button>
+                            {/* Session Controls */}
+                            <div className={styles.sidebarActions}>
+                                <SessionCompletionButton
+                                    onClick={details?.onToggleComplete}
+                                    completed={details?.isCompleted}
+                                    title="Mark Session Complete"
+                                    className={!details?.isCompleted ? styles.completePendingButton : ''}
+                                />
+                                <Button
+                                    onClick={details?.onOptions}
+                                    variant="primary"
+                                    title="Session Options"
+                                    className={styles.optionsButton}
+                                >
+                                    Options
+                                </Button>
+                                <Button
+                                    onClick={details?.onPauseResume}
+                                    variant="secondary"
+                                    title={details?.isPaused ? "Resume Session" : "Pause Session"}
+                                    disabled={details?.isCompleted}
+                                    className={styles.pauseButton}
+                                >
+                                    {details?.isPaused ? "Resume" : "Pause"}
+                                </Button>
+                                <Button
+                                    onClick={details?.onDelete}
+                                    variant="danger"
+                                    title="Delete Session"
+                                    className={styles.deleteButton}
+                                >
+                                    Delete
+                                </Button>
+                            </div>
+
+                            {/* Divider */}
+                            <div className={styles.divider}></div>
                         </div>
 
-                        {/* Divider */}
-                        <div className={styles.divider}></div>
-
-                        {/* Notes Management */}
+                        {/* Notes Management — fills remaining space, composer pinned to bottom */}
                         <NotesPanel
                             {...details?.notesPanelProps}
                         />
