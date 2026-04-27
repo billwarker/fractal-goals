@@ -135,13 +135,6 @@ function Sessions() {
     }, [selectedSessionId, visibleSessions]);
 
     useEffect(() => {
-        if (selectedSessionId || visibleSessions.length === 0) {
-            return;
-        }
-        setSelectedSessionId(visibleSessions[0].id);
-    }, [selectedSessionId, visibleSessions]);
-
-    useEffect(() => {
         if (selectedSessionId) {
             const element = document.getElementById(`session-card-${selectedSessionId}`);
             if (element) {
@@ -292,6 +285,7 @@ function Sessions() {
                 <PageHeader
                     title="Sessions"
                     subtitle="Query sessions by date range, completion, activity, and activity-linked goals."
+                    hideTitleOnMobile={false}
                     actions={(
                         <>
                             <HeaderButton variant="primary" onClick={() => navigate(`/${rootId}/manage-session-templates`)}>

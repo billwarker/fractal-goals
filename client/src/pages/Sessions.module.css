@@ -275,15 +275,11 @@
 
     .leftPanel {
         min-height: 0;
-    }
-
-    .pageHeader {
-        padding: 92px 12px 12px 12px;
-        position: sticky;
-        top: 0;
+        overflow: visible;
     }
 
     .sessionsList {
+        overflow-y: visible;
         padding: 12px;
         padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
         background-size: 16px 16px;
