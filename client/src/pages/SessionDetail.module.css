@@ -1,19 +1,26 @@
 /* SessionDetail.module.css */
 
 .sessionDetailContainer {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(300px, 30%);
-    gap: var(--spacing-2xl);
+    display: flex;
+    height: calc(100vh - var(--app-nav-height, 0px));
     width: 100%;
     position: relative;
-    padding: var(--spacing-xl);
     color: var(--color-text-primary);
+    background: var(--color-bg-app);
     box-sizing: border-box;
+    overflow: hidden;
 }
 
 .sessionMainContent {
+    flex: 1;
     min-width: 0;
+    overflow-y: auto;
+    padding: var(--spacing-xl);
     padding-bottom: 120px;
+    background-image:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+    background-size: 20px 20px;
 }
 
 .mobileSessionHeader {
@@ -21,7 +28,12 @@
 }
 
 .sessionSidebarWrapper {
-    position: relative;
+    width: 390px;
+    min-width: 0;
+    flex-shrink: 0;
+    border-left: 1px solid var(--color-border);
+    background: var(--color-bg-sidebar);
+    overflow: hidden;
 }
 
 .sessionSidebarHidden {
@@ -29,10 +41,8 @@
 }
 
 .sessionSidebarSticky {
-    position: sticky;
-    top: 0;
-    height: calc(100vh - var(--app-nav-height, 0px) - 48px);
-    overflow-y: auto;
+    height: 100%;
+    overflow: hidden;
 }
 
 .sessionSectionsList {
@@ -120,7 +130,7 @@
     align-items: center;
     padding: var(--spacing-md) var(--spacing-lg);
     border-bottom: 1px solid var(--color-border);
-    background: linear-gradient(180deg, rgba(79, 156, 249, 0.14), transparent);
+    background: var(--color-bg-sidebar);
 }
 
 .mobilePaneTitle {
@@ -190,40 +200,29 @@
 }
 
 @media (max-width: 1024px) {
-    .sessionDetailContainer {
-        grid-template-columns: 1fr;
-        padding: var(--spacing-lg);
-        padding-top: 84px;
-    }
-
-    .sessionSidebarSticky {
-        height: auto;
-        position: static;
-    }
-
     .autoSaveIndicator {
         right: 16px;
         bottom: 16px;
     }
 }
 
-@media (max-width: 640px) {
-    .sessionDetailContainer {
-        padding: var(--spacing-md);
-        gap: var(--spacing-lg);
-    }
-
-    .statusWrapper {
-        padding-top: var(--spacing-md);
-        padding-left: var(--spacing-md);
-        padding-right: var(--spacing-md);
-    }
-}
-
 @media (max-width: 768px) {
     .sessionDetailContainer {
-        grid-template-columns: 1fr;
+        display: block;
+        height: auto;
+        min-height: calc(100vh - var(--app-nav-height, 0px));
+        overflow: visible;
+    }
+
+    .sessionMainContent {
+        padding: var(--spacing-lg);
+        padding-top: 84px;
         padding-bottom: 96px;
+    }
+
+    .sessionSidebarSticky {
+        height: auto;
+        position: static;
     }
 
     .mobileSessionHeader {
@@ -324,5 +323,19 @@
 
     .autoSaveIndicator {
         bottom: 84px;
+    }
+}
+
+@media (max-width: 640px) {
+    .sessionMainContent {
+        padding: var(--spacing-md);
+        padding-bottom: 96px;
+        gap: var(--spacing-lg);
+    }
+
+    .statusWrapper {
+        padding-top: var(--spacing-md);
+        padding-left: var(--spacing-md);
+        padding-right: var(--spacing-md);
     }
 }

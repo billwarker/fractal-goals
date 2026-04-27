@@ -11,6 +11,7 @@ import TemplateBuilderModal from '../components/modals/TemplateBuilderModal';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import PageHeader from '../components/layout/PageHeader';
 import headerStyles from '../components/layout/PageHeader.module.css';
+import HeaderButton from '../components/layout/HeaderButton';
 import styles from './CreateSessionTemplate.module.css';
 
 /**
@@ -147,12 +148,9 @@ function CreateSessionTemplate() {
                 title="Manage Session Templates"
                 subtitle="Build reusable session structures from your activity library."
                 actions={(
-                    <button
-                        onClick={handleCreateClick}
-                        className={`${headerStyles.actionButton} ${headerStyles.primaryActionButton}`}
-                    >
+                    <HeaderButton variant="primary" onClick={handleCreateClick}>
                         + Create Template
-                    </button>
+                    </HeaderButton>
                 )}
             />
 
@@ -168,12 +166,9 @@ function CreateSessionTemplate() {
                         <p className={styles.emptyText}>
                             No session templates created yet
                         </p>
-                        <button
-                            onClick={handleCreateClick}
-                            className={`${headerStyles.actionButton} ${headerStyles.primaryActionButton} ${styles.createFirstButton}`}
-                        >
+                        <HeaderButton variant="primary" onClick={handleCreateClick} className={styles.createFirstButton}>
                             + Create Your First Template
-                        </button>
+                        </HeaderButton>
                     </div>
                 ) : (
                     <div className={styles.templatesGrid}>

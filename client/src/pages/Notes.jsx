@@ -18,9 +18,11 @@ import { useFractalTree } from '../hooks/useGoalQueries';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import ActivityFilterModal from '../components/common/ActivityFilterModal';
 import GoalTreePicker from '../components/common/GoalTreePicker';
+import SidePaneHeader from '../components/common/SidePaneHeader';
+import SidePaneHeaderButton from '../components/common/SidePaneHeaderButton';
 import useIsMobile from '../hooks/useIsMobile';
 import PageHeader from '../components/layout/PageHeader';
-import headerStyles from '../components/layout/PageHeader.module.css';
+import HeaderButton from '../components/layout/HeaderButton';
 import styles from './Notes.module.css';
 
 const NOTE_TYPE_OPTIONS = [
@@ -206,29 +208,23 @@ function Notes() {
                 subtitle={isLoading && notes.length === 0 ? '…' : `${total} note${total !== 1 ? 's' : ''}`}
                 actions={(
                     <>
-                        <button
-                            className={`${headerStyles.actionButton} ${headerStyles.primaryActionButton}`}
+                        <HeaderButton
+                            variant="primary"
                             onClick={() => { setComposing(true); setIsFiltersPaneOpen(true); }}
                             disabled={composing}
                         >
                             + Write Note
-                        </button>
+                        </HeaderButton>
                         {isMobile ? (
-                            <button
-                                className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
-                                onClick={() => setMobilePanelOpen((value) => !value)}
-                            >
+                            <HeaderButton variant="secondary" onClick={() => setMobilePanelOpen((value) => !value)}>
                                 {mobilePanelLabel}
-                            </button>
+                            </HeaderButton>
                         ) : (
-                            <button
-                                className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
-                                onClick={() => setIsFiltersPaneOpen(v => !v)}
-                            >
+                            <HeaderButton variant="secondary" onClick={() => setIsFiltersPaneOpen(v => !v)}>
                                 {isFiltersPaneOpen
                                     ? (composing ? 'Hide Associator' : 'Hide Filters')
                                     : (composing ? 'Show Associator' : 'Show Filters')}
-                            </button>
+                            </HeaderButton>
                         )}
                     </>
                 )}
@@ -359,21 +355,27 @@ function Notes() {
     /* ─── Right column filter panel ─── */
     const filterPanel = (
         <div className={styles.filterPanel}>
-            <div className={styles.filterPanelHeader}>
-                <div>
-                    <div className={styles.filterPanelTitle}>Filters</div>
-                    <div className={styles.filterPanelSubtitle}>
-                        {isLoading ? '…' : `${total} note${total !== 1 ? 's' : ''} shown`}
-                    </div>
-                </div>
-                <button
-                    className={styles.resetFiltersBtn}
-                    onClick={clearFilters}
-                    disabled={!hasActiveFilters}
-                >
-                    Reset Filters
-                </button>
-            </div>
+            <SidePaneHeader
+                title="Filters"
+                subtitle={isLoading ? '...' : `${total} note${total !== 1 ? 's' : ''} shown`}
+                actions={(
+                    <>
+                    <SidePaneHeaderButton
+                        variant="reset"
+                        onClick={clearFilters}
+                        disabled={!hasActiveFilters}
+                    >
+                        Reset Filters
+                    </SidePaneHeaderButton>
+                    <SidePaneHeaderButton
+                        onClick={() => setIsFiltersPaneOpen(false)}
+                        aria-label="Collapse filters panel"
+                    >
+                        Collapse
+                    </SidePaneHeaderButton>
+                    </>
+                )}
+            />
 
             {filterPanelBody}
         </div>
@@ -393,12 +395,7 @@ function Notes() {
 
     const composeLinkPanel = (
         <div className={styles.composeLinkCard}>
-            <div className={styles.filterPanelHeader}>
-                <div>
-                    <div className={styles.filterPanelTitle}>Link Note</div>
-                    <div className={styles.filterPanelSubtitle}>Goal or Activity</div>
-                </div>
-            </div>
+            <SidePaneHeader title="Link Note" subtitle="Goal or Activity" />
             {composeLinkPanelBody}
         </div>
     );

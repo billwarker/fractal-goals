@@ -13,6 +13,7 @@ import GroupBuilderModal from '../components/modals/GroupBuilderModal';
 import Linkify from '../components/atoms/Linkify';
 import PageHeader from '../components/layout/PageHeader';
 import headerStyles from '../components/layout/PageHeader.module.css';
+import HeaderButton from '../components/layout/HeaderButton';
 import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
 import { buildGroupReorderPayload } from '../utils/manageActivities';
 import styles from './ManageActivities.module.css'; // Import CSS Module
@@ -385,24 +386,15 @@ function ManageActivities() {
                 subtitle="Create, group, and reuse activity definitions across sessions and templates."
                 actions={(
                     <>
-                        <button
-                            onClick={() => setShowMetricsModal(true)}
-                            className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
-                        >
+                        <HeaderButton variant="secondary" onClick={() => setShowMetricsModal(true)}>
                             Manage Metrics
-                        </button>
-                        <button
-                            onClick={handleCreateGroup}
-                            className={`${headerStyles.actionButton} ${headerStyles.tertiaryActionButton}`}
-                        >
+                        </HeaderButton>
+                        <HeaderButton variant="tertiary" onClick={handleCreateGroup}>
                             + Create Group
-                        </button>
-                        <button
-                            onClick={handleCreateClick}
-                            className={`${headerStyles.actionButton} ${headerStyles.primaryActionButton}`}
-                        >
+                        </HeaderButton>
+                        <HeaderButton variant="primary" onClick={handleCreateClick}>
                             + Create Activity
-                        </button>
+                        </HeaderButton>
                     </>
                 )}
             />

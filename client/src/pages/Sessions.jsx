@@ -16,7 +16,7 @@ import EmptyState from '../components/common/EmptyState';
 import LoadingState from '../components/common/LoadingState';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import PageHeader from '../components/layout/PageHeader';
-import headerStyles from '../components/layout/PageHeader.module.css';
+import HeaderButton from '../components/layout/HeaderButton';
 import { flattenGoals } from '../utils/goalHelpers';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import { fractalApi } from '../utils/api';
@@ -294,24 +294,19 @@ function Sessions() {
                     subtitle="Query sessions by date range, completion, activity, and activity-linked goals."
                     actions={(
                         <>
-                            <button
-                                onClick={() => navigate(`/${rootId}/manage-session-templates`)}
-                                className={`${headerStyles.actionButton} ${headerStyles.primaryActionButton}`}
-                            >
+                            <HeaderButton variant="primary" onClick={() => navigate(`/${rootId}/manage-session-templates`)}>
                                 Manage Session Templates
-                            </button>
-                            <button
-                                onClick={() => navigate(`/${rootId}/manage-activities`)}
-                                className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
-                            >
+                            </HeaderButton>
+                            <HeaderButton variant="secondary" onClick={() => navigate(`/${rootId}/manage-activities`)}>
                                 Manage Activities
-                            </button>
-                            <button
+                            </HeaderButton>
+                            <HeaderButton
+                                variant="secondary"
                                 onClick={() => setIsFiltersPaneOpen((prev) => !prev)}
-                                className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton} ${styles.notesToggleButton}`}
+                                className={styles.notesToggleButton}
                             >
                                 {isFiltersPaneOpen ? 'Hide Filters' : 'Show Filters'}
-                            </button>
+                            </HeaderButton>
                         </>
                     )}
                 />

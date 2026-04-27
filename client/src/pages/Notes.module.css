@@ -85,50 +85,6 @@
     overflow: hidden;
 }
 
-.filterPanelHeader {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    padding: 16px 16px 14px;
-    border-bottom: 1px solid var(--color-border);
-    flex-shrink: 0;
-    gap: 10px;
-}
-
-.filterPanelTitle {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    line-height: 1.2;
-}
-
-.filterPanelSubtitle {
-    font-size: 12px;
-    color: var(--color-text-muted);
-    margin-top: 2px;
-}
-
-.resetFiltersBtn {
-    padding: 6px 10px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm, 6px);
-    background: var(--color-bg-card, var(--color-bg-input));
-    color: var(--color-text-primary);
-    font-size: 12px;
-    cursor: pointer;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.resetFiltersBtn:hover:not(:disabled) {
-    border-color: var(--color-text-muted);
-}
-
-.resetFiltersBtn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
 .filterPanelBody {
     flex: 1;
     overflow-y: auto;

@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import SidePaneHeader from '../common/SidePaneHeader';
+import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
 import SessionCalendarHeatmap from './SessionCalendarHeatmap';
 import SessionFilterSelectionModal from './SessionFilterSelectionModal';
 import './SessionsQuerySidebar.css';
@@ -45,35 +47,29 @@ function SessionsQuerySidebar({
 
     return (
         <div className="sessions-query-sidebar">
-            <div className="sessions-query-sidebar-header">
-                <div>
-                    <h3 className="sessions-query-sidebar-title">Filters</h3>
-                    <div className="sessions-query-sidebar-subtitle">
-                        {visibleSessionsCount} shown
-                        {totalSessionsCount ? ` of ${totalSessionsCount}` : ''}
-                    </div>
-                </div>
-                <div className="sessions-query-sidebar-header-actions">
-                    <button
-                        type="button"
-                        className="sessions-query-sidebar-reset"
+            <SidePaneHeader
+                title="Filters"
+                subtitle={`${visibleSessionsCount} shown${totalSessionsCount ? ` of ${totalSessionsCount}` : ''}`}
+                actions={(
+                    <>
+                    <SidePaneHeaderButton
+                        variant="reset"
                         onClick={() => onResetFilters?.()}
                         disabled={!hasActiveFilters}
                     >
                         Reset Filters
-                    </button>
+                    </SidePaneHeaderButton>
                     {onToggleCollapse && (
-                        <button
-                            type="button"
-                            className="sessions-query-sidebar-collapse"
+                        <SidePaneHeaderButton
                             onClick={onToggleCollapse}
                             aria-label="Collapse filters panel"
                         >
                             {isMobile ? 'Hide' : 'Collapse'}
-                        </button>
+                        </SidePaneHeaderButton>
                     )}
-                </div>
-            </div>
+                    </>
+                )}
+            />
 
             <div className="sessions-query-sidebar-content">
                 <section className="sessions-query-sidebar-section">

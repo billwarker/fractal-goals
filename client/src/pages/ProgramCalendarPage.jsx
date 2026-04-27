@@ -8,6 +8,10 @@ import ProgramCalendarView from '../components/programs/ProgramCalendarView';
 import ProgramSidebar from '../components/programs/ProgramSidebar';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/atoms/Modal';
+import SidePaneHeader from '../components/common/SidePaneHeader';
+import SidePaneHeaderButton from '../components/common/SidePaneHeaderButton';
+import PageHeader from '../components/layout/PageHeader';
+import HeaderButton from '../components/layout/HeaderButton';
 import { NoteComposer, NoteTimeline } from '../components/notes';
 import { useGoals } from '../contexts/GoalsContext';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
@@ -182,8 +186,15 @@ function ProgramSidePane({
 
     return (
         <aside className={styles.sidePane} aria-label="Program side pane">
-            <div className={styles.sidePaneHeader}>
-                <div className={styles.sidePaneHeaderCopy}>
+            <SidePaneHeader
+                actions={(
+                    <SidePaneHeaderButton
+                        onClick={onCollapse}
+                    >
+                        Collapse
+                    </SidePaneHeaderButton>
+                )}
+            >
                     <div className={styles.sidePaneViewToggle} aria-label="Program side pane view">
                         <button
                             type="button"
@@ -200,14 +211,7 @@ function ProgramSidePane({
                             Notes
                         </button>
                     </div>
-                </div>
-                <button
-                    className={styles.sidePaneCollapseButton}
-                    onClick={onCollapse}
-                >
-                    Collapse
-                </button>
-            </div>
+            </SidePaneHeader>
 
             {program && view === 'details' ? (
                 <>
@@ -669,84 +673,60 @@ function ProgramCalendarPage() {
         programs: 'Other Programs',
     }[programOptionsView] || 'Program Options';
 
-    const viewActions = (
-        <div className={styles.headerActions}>
-            {displayProgram ? (
-                <>
-                    <div className={styles.viewToggle} aria-label="Program view">
-                        <button
-                            className={`${styles.toggleButton} ${viewMode === 'calendar' ? styles.toggleButtonActive : ''}`}
-                            onClick={() => setViewMode('calendar')}
-                        >
-                            Calendar
-                        </button>
-                        <button
-                            className={`${styles.toggleButton} ${viewMode === 'blocks' ? styles.toggleButtonActive : ''}`}
-                            onClick={() => setViewMode('blocks')}
-                        >
-                            Blocks
-                        </button>
-                    </div>
-                    {viewMode === 'blocks' ? (
-                        <button
-                            className={styles.primaryButton}
-                            onClick={handleAddBlockClick}
-                        >
-                            Add Block
-                        </button>
-                    ) : null}
-                    <button
-                        className={styles.secondaryButton}
-                        onClick={() => setIsProgramOptionsOpen(true)}
-                    >
-                        Program Options
-                    </button>
-                    <button
-                        className={styles.secondaryButton}
-                        onClick={() => setIsSidePaneVisible((visible) => !visible)}
-                    >
-                        {isSidePaneVisible ? 'Hide Sidebar' : 'Show Sidebar'}
-                    </button>
-                </>
-            ) : (
-                <>
-                    <button
-                        className={styles.secondaryButton}
-                        onClick={() => setIsProgramOptionsOpen(true)}
-                    >
-                        Program Options
-                    </button>
-                    <button
-                        className={styles.secondaryButton}
-                        onClick={() => setIsSidePaneVisible((visible) => !visible)}
-                    >
-                        {isSidePaneVisible ? 'Hide Sidebar' : 'Show Sidebar'}
-                    </button>
-                </>
-            )}
-        </div>
+    const viewActions = displayProgram ? (
+        <>
+            <div className={styles.viewToggle} aria-label="Program view">
+                <button
+                    className={`${styles.toggleButton} ${viewMode === 'calendar' ? styles.toggleButtonActive : ''}`}
+                    onClick={() => setViewMode('calendar')}
+                >
+                    Calendar
+                </button>
+                <button
+                    className={`${styles.toggleButton} ${viewMode === 'blocks' ? styles.toggleButtonActive : ''}`}
+                    onClick={() => setViewMode('blocks')}
+                >
+                    Blocks
+                </button>
+            </div>
+            {viewMode === 'blocks' ? (
+                <HeaderButton variant="primary" onClick={handleAddBlockClick}>
+                    Add Block
+                </HeaderButton>
+            ) : null}
+            <HeaderButton variant="secondary" onClick={() => setIsProgramOptionsOpen(true)}>
+                Program Options
+            </HeaderButton>
+            <HeaderButton variant="secondary" onClick={() => setIsSidePaneVisible((visible) => !visible)}>
+                {isSidePaneVisible ? 'Hide Sidebar' : 'Show Sidebar'}
+            </HeaderButton>
+        </>
+    ) : (
+        <>
+            <HeaderButton variant="secondary" onClick={() => setIsProgramOptionsOpen(true)}>
+                Program Options
+            </HeaderButton>
+            <HeaderButton variant="secondary" onClick={() => setIsSidePaneVisible((visible) => !visible)}>
+                {isSidePaneVisible ? 'Hide Sidebar' : 'Show Sidebar'}
+            </HeaderButton>
+        </>
     );
 
     return (
         <div className={styles.container}>
             <div className={`${styles.workspace} ${!isSidePaneVisible ? styles.workspaceNoSidePane : ''}`}>
                 <div className={styles.mainColumn}>
-                    <header className={styles.header}>
-                        <div className={styles.titleGroup}>
-                            <div className={styles.headerCopy}>
-                                <div className={styles.titleRow}>
-                                    <h1 className={styles.pageTitle}>{pageTitle}</h1>
-                                    {displayProgramStatus ? (
-                                        <span className={`${styles.statusBadge} ${displayProgramStatus === 'active' ? styles.statusBadgeActive : styles.statusBadgeInactive}`}>
-                                            {displayProgramStatus === 'active' ? 'Active' : 'Inactive'}
-                                        </span>
-                                    ) : null}
-                                </div>
-                                {pageSubtitle ? <p className={styles.pageSubtitle}>{pageSubtitle}</p> : null}
-                            </div>
-                        </div>
-                        {viewActions}
-                    </header>
+                    <PageHeader
+                        title={pageTitle}
+                        subtitle={pageSubtitle}
+                        hideTitleOnMobile={false}
+                        titleAccessory={displayProgramStatus ? (
+                            <span className={`${styles.statusBadge} ${displayProgramStatus === 'active' ? styles.statusBadgeActive : styles.statusBadgeInactive}`}>
+                                {displayProgramStatus === 'active' ? 'Active' : 'Inactive'}
+                            </span>
+                        ) : null}
+                        actions={viewActions}
+                    />
 
                     <div className={styles.calendarPanel}>
                         {loading || (viewMode === 'blocks' && detailLoading) ? (

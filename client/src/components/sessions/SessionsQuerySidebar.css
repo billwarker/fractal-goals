@@ -5,57 +5,6 @@
     background: var(--color-bg-sidebar);
 }
 
-.sessions-query-sidebar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 16px;
-    border-bottom: 1px solid var(--color-border);
-}
-
-.sessions-query-sidebar-header-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-}
-
-.sessions-query-sidebar-title {
-    margin: 0 0 4px 0;
-    font-size: 16px;
-    color: var(--color-text-primary);
-}
-
-.sessions-query-sidebar-subtitle {
-    font-size: 12px;
-    color: var(--color-text-muted);
-}
-
-.sessions-query-sidebar-collapse {
-    padding: 6px 10px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm);
-    background: transparent;
-    color: var(--color-text-muted);
-    cursor: pointer;
-}
-
-.sessions-query-sidebar-reset {
-    padding: 6px 10px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm);
-    background: var(--color-bg-card);
-    color: var(--color-text-primary);
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.sessions-query-sidebar-reset:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
 .sessions-query-sidebar-content {
     flex: 1;
     overflow-y: auto;
@@ -344,17 +293,6 @@
 }
 
 @media (max-width: 768px) {
-    .sessions-query-sidebar-header {
-        /* 24px top accounts for the drag handle (10px offset + 4px handle + gap) */
-        padding: 24px 16px 14px 16px;
-    }
-
-    .sessions-query-sidebar-collapse,
-    .sessions-query-sidebar-reset {
-        min-height: 44px;
-        padding: 8px 14px;
-    }
-
     .sessions-query-date-grid {
         grid-template-columns: 1fr;
     }

@@ -2,30 +2,21 @@
 
 .sessionSidepane {
     width: 100%;
+    height: 100%;
     background: var(--color-bg-sidebar);
-    backdrop-filter: blur(4px);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-md);
     display: flex;
     flex-direction: column;
-    max-height: calc(100vh - 120px);
     box-sizing: border-box;
+    overflow: hidden;
     overflow-x: hidden;
 }
 
 .sessionSidepaneEmbedded {
+    height: auto;
     border: none;
     border-radius: 0;
     box-shadow: none;
     max-height: none;
-}
-
-.sidepaneHeader {
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-bottom: 1px solid var(--color-border);
-    flex-shrink: 0;
-    background: linear-gradient(180deg, rgba(79, 156, 249, 0.1), transparent);
 }
 
 .sidepaneTabs {
@@ -64,6 +55,7 @@
 
 .sidepaneContent {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: var(--spacing-lg);
 }
@@ -141,7 +133,7 @@
 
 @media (max-width: 1024px) {
     .sessionSidepane {
-        max-height: calc(100vh - 100px);
+        max-height: none;
     }
 }
 

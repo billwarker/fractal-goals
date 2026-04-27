@@ -11,6 +11,7 @@ import React from 'react';
 import SessionInfoPanel from './SessionInfoPanel';
 import Button from '../atoms/Button';
 import SessionCompletionButton from '../common/SessionCompletionButton';
+import SidePaneHeader from '../common/SidePaneHeader';
 import GoalsPanel from './GoalsPanel';
 import NotesPanel from './NotesPanel';
 import HistoryPanel from './HistoryPanel';
@@ -31,7 +32,7 @@ function SessionSidePane({
         <div className={`${styles.sessionSidepane} ${embedded ? styles.sessionSidepaneEmbedded : ''}`}>
             {/* Mode Toggle Header */}
             {showModeTabs && (
-                <div className={styles.sidepaneHeader}>
+                <SidePaneHeader>
                     <div className={styles.sidepaneTabs}>
                         <button
                             type="button"
@@ -58,7 +59,7 @@ function SessionSidePane({
                             History
                         </button>
                     </div>
-                </div>
+                </SidePaneHeader>
             )}
 
             {/* Mode Content */}

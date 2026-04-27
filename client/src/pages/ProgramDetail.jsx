@@ -7,7 +7,7 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import ProgramSidebar from '../components/programs/ProgramSidebar';
 import ProgramBlockView from '../components/programs/ProgramBlockView';
 import PageHeader from '../components/layout/PageHeader';
-import headerStyles from '../components/layout/PageHeader.module.css';
+import HeaderButton from '../components/layout/HeaderButton';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useProgramData } from '../hooks/useProgramData';
 import { useProgramGoalSets } from '../hooks/useProgramGoalSets';
@@ -193,26 +193,17 @@ const ProgramDetail = () => {
                 subtitle={`${formatDate(program.start_date)} - ${formatDate(program.end_date)}`}
                 className={styles.header}
                 actions={(
-                    <div className={styles.headerActions}>
-                    <button
-                        onClick={() => navigate(`/${rootId}/programs?show_all=true`)}
-                            className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
-                    >
+                    <>
+                        <HeaderButton variant="secondary" onClick={() => navigate(`/${rootId}/programs?show_all=true`)}>
                             Back
-                    </button>
-                    <button
-                        onClick={handleAddBlockClick}
-                            className={`${headerStyles.actionButton} ${headerStyles.primaryActionButton}`}
-                    >
-                        Add Block
-                    </button>
-                    <button
-                        onClick={() => setShowEditBuilder(true)}
-                            className={`${headerStyles.actionButton} ${headerStyles.secondaryActionButton}`}
-                    >
-                        Edit Program
-                    </button>
-                    </div>
+                        </HeaderButton>
+                        <HeaderButton variant="primary" onClick={handleAddBlockClick}>
+                            Add Block
+                        </HeaderButton>
+                        <HeaderButton variant="secondary" onClick={() => setShowEditBuilder(true)}>
+                            Edit Program
+                        </HeaderButton>
+                    </>
                 )}
             />
 
