@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
@@ -283,6 +283,7 @@ function ProgramSidePane({
 
 function ProgramCalendarPage() {
     const { rootId, programId } = useParams();
+    const location = useLocation();
     const { setActiveRootId } = useGoals();
     const { getGoalColor, getGoalTextColor } = useGoalLevels();
     const { timezone } = useTimezone();
@@ -391,6 +392,12 @@ function ProgramCalendarPage() {
         handleEventClick: handleProgramEventClick,
         handleAddChildGoal,
     } = useProgramDetailController({ goals: displayGoals });
+
+    useEffect(() => {
+        if (!rootId || location.pathname.startsWith(`/${rootId}/programs`)) return;
+
+        closeGoalModal();
+    }, [closeGoalModal, location.pathname, rootId]);
 
     const {
         sortedBlocks,

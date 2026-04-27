@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import GoalDetailModal from '../GoalDetailModal';
+import { GOAL_DETAIL_NAVIGATION_EVENT } from '../../utils/navigationEvents';
 
 const { mockUseGoalForm, mockNotify, mockGoalAssociations, mockGoalMetrics, mockGoalDurations } = vi.hoisted(() => ({
     mockUseGoalForm: vi.fn(),
@@ -198,6 +199,31 @@ describe('GoalDetailModal smoke coverage', () => {
             expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
             expect(screen.getByText('goal options view')).toBeInTheDocument();
         }, { timeout: 5000 });
+    });
+
+    it('closes when app navigation begins', () => {
+        const onClose = vi.fn();
+
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={onClose}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    attributes: { id: 'goal-1', type: 'ShortTermGoal' },
+                }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={vi.fn()}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                treeData={[]}
+            />
+        );
+
+        window.dispatchEvent(new CustomEvent(GOAL_DETAIL_NAVIGATION_EVENT));
+
+        expect(onClose).toHaveBeenCalled();
     });
 
     it('renders create mode and submits through onCreate', async () => {

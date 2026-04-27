@@ -19,6 +19,7 @@ import GoalHeader from './goals/GoalHeader';
 import GoalViewMode from './goals/GoalViewMode';
 import GoalEditForm from './goals/GoalEditForm';
 import GoalIcon from './atoms/GoalIcon';
+import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
 
 import styles from './GoalDetailModal.module.css';
 
@@ -179,6 +180,18 @@ function GoalDetailModal({
         onToggleCompletion,
         resetForm,
     });
+
+    React.useEffect(() => {
+        const handleNavigationIntent = () => {
+            if (displayMode === 'modal' && !isOpen) return;
+            handleClose();
+        };
+
+        window.addEventListener(GOAL_DETAIL_NAVIGATION_EVENT, handleNavigationIntent);
+        return () => {
+            window.removeEventListener(GOAL_DETAIL_NAVIGATION_EVENT, handleNavigationIntent);
+        };
+    }, [displayMode, handleClose, isOpen]);
 
     // Use centralized React Query hooks for fetches
     const {

@@ -36,7 +36,7 @@
 /* Modal Structure */
 .modalOverlay {
     position: fixed;
-    top: 0;
+    top: var(--app-nav-height, 0px);
     left: 0;
     right: 0;
     bottom: 0;
@@ -56,7 +56,7 @@
     /* Explicit 24px to match sticky header negative margins */
     max-width: 700px;
     width: 90%;
-    max-height: 90vh;
+    max-height: calc(90vh - var(--app-nav-height, 0px));
     overflow-y: auto;
     overflow-x: hidden;
     /* Prevent horizontal scrolling */

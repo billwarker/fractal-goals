@@ -26,6 +26,7 @@ const SettingsModal = lazyWithRetry(() => import('./components/modals/SettingsMo
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 
 import { usePageTitle } from './hooks/usePageTitle';
+import { dismissGoalDetailsForNavigation } from './utils/navigationEvents';
 
 // Navigation header component defined outside of App to avoid re-declaration
 const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
@@ -93,6 +94,14 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
     const logsNavItem = { path: `/${rootId}/logs`, label: 'LOGS' };
 
     const isActive = (path) => location.pathname.startsWith(path);
+    const handleNavigate = (path) => {
+        dismissGoalDetailsForNavigation();
+        navigate(path);
+    };
+    const handleOpenSettings = () => {
+        dismissGoalDetailsForNavigation();
+        onOpenSettings();
+    };
 
     if (isMobile) {
         return (
@@ -101,7 +110,7 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                     <div className={styles.mobileControlsRow}>
                         <button
                             className={`${styles.addSessionBtn} ${styles.mobileBtn} ${styles.mobileTopAddBtn}`}
-                            onClick={() => navigate(`/${rootId}/create-session`)}
+                            onClick={() => handleNavigate(`/${rootId}/create-session`)}
                         >
                             + ADD SESSION
                         </button>
@@ -110,7 +119,7 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                             <button
                                 key={item.path}
                                 className={`nav-text-link ${styles.mobileBtn} ${isActive(item.path) ? 'active' : ''}`}
-                                onClick={() => navigate(item.path)}
+                                onClick={() => handleNavigate(item.path)}
                             >
                                 {item.label}
                             </button>
@@ -118,16 +127,16 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
 
                         <button
                             className={`nav-text-link ${styles.mobileBtn} ${isActive(logsNavItem.path) ? 'active' : ''}`}
-                            onClick={() => navigate(logsNavItem.path)}
+                            onClick={() => handleNavigate(logsNavItem.path)}
                         >
                             {logsNavItem.label}
                         </button>
 
-                        <button className={`nav-text-link ${styles.mobileBtn}`} onClick={onOpenSettings}>
+                        <button className={`nav-text-link ${styles.mobileBtn}`} onClick={handleOpenSettings}>
                             SETTINGS
                         </button>
 
-                        <button className={`nav-text-link home-link ${styles.mobileBtn}`} onClick={() => navigate('/')}>
+                        <button className={`nav-text-link home-link ${styles.mobileBtn}`} onClick={() => handleNavigate('/')}>
                             EXIT
                         </button>
                     </div>
@@ -145,7 +154,7 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
 
                     <button
                         className={styles.addSessionBtn}
-                        onClick={() => navigate(`/${rootId}/create-session`)}
+                        onClick={() => handleNavigate(`/${rootId}/create-session`)}
                     >
                         + ADD SESSION
                     </button>
@@ -154,7 +163,7 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                         <button
                             key={item.path}
                             className={`nav-text-link ${isActive(item.path) ? 'active' : ''}`}
-                            onClick={() => navigate(item.path)}
+                            onClick={() => handleNavigate(item.path)}
                         >
                             {item.label}
                         </button>
@@ -174,18 +183,18 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                     <div className={`nav-separator ${styles.navSeparator}`}></div>
                     <button
                         className={`nav-text-link ${isActive(logsNavItem.path) ? 'active' : ''}`}
-                        onClick={() => navigate(logsNavItem.path)}
+                        onClick={() => handleNavigate(logsNavItem.path)}
                     >
                         {logsNavItem.label}
                     </button>
 
                     <div className={`nav-separator ${styles.navSeparator}`}></div>
-                    <button className="nav-text-link" onClick={onOpenSettings}>
+                    <button className="nav-text-link" onClick={handleOpenSettings}>
                         {isMobile ? 'SET' : 'SETTINGS'}
                     </button>
 
                     <div className={`nav-separator ${styles.navSeparator}`}></div>
-                    <button className="nav-text-link home-link" onClick={() => navigate('/')}>
+                    <button className="nav-text-link home-link" onClick={() => handleNavigate('/')}>
                         {isMobile ? 'EXIT' : 'EXIT TO HOME'}
                     </button>
                 </div>

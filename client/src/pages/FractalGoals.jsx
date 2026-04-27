@@ -1,5 +1,5 @@
 import React, { Suspense, useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import Sidebar from '../components/Sidebar';
 import ErrorBoundary from '../components/ErrorBoundary';
@@ -45,6 +45,7 @@ function FractalGoals() {
 
     const { rootId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
 
     // Contexts
     const {
@@ -221,6 +222,9 @@ function FractalGoals() {
         }
     };
 
+    if (rootId && location.pathname !== `/${rootId}/goals`) {
+        return null;
+    }
 
     if (loading || !fractalData) {
         return (
