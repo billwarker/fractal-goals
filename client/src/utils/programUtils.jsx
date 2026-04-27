@@ -27,13 +27,18 @@ export const isBlockActive = (block) => {
  */
 export const ActiveBlockBadge = () => (
     <span style={{
-        background: '#2e7d32',
-        color: 'white',
-        padding: '2px 6px',
-        borderRadius: '3px',
-        fontSize: '10px',
-        fontWeight: 600,
-        textTransform: 'uppercase'
+        display: 'inline-flex',
+        alignItems: 'center',
+        minHeight: '22px',
+        padding: '0 8px',
+        border: '1px solid color-mix(in srgb, var(--color-brand-success) 62%, var(--color-border))',
+        borderRadius: '999px',
+        background: 'color-mix(in srgb, var(--color-brand-success) 16%, transparent)',
+        color: 'var(--color-brand-success)',
+        fontSize: '11px',
+        fontWeight: 700,
+        lineHeight: 1,
+        whiteSpace: 'nowrap',
     }}>
         Active
     </span>

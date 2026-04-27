@@ -22,7 +22,6 @@ import SessionSectionGrid from './SessionSectionGrid';
 import ActivityCard from './ActivityCard';
 import styles from './SessionCardExpanded.module.css';
 import {
-    getReadableTextColor,
     getTemplateColor,
     isQuickSession,
 } from '../../utils/sessionRuntime';
@@ -141,7 +140,6 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     const sessionData = session.attributes?.session_data;
     const quickSession = isQuickSession(session);
     const templateColor = getTemplateColor(session);
-    const templateTextColor = getReadableTextColor(templateColor);
     const sessionStart = sessionData?.session_start || session?.session_start || session?.attributes?.session_start;
     const sessionEnd = sessionData?.session_end || session?.session_end || session?.attributes?.session_end;
     const shortTermGoals = session.short_term_goals || [];
@@ -314,7 +312,11 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                                 ? `/${rootId}/sessions?quickSessionId=${session.id}`
                                 : `/${rootId}/session/${session.id}`}
                             className={`${styles.cardHeaderTitle} ${sessionData?.template_name ? styles.cardHeaderTitleTemplate : ''}`}
-                            style={sessionData?.template_name ? { backgroundColor: templateColor, color: templateTextColor } : undefined}
+                            style={sessionData?.template_name ? {
+                                borderColor: templateColor,
+                                color: templateColor,
+                                background: `color-mix(in srgb, ${templateColor} 14%, transparent)`,
+                            } : undefined}
                         >
                             {session.name}
                         </Link>

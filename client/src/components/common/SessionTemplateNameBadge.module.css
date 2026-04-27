@@ -3,23 +3,28 @@
     align-items: center;
     width: fit-content;
     max-width: 100%;
-    border-radius: 8px;
+    border-radius: 999px;
+    border: 1px solid;
     overflow-wrap: anywhere;
-    line-height: 1.3;
+    line-height: 1;
     font-weight: 700;
+    white-space: nowrap;
 }
 
 .sizeSm {
-    padding: 6px 10px;
-    font-size: 14px;
+    padding: 0 8px;
+    min-height: 20px;
+    font-size: 11px;
 }
 
 .sizeMd {
-    padding: 8px 12px;
-    font-size: 16px;
+    padding: 0 10px;
+    min-height: 24px;
+    font-size: 12px;
 }
 
 .sizeLg {
-    padding: 8px 12px;
-    font-size: 18px;
+    padding: 0 12px;
+    min-height: 28px;
+    font-size: 14px;
 }

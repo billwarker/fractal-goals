@@ -43,8 +43,9 @@
 
 .cardHeaderTitleTemplate {
     max-width: 100%;
-    padding: 6px 10px;
-    border-radius: 6px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid;
     line-height: 1.3;
 }
 

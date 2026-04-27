@@ -10,6 +10,7 @@ import Button from '../atoms/Button';
 import { Heading } from '../atoms/Typography';
 import Input from '../atoms/Input';
 import { formatClockDuration } from '../../utils/sessionTime';
+import { getTemplateColor } from '../../utils/sessionRuntime';
 
 import styles from './SessionInfoPanel.module.css';
 
@@ -29,6 +30,7 @@ function SessionInfoPanel() {
     const [editValue, setEditValue] = useState('');
     const [saving, setSaving] = useState(false);
     const { timezone } = useTimezone();
+    const templateColor = getTemplateColor(session);
 
     const formatDate = (dateString) => {
         if (!dateString) return '—';
@@ -85,7 +87,20 @@ function SessionInfoPanel() {
         <div className={styles.sessionInfoPanel}>
             {/* Session Title */}
             <div className={styles.sessionInfoTitle}>
-                <Heading level={2}>{session.name}</Heading>
+                <Heading level={2}>
+                    {templateColor ? (
+                        <span
+                            className={styles.templateBadge}
+                            style={{
+                                borderColor: templateColor,
+                                color: templateColor,
+                                background: `color-mix(in srgb, ${templateColor} 14%, transparent)`,
+                            }}
+                        >
+                            {session.name}
+                        </span>
+                    ) : session.name}
+                </Heading>
                 <Button
                     variant="ghost"
                     size="sm"

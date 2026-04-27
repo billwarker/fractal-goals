@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { formatDateInTimezone } from '../../utils/dateUtils';
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { getReadableTextColor, getTemplateColor } from '../../utils/sessionRuntime';
+import { getTemplateColor } from '../../utils/sessionRuntime';
 import './SessionCard.css';
 
 function SessionCard({
@@ -26,7 +26,6 @@ function SessionCard({
 
     const sessionData = session.attributes?.session_data || session.session_data || {};
     const templateColor = getTemplateColor(session);
-    const templateTextColor = getReadableTextColor(templateColor);
     const sessionGoals = [
         ...(Array.isArray(session.short_term_goals) ? session.short_term_goals : []),
         ...(Array.isArray(session.immediate_goals) ? session.immediate_goals : []),
@@ -99,7 +98,11 @@ function SessionCard({
             {sessionData.template_name && (
                 <div
                     className="session-card-template"
-                    style={{ backgroundColor: templateColor, color: templateTextColor }}
+                    style={{
+                        borderColor: templateColor,
+                        color: templateColor,
+                        background: `color-mix(in srgb, ${templateColor} 14%, transparent)`,
+                    }}
                 >
                     {sessionData.template_name}
                 </div>
