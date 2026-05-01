@@ -43,7 +43,7 @@ def test_update_goal_completion_sets_and_clears_completed_session_id(
     assert uncompleted_goal.completed_session_id is None
 
 
-def test_update_goal_completion_rejects_frozen_goal(
+def test_update_goal_completion_rejects_paused_goal(
     db_session,
     test_user,
     sample_ultimate_goal,
@@ -62,7 +62,7 @@ def test_update_goal_completion_rejects_frozen_goal(
 
     assert goal is None
     assert status == 400
-    assert error == "Cannot complete a frozen goal. Unfreeze it first."
+    assert error == "Cannot complete a paused goal. Resume it first."
 
 
 def test_move_goal_allows_flexible_hierarchy_and_rejects_non_monotonic_path(

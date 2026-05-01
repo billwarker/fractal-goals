@@ -34,7 +34,6 @@ function formatCompletedDate(dateStr) {
 function GoalChildrenList({
     treeData,
     goalId,
-    goalColor,
     childType,
     onGoalSelect
 }) {
@@ -49,7 +48,7 @@ function GoalChildrenList({
 
     return (
         <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '14px', marginTop: '4px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: goalColor, fontWeight: 'bold' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: 'var(--color-text-primary)', fontWeight: 'bold' }}>
                 Associated {getTypeDisplayName(childType)}s
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

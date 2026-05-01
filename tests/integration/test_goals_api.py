@@ -440,17 +440,17 @@ class TestGoalOptionsEndpoints:
         assert alternate_mid.id in eligible_parent_ids
         assert alternate_long.id not in eligible_parent_ids
 
-    def test_freeze_endpoint_blocks_completion(self, authed_client, sample_goal_hierarchy):
+    def test_pause_endpoint_blocks_completion(self, authed_client, sample_goal_hierarchy):
         root_id = sample_goal_hierarchy['ultimate'].id
         goal_id = sample_goal_hierarchy['short_term'].id
 
-        freeze_response = authed_client.patch(
-            f'/api/{root_id}/goals/{goal_id}/freeze',
-            json={'frozen': True},
+        pause_response = authed_client.patch(
+            f'/api/{root_id}/goals/{goal_id}/pause',
+            json={'paused': True},
         )
 
-        assert freeze_response.status_code == 200
-        assert freeze_response.get_json()['frozen'] is True
+        assert pause_response.status_code == 200
+        assert pause_response.get_json()['paused'] is True
 
         completion_response = authed_client.patch(
             f'/api/goals/{goal_id}/complete',
@@ -458,7 +458,7 @@ class TestGoalOptionsEndpoints:
         )
 
         assert completion_response.status_code == 400
-        assert completion_response.get_json()['error'] == 'Cannot complete a frozen goal. Unfreeze it first.'
+        assert completion_response.get_json()['error'] == 'Cannot complete a paused goal. Resume it first.'
 
     def test_move_goal_endpoint_only_allows_same_parent_tier(
         self,

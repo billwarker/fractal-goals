@@ -12,7 +12,7 @@
     "lint:fix": "eslint . --fix",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run",
+    "test:run": "node scripts/run-vitest-with-timeout.mjs",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {

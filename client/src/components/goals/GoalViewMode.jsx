@@ -1,7 +1,6 @@
 import React, { Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
-import { isExecutionGoalType } from '../../utils/goalNodeModel';
 import { isGoalAssociatedWithBlock } from '../../utils/programGoalAssociations';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import GoalSmartSection from './GoalSmartSection';
@@ -18,12 +17,10 @@ function GoalViewMode({
     rootId,
     goalType,
     goalColor,
-    textColor,
     parentGoalName,
     parentGoalColor,
     isCompleted,
     levelConfig,
-    allowManualCompletion,
     trackActivities,
     completedViaChildren,
     childType,
@@ -38,13 +35,9 @@ function GoalViewMode({
     description,
     deadline,
     relevanceStatement,
-    isFrozen,
     // Handlers
     setViewState,
-    setIsEditing,
     onClose,
-    onToggleCompletion,
-    onAddChild,
     onGoalSelect,
     onUpdate,
     setTargets,
@@ -52,131 +45,9 @@ function GoalViewMode({
 }) {
     const navigate = useNavigate();
     const { getGoalColor } = useGoalLevels();
-    const childGoalColor = goalColor;
 
     return (
         <div className={styles.viewContainer}>
-
-            {/* Action Buttons - 2x2 Grid */}
-            <div className={styles.actionGrid}>
-                {onToggleCompletion && (() => {
-                    const isManualAllowed = levelConfig.allow_manual_completion !== false;
-                    const canShowManual = allowManualCompletion && isManualAllowed && !isFrozen;
-                    const canToggleCompletion = !isFrozen && (isCompleted || canShowManual);
-                    const isTargetsAllowed = levelConfig.track_activities !== false;
-                    const isChildrenAllowed = !isExecutionGoalType(goalType);
-
-                    return (
-                        <button
-                            onClick={() => {
-                                if (isFrozen) {
-                                    return;
-                                }
-                                if (isCompleted) {
-                                    setViewState('uncomplete-confirm');
-                                } else if (canShowManual) {
-                                    setViewState('complete-confirm');
-                                }
-                            }}
-                            disabled={!canToggleCompletion}
-                            className={styles.btnAction}
-                            style={{
-                                background: isFrozen
-                                    ? 'rgba(30, 58, 95, 0.16)'
-                                    : isCompleted
-                                        ? '#4caf50'
-                                        : 'transparent',
-                                border: `1px solid ${isFrozen
-                                    ? 'rgba(100, 181, 246, 0.35)'
-                                    : isCompleted
-                                        ? '#4caf50'
-                                        : (canShowManual ? 'var(--color-border)' : 'var(--color-border-hover)')}`,
-                                color: isFrozen
-                                    ? '#93c5fd'
-                                    : isCompleted
-                                        ? 'white'
-                                        : (canShowManual ? 'var(--color-text-primary)' : 'var(--color-text-muted)'),
-                                cursor: canToggleCompletion ? 'pointer' : 'default',
-                                fontWeight: (isCompleted || isFrozen) ? 'bold' : 'normal',
-                                opacity: canToggleCompletion ? 1 : 0.8
-                            }}
-                        >
-                            {isFrozen ? 'Frozen' : isCompleted ? '✓ Completed' : (
-                                canShowManual ? 'Mark Complete' : (
-                                    trackActivities && isTargetsAllowed && completedViaChildren && isChildrenAllowed ? 'Complete via Children & Targets' :
-                                        trackActivities && isTargetsAllowed ? 'Complete via Target(s)' :
-                                            completedViaChildren && isChildrenAllowed ? 'Complete via Children' :
-                                                'Auto-completing...'
-                                )
-                            )}
-                        </button>
-                    );
-                })()}
-
-                {onAddChild && childType && (
-                    <button
-                        onClick={() => {
-                            if (goalType === 'ImmediateGoal') return;
-                            if (displayMode === 'modal' && onClose) onClose();
-                            onAddChild(goal);
-                        }}
-                        className={styles.btnAction}
-                        disabled={goalType === 'ImmediateGoal'}
-                        title=""
-                        style={{
-                            background: 'transparent',
-                            border: `1px solid ${childGoalColor}`,
-                            color: childGoalColor,
-                            fontWeight: 'bold',
-                            opacity: goalType === 'ImmediateGoal' ? 0.5 : 1,
-                            cursor: goalType === 'ImmediateGoal' ? 'not-allowed' : 'pointer'
-                        }}
-                    >
-                        + Add Child Goal
-                    </button>
-                )}
-
-                <button
-                    onClick={() => setIsEditing(true)}
-                    className={styles.btnAction}
-                    style={{
-                        background: goalColor,
-                        border: 'none',
-                        color: textColor,
-                        fontWeight: 600
-                    }}
-                >
-                    Edit Goal
-                </button>
-
-                <button
-                    onClick={() => setViewState('goal-notes')}
-                    className={styles.btnAction}
-                    style={{
-                        background: 'transparent',
-                        border: '1px solid var(--color-border)',
-                        color: 'var(--color-text-primary)',
-                        fontWeight: 600,
-                    }}
-                >
-                    Notes
-                </button>
-
-                <button
-                    onClick={() => setViewState('goal-options')}
-                    className={styles.btnAction}
-                    style={{
-                        background: 'transparent',
-                        border: '1px solid var(--color-border)',
-                        color: 'var(--color-text-primary)',
-                        fontWeight: 600,
-                    }}
-                >
-                    Options
-                </button>
-
-            </div>
-
             <GoalSmartSection
                 goal={goal}
                 goalColor={goalColor}
@@ -201,7 +72,7 @@ function GoalViewMode({
 
                 return (
                     <div>
-                        <label className={styles.label} style={{ marginBottom: '6px', color: goalColor, fontSize: 'var(--font-size-xs)' }}>
+                        <label className={styles.label} style={{ marginBottom: '6px', color: 'var(--color-text-primary)', fontSize: 'var(--font-size-xs)' }}>
                             Associated Programs
                         </label>
                         <div className={styles.associatedPrograms}>
@@ -247,7 +118,7 @@ function GoalViewMode({
                             <span style={{
                                 fontSize: '12px',
                                 fontWeight: 'bold',
-                                color: goalColor,
+                                color: 'var(--color-text-primary)',
                                 textDecoration: 'underline'
                             }}>
                                 Time Spent:
@@ -265,7 +136,7 @@ function GoalViewMode({
                             padding: '4px 0',
                             gap: '6px'
                         }}>
-                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: goalColor }}>
+                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
                                 Sessions:
                             </span>
                             <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
@@ -288,7 +159,7 @@ function GoalViewMode({
                             <span style={{
                                 fontSize: '12px',
                                 fontWeight: 'bold',
-                                color: goalColor,
+                                color: 'var(--color-text-primary)',
                                 textDecoration: 'underline'
                             }}>
                                 Activities:
@@ -324,7 +195,7 @@ function GoalViewMode({
                                 });
                             }
                         }}
-                        headerColor={goalColor}
+                        headerColor="var(--color-text-primary)"
                         goalType={goalType}
                         goalCompleted={isCompleted}
                     />

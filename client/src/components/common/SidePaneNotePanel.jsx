@@ -15,6 +15,7 @@ function SidePaneNotePanel({
     onLoadMore,
     placeholder = 'Add a note...',
     label = 'Notes',
+    composerOnly = false,
 }) {
     const [content, setContent] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,6 +56,40 @@ function SidePaneNotePanel({
         }
     };
 
+    const composer = (
+        <div className={styles.composer}>
+            <form className={styles.composerForm} onSubmit={handleSubmit}>
+                <div className={styles.inputRow}>
+                    <textarea
+                        ref={inputRef}
+                        value={content}
+                        onChange={handleChange}
+                        onKeyDown={handleKeyDown}
+                        placeholder={placeholder}
+                        disabled={isSubmitting}
+                        className={styles.textarea}
+                        rows={1}
+                    />
+                    <button
+                        type="submit"
+                        disabled={!content.trim() || isSubmitting}
+                        className={styles.submitBtn}
+                        title="Add note (Enter, Shift+Enter for new line)"
+                    >
+                        {isSubmitting ? '…' : '📝'}
+                    </button>
+                </div>
+                <div className={styles.hint}>
+                    Markdown supported. Press Enter to save, Shift+Enter for a new line.
+                </div>
+            </form>
+        </div>
+    );
+
+    if (composerOnly) {
+        return composer;
+    }
+
     return (
         <div className={styles.panel}>
             <div className={styles.timelineHeader}>
@@ -92,33 +127,7 @@ function SidePaneNotePanel({
                 )}
             </div>
 
-            <div className={styles.composer}>
-                <form className={styles.composerForm} onSubmit={handleSubmit}>
-                    <div className={styles.inputRow}>
-                        <textarea
-                            ref={inputRef}
-                            value={content}
-                            onChange={handleChange}
-                            onKeyDown={handleKeyDown}
-                            placeholder={placeholder}
-                            disabled={isSubmitting}
-                            className={styles.textarea}
-                            rows={1}
-                        />
-                        <button
-                            type="submit"
-                            disabled={!content.trim() || isSubmitting}
-                            className={styles.submitBtn}
-                            title="Add note (Enter, Shift+Enter for new line)"
-                        >
-                            {isSubmitting ? '…' : '📝'}
-                        </button>
-                    </div>
-                    <div className={styles.hint}>
-                        Markdown supported. Press Enter to save, Shift+Enter for a new line.
-                    </div>
-                </form>
-            </div>
+            {composer}
         </div>
     );
 }

@@ -1,17 +1,20 @@
 import React, { Suspense, useMemo, useState } from 'react';
 
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
+import { useTimezone } from '../contexts/TimezoneContext';
 import { useGoalAssociationMutations } from '../hooks/useGoalAssociationMutations';
 import useGoalDetailController from '../hooks/useGoalDetailController';
 import useGoalDurationModal from '../hooks/useGoalDurationModal';
 import { useGoalForm } from '../hooks/useGoalForm';
+import { useGoalNotes } from '../hooks/useGoalNotes';
 import { useGoalAssociations, useGoalMetrics } from '../hooks/useGoalQueries';
 import { deriveEvidenceGoalIds, getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
 import { getChildType, getValidChildTypes, getTypeDisplayName } from '../utils/goalHelpers';
-import { flattenGoalTree } from '../utils/goalNodeModel';
+import { flattenGoalTree, isExecutionGoalType } from '../utils/goalNodeModel';
 import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
+import { formatDateInTimezone } from '../utils/dateUtils';
 import { getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalCompletionModal from './goals/GoalCompletionModal';
 import GoalUncompletionModal from './goals/GoalUncompletionModal';
@@ -19,6 +22,7 @@ import GoalHeader from './goals/GoalHeader';
 import GoalViewMode from './goals/GoalViewMode';
 import GoalEditForm from './goals/GoalEditForm';
 import GoalIcon from './atoms/GoalIcon';
+import SidePaneNotePanel from './common/SidePaneNotePanel';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
 
 import styles from './GoalDetailModal.module.css';
@@ -29,6 +33,7 @@ const InlineActivityBuilder = lazyWithRetry(() => import('./goalDetail/InlineAct
 const GenericGraphModal = lazyWithRetry(() => import('./analytics/GenericGraphModal'), 'components/analytics/GenericGraphModal');
 const GoalOptionsView = lazyWithRetry(() => import('./goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./goalDetail/GoalNotesView'), 'components/goalDetail/GoalNotesView');
+const GoalTimelineView = lazyWithRetry(() => import('./goalDetail/GoalTimelineView'), 'components/goalDetail/GoalTimelineView');
 
 /**
  * GoalDetailModal Component
@@ -68,6 +73,7 @@ function GoalDetailModal({
     initialActivities = [], // Initial associated activities for create mode
     initialActivityGroups = [] // Initial associated groups for create mode
 }) {
+    const { timezone } = useTimezone();
     const {
         getGoalColor = () => '#4caf50',
         getGoalTextColor = () => '#ffffff',
@@ -137,6 +143,7 @@ function GoalDetailModal({
         ? (selectedChildType || defaultChildType)
         : (goal?.attributes?.type || goal?.type);
     const goalId = mode === 'create' ? null : (goal?.attributes?.id || goal?.id);
+    const { createNote: createGoalNote } = useGoalNotes(rootId, goalId);
     const goalColor = getGoalColor(goalType);
     const goalSecondaryColor = getGoalSecondaryColor(goalType);
     const goalIcon = getGoalIcon(goalType);
@@ -292,21 +299,28 @@ function GoalDetailModal({
     };
 
     const textColor = getGoalTextColor(goalType);
+    const completedColor = getGoalColor('Completed');
+    const completedTextColor = getGoalTextColor('Completed');
     const childType = getChildType(goalType);
     const levelConfig = getLevelByName(goalType) || {};
 
     const parentGoalInfo = getParentGoalInfo({ mode, parentGoal, goal, treeData });
     const parentGoalName = parentGoalInfo?.name;
     const parentGoalColor = parentGoalInfo?.type ? getGoalColor(parentGoalInfo.type) : null;
-    const isFrozen = Boolean(goal?.frozen || goal?.attributes?.frozen);
+    const isPaused = Boolean(
+        goal?.paused
+        || goal?.attributes?.paused
+        || goal?.frozen
+        || goal?.attributes?.frozen
+    );
 
     const goalStatus = useMemo(() => {
         if (mode === 'create') {
             return 'active';
         }
 
-        if (isFrozen) {
-            return 'frozen';
+        if (isPaused) {
+            return 'paused';
         }
 
         if (!depGoalId || !treeData) {
@@ -331,7 +345,85 @@ function GoalDetailModal({
 
         const activeLineageIds = getActiveLineageIds(activeEvidenceGoalIds, parentById);
         return activeLineageIds.has(String(depGoalId)) ? 'active' : 'inactive';
-    }, [activityDefinitions, activityGroupsFromProps, depGoalId, evidenceGoalIds, isFrozen, mode, sessions, treeData]);
+    }, [activityDefinitions, activityGroupsFromProps, depGoalId, evidenceGoalIds, isPaused, mode, sessions, treeData]);
+
+    const handleQuickGoalNote = async (content) => {
+        if (!rootId || !goalId) {
+            return;
+        }
+        await createGoalNote({
+            content,
+            context_type: 'goal',
+            context_id: goalId,
+            goal_id: goalId,
+        });
+    };
+
+    const completionFooterState = useMemo(() => {
+        const isManualAllowed = levelConfig.allow_manual_completion !== false;
+        const canShowManual = allowManualCompletion && isManualAllowed && !isPaused;
+        const canToggleCompletion = !isPaused && Boolean(onToggleCompletion) && (isCompleted || canShowManual);
+        const isTargetsAllowed = levelConfig.track_activities !== false;
+        const isChildrenAllowed = !isExecutionGoalType(goalType);
+        const completedAt = localCompletedAt || goal?.attributes?.completed_at || goal?.completed_at;
+        const completedLabel = completedAt
+            ? `Completed on ${formatDateInTimezone(completedAt, timezone, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+            })}`
+            : 'Completed';
+        const label = isPaused
+            ? 'Paused'
+            : isCompleted
+                ? completedLabel
+                : canShowManual
+                    ? 'Mark Complete'
+                    : trackActivities && isTargetsAllowed && completedViaChildren && isChildrenAllowed
+                        ? 'Complete via Children & Targets'
+                        : trackActivities && isTargetsAllowed
+                            ? 'Complete via Target(s)'
+                            : completedViaChildren && isChildrenAllowed
+                                ? 'Complete via Children'
+                                : 'Auto-completing...';
+
+        return { canShowManual, canToggleCompletion, label };
+    }, [
+        allowManualCompletion,
+        completedViaChildren,
+        goalType,
+        goal?.attributes?.completed_at,
+        goal?.completed_at,
+        isCompleted,
+        isPaused,
+        levelConfig.allow_manual_completion,
+        levelConfig.track_activities,
+        localCompletedAt,
+        onToggleCompletion,
+        timezone,
+        trackActivities,
+    ]);
+
+    const handleCompletionFooterClick = () => {
+        if (!completionFooterState.canToggleCompletion || isPaused) {
+            return;
+        }
+        setViewState(isCompleted ? 'uncomplete-confirm' : 'complete-confirm');
+    };
+
+    const canAddChildGoal = Boolean(onAddChild && childType && goalType !== 'ImmediateGoal' && !isCompleted);
+
+    const handleAddChildGoal = () => {
+        if (!canAddChildGoal) {
+            return;
+        }
+        if (displayMode === 'modal' && handleClose) {
+            handleClose();
+        }
+        onAddChild(goal);
+    };
 
     const goalForSmart = {
         ...goal,
@@ -469,6 +561,7 @@ function GoalDetailModal({
                         refreshAssociations={refreshAssociations}
                         handleCancel={handleCancel}
                         handleSave={handleSave}
+                        showActions={mode === 'create'}
                         errors={errors}
                     />
                 ) : (
@@ -500,12 +593,8 @@ function GoalDetailModal({
                         description={description}
                         deadline={deadline}
                         relevanceStatement={relevanceStatement}
-                        isFrozen={isFrozen}
                         setViewState={setViewState}
-                        setIsEditing={setIsEditing}
                         onClose={handleClose}
-                        onToggleCompletion={onToggleCompletion}
-                        onAddChild={onAddChild}
                         onGoalSelect={onGoalSelect}
                         onUpdate={onUpdate}
                         setTargets={setTargets}
@@ -603,7 +692,7 @@ function GoalDetailModal({
                     viewMode="selector"
                     onCloseSelector={() => setViewState('goal')}
                     goalType={goalType}
-                    headerColor={goalColor}
+                    headerColor="var(--color-text-primary)"
                     onClose={handleClose}
                     onSave={!isEditing ? persistAssociations : undefined}
                     onRefreshAssociations={refreshAssociations}
@@ -662,8 +751,16 @@ function GoalDetailModal({
                 <GoalNotesView
                     rootId={rootId}
                     goalId={goalId}
-                    goalColor={goalColor}
-                    onBack={() => setViewState('goal')}
+                    hideComposer
+                />
+            </Suspense>
+        );
+    } else if (viewState === 'goal-timeline') {
+        content = (
+            <Suspense fallback={null}>
+                <GoalTimelineView
+                    rootId={rootId}
+                    goalId={goalId}
                 />
             </Suspense>
         );
@@ -674,9 +771,33 @@ function GoalDetailModal({
         content = renderGoalContent();
     }
 
-    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes')
+    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline')
         && !(needsLevelPicker && selectedChildType === null);
     if (shouldShowPersistentHeader) {
+        const headerActions = mode !== 'create' ? (
+            <div className={styles.headerActions}>
+                <button
+                    type="button"
+                    className={`${styles.headerActionButton} ${isEditing && viewState === 'goal' ? styles.headerActionActive : ''}`}
+                    onClick={() => {
+                        setViewState('goal');
+                        setIsEditing(true);
+                    }}
+                    style={{ '--goal-tab-accent': goalColor }}
+                >
+                    Edit
+                </button>
+                <button
+                    type="button"
+                    className={`${styles.headerActionButton} ${viewState === 'goal-options' ? styles.headerActionActive : ''}`}
+                    onClick={() => setViewState('goal-options')}
+                    style={{ '--goal-tab-accent': goalColor }}
+                >
+                    Options
+                </button>
+            </div>
+        ) : null;
+
         content = (
             <>
                 <GoalHeader
@@ -687,18 +808,121 @@ function GoalDetailModal({
                     goalColor={goalColor}
                     textColor={textColor}
                     parentGoal={parentGoal}
-                    isCompleted={isCompleted}
                     onClose={handleClose}
                     onCollapse={onMobileCollapse}
                     deadline={deadline}
                     goalStatus={goalStatus}
+                    headerActions={headerActions}
                 />
+                {mode !== 'create' && (
+                    <div className={styles.goalTabRow} aria-label="Goal detail views">
+                        <button
+                            type="button"
+                            className={`${styles.goalTabButton} ${viewState === 'goal' ? styles.goalTabActive : ''}`}
+                            onClick={() => setViewState('goal')}
+                            style={{ '--goal-tab-accent': goalColor }}
+                        >
+                            Details
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.goalTabButton} ${viewState === 'goal-timeline' ? styles.goalTabActive : ''}`}
+                            onClick={() => setViewState('goal-timeline')}
+                            style={{ '--goal-tab-accent': goalColor }}
+                        >
+                            Timeline
+                        </button>
+                        <button
+                            type="button"
+                            className={`${styles.goalTabButton} ${viewState === 'goal-notes' ? styles.goalTabActive : ''}`}
+                            onClick={() => setViewState('goal-notes')}
+                            style={{ '--goal-tab-accent': goalColor }}
+                        >
+                            Notes
+                        </button>
+                    </div>
+                )}
                 {content}
             </>
         );
     }
 
     // ============ RENDER ============
+    const showGoalNoteComposer = viewState === 'goal-notes'
+        && mode !== 'create'
+        && Boolean(rootId && goalId)
+        && !['complete-confirm', 'uncomplete-confirm'].includes(viewState);
+    const showEditFooter = viewState === 'goal'
+        && mode !== 'create'
+        && isEditing;
+    const showCompletionFooter = viewState === 'goal'
+        && mode !== 'create'
+        && !isEditing
+        && Boolean(onToggleCompletion);
+    const footerContent = showGoalNoteComposer ? (
+        <SidePaneNotePanel
+            composerOnly
+            onSubmit={handleQuickGoalNote}
+            placeholder="Add a goal note..."
+        />
+    ) : showEditFooter ? (
+        <div className={styles.completionFooter}>
+            <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit}`}>
+                <button
+                    type="button"
+                    onClick={handleCancel}
+                    className={styles.completionFooterButton}
+                    style={{
+                        '--completion-accent': goalColor,
+                        '--completion-text': 'var(--color-text-primary)',
+                    }}
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    onClick={handleSave}
+                    className={`${styles.completionFooterButton} ${styles.editFooterSaveButton}`}
+                    style={{
+                        '--completion-accent': goalColor,
+                        '--completion-text': textColor,
+                    }}
+                >
+                    Save
+                </button>
+            </div>
+        </div>
+    ) : showCompletionFooter ? (
+        <div className={styles.completionFooter}>
+            <div className={`${styles.completionFooterActions} ${canAddChildGoal ? styles.completionFooterSplit : ''}`}>
+                {canAddChildGoal && (
+                    <button
+                        type="button"
+                        onClick={handleAddChildGoal}
+                        className={styles.completionFooterButton}
+                        style={{
+                            '--completion-accent': goalColor,
+                            '--completion-text': 'var(--color-text-primary)',
+                        }}
+                    >
+                        + Add Child Goal
+                    </button>
+                )}
+                <button
+                    type="button"
+                    onClick={handleCompletionFooterClick}
+                    disabled={!completionFooterState.canToggleCompletion}
+                    className={`${styles.completionFooterButton} ${isCompleted ? styles.completionFooterDone : ''} ${isPaused ? styles.completionFooterPaused : ''}`}
+                    style={{
+                        '--completion-accent': isCompleted ? completedColor : goalColor,
+                        '--completion-text': isCompleted ? completedTextColor : 'var(--color-text-primary)',
+                    }}
+                >
+                    {completionFooterState.label}
+                </button>
+            </div>
+        </div>
+    ) : null;
 
 
     if (displayMode === 'panel') {
@@ -708,6 +932,11 @@ function GoalDetailModal({
                     <div className={styles.panelContent}>
                         {content}
                     </div>
+                    {footerContent && (
+                        <div className={styles.panelNoteComposer}>
+                            {footerContent}
+                        </div>
+                    )}
                 </div>
             </>
         );
@@ -727,7 +956,14 @@ function GoalDetailModal({
                         borderTop: `4px solid ${goalColor}`,
                     }}
                 >
-                    {content}
+                    <div className={styles.modalScrollArea}>
+                        {content}
+                    </div>
+                    {footerContent && (
+                        <div className={styles.modalNoteComposer}>
+                            {footerContent}
+                        </div>
+                    )}
                 </div>
             </div>
         </>

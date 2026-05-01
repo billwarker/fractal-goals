@@ -24,6 +24,14 @@ const { mockUseGoalForm, mockNotify, mockGoalAssociations, mockGoalMetrics, mock
 }));
 
 vi.mock('@tanstack/react-query', () => ({
+    useQuery: () => ({
+        data: [],
+        isLoading: false,
+        error: null,
+    }),
+    useMutation: () => ({
+        mutateAsync: vi.fn(() => Promise.resolve()),
+    }),
     useQueryClient: () => ({
         invalidateQueries: vi.fn(),
     }),
@@ -47,6 +55,19 @@ vi.mock('../../hooks/useGoalQueries', () => ({
     useGoalAssociations: () => mockGoalAssociations,
     useGoalMetrics: () => mockGoalMetrics,
     useGoalDailyDurations: () => mockGoalDurations,
+}));
+
+vi.mock('../../hooks/useGoalNotes', () => ({
+    useGoalNotes: () => ({
+        notes: [],
+        isLoading: false,
+        error: null,
+        createNote: vi.fn(() => Promise.resolve()),
+        updateNote: vi.fn(() => Promise.resolve()),
+        deleteNote: vi.fn(() => Promise.resolve()),
+        pinNote: vi.fn(() => Promise.resolve()),
+        unpinNote: vi.fn(() => Promise.resolve()),
+    }),
 }));
 
 vi.mock('../../utils/api', () => ({
@@ -95,8 +116,17 @@ vi.mock('../goals/GoalViewMode', () => ({
             <div>view:{name}</div>
             <button onClick={() => setIsEditing(true)}>edit goal</button>
             <button onClick={() => setViewState('goal-options')}>open options</button>
+            <button onClick={() => setViewState('goal-timeline')}>open timeline</button>
         </div>
     ),
+}));
+
+vi.mock('../goalDetail/GoalTimelineView', () => ({
+    default: () => <div>goal timeline view</div>,
+}));
+
+vi.mock('../analytics/GenericGraphModal', () => ({
+    default: () => null,
 }));
 
 vi.mock('../goals/GoalEditForm', () => ({
@@ -198,6 +228,37 @@ describe('GoalDetailModal smoke coverage', () => {
         await waitFor(() => {
             expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
             expect(screen.getByText('goal options view')).toBeInTheDocument();
+        }, { timeout: 5000 });
+    });
+
+    it('keeps the shared header visible when switching to timeline view', async () => {
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    attributes: { id: 'goal-1', type: 'ShortTermGoal', parent_id: 'parent-1' },
+                }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={vi.fn()}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root',
+                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
+                    children: [],
+                }}
+            />
+        );
+
+        fireEvent.click(screen.getByText('open timeline'));
+
+        await waitFor(() => {
+            expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
+            expect(screen.getByText('goal timeline view')).toBeInTheDocument();
         }, { timeout: 5000 });
     });
 

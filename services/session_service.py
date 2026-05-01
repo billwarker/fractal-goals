@@ -257,6 +257,22 @@ class SessionService:
         return func.coalesce(ActivityInstance.time_stop, ActivityInstance.updated_at, ActivityInstance.created_at)
 
     @staticmethod
+    def _timestamp_contributes_to_goal(timestamp, goal) -> bool:
+        occurred_at = _as_utc_datetime(timestamp)
+        if not occurred_at or not goal:
+            return False
+
+        created_at = _as_utc_datetime(goal.created_at)
+        if created_at and occurred_at < created_at:
+            return False
+
+        completed_at = _as_utc_datetime(goal.completed_at)
+        if completed_at and occurred_at >= completed_at:
+            return False
+
+        return True
+
+    @staticmethod
     def _normalize_window_days(raw_days, default=7, max_days=MAX_FLOWTREE_WINDOW_DAYS) -> int:
         try:
             days = int(raw_days or default)
@@ -762,10 +778,11 @@ class SessionService:
         window_days = self._normalize_window_days(days)
         cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
 
-        recent_activity_ids = [
-            activity_definition_id
-            for (activity_definition_id,) in self.db_session.query(
+        recent_instance_rows = self.db_session.query(
                 ActivityInstance.activity_definition_id,
+                ActivityInstance.time_stop,
+                ActivityInstance.updated_at,
+                ActivityInstance.created_at,
             ).join(
                 Session,
                 Session.id == ActivityInstance.session_id,
@@ -776,15 +793,20 @@ class SessionService:
                 ActivityInstance.deleted_at == None,
                 ActivityInstance.completed.is_(True),
                 self._effective_activity_completion_timestamp() >= cutoff,
-            ).distinct().all()
+            ).all()
+        recent_activity_ids = sorted({
+            activity_definition_id
+            for activity_definition_id, *_ in recent_instance_rows
             if activity_definition_id
-        ]
+        })
 
         effective_goals_by_activity = self._get_effective_activity_goals(root_id, recent_activity_ids)
         goal_ids = set()
-        for activity_id in recent_activity_ids:
+        for activity_id, time_stop, updated_at, created_at in recent_instance_rows:
+            completed_timestamp = time_stop or updated_at or created_at
             for goal in effective_goals_by_activity.get(activity_id, []):
-                goal_ids.add(str(goal.id))
+                if self._timestamp_contributes_to_goal(completed_timestamp, goal):
+                    goal_ids.add(str(goal.id))
 
         return {
             "goal_ids": sorted(goal_ids),
@@ -804,13 +826,26 @@ class SessionService:
             return self._empty_flowtree_session_metrics(window_days), None, 200
 
         matching_activity_ids = self._get_activity_definition_ids_for_goal_filter(root_id, list(visible_goal_ids))
+        effective_goals_by_activity = self._get_effective_activity_goals(root_id, list(matching_activity_ids))
+        target_goal_ids = {str(goal_id) for goal_id in visible_goal_ids}
+
+        def activity_instance_contributes(activity_id, timestamp):
+            for goal in effective_goals_by_activity.get(activity_id, []):
+                if str(goal.id) not in target_goal_ids:
+                    continue
+                if self._timestamp_contributes_to_goal(timestamp, goal):
+                    return True
+            return False
+
         relevant_session_ids = set()
 
         if matching_activity_ids:
-            relevant_session_ids.update(
-                session_id
-                for (session_id,) in self.db_session.query(
+            activity_session_rows = self.db_session.query(
                     ActivityInstance.session_id,
+                    ActivityInstance.activity_definition_id,
+                    ActivityInstance.time_stop,
+                    ActivityInstance.updated_at,
+                    ActivityInstance.created_at,
                 ).join(
                     Session,
                     Session.id == ActivityInstance.session_id,
@@ -820,14 +855,20 @@ class SessionService:
                     ActivityInstance.root_id == root_id,
                     ActivityInstance.deleted_at == None,
                     ActivityInstance.activity_definition_id.in_(matching_activity_ids),
-                ).distinct().all()
-                if session_id
-            )
+                ).all()
+            for session_id, activity_id, time_stop, updated_at, created_at in activity_session_rows:
+                if not session_id:
+                    continue
+                if activity_instance_contributes(activity_id, time_stop or updated_at or created_at):
+                    relevant_session_ids.add(session_id)
 
-        relevant_session_ids.update(
-            session_id
-            for (session_id,) in self.db_session.query(
+        session_goal_rows = self.db_session.query(
                 session_goals.c.session_id,
+                session_goals.c.goal_id,
+                Session.session_start,
+                Session.session_end,
+                Session.completed_at,
+                Session.created_at,
             ).join(
                 Session,
                 Session.id == session_goals.c.session_id,
@@ -835,9 +876,20 @@ class SessionService:
                 Session.root_id == root_id,
                 Session.deleted_at == None,
                 session_goals.c.goal_id.in_(visible_goal_ids),
-            ).distinct().all()
-            if session_id
-        )
+            ).all()
+        goals_by_id = {
+            goal.id: goal
+            for goal in self.db_session.query(Goal).filter(
+                Goal.root_id == root_id,
+                Goal.id.in_(visible_goal_ids),
+                Goal.deleted_at == None,
+            ).all()
+        }
+        for session_id, goal_id, session_start, session_end, completed_at, created_at in session_goal_rows:
+            goal = goals_by_id.get(goal_id)
+            session_timestamp = session_end or completed_at or session_start or created_at
+            if session_id and self._timestamp_contributes_to_goal(session_timestamp, goal):
+                relevant_session_ids.add(session_id)
 
         summary = self._empty_flowtree_session_metrics(window_days)
         if not relevant_session_ids:
@@ -893,6 +945,7 @@ class SessionService:
             return summary, None, 200
 
         instances = self.db_session.query(
+            ActivityInstance.activity_definition_id,
             ActivityInstance.duration_seconds,
             ActivityInstance.completed,
             ActivityInstance.time_stop,
@@ -910,13 +963,16 @@ class SessionService:
             ActivityInstance.session_id.in_(relevant_session_ids),
         ).all()
 
-        for duration_seconds, completed, time_stop, updated_at, created_at in instances:
+        for activity_id, duration_seconds, completed, time_stop, updated_at, created_at in instances:
             if not completed:
                 continue
+            completed_timestamp = _as_utc_datetime(time_stop or updated_at or created_at)
+            if not activity_instance_contributes(activity_id, completed_timestamp):
+                continue
+
             summary["completed_instances_count"] += 1
             summary["total_instance_duration_seconds"] += int(duration_seconds or 0)
 
-            completed_timestamp = _as_utc_datetime(time_stop or updated_at or created_at)
             if completed_timestamp and completed_timestamp >= cutoff:
                 summary["recent_instances_count"] += 1
 

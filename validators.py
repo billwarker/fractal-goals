@@ -494,8 +494,13 @@ class GoalCompletionUpdateSchema(BaseModel):
 
 
 class GoalFreezeSchema(BaseModel):
-    """Schema for toggling the frozen state on a goal."""
+    """Compatibility schema for the old frozen goal state."""
     frozen: bool = True
+
+
+class GoalPauseSchema(BaseModel):
+    """Schema for toggling the paused state on a goal."""
+    paused: bool = True
 
 
 class GoalMoveSchema(BaseModel):

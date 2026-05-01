@@ -17,6 +17,20 @@ export const fractalGoalsApi = {
     getGoalAnalytics: (rootId) => axios.get(`${API_BASE}/${rootId}/goals/analytics`),
     getGoalActivities: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activities`),
     getGoalActivityGroups: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups`),
+    getGoalTimeline: (rootId, goalId, params = {}) => {
+        const query = new URLSearchParams();
+        if (Array.isArray(params.types)) {
+            query.set('types', params.types.join(','));
+        }
+        if (params.includeChildren != null) {
+            query.set('include_children', params.includeChildren ? 'true' : 'false');
+        }
+        if (params.limit != null) {
+            query.set('limit', params.limit);
+        }
+        const qs = query.toString();
+        return axios.get(`${API_BASE}/${rootId}/goals/${goalId}/timeline${qs ? '?' + qs : ''}`);
+    },
     getGoalMetrics: (goalId) => axios.get(`${API_BASE}/goals/${goalId}/metrics`),
     getGoalDailyDurations: (goalId) => axios.get(`${API_BASE}/goals/${goalId}/metrics/daily-durations`),
     linkGoalActivityGroup: (rootId, goalId, groupId) =>
@@ -32,8 +46,10 @@ export const fractalGoalsApi = {
     // Goal Options
     copyGoal: (rootId, goalId) =>
         axios.post(`${API_BASE}/${rootId}/goals/${goalId}/copy`),
+    pauseGoal: (rootId, goalId, paused) =>
+        axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/pause`, { paused }),
     freezeGoal: (rootId, goalId, frozen) =>
-        axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/freeze`, { frozen }),
+        axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/pause`, { paused: frozen }),
     moveGoal: (rootId, goalId, newParentId) =>
         axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/move`, { new_parent_id: newParentId }),
     convertGoalLevel: (rootId, goalId, levelId) =>

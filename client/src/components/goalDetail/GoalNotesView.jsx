@@ -11,7 +11,7 @@ import Button from '../atoms/Button';
 import { useGoalNotes } from '../../hooks/useGoalNotes';
 import styles from './GoalNotesView.module.css';
 
-function GoalNotesView({ rootId, goalId, goalColor, onBack }) {
+function GoalNotesView({ rootId, goalId, hideComposer = false }) {
     const [includeDescendants, setIncludeDescendants] = useState(false);
     const [composing, setComposing] = useState(false);
 
@@ -40,14 +40,6 @@ function GoalNotesView({ rootId, goalId, goalColor, onBack }) {
 
     return (
         <div className={styles.container}>
-            {/* Header */}
-            <div className={styles.header}>
-                <button className={styles.backBtn} onClick={onBack} type="button">
-                    ← Back
-                </button>
-                <span className={styles.title} style={{ color: goalColor }}>Notes</span>
-            </div>
-
             {/* Options row */}
             <div className={styles.optionsRow}>
                 <label className={styles.checkboxLabel}>
@@ -60,7 +52,7 @@ function GoalNotesView({ rootId, goalId, goalColor, onBack }) {
                     Include descendant goal notes
                 </label>
 
-                {!composing && (
+                {!hideComposer && !composing && (
                     <Button
                         variant="primary"
                         size="sm"
@@ -74,7 +66,7 @@ function GoalNotesView({ rootId, goalId, goalColor, onBack }) {
             </div>
 
             {/* Compose area */}
-            {composing && (
+            {!hideComposer && composing && (
                 <div className={styles.composeArea}>
                     <NoteComposer
                         rootId={rootId}
@@ -99,6 +91,7 @@ function GoalNotesView({ rootId, goalId, goalColor, onBack }) {
                         onUnpin={unpinNote}
                         groupByDate={true}
                         showContext={includeDescendants}
+                        showTypePill={false}
                         emptyMessage="No notes on this goal yet."
                     />
                 )}

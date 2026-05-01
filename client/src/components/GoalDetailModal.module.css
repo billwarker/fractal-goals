@@ -33,6 +33,159 @@
     overflow-y: auto;
 }
 
+.panelNoteComposer {
+    flex-shrink: 0;
+}
+
+.headerActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.headerActionButton {
+    min-width: 76px;
+    min-height: 26px;
+    padding: 0 14px;
+    border: 1px solid var(--action-accent, var(--color-border));
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--action-accent, var(--color-text-secondary));
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.headerActionButton:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--goal-tab-accent, var(--color-brand-primary)) 72%, var(--color-border));
+    background: color-mix(in srgb, var(--goal-tab-accent, var(--color-brand-primary)) 8%, transparent);
+    color: var(--color-text-primary);
+}
+
+.headerActionButton:active:not(:disabled),
+.headerActionActive {
+    border-color: var(--goal-tab-accent, var(--color-brand-primary));
+    background: color-mix(in srgb, var(--goal-tab-accent, var(--color-brand-primary)) 16%, transparent);
+    color: var(--color-text-primary);
+}
+
+.headerActionButton:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.headerActionPrimary {
+    background: var(--action-accent, var(--color-brand-primary));
+    color: var(--action-text, var(--color-text-inverse));
+}
+
+.goalTabRow {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin: 12px 0 14px;
+}
+
+.goalTabButton {
+    min-height: 34px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.goalTabButton:hover {
+    border-color: color-mix(in srgb, var(--goal-tab-accent, var(--color-brand-primary)) 72%, var(--color-border));
+    color: var(--color-text-primary);
+    background: color-mix(in srgb, var(--goal-tab-accent, var(--color-brand-primary)) 8%, transparent);
+}
+
+.goalTabActive {
+    border-color: var(--goal-tab-accent, var(--color-brand-primary));
+    background: color-mix(in srgb, var(--goal-tab-accent, var(--color-brand-primary)) 16%, transparent);
+    color: var(--color-text-primary);
+}
+
+.completionFooter {
+    flex-shrink: 0;
+    padding: var(--spacing-md, 12px) var(--spacing-lg, 16px) var(--spacing-lg, 16px);
+    background: var(--color-bg-sidebar);
+    border-top: 1px solid var(--color-border);
+}
+
+.completionFooterActions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.completionFooterSplit {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.completionFooterButton {
+    width: 100%;
+    min-height: 42px;
+    border: 1px solid var(--completion-accent, var(--color-border));
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--completion-accent, var(--color-text-primary));
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.completionFooterButton:not(.completionFooterDone):not(.completionFooterPaused) {
+    color: var(--completion-text, var(--color-text-primary));
+}
+
+.completionFooterButton:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--completion-accent, var(--color-brand-primary)) 16%, transparent);
+}
+
+.completionFooterDone:hover:not(:disabled) {
+    background: var(--completion-accent, var(--color-brand-success));
+    color: var(--completion-text, white);
+}
+
+.completionFooterButton:disabled {
+    opacity: 1;
+    cursor: default;
+}
+
+.completionFooterDone {
+    background: var(--completion-accent, var(--color-brand-success));
+    border-color: var(--completion-accent, var(--color-brand-success));
+    color: var(--completion-text, white);
+}
+
+.completionFooterPaused {
+    background: color-mix(in srgb, #60a5fa 12%, transparent);
+    color: #93c5fd;
+}
+
+.editFooterSaveButton {
+    background: var(--completion-accent, var(--color-brand-primary));
+    border-color: var(--completion-accent, var(--color-brand-primary));
+    color: var(--completion-text, var(--color-text-inverse));
+}
+
+.editFooterSaveButton:hover:not(:disabled) {
+    background: var(--completion-accent, var(--color-brand-primary));
+    color: var(--completion-text, var(--color-text-inverse));
+}
+
+@media (max-width: 560px) {
+    .completionFooterSplit {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Modal Structure */
 .modalOverlay {
     position: fixed;
@@ -51,20 +204,29 @@
     background: var(--color-bg-app);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    /* 8px */
-    padding: 24px;
-    /* Explicit 24px to match sticky header negative margins */
     max-width: 700px;
     width: 90%;
     max-height: calc(90vh - var(--app-nav-height, 0px));
-    overflow-y: auto;
-    overflow-x: hidden;
-    /* Prevent horizontal scrolling */
-    overflow-wrap: break-word;
-    /* Ensure long words don't force overflow */
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
     color: var(--color-text-primary);
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
     /* Border top color is dynamic in JS */
+}
+
+.modalScrollArea {
+    flex: 1;
+    min-height: 0;
+    padding: 24px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overflow-wrap: break-word;
+}
+
+.modalNoteComposer {
+    flex-shrink: 0;
 }
 
 /* Form Elements */

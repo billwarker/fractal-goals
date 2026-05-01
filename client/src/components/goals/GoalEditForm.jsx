@@ -44,12 +44,13 @@ function GoalEditForm({
     refreshAssociations,
     handleCancel,
     handleSave,
+    showActions = true,
     errors = {}
 }) {
     return (
         <div className={styles.editContainer}>
             <div className={styles.fieldGroup}>
-                <label className={styles.label} style={{ color: goalColor }}>
+                <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
                     Name
                 </label>
                 <Input
@@ -62,7 +63,7 @@ function GoalEditForm({
 
             {(
                 <div className={styles.fieldGroup}>
-                    <label className={styles.label} style={{ color: goalColor }}>
+                    <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
                         Description
                     </label>
                     <textarea
@@ -77,13 +78,13 @@ function GoalEditForm({
             {/* Relevance Statement - SMART "R" Criterion */}
             {((goal?.attributes?.parent_id || mode === 'create' && parentGoalName) || goalType === 'UltimateGoal') && (
                 <div className={styles.fieldGroup}>
-                    <label className={styles.label} style={{ color: goalColor }}>
+                    <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
                         Relevance (SMART)
                     </label>
                     <div className={styles.relevanceInfo}>
                         {goalType === 'UltimateGoal'
                             ? "Why does this Ultimate Goal matter to you?"
-                            : <span>How does this goal help you achieve <span style={{ color: parentGoalColor || 'var(--color-text-primary)', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: parentGoalColor || 'var(--color-text-primary)', fontWeight: 'bold' }}>?</span></span>
+                            : <span>How does this goal help you achieve <span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>?</span></span>
                         }
                     </div>
                     <textarea
@@ -101,7 +102,7 @@ function GoalEditForm({
 
             {!isExecutionGoalType(goalType) && (
                 <div className={styles.fieldGroup}>
-                    <label className={styles.label} style={{ color: goalColor }}>
+                    <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
                         Deadline
                     </label>
                     <Input
@@ -116,7 +117,7 @@ function GoalEditForm({
             {/* How is progress measured? */}
             {(
                 <div className={styles.progressBox}>
-                    <label className={styles.label} style={{ marginBottom: '10px', color: goalColor }}>
+                    <label className={styles.label} style={{ marginBottom: '10px', color: 'var(--color-text-primary)' }}>
                         How is progress measured? (Select all that apply)
                     </label>
                     <div className={styles.checkboxGroup}>
@@ -189,7 +190,7 @@ function GoalEditForm({
                         onOpenSelector={() => setViewState('activity-associator')}
                         completedViaChildren={completedViaChildren}
                         isAboveShortTermGoal={isAboveShortTermGoal(goalType)}
-                        headerColor={goalColor}
+                        headerColor="var(--color-text-primary)"
                         goalType={goalType}
                         onRefreshAssociations={refreshAssociations}
                         inheritParentActivities={inheritParentActivities}
@@ -214,32 +215,33 @@ function GoalEditForm({
                             // Let the parent modal handle this state change
                             setViewState('target-manager', target);
                         }}
-                        headerColor={goalColor}
+                        headerColor="var(--color-text-primary)"
                         goalType={goalType}
                         goalCompleted={isCompleted}
                     />
                 </Suspense>
             )}
 
-            {/* Edit Actions */}
-            <div className={styles.editActions}>
-                <button
-                    onClick={handleCancel}
-                    className={styles.btnCancel}
-                >
-                    Cancel
-                </button>
-                <button
-                    onClick={handleSave}
-                    className={styles.btnSave}
-                    style={{
-                        background: goalColor,
-                        color: textColor,
-                    }}
-                >
-                    {mode === 'create' ? 'Create' : 'Save'}
-                </button>
-            </div>
+            {showActions && (
+                <div className={styles.editActions}>
+                    <button
+                        onClick={handleCancel}
+                        className={styles.btnCancel}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        className={styles.btnSave}
+                        style={{
+                            background: goalColor,
+                            color: textColor,
+                        }}
+                    >
+                        {mode === 'create' ? 'Create' : 'Save'}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

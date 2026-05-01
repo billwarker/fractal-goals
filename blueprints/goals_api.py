@@ -13,6 +13,7 @@ from validators import (
     GoalCompletionUpdateSchema,
     GoalConvertLevelSchema,
     GoalFreezeSchema,
+    GoalPauseSchema,
     GoalMoveSchema,
     GoalTargetCreateSchema, GoalTargetEvaluationSchema,
     FractalCreateSchema,
@@ -449,6 +450,38 @@ def get_fractal_goal(current_user, root_id, goal_id):
         db_session.close()
 
 
+@goals_bp.route('/<root_id>/goals/<goal_id>/timeline', methods=['GET'])
+@token_required
+def get_goal_timeline(current_user, root_id, goal_id):
+    """Get a normalized timeline of goal progress and related events."""
+    db_session = get_db_session()
+    try:
+        has_types_filter = 'types' in request.args
+        raw_types = request.args.get('types', '')
+        types = [item.strip() for item in raw_types.split(',') if item.strip()]
+        include_children = request.args.get('include_children', 'true').lower() not in {'0', 'false', 'no'}
+        limit = request.args.get('limit', 50, type=int)
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        payload, error, status = service.get_goal_timeline(
+            root_id,
+            goal_id,
+            current_user.id,
+            types=types if has_types_filter else None,
+            include_children=include_children,
+            limit=limit,
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching goal timeline")
+        return internal_error(logger, "Error fetching goal timeline")
+    finally:
+        db_session.close()
+
+
 @goals_bp.route('/<root_id>/goals/<goal_id>', methods=['DELETE'])
 @token_required
 def delete_fractal_goal(current_user, root_id, goal_id):
@@ -604,11 +637,11 @@ def copy_goal_endpoint(current_user, root_id: str, goal_id: str):
 @token_required
 @validate_request(GoalFreezeSchema, allow_empty_json=True)
 def freeze_goal_endpoint(current_user, root_id: str, goal_id: str, validated_data):
-    """Toggle frozen state on a goal."""
+    """Compatibility endpoint for the old frozen goal state."""
     db_session = get_db_session()
     try:
         service = GoalService(db_session, sync_targets=_sync_targets)
-        goal, error, status = service.toggle_freeze(
+        goal, error, status = service.toggle_pause(
             root_id,
             goal_id,
             current_user.id,
@@ -619,7 +652,32 @@ def freeze_goal_endpoint(current_user, root_id: str, goal_id: str, validated_dat
         return jsonify(serialize_goal(goal)), status
     except SQLAlchemyError:
         db_session.rollback()
-        logger.exception("Error freezing goal")
+        logger.exception("Error pausing goal through compatibility endpoint")
+        return internal_error(logger, "Goals API request failed")
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/<root_id>/goals/<goal_id>/pause', methods=['PATCH'])
+@token_required
+@validate_request(GoalPauseSchema, allow_empty_json=True)
+def pause_goal_endpoint(current_user, root_id: str, goal_id: str, validated_data):
+    """Toggle paused state on a goal."""
+    db_session = get_db_session()
+    try:
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        goal, error, status = service.toggle_pause(
+            root_id,
+            goal_id,
+            current_user.id,
+            validated_data['paused'],
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_goal(goal)), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error pausing goal")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()

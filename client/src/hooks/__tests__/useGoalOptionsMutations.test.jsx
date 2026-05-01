@@ -6,7 +6,7 @@ import { useGoalOptionsMutations } from '../useGoalOptionsMutations';
 import { queryKeys } from '../queryKeys';
 
 const copyGoal = vi.fn();
-const freezeGoal = vi.fn();
+const pauseGoal = vi.fn();
 const moveGoal = vi.fn();
 const convertGoalLevel = vi.fn();
 const notifySuccess = vi.fn();
@@ -15,7 +15,7 @@ const notifyError = vi.fn();
 vi.mock('../../utils/api', () => ({
     fractalApi: {
         copyGoal: (...args) => copyGoal(...args),
-        freezeGoal: (...args) => freezeGoal(...args),
+        pauseGoal: (...args) => pauseGoal(...args),
         moveGoal: (...args) => moveGoal(...args),
         convertGoalLevel: (...args) => convertGoalLevel(...args),
     },
@@ -76,10 +76,10 @@ describe('useGoalOptionsMutations', () => {
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.eligibleMoveParents('root-1', 'goal-1') });
     });
 
-    it('shows success feedback for freeze, move, and convert mutations', async () => {
+    it('shows success feedback for pause, move, and convert mutations', async () => {
         const queryClient = createQueryClient();
         vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue();
-        freezeGoal.mockResolvedValueOnce({ data: { id: 'goal-1', frozen: true } });
+        pauseGoal.mockResolvedValueOnce({ data: { id: 'goal-1', paused: true } });
         moveGoal.mockResolvedValueOnce({ data: { id: 'goal-1', parent_id: 'parent-2' } });
         convertGoalLevel.mockResolvedValueOnce({ data: { id: 'goal-1', level_id: 'level-2' } });
 
@@ -89,13 +89,13 @@ describe('useGoalOptionsMutations', () => {
         );
 
         await act(async () => {
-            await result.current.freezeGoal(true);
+            await result.current.pauseGoal(true);
             await result.current.moveGoal('parent-2');
             await result.current.convertGoalLevel('level-2');
         });
 
         await waitFor(() => {
-            expect(notifySuccess).toHaveBeenCalledWith('Goal frozen');
+            expect(notifySuccess).toHaveBeenCalledWith('Goal paused');
             expect(notifySuccess).toHaveBeenCalledWith('Goal moved');
             expect(notifySuccess).toHaveBeenCalledWith('Goal level converted');
         });

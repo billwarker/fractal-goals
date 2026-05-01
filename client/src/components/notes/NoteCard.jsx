@@ -67,6 +67,7 @@ function NoteCard({
     compact = false,
     minimal = false,
     variant = 'card',
+    showTypePill = true,
     isSelected = false,
     onSelect,
 }) {
@@ -317,7 +318,7 @@ function NoteCard({
                     )}
 
                     <div className={styles.headerActions}>
-                        {!minimal && <span className={styles.noteTypePill}>{resolvedNoteTypeLabel}</span>}
+                        {!minimal && showTypePill && <span className={styles.noteTypePill}>{resolvedNoteTypeLabel}</span>}
                         <span className={styles.timestamp}>
                             {formatDate(note.created_at)}
                             {note.isPast && note.session_name && resolvedNoteType !== 'session_note' && (

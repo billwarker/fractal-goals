@@ -1,0 +1,144 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 4px 0;
+}
+
+.filterLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.filterLabelActive {
+    color: var(--color-text-primary);
+}
+
+.checkbox {
+    cursor: pointer;
+    accent-color: var(--color-brand-primary);
+    color-scheme: inherit;
+}
+
+.timeline {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 112px;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.time {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    line-height: 1.4;
+    text-align: right;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.itemTitle {
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.itemTitleRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.goalEventIcon {
+    flex: 0 0 auto;
+}
+
+.subtitle {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.pill {
+    padding: 3px 6px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-muted);
+    font-size: 11px;
+    line-height: 1.2;
+}
+
+.levelPill {
+    padding: 3px 6px;
+    border: 1px solid color-mix(in srgb, var(--timeline-goal-color, var(--color-border-hover)) 72%, transparent);
+    border-radius: var(--radius-sm);
+    color: var(--timeline-goal-color, var(--color-text-muted));
+    font-size: 11px;
+    line-height: 1.2;
+}
+
+.metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 2px;
+}
+
+.metricPill {
+    padding: 3px 6px;
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    background: var(--color-bg-card-alt);
+    font-size: 11px;
+}
+
+.state {
+    padding: 18px 12px;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    text-align: center;
+    font-size: 13px;
+}
+
+@media (max-width: 560px) {
+    .item {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .time {
+        text-align: left;
+    }
+}

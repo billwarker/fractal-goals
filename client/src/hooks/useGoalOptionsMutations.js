@@ -30,17 +30,17 @@ export function useGoalOptionsMutations(rootId, goalId) {
         onError: (error) => notify.error(`Failed to copy goal: ${formatError(error)}`),
     });
 
-    const freezeMutation = useMutation({
-        mutationFn: async (frozen) => {
-            const response = await fractalApi.freezeGoal(rootId, goalId, frozen);
+    const pauseMutation = useMutation({
+        mutationFn: async (paused) => {
+            const response = await fractalApi.pauseGoal(rootId, goalId, paused);
             return response.data;
         },
-        onSuccess: async (_goal, frozen) => {
+        onSuccess: async (_goal, paused) => {
             await invalidateGoalQueries();
-            notify.success(frozen ? 'Goal frozen' : 'Goal unfrozen');
+            notify.success(paused ? 'Goal paused' : 'Goal resumed');
         },
-        onError: (error, frozen) => notify.error(
-            `Failed to ${frozen ? 'freeze' : 'unfreeze'} goal: ${formatError(error)}`
+        onError: (error, paused) => notify.error(
+            `Failed to ${paused ? 'pause' : 'resume'} goal: ${formatError(error)}`
         ),
     });
 
@@ -70,11 +70,12 @@ export function useGoalOptionsMutations(rootId, goalId) {
 
     return {
         isLoading: copyMutation.isPending
-            || freezeMutation.isPending
+            || pauseMutation.isPending
             || moveMutation.isPending
             || convertLevelMutation.isPending,
         copyGoal: () => copyMutation.mutateAsync(),
-        freezeGoal: (frozen) => freezeMutation.mutateAsync(frozen),
+        pauseGoal: (paused) => pauseMutation.mutateAsync(paused),
+        freezeGoal: (frozen) => pauseMutation.mutateAsync(frozen),
         moveGoal: (newParentId) => moveMutation.mutateAsync(newParentId),
         convertGoalLevel: (levelId) => convertLevelMutation.mutateAsync(levelId),
     };

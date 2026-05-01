@@ -1,7 +1,7 @@
 import { buildGraphPresentation } from '../flowTreeGraphUtils';
 
 describe('buildGraphPresentation', () => {
-    it('dims frozen goals when fade inactive branches is enabled even without recent evidence', () => {
+    it('dims paused goals when fade inactive branches is enabled even without recent evidence', () => {
         const treeData = {
             id: 'root-1',
             name: 'Root Goal',
@@ -9,9 +9,9 @@ describe('buildGraphPresentation', () => {
             children: [
                 {
                     id: 'goal-1',
-                    name: 'Frozen Goal',
+                    name: 'Paused Goal',
                     type: 'LongTermGoal',
-                    frozen: true,
+                    paused: true,
                     children: [],
                 },
             ],
@@ -31,10 +31,10 @@ describe('buildGraphPresentation', () => {
             isMobile: false,
         });
 
-        const frozenNode = graph.nodes.find((node) => node.id === 'goal-1');
-        const frozenEdge = graph.edges.find((edge) => edge.target === 'goal-1');
+        const pausedNode = graph.nodes.find((node) => node.id === 'goal-1');
+        const pausedEdge = graph.edges.find((edge) => edge.target === 'goal-1');
 
-        expect(frozenNode?.style?.opacity).toBe(0.34);
-        expect(frozenEdge?.style?.opacity).toBe(0.26);
+        expect(pausedNode?.style?.opacity).toBe(0.34);
+        expect(pausedEdge?.style?.opacity).toBe(0.26);
     });
 });

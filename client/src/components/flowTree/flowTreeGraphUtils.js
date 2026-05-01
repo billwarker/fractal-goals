@@ -257,21 +257,21 @@ export const buildGraphPresentation = ({
     );
 
     const nodeStyleMap = new Map();
-    const frozenNodeIds = new Set();
+    const pausedNodeIds = new Set();
     remappedNodes.forEach((node) => {
         const isActive = activeLineageIds.has(node.id);
         const isInactive = inactiveNodeIds.has(node.id);
-        const isFrozen = Boolean(node.data?.frozen);
+        const isPaused = Boolean(node.data?.paused ?? node.data?.frozen);
         const shouldFadeInactive = isInactive && !isActive;
-        const shouldFade = normalizedSettings.fadeInactiveBranches && (shouldFadeInactive || isFrozen);
+        const shouldFade = normalizedSettings.fadeInactiveBranches && (shouldFadeInactive || isPaused);
 
-        if (isFrozen) {
-            frozenNodeIds.add(node.id);
+        if (isPaused) {
+            pausedNodeIds.add(node.id);
         }
 
         if (shouldFade) {
             nodeStyleMap.set(node.id, {
-                opacity: isFrozen ? 0.34 : 0.22,
+                opacity: isPaused ? 0.34 : 0.22,
                 transition: 'opacity 140ms ease-in-out',
             });
         }
@@ -292,7 +292,7 @@ export const buildGraphPresentation = ({
 
         const shouldFadeEdge = normalizedSettings.fadeInactiveBranches
             && (
-                frozenNodeIds.has(targetId)
+                pausedNodeIds.has(targetId)
                 || (inactiveNodeIds.has(targetId) && !isActiveEdge)
             );
 
@@ -309,7 +309,7 @@ export const buildGraphPresentation = ({
             style.opacity = 1;
             style.zIndex = 3;
         } else if (shouldFadeEdge) {
-            style.opacity = frozenNodeIds.has(targetId) ? 0.26 : 0.16;
+            style.opacity = pausedNodeIds.has(targetId) ? 0.26 : 0.16;
             style.strokeWidth = 1;
         }
 

@@ -50,11 +50,16 @@ function GoalOptionsView({
         getGoalIcon,
     } = useGoalLevels();
     const [subView, setSubView] = useState('main');
-    const isFrozen = Boolean(goal?.frozen || goal?.attributes?.frozen);
+    const isPaused = Boolean(
+        goal?.paused
+        || goal?.attributes?.paused
+        || goal?.frozen
+        || goal?.attributes?.frozen
+    );
     const {
         isLoading: loading,
         copyGoal,
-        freezeGoal,
+        pauseGoal,
         moveGoal,
         convertGoalLevel,
     } = useGoalOptionsMutations(rootId, goalId);
@@ -122,10 +127,10 @@ function GoalOptionsView({
         }
     };
 
-    const handleFreeze = async () => {
+    const handlePause = async () => {
         try {
-            const nextFrozen = !isFrozen;
-            await freezeGoal(nextFrozen);
+            const nextPaused = !isPaused;
+            await pauseGoal(nextPaused);
             setViewState('goal');
         } catch {
             // Mutation helpers surface errors via their own notification layer.
@@ -207,13 +212,13 @@ function GoalOptionsView({
             textColor: goalColor,
         },
         {
-            label: isFrozen ? 'Unfreeze Goal' : 'Freeze Goal',
-            description: isFrozen
+            label: isPaused ? 'Resume Goal' : 'Pause Goal',
+            description: isPaused
                 ? 'Resume progress and re-enable completion controls.'
-                : 'Pause progress tracking and block completion until unfrozen.',
-            onClick: handleFreeze,
-            borderColor: isFrozen ? '#16a34a' : '#2563eb',
-            textColor: isFrozen ? '#16a34a' : '#2563eb',
+                : 'Pause progress tracking and block completion until resumed.',
+            onClick: handlePause,
+            borderColor: isPaused ? '#16a34a' : '#2563eb',
+            textColor: isPaused ? '#16a34a' : '#2563eb',
         },
         {
             label: 'Move Goal',
@@ -240,13 +245,6 @@ function GoalOptionsView({
 
     return (
         <div className={styles.optionsSubView}>
-            <button
-                type="button"
-                onClick={() => setViewState('goal')}
-                className={styles.optionsBackButton}
-            >
-                ← Back
-            </button>
             {options.filter(Boolean).map((option) => (
                 <button
                     key={option.label}

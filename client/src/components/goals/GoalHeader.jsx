@@ -12,30 +12,36 @@ function GoalHeader({
     goalColor,
     textColor,
     parentGoal,
-    isCompleted,
     onClose, // Callback to close modal when navigating
     onCollapse, // Mobile panel collapse toggle
     deadline,
     isCompact = false, // Prop to control collapsed state
     goalStatus = 'active',
+    headerActions = null,
 }) {
     const { timezone } = useTimezone();
-    const normalizedStatus = goalStatus === 'frozen'
-        ? 'frozen'
+    const normalizedStatus = goalStatus === 'frozen' || goalStatus === 'paused'
+        ? 'paused'
         : goalStatus === 'inactive'
             ? 'inactive'
             : 'active';
     const statusConfig = {
         active: {
             label: 'Active',
-            color: '#15803d',
+            borderColor: 'color-mix(in srgb, var(--color-brand-success) 62%, var(--color-border))',
+            background: 'color-mix(in srgb, var(--color-brand-success) 16%, transparent)',
+            color: 'var(--color-brand-success)',
         },
         inactive: {
             label: 'Inactive',
+            borderColor: 'var(--color-border)',
+            background: 'color-mix(in srgb, var(--color-bg-card) 72%, transparent)',
             color: 'var(--color-text-secondary)',
         },
-        frozen: {
-            label: 'Frozen',
+        paused: {
+            label: 'Paused',
+            borderColor: 'color-mix(in srgb, #60a5fa 62%, var(--color-border))',
+            background: 'color-mix(in srgb, #60a5fa 14%, transparent)',
             color: '#93c5fd',
         },
     }[normalizedStatus];
@@ -44,9 +50,9 @@ function GoalHeader({
         <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px',
-            paddingBottom: '20px', // More space before the border line
-            marginBottom: '24px', // Reverted to standard spacing
+            gap: '10px',
+            paddingBottom: '14px',
+            marginBottom: '0',
             borderBottom: `2px solid ${goalColor}`,
             position: 'sticky',
             top: '-24px', // Stick to the very top (covering parent padding)
@@ -123,7 +129,7 @@ function GoalHeader({
             <div style={{
                 display: isCompact ? 'none' : 'flex', // Standard display toggle, no animation
                 flexDirection: 'column',
-                gap: '12px'
+                gap: '10px'
             }}>
                 {/* Second Row: Badges and Status */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -150,18 +156,19 @@ function GoalHeader({
                     {mode !== 'create' && (
                         <>
                             <span style={{
-                                color: 'var(--color-text-muted)',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                            }}>
-                                |
-                            </span>
-                            <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                minHeight: '22px',
+                                padding: '0 8px',
+                                border: `1px solid ${statusConfig.borderColor}`,
+                                borderRadius: '999px',
+                                background: statusConfig.background,
                                 color: statusConfig.color,
-                                fontSize: '12px',
+                                fontSize: '11px',
                                 fontWeight: 700,
-                                letterSpacing: '0.08em',
-                                textTransform: 'uppercase',
+                                lineHeight: 1,
+                                whiteSpace: 'nowrap',
                             }}>
                                 {statusConfig.label}
                             </span>
@@ -173,42 +180,40 @@ function GoalHeader({
                             under "{parentGoal.name}"
                         </span>
                     )}
-                    {mode !== 'create' && isCompleted && (
-                        <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                            ✓ Completed {goal?.attributes?.completed_at ? `on ${formatDateInTimezone(goal.attributes.completed_at, timezone, { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
-                        </span>
-                    )}
                 </div>
 
                 {/* Third Row: Dates */}
-                {(mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline || deadline)) && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        {goal?.attributes?.created_at && (
-                            <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Created</span>
-                                <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-                                    {formatDateInTimezone(goal.attributes.created_at, timezone, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                </span>
-                            </div>
-                        )}
-                        {(deadline || goal?.attributes?.deadline) && (
-                            <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Due</span>
-                                <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-                                    {(() => {
-                                        const d = deadline || goal?.attributes?.deadline;
-                                        // Deadlines are often YYYY-MM-DD.
-                                        // If we use formatDateInTimezone on YYYY-MM-DD it treats it as UTC and shifts it.
-                                        // If it's YYYY-MM-DD we probably want to display it as is, or use the "local date" logic.
-                                        if (d && d.length === 10 && !d.includes('T')) {
-                                            const [year, month, day] = d.split('-').map(Number);
-                                            return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                                        }
-                                        return formatDateInTimezone(d, timezone, { month: 'short', day: 'numeric', year: 'numeric' });
-                                    })()}
-                                </span>
-                            </div>
-                        )}
+                {(mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline || deadline || headerActions)) && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                            {goal?.attributes?.created_at && (
+                                <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Created</span>
+                                    <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
+                                        {formatDateInTimezone(goal.attributes.created_at, timezone, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </span>
+                                </div>
+                            )}
+                            {(deadline || goal?.attributes?.deadline) && (
+                                <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Due</span>
+                                    <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
+                                        {(() => {
+                                            const d = deadline || goal?.attributes?.deadline;
+                                            // Deadlines are often YYYY-MM-DD.
+                                            // If we use formatDateInTimezone on YYYY-MM-DD it treats it as UTC and shifts it.
+                                            // If it's YYYY-MM-DD we probably want to display it as is, or use the "local date" logic.
+                                            if (d && d.length === 10 && !d.includes('T')) {
+                                                const [year, month, day] = d.split('-').map(Number);
+                                                return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                            }
+                                            return formatDateInTimezone(d, timezone, { month: 'short', day: 'numeric', year: 'numeric' });
+                                        })()}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                        {headerActions}
                     </div>
                 )}
             </div>

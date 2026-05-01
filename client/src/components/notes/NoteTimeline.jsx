@@ -64,6 +64,7 @@ function NoteTimeline({
     compact = false,
     minimal = false,
     variant = 'card', // 'card' (filled) or 'flat' (transparent, for session detail)
+    showTypePill = true,
     selectedNoteId,
     onNoteSelect,
     hasMore = false,
@@ -93,6 +94,7 @@ function NoteTimeline({
             compact={compact}
             minimal={minimal}
             variant={variant}
+            showTypePill={showTypePill}
             isSelected={selectedNoteId === note.id}
             onSelect={() => onNoteSelect && onNoteSelect(note)}
         />
