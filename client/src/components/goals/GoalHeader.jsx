@@ -10,6 +10,7 @@ function GoalHeader({
     goal,
     goalType,
     goalColor,
+    goalSecondaryColor,
     textColor,
     parentGoal,
     onClose, // Callback to close modal when navigating
@@ -46,6 +47,15 @@ function GoalHeader({
             color: '#93c5fd',
         },
     }[normalizedStatus];
+    const levelBadgeBackground = goalSecondaryColor
+        ? `linear-gradient(135deg, ${goalColor} 0%, color-mix(in srgb, ${goalSecondaryColor} 72%, ${goalColor}) 100%)`
+        : goalColor;
+    const levelBadgeBorder = goalSecondaryColor
+        ? `1px solid color-mix(in srgb, ${goalSecondaryColor} 78%, ${goalColor})`
+        : '1px solid transparent';
+    const levelBadgeShadow = goalSecondaryColor
+        ? `inset 0 0 0 1px color-mix(in srgb, ${goalSecondaryColor} 24%, transparent)`
+        : 'none';
 
     return (
         <div style={{
@@ -142,18 +152,26 @@ function GoalHeader({
                         )}
                         <div style={{
                             padding: '4px 10px',
-                            background: goalColor,
+                            background: levelBadgeBackground,
                             color: textColor,
+                            border: levelBadgeBorder,
                             borderRadius: '4px',
                             fontSize: '12px',
-                            fontWeight: 'bold'
+                            fontWeight: 'bold',
+                            boxShadow: levelBadgeShadow,
                         }}>
                             {getTypeDisplayName(goalType)}
                         </div>
 
                         {/* Only show SMART indicator in non-create mode, or if we have enough data */}
                         {mode !== 'create' && (
-                            <SMARTIndicator goal={goal} goalType={goalType} />
+                            <SMARTIndicator
+                                goal={goal}
+                                goalType={goalType}
+                                color={goalColor}
+                                secondaryColor={goalSecondaryColor}
+                                textColor={textColor}
+                            />
                         )}
                         {mode !== 'create' && (
                             <>

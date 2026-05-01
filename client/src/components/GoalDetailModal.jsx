@@ -148,23 +148,7 @@ function GoalDetailModal({
     const goalSecondaryColor = getGoalSecondaryColor(goalType);
     const goalIcon = getGoalIcon(goalType);
     const goalIsSmart = isSMART(goal);
-
     const depGoalId = goal?.attributes?.id || goal?.id;
-    const {
-        graphModalConfig,
-        openDurationModal,
-        closeDurationModal,
-    } = useGoalDurationModal({
-        goalId: depGoalId,
-        goalName: goal?.name,
-        fallbackName: name,
-        goalType,
-        goalColor,
-        goalIcon,
-        goalSecondaryColor,
-        isSmart: goalIsSmart,
-    });
-
 
     const {
         isEditing,
@@ -186,6 +170,27 @@ function GoalDetailModal({
         onClose,
         onToggleCompletion,
         resetForm,
+    });
+    const textColor = getGoalTextColor(goalType);
+    const completedColor = getGoalColor('Completed');
+    const completedSecondaryColor = getGoalSecondaryColor('Completed');
+    const completedTextColor = getGoalTextColor('Completed');
+    const displayGoalColor = mode !== 'create' && isCompleted ? completedColor : goalColor;
+    const displayGoalSecondaryColor = mode !== 'create' && isCompleted ? completedSecondaryColor : goalSecondaryColor;
+    const displayTextColor = mode !== 'create' && isCompleted ? completedTextColor : textColor;
+    const {
+        graphModalConfig,
+        openDurationModal,
+        closeDurationModal,
+    } = useGoalDurationModal({
+        goalId: depGoalId,
+        goalName: goal?.name,
+        fallbackName: name,
+        goalType,
+        goalColor: displayGoalColor,
+        goalIcon,
+        goalSecondaryColor: displayGoalSecondaryColor,
+        isSmart: goalIsSmart,
     });
 
     React.useEffect(() => {
@@ -298,9 +303,6 @@ function GoalDetailModal({
         }
     };
 
-    const textColor = getGoalTextColor(goalType);
-    const completedColor = getGoalColor('Completed');
-    const completedTextColor = getGoalTextColor('Completed');
     const childType = getChildType(goalType);
     const levelConfig = getLevelByName(goalType) || {};
 
@@ -533,8 +535,8 @@ function GoalDetailModal({
                         goalId={goalId}
                         rootId={rootId}
                         goalType={goalType}
-                        goalColor={goalColor}
-                        textColor={textColor}
+                        goalColor={displayGoalColor}
+                        textColor={displayTextColor}
                         parentGoal={parentGoal}
                         parentGoalName={parentGoalName}
                         parentGoalColor={parentGoalColor}
@@ -572,8 +574,8 @@ function GoalDetailModal({
                         goalId={goalId}
                         rootId={rootId}
                         goalType={goalType}
-                        goalColor={goalColor}
-                        textColor={textColor}
+                        goalColor={displayGoalColor}
+                        textColor={displayTextColor}
                         parentGoalName={parentGoalName}
                         parentGoalColor={parentGoalColor}
                         isCompleted={isCompleted}
@@ -732,8 +734,8 @@ function GoalDetailModal({
                     goal={goal}
                     goalId={goalId}
                     rootId={rootId}
-                    goalColor={goalColor}
-                    textColor={textColor}
+                    goalColor={displayGoalColor}
+                    textColor={displayTextColor}
                     goalType={goalType}
                     treeData={treeData}
                     onGoalSelect={onGoalSelect}
@@ -783,7 +785,7 @@ function GoalDetailModal({
                         setViewState('goal');
                         setIsEditing(true);
                     }}
-                    style={{ '--goal-tab-accent': goalColor }}
+                    style={{ '--goal-tab-accent': displayGoalColor }}
                 >
                     Edit
                 </button>
@@ -791,7 +793,7 @@ function GoalDetailModal({
                     type="button"
                     className={`${styles.headerActionButton} ${viewState === 'goal-options' ? styles.headerActionActive : ''}`}
                     onClick={() => setViewState('goal-options')}
-                    style={{ '--goal-tab-accent': goalColor }}
+                    style={{ '--goal-tab-accent': displayGoalColor }}
                 >
                     Options
                 </button>
@@ -803,7 +805,7 @@ function GoalDetailModal({
                     type="button"
                     className={`${styles.goalTabButton} ${viewState === 'goal' ? styles.goalTabActive : ''}`}
                     onClick={() => setViewState('goal')}
-                    style={{ '--goal-tab-accent': goalColor }}
+                    style={{ '--goal-tab-accent': displayGoalColor }}
                 >
                     Details
                 </button>
@@ -811,7 +813,7 @@ function GoalDetailModal({
                     type="button"
                     className={`${styles.goalTabButton} ${viewState === 'goal-timeline' ? styles.goalTabActive : ''}`}
                     onClick={() => setViewState('goal-timeline')}
-                    style={{ '--goal-tab-accent': goalColor }}
+                    style={{ '--goal-tab-accent': displayGoalColor }}
                 >
                     Timeline
                 </button>
@@ -819,7 +821,7 @@ function GoalDetailModal({
                     type="button"
                     className={`${styles.goalTabButton} ${viewState === 'goal-notes' ? styles.goalTabActive : ''}`}
                     onClick={() => setViewState('goal-notes')}
-                    style={{ '--goal-tab-accent': goalColor }}
+                    style={{ '--goal-tab-accent': displayGoalColor }}
                 >
                     Notes
                 </button>
@@ -833,8 +835,9 @@ function GoalDetailModal({
                     name={name}
                     goal={goalForSmart}
                     goalType={goalType}
-                    goalColor={goalColor}
-                    textColor={textColor}
+                    goalColor={displayGoalColor}
+                    goalSecondaryColor={mode !== 'create' && (isCompleted || goalIsSmart) ? displayGoalSecondaryColor : null}
+                    textColor={displayTextColor}
                     parentGoal={parentGoal}
                     onClose={handleClose}
                     onCollapse={onMobileCollapse}
@@ -877,7 +880,7 @@ function GoalDetailModal({
                     onClick={handleCancel}
                     className={styles.completionFooterButton}
                     style={{
-                        '--completion-accent': goalColor,
+                        '--completion-accent': displayGoalColor,
                         '--completion-text': 'var(--color-text-primary)',
                     }}
                 >
@@ -888,8 +891,8 @@ function GoalDetailModal({
                     onClick={handleSave}
                     className={`${styles.completionFooterButton} ${styles.editFooterSaveButton}`}
                     style={{
-                        '--completion-accent': goalColor,
-                        '--completion-text': textColor,
+                        '--completion-accent': displayGoalColor,
+                        '--completion-text': displayTextColor,
                     }}
                 >
                     Save
@@ -905,7 +908,7 @@ function GoalDetailModal({
                         onClick={handleAddChildGoal}
                         className={styles.completionFooterButton}
                         style={{
-                            '--completion-accent': goalColor,
+                            '--completion-accent': displayGoalColor,
                             '--completion-text': 'var(--color-text-primary)',
                         }}
                     >
@@ -918,7 +921,8 @@ function GoalDetailModal({
                     disabled={!completionFooterState.canToggleCompletion}
                     className={`${styles.completionFooterButton} ${isCompleted ? styles.completionFooterDone : ''} ${isPaused ? styles.completionFooterPaused : ''}`}
                     style={{
-                        '--completion-accent': isCompleted ? completedColor : goalColor,
+                        '--completion-accent': isCompleted ? completedColor : displayGoalColor,
+                        '--completion-secondary': isCompleted ? completedSecondaryColor : displayGoalSecondaryColor,
                         '--completion-text': isCompleted ? completedTextColor : 'var(--color-text-primary)',
                     }}
                 >
@@ -957,7 +961,7 @@ function GoalDetailModal({
                     onClick={(e) => e.stopPropagation()}
                     className={styles.modalContent}
                     style={{
-                        borderTop: `4px solid ${goalColor}`,
+                        borderTop: `4px solid ${displayGoalColor}`,
                     }}
                 >
                     <div className={styles.modalScrollArea}>

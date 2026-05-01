@@ -1,6 +1,5 @@
 import React from 'react';
-import { calculateSMARTStatus, SMART_CRITERIA, getSMARTTooltip } from '../utils/smartHelpers';
-import { useTheme } from '../contexts/ThemeContext'
+import { calculateSMARTStatus, getSMARTTooltip } from '../utils/smartHelpers';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';;
 
 /**
@@ -9,11 +8,14 @@ import { useGoalLevels } from '../contexts/GoalLevelsContext';;
  * Displays "SMART" text with each letter highlighted if its criterion is met.
  * Letters are colored with the goal's cosmic color when met, gray when not.
  */
-function SMARTIndicator({ goal, goalType }) {
-    const { getGoalColor } = useGoalLevels();;
+function SMARTIndicator({ goal, goalType, color, secondaryColor, textColor }) {
+    const { getGoalColor, getGoalSecondaryColor, getGoalTextColor } = useGoalLevels();;
     const status = calculateSMARTStatus(goal);
-    const goalColor = getGoalColor(goalType);
-    const inactiveColor = '#555';
+    const goalColor = color || getGoalColor(goalType);
+    const goalSecondaryColor = secondaryColor || getGoalSecondaryColor(goalType);
+    const goalTextColor = textColor || getGoalTextColor(goalType);
+    const isFullySmart = Object.values(status).every(Boolean);
+    const inactiveColor = 'var(--color-text-secondary)';
 
     // Map status keys to SMART letter order
     const letters = [
@@ -27,12 +29,26 @@ function SMARTIndicator({ goal, goalType }) {
     return (
         <div
             style={{
-                display: 'flex',
+                display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: '1px',
+                minHeight: '22px',
+                padding: '0 8px',
+                border: isFullySmart
+                    ? `1px solid color-mix(in srgb, ${goalSecondaryColor} 78%, ${goalColor})`
+                    : '1px solid var(--color-border)',
+                borderRadius: '999px',
+                background: isFullySmart
+                    ? `linear-gradient(135deg, ${goalColor} 0%, color-mix(in srgb, ${goalSecondaryColor} 72%, ${goalColor}) 100%)`
+                    : 'color-mix(in srgb, var(--color-bg-card) 72%, transparent)',
+                boxShadow: isFullySmart
+                    ? `inset 0 0 0 1px color-mix(in srgb, ${goalSecondaryColor} 22%, transparent)`
+                    : 'none',
                 fontSize: '12px',
                 fontWeight: 'bold',
-                letterSpacing: '0.5px'
+                letterSpacing: '0.5px',
+                lineHeight: 1,
             }}
         >
             {letters.map(({ key, letter }) => {
@@ -44,7 +60,11 @@ function SMARTIndicator({ goal, goalType }) {
                         key={key}
                         title={tooltip}
                         style={{
-                            color: isMet ? goalColor : inactiveColor,
+                            color: isFullySmart
+                                ? goalTextColor
+                                : isMet
+                                    ? goalColor
+                                    : inactiveColor,
                             cursor: 'help',
                             transition: 'color 0.2s ease'
                         }}
