@@ -18,6 +18,7 @@ function GoalHeader({
     isCompact = false, // Prop to control collapsed state
     goalStatus = 'active',
     headerActions = null,
+    headerTabs = null,
 }) {
     const { timezone } = useTimezone();
     const normalizedStatus = goalStatus === 'frozen' || goalStatus === 'paused'
@@ -131,66 +132,70 @@ function GoalHeader({
                 flexDirection: 'column',
                 gap: '10px'
             }}>
-                {/* Second Row: Badges and Status */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    {mode === 'create' && (
-                        <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
-                            + Create
-                        </span>
-                    )}
-                    <div style={{
-                        padding: '4px 10px',
-                        background: goalColor,
-                        color: textColor,
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                    }}>
-                        {getTypeDisplayName(goalType)}
+                {/* Second Row: Badges, Status, and Header Actions */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        {mode === 'create' && (
+                            <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
+                                + Create
+                            </span>
+                        )}
+                        <div style={{
+                            padding: '4px 10px',
+                            background: goalColor,
+                            color: textColor,
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                        }}>
+                            {getTypeDisplayName(goalType)}
+                        </div>
+
+                        {/* Only show SMART indicator in non-create mode, or if we have enough data */}
+                        {mode !== 'create' && (
+                            <SMARTIndicator goal={goal} goalType={goalType} />
+                        )}
+                        {mode !== 'create' && (
+                            <>
+                                <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    minHeight: '22px',
+                                    padding: '0 8px',
+                                    border: `1px solid ${statusConfig.borderColor}`,
+                                    borderRadius: '999px',
+                                    background: statusConfig.background,
+                                    color: statusConfig.color,
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    lineHeight: 1,
+                                    whiteSpace: 'nowrap',
+                                }}>
+                                    {statusConfig.label}
+                                </span>
+                            </>
+                        )}
+
+                        {mode === 'create' && parentGoal && (
+                            <span style={{ color: '#888', fontSize: '12px' }}>
+                                under "{parentGoal.name}"
+                            </span>
+                        )}
                     </div>
 
-                    {/* Only show SMART indicator in non-create mode, or if we have enough data */}
-                    {mode !== 'create' && (
-                        <SMARTIndicator goal={goal} goalType={goalType} />
-                    )}
-                    {mode !== 'create' && (
-                        <>
-                            <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                minHeight: '22px',
-                                padding: '0 8px',
-                                border: `1px solid ${statusConfig.borderColor}`,
-                                borderRadius: '999px',
-                                background: statusConfig.background,
-                                color: statusConfig.color,
-                                fontSize: '11px',
-                                fontWeight: 700,
-                                lineHeight: 1,
-                                whiteSpace: 'nowrap',
-                            }}>
-                                {statusConfig.label}
-                            </span>
-                        </>
-                    )}
-
-                    {mode === 'create' && parentGoal && (
-                        <span style={{ color: '#888', fontSize: '12px' }}>
-                            under "{parentGoal.name}"
-                        </span>
-                    )}
+                    {headerActions}
                 </div>
 
                 {/* Third Row: Dates */}
-                {(mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline || deadline || headerActions)) && (
+                {(mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline || deadline)) && (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                             {goal?.attributes?.created_at && (
                                 <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Created</span>
                                     <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-                                        {formatDateInTimezone(goal.attributes.created_at, timezone, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        {formatDateInTimezone(goal.attributes.created_at, timezone, { month: 'short', day: 'numeric', year: 'numeric', hour: undefined, minute: undefined })}
                                     </span>
                                 </div>
                             )}
@@ -213,10 +218,11 @@ function GoalHeader({
                                 </div>
                             )}
                         </div>
-                        {headerActions}
                     </div>
                 )}
             </div>
+
+            {mode !== 'create' && headerTabs}
         </div>
     );
 }

@@ -7,6 +7,7 @@ import { lazyWithRetry } from './utils/lazyWithRetry';
 import { getViewportMetaContent, shouldAllowZoom } from './utils/viewportMeta';
 import styles from './AppRouter.module.css';
 import './App.css';
+import GoalIcon from './components/atoms/GoalIcon';
 
 // Import page components
 import Selection from './pages/Selection';
@@ -27,12 +28,14 @@ import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 
 import { usePageTitle } from './hooks/usePageTitle';
 import { dismissGoalDetailsForNavigation } from './utils/navigationEvents';
+import { useGoalLevels } from './contexts/GoalLevelsContext';
 
 // Navigation header component defined outside of App to avoid re-declaration
 const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const { headerActions } = useHeader();
+    const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
     const isMobile = useIsMobile();
     const navRef = useRef(null);
 
@@ -47,6 +50,11 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
 
     const { data: rootGoal } = useRootGoal(rootId, { enabled: isFractalRoute });
     const fractalName = rootGoal?.name || 'Fractal Goals';
+    const rootGoalType = rootGoal?.attributes?.type || rootGoal?.type;
+    const rootGoalIsSmart = Boolean(rootGoal?.attributes?.is_smart ?? rootGoal?.is_smart);
+    const rootGoalColor = rootGoalType ? getGoalColor(rootGoalType) : null;
+    const rootGoalSecondaryColor = rootGoalType ? getGoalSecondaryColor(rootGoalType) : null;
+    const rootGoalIcon = rootGoalType ? getGoalIcon(rootGoalType) : 'circle';
 
     useEffect(() => {
         if (typeof onHeightChange !== 'function') {
@@ -150,7 +158,19 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
             <div className="nav-group">
                 {/* Left Side: Title and Primary Nav */}
                 <div className={styles.navContainer}>
-                    <span className={`fractal-title ${styles.fractalTitle}`}>{fractalName}</span>
+                    <span className={styles.fractalTitleWrap}>
+                        {rootGoalType && (
+                            <GoalIcon
+                                shape={rootGoalIcon}
+                                color={rootGoalColor}
+                                secondaryColor={rootGoalSecondaryColor}
+                                isSmart={rootGoalIsSmart}
+                                size={22}
+                                className={styles.fractalTitleIcon}
+                            />
+                        )}
+                        <span className={`fractal-title ${styles.fractalTitle}`}>{fractalName}</span>
+                    </span>
 
                     <button
                         className={styles.addSessionBtn}

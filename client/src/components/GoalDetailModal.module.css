@@ -85,7 +85,7 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
-    margin: 12px 0 14px;
+    margin: 4px 0 0;
 }
 
 .goalTabButton {
@@ -111,11 +111,20 @@
     color: var(--color-text-primary);
 }
 
+.afterHeaderContent {
+    padding-top: 14px;
+}
+
 .completionFooter {
     flex-shrink: 0;
-    padding: var(--spacing-md, 12px) var(--spacing-lg, 16px) var(--spacing-lg, 16px);
+    padding: 18px var(--spacing-lg, 16px) 4px;
     background: var(--color-bg-sidebar);
     border-top: 1px solid var(--color-border);
+}
+
+.modalFooterComposer.modalFooterComposer {
+    padding-top: 18px;
+    padding-bottom: 0;
 }
 
 .completionFooterActions {
@@ -227,6 +236,8 @@
 
 .modalNoteComposer {
     flex-shrink: 0;
+    margin-top: auto;
+    margin-bottom: -18px;
 }
 
 /* Form Elements */

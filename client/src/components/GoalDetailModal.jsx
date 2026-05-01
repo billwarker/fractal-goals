@@ -797,6 +797,34 @@ function GoalDetailModal({
                 </button>
             </div>
         ) : null;
+        const headerTabs = mode !== 'create' ? (
+            <div className={styles.goalTabRow} aria-label="Goal detail views">
+                <button
+                    type="button"
+                    className={`${styles.goalTabButton} ${viewState === 'goal' ? styles.goalTabActive : ''}`}
+                    onClick={() => setViewState('goal')}
+                    style={{ '--goal-tab-accent': goalColor }}
+                >
+                    Details
+                </button>
+                <button
+                    type="button"
+                    className={`${styles.goalTabButton} ${viewState === 'goal-timeline' ? styles.goalTabActive : ''}`}
+                    onClick={() => setViewState('goal-timeline')}
+                    style={{ '--goal-tab-accent': goalColor }}
+                >
+                    Timeline
+                </button>
+                <button
+                    type="button"
+                    className={`${styles.goalTabButton} ${viewState === 'goal-notes' ? styles.goalTabActive : ''}`}
+                    onClick={() => setViewState('goal-notes')}
+                    style={{ '--goal-tab-accent': goalColor }}
+                >
+                    Notes
+                </button>
+            </div>
+        ) : null;
 
         content = (
             <>
@@ -813,36 +841,11 @@ function GoalDetailModal({
                     deadline={deadline}
                     goalStatus={goalStatus}
                     headerActions={headerActions}
+                    headerTabs={headerTabs}
                 />
-                {mode !== 'create' && (
-                    <div className={styles.goalTabRow} aria-label="Goal detail views">
-                        <button
-                            type="button"
-                            className={`${styles.goalTabButton} ${viewState === 'goal' ? styles.goalTabActive : ''}`}
-                            onClick={() => setViewState('goal')}
-                            style={{ '--goal-tab-accent': goalColor }}
-                        >
-                            Details
-                        </button>
-                        <button
-                            type="button"
-                            className={`${styles.goalTabButton} ${viewState === 'goal-timeline' ? styles.goalTabActive : ''}`}
-                            onClick={() => setViewState('goal-timeline')}
-                            style={{ '--goal-tab-accent': goalColor }}
-                        >
-                            Timeline
-                        </button>
-                        <button
-                            type="button"
-                            className={`${styles.goalTabButton} ${viewState === 'goal-notes' ? styles.goalTabActive : ''}`}
-                            onClick={() => setViewState('goal-notes')}
-                            style={{ '--goal-tab-accent': goalColor }}
-                        >
-                            Notes
-                        </button>
-                    </div>
-                )}
-                {content}
+                <div className={styles.afterHeaderContent}>
+                    {content}
+                </div>
             </>
         );
     }
@@ -864,6 +867,7 @@ function GoalDetailModal({
             composerOnly
             onSubmit={handleQuickGoalNote}
             placeholder="Add a goal note..."
+            className={styles.modalFooterComposer}
         />
     ) : showEditFooter ? (
         <div className={styles.completionFooter}>

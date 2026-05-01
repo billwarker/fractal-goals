@@ -16,6 +16,7 @@ function SidePaneNotePanel({
     placeholder = 'Add a note...',
     label = 'Notes',
     composerOnly = false,
+    className = '',
 }) {
     const [content, setContent] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,7 +58,7 @@ function SidePaneNotePanel({
     };
 
     const composer = (
-        <div className={styles.composer}>
+        <div className={`${styles.composer} ${className}`}>
             <form className={styles.composerForm} onSubmit={handleSubmit}>
                 <div className={styles.inputRow}>
                     <textarea
