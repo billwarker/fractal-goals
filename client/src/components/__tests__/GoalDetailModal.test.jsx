@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import GoalDetailModal from '../GoalDetailModal';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../../utils/navigationEvents';
@@ -282,7 +282,9 @@ describe('GoalDetailModal smoke coverage', () => {
             />
         );
 
-        window.dispatchEvent(new CustomEvent(GOAL_DETAIL_NAVIGATION_EVENT));
+        act(() => {
+            window.dispatchEvent(new CustomEvent(GOAL_DETAIL_NAVIGATION_EVENT));
+        });
 
         expect(onClose).toHaveBeenCalled();
     });
