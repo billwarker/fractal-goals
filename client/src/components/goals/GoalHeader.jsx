@@ -143,8 +143,8 @@ function GoalHeader({
                 gap: '10px'
             }}>
                 {/* Second Row: Badges, Status, and Header Actions */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
                         {mode === 'create' && (
                             <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
                                 + Create
@@ -159,6 +159,7 @@ function GoalHeader({
                             fontSize: '12px',
                             fontWeight: 'bold',
                             boxShadow: levelBadgeShadow,
+                            whiteSpace: 'nowrap',
                         }}>
                             {getTypeDisplayName(goalType)}
                         </div>
