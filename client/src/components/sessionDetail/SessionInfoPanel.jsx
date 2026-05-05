@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { useLiveSessionDuration } from '../../hooks/useSessionDuration';
+import { useLivePausedDuration, useLiveSessionDuration } from '../../hooks/useSessionDuration';
 import { formatDateInTimezone, formatForInput, localToISO } from '../../utils/dateUtils';
 import notify from '../../utils/notify';
 import Button from '../atoms/Button';
@@ -25,6 +25,7 @@ function SessionInfoPanel() {
 
     const totalDuration = calculateTotalDuration();
     const liveDuration = useLiveSessionDuration(session);
+    const pausedDuration = useLivePausedDuration(session);
     const [isExpanded, setIsExpanded] = useState(false);
     const [editingField, setEditingField] = useState(null); // 'start' | 'end' | null
     const [editValue, setEditValue] = useState('');
@@ -125,7 +126,9 @@ function SessionInfoPanel() {
                 {session?.is_paused && (
                     <div className={styles.sessionInfoRow}>
                         <span className={styles.label}>Status:</span>
-                        <span className={`${styles.value} ${styles.duration}`} style={{ color: 'orange' }}>PAUSED</span>
+                        <span className={`${styles.value} ${styles.duration} ${styles.pausedStatus}`}>
+                            PAUSED {pausedDuration.formatted}
+                        </span>
                     </div>
                 )}
                 {session.program_info && (
@@ -218,13 +221,7 @@ function SessionInfoPanel() {
                             <div className={styles.sessionInfoRow}>
                                 <span className={styles.label}>Paused Time:</span>
                                 <span className={styles.value}>
-                                    {formatClockDuration(
-                                        (session?.total_paused_seconds || 0) +
-                                        (session?.is_paused && session?.last_paused_at
-                                            ? Math.floor((Date.now() - new Date(session.last_paused_at).getTime()) / 1000)
-                                            : 0),
-                                        '0:00'
-                                    )}
+                                    {pausedDuration.formatted}
                                 </span>
                             </div>
                         )}

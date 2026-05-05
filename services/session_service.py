@@ -306,6 +306,33 @@ class SessionService:
         }
 
     @staticmethod
+    def _finalize_paused_session_duration(session_obj, completion_time: datetime):
+        """Fold an active pause into totals and persist active session duration."""
+        if is_quick_session(session_obj):
+            return
+
+        completion_at = _as_utc_datetime(completion_time) or datetime.now(timezone.utc)
+        if session_obj.is_paused and session_obj.last_paused_at:
+            paused_at = _as_utc_datetime(session_obj.last_paused_at)
+            if paused_at and completion_at > paused_at:
+                paused_duration = int((completion_at - paused_at).total_seconds())
+                session_obj.total_paused_seconds = (session_obj.total_paused_seconds or 0) + paused_duration
+        session_obj.is_paused = False
+        session_obj.last_paused_at = None
+
+        if not session_obj.session_end:
+            session_obj.session_end = completion_at
+
+        start_at = _as_utc_datetime(session_obj.session_start)
+        end_at = _as_utc_datetime(session_obj.session_end)
+        if start_at and end_at and end_at > start_at:
+            wall_duration = int((end_at - start_at).total_seconds())
+            session_obj.total_duration_seconds = max(
+                0,
+                wall_duration - (session_obj.total_paused_seconds or 0),
+            )
+
+    @staticmethod
     def _build_analytics_legacy_instance(session_obj, exercise: JsonDict, fallback_id: str) -> JsonDict:
         metric_values = exercise.get("metrics") if isinstance(exercise.get("metrics"), list) else []
         return {
@@ -1874,12 +1901,19 @@ class SessionService:
 
                         # Apply any active straggler paused time if the session was currently paused
                         if instance.is_paused and instance.last_paused_at:
-                            paused_duration = (completion_time - instance.last_paused_at).total_seconds()
-                            instance.total_paused_seconds = (instance.total_paused_seconds or 0) + int(paused_duration)
+                            paused_at = _as_utc_datetime(instance.last_paused_at)
+                            if paused_at:
+                                paused_duration = (completion_time - paused_at).total_seconds()
+                                instance.total_paused_seconds = (
+                                    (instance.total_paused_seconds or 0)
+                                    + int(max(0, paused_duration))
+                                )
                             instance.is_paused = False
                             instance.last_paused_at = None
 
-                        duration = (instance.time_stop - instance.time_start).total_seconds()
+                        stop_at = _as_utc_datetime(instance.time_stop)
+                        start_at = _as_utc_datetime(instance.time_start)
+                        duration = (stop_at - start_at).total_seconds() if stop_at and start_at else 0
                         active_duration = max(0, duration - (instance.total_paused_seconds or 0))
                         instance.duration_seconds = int(active_duration)
                     instance.completed = True
@@ -1887,6 +1921,8 @@ class SessionService:
                 session.completed_at = None
                 session.session_end = None
                 session.total_duration_seconds = None
+                session.is_paused = False
+                session.last_paused_at = None
                 
                 # Also clear it from the nested session_data if it exists
                 if isinstance(session.attributes, dict) and 'session_data' in session.attributes:
@@ -1915,6 +1951,9 @@ class SessionService:
         if 'session_data' in data:
             val = data['session_data']
             session.attributes = models._safe_load_json(val, val)
+
+        if data.get('completed') and session.completed:
+            self._finalize_paused_session_duration(session, session.session_end or session.completed_at)
         
         self.db_session.commit()
         self._recompute_and_attach_stats(session)

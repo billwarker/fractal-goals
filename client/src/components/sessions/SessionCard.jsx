@@ -33,6 +33,13 @@ function SessionCard({
     ];
     const notesCount = Array.isArray(session.notes) ? session.notes.length : (session.notes_count || 0);
     const sessionCompleted = Boolean(session.completed || session.attributes?.completed);
+    const sessionPaused = Boolean(session.is_paused ?? session.attributes?.is_paused);
+    let statusLabel = 'Incomplete session';
+    if (sessionPaused) {
+        statusLabel = 'Paused session';
+    } else if (sessionCompleted) {
+        statusLabel = 'Completed session';
+    }
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
@@ -71,7 +78,7 @@ function SessionCard({
 
     return (
         <div
-            className={`session-card ${isSelected ? 'selected' : ''} ${sessionCompleted ? 'completed' : ''}`}
+            className={`session-card ${isSelected ? 'selected' : ''} ${sessionCompleted ? 'completed' : ''} ${sessionPaused ? 'paused' : ''}`}
             onClick={handleClick}
         >
             {/* Header Row */}
@@ -85,8 +92,9 @@ function SessionCard({
                     </span>
                     <CompletionCheckBadge
                         checked={sessionCompleted}
+                        paused={sessionPaused}
                         className="session-card-completed-badge"
-                        label={sessionCompleted ? 'Completed session' : 'Incomplete session'}
+                        label={statusLabel}
                     />
                     <span className="session-card-notes-count">
                         📝 {notesCount}

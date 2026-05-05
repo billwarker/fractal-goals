@@ -7,6 +7,7 @@ import { renderHook } from '@testing-library/react';
 import {
     formatDuration,
     formatShortDuration,
+    calculatePausedSeconds,
     calculateSessionDuration,
     calculateSectionDuration,
     useSessionDuration
@@ -76,17 +77,43 @@ describe('calculateSessionDuration', () => {
         expect(calculateSessionDuration(session)).toBe(null);
     });
 
-    it('calculates from session_start and session_end (priority 1)', () => {
+    it('uses total_duration_seconds before wall clock duration', () => {
+        const session = {
+            session_start: '2024-01-01T10:00:00Z',
+            session_end: '2024-01-01T11:30:00Z',
+            total_duration_seconds: 3600,
+            attributes: {
+                session_data: {
+                    session_start: '2024-01-01T10:00:00Z',
+                    session_end: '2024-01-01T11:30:00Z'
+                },
+            }
+        };
+        expect(calculateSessionDuration(session)).toBe(3600);
+    });
+
+    it('calculates from session_start and session_end when persisted duration is missing', () => {
         const session = {
             attributes: {
                 session_data: {
                     session_start: '2024-01-01T10:00:00Z',
                     session_end: '2024-01-01T11:30:00Z' // 1.5 hours = 5400 seconds
-                },
-                total_duration_seconds: 1000 // Should be ignored
+                }
             }
         };
         expect(calculateSessionDuration(session)).toBe(5400);
+    });
+
+    it('subtracts paused time from wall clock duration', () => {
+        const session = {
+            session_start: '2024-01-01T10:00:00Z',
+            session_end: '2024-01-01T11:30:00Z',
+            total_paused_seconds: 900,
+            attributes: {
+                session_data: {}
+            }
+        };
+        expect(calculateSessionDuration(session)).toBe(4500);
     });
 
     it('calculates from top-level session_start/session_end when session_data is missing them', () => {
@@ -94,8 +121,7 @@ describe('calculateSessionDuration', () => {
             session_start: '2024-01-01T10:00:00Z',
             session_end: '2024-01-01T11:30:00Z',
             attributes: {
-                session_data: {},
-                total_duration_seconds: 1000
+                session_data: {}
             }
         };
         expect(calculateSessionDuration(session)).toBe(5400);
@@ -157,6 +183,18 @@ describe('calculateSessionDuration', () => {
         };
         // Should fall back to total_duration_seconds
         expect(calculateSessionDuration(session)).toBe(600);
+    });
+});
+
+describe('calculatePausedSeconds', () => {
+    it('includes the active paused span when currently paused', () => {
+        const session = {
+            is_paused: true,
+            last_paused_at: '2024-01-01T10:00:00Z',
+            total_paused_seconds: 120,
+        };
+
+        expect(calculatePausedSeconds(session, new Date('2024-01-01T10:02:30Z').getTime())).toBe(270);
     });
 });
 

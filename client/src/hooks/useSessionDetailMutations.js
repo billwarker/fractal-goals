@@ -134,6 +134,7 @@ export function useSessionDetailMutations({
         onSuccess: (response) => {
             queryClient.setQueryData(sessionKey, response.data);
             queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
+            invalidateSessionListQueries();
             notify.success('Session paused');
         },
         onError: (error) => {
@@ -146,6 +147,7 @@ export function useSessionDetailMutations({
         onSuccess: (response) => {
             queryClient.setQueryData(sessionKey, response.data);
             queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
+            invalidateSessionListQueries();
             notify.success('Session resumed');
         },
         onError: (error) => {

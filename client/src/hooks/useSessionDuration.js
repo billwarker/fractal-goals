@@ -2,13 +2,36 @@
  * useSessionDuration - Hook for calculating and formatting session duration
  * 
  * Calculates duration from multiple sources with priority:
- * 1. session_start/session_end times (wall clock)
- * 2. total_duration_seconds attribute (set on completion)
+ * 1. total_duration_seconds attribute (set on completion, excludes paused time)
+ * 2. session_start/session_end times minus known paused time
  * 3. Sum of activity instance durations
  */
 
 import { useMemo, useState, useEffect } from 'react';
 import { formatHourMinuteDuration, formatClockDuration } from '../utils/sessionTime';
+
+export function getSessionPauseState(session) {
+    const attrs = session?.attributes || {};
+    return {
+        isPaused: Boolean(session?.is_paused ?? attrs.is_paused ?? false),
+        lastPausedAt: session?.last_paused_at ?? attrs.last_paused_at ?? null,
+        totalPausedSeconds: session?.total_paused_seconds ?? attrs.total_paused_seconds ?? 0,
+    };
+}
+
+export function calculatePausedSeconds(session, nowMs = Date.now()) {
+    const { isPaused, lastPausedAt, totalPausedSeconds } = getSessionPauseState(session);
+    let currentPauseSeconds = 0;
+
+    if (isPaused && lastPausedAt) {
+        const pausedAtMs = new Date(lastPausedAt).getTime();
+        if (!Number.isNaN(pausedAtMs)) {
+            currentPauseSeconds = Math.max(0, Math.floor((nowMs - pausedAtMs) / 1000));
+        }
+    }
+
+    return Math.max(0, Number(totalPausedSeconds || 0) + currentPauseSeconds);
+}
 
 /**
  * Format seconds into H:MM or 0:MM format
@@ -42,7 +65,13 @@ export function calculateSessionDuration(session) {
     const startTime = sessionData?.session_start || session?.session_start || session?.attributes?.session_start;
     const endTime = sessionData?.session_end || session?.session_end || session?.attributes?.session_end;
 
-    // Priority 1: Calculate from session_start and session_end
+    // Priority 1: Use persisted active duration if available. This excludes paused time.
+    const totalDurationSeconds = session?.attributes?.total_duration_seconds ?? session?.total_duration_seconds;
+    if (totalDurationSeconds != null && totalDurationSeconds > 0) {
+        return totalDurationSeconds;
+    }
+
+    // Priority 2: Calculate from session_start and session_end, subtracting known pauses.
     if (startTime && endTime) {
         const start = new Date(startTime);
         const end = new Date(endTime);
@@ -50,15 +79,9 @@ export function calculateSessionDuration(session) {
         if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
             const diffSeconds = Math.floor((end - start) / 1000);
             if (diffSeconds > 0) {
-                return diffSeconds;
+                return Math.max(0, diffSeconds - calculatePausedSeconds(session, end.getTime()));
             }
         }
-    }
-
-    // Priority 2: Use total_duration_seconds if available
-    const totalDurationSeconds = session?.attributes?.total_duration_seconds ?? session?.total_duration_seconds;
-    if (totalDurationSeconds != null && totalDurationSeconds > 0) {
-        return totalDurationSeconds;
     }
 
     // Priority 3: Calculate from activity instances
@@ -142,18 +165,8 @@ export function useLiveSessionDuration(session) {
 
         const updateClock = () => {
             const now = Date.now();
-            const totalPaused = session.total_paused_seconds || session.attributes?.total_paused_seconds || 0;
-            const isPaused = session.is_paused || session.attributes?.is_paused || false;
-            const lastPausedAt = session.last_paused_at || session.attributes?.last_paused_at;
-            let currentPausedStraggler = 0;
-
-            if (isPaused && lastPausedAt) {
-                const pausedTime = new Date(lastPausedAt).getTime();
-                currentPausedStraggler = Math.floor((now - pausedTime) / 1000);
-            }
-
             const diffSeconds = Math.floor((now - start) / 1000);
-            const activeSeconds = Math.max(0, diffSeconds - totalPaused - currentPausedStraggler);
+            const activeSeconds = Math.max(0, diffSeconds - calculatePausedSeconds(session, now));
             setSeconds(activeSeconds);
         };
 
@@ -170,6 +183,40 @@ export function useLiveSessionDuration(session) {
         session?.is_paused,
         session?.total_paused_seconds,
         session?.attributes?.is_paused,
+        session?.attributes?.total_paused_seconds
+    ]);
+
+    return {
+        seconds,
+        formatted: formatClockDuration(seconds, '0:00'),
+        hasData: seconds > 0
+    };
+}
+
+export function useLivePausedDuration(session) {
+    const [seconds, setSeconds] = useState(() => calculatePausedSeconds(session));
+
+    useEffect(() => {
+        if (!session) {
+            setSeconds(0);
+            return undefined;
+        }
+
+        const updateClock = () => setSeconds(calculatePausedSeconds(session));
+        updateClock();
+
+        const { isPaused } = getSessionPauseState(session);
+        if (!isPaused) return undefined;
+
+        const interval = setInterval(updateClock, 1000);
+        return () => clearInterval(interval);
+    }, [
+        session,
+        session?.is_paused,
+        session?.last_paused_at,
+        session?.total_paused_seconds,
+        session?.attributes?.is_paused,
+        session?.attributes?.last_paused_at,
         session?.attributes?.total_paused_seconds
     ]);
 

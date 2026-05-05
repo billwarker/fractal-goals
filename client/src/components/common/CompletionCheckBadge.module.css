@@ -20,8 +20,30 @@
     color: var(--color-text-muted);
 }
 
+.paused {
+    background: color-mix(in srgb, var(--color-warning, #f59e0b) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 62%, transparent);
+    color: var(--color-warning, #f59e0b);
+}
+
 .mark {
     display: block;
     width: 18px;
     height: 18px;
+}
+
+.pauseMark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 18px;
+    height: 18px;
+}
+
+.pauseMark span {
+    display: block;
+    width: 4px;
+    height: 12px;
+    background: currentColor;
 }

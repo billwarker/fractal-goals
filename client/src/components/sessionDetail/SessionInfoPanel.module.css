@@ -79,6 +79,10 @@
     font-family: var(--font-family-mono);
 }
 
+.value.pausedStatus {
+    color: var(--color-warning, #f59e0b);
+}
+
 .link {
     color: var(--color-brand-primary);
     text-decoration: none;

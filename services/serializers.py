@@ -384,6 +384,17 @@ def serialize_session(session, include_image_data=False):
             if k not in result["attributes"]:
                 result["attributes"][k] = copy.deepcopy(v)
 
+    session_data.update({
+        "session_start": format_utc(session.session_start),
+        "session_end": format_utc(session.session_end),
+        "duration_minutes": session.duration_minutes,
+        "total_duration_seconds": session.total_duration_seconds,
+        "is_paused": getattr(session, 'is_paused', False),
+        "last_paused_at": format_utc(getattr(session, 'last_paused_at', None)),
+        "total_paused_seconds": getattr(session, 'total_paused_seconds', 0),
+        "completed": session.completed,
+    })
+
     if isinstance(template_payload, dict):
         if not session_data.get("template_name") and getattr(getattr(session, "template", None), "name", None):
             session_data["template_name"] = session.template.name

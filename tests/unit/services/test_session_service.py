@@ -1,7 +1,7 @@
 import pytest
 import json
 from uuid import uuid4
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from models import Goal, ActivityDefinition, ActivityGroup, ActivityInstance, Session, get_session_by_id
 from services.session_service import SessionService
@@ -188,6 +188,35 @@ def test_update_session_completion(db_session, session_service, sample_practice_
     session_obj = get_session_by_id(db_session, sample_practice_session.id)
     assert session_obj.completed is True
     assert session_obj.completed_at is not None
+
+
+def test_update_session_completion_excludes_paused_time(
+    db_session, session_service, sample_practice_session, test_user
+):
+    start = datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc)
+    end = start + timedelta(minutes=30)
+    sample_practice_session.session_start = start
+    sample_practice_session.is_paused = True
+    sample_practice_session.last_paused_at = end - timedelta(minutes=10)
+    sample_practice_session.total_paused_seconds = 5 * 60
+    db_session.commit()
+
+    result, error_msg, status_code = session_service.update_session(
+        sample_practice_session.root_id,
+        sample_practice_session.id,
+        test_user.id,
+        {
+            'completed': True,
+            'session_end': end.isoformat(),
+        },
+    )
+
+    assert error_msg is None
+    assert status_code == 200
+    assert result['completed'] is True
+    assert result['is_paused'] is False
+    assert result['total_paused_seconds'] == 15 * 60
+    assert result['total_duration_seconds'] == 15 * 60
 
 def test_delete_session(db_session, session_service, sample_practice_session, test_user):
     root_id = sample_practice_session.root_id

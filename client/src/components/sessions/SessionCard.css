@@ -25,6 +25,10 @@
     border-left: 3px solid var(--color-brand-success);
 }
 
+.session-card.paused {
+    border-left: 3px solid var(--color-warning, #f59e0b);
+}
+
 .session-card-header {
     display: flex;
     justify-content: space-between;
