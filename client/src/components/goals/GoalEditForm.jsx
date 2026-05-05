@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import Input from '../atoms/Input';
 import Checkbox from '../atoms/Checkbox';
+import CheckIcon from '../atoms/CheckIcon';
 import { isAboveShortTermGoal } from '../../utils/goalHelpers';
 import { isExecutionGoalType } from '../../utils/goalNodeModel';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
@@ -146,21 +147,21 @@ function GoalEditForm({
                     <div className={styles.infoList}>
                         {trackActivities && (
                             <div className={styles.infoItem}>
-                                <span style={{ fontSize: '13px' }}>✓</span>
+                                <CheckIcon size={13} />
                                 <span>Goal is complete when target(s) are achieved.</span>
                             </div>
                         )}
 
                         {completedViaChildren && (
                             <div className={styles.infoItem}>
-                                <span style={{ fontSize: '13px' }}>✓</span>
+                                <CheckIcon size={13} />
                                 <span>Goal is complete when all child goals are done (Delegated).</span>
                             </div>
                         )}
 
                         {allowManualCompletion && (
                             <div className={styles.infoItem}>
-                                <span style={{ fontSize: '13px' }}>✓</span>
+                                <CheckIcon size={13} />
                                 <span>Goal can be marked as complete by the user.</span>
                             </div>
                         )}

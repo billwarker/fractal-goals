@@ -1,5 +1,7 @@
 import React from 'react';
 
+import CloseIcon from '../atoms/CloseIcon';
+import InheritanceArrowIcon from '../atoms/InheritanceArrowIcon';
 import styles from './ActivityAssociator.module.css';
 
 const ActivityMiniCard = ({
@@ -19,7 +21,7 @@ const ActivityMiniCard = ({
             ? `↑ Also inherited from ${inheritedSourceNames[0]}`
             : '↑ Also inherited from a child goal';
     const parentInheritanceLabel = '↓ Also inherited from parent goal';
-    const inheritedDirectionSymbol = activity.inherited_from_parent ? '↓' : '↑';
+    const inheritedDirection = activity.inherited_from_parent ? 'down' : 'up';
     const inheritedDirectionTitle = activity.inherited_from_parent
         ? 'Inherited from parent goal'
         : 'Inherited from child goal';
@@ -44,7 +46,7 @@ const ActivityMiniCard = ({
                 <h4 className={styles.miniCardName}>
                     {isInheritedOnly && (
                         <span className={styles.inheritedIcon} title={inheritedDirectionTitle}>
-                            {inheritedDirectionSymbol}
+                            <InheritanceArrowIcon direction={inheritedDirection} size={12} />
                         </span>
                     )}
                     {activity.name}
@@ -58,7 +60,7 @@ const ActivityMiniCard = ({
                         }}
                         title={isAlsoInheritedFromChildren ? 'Remove direct association' : 'Remove association'}
                     >
-                        ×
+                        <CloseIcon size={14} />
                     </button>
                 )}
             </div>

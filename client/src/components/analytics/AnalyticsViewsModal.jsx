@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 
+import CloseIcon from '../atoms/CloseIcon';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 import styles from './AnalyticsViewsModal.module.css';
 
@@ -17,8 +18,8 @@ function AnalyticsViewsModal({
             <div className={styles.sheet} onClick={(event) => event.stopPropagation()}>
                 <div className={styles.header}>
                     <h3 className={styles.title}>Analytics Views</h3>
-                    <button type="button" className={styles.closeButton} onClick={onClose}>
-                        ×
+                    <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close analytics views">
+                        <CloseIcon size={16} />
                     </button>
                 </div>
 

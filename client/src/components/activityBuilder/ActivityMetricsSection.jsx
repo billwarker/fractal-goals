@@ -6,6 +6,7 @@ import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import Button from '../atoms/Button';
 import Checkbox from '../atoms/Checkbox';
+import CloseIcon from '../atoms/CloseIcon';
 import Input from '../atoms/Input';
 import styles from '../ActivityBuilder.module.css';
 import metricStyles from './ActivityMetricsSection.module.css';
@@ -124,8 +125,9 @@ function ActivityMetricsSection({
                                         onClick={() => onRemoveMetric(idx)}
                                         variant="ghost"
                                         style={{ color: 'var(--color-brand-danger)', padding: '8px' }}
+                                        aria-label="Remove metric"
                                     >
-                                        ×
+                                        <CloseIcon size={14} />
                                     </Button>
                                 )}
                             </div>

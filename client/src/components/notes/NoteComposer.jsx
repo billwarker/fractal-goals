@@ -12,6 +12,7 @@ import remarkGfm from 'remark-gfm';
 import { useActivities, useActivityGroups } from '../../hooks/useActivityQueries';
 import { useFractalTree } from '../../hooks/useGoalQueries';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import CloseIcon from '../atoms/CloseIcon';
 import CreateNoteIcon from '../atoms/CreateNoteIcon';
 import GoalTreePicker from '../common/GoalTreePicker';
 import styles from './NoteComposer.module.css';
@@ -181,14 +182,18 @@ function NoteComposer({
                             <span className={styles.chip}>
                                 Goal: {selectedGoalName || selectedGoalId}
                                 {!prelinkedGoalId && (
-                                    <button className={styles.chipRemove} onClick={clearGoal} type="button">×</button>
+                                    <button className={styles.chipRemove} onClick={clearGoal} type="button">
+                                        <CloseIcon size={12} />
+                                    </button>
                                 )}
                             </span>
                         )}
                         {selectedActivityId && (
                             <span className={styles.chip}>
                                 Activity: {selectedActivityName || selectedActivityId}
-                                <button className={styles.chipRemove} onClick={clearActivity} type="button">×</button>
+                                <button className={styles.chipRemove} onClick={clearActivity} type="button">
+                                    <CloseIcon size={12} />
+                                </button>
                             </span>
                         )}
                     </div>

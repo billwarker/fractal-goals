@@ -5,6 +5,7 @@ import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
+import CloseIcon from '../atoms/CloseIcon';
 import Input from '../atoms/Input';
 import Select from '../atoms/Select';
 import TextArea from '../atoms/TextArea';
@@ -500,8 +501,9 @@ function TemplateBuilderModalContent({
                                                                     size="sm"
                                                                     variant="danger"
                                                                     onClick={() => handleRemoveQuickActivity(activityIndex)}
+                                                                    aria-label="Remove quick activity"
                                                                 >
-                                                                    ×
+                                                                    <CloseIcon size={14} />
                                                                 </Button>
                                                             </div>
                                                         )}
@@ -596,8 +598,9 @@ function TemplateBuilderModalContent({
                                                                     size="sm"
                                                                     variant="danger"
                                                                     onClick={() => handleRemoveSection(sectionIndex)}
+                                                                    aria-label="Remove section"
                                                                 >
-                                                                    ×
+                                                                    <CloseIcon size={14} />
                                                                 </Button>
                                                             </div>
                                                         )}
@@ -650,7 +653,7 @@ function TemplateBuilderModalContent({
                                                                         className={styles.removeActivityButton}
                                                                         aria-label="Remove activity"
                                                                     >
-                                                                        ×
+                                                                        <CloseIcon size={14} />
                                                                     </button>
                                                                 </div>
                                                             </div>

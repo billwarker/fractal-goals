@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import CloseIcon from '../atoms/CloseIcon';
 import styles from './ActivityFilterModal.module.css';
 
 const ROOT_KEY = '__root__';
@@ -217,8 +218,8 @@ function ActivityFilterModal({
                             {currentGroup ? currentGroup.name : title}
                         </h3>
                     </div>
-                    <button type="button" className={styles.closeButton} onClick={onClose}>
-                        ×
+                    <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close activity filter">
+                        <CloseIcon size={16} />
                     </button>
                 </div>
 

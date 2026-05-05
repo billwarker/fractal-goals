@@ -12,6 +12,7 @@ import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
+import CloseIcon from '../atoms/CloseIcon';
 import GoalAssociationPicker from '../goals/GoalAssociationPicker';
 import { useProgramDayViewModel } from '../../hooks/useProgramDayViewModel';
 import styles from './DayViewModal.module.css';
@@ -113,7 +114,7 @@ const DayViewModal = ({
                             className={styles.closeButton}
                             aria-label="Close"
                         >
-                            ×
+                            <CloseIcon size={16} />
                         </button>
                     </div>
                 </div>
@@ -163,8 +164,9 @@ const DayViewModal = ({
                                                 onClick={() => onUnscheduleDay && onUnscheduleDay(day)}
                                                 className={styles.removeButton}
                                                 title={day.isRecurringTemplate ? 'Remove sessions from this date' : 'Unschedule Day'}
+                                                aria-label={day.isRecurringTemplate ? 'Remove sessions from this date' : 'Unschedule day'}
                                             >
-                                                ✕
+                                                <CloseIcon size={14} />
                                             </button>
                                         </div>
 
@@ -252,10 +254,10 @@ const DayViewModal = ({
                                             <button
                                                 onClick={() => onUnscheduleDay && onUnscheduleDay({ ...session, type: 'session' })}
                                                 className={styles.removeButton}
-                                                style={{ fontSize: '18px', fontWeight: 300 }}
                                                 title="Cancel Session"
+                                                aria-label="Cancel session"
                                             >
-                                                ✕
+                                                <CloseIcon size={14} />
                                             </button>
                                         </div>
                                     </div>

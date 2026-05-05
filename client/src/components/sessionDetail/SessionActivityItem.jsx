@@ -9,6 +9,7 @@ import ActivityCompletionButton from '../common/ActivityCompletionButton';
 import MetaField from '../common/MetaField';
 import Linkify from '../atoms/Linkify';
 import Button from '../atoms/Button';
+import CloseIcon from '../atoms/CloseIcon';
 
 import { DeletedBadge } from '../ui/DeletedEntityFallback';
 import NoteQuickAdd from './NoteQuickAdd';
@@ -994,7 +995,11 @@ function SessionActivityItem({
                 </div>
 
                 {/* Delete Button */}
-                {!quickMode && <button onClick={onDelete} className={styles.deleteButton} aria-label="Delete activity">×</button>}
+                {!quickMode && (
+                    <button onClick={onDelete} className={styles.deleteButton} aria-label="Delete activity">
+                        <CloseIcon size={14} />
+                    </button>
+                )}
             </div>
 
             {/* Content Area */}
@@ -1120,7 +1125,9 @@ function SessionActivityItem({
                                         </span>
                                     )}
 
-                                    <button onClick={() => handleRemoveSet(setIdx)} className={styles.removeSetButton} aria-label="Remove set">×</button>
+                                    <button onClick={() => handleRemoveSet(setIdx)} className={styles.removeSetButton} aria-label="Remove set">
+                                        <CloseIcon size={14} />
+                                    </button>
                                 </div>
                             ))}
                         </div>

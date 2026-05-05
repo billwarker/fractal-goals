@@ -1,6 +1,7 @@
 import React from 'react';
 
 import Button from '../atoms/Button';
+import CloseIcon from '../atoms/CloseIcon';
 import Input from '../atoms/Input';
 import styles from '../ActivityBuilder.module.css';
 
@@ -30,8 +31,9 @@ function ActivitySplitsSection({
                                 onClick={() => onRemoveSplit(idx)}
                                 variant="ghost"
                                 style={{ color: 'var(--color-brand-danger)', padding: '8px' }}
+                                aria-label="Remove split"
                             >
-                                ×
+                                <CloseIcon size={14} />
                             </Button>
                         )}
                         {idx === splits.length - 1 && splits.length < 5 && (

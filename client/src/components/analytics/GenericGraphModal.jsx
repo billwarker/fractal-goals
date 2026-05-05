@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { Line, Bar } from 'react-chartjs-2';
 import { DISABLED_CHART_ANIMATION, useChartOptions } from './ChartJSWrapper'; // Import hook
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import CloseIcon from '../atoms/CloseIcon';
 import GoalIcon from '../atoms/GoalIcon';
 import styles from './GenericGraphModal.module.css';
 
@@ -233,7 +234,7 @@ const GenericGraphModal = ({
                         onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-primary)'}
                         onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-muted)'}
                     >
-                        ×
+                        <CloseIcon size={28} />
                     </button>
                 </div>
 

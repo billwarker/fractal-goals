@@ -1,5 +1,6 @@
 import React from 'react';
 
+import CloseIcon from '../atoms/CloseIcon';
 import SessionSidePane from './SessionSidePane';
 import styles from '../../pages/SessionDetail.module.css';
 
@@ -36,7 +37,7 @@ function SessionDetailPaneLayout({
                                 onClick={onCloseMobilePane}
                                 aria-label="Close panel"
                             >
-                                ×
+                                <CloseIcon size={16} />
                             </button>
                         </div>
                         <SessionSidePane model={sidePaneModel} showModeTabs={false} embedded />

@@ -6,6 +6,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import CheckIcon from '../atoms/CheckIcon';
+import CloseIcon from '../atoms/CloseIcon';
 import GoalIcon from '../atoms/GoalIcon';
 import ImageViewerModal from '../sessionDetail/ImageViewerModal';
 import MarkdownNoteContent from './MarkdownNoteContent';
@@ -384,8 +386,16 @@ function NoteCard({
                             rows={1}
                         />
                         <div className={styles.editActions}>
-                            <button onClick={handleSave} className={styles.saveBtn}>✓</button>
-                            <button onClick={() => { setEditContent(note.content); setIsEditing(false); }} className={styles.cancelBtn}>✕</button>
+                            <button onClick={handleSave} className={styles.saveBtn} aria-label="Save note">
+                                <CheckIcon size={14} />
+                            </button>
+                            <button
+                                onClick={() => { setEditContent(note.content); setIsEditing(false); }}
+                                className={styles.cancelBtn}
+                                aria-label="Cancel editing"
+                            >
+                                <CloseIcon size={14} />
+                            </button>
                         </div>
                     </div>
                 ) : (

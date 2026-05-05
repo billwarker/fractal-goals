@@ -1,6 +1,7 @@
 import React from 'react';
 
 import Button from '../atoms/Button';
+import CloseIcon from '../atoms/CloseIcon';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import styles from './ImmediateGoalSection.module.css';
 
@@ -126,8 +127,9 @@ function NewGoalCard({ goal, onRemove }) {
                 variant="danger"
                 size="sm"
                 className={styles.removeButton}
+                aria-label="Remove immediate goal"
             >
-                ×
+                <CloseIcon size={14} />
             </Button>
         </div>
     );

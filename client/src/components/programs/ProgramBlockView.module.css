@@ -251,8 +251,9 @@
 }
 
 .addBlockIcon {
-    font-size: 18px;
-    line-height: 1;
+    width: 18px;
+    height: 18px;
+    display: block;
 }
 
 /* ─── Day Card ────────────────────────────────────────────────────────────── */
@@ -336,8 +337,9 @@
 .templateDoneMark {
     flex: 0 0 auto;
     color: var(--color-brand-success);
-    font-size: 11px;
-    font-weight: 700;
+    width: 12px;
+    height: 12px;
+    display: block;
 }
 
 .templateCount {
@@ -399,9 +401,9 @@
 }
 
 .addDayIcon {
-    font-size: 20px;
-    font-weight: 300;
-    line-height: 1;
+    width: 20px;
+    height: 20px;
+    display: block;
     color: var(--color-text-muted);
 }
 

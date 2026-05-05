@@ -21,6 +21,7 @@ import GoalUncompletionModal from './goals/GoalUncompletionModal';
 import GoalHeader from './goals/GoalHeader';
 import GoalViewMode from './goals/GoalViewMode';
 import GoalEditForm from './goals/GoalEditForm';
+import CloseIcon from './atoms/CloseIcon';
 import GoalIcon from './atoms/GoalIcon';
 import SidePaneNotePanel from './common/SidePaneNotePanel';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
@@ -465,7 +466,7 @@ function GoalDetailModal({
                     aria-label="Close"
                     className={styles.levelPickerClose}
                 >
-                    ×
+                    <CloseIcon size={16} />
                 </button>
             </div>
             <p className={styles.levelPickerPrompt}>

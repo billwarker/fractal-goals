@@ -438,12 +438,13 @@
     border: none;
     color: var(--color-brand-danger);
     cursor: pointer;
-    font-size: 22px;
-    line-height: 1;
     position: absolute;
     top: 8px;
     right: 8px;
     z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .contentArea {
@@ -644,6 +645,9 @@
     border: none;
     color: var(--color-text-muted);
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .addSetButton {

@@ -140,6 +140,14 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     const sessionData = session.attributes?.session_data;
     const quickSession = isQuickSession(session);
     const templateColor = getTemplateColor(session);
+    const sessionCompleted = Boolean(session.completed ?? session.attributes?.completed);
+    const sessionPaused = Boolean(session.is_paused ?? session.attributes?.is_paused);
+    let sessionStatusLabel = 'Incomplete session';
+    if (sessionPaused) {
+        sessionStatusLabel = 'Paused session';
+    } else if (sessionCompleted) {
+        sessionStatusLabel = 'Completed session';
+    }
     const sessionStart = sessionData?.session_start || session?.session_start || session?.attributes?.session_start;
     const sessionEnd = sessionData?.session_end || session?.session_end || session?.attributes?.session_end;
     const shortTermGoals = session.short_term_goals || [];
@@ -321,8 +329,9 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                             {session.name}
                         </Link>
                         <CompletionCheckBadge
-                            checked={Boolean(session.attributes?.completed)}
-                            label={session.attributes?.completed ? 'Completed session' : 'Incomplete session'}
+                            checked={sessionCompleted}
+                            paused={sessionPaused}
+                            label={sessionStatusLabel}
                         />
                     </div>
                     {session.attributes?.description && (

@@ -53,7 +53,7 @@ describe('SessionInfoPanel', () => {
         const input = screen.getByDisplayValue('2026-01-01T00:00');
         fireEvent.change(input, { target: { value: '2026-01-01T01:15' } });
 
-        const saveButton = screen.getAllByRole('button', { name: '✓' })[0];
+        const saveButton = screen.getAllByRole('button', { name: 'Save time' })[0];
         fireEvent.click(saveButton);
 
         await waitFor(() => {

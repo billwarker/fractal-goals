@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import '../App.css';
 import styles from './Programming.module.css';
+import CloseIcon from '../components/atoms/CloseIcon';
 import AlertModal from '../components/modals/AlertModal';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 
@@ -230,7 +231,7 @@ function Programming() {
                                                         className={styles.btnRemove}
                                                         aria-label="Remove component"
                                                     >
-                                                        ×
+                                                        <CloseIcon size={14} />
                                                     </button>
                                                 </div>
                                             </div>

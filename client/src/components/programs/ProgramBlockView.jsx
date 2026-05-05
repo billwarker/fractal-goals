@@ -1,5 +1,10 @@
 import React from 'react';
 import GoalIcon from '../atoms/GoalIcon';
+import CheckIcon from '../atoms/CheckIcon';
+import EditIcon from '../atoms/EditIcon';
+import LinkIcon from '../atoms/LinkIcon';
+import PlusIcon from '../atoms/PlusIcon';
+import TrashIcon from '../atoms/TrashIcon';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { isBlockActive, ActiveBlockBadge } from '../../utils/programUtils';
 import Card from '../atoms/Card';
@@ -18,36 +23,6 @@ import {
     getISOYMDInTimezone,
     getWeekdayName,
 } from '../../utils/dateUtils';
-
-// SVG icons as inline components to avoid extra imports
-function IconEdit() {
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-        </svg>
-    );
-}
-
-function IconTrash() {
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-            <path d="M10 11v6M14 11v6" />
-            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-        </svg>
-    );
-}
-
-function IconLink() {
-    return (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-        </svg>
-    );
-}
 
 function ProgramBlockView({
     blocks, // sortedBlocks
@@ -92,7 +67,7 @@ function ProgramBlockView({
         return (
             <div className={styles.container}>
                 <button type="button" className={styles.addBlockButton} onClick={onAddBlock}>
-                    <span className={styles.addBlockIcon}>+</span>
+                    <PlusIcon className={styles.addBlockIcon} />
                     Add Block
                 </button>
             </div>
@@ -152,7 +127,7 @@ function ProgramBlockView({
                                     title="Attach goal"
                                     aria-label="Attach goal"
                                 >
-                                    <IconLink />
+                                    <LinkIcon size={14} />
                                 </button>
                                 <button
                                     type="button"
@@ -161,7 +136,7 @@ function ProgramBlockView({
                                     title="Edit block"
                                     aria-label="Edit block"
                                 >
-                                    <IconEdit />
+                                    <EditIcon size={14} />
                                 </button>
                                 <button
                                     type="button"
@@ -170,7 +145,7 @@ function ProgramBlockView({
                                     title="Delete block"
                                     aria-label="Delete block"
                                 >
-                                    <IconTrash />
+                                    <TrashIcon size={14} />
                                 </button>
                             </div>
                         </div>
@@ -302,7 +277,7 @@ function ProgramBlockView({
                                                                         className={`${styles.templateItem} ${isDone ? styles.templateItemDone : styles.templateItemPending}`}
                                                                     >
                                                                         <div className={styles.templateBadgeWrap}>
-                                                                            {isDone && <span className={styles.templateDoneMark}>✓</span>}
+                                                                            {isDone && <CheckIcon className={styles.templateDoneMark} size={12} />}
                                                                             <SessionTemplateNameBadge entity={template} size="sm" />
                                                                         </div>
                                                                         {sCount > 1 && <span className={styles.templateCount}>×{sCount}</span>}
@@ -329,7 +304,7 @@ function ProgramBlockView({
                                             onClick={() => onAddDay(block.id)}
                                             aria-label="Add day to block"
                                         >
-                                            <span className={styles.addDayIcon}>+</span>
+                                            <PlusIcon className={styles.addDayIcon} />
                                             <span>Add Day</span>
                                         </button>
                                     </div>
@@ -341,7 +316,7 @@ function ProgramBlockView({
             })}
 
             <button type="button" className={styles.addBlockButton} onClick={onAddBlock}>
-                <span className={styles.addBlockIcon}>+</span>
+                <PlusIcon className={styles.addBlockIcon} />
                 Add Block
             </button>
 

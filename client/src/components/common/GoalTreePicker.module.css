@@ -103,10 +103,11 @@
 }
 
 .completedBadge {
-    font-size: 10px;
     color: var(--color-text-muted);
     flex-shrink: 0;
     margin-left: 4px;
+    display: inline-flex;
+    align-items: center;
 }
 
 /* Lineage selection buttons */

@@ -9,6 +9,7 @@ import WeeklyBarChart from './WeeklyBarChart';
 import { Bar, Line } from 'react-chartjs-2';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import Button from '../atoms/Button';
+import CloseIcon from '../atoms/CloseIcon';
 import Select from '../atoms/Select';
 import { Heading } from '../atoms/Typography';
 
@@ -402,8 +403,9 @@ function ProfileWindow({
                             variant="ghost"
                             size="sm"
                             style={{ padding: '0 8px', minWidth: '32px' }}
+                            aria-label="Close analytics window"
                         >
-                            ✕
+                            <CloseIcon size={16} />
                         </Button>
                     )}
                 </div>

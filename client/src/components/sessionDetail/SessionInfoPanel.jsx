@@ -7,6 +7,9 @@ import { useLivePausedDuration, useLiveSessionDuration } from '../../hooks/useSe
 import { formatDateInTimezone, formatForInput, localToISO } from '../../utils/dateUtils';
 import notify from '../../utils/notify';
 import Button from '../atoms/Button';
+import CheckIcon from '../atoms/CheckIcon';
+import CloseIcon from '../atoms/CloseIcon';
+import EditIcon from '../atoms/EditIcon';
 import { Heading } from '../atoms/Typography';
 import Input from '../atoms/Input';
 import { formatClockDuration } from '../../utils/sessionTime';
@@ -166,8 +169,12 @@ function SessionInfoPanel() {
                                         fullWidth
                                     />
                                     <div className={styles.editActions}>
-                                        <Button onClick={handleSaveEdit} disabled={saving} variant="success" size="sm" className={styles.editActionButton}>✓</Button>
-                                        <Button onClick={() => setEditingField(null)} variant="danger" size="sm" className={styles.editActionButton}>✗</Button>
+                                        <Button onClick={handleSaveEdit} disabled={saving} variant="success" size="sm" className={styles.editActionButton} aria-label="Save time">
+                                            <CheckIcon size={14} />
+                                        </Button>
+                                        <Button onClick={() => setEditingField(null)} variant="danger" size="sm" className={styles.editActionButton} aria-label="Cancel time edit">
+                                            <CloseIcon size={14} />
+                                        </Button>
                                     </div>
                                 </div>
                             ) : (
@@ -179,7 +186,7 @@ function SessionInfoPanel() {
                                         onClick={() => handleStartEdit('start', startTime)}
                                         title="Edit start time"
                                     >
-                                        ✎
+                                        <EditIcon size={12} />
                                     </button>
                                 </div>
                             )}
@@ -198,8 +205,12 @@ function SessionInfoPanel() {
                                         fullWidth
                                     />
                                     <div className={styles.editActions}>
-                                        <Button onClick={handleSaveEdit} disabled={saving} variant="success" size="sm" className={styles.editActionButton}>✓</Button>
-                                        <Button onClick={() => setEditingField(null)} variant="danger" size="sm" className={styles.editActionButton}>✗</Button>
+                                        <Button onClick={handleSaveEdit} disabled={saving} variant="success" size="sm" className={styles.editActionButton} aria-label="Save time">
+                                            <CheckIcon size={14} />
+                                        </Button>
+                                        <Button onClick={() => setEditingField(null)} variant="danger" size="sm" className={styles.editActionButton} aria-label="Cancel time edit">
+                                            <CloseIcon size={14} />
+                                        </Button>
                                     </div>
                                 </div>
                             ) : (
@@ -211,7 +222,7 @@ function SessionInfoPanel() {
                                         onClick={() => handleStartEdit('end', endTime)}
                                         title="Edit end time"
                                     >
-                                        ✎
+                                        <EditIcon size={12} />
                                     </button>
                                 </div>
                             )}

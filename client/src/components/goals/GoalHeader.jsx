@@ -1,6 +1,7 @@
 import React from 'react';
 import { getTypeDisplayName } from '../../utils/goalHelpers';
 import SMARTIndicator from '../SMARTIndicator';
+import CloseIcon from '../atoms/CloseIcon';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../../utils/dateUtils';
 
@@ -129,7 +130,7 @@ function GoalHeader({
                                 alignItems: 'center'
                             }}
                         >
-                            ×
+                            <CloseIcon size={20} />
                         </button>
                     )}
                 </div>

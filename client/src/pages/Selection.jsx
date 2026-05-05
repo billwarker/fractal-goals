@@ -6,6 +6,7 @@ import { getTypeDisplayName } from '../utils/goalHelpers';
 import GoalModal from '../components/modals/GoalModal';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import AuthModal from '../components/modals/AuthModal';
+import CloseIcon from '../components/atoms/CloseIcon';
 import GoalIcon from '../components/atoms/GoalIcon';
 import { useAuth } from '../contexts/AuthContext';
 import { queryKeys } from '../hooks/queryKeys';
@@ -331,8 +332,9 @@ function Selection() {
                                     className={styles.deleteBtn}
                                     onClick={(e) => handleDeleteClick(e, fractal)}
                                     title="Delete Fractal"
+                                    aria-label="Delete fractal"
                                 >
-                                    ×
+                                    <CloseIcon size={14} />
                                 </button>
                             </div>
                         );

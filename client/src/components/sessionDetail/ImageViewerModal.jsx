@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect } from 'react';
+import CloseIcon from '../atoms/CloseIcon';
 import './ImageViewerModal.css';
 
 function ImageViewerModal({ imageData, onClose }) {
@@ -32,8 +33,9 @@ function ImageViewerModal({ imageData, onClose }) {
                     className="image-viewer-close"
                     onClick={onClose}
                     title="Close (Esc)"
+                    aria-label="Close image viewer"
                 >
-                    ×
+                    <CloseIcon size={18} />
                 </button>
                 <div className="image-viewer-content">
                     <img

@@ -5,6 +5,8 @@ import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import GoalIcon from '../atoms/GoalIcon';
+import CheckIcon from '../atoms/CheckIcon';
+import InheritanceArrowIcon from '../atoms/InheritanceArrowIcon';
 
 import styles from './ActivityAssociationModal.module.css';
 
@@ -274,22 +276,13 @@ const ActivityAssociationModal = ({
                                 >
                                     <div className={checkboxClass} title={inheritanceLabel || undefined}>
                                         {isSelected && (
-                                            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                                                <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                            </svg>
+                                            <CheckIcon size={10} strokeWidth={3} />
                                         )}
                                         {!isSelected && isInherited && (
-                                            inheritance.direction === 'child' ? (
-                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-label={inheritanceLabel}>
-                                                    <path d="M12 19V6" />
-                                                    <polyline points="7 11 12 6 17 11" />
-                                                </svg>
-                                            ) : (
-                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-label={inheritanceLabel}>
-                                                    <path d="M12 5v13" />
-                                                    <polyline points="7 14 12 19 17 14" />
-                                                </svg>
-                                            )
+                                            <InheritanceArrowIcon
+                                                direction={inheritance.direction === 'child' ? 'up' : 'down'}
+                                                size={10}
+                                            />
                                         )}
                                     </div>
 

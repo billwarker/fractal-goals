@@ -17,6 +17,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import CheckIcon from '../atoms/CheckIcon';
 import GoalIcon from '../atoms/GoalIcon';
 import styles from './GoalTreePicker.module.css';
 
@@ -119,7 +120,11 @@ function GoalTreePickerNode({
                     </span>
                 )}
                 <span className={styles.treeNodeName}>{node.name}</span>
-                {node.completed && <span className={styles.completedBadge}>✓</span>}
+                {node.completed && (
+                    <span className={styles.completedBadge}>
+                        <CheckIcon size={10} />
+                    </span>
+                )}
             </div>
 
             {/* Lineage buttons — shown below the active row */}

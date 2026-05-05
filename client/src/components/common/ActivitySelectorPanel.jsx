@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 
+import CloseIcon from '../atoms/CloseIcon';
 import EmptyState from './EmptyState';
 import styles from './ActivitySelectorPanel.module.css';
 
@@ -160,7 +161,7 @@ export default function ActivitySelectorPanel({
                         className={styles.closeButton}
                         aria-label="Close activity selector"
                     >
-                        ×
+                        <CloseIcon size={16} />
                     </button>
                 </div>
             </div>

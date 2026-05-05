@@ -1,6 +1,7 @@
 import React from 'react';
 
 import CompletionCheckIcon from '../atoms/CompletionCheckIcon';
+import CompletionPauseIcon from '../atoms/CompletionPauseIcon';
 import styles from './CompletionCheckBadge.module.css';
 
 function CompletionCheckBadge({
@@ -29,10 +30,7 @@ function CompletionCheckBadge({
             aria-label={accessibleLabel}
         >
             {paused ? (
-                <span className={styles.pauseMark} aria-hidden="true">
-                    <span />
-                    <span />
-                </span>
+                <CompletionPauseIcon className={styles.mark} />
             ) : (
                 <CompletionCheckIcon checked={checked} className={styles.mark} />
             )}

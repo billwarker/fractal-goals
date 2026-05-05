@@ -3,6 +3,7 @@ import { useActivities, useCreateActivity, useDeleteActivity } from '../hooks/us
 import Modal from './atoms/Modal';
 import ModalBody from './atoms/ModalBody';
 import Button from './atoms/Button';
+import CloseIcon from './atoms/CloseIcon';
 import Input from './atoms/Input';
 import Checkbox from './atoms/Checkbox';
 import styles from './ActivitiesManager.module.css';
@@ -243,7 +244,7 @@ function ActivitiesManager({ rootId, onClose }) {
                                                             className={styles.metricRemoveButton}
                                                             aria-label="Remove metric"
                                                         >
-                                                            ×
+                                                            <CloseIcon size={14} />
                                                         </Button>
                                                     )}
                                                 </div>

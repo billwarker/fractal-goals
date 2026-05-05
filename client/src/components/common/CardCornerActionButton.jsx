@@ -1,5 +1,6 @@
 import React from 'react';
 
+import CloseIcon from '../atoms/CloseIcon';
 import styles from './CardCornerActionButton.module.css';
 
 function CardCornerActionButton({
@@ -7,7 +8,7 @@ function CardCornerActionButton({
     title,
     onClick,
     className = '',
-    children = '✕',
+    children = <CloseIcon size={14} />,
 }) {
     return (
         <button

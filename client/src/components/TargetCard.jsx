@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
+import CloseIcon from './atoms/CloseIcon';
 import GoalIcon from './atoms/GoalIcon';
 import { DeletedEntityCard } from './ui/DeletedEntityFallback';
 import styles from './TargetCard.module.css';
@@ -95,8 +96,9 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                                 }}
                                 className={styles.deleteButton}
                                 title="Delete Target"
+                                aria-label="Delete target"
                             >
-                                ×
+                                <CloseIcon size={14} />
                             </button>
                         )}
                     </div>

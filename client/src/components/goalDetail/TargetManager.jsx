@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import CheckIcon from '../atoms/CheckIcon';
 import TargetCard from '../TargetCard';
 import notify from '../../utils/notify';
 import { usePrograms } from '../../hooks/useProgramQueries';
@@ -282,7 +283,7 @@ const TargetManager = ({
                                             gap: '6px'
                                         }}
                                     >
-                                        {isSelected && <span>✓</span>}
+                                        {isSelected && <CheckIcon size={13} />}
                                         {activity.name}
                                     </button>
                                 );
