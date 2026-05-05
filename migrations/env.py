@@ -38,15 +38,22 @@ target_metadata = Base.metadata
 
 def get_url():
     """Get the database URL from application config or alembic.ini."""
-    # First try to use our application config (which reads from environment)
+    # Prefer a direct (non-pooler) connection for migrations to avoid hitting
+    # session-mode pool limits while the app holds pooler connections.
+    import os
+    direct_url = os.getenv('SUPABASE_DIRECT_DATABASE_URL')
+    if direct_url:
+        if direct_url.startswith('postgres://'):
+            direct_url = direct_url.replace('postgres://', 'postgresql://', 1)
+        return direct_url
+
     try:
         url = app_config.get_database_url()
         if url:
             return url
     except Exception:
         pass
-    
-    # Fallback to alembic.ini setting
+
     return config.get_main_option("sqlalchemy.url")
 
 
