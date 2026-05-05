@@ -48,13 +48,13 @@ function GoalHeader({
         },
     }[normalizedStatus];
     const levelBadgeBackground = goalSecondaryColor
-        ? `linear-gradient(135deg, ${goalColor} 0%, color-mix(in srgb, ${goalSecondaryColor} 72%, ${goalColor}) 100%)`
+        ? `linear-gradient(135deg, color-mix(in srgb, ${goalColor} var(--goal-gradient-primary-weight), var(--color-bg-surface)) 0%, color-mix(in srgb, ${goalSecondaryColor} var(--goal-gradient-secondary-weight), var(--color-bg-surface)) 100%)`
         : goalColor;
     const levelBadgeBorder = goalSecondaryColor
-        ? `1px solid color-mix(in srgb, ${goalSecondaryColor} 78%, ${goalColor})`
+        ? `1px solid color-mix(in srgb, ${goalSecondaryColor} var(--goal-gradient-border-weight), var(--color-border))`
         : '1px solid transparent';
     const levelBadgeShadow = goalSecondaryColor
-        ? `inset 0 0 0 1px color-mix(in srgb, ${goalSecondaryColor} 24%, transparent)`
+        ? `inset 0 0 0 1px color-mix(in srgb, ${goalSecondaryColor} var(--goal-gradient-inner-weight), transparent)`
         : 'none';
 
     return (

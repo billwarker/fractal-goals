@@ -62,6 +62,12 @@
   --color-focus-ring: rgba(79, 156, 249, 0.45);
   --color-checkbox-accent: #2baa68;
 
+  /* Goal gradient intensity. Dark mode can handle stronger fills. */
+  --goal-gradient-primary-weight: 100%;
+  --goal-gradient-secondary-weight: 72%;
+  --goal-gradient-border-weight: 78%;
+  --goal-gradient-inner-weight: 24%;
+
   /* Spacing */
   --spacing-2xs: 2px;
   --spacing-xs: 4px;
@@ -164,6 +170,12 @@
   --color-error: var(--color-brand-danger);
   --color-focus-ring: rgba(61, 130, 219, 0.32);
   --color-checkbox-accent: #3bc57c;
+
+  /* Light mode tints gradients toward the surface for calmer badges/buttons. */
+  --goal-gradient-primary-weight: 82%;
+  --goal-gradient-secondary-weight: 58%;
+  --goal-gradient-border-weight: 58%;
+  --goal-gradient-inner-weight: 14%;
 }
 
 /*
@@ -208,5 +220,9 @@
     --color-error: var(--color-brand-danger);
     --color-focus-ring: rgba(61, 130, 219, 0.32);
     --color-checkbox-accent: #3bc57c;
+    --goal-gradient-primary-weight: 82%;
+    --goal-gradient-secondary-weight: 58%;
+    --goal-gradient-border-weight: 58%;
+    --goal-gradient-inner-weight: 14%;
   }
 }

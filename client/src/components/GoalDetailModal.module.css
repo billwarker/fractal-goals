@@ -170,8 +170,8 @@
 .completionFooterDone:hover:not(:disabled) {
     background: linear-gradient(
         135deg,
-        color-mix(in srgb, var(--completion-accent, var(--color-brand-success)) 92%, var(--completion-secondary, var(--completion-accent, var(--color-brand-success)))),
-        color-mix(in srgb, var(--completion-secondary, var(--completion-accent, var(--color-brand-success))) 84%, var(--completion-accent, var(--color-brand-success)))
+        color-mix(in srgb, var(--completion-accent, var(--color-brand-success)) var(--goal-gradient-primary-weight), var(--color-bg-surface)),
+        color-mix(in srgb, var(--completion-secondary, var(--completion-accent, var(--color-brand-success))) calc(var(--goal-gradient-secondary-weight) + 8%), var(--color-bg-surface))
     );
     color: var(--completion-text, white);
 }
@@ -184,12 +184,12 @@
 .completionFooterDone {
     background: linear-gradient(
         135deg,
-        var(--completion-accent, var(--color-brand-success)),
-        color-mix(in srgb, var(--completion-secondary, var(--completion-accent, var(--color-brand-success))) 72%, var(--completion-accent, var(--color-brand-success)))
+        color-mix(in srgb, var(--completion-accent, var(--color-brand-success)) var(--goal-gradient-primary-weight), var(--color-bg-surface)),
+        color-mix(in srgb, var(--completion-secondary, var(--completion-accent, var(--color-brand-success))) var(--goal-gradient-secondary-weight), var(--color-bg-surface))
     );
-    border-color: color-mix(in srgb, var(--completion-secondary, var(--completion-accent, var(--color-brand-success))) 72%, var(--completion-accent, var(--color-brand-success)));
+    border-color: color-mix(in srgb, var(--completion-secondary, var(--completion-accent, var(--color-brand-success))) var(--goal-gradient-border-weight), var(--color-border));
     color: var(--completion-text, white);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--completion-secondary, var(--completion-accent, var(--color-brand-success))) 20%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--completion-secondary, var(--completion-accent, var(--color-brand-success))) var(--goal-gradient-inner-weight), transparent);
 }
 
 .completionFooterPaused {

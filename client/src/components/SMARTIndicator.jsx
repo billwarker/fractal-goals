@@ -36,14 +36,14 @@ function SMARTIndicator({ goal, goalType, color, secondaryColor, textColor }) {
                 minHeight: '22px',
                 padding: '0 8px',
                 border: isFullySmart
-                    ? `1px solid color-mix(in srgb, ${goalSecondaryColor} 78%, ${goalColor})`
+                    ? `1px solid color-mix(in srgb, ${goalSecondaryColor} var(--goal-gradient-border-weight), var(--color-border))`
                     : '1px solid var(--color-border)',
                 borderRadius: '999px',
                 background: isFullySmart
-                    ? `linear-gradient(135deg, ${goalColor} 0%, color-mix(in srgb, ${goalSecondaryColor} 72%, ${goalColor}) 100%)`
+                    ? `linear-gradient(135deg, color-mix(in srgb, ${goalColor} var(--goal-gradient-primary-weight), var(--color-bg-surface)) 0%, color-mix(in srgb, ${goalSecondaryColor} var(--goal-gradient-secondary-weight), var(--color-bg-surface)) 100%)`
                     : 'color-mix(in srgb, var(--color-bg-card) 72%, transparent)',
                 boxShadow: isFullySmart
-                    ? `inset 0 0 0 1px color-mix(in srgb, ${goalSecondaryColor} 22%, transparent)`
+                    ? `inset 0 0 0 1px color-mix(in srgb, ${goalSecondaryColor} var(--goal-gradient-inner-weight), transparent)`
                     : 'none',
                 fontSize: '12px',
                 fontWeight: 'bold',
