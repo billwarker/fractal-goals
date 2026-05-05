@@ -51,8 +51,8 @@
 }
 
 .session-card-completed-badge {
-    color: var(--color-brand-success);
-    font-size: var(--font-size-base);
+    width: 22px;
+    height: 22px;
 }
 
 .session-card-notes-count {

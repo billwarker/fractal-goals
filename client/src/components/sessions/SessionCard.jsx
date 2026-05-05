@@ -11,6 +11,7 @@ import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { formatDateInTimezone } from '../../utils/dateUtils';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { getTemplateColor } from '../../utils/sessionRuntime';
+import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import './SessionCard.css';
 
 function SessionCard({
@@ -31,6 +32,7 @@ function SessionCard({
         ...(Array.isArray(session.immediate_goals) ? session.immediate_goals : []),
     ];
     const notesCount = Array.isArray(session.notes) ? session.notes.length : (session.notes_count || 0);
+    const sessionCompleted = Boolean(session.completed || session.attributes?.completed);
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
@@ -69,7 +71,7 @@ function SessionCard({
 
     return (
         <div
-            className={`session-card ${isSelected ? 'selected' : ''} ${session.completed ? 'completed' : ''}`}
+            className={`session-card ${isSelected ? 'selected' : ''} ${sessionCompleted ? 'completed' : ''}`}
             onClick={handleClick}
         >
             {/* Header Row */}
@@ -81,9 +83,11 @@ function SessionCard({
                     <span className="session-card-duration">
                         {formatDuration(totalSeconds)}
                     </span>
-                    {session.completed && (
-                        <span className="session-card-completed-badge">✓</span>
-                    )}
+                    <CompletionCheckBadge
+                        checked={sessionCompleted}
+                        className="session-card-completed-badge"
+                        label={sessionCompleted ? 'Completed session' : 'Incomplete session'}
+                    />
                     <span className="session-card-notes-count">
                         📝 {notesCount}
                     </span>

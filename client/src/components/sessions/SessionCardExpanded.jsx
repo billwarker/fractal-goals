@@ -320,9 +320,10 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                         >
                             {session.name}
                         </Link>
-                        {session.attributes?.completed && (
-                            <CompletionCheckBadge />
-                        )}
+                        <CompletionCheckBadge
+                            checked={Boolean(session.attributes?.completed)}
+                            label={session.attributes?.completed ? 'Completed session' : 'Incomplete session'}
+                        />
                     </div>
                     {session.attributes?.description && (
                         <div className={styles.cardDescription}>

@@ -382,11 +382,11 @@ const ActivityCard = memo(function ActivityCard({
         <div className={`${styles.activityCard} ${isActivity ? styles.activityCardInstance : ''}`}>
             {/* Header */}
             <div className={styles.activityHeader}>
-                {activity.completed ? (
-                    <CompletionCheckBadge className={styles.completionBadge} label="Completed activity" />
-                ) : (
-                    <span className={styles.completionIcon} aria-hidden="true">○</span>
-                )}
+                <CompletionCheckBadge
+                    checked={Boolean(activity.completed)}
+                    className={styles.completionBadge}
+                    label={activity.completed ? 'Completed activity' : 'Incomplete activity'}
+                />
                 <div className={styles.content}>
                     <div className={styles.activityTitleRow}>
                         <div className={styles.activityName}>
