@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import SharedNoteTimeline from '../notes/NoteTimeline';
+import CreateNoteIcon from '../atoms/CreateNoteIcon';
 import styles from './SidePaneNotePanel.module.css';
 
 function SidePaneNotePanel({
@@ -77,7 +78,7 @@ function SidePaneNotePanel({
                         className={styles.submitBtn}
                         title="Add note (Enter, Shift+Enter for new line)"
                     >
-                        {isSubmitting ? '…' : '📝'}
+                        {isSubmitting ? '…' : <CreateNoteIcon />}
                     </button>
                 </div>
                 <div className={styles.hint}>

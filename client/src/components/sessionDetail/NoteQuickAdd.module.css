@@ -53,6 +53,12 @@
     font-size: 16px;
 }
 
+.noteSubmitBtn svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
 .noteSubmitBtn:hover:not(:disabled) {
     background: var(--color-bg-secondary);
     border-color: var(--color-brand-primary);

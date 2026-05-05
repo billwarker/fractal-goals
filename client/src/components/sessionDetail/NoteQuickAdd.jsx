@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useRef } from 'react';
+import CreateNoteIcon from '../atoms/CreateNoteIcon';
 import styles from './NoteQuickAdd.module.css';
 
 function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
@@ -45,7 +46,7 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
                 inputRef.current.style.height = 'auto';
                 inputRef.current.focus();
             }
-        } catch (err) {
+        } catch {
             // Error handling done in parent
         } finally {
             setIsSubmitting(false);
@@ -71,7 +72,7 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
                     className={styles.noteSubmitBtn}
                     title="Add note (Enter, Shift+Enter for new line)"
                 >
-                    {isSubmitting ? '...' : '📝'}
+                    {isSubmitting ? '...' : <CreateNoteIcon />}
                 </button>
             </div>
 
