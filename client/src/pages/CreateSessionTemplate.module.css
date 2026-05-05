@@ -30,6 +30,22 @@
     padding: 10px 24px;
 }
 
+.sortLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.sortSelect {
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text-primary);
+    padding: 8px 10px;
+}
+
 .templatesGrid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));

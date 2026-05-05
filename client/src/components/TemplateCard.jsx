@@ -7,6 +7,7 @@ import styles from './TemplateCard.module.css';
 import {
     isQuickSession,
 } from '../utils/sessionRuntime';
+import { getAverageDurationStat } from '../utils/durationStats';
 
 function getQuickActivityCount(template) {
     return template.template_data?.activities?.length || 0;
@@ -24,9 +25,9 @@ function getNormalActivityCount(template) {
  */
 function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
     const quickTemplate = isQuickSession(template);
-    const totalDuration = template.template_data?.total_duration_minutes || 0;
     const sectionCount = template.template_data?.sections?.length || 0;
     const activityCount = quickTemplate ? getQuickActivityCount(template) : getNormalActivityCount(template);
+    const averageDuration = getAverageDurationStat(template.stats);
 
     return (
         <div
@@ -47,10 +48,14 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
             </div>
 
             <div className={styles.statsRow}>
-                {!quickTemplate && (
-                    <span className={styles.stat}>
+                {averageDuration && (
+                    <span
+                        className={styles.stat}
+                        title={`Based on ${averageDuration.sampleCount} completed sessions`}
+                    >
                         <span className={styles.durationIcon}>⏱</span>
-                        {totalDuration} min
+                        Avg {averageDuration.label}
+                        <span className={styles.sampleHint}>({averageDuration.sampleCount})</span>
                     </span>
                 )}
                 {!quickTemplate && (

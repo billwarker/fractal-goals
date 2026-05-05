@@ -49,6 +49,11 @@
     gap: 4px;
 }
 
+.sampleHint {
+    color: var(--color-text-muted);
+    opacity: 0.75;
+}
+
 .durationIcon {
     color: var(--color-brand-primary);
 }

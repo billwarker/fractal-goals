@@ -117,3 +117,51 @@ class SessionTemplate(Base):
         backref="session_templates",
         viewonly=True
     )
+
+
+class SessionTemplateStats(Base):
+    __tablename__ = 'session_template_stats'
+
+    template_id = Column(String, ForeignKey('session_templates.id', ondelete='CASCADE'), primary_key=True)
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    usage_count = Column(Integer, nullable=False, default=0)
+    session_count = Column(Integer, nullable=False, default=0)
+    average_duration_seconds = Column(Integer, nullable=True)
+    median_duration_seconds = Column(Integer, nullable=True)
+    min_duration_seconds = Column(Integer, nullable=True)
+    max_duration_seconds = Column(Integer, nullable=True)
+    last_used_at = Column(DateTime, nullable=True)
+    calculation_version = Column(Integer, nullable=False, default=1)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    template = relationship("SessionTemplate", backref="persisted_stats", uselist=False)
+
+
+class TemplateSectionStats(Base):
+    __tablename__ = 'template_section_stats'
+
+    template_id = Column(String, ForeignKey('session_templates.id', ondelete='CASCADE'), primary_key=True)
+    section_key = Column(String, primary_key=True)
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    sample_count = Column(Integer, nullable=False, default=0)
+    average_duration_seconds = Column(Integer, nullable=True)
+    median_duration_seconds = Column(Integer, nullable=True)
+    min_duration_seconds = Column(Integer, nullable=True)
+    max_duration_seconds = Column(Integer, nullable=True)
+    calculation_version = Column(Integer, nullable=False, default=1)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class ActivityDurationStats(Base):
+    __tablename__ = 'activity_duration_stats'
+
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True)
+    activity_definition_id = Column(String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), primary_key=True)
+    sample_count = Column(Integer, nullable=False, default=0)
+    average_duration_seconds = Column(Integer, nullable=True)
+    median_duration_seconds = Column(Integer, nullable=True)
+    min_duration_seconds = Column(Integer, nullable=True)
+    max_duration_seconds = Column(Integer, nullable=True)
+    last_observed_at = Column(DateTime, nullable=True)
+    calculation_version = Column(Integer, nullable=False, default=1)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

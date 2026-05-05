@@ -22,6 +22,7 @@ from services.owned_entity_queries import (
 
 from services.events import Event, Events, event_bus
 from services.session_runtime import is_quick_session
+from services.session_template_stats_service import SessionTemplateStatsService
 from services.serializers import serialize_activity_instance, serialize_session
 from services.service_types import JsonDict, ServiceResult
 
@@ -49,6 +50,12 @@ def _parse_iso_datetime(value) -> datetime | None:
 class TimerService:
     def __init__(self, db_session):
         self.db_session = db_session
+
+    def _recompute_stats_for_instance(self, instance):
+        if not instance or not instance.session_id:
+            return
+        SessionTemplateStatsService(self.db_session).recompute_for_session(instance.session_id)
+        self.db_session.commit()
 
     @staticmethod
     def _activity_instance_query_options():
@@ -278,6 +285,7 @@ class TimerService:
             instance.last_paused_at = None
 
         self.db_session.commit()
+        self._recompute_stats_for_instance(instance)
         activity_name = instance.definition.name if instance.definition else "Unknown"
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_UPDATED,
@@ -342,6 +350,7 @@ class TimerService:
             instance.completed = True
 
         self.db_session.commit()
+        self._recompute_stats_for_instance(instance)
         activity_name = instance.definition.name if instance.definition else "Unknown"
         completion_event = Event(
             Events.ACTIVITY_INSTANCE_COMPLETED,

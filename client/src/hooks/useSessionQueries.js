@@ -24,7 +24,13 @@ export function useActivityInstantiationSummary(rootId) {
         queryKey: queryKeys.activityInstantiationSummary(rootId),
         queryFn: async () => {
             const res = await fractalApi.getActivityInstantiationSummary(rootId);
-            return res.data?.latest_by_activity || {};
+            if (res.data?.summary_by_activity) return res.data.summary_by_activity;
+            return Object.fromEntries(
+                Object.entries(res.data?.latest_by_activity || {}).map(([activityId, lastUsedAt]) => [
+                    activityId,
+                    { last_used_at: lastUsedAt, instance_count: null, average_duration_seconds: null },
+                ])
+            );
         },
         enabled: isReady,
         staleTime: 2 * 60 * 1000,

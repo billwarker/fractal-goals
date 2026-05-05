@@ -32,6 +32,13 @@ const EMPTY_TEMPLATE = {
     quickActivities: [],
 };
 
+function createSectionId() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return `section-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function buildActivityPreview(activity) {
     return {
         activity_id: activity.id,
@@ -51,6 +58,7 @@ function buildInitialTemplate(editingTemplate) {
 
     const sections = (editingTemplate.template_data?.sections || []).map((section) => ({
         ...section,
+        id: section.id || section.template_section_id || createSectionId(),
         activities: (section.activities || section.exercises || []).map((activity) => ({
             ...activity,
         })),
@@ -117,7 +125,7 @@ function TemplateBuilderModalContent({
 
         setCurrentTemplate((previous) => ({
             ...previous,
-            sections: [...previous.sections, { ...newSection, duration_minutes: duration }],
+            sections: [...previous.sections, { ...newSection, id: createSectionId(), duration_minutes: duration }],
         }));
         resetSectionEditor();
     };

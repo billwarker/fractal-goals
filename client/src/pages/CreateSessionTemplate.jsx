@@ -12,7 +12,28 @@ import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import PageHeader from '../components/layout/PageHeader';
 import headerStyles from '../components/layout/PageHeader.module.css';
 import HeaderButton from '../components/layout/HeaderButton';
+import { getTemplateSortTimestamp } from '../utils/durationStats';
 import styles from './CreateSessionTemplate.module.css';
+
+function readStoredSort(rootId) {
+    try {
+        const storage = window?.localStorage;
+        if (!storage || typeof storage.getItem !== 'function') return 'recentlyUsed';
+        return storage.getItem(`sessionTemplateSort:${rootId}`) || 'recentlyUsed';
+    } catch {
+        return 'recentlyUsed';
+    }
+}
+
+function writeStoredSort(rootId, sortMode) {
+    try {
+        const storage = window?.localStorage;
+        if (!storage || typeof storage.setItem !== 'function') return;
+        storage.setItem(`sessionTemplateSort:${rootId}`, sortMode);
+    } catch {
+        // localStorage can be unavailable in test/private contexts.
+    }
+}
 
 /**
  * Manage Session Templates Page - Grid view of template cards with modal builder
@@ -29,12 +50,18 @@ function CreateSessionTemplate() {
     const [showBuilder, setShowBuilder] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState(null);
     const [templateToDelete, setTemplateToDelete] = useState(null);
+    const [sortMode, setSortMode] = useState(() => readStoredSort(rootId));
 
     useEffect(() => {
         if (!rootId) {
             navigate('/');
         }
     }, [rootId, navigate]);
+
+    useEffect(() => {
+        if (!rootId) return;
+        writeStoredSort(rootId, sortMode);
+    }, [rootId, sortMode]);
 
     const { sessionTemplates: templates = [], isLoading: templatesLoading, error: templatesError } = useSessionTemplates(rootId);
     const { activities = [], isLoading: activitiesLoading, error: activitiesError } = useActivities(rootId);
@@ -72,6 +99,16 @@ function CreateSessionTemplate() {
 
     const loading = templatesLoading || activitiesLoading || activityGroupsLoading;
     const loadError = templatesError || activitiesError || activityGroupsError;
+    const sortedTemplates = [...templates].sort((a, b) => {
+        if (sortMode === 'name') return a.name.localeCompare(b.name);
+        if (sortMode === 'recentlyUpdated') {
+            return (b.updated_at || b.created_at || '').localeCompare(a.updated_at || a.created_at || '');
+        }
+        if (sortMode === 'mostUsed') {
+            return Number(b.stats?.usage_count || 0) - Number(a.stats?.usage_count || 0);
+        }
+        return getTemplateSortTimestamp(b).localeCompare(getTemplateSortTimestamp(a));
+    });
 
     const handleCreateClick = () => {
         setEditingTemplate(null);
@@ -148,9 +185,26 @@ function CreateSessionTemplate() {
                 title="Manage Session Templates"
                 subtitle="Build reusable session structures from your activity library."
                 actions={(
-                    <HeaderButton variant="primary" onClick={handleCreateClick}>
-                        + Create Template
-                    </HeaderButton>
+                    <>
+                        {templates.length > 0 && (
+                            <label className={styles.sortLabel}>
+                                Sort
+                                <select
+                                    className={styles.sortSelect}
+                                    value={sortMode}
+                                    onChange={(event) => setSortMode(event.target.value)}
+                                >
+                                    <option value="recentlyUsed">Recently used</option>
+                                    <option value="recentlyUpdated">Recently updated</option>
+                                    <option value="mostUsed">Most used</option>
+                                    <option value="name">Name A-Z</option>
+                                </select>
+                            </label>
+                        )}
+                        <HeaderButton variant="primary" onClick={handleCreateClick}>
+                            + Create Template
+                        </HeaderButton>
+                    </>
                 )}
             />
 
@@ -172,7 +226,7 @@ function CreateSessionTemplate() {
                     </div>
                 ) : (
                     <div className={styles.templatesGrid}>
-                        {templates.map(template => (
+                        {sortedTemplates.map(template => (
                             <TemplateCard
                                 key={template.id}
                                 template={template}

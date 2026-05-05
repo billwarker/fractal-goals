@@ -40,6 +40,8 @@ export function ActivitiesProvider({ children }) {
                 if (!Array.isArray(prev)) return prev;
                 return prev.map((item) => item.id === activityId ? { ...item, ...updated } : item);
             });
+            await queryClient.invalidateQueries({ queryKey: ['session', rootId] });
+            await queryClient.invalidateQueries({ queryKey: ['session-activities', rootId] });
             return updated;
         },
         {

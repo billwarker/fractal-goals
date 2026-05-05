@@ -24,6 +24,7 @@ import {
     formatAggValue,
     resolveAutoAggregationMode,
 } from '../../utils/progressAggregations';
+import { getAverageDurationStat } from '../../utils/durationStats';
 
 /**
  * Format duration in seconds to MM:SS format
@@ -265,6 +266,7 @@ function SessionActivityItem({
     activityDefinition: activityDefinitionProp = null,
     activityNotes: activityNotesProp = null,
     quickMode = false,
+    onOpenActivityBuilder = null,
 }) {
     // Context
     const {
@@ -283,6 +285,9 @@ function SessionActivityItem({
 
     const activityDefinition = activityDefinitionProp
         || (Array.isArray(activities) ? activities.find(a => a.id === exercise.activity_definition_id) : null);
+    const averageDuration = getAverageDurationStat(
+        session?.stats?.activity_durations?.[exercise.activity_definition_id]
+    );
     const onDelete = () => removeActivity(exercise.id);
     const onUpdate = useCallback((key, value, extraData = {}) => {
         if (key === 'timer_action') {
@@ -746,9 +751,38 @@ function SessionActivityItem({
                                 {def.name}
                                 {!activityDefinition && <DeletedBadge />}
                             </span>
+                            {isSelected && onOpenActivityBuilder && activityDefinition?.id && (
+                                <button
+                                    type="button"
+                                    className={styles.editDefinitionButton}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onOpenActivityBuilder(activityDefinition);
+                                    }}
+                                    title="Edit activity definition"
+                                    aria-label={`Edit ${def.name}`}
+                                >
+                                    ✎
+                                </button>
+                            )}
                         </div>
-                        {groupLabel && (
-                            <div className={styles.activityGroupLabel}>{groupLabel}</div>
+                        {(groupLabel || averageDuration) && (
+                            <div className={styles.activityMetaLine}>
+                                {groupLabel && (
+                                    <span className={styles.activityGroupLabel}>{groupLabel}</span>
+                                )}
+                                {groupLabel && averageDuration && (
+                                    <span className={styles.activityMetaSeparator}>•</span>
+                                )}
+                                {averageDuration && (
+                                    <span
+                                        className={styles.activityAverage}
+                                        title={`Average based on ${averageDuration.sampleCount} completed activity instances`}
+                                    >
+                                        Avg {averageDuration.label}
+                                    </span>
+                                )}
+                            </div>
                         )}
                         {def.description && (
                             <div className={styles.activityDescription} title={def.description}>

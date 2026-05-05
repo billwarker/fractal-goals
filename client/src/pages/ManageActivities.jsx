@@ -27,7 +27,7 @@ function ManageActivities() {
     const { updateActivity, deleteActivity, deleteActivityGroup, reorderActivityGroups } = useActivities();
     const { activities = [], isLoading: activitiesLoading } = useActivitiesQuery(rootId);
     const { activityGroups = [], isLoading: activityGroupsLoading } = useActivityGroups(rootId);
-    const { data: lastInstantiatedSummary = {} } = useActivityInstantiationSummary(rootId);
+    const { data: activityInstantiationSummary = {} } = useActivityInstantiationSummary(rootId);
 
     const [error, setError] = useState(null);
     const creating = false;
@@ -40,6 +40,7 @@ function ManageActivities() {
     const [editingGroup, setEditingGroup] = useState(null);
     const [groupToDelete, setGroupToDelete] = useState(null);
     const [showMetricsModal, setShowMetricsModal] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Collapsed state for groups (Set of group IDs)
     const [collapsedGroups, setCollapsedGroups] = useState(new Set());
@@ -54,9 +55,9 @@ function ManageActivities() {
         }
     }, [rootId, navigate]);
 
-    const lastInstantiatedByActivity = useMemo(() => {
-        return new Map(Object.entries(lastInstantiatedSummary || {}));
-    }, [lastInstantiatedSummary]);
+    const instantiationSummaryByActivity = useMemo(() => {
+        return new Map(Object.entries(activityInstantiationSummary || {}));
+    }, [activityInstantiationSummary]);
 
     const groupChildrenMap = useMemo(() => {
         const map = new Map();
@@ -80,6 +81,82 @@ function ManageActivities() {
         });
         return map;
     }, [activities]);
+
+    const filteredActivityView = useMemo(() => {
+        const query = searchTerm.trim().toLowerCase();
+        if (!query) {
+            return {
+                groupChildrenMap,
+                activitiesByGroupMap,
+                rootGroups: groupChildrenMap.get('__root__') || [],
+                hasSearch: false,
+                resultCount: (Array.isArray(activities) ? activities.length : 0) + (Array.isArray(activityGroups) ? activityGroups.length : 0),
+            };
+        }
+
+        const groupById = new Map((Array.isArray(activityGroups) ? activityGroups : []).map((group) => [group.id, group]));
+        const directGroupMatches = new Set();
+        const visibleGroupIds = new Set();
+        const groupScopeMatches = new Set();
+
+        const addAncestors = (groupId) => {
+            let current = groupById.get(groupId);
+            while (current) {
+                visibleGroupIds.add(current.id);
+                current = current.parent_id ? groupById.get(current.parent_id) : null;
+            }
+        };
+
+        const addDescendants = (groupId) => {
+            groupScopeMatches.add(groupId);
+            visibleGroupIds.add(groupId);
+            (groupChildrenMap.get(groupId) || []).forEach((child) => addDescendants(child.id));
+        };
+
+        (Array.isArray(activityGroups) ? activityGroups : []).forEach((group) => {
+            if ((group.name || '').toLowerCase().includes(query)) {
+                directGroupMatches.add(group.id);
+                addAncestors(group.id);
+                addDescendants(group.id);
+            }
+        });
+
+        const filteredActivities = new Map();
+        let resultCount = directGroupMatches.size;
+        (Array.isArray(activities) ? activities : []).forEach((activity) => {
+            const groupId = activity.group_id || '__ungrouped__';
+            const activityMatches = (activity.name || '').toLowerCase().includes(query);
+            const groupMatches = activity.group_id && groupScopeMatches.has(activity.group_id);
+            if (!activityMatches && !groupMatches) return;
+
+            if (!filteredActivities.has(groupId)) filteredActivities.set(groupId, []);
+            filteredActivities.get(groupId).push(activity);
+            resultCount += activityMatches ? 1 : 0;
+            if (activity.group_id) addAncestors(activity.group_id);
+        });
+
+        const filteredChildren = new Map();
+        visibleGroupIds.forEach((groupId) => {
+            const group = groupById.get(groupId);
+            if (!group) return;
+            const parentKey = group.parent_id && visibleGroupIds.has(group.parent_id)
+                ? group.parent_id
+                : '__root__';
+            if (!filteredChildren.has(parentKey)) filteredChildren.set(parentKey, []);
+            filteredChildren.get(parentKey).push(group);
+        });
+        filteredChildren.forEach((groups) => {
+            groups.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        });
+
+        return {
+            groupChildrenMap: filteredChildren,
+            activitiesByGroupMap: filteredActivities,
+            rootGroups: filteredChildren.get('__root__') || [],
+            hasSearch: true,
+            resultCount,
+        };
+    }, [activities, activityGroups, activitiesByGroupMap, groupChildrenMap, searchTerm]);
 
     // Group Handlers
     const handleCreateGroup = () => {
@@ -115,6 +192,20 @@ function ManageActivities() {
             newCollapsed.add(groupId);
         }
         setCollapsedGroups(newCollapsed);
+    };
+
+    const allGroupIds = useMemo(() => (
+        (Array.isArray(activityGroups) ? activityGroups : []).map((group) => group.id)
+    ), [activityGroups]);
+
+    const allGroupsCollapsed = allGroupIds.length > 0 && allGroupIds.every((groupId) => collapsedGroups.has(groupId));
+
+    const handleToggleCollapseAll = () => {
+        if (allGroupsCollapsed) {
+            setCollapsedGroups(new Set());
+            return;
+        }
+        setCollapsedGroups(new Set(allGroupIds));
     };
 
     // Helper to get siblings for reordering
@@ -249,14 +340,14 @@ function ManageActivities() {
 
     // Recursive Group Renderer
     const renderGroup = (group, level = 0) => {
-        const isCollapsed = collapsedGroups.has(group.id);
+        const isCollapsed = !filteredActivityView.hasSearch && collapsedGroups.has(group.id);
         const isDragOver = dragOverGroupId === group.id;
 
         // Find children groups
-        const childrenGroups = groupChildrenMap.get(group.id) || [];
+        const childrenGroups = filteredActivityView.groupChildrenMap.get(group.id) || [];
 
         // Find activities in this group
-        const groupActivities = activitiesByGroupMap.get(group.id) || [];
+        const groupActivities = filteredActivityView.activitiesByGroupMap.get(group.id) || [];
 
         const isRoot = level === 0;
 
@@ -353,7 +444,7 @@ function ManageActivities() {
                                     <ActivityCard
                                         key={activity.id}
                                         activity={activity}
-                                        lastInstantiated={lastInstantiatedByActivity.get(activity.id)}
+                                        instantiationSummary={instantiationSummaryByActivity.get(activity.id)}
                                         onEdit={handleEditClick}
                                         onDuplicate={handleDuplicate}
                                         onDelete={handleDeleteClick}
@@ -377,7 +468,9 @@ function ManageActivities() {
     };
 
     // Filter root groups
-    const rootGroups = groupChildrenMap.get('__root__') || [];
+    const rootGroups = filteredActivityView.rootGroups;
+    const ungroupedActivities = filteredActivityView.activitiesByGroupMap.get('__ungrouped__') || [];
+    const hasSearchResults = !filteredActivityView.hasSearch || filteredActivityView.resultCount > 0 || ungroupedActivities.length > 0;
 
     return (
         <div className={`${headerStyles.pageShell} ${styles.container}`}>
@@ -386,6 +479,21 @@ function ManageActivities() {
                 subtitle="Create, group, and reuse activity definitions across sessions and templates."
                 actions={(
                     <>
+                        <label className={styles.searchLabel}>
+                            <span className={styles.searchText}>Search</span>
+                            <input
+                                type="search"
+                                value={searchTerm}
+                                onChange={(event) => setSearchTerm(event.target.value)}
+                                placeholder="Groups or activities"
+                                className={styles.searchInput}
+                            />
+                        </label>
+                        {allGroupIds.length > 0 && (
+                            <HeaderButton variant="secondary" onClick={handleToggleCollapseAll}>
+                                {allGroupsCollapsed ? 'Expand All' : 'Collapse All'}
+                            </HeaderButton>
+                        )}
                         <HeaderButton variant="secondary" onClick={() => setShowMetricsModal(true)}>
                             Manage Metrics
                         </HeaderButton>
@@ -422,11 +530,11 @@ function ManageActivities() {
                         </h3>
                     )}
                     <div className={styles.grid} onDragEnd={handleDragEnd}>
-                        {(activitiesByGroupMap.get('__ungrouped__') || []).map(activity => (
+                        {ungroupedActivities.map(activity => (
                             <ActivityCard
                                 key={activity.id}
                                 activity={activity}
-                                lastInstantiated={lastInstantiatedByActivity.get(activity.id)}
+                                instantiationSummary={instantiationSummaryByActivity.get(activity.id)}
                                 onEdit={handleEditClick}
                                 onDuplicate={handleDuplicate}
                                 onDelete={handleDeleteClick}
@@ -436,15 +544,23 @@ function ManageActivities() {
                             />
                         ))}
                     </div>
-                    {(activitiesByGroupMap.get('__ungrouped__') || []).length === 0 && rootGroups.length > 0 && (
+                    {ungroupedActivities.length === 0 && rootGroups.length > 0 && !filteredActivityView.hasSearch && (
                         <div className={styles.emptyGroupState} style={{ padding: '15px', marginTop: '10px' }}>
                             {dragOverGroupId === 'ungrouped' ? 'Drop activity here to ungroup' : 'Drag activities here to ungroup'}
                         </div>
                     )}
                 </div>
 
+                {filteredActivityView.hasSearch && !hasSearchResults && (
+                    <div className={styles.emptyState}>
+                        <p className={styles.emptyStateText}>
+                            No groups or activities match "{searchTerm.trim()}"
+                        </p>
+                    </div>
+                )}
+
                 {/* Empty State (No activities and no groups) */}
-                {(Array.isArray(activities) ? activities.length : 0) === 0 && rootGroups.length === 0 && (
+                {!filteredActivityView.hasSearch && (Array.isArray(activities) ? activities.length : 0) === 0 && rootGroups.length === 0 && (
                     <div className={styles.emptyState}>
                         <p className={styles.emptyStateText}>
                             No activities defined yet

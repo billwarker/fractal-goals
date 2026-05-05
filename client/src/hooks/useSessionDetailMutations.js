@@ -280,9 +280,11 @@ export function useSessionDetailMutations({
                 || updates?.metrics !== undefined
                 || updates?.time_start !== undefined
                 || updates?.time_stop !== undefined
+                || updates?.duration_seconds !== undefined
             ) {
                 queryClient.invalidateQueries({ queryKey: sessionKey });
                 queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+                queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
             }
 
             // Invalidate progress comparison when metrics are updated

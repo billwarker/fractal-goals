@@ -9,6 +9,7 @@ import useIsMobile from '../../hooks/useIsMobile';
 import ActivitySelectorPanel from '../common/ActivitySelectorPanel';
 
 import { prepareActivityDefinitionCopy } from '../../utils/activityBuilder';
+import { getAverageDurationStat } from '../../utils/durationStats';
 import { calculateSectionDurationFromInstanceIds, formatClockDuration } from '../../utils/sessionTime';
 import { buildDefinitionMap, buildInstanceMap, buildPositionMap } from '../../utils/sessionSection';
 
@@ -64,6 +65,11 @@ const SessionSection = ({
     const activityPositionById = useMemo(() => {
         return buildPositionMap(section.activity_ids || []);
     }, [section.activity_ids]);
+    const sectionAverage = useMemo(() => {
+        const sectionStats = session?.stats?.template?.section_stats || {};
+        const key = section?.template_section_id || section?.id || `legacy:${sectionIndex}:${String(section?.name || '').trim().toLowerCase()}`;
+        return getAverageDurationStat(sectionStats[key]);
+    }, [section, sectionIndex, session?.stats?.template?.section_stats]);
     const notesByInstanceId = useMemo(() => {
         const map = new Map();
         (allNotes || []).forEach((note) => {
@@ -110,8 +116,12 @@ const SessionSection = ({
         setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
     };
 
-    const openActivityBuilder = (activityDefinition = null) => {
+    const openActivityBuilder = (activityDefinition = null, options = {}) => {
         closeSelector();
+        if (Object.keys(options).length > 0) {
+            onOpenActivityBuilder(sectionIndex, activityDefinition, options);
+            return;
+        }
         onOpenActivityBuilder(sectionIndex, activityDefinition);
     };
 
@@ -155,9 +165,14 @@ const SessionSection = ({
                                 <span className={styles.durationValue}>
                                     {formatClockDuration(calculateSectionDurationFromInstanceIds(section, activityInstances))}
                                 </span>
-                                <span className={styles.durationPlanned}>
-                                    (planned: {section.estimated_duration_minutes || '—'} min)
-                                </span>
+                                {sectionAverage && (
+                                    <span
+                                        className={styles.durationPlanned}
+                                        title={`Average based on ${sectionAverage.sampleCount} completed sessions`}
+                                    >
+                                        Avg {sectionAverage.label}
+                                    </span>
+                                )}
                             </span>
                         )}
                     />
@@ -207,6 +222,7 @@ const SessionSection = ({
                                 isDragging={isDragging}
                                 activityDefinition={definition}
                                 activityNotes={notesByInstanceId.get(instanceId) || []}
+                                onOpenActivityBuilder={(activityDefinitionToEdit) => openActivityBuilder(activityDefinitionToEdit, { mode: 'edit' })}
                             />
                         </div>
                     );

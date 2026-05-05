@@ -31,8 +31,9 @@ export function useSessionDetailUiState({ isMobile, addActivity, setSidePaneMode
         if (isMobile) setIsMobilePaneOpen(true);
     };
 
-    const handleOpenActivityBuilder = (sectionIndex, activityDefinition = null) => {
-        setSectionForNewActivity(sectionIndex);
+    const handleOpenActivityBuilder = (sectionIndex, activityDefinition = null, options = {}) => {
+        const editingExistingDefinition = options.mode === 'edit' && activityDefinition?.id;
+        setSectionForNewActivity(editingExistingDefinition ? null : sectionIndex);
         setBuilderActivity(activityDefinition);
         setShowBuilder(true);
     };

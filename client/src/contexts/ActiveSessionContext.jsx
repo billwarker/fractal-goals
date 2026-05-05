@@ -234,6 +234,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         onSuccess: (res) => {
             queryClient.setQueryData(sessionKey, res.data);
             invalidateSessionListQueries();
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
             setAutoSaveStatus('saved');
             scheduleStatusClear(2000);
         },

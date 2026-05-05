@@ -16,7 +16,8 @@ from .activity import (
     ProgressRecord,
 )
 from .session import (
-    Session, SessionTemplate, get_session_by_id, get_all_sessions,
+    Session, SessionTemplate, SessionTemplateStats, TemplateSectionStats, ActivityDurationStats,
+    get_session_by_id, get_all_sessions,
     get_sessions_for_root, get_immediate_goals_for_session, delete_session
 )
 from .program import (

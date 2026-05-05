@@ -10,6 +10,7 @@ from services.events import Event, Events, event_bus
 from services.owned_entity_queries import get_owned_session_template
 from services.session_runtime import is_quick_session
 from services.session_structure import build_template_data_from_session
+from services.session_template_stats_service import SessionTemplateStatsService
 from services.service_types import JsonList, ServiceResult
 from validators import validate_session_template_data
 
@@ -33,9 +34,29 @@ class TemplateService:
             SessionTemplate.root_id == root_id,
             SessionTemplate.deleted_at.is_(None),
         )
+        templates = templates_q.all()
+        stats_service = SessionTemplateStatsService(self.db_session)
+        template_ids = [template.id for template in templates]
+        stats_by_template = stats_service.persisted_stats_for_templates(root_id, template_ids)
+        missing_stats = [template_id for template_id in template_ids if template_id not in stats_by_template]
+        for template_id in missing_stats:
+            stats_by_template[template_id] = stats_service.recompute_template_stats(root_id, template_id) or {}
+        if missing_stats:
+            self.db_session.commit()
+        for template in templates:
+            template._duration_stats = stats_by_template.get(template.id, {})
+
+        templates.sort(
+            key=lambda template: (
+                template._duration_stats.get("last_used_at") or "",
+                template.updated_at or template.created_at,
+                template.name.lower(),
+            ),
+            reverse=True,
+        )
         if limit is not None:
-            templates_q = templates_q.offset(offset).limit(limit)
-        return templates_q.all(), None, 200
+            templates = templates[offset:offset + limit]
+        return templates, None, 200
 
     def get_template(self, root_id, template_id, current_user_id) -> ServiceResult[SessionTemplate]:
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -45,6 +66,13 @@ class TemplateService:
         template = get_owned_session_template(self.db_session, root_id, template_id)
         if not template:
             return None, "Template not found", 404
+        stats_service = SessionTemplateStatsService(self.db_session)
+        template._duration_stats = (
+            stats_service.persisted_stats_for_templates(root_id, [template.id]).get(template.id)
+            or stats_service.recompute_template_stats(root_id, template.id)
+            or {}
+        )
+        self.db_session.commit()
         return template, None, 200
 
     def create_template(self, root_id, current_user_id, data) -> ServiceResult[SessionTemplate]:
@@ -67,6 +95,9 @@ class TemplateService:
         self.db_session.add(new_template)
         self.db_session.commit()
         self.db_session.refresh(new_template)
+        stats_service = SessionTemplateStatsService(self.db_session)
+        new_template._duration_stats = stats_service.recompute_template_stats(root_id, new_template.id) or {}
+        self.db_session.commit()
         event_bus.emit(Event(
             Events.SESSION_TEMPLATE_CREATED,
             {
@@ -119,6 +150,9 @@ class TemplateService:
 
         self.db_session.commit()
         self.db_session.refresh(template)
+        stats_service = SessionTemplateStatsService(self.db_session)
+        template._duration_stats = stats_service.recompute_template_stats(root_id, template.id) or {}
+        self.db_session.commit()
         event_bus.emit(Event(
             Events.SESSION_TEMPLATE_UPDATED,
             {

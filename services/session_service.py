@@ -36,6 +36,7 @@ from services.session_runtime import (
     get_template_session_type,
     is_quick_session,
 )
+from services.session_template_stats_service import SessionTemplateStatsService
 from services.session_structure import (
     build_duplicate_session_data,
     extract_activity_definition_id,
@@ -102,6 +103,15 @@ class SessionService:
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split),
         )
+
+    def _recompute_and_attach_stats(self, session):
+        if not session:
+            return
+        stats_service = SessionTemplateStatsService(self.db_session)
+        computed = stats_service.recompute_for_session(session)
+        session._template_stats = computed.get("template") or {}
+        session._activity_duration_stats = computed.get("activity_durations") or {}
+        self.db_session.commit()
 
     @staticmethod
     def _analytics_session_read_options():
@@ -742,14 +752,15 @@ class SessionService:
         }, None, 200
 
     def get_activity_instantiation_summary(self, root_id, current_user_id) -> ServiceResult[JsonDict]:
-        """Return the most recent session timestamp for each instantiated activity."""
+        """Return instance count, latest usage, and average duration by activity."""
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
 
         rows = self.db_session.query(
             ActivityInstance.activity_definition_id,
-            func.max(self._effective_session_timestamp()).label("latest_timestamp"),
+            func.max(self._effective_activity_completion_timestamp()).label("latest_timestamp"),
+            func.count(ActivityInstance.id).label("instance_count"),
         ).join(
             Session,
             Session.id == ActivityInstance.session_id,
@@ -758,16 +769,37 @@ class SessionService:
             Session.deleted_at == None,
             ActivityInstance.root_id == root_id,
             ActivityInstance.deleted_at == None,
+            ActivityInstance.completed.is_(True),
         ).group_by(
             ActivityInstance.activity_definition_id,
         ).all()
 
         latest_by_activity = {}
-        for activity_definition_id, latest_timestamp in rows:
-            if activity_definition_id and latest_timestamp:
-                latest_by_activity[str(activity_definition_id)] = format_utc(latest_timestamp)
+        summary_by_activity = {}
+        activity_ids = [str(activity_definition_id) for activity_definition_id, _, _ in rows if activity_definition_id]
+        stats_service = SessionTemplateStatsService(self.db_session)
+        duration_stats = stats_service.persisted_activity_duration_stats(root_id, activity_ids)
+        missing_stats = [activity_id for activity_id in activity_ids if activity_id not in duration_stats]
+        if missing_stats:
+            duration_stats.update(stats_service.recompute_activity_stats(root_id, missing_stats))
+            self.db_session.commit()
 
-        return {"latest_by_activity": latest_by_activity}, None, 200
+        for activity_definition_id, latest_timestamp, instance_count in rows:
+            if activity_definition_id and latest_timestamp:
+                activity_id = str(activity_definition_id)
+                latest_by_activity[activity_id] = format_utc(latest_timestamp)
+                stats = duration_stats.get(activity_id) or {}
+                summary_by_activity[activity_id] = {
+                    "instance_count": int(instance_count or 0),
+                    "last_used_at": format_utc(latest_timestamp),
+                    "average_duration_seconds": stats.get("average_duration_seconds"),
+                    "duration_sample_count": stats.get("sample_count", 0),
+                }
+
+        return {
+            "latest_by_activity": latest_by_activity,
+            "summary_by_activity": summary_by_activity,
+        }, None, 200
 
     def get_recent_evidence_goal_ids(self, root_id, current_user_id, days=7) -> ServiceResult[JsonDict]:
         """Return goal ids with recent completed activity evidence."""
@@ -1017,6 +1049,33 @@ class SessionService:
             if derived_goals:
                 session._derived_goals = derived_goals
 
+        stats_service = SessionTemplateStatsService(self.db_session)
+        if session.template_id:
+            session._template_stats = (
+                stats_service.persisted_stats_for_templates(root_id, [session.template_id]).get(session.template_id)
+                or stats_service.recompute_template_stats(root_id, session.template_id)
+                or {}
+            )
+        activity_definition_ids = [
+            instance.activity_definition_id
+            for instance in (session.activity_instances or [])
+            if instance.activity_definition_id
+        ]
+        session._activity_duration_stats = stats_service.persisted_activity_duration_stats(
+            root_id,
+            activity_definition_ids,
+        )
+        missing_activity_ids = [
+            activity_id
+            for activity_id in activity_definition_ids
+            if activity_id not in session._activity_duration_stats
+        ]
+        if missing_activity_ids:
+            session._activity_duration_stats.update(
+                stats_service.recompute_activity_stats(root_id, missing_activity_ids)
+            )
+            self.db_session.commit()
+
         return serialize_session(session, include_image_data=True), None, 200
 
     def get_session_activities(self, root_id, session_id, current_user_id) -> ServiceResult[list[JsonDict]]:
@@ -1171,6 +1230,7 @@ class SessionService:
         if 'completed' in data:
             instance.completed = data.get('completed')
         self.db_session.commit()
+        self._recompute_and_attach_stats(session)
         self.db_session.refresh(instance)
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_UPDATED,
@@ -1214,6 +1274,7 @@ class SessionService:
 
         instance.deleted_at = models.utc_now()
         self.db_session.commit()
+        self._recompute_and_attach_stats(session)
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_DELETED,
             {
@@ -1519,6 +1580,8 @@ class SessionService:
 
                 # Persist activity instances and canonical activity ordering for section rendering.
                 for section, normalized_exercises in section_exercises:
+                    if section.get('id') and not section.get('template_section_id'):
+                        section['template_section_id'] = section.get('id')
                     section_activity_ids = []
                     for exercise, activity_id in normalized_exercises:
                         if activity_id not in activity_map:
@@ -1646,6 +1709,7 @@ class SessionService:
                 self.db_session.commit()
         
         self.db_session.refresh(new_session)
+        self._recompute_and_attach_stats(new_session)
         
         event_bus.emit(Event(Events.SESSION_CREATED, {
             'session_id': new_session.id,
@@ -1853,6 +1917,7 @@ class SessionService:
             session.attributes = models._safe_load_json(val, val)
         
         self.db_session.commit()
+        self._recompute_and_attach_stats(session)
         
         event_bus.emit(Event(
             Events.SESSION_UPDATED,
@@ -1894,7 +1959,19 @@ class SessionService:
              return None, "Session not found", 404
 
         session_name = session.name
+        template_id = session.template_id
+        activity_definition_ids = [
+            instance.activity_definition_id
+            for instance in (session.activity_instances or [])
+            if instance.activity_definition_id
+        ]
         session.deleted_at = datetime.now(timezone.utc)
+        self.db_session.commit()
+        stats_service = SessionTemplateStatsService(self.db_session)
+        if template_id:
+            stats_service.recompute_template_stats(root_id, template_id)
+        if activity_definition_ids:
+            stats_service.recompute_activity_stats(root_id, activity_definition_ids)
         self.db_session.commit()
 
         event_bus.emit(Event(Events.SESSION_DELETED, {

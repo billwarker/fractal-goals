@@ -100,10 +100,27 @@
     font-weight: normal;
 }
 
-.activityGroupLabel {
+.activityMetaLine {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: 12px;
     color: var(--color-text-muted);
     margin-top: 2px;
+    flex-wrap: wrap;
+}
+
+.activityGroupLabel {
+    color: inherit;
+}
+
+.activityAverage {
+    color: inherit;
+}
+
+.activityMetaSeparator {
+    color: var(--color-text-muted);
+    opacity: 0.7;
 }
 
 .activityDescription {
@@ -130,8 +147,31 @@
 .activityHeaderRight {
     display: flex;
     align-items: flex-start;
+    gap: 8px;
     flex: 0 0 auto;
     min-width: max-content;
+}
+
+.editDefinitionButton {
+    appearance: none;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    height: 28px;
+    width: 28px;
+    padding: 0;
+    flex: 0 0 auto;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.editDefinitionButton:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
+    color: var(--color-text-primary);
 }
 
 .actionStack {

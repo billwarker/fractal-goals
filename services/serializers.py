@@ -310,6 +310,8 @@ def serialize_session(session, include_image_data=False):
     """Serialize a Session object."""
     active_instances = _active_session_instances(session)
     template_payload = _safe_load_json(getattr(getattr(session, "template", None), "template_data", None), {})
+    session_template_stats = getattr(session, "_template_stats", None) or {}
+    activity_duration_stats = getattr(session, "_activity_duration_stats", None) or {}
     serialized_activity_instances = [serialize_activity_instance(inst) for inst in active_instances]
     result = {
         "id": session.id,
@@ -344,6 +346,10 @@ def serialize_session(session, include_image_data=False):
             "completed_at": format_utc(session.completed_at),
             "created_at": format_utc(session.created_at),
             "updated_at": format_utc(session.updated_at),
+        },
+        "stats": {
+            "template": session_template_stats,
+            "activity_durations": activity_duration_stats,
         },
         "activity_instances": serialized_activity_instances,
         "notes": [serialize_note(n, include_image=include_image_data) for n in session.notes_list if not n.deleted_at] if hasattr(session, 'notes_list') else []
@@ -632,6 +638,7 @@ def serialize_split_definition(split):
 def serialize_session_template(template):
     """Serialize a SessionTemplate object."""
     template_data = _safe_load_json(template.template_data, {})
+    stats = getattr(template, "_duration_stats", None)
     return {
         "id": template.id, 
         "name": template.name, 
@@ -642,6 +649,7 @@ def serialize_session_template(template):
         "template_color": get_template_color(template_data),
         "created_at": format_utc(getattr(template, 'created_at', None)),
         "updated_at": format_utc(getattr(template, 'updated_at', None)),
+        "stats": stats or {},
         "goals": [serialize_goal(g, include_children=False) for g in template.goals] if hasattr(template, 'goals') else []
     }
 

@@ -192,6 +192,7 @@ def validate_session_template_data(template_data: Dict[str, Any]) -> Dict[str, A
             section_name = sanitize_string(section.get('name') or '')
             if not section_name:
                 raise ValueError('each section must include a name')
+            section['name'] = section_name
             section_activities = None
             for key in ('activities', 'exercises', 'activity_ids'):
                 if key in section:

@@ -34,10 +34,17 @@
     overflow-wrap: anywhere;
 }
 
-.lastUsed {
+.metadata {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
     font-size: 11px;
     color: var(--color-text-muted);
-    font-style: italic;
+}
+
+.metadataSeparator {
+    opacity: 0.7;
 }
 
 .indicatorList {

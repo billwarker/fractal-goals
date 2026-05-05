@@ -1,5 +1,6 @@
 import React from 'react';
 import Linkify from './atoms/Linkify';
+import { formatAverageDuration } from '../utils/durationStats';
 import styles from './ActivityCard.module.css';
 
 /**
@@ -8,7 +9,7 @@ import styles from './ActivityCard.module.css';
  */
 function ActivityCard({
     activity,
-    lastInstantiated,
+    instantiationSummary,
     onEdit,
     onDuplicate,
     onDelete,
@@ -16,27 +17,18 @@ function ActivityCard({
     onDragStart,
     isDragging
 }) {
-    const formatLastUsed = (timestamp) => {
-        if (!timestamp) return 'Never used';
-
-        const now = new Date();
-        const then = new Date(timestamp);
-        const diffMs = now - then;
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 0) return 'Today';
-        if (diffDays === 1) return 'Yesterday';
-        if (diffDays < 7) return `${diffDays} days ago`;
-
-        const weeks = Math.floor(diffDays / 7);
-        if (diffDays < 30) return `${weeks} week${weeks !== 1 ? 's' : ''} ago`;
-
-        const months = Math.floor(diffDays / 30);
-        if (diffDays < 365) return `${months} month${months !== 1 ? 's' : ''} ago`;
-
-        const years = Math.floor(diffDays / 365);
-        return `${years} year${years !== 1 ? 's' : ''} ago`;
+    const formatLastUsedDate = (timestamp) => {
+        if (!timestamp) return 'Never';
+        const date = new Date(timestamp);
+        if (Number.isNaN(date.getTime())) return 'Never';
+        return date.toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        });
     };
+    const instanceCount = instantiationSummary?.instance_count;
+    const averageDuration = formatAverageDuration(instantiationSummary?.average_duration_seconds, '—');
 
     const handleDragStart = (e) => {
         e.dataTransfer.setData('activityId', activity.id);
@@ -62,8 +54,12 @@ function ActivityCard({
                         <Linkify>{activity.description}</Linkify>
                     </p>
                 )}
-                <div className={styles.lastUsed}>
-                    Last used: {formatLastUsed(lastInstantiated)}
+                <div className={styles.metadata}>
+                    <span>{instanceCount ?? 0} instance{instanceCount === 1 ? '' : 's'}</span>
+                    <span className={styles.metadataSeparator}>•</span>
+                    <span>Last used: {formatLastUsedDate(instantiationSummary?.last_used_at)}</span>
+                    <span className={styles.metadataSeparator}>•</span>
+                    <span>Avg: {averageDuration}</span>
                 </div>
             </div>
 

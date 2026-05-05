@@ -8,10 +8,14 @@ import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
 import { isQuickSession } from '../../utils/sessionRuntime';
+import { formatLastUsed, getAverageDurationStat, getTemplateSortTimestamp } from '../../utils/durationStats';
 import styles from './TemplatePicker.module.css';
 
 function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate }) {
     const navigate = useNavigate();
+    const orderedTemplates = [...templates].sort((a, b) => (
+        getTemplateSortTimestamp(b).localeCompare(getTemplateSortTimestamp(a))
+    ));
 
     return (
         <StepContainer>
@@ -25,12 +29,21 @@ function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate 
                 />
             ) : (
                 <div className={styles.grid}>
-                    {templates.map((template) => {
+                    {orderedTemplates.map((template) => {
                         const isSelected = selectedTemplate?.id === template.id;
                         const quickTemplate = isQuickSession(template);
                         const sectionCount = template.template_data?.sections?.length || 0;
                         const quickActivityCount = template.template_data?.activities?.length || 0;
-                        const duration = template.template_data?.total_duration_minutes || 0;
+                        const averageDuration = getAverageDurationStat(template.stats);
+                        const lastUsedLabel = formatLastUsed(template.stats?.last_used_at);
+                        const structureLabel = quickTemplate
+                            ? `${quickActivityCount} activit${quickActivityCount === 1 ? 'y' : 'ies'}`
+                            : `${sectionCount} section${sectionCount !== 1 ? 's' : ''}`;
+                        const metaParts = [
+                            structureLabel,
+                            averageDuration ? `Avg ${averageDuration.label}` : null,
+                            lastUsedLabel,
+                        ].filter(Boolean);
 
                         return (
                             <SelectableCard
@@ -44,10 +57,11 @@ function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate 
                                     <SessionTemplateTypePill entity={template} size="sm" />
                                 </div>
 
-                                <div className={styles.meta}>
-                                    {quickTemplate
-                                        ? `${quickActivityCount} activit${quickActivityCount === 1 ? 'y' : 'ies'}`
-                                        : `${sectionCount} section${sectionCount !== 1 ? 's' : ''} • ${duration} min`}
+                                <div
+                                    className={styles.meta}
+                                    title={averageDuration ? `Average based on ${averageDuration.sampleCount} completed sessions` : undefined}
+                                >
+                                    {metaParts.join(' • ')}
                                 </div>
 
                                 {template.description ? (

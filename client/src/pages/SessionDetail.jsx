@@ -115,8 +115,39 @@ function SessionDetailContent() {
         return (
             <div className={styles.sessionDetailContainer}>
                 <div className={styles.sessionMainContent}>
-                    <QuickSessionWorkspace />
+                    <QuickSessionWorkspace onOpenActivityBuilder={handleOpenActivityBuilder} />
                 </div>
+
+                <SessionDetailModals
+                    rootId={rootId}
+                    activities={activities}
+                    showDeleteConfirm={showDeleteConfirm}
+                    onCloseDeleteConfirm={() => setShowDeleteConfirm(false)}
+                    onConfirmDelete={handleConfirmDelete}
+                    showBuilder={showBuilder}
+                    builderActivity={builderActivity}
+                    onCloseBuilder={handleCloseActivityBuilder}
+                    onActivityCreated={handleActivityCreated}
+                    selectedGoal={selectedGoal}
+                    onCloseGoal={() => setSelectedGoal(null)}
+                    onUpdateGoal={(goalId, updates) => updateGoal({ goalId, updates })}
+                    onToggleGoalCompletion={(goalId, currentStatus) =>
+                        toggleGoalCompletion({ goalId, completed: !currentStatus })
+                    }
+                    onGoalAssociationsChanged={handleGoalAssociationsChanged}
+                    showAssociationModal={showAssociationModal}
+                    onCloseAssociationModal={() => setShowAssociationModal(false)}
+                    associationContext={associationContext}
+                    allAvailableGoals={allAvailableGoals}
+                    onAssociateActivity={handleAssociateActivity}
+                    showOptionsModal={showOptionsModal}
+                    onCloseOptionsModal={() => setShowOptionsModal(false)}
+                    sessionName={session?.name}
+                    onCreateTemplate={handleCreateTemplate}
+                    onDuplicateSession={handleDuplicateSession}
+                    isSavingTemplate={isSavingTemplate}
+                    isDuplicatingSession={isDuplicatingSession}
+                />
 
                 {autoSaveStatus && (
                     <div className={`${styles.autoSaveIndicator} ${autoSaveStatus === 'saved' ? styles.autoSaveSaved : autoSaveStatus === 'error' ? styles.autoSaveError : styles.autoSaveDefault}`}>

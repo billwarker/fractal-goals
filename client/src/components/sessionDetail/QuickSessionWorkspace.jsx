@@ -24,6 +24,7 @@ function QuickSessionWorkspace({
     embedded = false,
     onStartAnother,
     showCompletionAction = true,
+    onOpenActivityBuilder = null,
 }) {
     const { timezone } = useTimezone();
     const {
@@ -161,6 +162,9 @@ function QuickSessionWorkspace({
                                     quickMode
                                     isSelected={false}
                                     activityDefinition={definitionById.get(instance.activity_definition_id) || null}
+                                    onOpenActivityBuilder={onOpenActivityBuilder
+                                        ? (activityDefinition) => onOpenActivityBuilder(null, activityDefinition, { mode: 'edit' })
+                                        : null}
                                 />
                             ))}
                         </div>
