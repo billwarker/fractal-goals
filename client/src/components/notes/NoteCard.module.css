@@ -345,8 +345,13 @@
     color: var(--color-link, #6c8ebf);
 }
 
+.plainContent {
+    white-space: pre-wrap;
+}
+
 .previewContent {
     color: var(--color-text-secondary);
+    white-space: pre-wrap;
     display: -webkit-box;
     -webkit-line-clamp: 6;
     -webkit-box-orient: vertical;

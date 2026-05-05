@@ -12,6 +12,7 @@ import remarkGfm from 'remark-gfm';
 import { useActivities, useActivityGroups } from '../../hooks/useActivityQueries';
 import { useFractalTree } from '../../hooks/useGoalQueries';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import CreateNoteIcon from '../atoms/CreateNoteIcon';
 import GoalTreePicker from '../common/GoalTreePicker';
 import styles from './NoteComposer.module.css';
 
@@ -50,6 +51,7 @@ function NoteComposer({
     const selectedGoalName = controlledGoalName !== undefined ? controlledGoalName : internalGoalName;
     const selectedActivityId = controlledActivityId !== undefined ? controlledActivityId : internalActivityId;
     const selectedActivityName = controlledActivityName !== undefined ? controlledActivityName : internalActivityName;
+    const supportsMarkdown = !selectedGoalId && !selectedActivityId && !prelinkedGoalId;
 
     const { data: treeData } = useFractalTree(rootId, { enabled: !prelinkedGoalId });
     const { activities: internalActivities = [] } = useActivities(rootId);
@@ -68,14 +70,11 @@ function NoteComposer({
         }
     }, []);
 
-    const handleGoalSelect = (node) => {
-        if (controlledGoalSelect) {
-            controlledGoalSelect(node.id === selectedGoalId ? null : node.id, node.id === selectedGoalId ? null : node.name);
-        } else {
-            setInternalGoalId(node.id);
-            setInternalGoalName(node.name);
+    useEffect(() => {
+        if (!supportsMarkdown && previewMode) {
+            setPreviewMode(false);
         }
-    };
+    }, [previewMode, supportsMarkdown]);
 
     const handleActivitySelect = (activity) => {
         const next = selectedActivityId === activity.id ? null : activity.id;
@@ -135,24 +134,26 @@ function NoteComposer({
             <div className={styles.composerBody}>
                 {/* Left: write/preview area */}
                 <div className={styles.writeArea}>
-                    <div className={styles.writeToolbar}>
-                        <button
-                            className={[styles.modeBtn, !previewMode ? styles.modeBtnActive : ''].filter(Boolean).join(' ')}
-                            onClick={() => setPreviewMode(false)}
-                            type="button"
-                        >
-                            Write
-                        </button>
-                        <button
-                            className={[styles.modeBtn, previewMode ? styles.modeBtnActive : ''].filter(Boolean).join(' ')}
-                            onClick={() => setPreviewMode(true)}
-                            type="button"
-                        >
-                            Preview
-                        </button>
-                    </div>
+                    {supportsMarkdown && (
+                        <div className={styles.writeToolbar}>
+                            <button
+                                className={[styles.modeBtn, !previewMode ? styles.modeBtnActive : ''].filter(Boolean).join(' ')}
+                                onClick={() => setPreviewMode(false)}
+                                type="button"
+                            >
+                                Write
+                            </button>
+                            <button
+                                className={[styles.modeBtn, previewMode ? styles.modeBtnActive : ''].filter(Boolean).join(' ')}
+                                onClick={() => setPreviewMode(true)}
+                                type="button"
+                            >
+                                Preview
+                            </button>
+                        </div>
+                    )}
 
-                    {previewMode ? (
+                    {supportsMarkdown && previewMode ? (
                         <div className={styles.previewPane}>
                             {content.trim() ? (
                                 <div className={styles.markdownPreview}>
@@ -169,7 +170,7 @@ function NoteComposer({
                             value={content}
                             onChange={(e) => { setContent(e.target.value); adjustHeight(e.target); }}
                             onKeyDown={handleKeyDown}
-                            placeholder="Write a note… (Markdown supported, ⌘Enter to submit)"
+                            placeholder={supportsMarkdown ? "Write a fractal note… (Markdown supported, ⌘Enter to submit)" : "Write a quick note… (⌘Enter to submit)"}
                             rows={4}
                         />
                     )}
@@ -199,7 +200,14 @@ function NoteComposer({
                             disabled={!content.trim() || isSubmitting || externalSubmitting}
                             type="button"
                         >
-                            {isSubmitting ? 'Saving…' : (submitLabel || 'Save note')}
+                            {isSubmitting ? (
+                                'Saving…'
+                            ) : (
+                                <>
+                                    <CreateNoteIcon className={styles.submitIcon} />
+                                    {submitLabel || 'Save note'}
+                                </>
+                            )}
                         </button>
                         {onCancel && (
                             <button className={styles.cancelBtn} onClick={onCancel} type="button">

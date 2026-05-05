@@ -83,6 +83,7 @@ function NoteCard({
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const resolvedNoteType = deriveNoteType(note);
     const resolvedNoteTypeLabel = deriveNoteTypeLabel(note);
+    const supportsMarkdown = resolvedNoteType === 'fractal_note';
 
     const adjustHeight = (el) => {
         if (!el) return;
@@ -196,7 +197,7 @@ function NoteCard({
         typeof window === 'undefined' || typeof window.IntersectionObserver === 'undefined' || !shouldDeferRichContent
     );
     const shouldShowRichContent = !shouldDeferRichContent || shouldRenderRichContent;
-    const previewContent = buildPlainTextPreview(note.content);
+    const previewContent = supportsMarkdown ? buildPlainTextPreview(note.content) : note.content;
 
     useEffect(() => {
         if (!shouldDeferRichContent) {
@@ -391,7 +392,13 @@ function NoteCard({
                     !isImageOnly && (
                         <div className={styles.content}>
                             {shouldShowRichContent ? (
-                                <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
+                                supportsMarkdown ? (
+                                    <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
+                                ) : (
+                                    <div className={`${styles.markdownContent} ${styles.plainContent}`}>
+                                        {note.content}
+                                    </div>
+                                )
                             ) : (
                                 <div className={`${styles.markdownContent} ${styles.previewContent}`}>
                                     {previewContent || ' '}

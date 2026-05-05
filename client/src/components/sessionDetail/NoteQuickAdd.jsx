@@ -75,10 +75,6 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note..." }) {
                     {isSubmitting ? '...' : <CreateNoteIcon />}
                 </button>
             </div>
-
-            <div className={styles.noteHint}>
-                Markdown supported. Press Enter to save, Shift+Enter for a new line.
-            </div>
         </form>
     );
 }

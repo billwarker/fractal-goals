@@ -148,10 +148,20 @@
     color: #fff;
     border: none;
     border-radius: 6px;
-    padding: 8px 18px;
+    padding: 8px 16px;
     font-size: 14px;
     cursor: pointer;
     transition: opacity 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+}
+
+.submitIcon {
+    display: block;
+    width: 18px;
+    height: 18px;
 }
 
 .submitBtn:disabled {

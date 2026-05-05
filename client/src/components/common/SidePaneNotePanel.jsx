@@ -81,9 +81,6 @@ function SidePaneNotePanel({
                         {isSubmitting ? '…' : <CreateNoteIcon />}
                     </button>
                 </div>
-                <div className={styles.hint}>
-                    Markdown supported. Press Enter to save, Shift+Enter for a new line.
-                </div>
             </form>
         </div>
     );
