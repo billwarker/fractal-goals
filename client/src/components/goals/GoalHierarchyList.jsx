@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import GoalIcon from '../atoms/GoalIcon';
 import { getTypeDisplayName } from '../../utils/goalHelpers';
 import { isExecutionGoalType } from '../../utils/goalNodeModel';
@@ -56,6 +56,10 @@ function GoalHierarchyList({
     getGoalNameStyle,
     isGoalBranchHighlighted,
     getGoalBranchHighlightState,
+    getGoalConnectorHighlightState,
+    getGoalConnectorEdgeHighlightState,
+    connectorHighlightMode = 'selected',
+    showGoalHighlightHalo = false,
     getGoalLeftSlot,
     getScopedCharacteristics,
     getGoalColor,
@@ -146,7 +150,10 @@ function GoalHierarchyList({
         );
     }
 
-    const treeRoots = buildSessionHierarchyTree(nodes);
+    const treeRoots = useMemo(() => buildSessionHierarchyTree(nodes), [nodes]);
+    const listRef = useRef(null);
+    const iconRefs = useRef(new Map());
+    const [connectorEdges, setConnectorEdges] = useState([]);
 
     const getNodeHighlightState = (node) => {
         const originalNode = node.originalGoal || node;
@@ -155,105 +162,317 @@ function GoalHierarchyList({
             : (isGoalBranchHighlighted && isGoalBranchHighlighted(originalNode) ? 'active' : null);
     };
 
-    const branchContainsHighlightedNode = (node) => {
-        if (getNodeHighlightState(node)) {
-            return true;
+    const nodeIsHighlighted = (node) => Boolean(getNodeHighlightState(node));
+
+    const nodeConnectorIsHighlighted = (node) => {
+        if (!getGoalConnectorHighlightState) {
+            return nodeIsHighlighted(node);
         }
-        return node.children.some(branchContainsHighlightedNode);
+        return Boolean(getGoalConnectorHighlightState(node.originalGoal || node));
     };
 
-    const renderSessionTreeNodes = (treeNodes, depth = 0) => {
-        const activeChildIndexes = treeNodes
-            .map((node, index) => (branchContainsHighlightedNode(node) ? index : null))
-            .filter((index) => index !== null);
-        const lastActiveChildIndex = activeChildIndexes.length > 0
-            ? Math.max(...activeChildIndexes)
-            : -1;
+    const branchContainsHighlightedConnectorNode = (node) => {
+        if (nodeConnectorIsHighlighted(node)) {
+            return true;
+        }
+        return node.children.some(branchContainsHighlightedConnectorNode);
+    };
 
-        return (
-        <ul className={depth > 0 ? styles.sessionTreeChildren : styles.sessionTreeRoot}>
-            {treeNodes.map((node, index) => {
-                const isCompleted = node.status
-                    ? Boolean(node.status.completed)
-                    : Boolean(node.completed);
-                const isNestedNode = depth > 0;
-                const originalNode = node.originalGoal || node;
-                const isSelectable = isGoalSelectable ? isGoalSelectable(originalNode) : Boolean(onGoalClick);
-                const branchHighlightState = getNodeHighlightState(node);
-                const branchHasHighlightedNode = branchContainsHighlightedNode(node);
-                const shouldHighlightVerticalConnector = isNestedNode && index <= lastActiveChildIndex;
-                const shouldStopHighlightedVerticalConnector = shouldHighlightVerticalConnector && index === lastActiveChildIndex;
-                const shouldHighlightHorizontalConnector = isNestedNode && branchHasHighlightedNode;
-                const metaLabel = getGoalMetaLabel ? getGoalMetaLabel(originalNode) : null;
-                // Each level of nesting adds --tree-indent (28px). The left slot must escape
-                // all accumulated indentation plus the 28px padding-left on the wrapper div.
-                const leftSlotOffset = `calc(-1 * ${depth} * var(--tree-indent, 28px) - 28px)`;
+    const nodeActivatesConnector = (node) => (
+        connectorHighlightMode === 'lineage'
+            ? branchContainsHighlightedConnectorNode(node)
+            : nodeConnectorIsHighlighted(node)
+    );
+
+    const subtreeHasActiveConnector = (node) => {
+        if (nodeActivatesConnector(node)) {
+            return true;
+        }
+        return node.children.some(subtreeHasActiveConnector);
+    };
+
+    const getLastActiveIndex = (treeNodes) => {
+        let lastActiveIndex = -1;
+        treeNodes.forEach((node, index) => {
+            if (subtreeHasActiveConnector(node)) {
+                lastActiveIndex = index;
+            }
+        });
+        return lastActiveIndex;
+    };
+
+    const flattenSessionTreeRows = (treeNodes, depth = 0, ancestorContinuations = []) => {
+        const lastActiveIndex = getLastActiveIndex(treeNodes);
+
+        return treeNodes.flatMap((node, index) => {
+            const isLastSibling = index === treeNodes.length - 1;
+            const row = {
+                node,
+                depth,
+                parentId: node.parent_id || null,
+                isLastSibling,
+                ancestorContinuations,
+                currentTopActive: depth > 0 && index <= lastActiveIndex,
+                currentBottomActive: depth > 0 && index < lastActiveIndex,
+                currentHorizontalActive: depth > 0 && subtreeHasActiveConnector(node),
+                childBottomActive: node.children.length > 0 && node.children.some(subtreeHasActiveConnector),
+            };
+            const childRows = node.children.length > 0
+                ? flattenSessionTreeRows(node.children, depth + 1, [
+                    ...ancestorContinuations,
+                    {
+                        continues: !isLastSibling,
+                        active: index < lastActiveIndex,
+                    },
+                ])
+                : [];
+
+            return [row, ...childRows];
+        });
+    };
+
+    const sessionRows = useMemo(
+        () => flattenSessionTreeRows(treeRoots),
+        [
+            connectorHighlightMode,
+            getGoalBranchHighlightState,
+            getGoalConnectorHighlightState,
+            isGoalBranchHighlighted,
+            treeRoots,
+        ]
+    );
+
+    const rowById = useMemo(
+        () => new Map(sessionRows.map((row) => [String(row.node.id), row])),
+        [sessionRows]
+    );
+
+    const setIconRef = (nodeId) => (element) => {
+        const key = String(nodeId);
+        if (element) {
+            iconRefs.current.set(key, element);
+        } else {
+            iconRefs.current.delete(key);
+        }
+    };
+
+    useLayoutEffect(() => {
+        const listElement = listRef.current;
+        if (!listElement) {
+            return undefined;
+        }
+
+        const measureConnectors = () => {
+            const listRect = listElement.getBoundingClientRect();
+            const nextEdges = [];
+
+            sessionRows.forEach(({ node }) => {
+                const parentElement = iconRefs.current.get(String(node.id));
+                if (!parentElement) {
+                    return;
+                }
+
+                const parentRect = parentElement.getBoundingClientRect();
+                const from = {
+                    x: parentRect.left - listRect.left + (parentRect.width / 2),
+                    y: parentRect.top - listRect.top + (parentRect.height / 2),
+                };
+
+                node.children.forEach((child) => {
+                    const childElement = iconRefs.current.get(String(child.id));
+                    if (!childElement) {
+                        return;
+                    }
+
+                    const childRect = childElement.getBoundingClientRect();
+                    const to = {
+                        x: childRect.left - listRect.left + (childRect.width / 2),
+                        y: childRect.top - listRect.top + (childRect.height / 2),
+                    };
+                    const childRow = rowById.get(String(child.id));
+                    const active = getGoalConnectorEdgeHighlightState
+                        ? Boolean(getGoalConnectorEdgeHighlightState(node.originalGoal || node, child.originalGoal || child))
+                        : (childRow
+                            ? Boolean(childRow.currentTopActive || childRow.currentHorizontalActive)
+                            : false);
+
+                    nextEdges.push({
+                        key: `${node.id}-${child.id}`,
+                        parentId: node.id,
+                        childId: child.id,
+                        from,
+                        to,
+                        active,
+                    });
+                });
+            });
+
+            setConnectorEdges((currentEdges) => {
+                if (currentEdges.length !== nextEdges.length) {
+                    return nextEdges;
+                }
+
+                const hasChanged = nextEdges.some((edge, index) => {
+                    const currentEdge = currentEdges[index];
+                    return !currentEdge
+                        || currentEdge.key !== edge.key
+                        || currentEdge.active !== edge.active
+                        || currentEdge.from.x !== edge.from.x
+                        || currentEdge.from.y !== edge.from.y
+                        || currentEdge.to.x !== edge.to.x
+                        || currentEdge.to.y !== edge.to.y;
+                });
+
+                return hasChanged ? nextEdges : currentEdges;
+            });
+        };
+
+        const frameIds = [];
+        const timeoutIds = [];
+        const scheduleMeasure = () => {
+            measureConnectors();
+
+            if (typeof requestAnimationFrame === 'function') {
+                const firstFrameId = requestAnimationFrame(() => {
+                    measureConnectors();
+                    const secondFrameId = requestAnimationFrame(measureConnectors);
+                    frameIds.push(secondFrameId);
+                });
+                frameIds.push(firstFrameId);
+            }
+
+            timeoutIds.push(window.setTimeout(measureConnectors, 80));
+            timeoutIds.push(window.setTimeout(measureConnectors, 220));
+        };
+
+        scheduleMeasure();
+
+        const resizeObserver = typeof ResizeObserver !== 'undefined'
+            ? new ResizeObserver(scheduleMeasure)
+            : null;
+        resizeObserver?.observe(listElement);
+        iconRefs.current.forEach((element) => resizeObserver?.observe(element));
+        const modalElement = listElement.closest('[role="dialog"]') || listElement.closest('[class*="modal"]');
+        window.addEventListener('resize', scheduleMeasure);
+        modalElement?.addEventListener('transitionend', scheduleMeasure);
+        modalElement?.addEventListener('animationend', scheduleMeasure);
+
+        return () => {
+            frameIds.forEach((frameId) => cancelAnimationFrame(frameId));
+            timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+            resizeObserver?.disconnect();
+            window.removeEventListener('resize', scheduleMeasure);
+            modalElement?.removeEventListener('transitionend', scheduleMeasure);
+            modalElement?.removeEventListener('animationend', scheduleMeasure);
+        };
+    }, [getGoalConnectorEdgeHighlightState, rowById, sessionRows]);
+
+    const renderConnectorEdges = () => (
+        <svg className={styles.sessionConnectorSvg} aria-hidden="true">
+            {connectorEdges.map(({ key, parentId, childId, from, to, active }) => {
+                const midpointY = to.y;
+                const path = `M ${from.x} ${from.y} V ${midpointY} H ${to.x}`;
 
                 return (
-                    <li
-                        key={node.id}
-                        className={`${styles.sessionTreeItem} ${isNestedNode ? styles.sessionTreeItemNested : ''} ${node.children.length > 0 ? styles.sessionTreeItemHasChildren : ''} ${shouldHighlightVerticalConnector ? styles.sessionTreeItemBranchConnectorActive : ''} ${shouldStopHighlightedVerticalConnector ? styles.sessionTreeItemBranchConnectorEnd : ''}`}
-                    >
-                        <div
-                            className={`${styles.sessionTreeNode} ${node.isLinked ? styles.sessionNodeActive : ''} ${isNestedNode ? styles.sessionTreeNodeNested : ''} ${shouldHighlightHorizontalConnector ? styles.sessionTreeNodeBranchConnectorActive : ''}`}
-                        >
-                            {getGoalLeftSlot && (
-                                <div className={styles.sessionLeftSlot} style={{ left: leftSlotOffset }}>
-                                    {getGoalLeftSlot(node.originalGoal || node)}
-                                </div>
-                            )}
-                            <div className={styles.sessionIconSlot}>
-                                <GoalIcon
-                                    shape={getGoalIcon ? getGoalIcon(node.type) : getScopedCharacteristics(node.type)?.icon || 'circle'}
-                                    color={isCompleted ? completedColor : getGoalColor(node.type)}
-                                    secondaryColor={isCompleted ? completedSecondaryColor : getGoalSecondaryColor(node.type)}
-                                    isSmart={node.is_smart}
-                                    size={16}
-                                />
-                            </div>
-                            <div className={styles.sessionNodeContent}>
-                                <span
-                                    className={`${styles.sessionNodeName} ${node.isLinked ? styles.sessionNodeNameActive : ''} ${!isSelectable ? styles.sessionNodeNameDisabled : ''}`}
-                                    style={getGoalNameStyle ? getGoalNameStyle(originalNode) : undefined}
-                                    onClick={() => handleGoalClick(node)}
-                                >
-                                    {node.name}
-                                </span>
-                                {metaLabel && (
-                                    typeof metaLabel === 'string' ? (
-                                        <span className={styles.sessionNodeMeta}>
-                                            {metaLabel}
-                                        </span>
-                                    ) : metaLabel
-                                )}
-                                {onStartSubGoalCreation && canAddChild(node.type) && (
-                                    <button
-                                        className={styles.addSubGoalBtn}
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            if (node.type === 'ImmediateGoal' && onAddTargetForGoal) {
-                                                onAddTargetForGoal(node);
-                                                return;
-                                            }
-                                            onStartSubGoalCreation(node);
-                                        }}
-                                        title={node.type === 'ImmediateGoal' ? 'Add Target' : 'Add Sub-goal'}
-                                    >
-                                        +
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {node.children.length > 0 ? renderSessionTreeNodes(node.children, depth + 1) : null}
-                    </li>
+                    <path
+                        key={key}
+                        d={path}
+                        className={`${styles.sessionConnectorEdge} ${active ? styles.sessionConnectorEdgeActive : ''}`}
+                        data-connector-active={active ? 'true' : 'false'}
+                        data-parent-goal-id={parentId}
+                        data-child-goal-id={childId}
+                    />
                 );
             })}
-        </ul>
+        </svg>
+    );
+
+    const renderSessionTreeRow = (row) => {
+        const {
+            node,
+            depth,
+        } = row;
+        const isCompleted = node.status
+            ? Boolean(node.status.completed)
+            : Boolean(node.completed);
+        const originalNode = node.originalGoal || node;
+        const isSelectable = isGoalSelectable ? isGoalSelectable(originalNode) : Boolean(onGoalClick);
+        const branchHighlightState = getNodeHighlightState(node);
+        const metaLabel = getGoalMetaLabel ? getGoalMetaLabel(originalNode) : null;
+        return (
+            <div
+                key={node.id}
+                className={styles.sessionTreeRow}
+                data-goal-id={node.id}
+            >
+                {getGoalLeftSlot && (
+                    <div className={styles.sessionLeftSlot}>
+                        {getGoalLeftSlot(originalNode)}
+                    </div>
+                )}
+                <div
+                    className={`${styles.sessionTreeNode} ${node.isLinked ? styles.sessionNodeActive : ''}`}
+                >
+                    <div
+                        className={styles.sessionIndent}
+                        style={{ width: `calc(${depth} * var(--tree-indent))` }}
+                        aria-hidden="true"
+                    />
+                    <div
+                        ref={setIconRef(node.id)}
+                        className={`${styles.sessionIconSlot} ${showGoalHighlightHalo && branchHighlightState ? styles.sessionIconSlotBranchActive : ''}`}
+                    >
+                        <GoalIcon
+                            shape={getGoalIcon ? getGoalIcon(node.type) : getScopedCharacteristics(node.type)?.icon || 'circle'}
+                            color={isCompleted ? completedColor : getGoalColor(node.type)}
+                            secondaryColor={isCompleted ? completedSecondaryColor : getGoalSecondaryColor(node.type)}
+                            isSmart={node.is_smart}
+                            size={16}
+                        />
+                    </div>
+                    <div className={styles.sessionNodeContent}>
+                        <span
+                            className={`${styles.sessionNodeName} ${node.isLinked ? styles.sessionNodeNameActive : ''} ${!isSelectable ? styles.sessionNodeNameDisabled : ''}`}
+                            style={getGoalNameStyle ? getGoalNameStyle(originalNode) : undefined}
+                            onClick={() => handleGoalClick(node)}
+                        >
+                            {node.name}
+                        </span>
+                        {metaLabel && (
+                            typeof metaLabel === 'string' ? (
+                                <span className={styles.sessionNodeMeta}>
+                                    {metaLabel}
+                                </span>
+                            ) : metaLabel
+                        )}
+                        {onStartSubGoalCreation && canAddChild(node.type) && (
+                            <button
+                                className={styles.addSubGoalBtn}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (node.type === 'ImmediateGoal' && onAddTargetForGoal) {
+                                        onAddTargetForGoal(node);
+                                        return;
+                                    }
+                                    onStartSubGoalCreation(node);
+                                }}
+                                title={node.type === 'ImmediateGoal' ? 'Add Target' : 'Add Sub-goal'}
+                            >
+                                +
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
         );
     };
 
-    return <div className={`${styles.list} ${styles.sessionList}`}>{renderSessionTreeNodes(treeRoots)}</div>;
+    return (
+        <div ref={listRef} className={`${styles.list} ${styles.sessionList}`}>
+            {renderConnectorEdges()}
+            {sessionRows.map(renderSessionTreeRow)}
+        </div>
+    );
 }
 
 export default GoalHierarchyList;

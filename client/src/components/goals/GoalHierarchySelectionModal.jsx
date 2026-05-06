@@ -14,6 +14,10 @@ function GoalHierarchySelectionModal({
     selectionMode = 'multiple',
     searchPlaceholder = 'Search goals...',
     emptyState = 'No goals available.',
+    highlightSelectionAncestors = false,
+    connectorHighlightMode,
+    showGoalHighlightHalo = false,
+    showAncestorControls = true,
     confirmLabel,
     onClose,
     onConfirm,
@@ -40,6 +44,10 @@ function GoalHierarchySelectionModal({
                     selectionMode={selectionMode}
                     searchPlaceholder={searchPlaceholder}
                     emptyState={emptyState}
+                    highlightSelectionAncestors={highlightSelectionAncestors}
+                    connectorHighlightMode={connectorHighlightMode}
+                    showGoalHighlightHalo={showGoalHighlightHalo}
+                    showAncestorControls={showAncestorControls}
                 />
             </ModalBody>
             <ModalFooter>

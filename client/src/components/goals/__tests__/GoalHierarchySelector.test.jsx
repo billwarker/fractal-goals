@@ -78,4 +78,125 @@ describe('GoalHierarchySelector', () => {
         fireEvent.click(screen.getByLabelText('Select all ancestors of Grandchild Goal'));
         expect(handleSelectionChange).toHaveBeenLastCalledWith(['goal-child', 'goal-root']);
     });
+
+    it('keeps filter-style connector highlighting scoped to explicitly selected goals', () => {
+        const { container } = render(
+            <GoalHierarchySelector
+                goals={goals}
+                selectedGoalIds={['goal-root', 'goal-child']}
+                onSelectionChange={vi.fn()}
+                selectionMode="multiple"
+                connectorHighlightMode="selected"
+            />
+        );
+
+        const grandchildRow = screen.getByText('Grandchild Goal').closest('[data-goal-id]');
+        expect(grandchildRow.querySelectorAll('[data-connector-active="true"]')).toHaveLength(0);
+        expect(container.querySelectorAll('[data-connector-active="true"]').length).toBeGreaterThan(0);
+    });
+
+    it('does not activate connectors for a direct filter-style child selection', () => {
+        const { container } = render(
+            <GoalHierarchySelector
+                goals={goals}
+                selectedGoalIds={['goal-grandchild']}
+                onSelectionChange={vi.fn()}
+                selectionMode="multiple"
+                connectorHighlightMode="bulk"
+                showGoalHighlightHalo
+            />
+        );
+
+        expect(container.querySelectorAll('[class*="sessionIconSlotBranchActive"]')).toHaveLength(1);
+        expect(container.querySelectorAll('[data-connector-active="true"]')).toHaveLength(0);
+    });
+
+    it('uses the ancestor control to explicitly select parents in filter-style mode', () => {
+        const handleSelectionChange = vi.fn();
+        render(
+            <GoalHierarchySelector
+                goals={goals}
+                selectedGoalIds={['goal-grandchild']}
+                onSelectionChange={handleSelectionChange}
+                selectionMode="multiple"
+                connectorHighlightMode="selected"
+            />
+        );
+
+        const ancestorControl = screen.getByLabelText('Select all ancestors of Grandchild Goal');
+        expect(ancestorControl).toBeEnabled();
+
+        fireEvent.click(ancestorControl);
+        expect(handleSelectionChange).toHaveBeenLastCalledWith(['goal-grandchild', 'goal-child', 'goal-root']);
+    });
+
+    it('uses halos for direct filter selections and connector lines only for bulk controls', () => {
+        function FilterHarness() {
+            const [selectedIds, setSelectedIds] = React.useState([]);
+            return (
+                <GoalHierarchySelector
+                    goals={goals}
+                    selectedGoalIds={selectedIds}
+                    onSelectionChange={setSelectedIds}
+                    selectionMode="multiple"
+                    connectorHighlightMode="bulk"
+                    showGoalHighlightHalo
+                />
+            );
+        }
+
+        const { container } = render(<FilterHarness />);
+
+        fireEvent.click(screen.getByLabelText('Select Child Goal'));
+        expect(container.querySelectorAll('[class*="sessionIconSlotBranchActive"]')).toHaveLength(1);
+        expect(container.querySelectorAll('[data-connector-active="true"]')).toHaveLength(0);
+
+        fireEvent.click(screen.getByLabelText('Select all descendants of Child Goal'));
+        expect(container.querySelectorAll('[class*="sessionIconSlotBranchActive"]')).toHaveLength(2);
+        expect(container.querySelectorAll('[data-connector-active="true"]').length).toBeGreaterThan(0);
+    });
+
+    it('does not highlight ancestor lineage when selecting filter descendants', () => {
+        function FilterHarness() {
+            const [selectedIds, setSelectedIds] = React.useState([]);
+            return (
+                <GoalHierarchySelector
+                    goals={goals}
+                    selectedGoalIds={selectedIds}
+                    onSelectionChange={setSelectedIds}
+                    selectionMode="multiple"
+                    connectorHighlightMode="bulk"
+                    showGoalHighlightHalo
+                />
+            );
+        }
+
+        const { container } = render(<FilterHarness />);
+
+        fireEvent.click(screen.getByLabelText('Select all descendants of Child Goal'));
+
+        expect(container.querySelector('[data-parent-goal-id="goal-root"][data-child-goal-id="goal-child"]'))
+            .toHaveAttribute('data-connector-active', 'false');
+        expect(container.querySelector('[data-parent-goal-id="goal-child"][data-child-goal-id="goal-grandchild"]'))
+            .toHaveAttribute('data-connector-active', 'true');
+    });
+
+    it('can highlight inherited lineage for activity association mode', () => {
+        const { container } = render(
+            <GoalHierarchySelector
+                goals={goals}
+                selectedGoalIds={['goal-grandchild']}
+                onSelectionChange={vi.fn()}
+                selectionMode="multiple"
+                highlightSelectionAncestors
+                connectorHighlightMode="lineage"
+            />
+        );
+
+        expect(container.querySelectorAll('[data-connector-active="true"]').length).toBeGreaterThan(0);
+        expect(container.querySelector('[data-parent-goal-id="goal-root"][data-child-goal-id="goal-child"]'))
+            .toHaveAttribute('data-connector-active', 'true');
+        expect(container.querySelector('[data-parent-goal-id="goal-child"][data-child-goal-id="goal-grandchild"]'))
+            .toHaveAttribute('data-connector-active', 'true');
+    });
 });

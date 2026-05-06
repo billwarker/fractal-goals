@@ -164,6 +164,8 @@ function GoalHierarchySelector({
     emptyState = 'No goals available.',
     showSelectionInheritanceMeta = false,
     highlightSelectionAncestors = false,
+    connectorHighlightMode = highlightSelectionAncestors ? 'lineage' : 'selected',
+    showGoalHighlightHalo = false,
     showAncestorControls = true,
 }) {
     const {
@@ -173,6 +175,7 @@ function GoalHierarchySelector({
         getScopedCharacteristics,
     } = useGoalLevels();
     const [searchTerm, setSearchTerm] = useState('');
+    const [bulkConnectorGoalIds, setBulkConnectorGoalIds] = useState(() => new Set());
 
     const normalizedGoals = useMemo(
         () => goals.map(normalizeGoal).filter((goal) => goal?.id),
@@ -216,6 +219,12 @@ function GoalHierarchySelector({
     };
 
     const toggleGoal = (goalId) => {
+        setBulkConnectorGoalIds((current) => {
+            const next = new Set(current);
+            next.delete(goalId);
+            return next;
+        });
+
         if (isSingleSelect) {
             emitSelection(selectedIdSet.has(goalId) ? [] : [goalId]);
             return;
@@ -230,7 +239,7 @@ function GoalHierarchySelector({
         emitSelection(Array.from(next));
     };
 
-    const toggleRelatedGoals = (relatedIds) => {
+    const toggleRelatedGoals = (sourceId, relatedIds) => {
         if (!relatedIds.length) {
             return;
         }
@@ -243,6 +252,18 @@ function GoalHierarchySelector({
             } else {
                 next.add(relatedId);
             }
+        });
+        setBulkConnectorGoalIds((current) => {
+            const nextConnectorIds = new Set(current);
+            [sourceId, ...relatedIds].forEach((relatedId) => {
+                const normalizedId = String(relatedId);
+                if (allSelected) {
+                    nextConnectorIds.delete(normalizedId);
+                } else {
+                    nextConnectorIds.add(normalizedId);
+                }
+            });
+            return nextConnectorIds;
         });
         emitSelection(Array.from(next));
     };
@@ -282,7 +303,7 @@ function GoalHierarchySelector({
                                     type="checkbox"
                                     checked={areAncestorsSelected}
                                     disabled={!hasAncestors}
-                                    onChange={() => toggleRelatedGoals(ancestorIds)}
+                                    onChange={() => toggleRelatedGoals(goalId, ancestorIds)}
                                     aria-label={`Select all ancestors of ${goal.name}`}
                                 />
                                 <span aria-hidden="true">↑</span>
@@ -294,11 +315,11 @@ function GoalHierarchySelector({
                         >
                             <input
                                 type="checkbox"
-                                checked={areDescendantsSelected}
-                                disabled={!hasDescendants}
-                                onChange={() => toggleRelatedGoals(descendantIds)}
-                                aria-label={`Select all descendants of ${goal.name}`}
-                            />
+                            checked={areDescendantsSelected}
+                            disabled={!hasDescendants}
+                            onChange={() => toggleRelatedGoals(goalId, descendantIds)}
+                            aria-label={`Select all descendants of ${goal.name}`}
+                        />
                             <span aria-hidden="true">↓</span>
                         </label>
                     </>
@@ -308,20 +329,37 @@ function GoalHierarchySelector({
     };
 
     const getGoalBranchHighlightState = (goal) => {
+        if (selectedIdSet.has(String(goal.id))) {
+            return 'target';
+        }
+
         if (highlightSelectionAncestors && selectedAncestorIdSet.has(String(goal.id))) {
             return 'ancestor';
         }
 
-        const hasSelectedDescendant = Boolean(
-            findSelectedDescendant(goal.id, goalById, childIdsByParent, selectedIdSet)
-        );
-        if (hasSelectedDescendant) {
-            return 'ancestor';
-        }
-        if (selectedIdSet.has(String(goal.id))) {
-            return 'target';
-        }
         return null;
+    };
+
+    const getGoalConnectorHighlightState = (goal) => {
+        if (connectorHighlightMode === 'bulk') {
+            return bulkConnectorGoalIds.has(String(goal.id));
+        }
+        return Boolean(getGoalBranchHighlightState(goal));
+    };
+
+    const getGoalConnectorEdgeHighlightState = (parentGoal, childGoal) => {
+        const parentId = String(parentGoal.id);
+        const childId = String(childGoal.id);
+
+        if (connectorHighlightMode === 'bulk') {
+            return bulkConnectorGoalIds.has(parentId) && bulkConnectorGoalIds.has(childId);
+        }
+
+        if (connectorHighlightMode === 'lineage') {
+            return selectedIdSet.has(childId) || selectedAncestorIdSet.has(childId);
+        }
+
+        return selectedIdSet.has(parentId) && selectedIdSet.has(childId);
     };
 
     const getGoalMetaLabel = (goal) => {
@@ -365,6 +403,10 @@ function GoalHierarchySelector({
                     getGoalLeftSlot={getGoalLeftSlot}
                     getGoalMetaLabel={getGoalMetaLabel}
                     getGoalBranchHighlightState={getGoalBranchHighlightState}
+                    getGoalConnectorHighlightState={getGoalConnectorHighlightState}
+                    getGoalConnectorEdgeHighlightState={getGoalConnectorEdgeHighlightState}
+                    connectorHighlightMode={connectorHighlightMode}
+                    showGoalHighlightHalo={showGoalHighlightHalo}
                     getGoalColor={getGoalColor}
                     getGoalSecondaryColor={getGoalSecondaryColor}
                     getGoalIcon={getGoalIcon}

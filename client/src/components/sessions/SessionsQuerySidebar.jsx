@@ -315,6 +315,8 @@ function SessionsQuerySidebar({
                 selectionMode="multiple"
                 searchPlaceholder="Search goals"
                 emptyState="No goals available."
+                connectorHighlightMode="bulk"
+                showGoalHighlightHalo
                 onClose={() => setIsGoalModalOpen(false)}
                 onConfirm={(selectedIds) => onUpdateFilters?.({ goalIds: selectedIds })}
             />
