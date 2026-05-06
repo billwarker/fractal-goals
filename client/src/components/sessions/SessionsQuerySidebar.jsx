@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import SidePaneHeader from '../common/SidePaneHeader';
 import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
+import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 import SessionCalendarHeatmap from './SessionCalendarHeatmap';
 import SessionFilterSelectionModal from './SessionFilterSelectionModal';
 import './SessionsQuerySidebar.css';
@@ -306,14 +307,14 @@ function SessionsQuerySidebar({
                 onConfirm={(selectedIds) => onUpdateFilters?.({ activityIds: selectedIds })}
             />
 
-            <SessionFilterSelectionModal
+            <GoalHierarchySelectionModal
                 isOpen={isGoalModalOpen}
                 title="Filter By Goal"
-                items={goalOptions}
-                selectedIds={filters.goalIds}
+                goals={goalOptions}
+                selectedGoalIds={filters.goalIds}
+                selectionMode="multiple"
                 searchPlaceholder="Search goals"
-                emptyState="No activity-linked goals available."
-                itemKind="goal"
+                emptyState="No goals available."
                 onClose={() => setIsGoalModalOpen(false)}
                 onConfirm={(selectedIds) => onUpdateFilters?.({ goalIds: selectedIds })}
             />

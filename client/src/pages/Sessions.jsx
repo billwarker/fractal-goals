@@ -205,14 +205,8 @@ function Sessions() {
 
     const goalOptions = useMemo(() => {
         const allGoals = flattenGoals(goalTree ? [goalTree] : []);
-        const goalIdsInActivities = new Set(
-            activities.flatMap((activity) => activity.associated_goal_ids || [])
-        );
-
-        return allGoals
-            .filter((goal) => goalIdsInActivities.has(goal.id))
-            .sort((goalA, goalB) => goalA.name.localeCompare(goalB.name));
-    }, [activities, goalTree]);
+        return allGoals;
+    }, [goalTree]);
 
     const formatDate = useCallback((dateString, options = {}) => {
         if (!dateString) return '';

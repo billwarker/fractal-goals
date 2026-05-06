@@ -1,0 +1,29 @@
+.secondaryButton,
+.primaryButton {
+    min-height: 40px;
+    padding: 0 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.secondaryButton {
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+}
+
+.secondaryButton:hover {
+    background: var(--color-bg-card-alt);
+}
+
+.primaryButton {
+    border: 1px solid var(--color-brand-primary);
+    background: var(--color-brand-primary);
+    color: white;
+}
+
+.primaryButton:hover {
+    filter: brightness(0.96);
+}

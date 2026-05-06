@@ -57,7 +57,7 @@ function parseGoalTargets(node) {
     return [];
 }
 
-export function flattenGoals(node, activityId, goals = []) {
+export function flattenGoals(node, activityId, goals = [], parentId = null) {
     if (!node) {
         return goals;
     }
@@ -73,12 +73,14 @@ export function flattenGoals(node, activityId, goals = []) {
         id: node.id || node.attributes?.id,
         name: node.name,
         type: node.attributes?.type || node.type,
+        parent_id: parentId,
         childrenIds,
         hasTargetForActivity,
     });
 
     if (node.children && node.children.length > 0) {
-        node.children.forEach((child) => flattenGoals(child, activityId, goals));
+        const nodeId = node.id || node.attributes?.id;
+        node.children.forEach((child) => flattenGoals(child, activityId, goals, nodeId));
     }
 
     return goals;

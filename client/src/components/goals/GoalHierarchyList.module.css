@@ -50,10 +50,22 @@
     background: var(--color-border);
 }
 
+.sessionTreeItemBranchConnectorActive::before {
+    background: var(--color-brand-secondary, #ff9f1a);
+    width: 2px;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--color-brand-secondary, #ff9f1a) 48%, transparent);
+}
+
+.sessionTreeItemBranchConnectorEnd::before {
+    bottom: auto;
+    height: calc(var(--tree-row-height) + (var(--tree-item-pad-y) * 2));
+}
+
 .sessionTreeItemNested:last-child::before {
     bottom: auto;
     height: calc(var(--tree-row-height) + (var(--tree-item-pad-y) * 2));
 }
+
 
 .sessionTreeNode {
     position: relative;
@@ -73,6 +85,12 @@
     height: 1px;
     background: var(--color-border);
     z-index: 0;
+}
+
+.sessionTreeNodeBranchConnectorActive::before {
+    background: var(--color-brand-secondary, #ff9f1a);
+    height: 2px;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--color-brand-secondary, #ff9f1a) 48%, transparent);
 }
 
 /* Left slot: absolutely positioned so it always sits at the same x coordinate

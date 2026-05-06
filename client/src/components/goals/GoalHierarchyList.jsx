@@ -54,6 +54,8 @@ function GoalHierarchyList({
     isGoalSelectable,
     getGoalMetaLabel,
     getGoalNameStyle,
+    isGoalBranchHighlighted,
+    getGoalBranchHighlightState,
     getGoalLeftSlot,
     getScopedCharacteristics,
     getGoalColor,
@@ -146,15 +148,42 @@ function GoalHierarchyList({
 
     const treeRoots = buildSessionHierarchyTree(nodes);
 
-    const renderSessionTreeNodes = (treeNodes, depth = 0) => (
+    const getNodeHighlightState = (node) => {
+        const originalNode = node.originalGoal || node;
+        return getGoalBranchHighlightState
+            ? getGoalBranchHighlightState(originalNode)
+            : (isGoalBranchHighlighted && isGoalBranchHighlighted(originalNode) ? 'active' : null);
+    };
+
+    const branchContainsHighlightedNode = (node) => {
+        if (getNodeHighlightState(node)) {
+            return true;
+        }
+        return node.children.some(branchContainsHighlightedNode);
+    };
+
+    const renderSessionTreeNodes = (treeNodes, depth = 0) => {
+        const activeChildIndexes = treeNodes
+            .map((node, index) => (branchContainsHighlightedNode(node) ? index : null))
+            .filter((index) => index !== null);
+        const lastActiveChildIndex = activeChildIndexes.length > 0
+            ? Math.max(...activeChildIndexes)
+            : -1;
+
+        return (
         <ul className={depth > 0 ? styles.sessionTreeChildren : styles.sessionTreeRoot}>
-            {treeNodes.map((node) => {
+            {treeNodes.map((node, index) => {
                 const isCompleted = node.status
                     ? Boolean(node.status.completed)
                     : Boolean(node.completed);
                 const isNestedNode = depth > 0;
                 const originalNode = node.originalGoal || node;
                 const isSelectable = isGoalSelectable ? isGoalSelectable(originalNode) : Boolean(onGoalClick);
+                const branchHighlightState = getNodeHighlightState(node);
+                const branchHasHighlightedNode = branchContainsHighlightedNode(node);
+                const shouldHighlightVerticalConnector = isNestedNode && index <= lastActiveChildIndex;
+                const shouldStopHighlightedVerticalConnector = shouldHighlightVerticalConnector && index === lastActiveChildIndex;
+                const shouldHighlightHorizontalConnector = isNestedNode && branchHasHighlightedNode;
                 const metaLabel = getGoalMetaLabel ? getGoalMetaLabel(originalNode) : null;
                 // Each level of nesting adds --tree-indent (28px). The left slot must escape
                 // all accumulated indentation plus the 28px padding-left on the wrapper div.
@@ -163,10 +192,10 @@ function GoalHierarchyList({
                 return (
                     <li
                         key={node.id}
-                        className={`${styles.sessionTreeItem} ${isNestedNode ? styles.sessionTreeItemNested : ''} ${node.children.length > 0 ? styles.sessionTreeItemHasChildren : ''}`}
+                        className={`${styles.sessionTreeItem} ${isNestedNode ? styles.sessionTreeItemNested : ''} ${node.children.length > 0 ? styles.sessionTreeItemHasChildren : ''} ${shouldHighlightVerticalConnector ? styles.sessionTreeItemBranchConnectorActive : ''} ${shouldStopHighlightedVerticalConnector ? styles.sessionTreeItemBranchConnectorEnd : ''}`}
                     >
                         <div
-                            className={`${styles.sessionTreeNode} ${node.isLinked ? styles.sessionNodeActive : ''} ${isNestedNode ? styles.sessionTreeNodeNested : ''}`}
+                            className={`${styles.sessionTreeNode} ${node.isLinked ? styles.sessionNodeActive : ''} ${isNestedNode ? styles.sessionTreeNodeNested : ''} ${shouldHighlightHorizontalConnector ? styles.sessionTreeNodeBranchConnectorActive : ''}`}
                         >
                             {getGoalLeftSlot && (
                                 <div className={styles.sessionLeftSlot} style={{ left: leftSlotOffset }}>
@@ -221,7 +250,8 @@ function GoalHierarchyList({
                 );
             })}
         </ul>
-    );
+        );
+    };
 
     return <div className={`${styles.list} ${styles.sessionList}`}>{renderSessionTreeNodes(treeRoots)}</div>;
 }

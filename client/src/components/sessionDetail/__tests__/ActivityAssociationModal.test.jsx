@@ -103,7 +103,7 @@ describe('ActivityAssociationModal', () => {
         });
     });
 
-    it('shows parent and child inheritance copy only for inherited rows', () => {
+    it('does not render inherited selection labels in the hierarchy picker', () => {
         render(
             <ActivityAssociationModal
                 isOpen={true}
@@ -138,9 +138,7 @@ describe('ActivityAssociationModal', () => {
             />
         );
 
-        expect(screen.getByText('Inherited via child goal: Long Goal')).toBeInTheDocument();
-        expect(screen.getByText('Inherited via parent goal: Long Goal')).toBeInTheDocument();
-        expect(screen.queryByText('via Ultimate Goal')).not.toBeInTheDocument();
-        expect(screen.queryByText('via Long Goal')).not.toBeInTheDocument();
+        expect(screen.queryByText(/Inherited via child goal/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Inherited via parent goal/i)).not.toBeInTheDocument();
     });
 });

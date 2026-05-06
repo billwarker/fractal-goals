@@ -12,6 +12,7 @@ import Button from '../atoms/Button';
 import CloseIcon from '../atoms/CloseIcon';
 import Select from '../atoms/Select';
 import { Heading } from '../atoms/Typography';
+import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 
 import ActivityGraphSelector from './ActivityGraphSelector';
 import { DISABLED_CHART_ANIMATION } from './ChartJSWrapper';
@@ -52,6 +53,7 @@ function ProfileWindow({
 
     // Local state for split dropdown
     const [showSplitMenu, setShowSplitMenu] = useState(false);
+    const [isGoalPickerOpen, setIsGoalPickerOpen] = useState(false);
 
     // Track container width for responsive styling
     const [isNarrow, setIsNarrow] = useState(false);
@@ -524,16 +526,17 @@ function ProfileWindow({
             const goals = goalAnalytics?.goals || [];
             return (
                 <div className={styles.level2Container} style={{ gap: '8px' }}>
-                    <Select
-                        value={selectedGoal?.id || ''}
-                        onChange={(e) => setSelectedGoal(goals.find(g => g.id === e.target.value) || null)}
-                        className={styles.selectAtom}
+                    <Button
+                        type="button"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            setIsGoalPickerOpen(true);
+                        }}
+                        variant={selectedGoal ? 'primary' : 'secondary'}
+                        size="sm"
                     >
-                        <option value="">Select Goal...</option>
-                        {goals.map(g => (
-                            <option key={g.id} value={g.id}>{g.name}</option>
-                        ))}
-                    </Select>
+                        {selectedGoal ? selectedGoal.name : 'Select Goal'}
+                    </Button>
                     {selectedGoal && (
                         <div className={styles.controlGroup}>
                             <Button
@@ -779,6 +782,19 @@ function ProfileWindow({
         >
             {renderUnifiedHeader()}
             {renderVisualizationContent()}
+            <GoalHierarchySelectionModal
+                isOpen={isGoalPickerOpen}
+                title="Select Goal"
+                goals={goalAnalytics?.goals || []}
+                selectedGoalIds={selectedGoal?.id ? [selectedGoal.id] : []}
+                selectionMode="single"
+                confirmLabel="Select Goal"
+                onClose={() => setIsGoalPickerOpen(false)}
+                onConfirm={(goalIds) => {
+                    const goal = (goalAnalytics?.goals || []).find((item) => item.id === goalIds[0]);
+                    setSelectedGoal(goal || null);
+                }}
+            />
         </div>
     );
 }
