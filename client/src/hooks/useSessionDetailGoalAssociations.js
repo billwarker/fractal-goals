@@ -38,7 +38,7 @@ export function useSessionDetailGoalAssociations({
         const activityDefinitionId = associationContext?.activityDefinition?.id || null;
 
         return flattenedGoals
-            .filter((goal) => ELIGIBLE_ACTIVITY_ASSOCIATION_TYPES.has(goal.type) && !goal.completed)
+            .filter((goal) => ELIGIBLE_ACTIVITY_ASSOCIATION_TYPES.has(goal.type))
             .map((goal) => ({
                 ...goal,
                 parentName: goal.parent_id ? goalsById.get(goal.parent_id)?.name || null : null,

@@ -130,6 +130,56 @@ describe('GoalHierarchySelector', () => {
         expect(handleSelectionChange).toHaveBeenLastCalledWith(['goal-grandchild', 'goal-child', 'goal-root']);
     });
 
+    it('enables ancestor controls when parent ids are only available on normalized goals', () => {
+        render(
+            <GoalHierarchySelector
+                goals={[
+                    { id: 'goal-root', attributes: { id: 'goal-root', name: 'Root Goal', type: 'UltimateGoal' } },
+                    {
+                        id: 'goal-child',
+                        attributes: {
+                            id: 'goal-child',
+                            name: 'Child Goal',
+                            type: 'LongTermGoal',
+                            parent_id: 'goal-root',
+                        },
+                    },
+                ]}
+                selectedGoalIds={[]}
+                onSelectionChange={vi.fn()}
+                selectionMode="multiple"
+                connectorHighlightMode="bulk"
+            />
+        );
+
+        expect(screen.getByLabelText('Select all ancestors of Child Goal')).toBeEnabled();
+    });
+
+    it('can hide completed goals from the hierarchy', () => {
+        render(
+            <GoalHierarchySelector
+                goals={[
+                    { id: 'active-goal', name: 'Active Goal', type: 'UltimateGoal' },
+                    { id: 'completed-goal', name: 'Completed Goal', type: 'LongTermGoal', completed: true },
+                    { id: 'status-completed-goal', name: 'Status Completed Goal', type: 'ShortTermGoal', status: { completed: true } },
+                ]}
+                selectedGoalIds={[]}
+                onSelectionChange={vi.fn()}
+                selectionMode="multiple"
+            />
+        );
+
+        expect(screen.getByText('Active Goal')).toBeInTheDocument();
+        expect(screen.getByText('Completed Goal')).toBeInTheDocument();
+        expect(screen.getByText('Status Completed Goal')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByLabelText('Hide completed goals'));
+
+        expect(screen.getByText('Active Goal')).toBeInTheDocument();
+        expect(screen.queryByText('Completed Goal')).not.toBeInTheDocument();
+        expect(screen.queryByText('Status Completed Goal')).not.toBeInTheDocument();
+    });
+
     it('uses halos for direct filter selections and connector lines only for bulk controls', () => {
         function FilterHarness() {
             const [selectedIds, setSelectedIds] = React.useState([]);

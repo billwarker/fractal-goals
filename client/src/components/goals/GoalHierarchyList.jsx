@@ -407,7 +407,7 @@ function GoalHierarchyList({
             >
                 {getGoalLeftSlot && (
                     <div className={styles.sessionLeftSlot}>
-                        {getGoalLeftSlot(originalNode)}
+                        {getGoalLeftSlot(node)}
                     </div>
                 )}
                 <div

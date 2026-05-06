@@ -143,12 +143,16 @@ describe('useSessionDetailGoalAssociations', () => {
             'mid-1',
             'short-1',
             'immediate-1',
+            'long-completed',
         ]);
         expect(result.current.allAvailableGoals.some((goal) => goal.id === 'micro-1')).toBe(false);
         expect(result.current.allAvailableGoals.some((goal) => goal.id === 'nano-1')).toBe(false);
         expect(result.current.allAvailableGoals.find((goal) => goal.id === 'immediate-1')).toMatchObject({
             parentName: 'Short Goal',
             hasTargetForActivity: true,
+        });
+        expect(result.current.allAvailableGoals.find((goal) => goal.id === 'long-completed')).toMatchObject({
+            completed: true,
         });
 
         let saved;

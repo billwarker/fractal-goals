@@ -73,6 +73,8 @@ export function flattenGoals(node, activityId, goals = [], parentId = null) {
         id: node.id || node.attributes?.id,
         name: node.name,
         type: node.attributes?.type || node.type,
+        completed: Boolean(node.completed || node.attributes?.completed),
+        completed_at: node.attributes?.completed_at || node.completed_at || null,
         parent_id: parentId,
         childrenIds,
         hasTargetForActivity,

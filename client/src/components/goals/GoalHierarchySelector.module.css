@@ -1,4 +1,5 @@
 .selector {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 18px;
@@ -22,6 +23,63 @@
 .searchInput:focus {
     outline: 2px solid var(--color-focus-ring, rgba(80, 145, 245, 0.35));
     border-color: var(--color-brand-primary);
+}
+
+.optionsRow {
+    position: absolute;
+    top: 62px;
+    right: 4px;
+    z-index: 5;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0;
+}
+
+.hideCompletedControl {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+}
+
+.hideCompletedControl input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.hideCompletedControl > span:first-of-type {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-card);
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.hideCompletedControl:hover > span:first-of-type {
+    border-color: var(--color-brand-primary);
+    background: var(--color-bg-card-alt);
+}
+
+.hideCompletedControl input:checked + span {
+    border-color: var(--color-brand-primary);
+    background: var(--color-brand-primary);
+}
+
+.hideCompletedControl input:focus-visible + span {
+    outline: 2px solid var(--color-focus-ring, rgba(80, 145, 245, 0.35));
+    outline-offset: 2px;
 }
 
 .treeFrame {

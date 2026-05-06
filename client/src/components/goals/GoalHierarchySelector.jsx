@@ -14,7 +14,7 @@ function normalizeGoal(goal) {
         type: goal.type || goal.goal_type || attributes.type || attributes.goal_type,
         parent_id: goal.parent_id || goal.parentId || attributes.parent_id || attributes.parentId || null,
         childrenIds: goal.childrenIds || goal.children_ids || attributes.childrenIds || attributes.children_ids || [],
-        completed: Boolean(goal.completed || attributes.completed),
+        completed: Boolean(goal.completed || goal.status?.completed || attributes.completed || attributes.status?.completed),
         originalGoal: goal.originalGoal || goal,
     };
 }
@@ -175,6 +175,7 @@ function GoalHierarchySelector({
         getScopedCharacteristics,
     } = useGoalLevels();
     const [searchTerm, setSearchTerm] = useState('');
+    const [hideCompletedGoals, setHideCompletedGoals] = useState(false);
     const [bulkConnectorGoalIds, setBulkConnectorGoalIds] = useState(() => new Set());
 
     const normalizedGoals = useMemo(
@@ -194,8 +195,14 @@ function GoalHierarchySelector({
         [normalizedGoals]
     );
     const visibleGoals = useMemo(
-        () => filterGoalsForSearch(normalizedGoals, searchTerm),
-        [normalizedGoals, searchTerm]
+        () => {
+            const filteredGoals = hideCompletedGoals
+                ? normalizedGoals.filter((goal) => !goal.completed)
+                : normalizedGoals;
+
+            return filterGoalsForSearch(filteredGoals, searchTerm);
+        },
+        [hideCompletedGoals, normalizedGoals, searchTerm]
     );
     const selectedAncestorIdSet = useMemo(() => {
         if (!highlightSelectionAncestors) {
@@ -394,6 +401,18 @@ function GoalHierarchySelector({
                     />
                 </div>
             )}
+
+            <div className={styles.optionsRow}>
+                <label className={styles.hideCompletedControl}>
+                    <input
+                        type="checkbox"
+                        checked={hideCompletedGoals}
+                        onChange={(event) => setHideCompletedGoals(event.target.checked)}
+                    />
+                    <span aria-hidden="true">{hideCompletedGoals ? '✓' : ''}</span>
+                    <span>Hide completed goals</span>
+                </label>
+            </div>
 
             <div className={styles.treeFrame}>
                 <GoalHierarchyList
