@@ -433,6 +433,8 @@ function GoalHierarchySelector({
                     getGoalColor={getGoalColor}
                     getGoalSecondaryColor={getGoalSecondaryColor}
                     getGoalIcon={getGoalIcon}
+                    completedColor={getGoalColor('Completed')}
+                    completedSecondaryColor={getGoalSecondaryColor('Completed')}
                     getScopedCharacteristics={getScopedCharacteristics || (() => null)}
                     emptyState={searchTerm.trim() ? 'No goals match this search.' : emptyState}
                 />

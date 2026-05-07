@@ -3,17 +3,22 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import GoalHierarchySelector from '../GoalHierarchySelector';
 
+const goalIconSpy = vi.hoisted(() => vi.fn());
+
 vi.mock('../../../contexts/GoalLevelsContext', () => ({
     useGoalLevels: () => ({
-        getGoalColor: () => '#22d3ee',
-        getGoalSecondaryColor: () => '#0f766e',
+        getGoalColor: (type) => (type === 'Completed' ? '#ffcc00' : '#22d3ee'),
+        getGoalSecondaryColor: (type) => (type === 'Completed' ? '#775500' : '#0f766e'),
         getGoalIcon: () => 'circle',
         getScopedCharacteristics: () => ({ icon: 'circle' }),
     }),
 }));
 
 vi.mock('../../atoms/GoalIcon', () => ({
-    default: () => <span>icon</span>,
+    default: (props) => {
+        goalIconSpy(props);
+        return <span>icon</span>;
+    },
 }));
 
 describe('GoalHierarchySelector', () => {
@@ -180,6 +185,25 @@ describe('GoalHierarchySelector', () => {
         expect(screen.queryByText('Status Completed Goal')).not.toBeInTheDocument();
     });
 
+    it('uses the user completion colors for completed goals', () => {
+        render(
+            <GoalHierarchySelector
+                goals={[
+                    { id: 'active-goal', name: 'Active Goal', type: 'UltimateGoal' },
+                    { id: 'completed-goal', name: 'Completed Goal', type: 'LongTermGoal', completed: true },
+                ]}
+                selectedGoalIds={[]}
+                onSelectionChange={vi.fn()}
+                selectionMode="multiple"
+            />
+        );
+
+        expect(goalIconSpy).toHaveBeenCalledWith(expect.objectContaining({
+            color: '#ffcc00',
+            secondaryColor: '#775500',
+        }));
+    });
+
     it('uses halos for direct filter selections and connector lines only for bulk controls', () => {
         function FilterHarness() {
             const [selectedIds, setSelectedIds] = React.useState([]);
@@ -276,3 +300,6 @@ describe('GoalHierarchySelector', () => {
             .toHaveAttribute('data-connector-active', 'true');
     });
 });
+    beforeEach(() => {
+        goalIconSpy.mockClear();
+    });
