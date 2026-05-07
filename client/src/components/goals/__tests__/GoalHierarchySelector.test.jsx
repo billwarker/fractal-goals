@@ -231,6 +231,32 @@ describe('GoalHierarchySelector', () => {
             .toHaveAttribute('data-connector-active', 'true');
     });
 
+    it('keeps descendant connector highlighting when selecting the bulk source goal afterward', () => {
+        function FilterHarness() {
+            const [selectedIds, setSelectedIds] = React.useState([]);
+            return (
+                <GoalHierarchySelector
+                    goals={goals}
+                    selectedGoalIds={selectedIds}
+                    onSelectionChange={setSelectedIds}
+                    selectionMode="multiple"
+                    connectorHighlightMode="bulk"
+                    showGoalHighlightHalo
+                />
+            );
+        }
+
+        const { container } = render(<FilterHarness />);
+
+        fireEvent.click(screen.getByLabelText('Select all descendants of Child Goal'));
+        expect(container.querySelector('[data-parent-goal-id="goal-child"][data-child-goal-id="goal-grandchild"]'))
+            .toHaveAttribute('data-connector-active', 'true');
+
+        fireEvent.click(screen.getByLabelText('Select Child Goal'));
+        expect(container.querySelector('[data-parent-goal-id="goal-child"][data-child-goal-id="goal-grandchild"]'))
+            .toHaveAttribute('data-connector-active', 'true');
+    });
+
     it('can highlight inherited lineage for activity association mode', () => {
         const { container } = render(
             <GoalHierarchySelector

@@ -226,19 +226,23 @@ function GoalHierarchySelector({
     };
 
     const toggleGoal = (goalId) => {
-        setBulkConnectorGoalIds((current) => {
-            const next = new Set(current);
-            next.delete(goalId);
-            return next;
-        });
+        const isCurrentlySelected = selectedIdSet.has(goalId);
+
+        if (isCurrentlySelected) {
+            setBulkConnectorGoalIds((current) => {
+                const next = new Set(current);
+                next.delete(goalId);
+                return next;
+            });
+        }
 
         if (isSingleSelect) {
-            emitSelection(selectedIdSet.has(goalId) ? [] : [goalId]);
+            emitSelection(isCurrentlySelected ? [] : [goalId]);
             return;
         }
 
         const next = new Set(selectedIdSet);
-        if (next.has(goalId)) {
+        if (isCurrentlySelected) {
             next.delete(goalId);
         } else {
             next.add(goalId);
