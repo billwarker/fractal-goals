@@ -134,7 +134,7 @@
 
 .modalFooterComposer.modalFooterComposer {
     padding-top: 18px;
-    padding-bottom: 0;
+    padding-bottom: 18px;
 }
 
 .completionFooterActions {
@@ -283,7 +283,6 @@
 .modalNoteComposer {
     flex-shrink: 0;
     margin-top: auto;
-    margin-bottom: -18px;
 }
 
 /* Form Elements */

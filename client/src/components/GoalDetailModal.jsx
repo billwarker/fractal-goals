@@ -1,4 +1,5 @@
 import React, { Suspense, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -952,31 +953,31 @@ function GoalDetailModal({
     }
 
     // Modal mode
-    return (
-        <>
+    const modalMarkup = (
+        <div
+            className={styles.modalOverlay}
+            onClick={handleClose}
+        >
             <div
-                className={styles.modalOverlay}
-                onClick={handleClose}
+                onClick={(e) => e.stopPropagation()}
+                className={styles.modalContent}
+                style={{
+                    borderTop: `4px solid ${displayGoalColor}`,
+                }}
             >
-                <div
-                    onClick={(e) => e.stopPropagation()}
-                    className={styles.modalContent}
-                    style={{
-                        borderTop: `4px solid ${displayGoalColor}`,
-                    }}
-                >
-                    <div className={styles.modalScrollArea}>
-                        {content}
-                    </div>
-                    {footerContent && (
-                        <div className={styles.modalNoteComposer}>
-                            {footerContent}
-                        </div>
-                    )}
+                <div className={styles.modalScrollArea}>
+                    {content}
                 </div>
+                {footerContent && (
+                    <div className={styles.modalNoteComposer}>
+                        {footerContent}
+                    </div>
+                )}
             </div>
-        </>
+        </div>
     );
+
+    return createPortal(modalMarkup, document.body);
 }
 
 export default GoalDetailModal;

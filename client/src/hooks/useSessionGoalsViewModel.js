@@ -44,7 +44,30 @@ function buildParentMap(nodes) {
     });
     return parentMap;
 }
+
+function getSessionStartTimestamp(session) {
+    const rawStart = session?.session_start
+        || session?.attributes?.session_start
+        || session?.created_at
+        || session?.attributes?.created_at
+        || null;
+    if (!rawStart) return null;
+
+    const timestamp = Date.parse(rawStart);
+    return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function wasCompletedBeforeSession(goal, sessionStartTimestamp) {
+    if (sessionStartTimestamp === null) return false;
+    if (!goal?.completed) return false;
+    if (!goal.completed_at) return false;
+
+    const completedTimestamp = Date.parse(goal.completed_at);
+    return !Number.isNaN(completedTimestamp) && completedTimestamp < sessionStartTimestamp;
+}
+
 export function useSessionGoalsViewModel({
+    session,
     sessionGoalsView,
     selectedActivity,
     targetAchievements,
@@ -59,16 +82,20 @@ export function useSessionGoalsViewModel({
         );
     }, [sessionGoalsView]);
 
+    const sessionStartTimestamp = useMemo(() => getSessionStartTimestamp(session), [session]);
+
     const activeActivityDefId = selectedActivity?.activity_definition_id || selectedActivity?.activity_id || null;
     const activeActivityInstanceId = selectedActivity?.id || null;
 
     // 2. Derive Session Hierarchy (everything)
     const sessionHierarchy = useMemo(() => {
-        return normalizedTree.map(node => ({
-            ...node,
-            status: getGoalStatus(node, targetAchievements, achievedTargetIds)
-        }));
-    }, [normalizedTree, targetAchievements, achievedTargetIds]);
+        return normalizedTree
+            .filter(node => !wasCompletedBeforeSession(node, sessionStartTimestamp))
+            .map(node => ({
+                ...node,
+                status: getGoalStatus(node, targetAchievements, achievedTargetIds)
+            }));
+    }, [normalizedTree, sessionStartTimestamp, targetAchievements, achievedTargetIds]);
 
     // 3. Derive Activity Hierarchy (filtered by associated activity)
     const activityHierarchy = useMemo(() => {
@@ -99,12 +126,13 @@ export function useSessionGoalsViewModel({
 
         return normalizedTree
             .filter(node => relevantIds.has(node.id))
+            .filter(node => !wasCompletedBeforeSession(node, sessionStartTimestamp))
             .map(node => ({
                 ...node,
                 status: getGoalStatus(node, targetAchievements, achievedTargetIds)
             }));
 
-    }, [activeActivityDefId, activeActivityInstanceId, sessionGoalsView, normalizedTree, targetAchievements, achievedTargetIds]);
+    }, [activeActivityDefId, activeActivityInstanceId, sessionGoalsView, normalizedTree, sessionStartTimestamp, targetAchievements, achievedTargetIds]);
 
     // 4. Build Target Cards
     const targetCards = useMemo(() => {

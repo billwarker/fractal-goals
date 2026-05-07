@@ -23,6 +23,7 @@ function GoalsPanel({
     const {
         rootId,
         sessionId,
+        session,
         activities: activityDefinitions,
         targetAchievements,
         achievedTargetIds,
@@ -60,6 +61,7 @@ function GoalsPanel({
         activityHierarchy,
         targetCards,
     } = useSessionGoalsViewModel({
+        session,
         sessionGoalsView,
         selectedActivity: viewMode === 'activity' ? selectedActivity : null,
         targetAchievements,
