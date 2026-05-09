@@ -98,9 +98,10 @@ vi.mock('../goals/GoalUncompletionModal', () => ({
 }));
 
 vi.mock('../goals/GoalHeader', () => ({
-    default: ({ name, onClose, goalStatus }) => (
+    default: ({ name, onClose, goalStatus, headerTabs }) => (
         <div>
             <div>header:{name}:{goalStatus}</div>
+            {headerTabs}
             <button onClick={onClose}>close modal</button>
         </div>
     ),
@@ -124,6 +125,24 @@ vi.mock('../goals/GoalViewMode', () => ({
 vi.mock('../goalDetail/GoalTimelineView', () => ({
     default: () => <div>goal timeline view</div>,
 }));
+
+vi.mock('../goalDetail/ActivityAssociator', async () => {
+    const ReactModule = await vi.importActual('react');
+
+    function MockActivityAssociator({ registerAssociateAction }) {
+        ReactModule.useEffect(() => {
+            if (!registerAssociateAction) return undefined;
+            registerAssociateAction(() => {});
+            return () => registerAssociateAction(null);
+        }, [registerAssociateAction]);
+
+        return ReactModule.createElement('div', null, 'goal activities view');
+    }
+
+    return {
+        default: MockActivityAssociator,
+    };
+});
 
 vi.mock('../analytics/GenericGraphModal', () => ({
     default: () => null,
@@ -259,6 +278,37 @@ describe('GoalDetailModal smoke coverage', () => {
         await waitFor(() => {
             expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
             expect(screen.getByText('goal timeline view')).toBeInTheDocument();
+        }, { timeout: 5000 });
+    });
+
+    it('shows activities as a tab and moves associate action into the footer', async () => {
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    attributes: { id: 'goal-1', type: 'ShortTermGoal', parent_id: 'parent-1' },
+                }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={vi.fn()}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root',
+                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
+                    children: [],
+                }}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Activities' }));
+
+        await waitFor(() => {
+            expect(screen.getByText('goal activities view')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: '+ Associate Activities' })).toBeInTheDocument();
         }, { timeout: 5000 });
     });
 

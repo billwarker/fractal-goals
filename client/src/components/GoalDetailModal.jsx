@@ -130,6 +130,10 @@ function GoalDetailModal({
     const needsLevelPicker = mode === 'create' && validChildTypes.length > 1;
     // null = picker not yet confirmed; a type string = level chosen, show form
     const [selectedChildType, setSelectedChildType] = useState(needsLevelPicker ? null : defaultChildType);
+    const [activitiesAssociateAction, setActivitiesAssociateAction] = useState(null);
+    const [activityBuilderReturnView, setActivityBuilderReturnView] = useState('activity-associator');
+    const goalHeaderRef = React.useRef(null);
+    const [goalHeaderStickyOffset, setGoalHeaderStickyOffset] = useState(0);
     // Reset when the parent changes (e.g. modal reused for a different goal)
     React.useEffect(() => {
         if (mode === 'create') {
@@ -351,6 +355,33 @@ function GoalDetailModal({
         return activeLineageIds.has(String(depGoalId)) ? 'active' : 'inactive';
     }, [activityDefinitions, activityGroupsFromProps, depGoalId, evidenceGoalIds, isPaused, mode, sessions, treeData]);
 
+    React.useEffect(() => {
+        if (!shouldMeasureStickyHeader(viewState)) {
+            setGoalHeaderStickyOffset(0);
+            return undefined;
+        }
+
+        const headerElement = goalHeaderRef.current;
+        if (!headerElement) {
+            return undefined;
+        }
+
+        const updateOffset = () => {
+            setGoalHeaderStickyOffset(Math.max(0, Math.round(headerElement.offsetHeight - 24)));
+        };
+
+        updateOffset();
+
+        if (typeof ResizeObserver === 'undefined') {
+            window.addEventListener('resize', updateOffset);
+            return () => window.removeEventListener('resize', updateOffset);
+        }
+
+        const observer = new ResizeObserver(updateOffset);
+        observer.observe(headerElement);
+        return () => observer.disconnect();
+    }, [viewState, name, deadline, goalStatus]);
+
     const handleQuickGoalNote = async (content) => {
         if (!rootId || !goalId) {
             return;
@@ -362,6 +393,10 @@ function GoalDetailModal({
             goal_id: goalId,
         });
     };
+
+    const registerActivitiesAssociateAction = React.useCallback((handler) => {
+        setActivitiesAssociateAction(() => handler);
+    }, []);
 
     const completionFooterState = useMemo(() => {
         const isManualAllowed = levelConfig.allow_manual_completion !== false;
@@ -584,11 +619,9 @@ function GoalDetailModal({
                         levelConfig={levelConfig}
                         allowManualCompletion={allowManualCompletion}
                         trackActivities={trackActivities}
-                        completedViaChildren={completedViaChildren}
                         childType={childType}
                         displayMode={displayMode}
                         programs={programs}
-                        metrics={fetchedMetrics}
                         targets={targets}
                         associatedActivities={associatedActivities}
                         activityDefinitions={activityDefinitions}
@@ -602,7 +635,6 @@ function GoalDetailModal({
                         onGoalSelect={onGoalSelect}
                         onUpdate={onUpdate}
                         setTargets={setTargets}
-                        handleTimeSpentClick={openDurationModal}
                     />
                 )
                 }
@@ -704,6 +736,41 @@ function GoalDetailModal({
                     setInheritParentActivities={setInheritParentActivities}
                     onCreateActivity={() => {
                         // Switch to activity builder view
+                        setActivityBuilderReturnView('activity-associator');
+                        setViewState('activity-builder');
+                    }}
+                />
+            </Suspense>
+        );
+    } else if (viewState === 'goal-activities') {
+        content = (
+            <Suspense fallback={null}>
+                <ActivityAssociator
+                    associatedActivities={associatedActivities}
+                    setAssociatedActivities={setAssociatedActivities}
+                    associatedActivityGroups={associatedActivityGroups}
+                    setAssociatedActivityGroups={setAssociatedActivityGroups}
+                    activityDefinitions={activityDefinitions}
+                    activityGroups={activityGroups}
+                    setActivityGroups={setActivityGroups}
+                    rootId={rootId}
+                    goalId={goalId}
+                    parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
+                    goalName={name}
+                    setTargets={setTargets}
+                    isEditing={true}
+                    targets={targets}
+                    embedded
+                    useFooterAssociateAction
+                    registerAssociateAction={registerActivitiesAssociateAction}
+                    onClose={handleClose}
+                    onSave={persistAssociations}
+                    onRefreshAssociations={refreshAssociations}
+                    inheritParentActivities={inheritParentActivities}
+                    setInheritParentActivities={setInheritParentActivities}
+                    dividerColor={displayGoalColor}
+                    onCreateActivity={() => {
+                        setActivityBuilderReturnView('goal-activities');
                         setViewState('activity-builder');
                     }}
                 />
@@ -723,9 +790,9 @@ function GoalDetailModal({
                                 notify.success(`Associated "${newActivity.name}" with goal`);
                             }
                         }
-                        setViewState('activity-associator');
+                        setViewState(activityBuilderReturnView);
                     }}
-                    onCancel={() => setViewState('activity-associator')}
+                    onCancel={() => setViewState(activityBuilderReturnView)}
                 />
             </Suspense>
         );
@@ -765,6 +832,8 @@ function GoalDetailModal({
                 <GoalTimelineView
                     rootId={rootId}
                     goalId={goalId}
+                    metrics={fetchedMetrics}
+                    onTimeSpentClick={openDurationModal}
                 />
             </Suspense>
         );
@@ -775,7 +844,7 @@ function GoalDetailModal({
         content = renderGoalContent();
     }
 
-    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline')
+    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline' || viewState === 'goal-activities')
         && !(needsLevelPicker && selectedChildType === null);
     if (shouldShowPersistentHeader) {
         const headerActions = mode !== 'create' ? (
@@ -821,6 +890,14 @@ function GoalDetailModal({
                 </button>
                 <button
                     type="button"
+                    className={`${styles.goalTabButton} ${viewState === 'goal-activities' ? styles.goalTabActive : ''}`}
+                    onClick={() => setViewState('goal-activities')}
+                    style={{ '--goal-tab-accent': displayGoalColor }}
+                >
+                    Activities
+                </button>
+                <button
+                    type="button"
                     className={`${styles.goalTabButton} ${viewState === 'goal-notes' ? styles.goalTabActive : ''}`}
                     onClick={() => setViewState('goal-notes')}
                     style={{ '--goal-tab-accent': displayGoalColor }}
@@ -847,8 +924,12 @@ function GoalDetailModal({
                     goalStatus={goalStatus}
                     headerActions={headerActions}
                     headerTabs={headerTabs}
+                    headerRef={goalHeaderRef}
                 />
-                <div className={styles.afterHeaderContent}>
+                <div
+                    className={styles.afterHeaderContent}
+                    style={{ '--goal-detail-sticky-offset': `${goalHeaderStickyOffset}px` }}
+                >
                     {content}
                 </div>
             </>
@@ -867,6 +948,9 @@ function GoalDetailModal({
         && mode !== 'create'
         && !isEditing
         && Boolean(onToggleCompletion);
+    const showActivitiesFooter = viewState === 'goal-activities'
+        && mode !== 'create'
+        && Boolean(activitiesAssociateAction);
     const footerContent = showGoalNoteComposer ? (
         <SidePaneNotePanel
             composerOnly
@@ -898,6 +982,22 @@ function GoalDetailModal({
                     }}
                 >
                     Save
+                </button>
+            </div>
+        </div>
+    ) : showActivitiesFooter ? (
+        <div className={styles.completionFooter}>
+            <div className={styles.completionFooterActions}>
+                <button
+                    type="button"
+                    onClick={activitiesAssociateAction}
+                    className={styles.completionFooterButton}
+                    style={{
+                        '--completion-accent': displayGoalColor,
+                        '--completion-text': 'var(--color-text-primary)',
+                    }}
+                >
+                    + Associate Activities
                 </button>
             </div>
         </div>
@@ -978,6 +1078,10 @@ function GoalDetailModal({
     );
 
     return createPortal(modalMarkup, document.body);
+}
+
+function shouldMeasureStickyHeader(viewState) {
+    return viewState === 'goal-activities';
 }
 
 export default GoalDetailModal;

@@ -81,6 +81,76 @@ def test_recursive_metrics(db_session):
     assert child_b_metrics["recursive"]["sessions_count"] == 1
     assert child_b_metrics["recursive"]["sessions_duration_seconds"] == 900
 
+def test_recursive_session_metrics_deduplicate_sessions_linked_to_multiple_subtree_goals(db_session):
+    root_id = str(uuid.uuid4())
+    root = Goal(id=root_id, name="Root Goal", root_id=root_id)
+    child_id = str(uuid.uuid4())
+    child = Goal(id=child_id, name="Child Goal", parent_id=root_id, root_id=root_id)
+    db_session.add_all([root, child])
+    db_session.flush()
+
+    session = Session(
+        id=str(uuid.uuid4()),
+        name="Shared Session",
+        total_duration_seconds=1200,
+        root_id=root_id,
+        session_start=datetime.utcnow(),
+    )
+    db_session.add(session)
+    db_session.flush()
+    db_session.execute(session_goals.insert().values(
+        session_id=session.id,
+        goal_id=root_id,
+        goal_type='UltimateGoal',
+        association_source='manual',
+    ))
+    db_session.execute(session_goals.insert().values(
+        session_id=session.id,
+        goal_id=child_id,
+        goal_type='ShortTermGoal',
+        association_source='activity',
+    ))
+    db_session.commit()
+
+    metrics = GoalMetricsService(db_session).get_metrics_for_goal(root_id)
+
+    assert metrics["recursive"]["sessions_count"] == 1
+    assert metrics["recursive"]["sessions_duration_seconds"] == 1200
+
+    daily = GoalMetricsService(db_session).get_goal_daily_durations(root_id)
+    assert len(daily["points"]) == 1
+    assert daily["points"][0]["session_duration"] == 1200
+
+def test_session_metrics_ignore_soft_deleted_goal_links(db_session):
+    root_id = str(uuid.uuid4())
+    root = Goal(id=root_id, name="Root Goal", root_id=root_id)
+    db_session.add(root)
+    db_session.flush()
+
+    session = Session(
+        id=str(uuid.uuid4()),
+        name="Deleted Link Session",
+        total_duration_seconds=600,
+        root_id=root_id,
+    )
+    db_session.add(session)
+    db_session.flush()
+    db_session.execute(session_goals.insert().values(
+        session_id=session.id,
+        goal_id=root_id,
+        goal_type='UltimateGoal',
+        association_source='manual',
+        deleted_at=datetime.utcnow(),
+    ))
+    db_session.commit()
+
+    metrics = GoalMetricsService(db_session).get_metrics_for_goal(root_id)
+
+    assert metrics["direct"]["sessions_count"] == 0
+    assert metrics["direct"]["sessions_duration_seconds"] == 0
+    assert metrics["recursive"]["sessions_count"] == 0
+    assert metrics["recursive"]["sessions_duration_seconds"] == 0
+
 def test_recursive_activity_metrics(db_session):
     # Similar hierarchy
     root_id = str(uuid.uuid4())

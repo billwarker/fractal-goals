@@ -49,7 +49,11 @@ const ActivityAssociator = ({
     setInheritParentActivities,
     onClose,
     onSave,
-    onRefreshAssociations
+    onRefreshAssociations,
+    embedded = false,
+    useFooterAssociateAction = false,
+    registerAssociateAction,
+    dividerColor,
 }) => {
     const { createActivityGroup, setActivityGroupGoals } = useActivities();
 
@@ -107,6 +111,15 @@ const ActivityAssociator = ({
             setNewGroupParentId('');
         }
     }, [isDiscoveryActive, activityGroups]);
+
+    useEffect(() => {
+        if (!useFooterAssociateAction || !registerAssociateAction) {
+            return undefined;
+        }
+
+        registerAssociateAction(isDiscoveryActive ? null : () => setIsDiscoveryActive(true));
+        return () => registerAssociateAction(null);
+    }, [isDiscoveryActive, registerAssociateAction, useFooterAssociateAction]);
 
     // HANDLERS
     const toggleGroupCollapse = (groupId) => {
@@ -454,12 +467,15 @@ const ActivityAssociator = ({
     );
 
     // Determine if we're in "selector" mode (full pane) or "list" mode (inline in edit form)
-    const isSelectorMode = !!onCloseSelector;
+    const isSelectorMode = !!onCloseSelector || embedded;
 
     return (
         <div
             className={styles.container}
-            style={{ '--activity-associator-accent': headerColor || 'var(--color-text-primary)' }}
+            style={{
+                '--activity-associator-accent': headerColor || 'var(--color-text-primary)',
+                '--activity-associator-divider': dividerColor || headerColor || 'var(--color-text-primary)',
+            }}
         >
             <Modal
                 isOpen={!!pendingActivityRemoval}
@@ -508,28 +524,30 @@ const ActivityAssociator = ({
 
             {/* ============ STICKY HEADER (selector mode only) ============ */}
             {isSelectorMode && (
-                <div className={styles.header}>
-                    <div className={styles.headerTopLine}>
-                        <div className={styles.headerLeft}>
-                            <button
-                                onClick={onCloseSelector}
-                                className={styles.backBtn}
-                                title="Back to Goal"
-                            >
-                                ←
-                            </button>
-                        </div>
-                        <h3 className={styles.headerTitle}>
-                            Associated Activities
-                        </h3>
-                        <div className={styles.headerRight}>
-                            {onClose && (
-                                <button onClick={onClose} className={styles.closeBtn} aria-label="Close">
-                                    <CloseIcon size={16} />
+                <div className={`${styles.header} ${embedded ? styles.embeddedHeader : ''}`}>
+                    {!embedded && (
+                        <div className={styles.headerTopLine}>
+                            <div className={styles.headerLeft}>
+                                <button
+                                    onClick={onCloseSelector}
+                                    className={styles.backBtn}
+                                    title="Back to Goal"
+                                >
+                                    ←
                                 </button>
-                            )}
+                            </div>
+                            <h3 className={styles.headerTitle}>
+                                Associated Activities
+                            </h3>
+                            <div className={styles.headerRight}>
+                                {onClose && (
+                                    <button onClick={onClose} className={styles.closeBtn} aria-label="Close">
+                                        <CloseIcon size={16} />
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     <div className={styles.metricsBreakdown}>
                         <div className={styles.metricItem}>
@@ -598,7 +616,7 @@ const ActivityAssociator = ({
             )}
 
             {/* ============ ASSOCIATE BUTTON (selector mode only) ============ */}
-            {isSelectorMode && !isDiscoveryActive && (
+            {isSelectorMode && !isDiscoveryActive && !useFooterAssociateAction && (
                 <div className={styles.associateActions}>
                     <button
                         type="button"

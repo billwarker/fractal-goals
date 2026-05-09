@@ -56,17 +56,23 @@ class GoalMetricsService:
         # Count of sessions linked to any goal in subtree
         # Sessions are linked via `session_goals` table
         
-        sessions_query = self.db_session.query(
-            func.count(Session.id),
-            func.sum(Session.total_duration_seconds)
+        valid_recursive_sessions = self.db_session.query(
+            Session.id.label("session_id"),
+            Session.total_duration_seconds.label("duration_seconds"),
         ).join(
             session_goals, Session.id == session_goals.c.session_id
         ).join(
             Goal, session_goals.c.goal_id == Goal.id
         ).filter(
             session_goals.c.goal_id.in_(subtree_ids),
+            session_goals.c.deleted_at == None,
             Session.deleted_at == None,
             sa.or_(Goal.completed_at == None, func.coalesce(Session.session_start, Session.created_at) < Goal.completed_at)
+        ).distinct(Session.id).subquery()
+
+        sessions_query = self.db_session.query(
+            func.count(valid_recursive_sessions.c.session_id),
+            func.sum(valid_recursive_sessions.c.duration_seconds)
         ).first()
         
         rec_sessions_count = sessions_query[0] or 0
@@ -122,6 +128,7 @@ class GoalMetricsService:
             Goal, session_goals.c.goal_id == Goal.id
         ).filter(
             session_goals.c.goal_id == goal_id,
+            session_goals.c.deleted_at == None,
             Session.deleted_at == None,
             sa.or_(Goal.completed_at == None, func.coalesce(Session.session_start, Session.created_at) < Goal.completed_at)
         ).first()
@@ -217,19 +224,26 @@ class GoalMetricsService:
         # Group by date of session_start (fallback to created_at)
         session_date_col = func.date(func.coalesce(Session.session_start, Session.created_at))
         
-        sessions_query = self.db_session.query(
+        valid_daily_sessions = self.db_session.query(
+            Session.id.label("session_id"),
             session_date_col.label('date'),
-            func.sum(Session.total_duration_seconds).label('duration')
+            Session.total_duration_seconds.label('duration')
         ).join(
             session_goals, Session.id == session_goals.c.session_id
         ).join(
             Goal, session_goals.c.goal_id == Goal.id
         ).filter(
             session_goals.c.goal_id.in_(subtree_ids),
+            session_goals.c.deleted_at == None,
             Session.deleted_at == None,
             sa.or_(Goal.completed_at == None, func.coalesce(Session.session_start, Session.created_at) < Goal.completed_at)
+        ).distinct(Session.id).subquery()
+
+        sessions_query = self.db_session.query(
+            valid_daily_sessions.c.date,
+            func.sum(valid_daily_sessions.c.duration).label('duration')
         ).group_by(
-            session_date_col
+            valid_daily_sessions.c.date
         ).all()
         
         # 2. Activity Durations by Day (Recursive)
@@ -284,4 +298,3 @@ class GoalMetricsService:
         results.sort(key=lambda x: x['date'])
         
         return {"points": results}
-

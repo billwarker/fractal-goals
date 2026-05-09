@@ -1,11 +1,9 @@
 import React, { Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { isGoalAssociatedWithBlock } from '../../utils/programGoalAssociations';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import GoalSmartSection from './GoalSmartSection';
 import GoalChildrenList from './GoalChildrenList';
-import { formatDurationSeconds as formatDuration } from '../../utils/formatters';
 import styles from '../GoalDetailModal.module.css';
 
 const TargetManager = lazyWithRetry(() => import('../goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
@@ -22,11 +20,9 @@ function GoalViewMode({
     isCompleted,
     levelConfig,
     trackActivities,
-    completedViaChildren,
     childType,
     displayMode,
     programs,
-    metrics,
     targets,
     associatedActivities,
     activityDefinitions,
@@ -36,15 +32,12 @@ function GoalViewMode({
     deadline,
     relevanceStatement,
     // Handlers
-    setViewState,
     onClose,
     onGoalSelect,
     onUpdate,
     setTargets,
-    handleTimeSpentClick,
 }) {
     const navigate = useNavigate();
-    const { getGoalColor } = useGoalLevels();
 
     return (
         <div className={styles.viewContainer}>
@@ -93,84 +86,6 @@ function GoalViewMode({
                     </div>
                 );
             })()}
-
-            {/* Updated Metrics Section - Centered between other sections */}
-            {metrics && (
-                <div className={styles.metricsContainer}>
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr 1fr',
-                        columnGap: '24px',
-                        rowGap: '12px'
-                    }}>
-                        {/* Metric Item: Time */}
-                        <div
-                            onClick={handleTimeSpentClick}
-                            style={{
-                                display: 'flex',
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                cursor: 'pointer',
-                                padding: '4px 0',
-                                gap: '6px'
-                            }}
-                        >
-                            <span style={{
-                                fontSize: '12px',
-                                fontWeight: 'bold',
-                                color: 'var(--color-text-primary)',
-                                textDecoration: 'underline'
-                            }}>
-                                Time Spent:
-                            </span>
-                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                                {formatDuration(metrics.recursive.activities_duration_seconds)}
-                            </span>
-                        </div>
-
-                        {/* Metric Item: Sessions */}
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            padding: '4px 0',
-                            gap: '6px'
-                        }}>
-                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                                Sessions:
-                            </span>
-                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                                {metrics.recursive.sessions_count}
-                            </span>
-                        </div>
-
-                        {/* Metric Item: Activities */}
-                        <div
-                            onClick={() => setViewState('activity-associator')}
-                            style={{
-                                display: 'flex',
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                cursor: 'pointer',
-                                padding: '4px 0',
-                                gap: '6px'
-                            }}
-                        >
-                            <span style={{
-                                fontSize: '12px',
-                                fontWeight: 'bold',
-                                color: 'var(--color-text-primary)',
-                                textDecoration: 'underline'
-                            }}>
-                                Activities:
-                            </span>
-                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
-                                {associatedActivities ? associatedActivities.length : metrics.recursive.activities_count}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Targets Section - View Mode (Read-only) */}
             {trackActivities && levelConfig.track_activities !== false && (

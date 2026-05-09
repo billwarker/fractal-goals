@@ -45,7 +45,7 @@ function formatMetricValue(metric) {
     return `${metric.name || 'Metric'}: ${formatted}${metric.unit ? ` ${metric.unit}` : ''}`;
 }
 
-function GoalTimelineView({ rootId, goalId }) {
+function GoalTimelineView({ rootId, goalId, metrics, onTimeSpentClick }) {
     const { timezone } = useTimezone();
     const [selectedTypes, setSelectedTypes] = useState(DEFAULT_GOAL_TIMELINE_TYPES);
     const [includeChildren, setIncludeChildren] = useState(true);
@@ -67,6 +67,28 @@ function GoalTimelineView({ rootId, goalId }) {
 
     return (
         <div className={styles.container}>
+            {metrics?.recursive && (
+                <div className={styles.summary}>
+                    <button
+                        type="button"
+                        className={styles.summaryItemButton}
+                        onClick={onTimeSpentClick}
+                        disabled={!onTimeSpentClick}
+                    >
+                        <span className={styles.summaryLabel}>Time Spent:</span>
+                        <span className={styles.summaryValue}>
+                            {formatDurationSeconds(metrics.recursive.activities_duration_seconds || 0)}
+                        </span>
+                    </button>
+                    <div className={styles.summaryItem}>
+                        <span className={styles.summaryLabel}>Sessions:</span>
+                        <span className={styles.summaryValue}>
+                            {metrics.recursive.sessions_count || 0}
+                        </span>
+                    </div>
+                </div>
+            )}
+
             <div className={styles.filters} aria-label="Timeline filters">
                 {FILTERS.map(({ type, label }) => {
                     const checked = selectedSet.has(type);

@@ -74,7 +74,63 @@
     margin-top: -24px;
     padding-top: 24px;
     isolation: isolate;
-    border-bottom: 2px solid var(--activity-associator-accent);
+    border-bottom: 2px solid var(--activity-associator-divider);
+}
+
+.embeddedHeader {
+    position: sticky;
+    top: var(--goal-detail-sticky-offset, 0px);
+    z-index: 19;
+    margin: -14px -24px 0;
+    padding: 14px 24px 12px;
+    background: var(--color-bg-surface);
+    border-bottom: 2px solid var(--activity-associator-divider);
+    isolation: isolate;
+}
+
+.embeddedHeader .metricsBreakdown {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    align-items: center;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.embeddedHeader .metricsBreakdown::-webkit-scrollbar {
+    display: none;
+}
+
+.embeddedHeader .metricItem {
+    flex: 0 0 auto;
+    gap: 6px;
+    padding: 0 14px;
+    min-height: 28px;
+    border-right: 1px solid var(--color-border);
+}
+
+.embeddedHeader .metricItem:first-child {
+    padding-left: 0;
+}
+
+.embeddedHeader .metricItem:last-child {
+    padding-right: 0;
+    border-right: 0;
+}
+
+.embeddedHeader .metricNumber,
+.embeddedHeader .metricLabel {
+    font-size: 11px;
+    line-height: 1.2;
+}
+
+.embeddedHeader .metricNumber {
+    color: var(--activity-associator-divider);
+}
+
+.embeddedHeader .metricLabelRow {
+    gap: 6px;
+    white-space: nowrap;
 }
 
 .headerTopLine {

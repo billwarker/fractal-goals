@@ -21,6 +21,7 @@ function GoalHeader({
     goalStatus = 'active',
     headerActions = null,
     headerTabs = null,
+    headerRef = null,
 }) {
     const { timezone } = useTimezone();
     const normalizedStatus = goalStatus === 'frozen' || goalStatus === 'paused'
@@ -59,7 +60,7 @@ function GoalHeader({
         : 'none';
 
     return (
-        <div style={{
+        <div ref={headerRef} style={{
             display: 'flex',
             flexDirection: 'column',
             gap: '10px',
