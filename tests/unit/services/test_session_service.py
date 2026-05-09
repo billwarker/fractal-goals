@@ -218,6 +218,38 @@ def test_update_session_completion_excludes_paused_time(
     assert result['total_paused_seconds'] == 15 * 60
     assert result['total_duration_seconds'] == 15 * 60
 
+
+def test_update_completed_session_time_recomputes_duration_excluding_pauses(
+    db_session, session_service, sample_practice_session, test_user
+):
+    start = datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc)
+    original_end = start + timedelta(minutes=45)
+    edited_end = start + timedelta(minutes=60)
+    sample_practice_session.completed = True
+    sample_practice_session.completed_at = original_end
+    sample_practice_session.session_start = start
+    sample_practice_session.session_end = original_end
+    sample_practice_session.total_paused_seconds = 10 * 60
+    sample_practice_session.total_duration_seconds = 35 * 60
+    db_session.commit()
+
+    result, error_msg, status_code = session_service.update_session(
+        sample_practice_session.root_id,
+        sample_practice_session.id,
+        test_user.id,
+        {
+            'session_end': edited_end.isoformat(),
+        },
+    )
+
+    assert error_msg is None
+    assert status_code == 200
+    assert result['completed'] is True
+    assert result['session_end'] == edited_end.isoformat().replace('+00:00', 'Z')
+    assert result['total_paused_seconds'] == 10 * 60
+    assert result['total_duration_seconds'] == 50 * 60
+
+
 def test_delete_session(db_session, session_service, sample_practice_session, test_user):
     root_id = sample_practice_session.root_id
     session_id = sample_practice_session.id

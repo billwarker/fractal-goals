@@ -1952,7 +1952,18 @@ class SessionService:
             val = data['session_data']
             session.attributes = models._safe_load_json(val, val)
 
-        if data.get('completed') and session.completed:
+        should_recompute_completed_duration = (
+            session.completed
+            and not is_quick_session(session)
+            and ('total_duration_seconds' not in data)
+            and (
+                data.get('completed')
+                or 'session_start' in data
+                or 'session_end' in data
+            )
+        )
+
+        if should_recompute_completed_duration:
             self._finalize_paused_session_duration(session, session.session_end or session.completed_at)
         
         self.db_session.commit()
