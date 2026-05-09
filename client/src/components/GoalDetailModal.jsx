@@ -16,6 +16,7 @@ import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { formatDateInTimezone } from '../utils/dateUtils';
+import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
 import { getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalCompletionModal from './goals/GoalCompletionModal';
 import GoalUncompletionModal from './goals/GoalUncompletionModal';
@@ -132,6 +133,7 @@ function GoalDetailModal({
     const [selectedChildType, setSelectedChildType] = useState(needsLevelPicker ? null : defaultChildType);
     const [activitiesAssociateAction, setActivitiesAssociateAction] = useState(null);
     const [activityBuilderReturnView, setActivityBuilderReturnView] = useState('activity-associator');
+    const [activityBuilderTemplate, setActivityBuilderTemplate] = useState(null);
     const goalHeaderRef = React.useRef(null);
     const [goalHeaderStickyOffset, setGoalHeaderStickyOffset] = useState(0);
     // Reset when the parent changes (e.g. modal reused for a different goal)
@@ -737,6 +739,12 @@ function GoalDetailModal({
                     onCreateActivity={() => {
                         // Switch to activity builder view
                         setActivityBuilderReturnView('activity-associator');
+                        setActivityBuilderTemplate(null);
+                        setViewState('activity-builder');
+                    }}
+                    onCopyActivity={(activity) => {
+                        setActivityBuilderReturnView('activity-associator');
+                        setActivityBuilderTemplate(prepareActivityDefinitionCopy(activity));
                         setViewState('activity-builder');
                     }}
                 />
@@ -771,6 +779,12 @@ function GoalDetailModal({
                     dividerColor={displayGoalColor}
                     onCreateActivity={() => {
                         setActivityBuilderReturnView('goal-activities');
+                        setActivityBuilderTemplate(null);
+                        setViewState('activity-builder');
+                    }}
+                    onCopyActivity={(activity) => {
+                        setActivityBuilderReturnView('goal-activities');
+                        setActivityBuilderTemplate(prepareActivityDefinitionCopy(activity));
                         setViewState('activity-builder');
                     }}
                 />
@@ -783,6 +797,7 @@ function GoalDetailModal({
                     rootId={rootId}
                     goalId={goalId}
                     activityGroups={activityGroups}
+                    activityTemplate={activityBuilderTemplate}
                     onSuccess={async (newActivity) => {
                         if (newActivity && newActivity.id) {
                             await attachInlineCreatedActivity(newActivity);
@@ -790,9 +805,13 @@ function GoalDetailModal({
                                 notify.success(`Associated "${newActivity.name}" with goal`);
                             }
                         }
+                        setActivityBuilderTemplate(null);
                         setViewState(activityBuilderReturnView);
                     }}
-                    onCancel={() => setViewState(activityBuilderReturnView)}
+                    onCancel={() => {
+                        setActivityBuilderTemplate(null);
+                        setViewState(activityBuilderReturnView);
+                    }}
                 />
             </Suspense>
         );

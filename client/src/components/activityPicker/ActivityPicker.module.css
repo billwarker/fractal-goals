@@ -1,0 +1,387 @@
+.picker {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    color: var(--color-text-primary);
+}
+
+.panel {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-elevated);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 10%, transparent);
+}
+
+.body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+    padding: 16px;
+    overflow: auto;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.titleBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.title {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+.subtitle {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.headerActions {
+    display: flex;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.backButton,
+.closeButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    padding: 0 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.closeButton {
+    width: 30px;
+    padding: 0;
+}
+
+.backButton:hover,
+.closeButton:hover {
+    border-color: var(--color-border-hover);
+    color: var(--color-text-primary);
+    background: var(--color-bg-hover);
+}
+
+.searchInput {
+    width: 100%;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+}
+
+.searchInput:focus {
+    border-color: var(--color-brand-primary);
+}
+
+.groupGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+}
+
+.groupCard {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    min-height: 58px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-bg-card-alt);
+}
+
+.groupCardSelected {
+    border-color: color-mix(in srgb, var(--color-brand-primary) 70%, var(--color-border));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 32%, transparent);
+}
+
+.groupBrowseButton {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-primary);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+
+.groupBrowseButton:hover {
+    background: color-mix(in srgb, var(--color-brand-primary) 8%, transparent);
+}
+
+.groupName {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.groupMeta {
+    color: var(--color-text-muted);
+    font-size: 10px;
+    line-height: 1.2;
+}
+
+.groupSelectButton {
+    min-width: 76px;
+    border: 0;
+    border-left: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-brand-primary) 8%, transparent);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.groupSelectButton:hover,
+.groupSelectButtonActive {
+    background: color-mix(in srgb, var(--color-brand-primary) 20%, transparent);
+    color: var(--color-brand-primary);
+}
+
+.activityList {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 8px;
+}
+
+.sectionHeading {
+    grid-column: 1 / -1;
+    margin: 4px 0 0;
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.activityRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto 1fr;
+    align-items: start;
+    gap: 10px;
+    min-height: 74px;
+    padding: 11px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+
+.activityRow:hover,
+.activityRowSelected {
+    border-color: color-mix(in srgb, var(--color-brand-primary) 60%, var(--color-border));
+    background: color-mix(in srgb, var(--color-brand-primary) 10%, transparent);
+}
+
+.selectionControl {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text-primary);
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.radioControl {
+    border-radius: 999px;
+}
+
+.activityRowSelected .selectionControl {
+    border-color: var(--color-brand-primary);
+    background: var(--color-brand-primary);
+    color: var(--color-text-inverse, #fff);
+}
+
+.activityName {
+    min-width: 0;
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.activityMeta {
+    display: block;
+    margin-top: 4px;
+    color: var(--color-text-muted);
+    font-size: 10px;
+    line-height: 1.25;
+}
+
+.countBadge {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: end;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-brand-primary) 20%, transparent);
+    color: var(--color-text-primary);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.divider {
+    width: 100%;
+    height: 1px;
+    background: var(--color-border);
+}
+
+.primaryActions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px;
+}
+
+.secondaryAction {
+    min-height: 34px;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.secondaryAction:hover,
+.secondaryActionActive {
+    border-style: solid;
+    border-color: var(--color-brand-primary);
+    background: color-mix(in srgb, var(--color-brand-primary) 10%, transparent);
+    color: var(--color-brand-primary);
+}
+
+.emptyState {
+    padding: 16px;
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+.footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    border-top: 1px solid var(--color-border);
+}
+
+.footerSummary {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}
+
+.footerActions {
+    display: flex;
+    gap: 10px;
+}
+
+.clearButton,
+.cancelButton,
+.confirmButton {
+    min-height: 34px;
+    padding: 0 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.clearButton,
+.cancelButton {
+    background: transparent;
+    color: var(--color-text-secondary);
+}
+
+.confirmButton {
+    background: var(--color-brand-primary);
+    border-color: var(--color-brand-primary);
+    color: var(--color-text-inverse, #fff);
+}
+
+.clearButton:disabled,
+.confirmButton:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+@media (max-width: 720px) {
+    .body {
+        padding: 14px;
+    }
+
+    .groupGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .footerActions {
+        width: 100%;
+    }
+
+    .clearButton,
+    .cancelButton,
+    .confirmButton {
+        flex: 1;
+    }
+}

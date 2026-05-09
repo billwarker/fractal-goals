@@ -7,7 +7,7 @@ import ActivityBuilderForm from '../activityBuilder/ActivityBuilderForm';
 import { flattenGoals } from '../activityBuilder/activityBuilderUtils';
 import styles from '../GoalDetailModal.module.css';
 
-function InlineActivityBuilderModal({ rootId, activityGroups = [], onSuccess, onCancel }) {
+function InlineActivityBuilderModal({ rootId, activityGroups = [], activityTemplate = null, onSuccess, onCancel }) {
     const { createActivity, updateActivity } = useActivities();
     const { getGoalColor, getGoalIcon } = useGoalLevels();
     const { data: currentFractal } = useFractalTree(rootId);
@@ -19,13 +19,13 @@ function InlineActivityBuilderModal({ rootId, activityGroups = [], onSuccess, on
             <div className={styles.activityBuilderHeader}>
                 <button onClick={onCancel} className={styles.backButton}>←</button>
                 <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-text-primary)', flex: 1 }}>
-                    Create New Activity
+                    {activityTemplate ? 'Copy Activity' : 'Create New Activity'}
                 </h3>
             </div>
             <ActivityBuilderForm
-                key="inline-create"
+                key={activityTemplate?._builderKey || 'inline-create'}
                 allGoals={allGoals}
-                editingActivity={null}
+                editingActivity={activityTemplate}
                 rootId={rootId}
                 activityGroups={activityGroups}
                 createActivity={createActivity}

@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import SidePaneHeader from '../common/SidePaneHeader';
 import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
+import ActivityFilterModal from '../common/ActivityFilterModal';
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 import SessionCalendarHeatmap from './SessionCalendarHeatmap';
-import SessionFilterSelectionModal from './SessionFilterSelectionModal';
 import './SessionsQuerySidebar.css';
 
 const RANGE_PRESET_OPTIONS = [
@@ -294,18 +294,19 @@ function SessionsQuerySidebar({
                 </section>
             </div>
 
-            <SessionFilterSelectionModal
-                isOpen={isActivityModalOpen}
-                title="Filter By Activity"
-                items={activities}
-                activityGroups={activityGroups}
-                selectedIds={filters.activityIds}
-                searchPlaceholder="Search activities"
-                emptyState="No activities available."
-                itemKind="activity"
-                onClose={() => setIsActivityModalOpen(false)}
-                onConfirm={(selectedIds) => onUpdateFilters?.({ activityIds: selectedIds })}
-            />
+            {isActivityModalOpen && (
+                <ActivityFilterModal
+                    title="Filter By Activity"
+                    activities={activities}
+                    activityGroups={activityGroups}
+                    initialActivityIds={filters.activityIds}
+                    selectionMode="multiple"
+                    allowGroupSelection={false}
+                    confirmLabel="Apply"
+                    onClose={() => setIsActivityModalOpen(false)}
+                    onConfirm={(selectedIds) => onUpdateFilters?.({ activityIds: selectedIds })}
+                />
+            )}
 
             <GoalHierarchySelectionModal
                 isOpen={isGoalModalOpen}

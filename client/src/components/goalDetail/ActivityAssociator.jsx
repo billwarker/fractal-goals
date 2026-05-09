@@ -6,7 +6,7 @@ import { sortGroupsTreeOrder } from '../../utils/manageActivities';
 import Modal from '../atoms/Modal';
 import Button from '../atoms/Button';
 import CloseIcon from '../atoms/CloseIcon';
-import ActivitySearchWidget from '../common/ActivitySearchWidget';
+import { ActivityPicker } from '../activityPicker';
 import notify from '../../utils/notify';
 import ActivityGroupContainer from './ActivityGroupContainer';
 import ActivityMiniCard from './ActivityMiniCard';
@@ -54,6 +54,7 @@ const ActivityAssociator = ({
     useFooterAssociateAction = false,
     registerAssociateAction,
     dividerColor,
+    onCopyActivity,
 }) => {
     const { createActivityGroup, setActivityGroupGoals } = useActivities();
 
@@ -638,30 +639,28 @@ const ActivityAssociator = ({
             {/* ============ DISCOVERY AREA (selector mode only) ============ */}
             {isSelectorMode && isDiscoveryActive && (
                     <div className={styles.discoveryWrapper}>
-                    <ActivitySearchWidget
+                    <ActivityPicker
                         activities={activityDefinitions.filter(a => !associatedActivities.some(aa => aa.id === a.id))}
                         activityGroups={activityGroups}
-                        preSelectedActivityIds={tempSelectedActivities}
+                        selectedActivityIds={tempSelectedActivities}
+                        selectedGroupIds={tempSelectedGroups}
+                        selectionMode="multiple"
+                        allowActivitySelection
                         allowGroupSelection={true}
+                        allowCreateActivity={Boolean(onCreateActivity)}
+                        allowCopyActivity={Boolean(onCopyActivity)}
+                        allowCreateGroup
                         title="Available Activities & Groups"
-                        onConfirm={handleConfirmActivitySelection}
+                        confirmLabel="Add Selected"
                         onCancel={() => setIsDiscoveryActive(false)}
-                        extraActions={
-                            <>
-                                <button
-                                    onClick={() => onCreateActivity && onCreateActivity()}
-                                    className={styles.createLink}
-                                >
-                                    + Create New Activity
-                                </button>
-                                <button
-                                    onClick={() => setShowGroupCreator(!showGroupCreator)}
-                                    className={styles.createLink}
-                                >
-                                    + Create New Group
-                                </button>
-                            </>
-                        }
+                        onCreateActivity={onCreateActivity}
+                        onCopyActivity={onCopyActivity}
+                        onCreateGroup={() => setShowGroupCreator(!showGroupCreator)}
+                        onChange={({ activityIds, groupIds }) => {
+                            setTempSelectedActivities(activityIds);
+                            setTempSelectedGroups(groupIds);
+                        }}
+                        onConfirm={({ activityIds, groupIds }) => handleConfirmActivitySelection(activityIds, groupIds)}
                     />
 
                     {/* Inline Group Creator overlay over search widget */}

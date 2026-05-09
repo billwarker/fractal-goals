@@ -29,7 +29,6 @@ const SessionSection = ({
     const isMobile = useIsMobile();
     // Context
     const {
-        rootId,
         activityInstances,
         activities,
         activityGroups,

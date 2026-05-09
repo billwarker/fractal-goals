@@ -46,7 +46,7 @@ describe('TemplateBuilderModal', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '+ Add Activity' }));
         fireEvent.click(screen.getByRole('button', { name: /Lower Body/ }));
-        fireEvent.click(screen.getByRole('button', { name: /\+ Squat/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Select Squat' }));
 
         expect(screen.getAllByText('Squat')).toHaveLength(1);
     });
