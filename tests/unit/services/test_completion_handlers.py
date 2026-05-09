@@ -123,6 +123,73 @@ def test_handle_session_completed(db_session, sample_practice_session, sample_me
         assert short_term_goal.completed is True
 
 
+def test_handle_session_completed_records_threshold_instance_that_met_target(
+    db_session,
+    sample_practice_session,
+    sample_metric_target,
+    sample_activity_definition,
+    sample_goal_hierarchy,
+):
+    """Session completion should credit the actual instance that satisfied the target."""
+    from models import MetricValue
+    from models.goal import session_goals
+
+    low_instance = ActivityInstance(
+        id=str(uuid.uuid4()),
+        session_id=sample_practice_session.id,
+        activity_definition_id=sample_activity_definition.id,
+        root_id=sample_practice_session.root_id,
+        completed=True,
+        created_at=datetime.now(timezone.utc),
+        time_stop=datetime.now(timezone.utc),
+        data={}
+    )
+    high_instance = ActivityInstance(
+        id=str(uuid.uuid4()),
+        session_id=sample_practice_session.id,
+        activity_definition_id=sample_activity_definition.id,
+        root_id=sample_practice_session.root_id,
+        completed=True,
+        created_at=datetime.now(timezone.utc) + timedelta(seconds=1),
+        time_stop=datetime.now(timezone.utc) + timedelta(seconds=1),
+        data={}
+    )
+    metric_def = sample_activity_definition.metric_definitions[0]
+    low_instance.metric_values.append(MetricValue(
+        id=str(uuid.uuid4()),
+        activity_instance_id=low_instance.id,
+        metric_definition_id=metric_def.id,
+        value=95.0
+    ))
+    high_instance.metric_values.append(MetricValue(
+        id=str(uuid.uuid4()),
+        activity_instance_id=high_instance.id,
+        metric_definition_id=metric_def.id,
+        value=105.0
+    ))
+    db_session.add_all([low_instance, high_instance])
+    db_session.execute(
+        session_goals.insert().values(
+            session_id=sample_practice_session.id,
+            goal_id=sample_goal_hierarchy['short_term'].id,
+            goal_type='short_term',
+            association_source='manual'
+        )
+    )
+    db_session.commit()
+
+    with patch('services.completion_handlers._get_db_session', return_value=db_session), \
+         patch.object(db_session, 'close', return_value=None):
+        services.completion_handlers.handle_session_completed(Event(Events.SESSION_COMPLETED, {
+            'session_id': sample_practice_session.id,
+            'root_id': sample_practice_session.root_id
+        }))
+
+    db_session.refresh(sample_metric_target)
+    assert sample_metric_target.completed is True
+    assert sample_metric_target.completed_instance_id == high_instance.id
+
+
 def test_handle_activity_instance_completed(db_session, sample_practice_session, sample_metric_target, sample_activity_definition, sample_goal_hierarchy):
     """Test that completing an activity instance within an uncompleted session evaluates targets."""
     from models import MetricValue

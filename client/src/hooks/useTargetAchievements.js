@@ -74,10 +74,20 @@ export function useTargetAchievements(activityInstances, parentGoals, sessionId 
                     }
                 }
 
+                const persistedWinningInstanceId = target.completed_instance_id || target.activity_instance_id;
+                const persistedWinningInstanceInView = Boolean(
+                    persistedWinningInstanceId
+                    && instances.some(instance => instance.id === persistedWinningInstanceId)
+                );
+                const shouldReevaluatePersistedCompletion = Boolean(
+                    target.completed
+                    && sessionId
+                    && target.completed_session_id === sessionId
+                    && persistedWinningInstanceInView
+                );
                 const shouldRespectPersistedCompletion = Boolean(
                     target.completed
-                    && instances.length === 0
-                    && (!sessionId || !target.completed_session_id || target.completed_session_id !== sessionId)
+                    && !shouldReevaluatePersistedCompletion
                 );
 
                 if (shouldRespectPersistedCompletion) {

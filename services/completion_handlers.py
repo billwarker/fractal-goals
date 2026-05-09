@@ -358,17 +358,17 @@ def _evaluate_threshold_targets_for_activity(
         }
         
         logger.info(f"[TARGET_EVAL] Evaluating '{target_name}' against instances...")
-        if _evaluate_threshold_target(target_dict, instances_by_activity):
+        matching_instance = _find_threshold_target_achieving_instance(target_dict, instances_by_activity)
+        if matching_instance:
             logger.info(f"[TARGET_EVAL] TARGET ACHIEVED: '{target_name}'")
             
             # Update the Target model directly
             target.completed = True
             target.completed_at = completed_at
             target.completed_session_id = session_id
-            instance_list = instances_by_activity.get(activity_id, [])
-            target.completed_instance_id = instance_list[0].get('id') if instance_list else None
-            if instance_list:
-                metric_map = _collect_actual_metric_values_from_instance_dict(instance_list[0])
+            target.completed_instance_id = matching_instance.get('id')
+            if matching_instance:
+                metric_map = _collect_actual_metric_values_from_instance_dict(matching_instance)
                 _record_target_contributions(db_session, target, target.completed_instance_id, metric_map)
             
             newly_completed.append(target)
@@ -443,6 +443,8 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
             
         target_type = target.type or 'threshold'
         target_achieved = False
+        matching_instance = None
+        matching_instances = []
         
         # Convert Target object to dict for evaluation
         target_dict = {
@@ -468,10 +470,12 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
                 target_instance_id = getattr(target, 'activity_instance_id', None)
                 if target_instance_id:
                     instances = [inst for inst in instances if inst.get('id') == target_instance_id]
-                target_achieved = any(inst.get('completed', False) for inst in instances)
+                matching_instances = [inst for inst in instances if inst.get('completed', False)]
+                target_achieved = bool(matching_instances)
         elif target_type == 'threshold':
             # Classic logic: Check if CURRENT session meets criteria
-            target_achieved = _evaluate_threshold_target(target_dict, instances_by_activity)
+            matching_instance = _find_threshold_target_achieving_instance(target_dict, instances_by_activity)
+            target_achieved = matching_instance is not None
         elif target_type in ('sum', 'frequency'):
             # Complex logic: Check if aggregated history meets criteria
             target_achieved = _evaluate_complex_target(db_session, target_dict, goal, session_id)
@@ -480,6 +484,10 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
             target.completed = True
             target.completed_at = now
             target.completed_session_id = session_id
+            if target_type == 'completion':
+                target.completed_instance_id = matching_instances[0].get('id') if matching_instances else None
+            elif target_type == 'threshold':
+                target.completed_instance_id = matching_instance.get('id') if matching_instance else None
             newly_completed.append(target)
             
             # Emit target achieved event
@@ -812,13 +820,13 @@ def _revert_achievements_for_instance(db_session, instance_id: str, pending_even
 
 
 
-def _evaluate_threshold_target(target, instances_by_activity):
-    """Evaluate a single-session threshold target."""
+def _find_threshold_target_achieving_instance(target, instances_by_activity):
+    """Return the first activity instance that satisfies a threshold target."""
     activity_id = target.get('activity_id')
     target_metrics = target.get('metrics', [])
     
     if not activity_id or not target_metrics:
-        return False
+        return None
     instances = instances_by_activity.get(activity_id, [])
     target_instance_id = target.get('activity_instance_id')
     if target_instance_id:
@@ -829,13 +837,18 @@ def _evaluate_threshold_target(target, instances_by_activity):
         if sets:
             for s in sets:
                 if _check_metrics_meet_target(target_metrics, s.get('metrics', [])):
-                    return True
+                    return inst
         
         # Check flat metrics
         if _check_metrics_meet_target(target_metrics, inst.get('metrics', [])):
-            return True
+            return inst
             
-    return False
+    return None
+
+
+def _evaluate_threshold_target(target, instances_by_activity):
+    """Evaluate a single-session threshold target."""
+    return _find_threshold_target_achieving_instance(target, instances_by_activity) is not None
 
 
 def _evaluate_complex_target(db_session, target, goal, current_session_id):

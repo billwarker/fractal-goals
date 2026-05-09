@@ -105,4 +105,109 @@ describe('useTargetAchievements', () => {
         expect(result.current.achievedTargetIds.has('target-3')).toBe(false);
         expect(result.current.targetAchievements.get('target-3')?.achieved).toBe(false);
     });
+
+    it('keeps a persisted target achieved when a later instance performs worse', () => {
+        const activityInstances = [
+            {
+                id: 'inst-4-later',
+                activity_definition_id: 'activity-4',
+                completed: true,
+                metrics: [{ metric_id: 'm-1', value: 5 }]
+            }
+        ];
+        const parentGoals = [
+            {
+                id: 'micro-4',
+                completed: true,
+                attributes: {
+                    targets: [
+                        {
+                            id: 'target-4',
+                            type: 'threshold',
+                            activity_id: 'activity-4',
+                            completed: true,
+                            completed_session_id: 'session-prior',
+                            completed_instance_id: 'inst-4-prior',
+                            metrics: [{ metric_id: 'm-1', value: 10 }]
+                        }
+                    ]
+                }
+            }
+        ];
+
+        const { result } = renderHook(() => useTargetAchievements(activityInstances, parentGoals, 'session-current'));
+        expect(result.current.achievedTargetIds.has('target-4')).toBe(true);
+        expect(result.current.targetAchievements.get('target-4')?.achieved).toBe(true);
+        expect(result.current.targetAchievements.get('target-4')?.wasAlreadyCompleted).toBe(true);
+    });
+
+    it('keeps a target achieved within the same session when a later instance performs worse', () => {
+        const activityInstances = [
+            {
+                id: 'inst-6-later',
+                activity_definition_id: 'activity-6',
+                completed: true,
+                metrics: [{ metric_id: 'm-1', value: 5 }]
+            }
+        ];
+        const parentGoals = [
+            {
+                id: 'micro-6',
+                completed: true,
+                attributes: {
+                    targets: [
+                        {
+                            id: 'target-6',
+                            type: 'threshold',
+                            activity_id: 'activity-6',
+                            completed: true,
+                            completed_session_id: 'session-current',
+                            completed_instance_id: 'inst-6-prior',
+                            metrics: [{ metric_id: 'm-1', value: 10 }]
+                        }
+                    ]
+                }
+            }
+        ];
+
+        const { result } = renderHook(() => useTargetAchievements(activityInstances, parentGoals, 'session-current'));
+        expect(result.current.achievedTargetIds.has('target-6')).toBe(true);
+        expect(result.current.targetAchievements.get('target-6')?.achieved).toBe(true);
+        expect(result.current.targetAchievements.get('target-6')?.wasAlreadyCompleted).toBe(true);
+    });
+
+    it('keeps a persisted target achieved when a later instance has no metric', () => {
+        const activityInstances = [
+            {
+                id: 'inst-5-later',
+                activity_definition_id: 'activity-5',
+                completed: true,
+                metrics: []
+            }
+        ];
+        const parentGoals = [
+            {
+                id: 'micro-5',
+                completed: true,
+                attributes: {
+                    targets: [
+                        {
+                            id: 'target-5',
+                            type: 'threshold',
+                            activity_id: 'activity-5',
+                            completed: true,
+                            completed_session_id: 'session-prior',
+                            completed_instance_id: 'inst-5-prior',
+                            metrics: [{ metric_id: 'm-1', value: 10 }]
+                        }
+                    ]
+                }
+            }
+        ];
+
+        const { result } = renderHook(() => useTargetAchievements(activityInstances, parentGoals, 'session-current'));
+        expect(result.current.achievedTargetIds.has('target-5')).toBe(true);
+        expect(result.current.targetAchievements.get('target-5')?.achieved).toBe(true);
+        expect(result.current.targetAchievements.get('target-5')?.wasAlreadyCompleted).toBe(true);
+    });
 });
