@@ -217,4 +217,84 @@ describe('useSessionGoalsViewModel', () => {
         expect(names).not.toContain('Old Activity Goal');
         expect(names).toContain('Current Activity Goal');
     });
+
+    it('excludes paused goals from the session hierarchy', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root',
+                type: 'UltimateGoal',
+                name: 'Root',
+                children: [
+                    {
+                        id: 'paused',
+                        type: 'ImmediateGoal',
+                        name: 'Paused Goal',
+                        paused: true,
+                        children: []
+                    },
+                    {
+                        id: 'active',
+                        type: 'ImmediateGoal',
+                        name: 'Active Goal',
+                        children: []
+                    }
+                ]
+            },
+            session_goal_ids: ['paused', 'active'],
+            activity_goal_ids_by_activity: {},
+            session_activity_ids: []
+        };
+
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            sessionGoalsView,
+            selectedActivity: null,
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+        }));
+
+        const names = result.current.sessionHierarchy.map((node) => node.name);
+        expect(names).not.toContain('Paused Goal');
+        expect(names).toContain('Active Goal');
+    });
+
+    it('excludes frozen goals from the activity hierarchy', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root',
+                type: 'UltimateGoal',
+                name: 'Root',
+                children: [
+                    {
+                        id: 'paused',
+                        type: 'ImmediateGoal',
+                        name: 'Frozen Activity Goal',
+                        frozen: true,
+                        children: []
+                    },
+                    {
+                        id: 'active',
+                        type: 'ImmediateGoal',
+                        name: 'Active Activity Goal',
+                        children: []
+                    }
+                ]
+            },
+            session_goal_ids: ['paused', 'active'],
+            activity_goal_ids_by_activity: {
+                'activity-1': ['paused', 'active']
+            },
+            session_activity_ids: ['activity-1']
+        };
+
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            sessionGoalsView,
+            selectedActivity: { id: 'inst-1', activity_definition_id: 'activity-1' },
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+        }));
+
+        const names = result.current.activityHierarchy.map((node) => node.name);
+        expect(names).not.toContain('Frozen Activity Goal');
+        expect(names).toContain('Active Activity Goal');
+    });
 });

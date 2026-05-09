@@ -66,6 +66,10 @@ function wasCompletedBeforeSession(goal, sessionStartTimestamp) {
     return !Number.isNaN(completedTimestamp) && completedTimestamp < sessionStartTimestamp;
 }
 
+function isPausedGoal(goal) {
+    return Boolean(goal?.paused || goal?.frozen);
+}
+
 export function useSessionGoalsViewModel({
     session,
     sessionGoalsView,
@@ -90,6 +94,7 @@ export function useSessionGoalsViewModel({
     // 2. Derive Session Hierarchy (everything)
     const sessionHierarchy = useMemo(() => {
         return normalizedTree
+            .filter(node => !isPausedGoal(node))
             .filter(node => !wasCompletedBeforeSession(node, sessionStartTimestamp))
             .map(node => ({
                 ...node,
@@ -126,6 +131,7 @@ export function useSessionGoalsViewModel({
 
         return normalizedTree
             .filter(node => relevantIds.has(node.id))
+            .filter(node => !isPausedGoal(node))
             .filter(node => !wasCompletedBeforeSession(node, sessionStartTimestamp))
             .map(node => ({
                 ...node,

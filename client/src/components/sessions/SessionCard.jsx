@@ -34,7 +34,8 @@ function SessionCard({
     const notesCount = Array.isArray(session.notes) ? session.notes.length : (session.notes_count || 0);
     const sessionCompleted = Boolean(session.completed || session.attributes?.completed);
     const sessionPaused = Boolean(session.is_paused ?? session.attributes?.is_paused);
-    let statusLabel = 'Incomplete session';
+    const sessionInProgress = !sessionCompleted && !sessionPaused;
+    let statusLabel = 'In-progress session';
     if (sessionPaused) {
         statusLabel = 'Paused session';
     } else if (sessionCompleted) {
@@ -92,6 +93,7 @@ function SessionCard({
                     </span>
                     <CompletionCheckBadge
                         checked={sessionCompleted}
+                        inProgress={sessionInProgress}
                         paused={sessionPaused}
                         className="session-card-completed-badge"
                         label={statusLabel}

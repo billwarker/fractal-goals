@@ -9,11 +9,13 @@ import { useSessionDetailMutations } from '../useSessionDetailMutations';
 const {
     createGoal,
     addActivityToSession,
+    startActivityTimer,
     updateActivityInstance,
     notify,
 } = vi.hoisted(() => ({
     createGoal: vi.fn(),
     addActivityToSession: vi.fn(),
+    startActivityTimer: vi.fn(),
     updateActivityInstance: vi.fn(),
     notify: {
         success: vi.fn(),
@@ -25,6 +27,7 @@ vi.mock('../../utils/api', () => ({
     fractalApi: {
         createGoal: (...args) => createGoal(...args),
         addActivityToSession: (...args) => addActivityToSession(...args),
+        startActivityTimer: (...args) => startActivityTimer(...args),
         updateActivityInstance: (...args) => updateActivityInstance(...args),
     },
 }));
@@ -195,5 +198,40 @@ describe('useSessionDetailMutations', () => {
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.progressComparison('inst-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['progress', 'history', 'act-1'] });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessionProgressSummary('session-1') });
+        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessions('root-1') });
+    });
+
+    it('invalidates session list queries after timer actions update activity state', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+        queryClient.setQueryData(queryKeys.sessionActivities('root-1', 'session-1'), [
+            { id: 'inst-1', activity_definition_id: 'act-1' },
+        ]);
+        startActivityTimer.mockResolvedValueOnce({
+            data: {
+                id: 'inst-1',
+                activity_definition_id: 'act-1',
+                time_start: '2026-03-12T15:00:00Z',
+                time_stop: null,
+            },
+        });
+
+        const { result } = renderHook(
+            () => useSessionDetailMutations(createBaseOptions(queryClient)),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.updateTimer('inst-1', 'start');
+        });
+
+        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.session('root-1', 'session-1') });
+        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessionGoalsView('root-1', 'session-1') });
+        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessions('root-1') });
     });
 });

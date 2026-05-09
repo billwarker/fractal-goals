@@ -142,7 +142,8 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     const templateColor = getTemplateColor(session);
     const sessionCompleted = Boolean(session.completed ?? session.attributes?.completed);
     const sessionPaused = Boolean(session.is_paused ?? session.attributes?.is_paused);
-    let sessionStatusLabel = 'Incomplete session';
+    const sessionInProgress = !sessionCompleted && !sessionPaused;
+    let sessionStatusLabel = 'In-progress session';
     if (sessionPaused) {
         sessionStatusLabel = 'Paused session';
     } else if (sessionCompleted) {
@@ -330,6 +331,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                         </Link>
                         <CompletionCheckBadge
                             checked={sessionCompleted}
+                            inProgress={sessionInProgress}
                             paused={sessionPaused}
                             label={sessionStatusLabel}
                         />

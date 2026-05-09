@@ -150,6 +150,7 @@ const SessionSection = ({
         >
             <SectionHeader
                 className={styles.sectionHeader}
+                contentClassName={styles.sectionHeaderContent}
                 title={(
                     <Heading level={3} className={styles.sectionTitle}>
                         {section.name || `Section ${sectionIndex + 1}`}

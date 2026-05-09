@@ -52,6 +52,44 @@ vi.mock('../ActivityCard', () => ({
 }));
 
 describe('SessionCardExpanded', () => {
+    it('shows a blue in-progress status badge in the title row', () => {
+        renderWithProviders(
+            <SessionCardExpanded
+                session={{
+                    id: 'session-active-1',
+                    name: 'Active Practice',
+                    is_paused: false,
+                    short_term_goals: [],
+                    immediate_goals: [],
+                    attributes: {
+                        completed: false,
+                        updated_at: '2026-03-12T15:43:00Z',
+                        session_data: {
+                            sections: [],
+                        },
+                    },
+                }}
+                rootId="root-1"
+                activities={[]}
+                isSelected={false}
+                onSelect={() => {}}
+                getGoalColor={() => '#607d8b'}
+                formatDate={(value) => value}
+                sessionActivityInstances={[]}
+            />,
+            {
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+                withTimezone: false,
+            }
+        );
+
+        const badge = screen.getByLabelText('In-progress session');
+        expect(badge).toBeInTheDocument();
+        expect(badge.querySelector('span')).toBeInTheDocument();
+    });
+
     it('shows an orange paused status badge in the title row', () => {
         renderWithProviders(
             <SessionCardExpanded

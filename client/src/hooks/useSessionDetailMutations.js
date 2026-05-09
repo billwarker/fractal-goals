@@ -287,6 +287,7 @@ export function useSessionDetailMutations({
                 queryClient.invalidateQueries({ queryKey: sessionKey });
                 queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
                 queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
+                invalidateSessionListQueries();
             }
 
             // Invalidate progress comparison when metrics are updated
@@ -381,12 +382,13 @@ export function useSessionDetailMutations({
                 );
                 queryClient.invalidateQueries({ queryKey: sessionKey });
                 queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+                invalidateSessionListQueries();
             }
         } catch (error) {
             console.error('Timer action failed', error);
             notify.error(`Timer action failed: ${error.response?.data?.error || error.message}`);
         }
-    }, [activityInstances, queryClient, rootId, sessionActivitiesKey, sessionGoalsViewKey, sessionId, sessionKey]);
+    }, [activityInstances, invalidateSessionListQueries, queryClient, rootId, sessionActivitiesKey, sessionGoalsViewKey, sessionId, sessionKey]);
 
     const handleReorderActivity = useCallback((sectionIndex, exerciseIndex, direction) => {
         updateSessionDataDraft((currentData) => {

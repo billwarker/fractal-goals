@@ -3,6 +3,52 @@ import { render, screen } from '@testing-library/react';
 import ActivityCard from '../ActivityCard';
 
 describe('ActivityCard', () => {
+    it('shows an in-progress status badge for a started activity', () => {
+        render(
+            <ActivityCard
+                activity={{
+                    type: 'activity',
+                    name: 'Guitar Solo Practice',
+                    time_start: '2026-03-12T15:00:00Z',
+                    time_stop: null,
+                    completed: false,
+                    sets: [],
+                    metrics: [],
+                }}
+                activityDefinition={{
+                    metric_definitions: [],
+                    split_definitions: [],
+                }}
+            />
+        );
+
+        expect(screen.getByLabelText('In-progress activity')).toBeInTheDocument();
+    });
+
+    it('shows a paused status badge for a paused activity', () => {
+        render(
+            <ActivityCard
+                activity={{
+                    type: 'activity',
+                    name: 'Guitar Solo Practice',
+                    time_start: '2026-03-12T15:00:00Z',
+                    time_stop: null,
+                    is_paused: true,
+                    completed: false,
+                    sets: [],
+                    metrics: [],
+                }}
+                activityDefinition={{
+                    metric_definitions: [],
+                    split_definitions: [],
+                }}
+            />
+        );
+
+        expect(screen.getByLabelText('Paused activity')).toBeInTheDocument();
+        expect(screen.queryByLabelText('In-progress activity')).not.toBeInTheDocument();
+    });
+
     it('renders sets when the payload has sets even if has_sets is omitted', () => {
         render(
             <ActivityCard

@@ -1,11 +1,13 @@
 import React from 'react';
 
 import CompletionCheckIcon from '../atoms/CompletionCheckIcon';
+import CompletionInProgressIcon from '../atoms/CompletionInProgressIcon';
 import CompletionPauseIcon from '../atoms/CompletionPauseIcon';
 import styles from './CompletionCheckBadge.module.css';
 
 function CompletionCheckBadge({
     checked = true,
+    inProgress = false,
     paused = false,
     label,
     className = '',
@@ -15,6 +17,8 @@ function CompletionCheckBadge({
         defaultLabel = 'Paused';
     } else if (checked) {
         defaultLabel = 'Completed';
+    } else if (inProgress) {
+        defaultLabel = 'In progress';
     }
     const accessibleLabel = label || defaultLabel;
     let statusClass = styles.unchecked;
@@ -22,6 +26,8 @@ function CompletionCheckBadge({
         statusClass = styles.paused;
     } else if (checked) {
         statusClass = styles.checked;
+    } else if (inProgress) {
+        statusClass = styles.inProgress;
     }
 
     return (
@@ -31,6 +37,8 @@ function CompletionCheckBadge({
         >
             {paused ? (
                 <CompletionPauseIcon className={styles.mark} />
+            ) : inProgress ? (
+                <CompletionInProgressIcon className={styles.mark} />
             ) : (
                 <CompletionCheckIcon checked={checked} className={styles.mark} />
             )}

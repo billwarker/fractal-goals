@@ -358,6 +358,17 @@ const ActivityCard = memo(function ActivityCard({
     const isActivity = activity.type === 'activity';
     const hasSets = activity.has_sets ?? Boolean(activity.sets?.length);
     const progressComparison = activity.progress_comparison || null;
+    const activityCompleted = Boolean(activity.completed ?? activity.attributes?.completed ?? activity.time_stop);
+    const activityPaused = Boolean(activity.is_paused ?? activity.attributes?.is_paused);
+    const activityInProgress = !activityCompleted && !activityPaused && Boolean(activity.time_start);
+    let activityStatusLabel = 'Incomplete activity';
+    if (activityPaused) {
+        activityStatusLabel = 'Paused activity';
+    } else if (activityCompleted) {
+        activityStatusLabel = 'Completed activity';
+    } else if (activityInProgress) {
+        activityStatusLabel = 'In-progress activity';
+    }
 
     const metricDefs = useMemo(() => activityDefinition?.metric_definitions || [], [activityDefinition?.metric_definitions]);
     const trackedMetricDefs = useMemo(() => filterTrackedMetricDefs(metricDefs), [metricDefs]);
@@ -383,9 +394,11 @@ const ActivityCard = memo(function ActivityCard({
             {/* Header */}
             <div className={styles.activityHeader}>
                 <CompletionCheckBadge
-                    checked={Boolean(activity.completed)}
+                    checked={activityCompleted}
+                    inProgress={activityInProgress}
+                    paused={activityPaused}
                     className={styles.completionBadge}
-                    label={activity.completed ? 'Completed activity' : 'Incomplete activity'}
+                    label={activityStatusLabel}
                 />
                 <div className={styles.content}>
                     <div className={styles.activityTitleRow}>

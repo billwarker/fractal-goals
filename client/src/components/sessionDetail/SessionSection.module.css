@@ -23,6 +23,13 @@
     flex-wrap: wrap;
 }
 
+.sectionHeaderContent {
+    display: flex;
+    align-items: baseline;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
 .sectionTitle {
     margin: 0;
     font-size: 18px;
@@ -41,6 +48,13 @@
 
 .sectionDurationField {
     min-width: 0;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.sectionDurationField > :first-child {
+    margin-bottom: 0;
 }
 
 .durationValue {
