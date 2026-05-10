@@ -54,30 +54,38 @@ const AnimatedGoalIcon = ({
     const RING_LAYERS = 3;
 
     const squareFractalBaseSize = 15;
-    const squareFractalGrowth = 1.4;
-    const squareFractalSequence = Array.from({ length: 6 }, (_, index) => ({
+    const squareFractalGrowth = 1.45;
+    const squareFractalSequence = Array.from({ length: 7 }, (_, index) => ({
         size: squareFractalBaseSize * (squareFractalGrowth ** index),
         rotation: index % 2 === 0 ? 45 : 0,
-    })).map((layer) => {
-        return {
-            ...layer,
-            fill: secondaryColor,
-        };
-    });
+    }));
     const squareLayerInterval = reduced ? 1.4 : 1.0;
     const squareHoldAfter = reduced ? 1.6 : 1.2;
-    const squareCycleDuration = squareLayerInterval * squareFractalSequence.length + squareHoldAfter;
+    const squarePhaseDuration = squareLayerInterval * squareFractalSequence.length + squareHoldAfter;
+    const squareCycleDuration = squarePhaseDuration * 2;
 
     const squareFractalKeyframes = isSquare
         ? `
 @keyframes l_square_fractal_sequence_${uid} {
-${squareFractalSequence.map((layer, i) => {
-        const stepStartPct = ((i * squareLayerInterval) / squareCycleDuration) * 100;
-        const stepEndPct = ((((i + 1) * squareLayerInterval) / squareCycleDuration) * 100) - 0.001;
-        const transform = `rotate(${layer.rotation}deg) scale(${layer.size})`;
-        return `  ${stepStartPct.toFixed(3)}%, ${stepEndPct.toFixed(3)}% { transform: ${transform}; opacity: 1; }`;
-    }).join('\n')}
-  ${(((squareFractalSequence.length * squareLayerInterval) / squareCycleDuration) * 100).toFixed(3)}%, 100% { opacity: 0; }
+${[secondaryColor, color].map((layerFill, phaseIndex) => (
+        squareFractalSequence.map((layer, i) => {
+            const elapsedStart = (phaseIndex * squarePhaseDuration) + (i * squareLayerInterval);
+            const isFinalLayer = i === squareFractalSequence.length - 1;
+            const elapsedEnd = isFinalLayer
+                ? (phaseIndex + 1) * squarePhaseDuration
+                : (phaseIndex * squarePhaseDuration) + ((i + 1) * squareLayerInterval);
+            const stepStartPct = (elapsedStart / squareCycleDuration) * 100;
+            const stepEndPct = ((elapsedEnd / squareCycleDuration) * 100) - 0.001;
+            const transform = `rotate(${layer.rotation}deg) scale(${layer.size})`;
+            return `  ${stepStartPct.toFixed(3)}%, ${stepEndPct.toFixed(3)}% { transform: ${transform}; fill: ${layerFill}; opacity: 1; }`;
+        }).join('\n')
+    )).join('\n')}
+  100% { transform: rotate(${squareFractalSequence[0].rotation}deg) scale(${squareFractalSequence[0].size}); fill: ${secondaryColor}; opacity: 1; }
+}
+@keyframes l_square_fractal_base_${uid} {
+  0%, 49.999% { fill: ${color}; }
+  50%, 99.999% { fill: ${secondaryColor}; }
+  100% { fill: ${color}; }
 }`
         : '';
 
@@ -198,7 +206,7 @@ ${isTriangle ? `
     ) : null;
 
     const squareFractalDetail = isSmart && isSquare ? (
-        <g>
+        <g mask={`url(#mask_${uid})`}>
             <rect
                 x="49.5"
                 y="49.5"
@@ -321,6 +329,12 @@ ${isTriangle ? `
                     : (isSmart && isTwelvePointStar ? secondaryColor : color)),
         stroke: isStrokeBased ? color : 'none',
         strokeWidth: isStrokeBased ? (pathElem.props.strokeWidth || '12') : '0',
+        style: isSmart && isSquare
+            ? {
+                animation: `l_square_fractal_base_${uid} ${squareCycleDuration}s step-end infinite`,
+                willChange: 'fill',
+            }
+            : undefined,
     });
 
     return (
