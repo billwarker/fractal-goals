@@ -26,11 +26,11 @@ const GoalIcon = ({
         switch (s.toLowerCase()) {
             case 'square':
                 return {
-                    outer: <rect x="5" y="5" width="90" height="90" rx="8" />,
-                    middle: <rect x="22" y="22" width="56" height="56" rx="6" />,
-                    inner: <rect x="38" y="38" width="24" height="24" rx="4" />,
-                    core: <rect x="46" y="46" width="8" height="8" rx="2" />,
-                    full: <rect x="5" y="5" width="90" height="90" rx="8" />
+                    outer: <rect x="5" y="5" width="90" height="90" />,
+                    middle: <rect x="22" y="22" width="56" height="56" />,
+                    inner: <rect x="38" y="38" width="24" height="24" />,
+                    core: <rect x="46" y="46" width="8" height="8" />,
+                    full: <rect x="5" y="5" width="90" height="90" />
                 };
             case 'triangle':
                 // Each ring is a proportional triangle, uniformly spaced so all strokes appear equal width.

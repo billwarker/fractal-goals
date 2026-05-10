@@ -12,7 +12,7 @@ import React, { useId, useState } from 'react';
 // We use the exact path data from GoalIcon's "full" shape
 const getBasePath = (s) => {
     switch (s.toLowerCase()) {
-        case 'square': return <rect x="5" y="5" width="90" height="90" rx="8" />;
+        case 'square': return <rect x="5" y="5" width="90" height="90" />;
         case 'triangle': return <path d="M50 5 L95 85 L5 85 Z" />;
         case 'diamond': return <path d="M50 5 L95 50 L50 95 L5 50 Z" />;
         case 'hexagon': return <path d="M50 5 L93.3 30 L93.3 70 L50 95 L6.7 70 L6.7 30 Z" />;
@@ -47,13 +47,42 @@ const AnimatedGoalIcon = ({
     const isStrokeBased = normalizedShape === 'check';
     const isCircle = normalizedShape === 'circle';
     const isTriangle = normalizedShape === 'triangle';
+    const isSquare = normalizedShape === 'square';
     const isTwelvePointStar = normalizedShape === 'twelvepointstar' || normalizedShape === 'twelve-point-star';
     const [trianglePhase, setTrianglePhase] = useState(0);
 
     const RING_LAYERS = 3;
 
+    const squareFractalBaseSize = 15;
+    const squareFractalGrowth = 1.4;
+    const squareFractalSequence = Array.from({ length: 6 }, (_, index) => ({
+        size: squareFractalBaseSize * (squareFractalGrowth ** index),
+        rotation: index % 2 === 0 ? 45 : 0,
+    })).map((layer) => {
+        return {
+            ...layer,
+            fill: secondaryColor,
+        };
+    });
+    const squareLayerInterval = reduced ? 1.4 : 1.0;
+    const squareHoldAfter = reduced ? 1.6 : 1.2;
+    const squareCycleDuration = squareLayerInterval * squareFractalSequence.length + squareHoldAfter;
+
+    const squareFractalKeyframes = isSquare
+        ? `
+@keyframes l_square_fractal_sequence_${uid} {
+${squareFractalSequence.map((layer, i) => {
+        const stepStartPct = ((i * squareLayerInterval) / squareCycleDuration) * 100;
+        const stepEndPct = ((((i + 1) * squareLayerInterval) / squareCycleDuration) * 100) - 0.001;
+        const transform = `rotate(${layer.rotation}deg) scale(${layer.size})`;
+        return `  ${stepStartPct.toFixed(3)}%, ${stepEndPct.toFixed(3)}% { transform: ${transform}; opacity: 1; }`;
+    }).join('\n')}
+  ${(((squareFractalSequence.length * squareLayerInterval) / squareCycleDuration) * 100).toFixed(3)}%, 100% { opacity: 0; }
+}`
+        : '';
+
     const buildKeyframes = () => `
-${!isTwelvePointStar && !isCircle && !isTriangle ? `
+${!isTwelvePointStar && !isCircle && !isTriangle && !isSquare ? `
 @keyframes l_ripple_tunnel_${uid} {
   0% { transform: scale(0.01); stroke-width: 1px; opacity: 0; }
   10% { opacity: 1; stroke-width: 5px; }
@@ -61,6 +90,7 @@ ${!isTwelvePointStar && !isCircle && !isTriangle ? `
   100% { transform: scale(1.1); stroke-width: 20px; opacity: 0; }
 }
 ` : ''}
+${isSquare ? squareFractalKeyframes : ''}
 ${isTriangle ? `
 @keyframes l_triangle_center_grow_${uid} {
   from { transform: scale(0.001); }
@@ -89,7 +119,7 @@ ${isTriangle ? `
 
     // Only generate the complex rippling rings for non-stroke shapes when isSmart is true.
     // The twelve-point star gets its own square-rotation detailing below.
-    if (!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && !isTriangle) {
+    if (!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && !isTriangle && !isSquare) {
         for (let i = 0; i < RING_LAYERS; i++) {
             const delay = (i / RING_LAYERS) * -duration;
             animatedRings.push(
@@ -165,6 +195,27 @@ ${isTriangle ? `
             </g>
             <circle cx="50" cy="50" r="6" fill={secondaryColor} stroke="none" />
         </>
+    ) : null;
+
+    const squareFractalDetail = isSmart && isSquare ? (
+        <g>
+            <rect
+                x="49.5"
+                y="49.5"
+                width="1"
+                height="1"
+                fill={secondaryColor}
+                stroke="none"
+                style={{
+                    transformOrigin: '50px 50px',
+                    transformBox: 'view-box',
+                    opacity: 0,
+                    animation: `l_square_fractal_sequence_${uid} ${squareCycleDuration}s linear infinite`,
+                    animationTimingFunction: 'step-end',
+                    willChange: 'transform, opacity',
+                }}
+            />
+        </g>
     ) : null;
 
     const meridianCount = 4;
@@ -299,7 +350,7 @@ ${isTriangle ? `
 
             {/* Render the SMART Detailing Ripples ON TOP of the base core,
                 masked exactly to the solid shape's geometry! */}
-            {!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && !isTriangle && (
+            {!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && !isTriangle && !isSquare && (
                 <g mask={`url(#mask_${uid})`}>
                     {animatedRings}
                 </g>
@@ -307,9 +358,10 @@ ${isTriangle ? `
             {twelvePointStarDetail}
             {circleGlobeDetail}
             {triangleTriforceDetail}
+            {squareFractalDetail}
 
             {/* Center Core Dot overlay for SMART goals */}
-            {!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && !isTriangle && React.cloneElement(pathElem, {
+            {!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && !isTriangle && !isSquare && React.cloneElement(pathElem, {
                 fill: color, // The very center is solid primary color again
                 stroke: 'none',
                 style: {
@@ -318,7 +370,7 @@ ${isTriangle ? `
                 }
             })}
             {/* Optional Outer Border to sharply define the edge against the background */}
-            {!isStrokeBased && !(isSmart && isTwelvePointStar) && !(isSmart && isTriangle) && React.cloneElement(pathElem, {
+            {!isStrokeBased && !(isSmart && isTwelvePointStar) && !(isSmart && isTriangle) && !(isSmart && isSquare) && React.cloneElement(pathElem, {
                 fill: 'none',
                 stroke: color,
                 strokeWidth: isCircle ? '3' : '4',
