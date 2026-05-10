@@ -5,7 +5,8 @@ import React, { useId } from 'react';
  *
  * Renders an animated SVG matching the specific static geometries of GoalIcon.
  * The "SMART mode ring/detailing" is brought to life as a continuous ripple tunnel
- * of the secondary color emerging from the solid primary core.
+ * of the secondary color emerging from the solid primary core. The twelve-point
+ * star uses rotating, nested squares to match its static SMART detailing.
  */
 
 // We use the exact path data from GoalIcon's "full" shape
@@ -42,24 +43,37 @@ const AnimatedGoalIcon = ({
 }) => {
     const uid = useId().replace(/:/g, '_');
     const pathElem = getBasePath(shape);
-    const isStrokeBased = shape.toLowerCase() === 'check';
+    const normalizedShape = shape.toLowerCase();
+    const isStrokeBased = normalizedShape === 'check';
+    const isTwelvePointStar = normalizedShape === 'twelvepointstar' || normalizedShape === 'twelve-point-star';
 
     const RING_LAYERS = 3;
 
     const buildKeyframes = () => `
+${!isTwelvePointStar ? `
 @keyframes l_ripple_tunnel_${uid} {
   0% { transform: scale(0.01); stroke-width: 1px; opacity: 0; }
   10% { opacity: 1; stroke-width: 5px; }
   85% { stroke-width: 16px; opacity: 1; }
   100% { transform: scale(1.1); stroke-width: 20px; opacity: 0; }
 }
+` : ''}
+@keyframes l_square_rotate_cw_${uid} {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes l_square_rotate_ccw_${uid} {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
 `;
 
     const duration = reduced ? 3.5 : 2.5;
     const animatedRings = [];
 
-    // Only generate the complex rippling rings for non-stroke shapes when isSmart is true
-    if (!isStrokeBased && isSmart) {
+    // Only generate the complex rippling rings for non-stroke shapes when isSmart is true.
+    // The twelve-point star gets its own square-rotation detailing below.
+    if (!isStrokeBased && isSmart && !isTwelvePointStar) {
         for (let i = 0; i < RING_LAYERS; i++) {
             const delay = (i / RING_LAYERS) * -duration;
             animatedRings.push(
@@ -80,8 +94,65 @@ const AnimatedGoalIcon = ({
         }
     }
 
+    const buildTwelvePointStarLayer = (squareSize, layerIndex) => {
+        const inset = (100 - squareSize) / 2;
+        const clockwise = Math.floor(layerIndex / 2) % 2 === 0;
+        const animationName = clockwise
+            ? `l_square_rotate_cw_${uid}`
+            : `l_square_rotate_ccw_${uid}`;
+
+        const rotations = [0, 30, 60];
+        const layerStyle = {
+            transformOrigin: '50px 50px',
+            transformBox: 'view-box',
+            animation: `${animationName} ${reduced ? 7 : 4.8}s linear infinite`,
+            willChange: 'transform',
+        };
+
+        const renderSquare = (baseRotation, squareIndex, rectProps) => (
+            <g
+                key={`${layerIndex}-${squareIndex}-${rectProps.fill || 'stroke'}`}
+                style={{
+                    transformOrigin: '50px 50px',
+                    transformBox: 'view-box',
+                    transform: `rotate(${baseRotation}deg)`,
+                }}
+            >
+                <rect
+                    x={inset}
+                    y={inset}
+                    width={squareSize}
+                    height={squareSize}
+                    strokeLinejoin="miter"
+                    style={layerStyle}
+                    {...rectProps}
+                />
+            </g>
+        );
+
+        return rotations.map((baseRotation, squareIndex) => (
+            renderSquare(baseRotation, squareIndex, {
+                fill: secondaryColor,
+                stroke: color,
+                strokeWidth: '5',
+            })
+        ));
+    };
+
+    const twelvePointStarDetail = isSmart && isTwelvePointStar ? (
+        <>
+            <g>{buildTwelvePointStarLayer(60, 0)}</g>
+            <g mask={`url(#mask_${uid})`}>
+                {[40, 20].map((squareSize, index) => (
+                    buildTwelvePointStarLayer(squareSize, index + 1)
+                ))}
+            </g>
+            <circle cx="50" cy="50" r="6" fill={secondaryColor} stroke="none" />
+        </>
+    ) : null;
+
     const baseCore = React.cloneElement(pathElem, {
-        fill: isStrokeBased ? 'none' : color,
+        fill: isStrokeBased ? 'none' : (isSmart && isTwelvePointStar ? secondaryColor : color),
         stroke: isStrokeBased ? color : 'none',
         strokeWidth: isStrokeBased ? (pathElem.props.strokeWidth || '12') : '0',
     });
@@ -110,24 +181,24 @@ const AnimatedGoalIcon = ({
 
             {/* Render the SMART Detailing Ripples ON TOP of the base core,
                 masked exactly to the solid shape's geometry! */}
-            {!isStrokeBased && isSmart && (
+            {!isStrokeBased && isSmart && !isTwelvePointStar && (
                 <g mask={`url(#mask_${uid})`}>
                     {animatedRings}
                 </g>
             )}
+            {twelvePointStarDetail}
 
             {/* Center Core Dot overlay for SMART goals */}
-            {!isStrokeBased && isSmart && React.cloneElement(pathElem, {
+            {!isStrokeBased && isSmart && !isTwelvePointStar && React.cloneElement(pathElem, {
                 fill: color, // The very center is solid primary color again
                 stroke: 'none',
                 style: {
-                    transformOrigin: shape.toLowerCase() === 'triangle' ? '50px 58px' : '50px 50px',
+                    transformOrigin: normalizedShape === 'triangle' ? '50px 58px' : '50px 50px',
                     transform: 'scale(0.18)'
                 }
             })}
-
             {/* Optional Outer Border to sharply define the edge against the background */}
-            {!isStrokeBased && React.cloneElement(pathElem, {
+            {!isStrokeBased && !(isSmart && isTwelvePointStar) && React.cloneElement(pathElem, {
                 fill: 'none',
                 stroke: color,
                 strokeWidth: '4',
