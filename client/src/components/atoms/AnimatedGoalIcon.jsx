@@ -45,12 +45,13 @@ const AnimatedGoalIcon = ({
     const pathElem = getBasePath(shape);
     const normalizedShape = shape.toLowerCase();
     const isStrokeBased = normalizedShape === 'check';
+    const isCircle = normalizedShape === 'circle';
     const isTwelvePointStar = normalizedShape === 'twelvepointstar' || normalizedShape === 'twelve-point-star';
 
     const RING_LAYERS = 3;
 
     const buildKeyframes = () => `
-${!isTwelvePointStar ? `
+${!isTwelvePointStar && !isCircle ? `
 @keyframes l_ripple_tunnel_${uid} {
   0% { transform: scale(0.01); stroke-width: 1px; opacity: 0; }
   10% { opacity: 1; stroke-width: 5px; }
@@ -66,6 +67,13 @@ ${!isTwelvePointStar ? `
   from { transform: rotate(0deg); }
   to { transform: rotate(-360deg); }
 }
+@keyframes l_globe_meridian_${uid} {
+  0%   { transform: scaleX(1); }
+  25%  { transform: scaleX(0); }
+  50%  { transform: scaleX(-1); }
+  75%  { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}
 `;
 
     const duration = reduced ? 3.5 : 2.5;
@@ -73,7 +81,7 @@ ${!isTwelvePointStar ? `
 
     // Only generate the complex rippling rings for non-stroke shapes when isSmart is true.
     // The twelve-point star gets its own square-rotation detailing below.
-    if (!isStrokeBased && isSmart && !isTwelvePointStar) {
+    if (!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle) {
         for (let i = 0; i < RING_LAYERS; i++) {
             const delay = (i / RING_LAYERS) * -duration;
             animatedRings.push(
@@ -151,8 +159,77 @@ ${!isTwelvePointStar ? `
         </>
     ) : null;
 
+    const meridianCount = 4;
+    const meridianDuration = reduced ? 20 : 14;
+    const globeTilt = -18;
+
+    const circleGlobeDetail = isCircle ? (
+        <g mask={`url(#mask_${uid})`}>
+            <g
+                style={{
+                    transformOrigin: '50px 50px',
+                    transformBox: 'view-box',
+                    transform: `rotate(${globeTilt}deg)`,
+                }}
+            >
+                {/* Latitude rings — static, evenly spaced across the sphere */}
+                <g>
+                    {[
+                        { cy: 22, ry: 3,   rx: 30 },
+                        { cy: 41, ry: 5.5, rx: 43 },
+                        { cy: 59, ry: 5.5, rx: 43 },
+                        { cy: 78, ry: 3,   rx: 30 },
+                    ].map((lat, i) => (
+                        <ellipse
+                            key={`lat-${i}`}
+                            cx="50"
+                            cy={lat.cy}
+                            rx={lat.rx}
+                            ry={lat.ry}
+                            fill="none"
+                            stroke={color}
+                            strokeWidth="3.5"
+                        />
+                    ))}
+                </g>
+
+                {/* Meridians — animated to simulate rotation around the vertical axis */}
+                <g>
+                    {Array.from({ length: meridianCount }).map((_, i) => {
+                        const delay = -(i / meridianCount) * meridianDuration;
+                        return (
+                            <g
+                                key={`mer-${i}`}
+                                style={{
+                                    transformOrigin: '50px 50px',
+                                    transformBox: 'view-box',
+                                    animation: `l_globe_meridian_${uid} ${meridianDuration}s linear ${delay}s infinite`,
+                                    willChange: 'transform',
+                                }}
+                            >
+                                <ellipse
+                                    cx="50"
+                                    cy="50"
+                                    rx="44"
+                                    ry="44"
+                                    fill="none"
+                                    stroke={color}
+                                    strokeWidth="4.5"
+                                />
+                            </g>
+                        );
+                    })}
+                </g>
+            </g>
+        </g>
+    ) : null;
+
     const baseCore = React.cloneElement(pathElem, {
-        fill: isStrokeBased ? 'none' : (isSmart && isTwelvePointStar ? secondaryColor : color),
+        fill: isStrokeBased
+            ? 'none'
+            : isCircle
+                ? secondaryColor
+                : (isSmart && isTwelvePointStar ? secondaryColor : color),
         stroke: isStrokeBased ? color : 'none',
         strokeWidth: isStrokeBased ? (pathElem.props.strokeWidth || '12') : '0',
     });
@@ -181,15 +258,16 @@ ${!isTwelvePointStar ? `
 
             {/* Render the SMART Detailing Ripples ON TOP of the base core,
                 masked exactly to the solid shape's geometry! */}
-            {!isStrokeBased && isSmart && !isTwelvePointStar && (
+            {!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && (
                 <g mask={`url(#mask_${uid})`}>
                     {animatedRings}
                 </g>
             )}
             {twelvePointStarDetail}
+            {circleGlobeDetail}
 
             {/* Center Core Dot overlay for SMART goals */}
-            {!isStrokeBased && isSmart && !isTwelvePointStar && React.cloneElement(pathElem, {
+            {!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && React.cloneElement(pathElem, {
                 fill: color, // The very center is solid primary color again
                 stroke: 'none',
                 style: {
@@ -201,7 +279,7 @@ ${!isTwelvePointStar ? `
             {!isStrokeBased && !(isSmart && isTwelvePointStar) && React.cloneElement(pathElem, {
                 fill: 'none',
                 stroke: color,
-                strokeWidth: '4',
+                strokeWidth: isCircle ? '3' : '4',
             })}
         </svg>
     );
