@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useId, useState } from 'react';
 
 /**
  * AnimatedGoalIcon Component
@@ -46,17 +46,25 @@ const AnimatedGoalIcon = ({
     const normalizedShape = shape.toLowerCase();
     const isStrokeBased = normalizedShape === 'check';
     const isCircle = normalizedShape === 'circle';
+    const isTriangle = normalizedShape === 'triangle';
     const isTwelvePointStar = normalizedShape === 'twelvepointstar' || normalizedShape === 'twelve-point-star';
+    const [trianglePhase, setTrianglePhase] = useState(0);
 
     const RING_LAYERS = 3;
 
     const buildKeyframes = () => `
-${!isTwelvePointStar && !isCircle ? `
+${!isTwelvePointStar && !isCircle && !isTriangle ? `
 @keyframes l_ripple_tunnel_${uid} {
   0% { transform: scale(0.01); stroke-width: 1px; opacity: 0; }
   10% { opacity: 1; stroke-width: 5px; }
   85% { stroke-width: 16px; opacity: 1; }
   100% { transform: scale(1.1); stroke-width: 20px; opacity: 0; }
+}
+` : ''}
+${isTriangle ? `
+@keyframes l_triangle_center_grow_${uid} {
+  from { transform: scale(0.001); }
+  to { transform: scale(1); }
 }
 ` : ''}
 @keyframes l_square_rotate_cw_${uid} {
@@ -81,7 +89,7 @@ ${!isTwelvePointStar && !isCircle ? `
 
     // Only generate the complex rippling rings for non-stroke shapes when isSmart is true.
     // The twelve-point star gets its own square-rotation detailing below.
-    if (!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle) {
+    if (!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && !isTriangle) {
         for (let i = 0; i < RING_LAYERS; i++) {
             const delay = (i / RING_LAYERS) * -duration;
             animatedRings.push(
@@ -224,12 +232,42 @@ ${!isTwelvePointStar && !isCircle ? `
         </g>
     ) : null;
 
+    const triangleCentroidY = 175 / 3;
+    const triangleGrowDuration = reduced ? 6 : 4;
+    const triangleFlipped = trianglePhase % 2 === 1;
+    const trianglePrimary = triangleFlipped ? secondaryColor : color;
+    const triangleSecondary = triangleFlipped ? color : secondaryColor;
+    const coverInvertedTrianglePoints = `50 165 -40 5 140 5`;
+
+    const triangleTriforceDetail = isSmart && isTriangle ? (
+        <g clipPath={`url(#clip_${uid})`}>
+            <g
+                key={trianglePhase}
+                onAnimationEnd={() => setTrianglePhase((phase) => phase + 1)}
+                style={{
+                    transformOrigin: `50px ${triangleCentroidY}px`,
+                    transformBox: 'view-box',
+                    animation: `l_triangle_center_grow_${uid} ${triangleGrowDuration}s linear forwards`,
+                    willChange: 'transform',
+                }}
+            >
+                <polygon
+                    points={coverInvertedTrianglePoints}
+                    fill={triangleSecondary}
+                    stroke="none"
+                />
+            </g>
+        </g>
+    ) : null;
+
     const baseCore = React.cloneElement(pathElem, {
         fill: isStrokeBased
             ? 'none'
             : isCircle
                 ? secondaryColor
-                : (isSmart && isTwelvePointStar ? secondaryColor : color),
+                : (isSmart && isTriangle
+                    ? trianglePrimary
+                    : (isSmart && isTwelvePointStar ? secondaryColor : color)),
         stroke: isStrokeBased ? color : 'none',
         strokeWidth: isStrokeBased ? (pathElem.props.strokeWidth || '12') : '0',
     });
@@ -251,6 +289,9 @@ ${!isTwelvePointStar && !isCircle ? `
                     {/* The mask geometry: solid white means fully opaque (visible) */}
                     {React.cloneElement(pathElem, { fill: 'white', stroke: 'none' })}
                 </mask>
+                <clipPath id={`clip_${uid}`}>
+                    {React.cloneElement(pathElem, { fill: 'white', stroke: 'none' })}
+                </clipPath>
             </defs>
 
             {/* Render the Solid Primary Base FIRST so it is in the background */}
@@ -258,16 +299,17 @@ ${!isTwelvePointStar && !isCircle ? `
 
             {/* Render the SMART Detailing Ripples ON TOP of the base core,
                 masked exactly to the solid shape's geometry! */}
-            {!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && (
+            {!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && !isTriangle && (
                 <g mask={`url(#mask_${uid})`}>
                     {animatedRings}
                 </g>
             )}
             {twelvePointStarDetail}
             {circleGlobeDetail}
+            {triangleTriforceDetail}
 
             {/* Center Core Dot overlay for SMART goals */}
-            {!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && React.cloneElement(pathElem, {
+            {!isStrokeBased && isSmart && !isTwelvePointStar && !isCircle && !isTriangle && React.cloneElement(pathElem, {
                 fill: color, // The very center is solid primary color again
                 stroke: 'none',
                 style: {
@@ -276,7 +318,7 @@ ${!isTwelvePointStar && !isCircle ? `
                 }
             })}
             {/* Optional Outer Border to sharply define the edge against the background */}
-            {!isStrokeBased && !(isSmart && isTwelvePointStar) && React.cloneElement(pathElem, {
+            {!isStrokeBased && !(isSmart && isTwelvePointStar) && !(isSmart && isTriangle) && React.cloneElement(pathElem, {
                 fill: 'none',
                 stroke: color,
                 strokeWidth: isCircle ? '3' : '4',
