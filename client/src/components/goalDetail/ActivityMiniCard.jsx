@@ -9,6 +9,8 @@ const ActivityMiniCard = ({
     isProtectedByGroup,
     onRemove,
     renderMetricIndicators,
+    isSelectable = false,
+    onSelect,
 }) => {
     const hasDirectAssociation = activity.has_direct_association !== false;
     const isInheritedOnly = Boolean(activity.is_inherited) && !hasDirectAssociation;
@@ -29,11 +31,29 @@ const ActivityMiniCard = ({
     const cardClasses = [
         styles.miniCard,
         isInheritedOnly && styles.miniCardInherited,
+        isSelectable && styles.miniCardSelectable,
     ].filter(Boolean).join(' ');
+
+    const handleSelect = () => {
+        if (!isSelectable) return;
+        onSelect?.(activity);
+    };
+
+    const handleKeyDown = (event) => {
+        if (!isSelectable) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleSelect();
+        }
+    };
 
     return (
         <div
             className={cardClasses}
+            role={isSelectable ? 'button' : undefined}
+            tabIndex={isSelectable ? 0 : undefined}
+            onClick={handleSelect}
+            onKeyDown={handleKeyDown}
             title={
                 isInheritedOnly
                     ? `Inherited from ${activity.source_goal_name}`
@@ -51,7 +71,7 @@ const ActivityMiniCard = ({
                     )}
                     {activity.name}
                 </h4>
-                {hasDirectAssociation && !isProtectedByGroup && (
+                {hasDirectAssociation && !isProtectedByGroup && !isSelectable && (
                     <button
                         className={styles.removeBtn}
                         onClick={(event) => {

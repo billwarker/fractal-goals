@@ -20,11 +20,8 @@ function GoalEditForm({
     textColor,
     parentGoal,
     parentGoalName,
-    parentGoalColor,
     isCompleted,
     // Level selection in create mode
-    validChildTypes,
-    onLevelChange,
     // Form state from useGoalForm
     name, setName,
     description, setDescription,
@@ -48,6 +45,8 @@ function GoalEditForm({
     showActions = true,
     errors = {}
 }) {
+    const showInlineProgressManagers = mode === 'create';
+
     return (
         <div className={styles.editContainer}>
             <div className={styles.fieldGroup}>
@@ -117,60 +116,62 @@ function GoalEditForm({
 
             {/* How is progress measured? */}
             {(
-                <div className={styles.progressBox}>
-                    <label className={styles.label} style={{ marginBottom: '10px', color: 'var(--color-text-primary)' }}>
+                <div className={styles.fieldGroup}>
+                    <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
                         How is progress measured? (Select all that apply)
                     </label>
-                    <div className={styles.checkboxGroup}>
-                        <Checkbox
-                            label="Activities & Targets"
-                            checked={trackActivities}
-                            onChange={(e) => setTrackActivities(e.target.checked)}
-                            className={styles.checkboxLabel}
-                        />
-                        {isAboveShortTermGoal(goalType) && (
+                    <div className={styles.progressBox}>
+                        <div className={styles.checkboxGroup}>
                             <Checkbox
-                                label="Completed via Children"
-                                checked={completedViaChildren}
-                                onChange={(e) => setCompletedViaChildren(e.target.checked)}
+                                label="Activities & Targets"
+                                checked={trackActivities}
+                                onChange={(e) => setTrackActivities(e.target.checked)}
                                 className={styles.checkboxLabel}
                             />
-                        )}
-                        <Checkbox
-                            label="Manual Completion"
-                            checked={allowManualCompletion}
-                            onChange={(e) => setAllowManualCompletion(e.target.checked)}
-                            className={styles.checkboxLabel}
-                        />
-                    </div>
+                            {isAboveShortTermGoal(goalType) && (
+                                <Checkbox
+                                    label="Completed via Children"
+                                    checked={completedViaChildren}
+                                    onChange={(e) => setCompletedViaChildren(e.target.checked)}
+                                    className={styles.checkboxLabel}
+                                />
+                            )}
+                            <Checkbox
+                                label="Manual Completion"
+                                checked={allowManualCompletion}
+                                onChange={(e) => setAllowManualCompletion(e.target.checked)}
+                                className={styles.checkboxLabel}
+                            />
+                        </div>
 
-                    <div className={styles.infoList}>
-                        {trackActivities && (
-                            <div className={styles.infoItem}>
-                                <CheckIcon size={13} />
-                                <span>Goal is complete when target(s) are achieved.</span>
-                            </div>
-                        )}
+                        <div className={styles.infoList}>
+                            {trackActivities && (
+                                <div className={styles.infoItem}>
+                                    <CheckIcon size={13} />
+                                    <span>Goal is complete when target(s) are achieved.</span>
+                                </div>
+                            )}
 
-                        {completedViaChildren && (
-                            <div className={styles.infoItem}>
-                                <CheckIcon size={13} />
-                                <span>Goal is complete when all child goals are done (Delegated).</span>
-                            </div>
-                        )}
+                            {completedViaChildren && (
+                                <div className={styles.infoItem}>
+                                    <CheckIcon size={13} />
+                                    <span>Goal is complete when all child goals are done (Delegated).</span>
+                                </div>
+                            )}
 
-                        {allowManualCompletion && (
-                            <div className={styles.infoItem}>
-                                <CheckIcon size={13} />
-                                <span>Goal can be marked as complete by the user.</span>
-                            </div>
-                        )}
+                            {allowManualCompletion && (
+                                <div className={styles.infoItem}>
+                                    <CheckIcon size={13} />
+                                    <span>Goal can be marked as complete by the user.</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Associated Activities Section - Edit/Create Mode */}
-            {trackActivities && (
+            {/* Associated Activities Section - Create Mode */}
+            {trackActivities && showInlineProgressManagers && (
                 <Suspense fallback={null}>
                     <ActivityAssociator
                         associatedActivities={associatedActivities}
@@ -200,8 +201,8 @@ function GoalEditForm({
                 </Suspense>
             )}
 
-            {/* Targets Section - Edit/Create Mode */}
-            {trackActivities && (
+            {/* Targets Section - Create Mode */}
+            {trackActivities && showInlineProgressManagers && (
                 <Suspense fallback={null}>
                     <TargetManager
                         targets={targets}

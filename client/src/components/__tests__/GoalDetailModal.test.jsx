@@ -4,8 +4,9 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import GoalDetailModal from '../GoalDetailModal';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../../utils/navigationEvents';
 
-const { mockUseGoalForm, mockNotify, mockGoalAssociations, mockGoalMetrics, mockGoalDurations } = vi.hoisted(() => ({
+const { mockUseGoalForm, mockResetForm, mockNotify, mockGoalAssociations, mockGoalMetrics, mockGoalDurations } = vi.hoisted(() => ({
     mockUseGoalForm: vi.fn(),
+    mockResetForm: vi.fn(),
     mockNotify: {
         success: vi.fn(),
         error: vi.fn(),
@@ -129,20 +130,55 @@ vi.mock('../goalDetail/GoalTimelineView', () => ({
 vi.mock('../goalDetail/ActivityAssociator', async () => {
     const ReactModule = await vi.importActual('react');
 
-    function MockActivityAssociator({ registerAssociateAction }) {
+    function MockActivityAssociator({
+        registerAssociateAction,
+        isTargetSelectionMode,
+        onSelectTargetActivity,
+    }) {
         ReactModule.useEffect(() => {
             if (!registerAssociateAction) return undefined;
             registerAssociateAction(() => {});
             return () => registerAssociateAction(null);
         }, [registerAssociateAction]);
 
-        return ReactModule.createElement('div', null, 'goal activities view');
+        return ReactModule.createElement(
+            'div',
+            null,
+            ReactModule.createElement('div', null, 'goal activities view'),
+            isTargetSelectionMode
+                ? ReactModule.createElement(
+                    'button',
+                    {
+                        onClick: () => onSelectTargetActivity({
+                            id: 'activity-1',
+                            name: 'Performance',
+                            has_metrics: true,
+                            metric_definitions: [{ id: 'metric-1', name: 'Quality', unit: 'rating' }],
+                        }),
+                    },
+                    'select target activity'
+                )
+                : null
+        );
     }
 
     return {
         default: MockActivityAssociator,
     };
 });
+
+vi.mock('../goalDetail/TargetManager', () => ({
+    default: ({ viewMode, onCloseBuilder }) => (
+        viewMode === 'builder' ? (
+            <div>
+                <div>embedded target builder</div>
+                <button onClick={onCloseBuilder}>back to activities</button>
+            </div>
+        ) : (
+            <div>target list view</div>
+        )
+    ),
+}));
 
 vi.mock('../analytics/GenericGraphModal', () => ({
     default: () => null,
@@ -178,7 +214,7 @@ describe('GoalDetailModal smoke coverage', () => {
             setAllowManualCompletion: vi.fn(),
             targets: [],
             setTargets: vi.fn(),
-            resetForm: vi.fn(),
+            resetForm: mockResetForm,
             errors: {},
             validateForm: vi.fn(() => true),
         });
@@ -295,6 +331,14 @@ describe('GoalDetailModal smoke coverage', () => {
                 onToggleCompletion={vi.fn()}
                 onDelete={vi.fn()}
                 rootId="root-1"
+                activityDefinitions={[
+                    {
+                        id: 'activity-1',
+                        name: 'Performance',
+                        has_metrics: true,
+                        metric_definitions: [{ id: 'metric-1', name: 'Quality', unit: 'rating' }],
+                    },
+                ]}
                 treeData={{
                     id: 'root-1',
                     name: 'Root',
@@ -309,6 +353,89 @@ describe('GoalDetailModal smoke coverage', () => {
         await waitFor(() => {
             expect(screen.getByText('goal activities view')).toBeInTheDocument();
             expect(screen.getByRole('button', { name: '+ Associate Activities' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: '+ Add Target' })).toBeInTheDocument();
+        }, { timeout: 5000 });
+    });
+
+    it('selects an activity from the Activities tab before opening the embedded target builder', async () => {
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    attributes: { id: 'goal-1', type: 'ShortTermGoal', parent_id: 'parent-1' },
+                }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={vi.fn()}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root',
+                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
+                    children: [],
+                }}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Activities' }));
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: '+ Add Target' })).toBeInTheDocument();
+        }, { timeout: 5000 });
+
+        fireEvent.click(screen.getByRole('button', { name: '+ Add Target' }));
+
+        await waitFor(() => {
+            expect(screen.getByText('goal activities view')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'select target activity' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: '+ Add Target' })).not.toBeInTheDocument();
+        }, { timeout: 5000 });
+
+        fireEvent.click(screen.getByRole('button', { name: 'select target activity' }));
+
+        await waitFor(() => {
+            expect(screen.getByText('embedded target builder')).toBeInTheDocument();
+            expect(screen.queryByText('goal activities view')).not.toBeInTheDocument();
+        }, { timeout: 5000 });
+    });
+
+    it('cancels edit state when navigating from edit details to another tab', async () => {
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    attributes: { id: 'goal-1', type: 'ShortTermGoal', parent_id: 'parent-1' },
+                }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={vi.fn()}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                mode="edit"
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root',
+                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
+                    children: [],
+                }}
+            />
+        );
+
+        expect(screen.getByText('edit:Deep Work')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Activities' }));
+
+        await waitFor(() => {
+            expect(mockResetForm).toHaveBeenCalled();
+            expect(screen.getByText('goal activities view')).toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
         }, { timeout: 5000 });
     });
 

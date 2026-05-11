@@ -147,6 +147,10 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+.completionFooterMulti {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
 .completionFooterButton {
     width: 100%;
     min-height: 42px;
@@ -224,6 +228,10 @@
     .completionFooterSplit {
         grid-template-columns: 1fr;
     }
+
+    .completionFooterMulti {
+        grid-template-columns: 1fr;
+    }
 }
 
 @container (max-width: 520px) {
@@ -292,12 +300,9 @@
 
 .label {
     display: block;
-    margin-bottom: 4px;
-    /* var(--spacing-xs) is often 4px */
+    margin-bottom: 8px;
     font-size: var(--font-size-xs);
-    /* 12px */
     font-weight: bold;
-    /* Color dynamic in JS */
 }
 
 .input {
@@ -353,7 +358,7 @@
 .relevanceInfo {
     font-size: 11px;
     color: var(--color-text-secondary);
-    margin-bottom: 6px;
+    margin-bottom: 10px;
     font-style: italic;
 }
 

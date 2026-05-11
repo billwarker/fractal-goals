@@ -19,7 +19,6 @@ function GoalHeader({
     deadline,
     isCompact = false, // Prop to control collapsed state
     goalStatus = 'active',
-    headerActions = null,
     headerTabs = null,
     headerRef = null,
 }) {
@@ -144,8 +143,8 @@ function GoalHeader({
                 flexDirection: 'column',
                 gap: '10px'
             }}>
-                {/* Second Row: Badges, Status, and Header Actions */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', width: '100%' }}>
+                {/* Second Row: Badges, Status, and Dates */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', width: '100%' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
                         {mode === 'create' && (
                             <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
@@ -203,44 +202,39 @@ function GoalHeader({
                                 under "{parentGoal.name}"
                             </span>
                         )}
-                    </div>
 
-                    {headerActions}
+                        {(mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline || deadline)) && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                                {goal?.attributes?.created_at && (
+                                    <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Created</span>
+                                        <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
+                                            {formatDateInTimezone(goal.attributes.created_at, timezone, { month: 'short', day: 'numeric', year: 'numeric', hour: undefined, minute: undefined })}
+                                        </span>
+                                    </div>
+                                )}
+                                {(deadline || goal?.attributes?.deadline) && (
+                                    <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Due</span>
+                                        <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
+                                            {(() => {
+                                                const d = deadline || goal?.attributes?.deadline;
+                                                // Deadlines are often YYYY-MM-DD.
+                                                // If we use formatDateInTimezone on YYYY-MM-DD it treats it as UTC and shifts it.
+                                                // If it's YYYY-MM-DD we probably want to display it as is, or use the "local date" logic.
+                                                if (d && d.length === 10 && !d.includes('T')) {
+                                                    const [year, month, day] = d.split('-').map(Number);
+                                                    return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                                }
+                                                return formatDateInTimezone(d, timezone, { month: 'short', day: 'numeric', year: 'numeric' });
+                                            })()}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
-
-                {/* Third Row: Dates */}
-                {(mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline || deadline)) && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                            {goal?.attributes?.created_at && (
-                                <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Created</span>
-                                    <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-                                        {formatDateInTimezone(goal.attributes.created_at, timezone, { month: 'short', day: 'numeric', year: 'numeric', hour: undefined, minute: undefined })}
-                                    </span>
-                                </div>
-                            )}
-                            {(deadline || goal?.attributes?.deadline) && (
-                                <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Due</span>
-                                    <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
-                                        {(() => {
-                                            const d = deadline || goal?.attributes?.deadline;
-                                            // Deadlines are often YYYY-MM-DD.
-                                            // If we use formatDateInTimezone on YYYY-MM-DD it treats it as UTC and shifts it.
-                                            // If it's YYYY-MM-DD we probably want to display it as is, or use the "local date" logic.
-                                            if (d && d.length === 10 && !d.includes('T')) {
-                                                const [year, month, day] = d.split('-').map(Number);
-                                                return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                                            }
-                                            return formatDateInTimezone(d, timezone, { month: 'short', day: 'numeric', year: 'numeric' });
-                                        })()}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
             </div>
 
             {mode !== 'create' && headerTabs}

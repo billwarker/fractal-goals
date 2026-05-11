@@ -55,6 +55,8 @@ const ActivityAssociator = ({
     registerAssociateAction,
     dividerColor,
     onCopyActivity,
+    isTargetSelectionMode = false,
+    onSelectTargetActivity,
 }) => {
     const { createActivityGroup, setActivityGroupGoals } = useActivities();
 
@@ -464,6 +466,8 @@ const ActivityAssociator = ({
             isProtectedByGroup={isActivityProtectedByLinkedGroup(activity)}
             onRemove={handleRemoveActivity}
             renderMetricIndicators={renderMetricIndicators}
+            isSelectable={isTargetSelectionMode}
+            onSelect={onSelectTargetActivity}
         />
     );
 

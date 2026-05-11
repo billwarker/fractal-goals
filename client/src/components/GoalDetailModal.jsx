@@ -134,6 +134,10 @@ function GoalDetailModal({
     const [activitiesAssociateAction, setActivitiesAssociateAction] = useState(null);
     const [activityBuilderReturnView, setActivityBuilderReturnView] = useState('activity-associator');
     const [activityBuilderTemplate, setActivityBuilderTemplate] = useState(null);
+    const [embeddedTargetBuilderTarget, setEmbeddedTargetBuilderTarget] = useState(undefined);
+    const [embeddedTargetActivityId, setEmbeddedTargetActivityId] = useState(null);
+    const [isTargetSelectionMode, setIsTargetSelectionMode] = useState(false);
+    const [targetManagerReturnView, setTargetManagerReturnView] = useState('goal');
     const goalHeaderRef = React.useRef(null);
     const [goalHeaderStickyOffset, setGoalHeaderStickyOffset] = useState(0);
     // Reset when the parent changes (e.g. modal reused for a different goal)
@@ -454,6 +458,68 @@ function GoalDetailModal({
         setViewState(isCompleted ? 'uncomplete-confirm' : 'complete-confirm');
     };
 
+    const handleEditDetails = () => {
+        setViewState('goal');
+        setIsEditing(true);
+    };
+
+    const handleAddTargetFromActivities = () => {
+        setTargetToEdit(null);
+        setEmbeddedTargetActivityId(null);
+        setIsTargetSelectionMode(true);
+    };
+
+    const handleCloseEmbeddedTargetBuilder = () => {
+        setEmbeddedTargetBuilderTarget(undefined);
+        setEmbeddedTargetActivityId(null);
+        setIsTargetSelectionMode(false);
+    };
+
+    const handleSelectTargetActivity = (activity) => {
+        if (!activity?.id) return;
+        const fullActivity = activityDefinitions.find((candidate) => candidate.id === activity.id) || activity;
+        if (!Array.isArray(fullActivity.metric_definitions) || fullActivity.metric_definitions.length === 0) {
+            notify.error('Choose an activity with metrics to create a target.');
+            return;
+        }
+        setEmbeddedTargetActivityId(fullActivity.id);
+        setEmbeddedTargetBuilderTarget(null);
+        setIsTargetSelectionMode(false);
+    };
+
+    const handleCancelTargetSelection = () => {
+        setIsTargetSelectionMode(false);
+    };
+
+    const persistTargetChanges = (newTargets) => {
+        if (onUpdate && goalId) {
+            onUpdate(goalId, {
+                name,
+                description,
+                deadline,
+                relevance_statement: relevanceStatement,
+                targets: newTargets,
+                completed_via_children: completedViaChildren,
+                inherit_parent_activities: inheritParentActivities,
+                track_activities: trackActivities,
+                allow_manual_completion: allowManualCompletion,
+            });
+        }
+    };
+
+    const handleGoalViewNavigation = (nextViewState) => {
+        if (isEditing && viewState === 'goal' && nextViewState !== 'goal') {
+            resetForm();
+            setIsEditing(false);
+        }
+        if (nextViewState !== 'goal-activities') {
+            setEmbeddedTargetBuilderTarget(undefined);
+            setEmbeddedTargetActivityId(null);
+            setIsTargetSelectionMode(false);
+        }
+        setViewState(nextViewState);
+    };
+
     const canAddChildGoal = Boolean(onAddChild && childType && goalType !== 'ImmediateGoal' && !isCompleted);
 
     const handleAddChildGoal = () => {
@@ -597,6 +663,7 @@ function GoalDetailModal({
                         activityGroups={activityGroups} setActivityGroups={setActivityGroups}
                         setViewState={(view, target) => {
                             if (target) setTargetToEdit(target);
+                            if (view === 'target-manager') setTargetManagerReturnView('goal');
                             setViewState(view);
                         }}
                         refreshAssociations={refreshAssociations}
@@ -689,7 +756,7 @@ function GoalDetailModal({
                     initialTarget={targetToEdit}
                     onCloseBuilder={() => {
                         setTargetToEdit(null);
-                        setViewState('goal');
+                        setViewState(targetManagerReturnView);
                     }}
                     goalType={goalType}
                     goalCompleted={isCompleted}
@@ -704,7 +771,7 @@ function GoalDetailModal({
                                 inherit_parent_activities: inheritParentActivities,
                             });
                         }
-                        setViewState('goal');
+                        setViewState(targetManagerReturnView);
                     }}
                 />
             </Suspense>
@@ -753,41 +820,65 @@ function GoalDetailModal({
     } else if (viewState === 'goal-activities') {
         content = (
             <Suspense fallback={null}>
-                <ActivityAssociator
-                    associatedActivities={associatedActivities}
-                    setAssociatedActivities={setAssociatedActivities}
-                    associatedActivityGroups={associatedActivityGroups}
-                    setAssociatedActivityGroups={setAssociatedActivityGroups}
-                    activityDefinitions={activityDefinitions}
-                    activityGroups={activityGroups}
-                    setActivityGroups={setActivityGroups}
-                    rootId={rootId}
-                    goalId={goalId}
-                    parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
-                    goalName={name}
-                    setTargets={setTargets}
-                    isEditing={true}
-                    targets={targets}
-                    embedded
-                    useFooterAssociateAction
-                    registerAssociateAction={registerActivitiesAssociateAction}
-                    onClose={handleClose}
-                    onSave={persistAssociations}
-                    onRefreshAssociations={refreshAssociations}
-                    inheritParentActivities={inheritParentActivities}
-                    setInheritParentActivities={setInheritParentActivities}
-                    dividerColor={displayGoalColor}
-                    onCreateActivity={() => {
-                        setActivityBuilderReturnView('goal-activities');
-                        setActivityBuilderTemplate(null);
-                        setViewState('activity-builder');
-                    }}
-                    onCopyActivity={(activity) => {
-                        setActivityBuilderReturnView('goal-activities');
-                        setActivityBuilderTemplate(prepareActivityDefinitionCopy(activity));
-                        setViewState('activity-builder');
-                    }}
-                />
+                {embeddedTargetBuilderTarget !== undefined ? (
+                    <TargetManager
+                        targets={targets}
+                        setTargets={setTargets}
+                        activityDefinitions={activityDefinitions}
+                        associatedActivities={associatedActivities}
+                        goalId={goalId}
+                        rootId={rootId}
+                        isEditing
+                        viewMode="builder"
+                        key={embeddedTargetActivityId || embeddedTargetBuilderTarget?.id || 'target-builder'}
+                        initialTarget={embeddedTargetBuilderTarget}
+                        initialActivityId={embeddedTargetActivityId}
+                        lockActivitySelection={Boolean(embeddedTargetActivityId)}
+                        onCloseBuilder={handleCloseEmbeddedTargetBuilder}
+                        onSave={persistTargetChanges}
+                        headerColor="var(--color-text-primary)"
+                        goalType={goalType}
+                        goalCompleted={isCompleted}
+                    />
+                ) : (
+                    <ActivityAssociator
+                        associatedActivities={associatedActivities}
+                        setAssociatedActivities={setAssociatedActivities}
+                        associatedActivityGroups={associatedActivityGroups}
+                        setAssociatedActivityGroups={setAssociatedActivityGroups}
+                        activityDefinitions={activityDefinitions}
+                        activityGroups={activityGroups}
+                        setActivityGroups={setActivityGroups}
+                        rootId={rootId}
+                        goalId={goalId}
+                        parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
+                        goalName={name}
+                        setTargets={setTargets}
+                        isEditing={true}
+                        targets={targets}
+                        embedded
+                        useFooterAssociateAction
+                        registerAssociateAction={registerActivitiesAssociateAction}
+                        onClose={handleClose}
+                        onSave={persistAssociations}
+                        onRefreshAssociations={refreshAssociations}
+                        inheritParentActivities={inheritParentActivities}
+                        setInheritParentActivities={setInheritParentActivities}
+                        dividerColor={displayGoalColor}
+                        onCreateActivity={() => {
+                            setActivityBuilderReturnView('goal-activities');
+                            setActivityBuilderTemplate(null);
+                            setViewState('activity-builder');
+                        }}
+                        onCopyActivity={(activity) => {
+                            setActivityBuilderReturnView('goal-activities');
+                            setActivityBuilderTemplate(prepareActivityDefinitionCopy(activity));
+                            setViewState('activity-builder');
+                        }}
+                        isTargetSelectionMode={isTargetSelectionMode}
+                        onSelectTargetActivity={handleSelectTargetActivity}
+                    />
+                )}
             </Suspense>
         );
     } else if (viewState === 'activity-builder') {
@@ -866,35 +957,12 @@ function GoalDetailModal({
     const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline' || viewState === 'goal-activities')
         && !(needsLevelPicker && selectedChildType === null);
     if (shouldShowPersistentHeader) {
-        const headerActions = mode !== 'create' ? (
-            <div className={styles.headerActions}>
-                <button
-                    type="button"
-                    className={`${styles.headerActionButton} ${isEditing && viewState === 'goal' ? styles.headerActionActive : ''}`}
-                    onClick={() => {
-                        setViewState('goal');
-                        setIsEditing(true);
-                    }}
-                    style={{ '--goal-tab-accent': displayGoalColor }}
-                >
-                    Edit
-                </button>
-                <button
-                    type="button"
-                    className={`${styles.headerActionButton} ${viewState === 'goal-options' ? styles.headerActionActive : ''}`}
-                    onClick={() => setViewState('goal-options')}
-                    style={{ '--goal-tab-accent': displayGoalColor }}
-                >
-                    Options
-                </button>
-            </div>
-        ) : null;
         const headerTabs = mode !== 'create' ? (
             <div className={styles.goalTabRow} aria-label="Goal detail views">
                 <button
                     type="button"
                     className={`${styles.goalTabButton} ${viewState === 'goal' ? styles.goalTabActive : ''}`}
-                    onClick={() => setViewState('goal')}
+                    onClick={() => handleGoalViewNavigation('goal')}
                     style={{ '--goal-tab-accent': displayGoalColor }}
                 >
                     Details
@@ -902,7 +970,7 @@ function GoalDetailModal({
                 <button
                     type="button"
                     className={`${styles.goalTabButton} ${viewState === 'goal-timeline' ? styles.goalTabActive : ''}`}
-                    onClick={() => setViewState('goal-timeline')}
+                    onClick={() => handleGoalViewNavigation('goal-timeline')}
                     style={{ '--goal-tab-accent': displayGoalColor }}
                 >
                     Timeline
@@ -910,7 +978,7 @@ function GoalDetailModal({
                 <button
                     type="button"
                     className={`${styles.goalTabButton} ${viewState === 'goal-activities' ? styles.goalTabActive : ''}`}
-                    onClick={() => setViewState('goal-activities')}
+                    onClick={() => handleGoalViewNavigation('goal-activities')}
                     style={{ '--goal-tab-accent': displayGoalColor }}
                 >
                     Activities
@@ -918,7 +986,7 @@ function GoalDetailModal({
                 <button
                     type="button"
                     className={`${styles.goalTabButton} ${viewState === 'goal-notes' ? styles.goalTabActive : ''}`}
-                    onClick={() => setViewState('goal-notes')}
+                    onClick={() => handleGoalViewNavigation('goal-notes')}
                     style={{ '--goal-tab-accent': displayGoalColor }}
                 >
                     Notes
@@ -941,7 +1009,6 @@ function GoalDetailModal({
                     onCollapse={onMobileCollapse}
                     deadline={deadline}
                     goalStatus={goalStatus}
-                    headerActions={headerActions}
                     headerTabs={headerTabs}
                     headerRef={goalHeaderRef}
                 />
@@ -963,12 +1030,12 @@ function GoalDetailModal({
     const showEditFooter = viewState === 'goal'
         && mode !== 'create'
         && isEditing;
-    const showCompletionFooter = viewState === 'goal'
+    const showDetailFooter = viewState === 'goal'
         && mode !== 'create'
-        && !isEditing
-        && Boolean(onToggleCompletion);
+        && !isEditing;
     const showActivitiesFooter = viewState === 'goal-activities'
         && mode !== 'create'
+        && embeddedTargetBuilderTarget === undefined
         && Boolean(activitiesAssociateAction);
     const footerContent = showGoalNoteComposer ? (
         <SidePaneNotePanel
@@ -1006,7 +1073,7 @@ function GoalDetailModal({
         </div>
     ) : showActivitiesFooter ? (
         <div className={styles.completionFooter}>
-            <div className={styles.completionFooterActions}>
+            <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit}`}>
                 <button
                     type="button"
                     onClick={activitiesAssociateAction}
@@ -1018,11 +1085,44 @@ function GoalDetailModal({
                 >
                     + Associate Activities
                 </button>
+                <button
+                    type="button"
+                    onClick={isTargetSelectionMode ? handleCancelTargetSelection : handleAddTargetFromActivities}
+                    className={styles.completionFooterButton}
+                    style={{
+                        '--completion-accent': displayGoalColor,
+                        '--completion-text': 'var(--color-text-primary)',
+                    }}
+                >
+                    {isTargetSelectionMode ? 'Cancel' : '+ Add Target'}
+                </button>
             </div>
         </div>
-    ) : showCompletionFooter ? (
+    ) : showDetailFooter ? (
         <div className={styles.completionFooter}>
-            <div className={`${styles.completionFooterActions} ${canAddChildGoal ? styles.completionFooterSplit : ''}`}>
+            <div className={`${styles.completionFooterActions} ${styles.completionFooterMulti}`}>
+                <button
+                    type="button"
+                    onClick={handleEditDetails}
+                    className={styles.completionFooterButton}
+                    style={{
+                        '--completion-accent': displayGoalColor,
+                        '--completion-text': 'var(--color-text-primary)',
+                    }}
+                >
+                    Edit
+                </button>
+                <button
+                    type="button"
+                    onClick={() => handleGoalViewNavigation('goal-options')}
+                    className={styles.completionFooterButton}
+                    style={{
+                        '--completion-accent': displayGoalColor,
+                        '--completion-text': 'var(--color-text-primary)',
+                    }}
+                >
+                    Options
+                </button>
                 {canAddChildGoal && (
                     <button
                         type="button"
@@ -1036,19 +1136,21 @@ function GoalDetailModal({
                         + Add Child Goal
                     </button>
                 )}
-                <button
-                    type="button"
-                    onClick={handleCompletionFooterClick}
-                    disabled={!completionFooterState.canToggleCompletion}
-                    className={`${styles.completionFooterButton} ${isCompleted ? styles.completionFooterDone : ''} ${isPaused ? styles.completionFooterPaused : ''}`}
-                    style={{
-                        '--completion-accent': isCompleted ? completedColor : displayGoalColor,
-                        '--completion-secondary': isCompleted ? completedSecondaryColor : displayGoalSecondaryColor,
-                        '--completion-text': isCompleted ? completedTextColor : 'var(--color-text-primary)',
-                    }}
-                >
-                    {completionFooterState.label}
-                </button>
+                {onToggleCompletion && (
+                    <button
+                        type="button"
+                        onClick={handleCompletionFooterClick}
+                        disabled={!completionFooterState.canToggleCompletion}
+                        className={`${styles.completionFooterButton} ${isCompleted ? styles.completionFooterDone : ''} ${isPaused ? styles.completionFooterPaused : ''}`}
+                        style={{
+                            '--completion-accent': isCompleted ? completedColor : displayGoalColor,
+                            '--completion-secondary': isCompleted ? completedSecondaryColor : displayGoalSecondaryColor,
+                            '--completion-text': isCompleted ? completedTextColor : 'var(--color-text-primary)',
+                        }}
+                    >
+                        {completionFooterState.label}
+                    </button>
+                )}
             </div>
         </div>
     ) : null;

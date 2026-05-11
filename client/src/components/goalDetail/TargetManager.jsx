@@ -17,7 +17,6 @@ const TargetManager = ({
     activityDefinitions,
     associatedActivities,
     isEditing,
-    mode,
     rootId, // Required for fetching programs
     onSave, // Callback to persist changes if needed (e.g. immediate save in view mode)
     // New props for full view mode
@@ -28,6 +27,9 @@ const TargetManager = ({
     headerColor, // New prop for header color
     goalType = null,
     goalCompleted = false,
+    showAddButton = true,
+    initialActivityId = null,
+    lockActivitySelection = false,
 }) => {
     // Internal view state: 'list' | 'add' | 'edit' (still used for internal builder state)
     // BUT we prioritize props if provided for view switching
@@ -39,7 +41,7 @@ const TargetManager = ({
     // Form State
 
     // Form State
-    const [selectedActivityId, setSelectedActivityId] = useState(initialTarget?.activity_id || '');
+    const [selectedActivityId, setSelectedActivityId] = useState(initialTarget?.activity_id || initialActivityId || '');
     const [targetName, setTargetName] = useState(initialTarget?.name || '');
     const [targetDescription, setTargetDescription] = useState(initialTarget?.description || '');
 
@@ -81,7 +83,7 @@ const TargetManager = ({
     // Handlers
     const handleOpenAddTarget = () => {
         setEditingTarget(null);
-        setSelectedActivityId('');
+        setSelectedActivityId(initialActivityId || '');
         setTargetName('');
         setTargetDescription('');
         setMetricValues({});
@@ -250,47 +252,59 @@ const TargetManager = ({
                 </div>
 
                 {/* Activity Selector */}
-                <div>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa' }}>
-                        Activity *
-                    </label>
+                {lockActivitySelection ? (
+                    <div>
+                        <label className={styles.inputLabel}>
+                            Activity
+                        </label>
+                        <div className={styles.selectedActivityDisplay}>
+                            <CheckIcon size={13} />
+                            <span>{selectedActivity?.name || 'Selected activity'}</span>
+                        </div>
+                    </div>
+                ) : (
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa' }}>
+                            Activity *
+                        </label>
 
-                    {activitiesForTargets.length === 0 ? (
-                        <div style={{ fontSize: '11px', color: '#f44336', marginTop: '4px' }}>
-                            {associatedActivities.length === 0
-                                ? 'No activities associated with this goal. Add activities first before setting targets.'
-                                : 'No associated activities have metrics. Add metrics to activities or associate activities with metrics.'}
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {activitiesForTargets.map(activity => {
-                                const isSelected = selectedActivityId === activity.id;
-                                return (
-                                    <button
-                                        key={activity.id}
-                                        onClick={() => handleActivityChange(activity.id)}
-                                        style={{
-                                            padding: '6px 12px',
-                                            background: isSelected ? 'var(--color-bg-card-hover)' : 'var(--color-bg-input)',
-                                            border: `1px solid ${isSelected ? 'var(--color-success)' : 'var(--color-border)'}`,
-                                            borderRadius: '16px',
-                                            color: isSelected ? 'var(--color-success)' : 'var(--color-text-secondary)',
-                                            fontSize: '13px',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '6px'
-                                        }}
-                                    >
-                                        {isSelected && <CheckIcon size={13} />}
-                                        {activity.name}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+                        {activitiesForTargets.length === 0 ? (
+                            <div style={{ fontSize: '11px', color: '#f44336', marginTop: '4px' }}>
+                                {associatedActivities.length === 0
+                                    ? 'No activities associated with this goal. Add activities first before setting targets.'
+                                    : 'No associated activities have metrics. Add metrics to activities or associate activities with metrics.'}
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                {activitiesForTargets.map(activity => {
+                                    const isSelected = selectedActivityId === activity.id;
+                                    return (
+                                        <button
+                                            key={activity.id}
+                                            onClick={() => handleActivityChange(activity.id)}
+                                            style={{
+                                                padding: '6px 12px',
+                                                background: isSelected ? 'var(--color-bg-card-hover)' : 'var(--color-bg-input)',
+                                                border: `1px solid ${isSelected ? 'var(--color-success)' : 'var(--color-border)'}`,
+                                                borderRadius: '16px',
+                                                color: isSelected ? 'var(--color-success)' : 'var(--color-text-secondary)',
+                                                fontSize: '13px',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                            }}
+                                        >
+                                            {isSelected && <CheckIcon size={13} />}
+                                            {activity.name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Target Name */}
                 <div>
@@ -534,7 +548,7 @@ const TargetManager = ({
                         </span>
                     )}
                 </div>
-                {isEditing && (
+                {isEditing && showAddButton && (
                     <button
                         onClick={canAddTargets ? handleOpenAddTarget : undefined}
                         disabled={!canAddTargets}
@@ -561,7 +575,8 @@ const TargetManager = ({
                                     isCompleted={Boolean(target.completed || goalCompleted)}
                                     activityDefinitions={activityDefinitions}
                                     onEdit={undefined} // Handled by parent div click
-                                    onDelete={() => confirmAndDeleteTarget(target.id)}
+                                    onDelete={isEditing ? () => confirmAndDeleteTarget(target.id) : undefined}
+                                    isEditMode={isEditing}
                                     goalType={goalType}
                                 />
                             </div>

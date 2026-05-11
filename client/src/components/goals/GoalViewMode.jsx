@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { isGoalAssociatedWithBlock } from '../../utils/programGoalAssociations';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import GoalSmartSection from './GoalSmartSection';
-import GoalChildrenList from './GoalChildrenList';
 import styles from '../GoalDetailModal.module.css';
 
 const TargetManager = lazyWithRetry(() => import('../goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
@@ -20,20 +19,17 @@ function GoalViewMode({
     isCompleted,
     levelConfig,
     trackActivities,
-    childType,
     displayMode,
     programs,
     targets,
     associatedActivities,
     activityDefinitions,
-    treeData,
     name,
     description,
     deadline,
     relevanceStatement,
     // Handlers
     onClose,
-    onGoalSelect,
     onUpdate,
     setTargets,
 }) {
@@ -116,15 +112,6 @@ function GoalViewMode({
                     />
                 </Suspense>
             )}
-
-            {/* Associated Children Section */}
-            <GoalChildrenList
-                treeData={treeData}
-                goalId={goalId}
-                goalColor={goalColor}
-                childType={childType}
-                onGoalSelect={onGoalSelect}
-            />
         </div>
     );
 }
