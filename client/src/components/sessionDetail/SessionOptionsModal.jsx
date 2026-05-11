@@ -13,6 +13,10 @@ function SessionOptionsModal({
     sessionName,
     onCreateTemplate,
     onDuplicateSession,
+    onPauseResume,
+    onDelete,
+    isPaused = false,
+    isCompleted = false,
     isSavingTemplate = false,
     isDuplicatingSession = false,
 }) {
@@ -101,6 +105,46 @@ function SessionOptionsModal({
                                 disabled={isSavingTemplate}
                             >
                                 Duplicate Session
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className={styles.optionCard}>
+                        <div className={styles.optionHeader}>
+                            <div className={styles.optionCopy}>
+                                <Heading level={4} className={styles.optionTitle}>
+                                    {isPaused ? 'Resume Session' : 'Pause Session'}
+                                </Heading>
+                                <Text as="p" size="sm" className={styles.optionDescription}>
+                                    {isPaused
+                                        ? 'Continue tracking time and activity for this session.'
+                                        : 'Temporarily stop this session without marking it complete.'}
+                                </Text>
+                            </div>
+                            <Button
+                                variant="secondary"
+                                onClick={onPauseResume}
+                                disabled={isCompleted || isSavingTemplate || isDuplicatingSession}
+                            >
+                                {isPaused ? 'Resume Session' : 'Pause Session'}
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className={`${styles.optionCard} ${styles.dangerCard}`}>
+                        <div className={styles.optionHeader}>
+                            <div className={styles.optionCopy}>
+                                <Heading level={4} className={styles.optionTitle}>Delete Session</Heading>
+                                <Text as="p" size="sm" className={styles.optionDescription}>
+                                    Permanently remove this session and its tracked activity data.
+                                </Text>
+                            </div>
+                            <Button
+                                variant="danger"
+                                onClick={onDelete}
+                                disabled={isSavingTemplate || isDuplicatingSession}
+                            >
+                                Delete Session
                             </Button>
                         </div>
                     </div>

@@ -27,7 +27,7 @@ export function useSessionDetailUiState({ isMobile, addActivity, setSidePaneMode
 
         setSelectedActivity(instance);
         setSelectedSetIndex(null);
-        setSidePaneMode('goals');
+        setSidePaneMode('details');
         if (isMobile) setIsMobilePaneOpen(true);
     };
 

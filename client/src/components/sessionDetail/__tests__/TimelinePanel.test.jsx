@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, screen } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
-import HistoryPanel from '../HistoryPanel';
+import TimelinePanel from '../TimelinePanel';
 
 const useActivityHistory = vi.fn(() => ({
     history: [],
@@ -22,6 +22,16 @@ vi.mock('../../../hooks/useProgressHistory', () => ({
     useProgressHistory: (...args) => useProgressHistory(...args),
 }));
 
+vi.mock('../NoteTimeline', () => ({
+    default: ({ notes }) => (
+        <div>
+            {notes.map((note) => (
+                <div key={note.id}>{note.content}</div>
+            ))}
+        </div>
+    ),
+}));
+
 vi.mock('../../../contexts/TimezoneContext', async (importOriginal) => {
     const actual = await importOriginal();
     return {
@@ -35,7 +45,7 @@ const sessionActivityDefs = [
     { id: 'activity-def-2', name: 'Arpeggios', metric_definitions: [] },
 ];
 
-describe('HistoryPanel', () => {
+describe('TimelinePanel', () => {
     beforeEach(() => {
         useActivityHistory.mockClear();
         useProgressHistory.mockClear();
@@ -53,7 +63,7 @@ describe('HistoryPanel', () => {
 
     it('follows the focused session activity without a sync effect', () => {
         renderWithProviders(
-            <HistoryPanel
+            <TimelinePanel
                 rootId="root-1"
                 sessionId="session-1"
                 selectedActivity={{ activity_definition_id: 'activity-def-2' }}
@@ -77,7 +87,7 @@ describe('HistoryPanel', () => {
 
     it('preserves manual selection until the chosen activity disappears, then falls back', () => {
         const { rerender } = renderWithProviders(
-            <HistoryPanel
+            <TimelinePanel
                 rootId="root-1"
                 sessionId="session-1"
                 selectedActivity={null}
@@ -91,6 +101,8 @@ describe('HistoryPanel', () => {
             }
         );
 
+        fireEvent.click(screen.getByRole('button', { name: 'Activity' }));
+
         const select = screen.getByRole('combobox');
         expect(select).toHaveValue('activity-def-1');
 
@@ -98,7 +110,7 @@ describe('HistoryPanel', () => {
         expect(select).toHaveValue('activity-def-2');
 
         rerender(
-            <HistoryPanel
+            <TimelinePanel
                 rootId="root-1"
                 sessionId="session-1"
                 selectedActivity={null}
@@ -109,7 +121,38 @@ describe('HistoryPanel', () => {
         expect(screen.getByRole('combobox')).toHaveValue('activity-def-1');
     });
 
-    it('renders saved progress indicators alongside history metrics', () => {
+    it('shows session notes in session mode', () => {
+        renderWithProviders(
+            <TimelinePanel
+                rootId="root-1"
+                sessionId="session-1"
+                selectedActivity={{ activity_definition_id: 'activity-def-1' }}
+                sessionActivityDefs={sessionActivityDefs}
+                notes={[
+                    {
+                        id: 'note-1',
+                        context_type: 'session',
+                        content: 'Keep the wrist relaxed',
+                        created_at: '2026-04-10T12:00:00.000Z',
+                    },
+                ]}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Session' }));
+
+        expect(screen.getByText('Session Notes (1)')).toBeInTheDocument();
+        expect(screen.getByText('Keep the wrist relaxed')).toBeInTheDocument();
+        expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    });
+
+    it('renders saved progress indicators alongside timeline metrics', () => {
         useActivityHistory.mockReturnValue({
             history: [
                 {
@@ -145,7 +188,7 @@ describe('HistoryPanel', () => {
         });
 
         renderWithProviders(
-            <HistoryPanel
+            <TimelinePanel
                 rootId="root-1"
                 sessionId="session-1"
                 selectedActivity={{ activity_definition_id: 'activity-def-1' }}
@@ -169,7 +212,7 @@ describe('HistoryPanel', () => {
         expect(screen.getByText('(▲10%)')).toBeInTheDocument();
     });
 
-    it('uses progress tone, not delta sign, for absolute history indicators', () => {
+    it('uses progress tone, not delta sign, for absolute timeline indicators', () => {
         useActivityHistory.mockReturnValue({
             history: [
                 {
@@ -205,7 +248,7 @@ describe('HistoryPanel', () => {
         });
 
         renderWithProviders(
-            <HistoryPanel
+            <TimelinePanel
                 rootId="root-1"
                 sessionId="session-1"
                 selectedActivity={{ activity_definition_id: 'activity-def-1' }}
@@ -227,6 +270,6 @@ describe('HistoryPanel', () => {
         );
 
         const indicator = screen.getByText('(-5)');
-        expect(indicator.className).toMatch(/historyProgressImproved/);
+        expect(indicator.className).toMatch(/timelineProgressImproved/);
     });
 });

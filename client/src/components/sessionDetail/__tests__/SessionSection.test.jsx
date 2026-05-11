@@ -76,13 +76,16 @@ vi.mock('../../../hooks/useIsMobile', () => ({
 }));
 
 vi.mock('../SessionActivityItem', () => ({
-    default: () => <div>session activity item</div>,
+    default: ({ onFocus, exercise }) => (
+        <div onClick={() => onFocus(exercise, null)}>session activity item</div>
+    ),
 }));
 
 describe('SessionSection', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         sessionUiState.showActivitySelector = {};
+        sessionDataState.activityInstances = [];
         sessionDataState.groupedActivities = {
             'group-1': [sessionDataState.activities[0]],
         };
@@ -143,5 +146,70 @@ describe('SessionSection', () => {
                 }),
             ],
         }));
+    });
+
+    it('clears selected activity when clicking empty section space', () => {
+        const onFocusActivity = vi.fn();
+        sessionDataState.activityInstances = [
+            {
+                id: 'instance-1',
+                activity_definition_id: 'activity-1',
+            },
+        ];
+
+        const { container } = render(
+            <SessionSection
+                section={{ name: 'Main Practice', activity_ids: ['instance-1'], estimated_duration_minutes: 10 }}
+                sectionIndex={0}
+                onFocusActivity={onFocusActivity}
+                selectedActivityId="instance-1"
+                onOpenActivityBuilder={vi.fn()}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByText('session activity item'));
+        expect(onFocusActivity).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 'instance-1' }),
+            null
+        );
+
+        onFocusActivity.mockClear();
+        fireEvent.click(container.querySelector('[class*="sectionContainer"]'));
+        expect(onFocusActivity).toHaveBeenCalledWith(null, null);
+    });
+
+    it('does not clear selected activity when clicking section controls', () => {
+        const onFocusActivity = vi.fn();
+        sessionDataState.activityInstances = [
+            {
+                id: 'instance-1',
+                activity_definition_id: 'activity-1',
+            },
+        ];
+
+        render(
+            <SessionSection
+                section={{ name: 'Main Practice', activity_ids: ['instance-1'], estimated_duration_minutes: 10 }}
+                sectionIndex={0}
+                onFocusActivity={onFocusActivity}
+                selectedActivityId="instance-1"
+                onOpenActivityBuilder={vi.fn()}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '+ Add Activity' }));
+        expect(onFocusActivity).not.toHaveBeenCalled();
     });
 });

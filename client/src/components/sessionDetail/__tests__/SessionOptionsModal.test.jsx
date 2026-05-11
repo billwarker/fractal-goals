@@ -58,4 +58,28 @@ describe('SessionOptionsModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Duplicate Session' }));
         expect(onDuplicateSession).toHaveBeenCalledTimes(1);
     });
+
+    it('runs pause/resume and delete actions from options', () => {
+        const onPauseResume = vi.fn();
+        const onDelete = vi.fn();
+
+        renderWithProviders(
+            <SessionOptionsModal
+                isOpen
+                onClose={vi.fn()}
+                sessionName="Morning Workout"
+                onCreateTemplate={vi.fn()}
+                onDuplicateSession={vi.fn()}
+                onPauseResume={onPauseResume}
+                onDelete={onDelete}
+                isPaused={false}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Pause Session' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Delete Session' }));
+
+        expect(onPauseResume).toHaveBeenCalledTimes(1);
+        expect(onDelete).toHaveBeenCalledTimes(1);
+    });
 });

@@ -104,7 +104,10 @@
 
 .mobilePaneOverlay {
     position: fixed;
-    inset: 0;
+    top: 0;
+    right: 0;
+    bottom: var(--mobile-dock-reserved-space, 0);
+    left: 0;
     z-index: 1300;
     background: rgba(7, 12, 18, 0.58);
     display: grid;
@@ -117,6 +120,8 @@
     border-top-right-radius: var(--border-radius-xl);
     border: 1px solid var(--color-border);
     border-bottom: none;
+    height: 82vh;
+    height: 82dvh;
     max-height: 82vh;
     overflow: hidden;
     box-shadow: var(--shadow-lg);
@@ -208,6 +213,7 @@
 
 @media (max-width: 768px) {
     .sessionDetailContainer {
+        --mobile-dock-reserved-space: calc(76px + env(safe-area-inset-bottom));
         display: block;
         height: auto;
         min-height: calc(100vh - var(--app-nav-height, 0px));
@@ -291,12 +297,13 @@
         position: fixed;
         left: 12px;
         right: 12px;
-        bottom: 10px;
-        z-index: 1100;
+        bottom: max(10px, env(safe-area-inset-bottom));
+        z-index: 1400;
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
         padding: 8px;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom));
         background: var(--color-bg-elevated);
         border: 1px solid var(--color-border);
         border-radius: var(--border-radius-lg);

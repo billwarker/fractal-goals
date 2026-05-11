@@ -36,6 +36,10 @@
     color: var(--color-text-secondary);
 }
 
+.dangerCard {
+    border-color: color-mix(in srgb, var(--color-brand-danger) 42%, var(--color-border));
+}
+
 .inlineForm {
     display: flex;
     flex-direction: column;

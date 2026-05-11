@@ -1,7 +1,7 @@
 import React from 'react';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
-import GoalsPanel from '../GoalsPanel';
+import SessionGoalHierarchyPanel from '../SessionGoalHierarchyPanel';
 
 let activeSessionMock = {
     rootId: 'root-1',
@@ -63,10 +63,14 @@ vi.mock('../../../utils/api', () => ({
     }
 }));
 
-vi.mock('../TargetsSection', () => ({ default: () => <div>Targets</div> }));
+vi.mock('../TargetsSection', () => ({
+    default: ({ scopedActivityName }) => (
+        <div>{scopedActivityName ? `Targets: ${scopedActivityName}` : 'Targets'}</div>
+    ),
+}));
 vi.mock('../GoalRow', () => ({ default: () => <div /> }));
 
-describe('GoalsPanel smoke', () => {
+describe('SessionGoalHierarchyPanel smoke', () => {
     beforeEach(() => {
         activeSessionMock = {
             rootId: 'root-1',
@@ -97,7 +101,7 @@ describe('GoalsPanel smoke', () => {
 
     it('renders without runtime reference errors', async () => {
         renderWithProviders(
-            <GoalsPanel
+            <SessionGoalHierarchyPanel
                 selectedActivity={null}
                 onGoalClick={vi.fn()}
                 onGoalCreated={vi.fn()}
@@ -112,14 +116,14 @@ describe('GoalsPanel smoke', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByText('Session')).toBeInTheDocument();
+            expect(screen.getByText('Session Goals')).toBeInTheDocument();
         });
         expect(screen.queryByText('Session Focus')).not.toBeInTheDocument();
     });
 
-    it('defaults new activity contexts to activity mode without a sync effect', async () => {
-        const view = renderWithProviders(
-            <GoalsPanel
+    it('keeps the full session hierarchy visible when an activity is selected', async () => {
+        renderWithProviders(
+            <SessionGoalHierarchyPanel
                 selectedActivity={{
                     id: 'instance-1',
                     activity_definition_id: 'activity-1',
@@ -138,34 +142,12 @@ describe('GoalsPanel smoke', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByText('Activity')).toBeInTheDocument();
+            expect(screen.getByText('Goals: Pull Up')).toBeInTheDocument();
         });
-        expect(screen.getByText('Activity').className).toContain('activeToggleButton');
-
-        fireEvent.click(screen.getByText('Session'));
-        expect(screen.getByText('Session').className).toContain('activeToggleButton');
-
-        view.unmount();
-
-        renderWithProviders(
-            <GoalsPanel
-                selectedActivity={{
-                    id: 'instance-2',
-                    activity_definition_id: 'activity-1',
-                    name: 'Pull Up Variation'
-                }}
-                onGoalClick={vi.fn()}
-                onGoalCreated={vi.fn()}
-                onOpenGoals={vi.fn()}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false
-            }
-        );
-
-        expect(screen.getByText('Activity').className).toContain('activeToggleButton');
+        expect(screen.queryByText('Session Goals')).not.toBeInTheDocument();
+        expect(screen.getByText('Targets: Pull Up')).toBeInTheDocument();
+        expect(screen.getByText('STG')).toBeInTheDocument();
+        expect(screen.getByText('IG')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Activity' })).not.toBeInTheDocument();
     });
 });

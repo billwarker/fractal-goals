@@ -110,6 +110,13 @@ const SessionSection = ({
         setDraggedItem(null);
     };
 
+    const handleSectionClick = (event) => {
+        if (!selectedActivityId) return;
+        if (event.target.closest('[data-session-activity-card="true"]')) return;
+        if (event.target.closest('button, input, textarea, select, a, [role="button"]')) return;
+        onFocusActivity?.(null, null);
+    };
+
     const isSelectorOpen = Boolean(showActivitySelector[sectionIndex]);
     const closeSelector = () => {
         setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
@@ -143,6 +150,7 @@ const SessionSection = ({
 
     return (
         <div
+            onClick={handleSectionClick}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -190,6 +198,7 @@ const SessionSection = ({
                     return (
                         <div
                             key={instanceId}
+                            data-session-activity-card="true"
                             draggable
                             onDragStart={(e) => {
                                 e.dataTransfer.effectAllowed = 'move';

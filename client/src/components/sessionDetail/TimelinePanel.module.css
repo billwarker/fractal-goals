@@ -1,27 +1,66 @@
-/* HistoryPanel Styles */
+/* TimelinePanel Styles */
 
-.historyPanel {
+.timelinePanel {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    padding: var(--spacing-lg, 16px);
-    overflow-y: auto;
+    min-height: 0;
+    overflow: hidden;
 }
 
-.historySelector {
+.timelineModeToggle {
+    display: flex;
+    width: calc(100% - (var(--spacing-lg, 16px) * 2));
+    gap: 4px;
+    padding: 3px;
+    margin: var(--spacing-lg, 16px) var(--spacing-lg, 16px) 0;
+    border: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--color-bg-secondary) 72%, var(--color-bg-app));
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
+.timelineModeButton {
+    flex: 1;
+    min-height: 24px;
+    padding: 3px 12px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+.timelineModeButton:hover {
+    background: color-mix(in srgb, var(--color-bg-card) 55%, transparent);
+    color: var(--color-text-primary);
+}
+
+.timelineModeButtonActive {
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+}
+
+.timelineSelector {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    padding: 0 var(--spacing-lg, 16px);
+    flex-shrink: 0;
 }
 
-.historySelector label {
+.timelineSelector label {
     font-size: 11px;
     color: var(--color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
-.historySelector select {
+.timelineSelector select {
     width: 100%;
     padding: 10px 12px;
     background: var(--color-bg-input);
@@ -32,20 +71,40 @@
     cursor: pointer;
 }
 
-.historySelector select:focus {
+.timelineSelector select:focus {
     outline: none;
     border-color: var(--color-brand-success);
 }
 
-.historyContent {
+.timelineBody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 var(--spacing-lg, 16px);
+}
+
+.timelineSection {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 18px;
+}
+
+.timelineSectionHeader {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.timelineContent {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
-.historyLoading,
-.historyEmpty,
-.historyError {
+.timelineLoading,
+.timelineEmpty,
+.timelineError {
     text-align: center;
     color: var(--color-text-muted);
     font-size: 13px;
@@ -53,55 +112,62 @@
     font-style: italic;
 }
 
-.historyError {
+.timelineError {
     color: var(--color-brand-danger);
 }
 
-.historyList {
+.timelineList {
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
-/* History Card */
-.historyCard {
+.timelineComposer {
+    flex-shrink: 0;
+    padding: var(--spacing-md, 12px) var(--spacing-lg, 16px) var(--spacing-lg, 16px);
+    background: var(--color-bg-sidebar);
+    border-top: 1px solid var(--color-border);
+}
+
+/* Timeline Card */
+.timelineCard {
     background: var(--color-bg-card-alt);
     border-radius: 6px;
     padding: 12px;
     border: 1px solid var(--color-border);
 }
 
-.historyCardHeader {
+.timelineCardHeader {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 6px;
 }
 
-.historyCardDate {
+.timelineCardDate {
     font-size: 12px;
     color: var(--color-brand-success);
     font-weight: 500;
 }
 
-.historyCardDuration {
+.timelineCardDuration {
     font-size: 11px;
     color: var(--color-text-muted);
 }
 
-.historyCardSession {
+.timelineCardSession {
     font-size: 12px;
     color: var(--color-text-muted);
     margin-bottom: 8px;
 }
 
-.historyCardSets {
+.timelineCardSets {
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-.historySet {
+.timelineSet {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -110,10 +176,10 @@
     border-radius: 4px;
 }
 
-.historySetBest {
+.timelineSetBest {
 }
 
-.historySetYield {
+.timelineSetYield {
     margin-left: auto;
     font-size: 11px;
     font-weight: 600;
@@ -121,7 +187,7 @@
     white-space: nowrap;
 }
 
-.historyAggSummary {
+.timelineAggSummary {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
@@ -131,47 +197,47 @@
     font-size: 11px;
 }
 
-.historyAggItem {
+.timelineAggItem {
     display: flex;
     gap: 4px;
     align-items: baseline;
 }
 
-.historyAggLabel {
+.timelineAggLabel {
     color: var(--color-text-muted);
 }
 
-.historyAggValue {
+.timelineAggValue {
     font-weight: 600;
     color: var(--color-text-secondary);
 }
 
-.historySetNum {
+.timelineSetNum {
     font-size: 11px;
     color: var(--color-text-muted);
     min-width: 20px;
 }
 
-.historySetMetrics {
+.timelineSetMetrics {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
 }
 
-.historyCardMetrics {
+.timelineCardMetrics {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
 }
 
-.historyMetricRow {
+.timelineMetricRow {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     flex-wrap: nowrap;
 }
 
-.historyMetric {
+.timelineMetric {
     padding: 3px 8px;
     background: var(--color-bg-input);
     border-radius: 4px;
@@ -179,26 +245,26 @@
     color: var(--color-text-secondary);
 }
 
-.historyProgressIndicator {
+.timelineProgressIndicator {
     font-size: 12px;
     font-weight: 500;
     line-height: 1;
     white-space: nowrap;
 }
 
-.historyProgressImproved {
+.timelineProgressImproved {
     color: var(--color-brand-success);
 }
 
-.historyProgressRegressed {
+.timelineProgressRegressed {
     color: var(--color-brand-danger);
 }
 
-.historyProgressNeutral {
+.timelineProgressNeutral {
     color: var(--color-text-muted);
 }
 
-.historyCardNotes {
+.timelineCardNotes {
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--color-border);
@@ -241,7 +307,58 @@
 
 .noteContent {
     flex: 1;
+    min-width: 0;
     color: var(--color-text-secondary);
     font-size: 12px;
     font-style: normal;
+}
+
+@media (max-width: 480px) {
+    .timelinePanel {
+        gap: 12px;
+    }
+
+    .timelineModeToggle {
+        margin-top: var(--spacing-md, 12px);
+    }
+
+    .timelineCardHeader {
+        align-items: flex-start;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .timelineSet {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .timelineSetMetrics,
+    .timelineCardMetrics {
+        min-width: 0;
+    }
+
+    .timelineSetYield {
+        width: 100%;
+        margin-left: 28px;
+        white-space: normal;
+    }
+
+    .timelineMetricRow {
+        max-width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .timelineMetric {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .noteRow {
+        flex-wrap: wrap;
+    }
+
+    .noteContent {
+        flex-basis: 100%;
+    }
 }

@@ -6,14 +6,10 @@ import { useSessionSidePaneViewModel } from '../useSessionSidePaneViewModel';
 
 const {
     toggleSessionComplete,
-    pauseSession,
-    resumeSession,
     useActiveSessionData,
     useActiveSessionActions,
 } = vi.hoisted(() => ({
     toggleSessionComplete: vi.fn(),
-    pauseSession: vi.fn(),
-    resumeSession: vi.fn(),
     useActiveSessionData: vi.fn(),
     useActiveSessionActions: vi.fn(),
 }));
@@ -48,15 +44,12 @@ describe('useSessionSidePaneViewModel', () => {
         });
         useActiveSessionActions.mockReturnValue({
             toggleSessionComplete,
-            pauseSession,
-            resumeSession,
         });
     });
 
-    it('builds a narrow side-pane model with derived notes and history inputs', () => {
+    it('builds a narrow side-pane model with derived notes and timeline inputs', () => {
         const onModeChange = vi.fn();
         const onOptions = vi.fn();
-        const onDelete = vi.fn();
         const onNoteAdded = vi.fn();
         const onGoalClick = vi.fn();
         const onGoalCreated = vi.fn();
@@ -79,7 +72,6 @@ describe('useSessionSidePaneViewModel', () => {
             updateNote,
             deleteNote,
             onOptions,
-            onDelete,
             onOpenGoals,
             mode: 'details',
             onModeChange,
@@ -89,23 +81,8 @@ describe('useSessionSidePaneViewModel', () => {
         expect(result.current.onModeChange).toBe(onModeChange);
         expect(result.current.details).toMatchObject({
             isCompleted: false,
-            isPaused: false,
             onToggleComplete: toggleSessionComplete,
             onOptions,
-            onDelete,
-        });
-        expect(result.current.details.notesPanelProps).toMatchObject({
-            rootId: 'root-1',
-            sessionId: 'session-1',
-            selectedActivity,
-            selectedActivityDef: { id: 'activity-1', name: 'Squat' },
-            selectedSetIndex: 1,
-            notes: [{ id: 'note-1' }],
-            previousNotes: [{ id: 'prev-note-1' }],
-            previousSessionNotes: [{ id: 'prev-session-1' }],
-            addNote,
-            updateNote,
-            deleteNote,
         });
         expect(result.current.goals).toMatchObject({
             selectedActivity,
@@ -113,7 +90,7 @@ describe('useSessionSidePaneViewModel', () => {
             onGoalCreated,
             onOpenGoals,
         });
-        expect(result.current.history).toEqual({
+        expect(result.current.timeline).toEqual({
             rootId: 'root-1',
             sessionId: 'session-1',
             selectedActivity,
@@ -121,46 +98,14 @@ describe('useSessionSidePaneViewModel', () => {
                 { id: 'activity-1', name: 'Squat' },
                 { id: 'activity-2', name: 'Bench' },
             ],
+            onNoteAdded,
+            notes: [{ id: 'note-1' }],
+            previousSessionNotes: [{ id: 'prev-session-1' }],
+            addNote,
+            updateNote,
+            deleteNote,
+            pinNote: undefined,
+            unpinNote: undefined,
         });
-    });
-
-    it('uses resume when the session is paused', () => {
-        useActiveSessionData.mockReturnValueOnce({
-            rootId: 'root-1',
-            sessionId: 'session-1',
-            session: {
-                id: 'session-1',
-                is_paused: true,
-                attributes: {
-                    completed: true,
-                },
-            },
-            activityInstances: [],
-            activities: [],
-        });
-
-        const { result } = renderHook(() => useSessionSidePaneViewModel({
-            selectedActivity: null,
-            selectedSetIndex: null,
-            onNoteAdded: vi.fn(),
-            onGoalClick: vi.fn(),
-            onGoalCreated: vi.fn(),
-            notes: [],
-            previousNotes: [],
-            previousSessionNotes: [],
-            addNote: vi.fn(),
-            updateNote: vi.fn(),
-            deleteNote: vi.fn(),
-            onOptions: vi.fn(),
-            onDelete: vi.fn(),
-            onOpenGoals: vi.fn(),
-            mode: 'details',
-            onModeChange: vi.fn(),
-        }));
-
-        result.current.details.onPauseResume();
-
-        expect(resumeSession).toHaveBeenCalledTimes(1);
-        expect(pauseSession).not.toHaveBeenCalled();
     });
 });

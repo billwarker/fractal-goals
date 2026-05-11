@@ -35,6 +35,7 @@ describe('useSessionGoalsViewModel', () => {
         const { result } = renderHook(() => useSessionGoalsViewModel({
             sessionGoalsView,
             selectedActivity: { id: 'inst-1', activity_definition_id: 'activity-1' },
+            activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
             targetAchievements: new Map(),
             achievedTargetIds: new Set(),
         }));
@@ -74,6 +75,7 @@ describe('useSessionGoalsViewModel', () => {
         const { result } = renderHook(() => useSessionGoalsViewModel({
             sessionGoalsView,
             selectedActivity: { id: 'inst-1', activity_definition_id: 'activity-1' },
+            activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
             targetAchievements: new Map(),
             achievedTargetIds: new Set(),
         }));
@@ -113,6 +115,7 @@ describe('useSessionGoalsViewModel', () => {
         const { result } = renderHook(() => useSessionGoalsViewModel({
             sessionGoalsView,
             selectedActivity: { id: 'inst-1', activity_definition_id: 'activity-1' },
+            activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
             targetAchievements: new Map(),
             achievedTargetIds: new Set(),
         }));
@@ -156,14 +159,15 @@ describe('useSessionGoalsViewModel', () => {
                 ]
             },
             session_goal_ids: ['old', 'during', 'active'],
-            activity_goal_ids_by_activity: {},
-            session_activity_ids: []
+            activity_goal_ids_by_activity: { 'activity-1': ['old', 'during', 'active'] },
+            session_activity_ids: ['activity-1']
         };
 
         const { result } = renderHook(() => useSessionGoalsViewModel({
             session: { session_start: '2026-05-03T12:00:00Z' },
             sessionGoalsView,
             selectedActivity: null,
+            activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
             targetAchievements: new Map(),
             achievedTargetIds: new Set(),
         }));
@@ -172,6 +176,108 @@ describe('useSessionGoalsViewModel', () => {
         expect(names).not.toContain('Already Done');
         expect(names).toContain('Done During Session');
         expect(names).toContain('Active');
+    });
+
+    it('keeps completed ancestors when active session goals need their lineage', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root',
+                type: 'UltimateGoal',
+                name: 'Completed Root',
+                completed: true,
+                completed_at: '2026-05-01T12:00:00Z',
+                children: [
+                    {
+                        id: 'active',
+                        type: 'ImmediateGoal',
+                        name: 'Active Leaf',
+                        completed: false,
+                        children: []
+                    }
+                ]
+            },
+            session_goal_ids: ['active'],
+            activity_goal_ids_by_activity: { 'activity-1': ['active'] },
+            session_activity_ids: ['activity-1']
+        };
+
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            session: { session_start: '2026-05-03T12:00:00Z' },
+            sessionGoalsView,
+            selectedActivity: null,
+            activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+        }));
+
+        expect(result.current.sessionHierarchy.map((node) => node.name)).toEqual([
+            'Completed Root',
+            'Active Leaf',
+        ]);
+    });
+
+    it('returns an empty session hierarchy when the current session has no activities', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root',
+                type: 'UltimateGoal',
+                name: 'Root',
+                children: [
+                    {
+                        id: 'active',
+                        type: 'ImmediateGoal',
+                        name: 'Active Leaf',
+                        children: []
+                    }
+                ]
+            },
+            session_goal_ids: ['active'],
+            activity_goal_ids_by_activity: { 'activity-1': ['active'] },
+            session_activity_ids: ['activity-1']
+        };
+
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            sessionGoalsView,
+            selectedActivity: null,
+            activityInstances: [],
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+        }));
+
+        expect(result.current.sessionHierarchy).toEqual([]);
+        expect(result.current.sessionActivityIds.size).toBe(0);
+    });
+
+    it('uses section activity ids to exclude instances no longer shown in the session', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root',
+                type: 'UltimateGoal',
+                name: 'Root',
+                children: [
+                    {
+                        id: 'active',
+                        type: 'ImmediateGoal',
+                        name: 'Active Leaf',
+                        children: []
+                    }
+                ]
+            },
+            session_goal_ids: ['active'],
+            activity_goal_ids_by_activity: { 'activity-1': ['active'] },
+            session_activity_ids: ['activity-1']
+        };
+
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            sessionGoalsView,
+            selectedActivity: null,
+            activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
+            localSessionData: { sections: [{ activity_ids: [] }] },
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+        }));
+
+        expect(result.current.sessionHierarchy).toEqual([]);
     });
 
     it('excludes goals completed before the session start from the activity hierarchy', () => {
@@ -209,6 +315,7 @@ describe('useSessionGoalsViewModel', () => {
             session: { attributes: { session_start: '2026-05-03T12:00:00Z' } },
             sessionGoalsView,
             selectedActivity: { id: 'inst-1', activity_definition_id: 'activity-1' },
+            activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
             targetAchievements: new Map(),
             achievedTargetIds: new Set(),
         }));
@@ -241,13 +348,14 @@ describe('useSessionGoalsViewModel', () => {
                 ]
             },
             session_goal_ids: ['paused', 'active'],
-            activity_goal_ids_by_activity: {},
-            session_activity_ids: []
+            activity_goal_ids_by_activity: { 'activity-1': ['paused', 'active'] },
+            session_activity_ids: ['activity-1']
         };
 
         const { result } = renderHook(() => useSessionGoalsViewModel({
             sessionGoalsView,
             selectedActivity: null,
+            activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
             targetAchievements: new Map(),
             achievedTargetIds: new Set(),
         }));
@@ -289,6 +397,7 @@ describe('useSessionGoalsViewModel', () => {
         const { result } = renderHook(() => useSessionGoalsViewModel({
             sessionGoalsView,
             selectedActivity: { id: 'inst-1', activity_definition_id: 'activity-1' },
+            activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
             targetAchievements: new Map(),
             achievedTargetIds: new Set(),
         }));

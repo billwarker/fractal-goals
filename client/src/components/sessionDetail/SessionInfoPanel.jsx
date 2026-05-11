@@ -118,13 +118,15 @@ function SessionInfoPanel() {
 
             {/* Always visible summary */}
             <div className={styles.sessionInfoSummary}>
-                <div className={styles.sessionInfoRow}>
-                    <span className={styles.label}>Activity Duration:</span>
-                    <span className={`${styles.value} ${styles.duration}`}>{formatClockDuration(totalDuration, '—')}</span>
-                </div>
-                <div className={styles.sessionInfoRow}>
-                    <span className={styles.label}>Session Duration:</span>
-                    <span className={`${styles.value} ${styles.duration}`}>{liveDuration.formatted}</span>
+                <div className={styles.durationSummaryRow}>
+                    <span className={styles.durationSummaryItem}>
+                        <span className={styles.label}>Activity</span>
+                        <span className={`${styles.value} ${styles.duration}`}>{formatClockDuration(totalDuration, '—')}</span>
+                    </span>
+                    <span className={styles.durationSummaryItem}>
+                        <span className={styles.label}>Session</span>
+                        <span className={`${styles.value} ${styles.duration}`}>{liveDuration.formatted}</span>
+                    </span>
                 </div>
                 {session?.is_paused && (
                     <div className={styles.sessionInfoRow}>

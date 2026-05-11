@@ -3,8 +3,8 @@
  * 
  * Provides:
  * - Session info header (compact, expandable)
- * - Notes: Quick-add notes, timeline of session notes, previous session notes
- * - History: View previous activity instance metrics
+ * - Details: Session controls and goal hierarchy
+ * - Timeline: Activity history and session notes
  */
 
 import React from 'react';
@@ -12,9 +12,8 @@ import SessionInfoPanel from './SessionInfoPanel';
 import Button from '../atoms/Button';
 import SessionCompletionButton from '../common/SessionCompletionButton';
 import SidePaneHeader from '../common/SidePaneHeader';
-import GoalsPanel from './GoalsPanel';
-import NotesPanel from './NotesPanel';
-import HistoryPanel from './HistoryPanel';
+import SessionGoalHierarchyPanel from './SessionGoalHierarchyPanel';
+import TimelinePanel from './TimelinePanel';
 import styles from './SessionSidePane.module.css';
 
 function SessionSidePane({
@@ -26,7 +25,7 @@ function SessionSidePane({
     const onModeChange = model?.onModeChange;
     const details = model?.details;
     const goals = model?.goals;
-    const history = model?.history;
+    const timeline = model?.timeline;
 
     return (
         <div className={`${styles.sessionSidepane} ${embedded ? styles.sessionSidepaneEmbedded : ''}`}>
@@ -44,19 +43,11 @@ function SessionSidePane({
                         </button>
                         <button
                             type="button"
-                            className={`${styles.sidepaneTab} ${mode === 'goals' ? styles.sidepaneTabActive : ''}`}
-                            onClick={() => onModeChange('goals')}
-                            aria-pressed={mode === 'goals'}
+                            className={`${styles.sidepaneTab} ${mode === 'timeline' ? styles.sidepaneTabActive : ''}`}
+                            onClick={() => onModeChange('timeline')}
+                            aria-pressed={mode === 'timeline'}
                         >
-                            Goals
-                        </button>
-                        <button
-                            type="button"
-                            className={`${styles.sidepaneTab} ${mode === 'history' ? styles.sidepaneTabActive : ''}`}
-                            onClick={() => onModeChange('history')}
-                            aria-pressed={mode === 'history'}
-                        >
-                            History
+                            Timeline
                         </button>
                     </div>
                 </SidePaneHeader>
@@ -86,47 +77,34 @@ function SessionSidePane({
                                 >
                                     Options
                                 </Button>
-                                <Button
-                                    onClick={details?.onPauseResume}
-                                    variant="secondary"
-                                    title={details?.isPaused ? "Resume Session" : "Pause Session"}
-                                    disabled={details?.isCompleted}
-                                    className={styles.pauseButton}
-                                >
-                                    {details?.isPaused ? "Resume" : "Pause"}
-                                </Button>
-                                <Button
-                                    onClick={details?.onDelete}
-                                    variant="danger"
-                                    title="Delete Session"
-                                    className={styles.deleteButton}
-                                >
-                                    Delete
-                                </Button>
                             </div>
 
                             {/* Divider */}
                             <div className={styles.divider}></div>
                         </div>
 
-                        {/* Notes Management — fills remaining space, composer pinned to bottom */}
-                        <NotesPanel
-                            {...details?.notesPanelProps}
+                        <SessionGoalHierarchyPanel
+                            selectedActivity={goals?.selectedActivity}
+                            onGoalClick={goals?.onGoalClick}
+                            onGoalCreated={goals?.onGoalCreated}
+                            onOpenGoals={goals?.onOpenGoals}
+                            className={styles.detailsGoalHierarchy}
                         />
                     </div>
-                ) : mode === 'goals' ? (
-                    <GoalsPanel
-                        selectedActivity={goals?.selectedActivity}
-                        onGoalClick={goals?.onGoalClick}
-                        onGoalCreated={goals?.onGoalCreated}
-                        onOpenGoals={goals?.onOpenGoals}
-                    />
                 ) : (
-                    <HistoryPanel
-                        rootId={history?.rootId}
-                        sessionId={history?.sessionId}
-                        selectedActivity={history?.selectedActivity}
-                        sessionActivityDefs={history?.sessionActivityDefs}
+                    <TimelinePanel
+                        rootId={timeline?.rootId}
+                        sessionId={timeline?.sessionId}
+                        selectedActivity={timeline?.selectedActivity}
+                        sessionActivityDefs={timeline?.sessionActivityDefs}
+                        onNoteAdded={timeline?.onNoteAdded}
+                        notes={timeline?.notes}
+                        previousSessionNotes={timeline?.previousSessionNotes}
+                        addNote={timeline?.addNote}
+                        updateNote={timeline?.updateNote}
+                        deleteNote={timeline?.deleteNote}
+                        pinNote={timeline?.pinNote}
+                        unpinNote={timeline?.unpinNote}
                     />
                 )}
             </div>

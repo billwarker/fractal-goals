@@ -20,6 +20,8 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         toggleGoalCompletion,
         addActivity,
         deleteSession,
+        pauseSession,
+        resumeSession,
     } = useActiveSessionActions();
     const { sidePaneMode, setSidePaneMode: setSidePaneModeUi } = useActiveSessionUi();
     const {
@@ -106,6 +108,18 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         return duplicatedSession;
     };
 
+    const handlePauseResume = async () => {
+        if (session?.is_paused) {
+            return resumeSession();
+        }
+        return pauseSession();
+    };
+
+    const handleDeleteSessionRequest = () => {
+        setShowOptionsModal(false);
+        setShowDeleteConfirm(true);
+    };
+
     const sidePaneModel = useSessionSidePaneViewModel({
         selectedActivity,
         selectedSetIndex,
@@ -119,7 +133,6 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         updateNote,
         deleteNote,
         onOptions: () => setShowOptionsModal(true),
-        onDelete: () => setShowDeleteConfirm(true),
         onOpenGoals: handleOpenGoals,
         mode: sidePaneMode,
         onModeChange: setSidePaneModeUi,
@@ -171,6 +184,8 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         setShowOptionsModal,
         handleCreateTemplate,
         handleDuplicateSession,
+        handlePauseResume,
+        handleDeleteSessionRequest,
         isSavingTemplate,
         isDuplicatingSession,
     };

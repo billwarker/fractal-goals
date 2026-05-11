@@ -65,6 +65,21 @@
     font-size: var(--font-size-xs);
 }
 
+.durationSummaryRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: var(--font-size-xs);
+}
+
+.durationSummaryItem {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
 .label {
     color: var(--color-text-muted);
 }

@@ -1,7 +1,7 @@
 /**
- * HistoryPanel - Activity history mode for SessionSidePane
+ * TimelinePanel - Session detail timeline adapter
  * 
- * Shows previous instances of the selected activity with their metrics.
+ * Combines activity progress timeline data with session notes inside a reusable shell.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -10,15 +10,22 @@ import { useProgressHistory } from '../../hooks/useProgressHistory';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
 import { useEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import TimelineShell from '../common/TimelineShell';
 import MarkdownNoteContent from '../notes/MarkdownNoteContent';
+import NoteQuickAdd from './NoteQuickAdd';
+import NoteTimeline from './NoteTimeline';
 import {
     computeAutoAggregations,
     filterTrackedMetricDefs,
     formatAggValue,
 } from '../../utils/progressAggregations';
-import styles from './HistoryPanel.module.css';
+import styles from './TimelinePanel.module.css';
 
 const HISTORY_LIMIT = 10;
+const TIMELINE_MODES = [
+    { value: 'activity', label: 'Activity' },
+    { value: 'session', label: 'Session' },
+];
 
 function formatMetricNumber(value) {
     if (value == null || Number.isNaN(Number(value))) return null;
@@ -27,12 +34,33 @@ function formatMetricNumber(value) {
     return numericValue.toFixed(1).replace(/\.0$/, '');
 }
 
-function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs }) {
+function TimelinePanel({
+    rootId,
+    sessionId,
+    selectedActivity,
+    sessionActivityDefs,
+    onNoteAdded,
+    notes = [],
+    previousSessionNotes = [],
+    addNote,
+    updateNote,
+    deleteNote,
+    pinNote,
+    unpinNote,
+}) {
     const [manualSelectedActivityId, setManualSelectedActivityId] = useState(null);
+    const [selectedNoteId, setSelectedNoteId] = useState(null);
+    const [viewModeOverrides, setViewModeOverrides] = useState({});
     const availableActivityIds = useMemo(
         () => sessionActivityDefs.map((definition) => definition.id),
         [sessionActivityDefs]
     );
+    const viewModeKey = selectedActivity?.id || selectedActivity?.activity_definition_id || 'session';
+    const viewMode = viewModeOverrides[viewModeKey] || (selectedActivity ? 'activity' : 'session');
+    const setViewMode = (nextMode) => {
+        setViewModeOverrides((previous) => ({ ...previous, [viewModeKey]: nextMode }));
+    };
+
     const selectedActivityId = useMemo(() => {
         const focusedActivityId = selectedActivity?.activity_definition_id;
         if (focusedActivityId && availableActivityIds.includes(focusedActivityId)) {
@@ -87,63 +115,147 @@ function HistoryPanel({ rootId, sessionId, selectedActivity, sessionActivityDefs
     const selectedDef = sessionActivityDefs.find(d => d.id === selectedActivityId);
     const deltaDisplayMode = useEffectiveDeltaDisplayMode(selectedDef, progressSettings);
 
-    return (
-        <div className={styles.historyPanel}>
-            {/* Activity Selector */}
-            <div className={styles.historySelector}>
-                <label>Select Activity:</label>
-                <select
-                    value={selectedActivityId || ''}
-                    onChange={(e) => setManualSelectedActivityId(e.target.value || null)}
-                >
-                    {sessionActivityDefs.length === 0 ? (
-                        <option value="">No activities in session</option>
-                    ) : (
-                        sessionActivityDefs.map(def => (
-                            <option key={def.id} value={def.id}>
-                                {def.name}
-                            </option>
-                        ))
-                    )}
-                </select>
-            </div>
+    const combinedNotes = useMemo(() => {
+        const currentSessionNotes = notes.filter(n => n.context_type === 'session');
+        let allNotes = [...currentSessionNotes];
 
-            {/* History Content */}
-            <div className={styles.historyContent}>
-                {!selectedActivityId ? (
-                    <div className={styles.historyEmpty}>
-                        Select an activity to view previous sessions
-                    </div>
-                ) : (loading || progressLoading) ? (
-                    <div className={styles.historyLoading}>Loading history...</div>
-                ) : (error || progressError) ? (
-                    <div className={styles.historyError}>Error: {error || progressError?.message || progressError}</div>
-                ) : history.length > 0 ? (
-                    <div className={styles.historyList}>
-                        {history.map(instance => (
-                            <ActivityHistoryCard
-                                key={instance.id}
-                                instance={instance}
-                                activityDef={selectedDef}
-                                progressRecord={
-                                    progressByInstanceId.get(instance.id)
-                                    || progressByInstanceId.get(instance.activity_instance_id)
-                                    || progressByInstanceId.get(instance.instance_id)
-                                    || null
-                                }
-                                formatDate={formatDate}
-                                timezone={timezone}
-                                deltaDisplayMode={deltaDisplayMode}
-                            />
-                        ))}
-                    </div>
+        if (previousSessionNotes && previousSessionNotes.length > 0) {
+            previousSessionNotes.forEach(sessionNoteGroup => {
+                const pastNotes = (sessionNoteGroup.notes || []).map(n => ({
+                    ...n,
+                    isPast: true,
+                    session_name: sessionNoteGroup.session_name,
+                    session_date: sessionNoteGroup.session_date
+                }));
+                allNotes = [...allNotes, ...pastNotes];
+            });
+        }
+
+        return allNotes.sort((a, b) => {
+            if (a.is_pinned !== b.is_pinned) {
+                return a.is_pinned ? -1 : 1;
+            }
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
+    }, [notes, previousSessionNotes]);
+
+    const handleAddNote = async (content) => {
+        if (!addNote) return;
+        try {
+            await addNote({
+                context_type: 'session',
+                context_id: sessionId,
+                session_id: sessionId,
+                content,
+            });
+            onNoteAdded?.();
+        } catch (err) {
+            console.error('Failed to add note:', err);
+        }
+    };
+
+    const activitySelector = viewMode === 'activity' ? (
+        <div className={styles.timelineSelector}>
+            <label>Select Activity:</label>
+            <select
+                value={selectedActivityId || ''}
+                onChange={(e) => setManualSelectedActivityId(e.target.value || null)}
+            >
+                {sessionActivityDefs.length === 0 ? (
+                    <option value="">No activities in session</option>
                 ) : (
-                    <div className={styles.historyEmpty}>
-                        No previous sessions found for {selectedDef?.name || 'this activity'}
-                    </div>
+                    sessionActivityDefs.map(def => (
+                        <option key={def.id} value={def.id}>
+                            {def.name}
+                        </option>
+                    ))
                 )}
-            </div>
+            </select>
         </div>
+    ) : null;
+
+    const composer = viewMode === 'session' ? (
+        <NoteQuickAdd
+            onSubmit={handleAddNote}
+            placeholder="Add a session note..."
+        />
+    ) : null;
+
+    return (
+        <TimelineShell
+            className={styles.timelinePanel}
+            modeToggleClassName={styles.timelineModeToggle}
+            modeButtonClassName={styles.timelineModeButton}
+            modeButtonActiveClassName={styles.timelineModeButtonActive}
+            bodyClassName={styles.timelineBody}
+            composerClassName={styles.timelineComposer}
+            modes={TIMELINE_MODES}
+            activeMode={viewMode}
+            onModeChange={setViewMode}
+            selector={activitySelector}
+            composer={composer}
+        >
+            {viewMode === 'session' ? (
+                <section className={styles.timelineSection}>
+                    <div className={styles.timelineSectionHeader}>
+                        Session Notes
+                        {combinedNotes.length > 0 && ` (${combinedNotes.length})`}
+                    </div>
+                    {combinedNotes.length > 0 ? (
+                        <NoteTimeline
+                            notes={combinedNotes}
+                            onUpdate={updateNote}
+                            onDelete={deleteNote}
+                            onPin={pinNote}
+                            onUnpin={unpinNote}
+                            compact={false}
+                            selectedNoteId={selectedNoteId}
+                            onNoteSelect={setSelectedNoteId}
+                        />
+                    ) : (
+                        <div className={styles.timelineEmpty}>No session notes yet</div>
+                    )}
+                </section>
+            ) : (
+                <section className={styles.timelineSection}>
+                    <div className={styles.timelineSectionHeader}>Activity Timeline</div>
+                    <div className={styles.timelineContent}>
+                        {!selectedActivityId ? (
+                            <div className={styles.timelineEmpty}>
+                                Select an activity to view previous sessions
+                            </div>
+                        ) : (loading || progressLoading) ? (
+                            <div className={styles.timelineLoading}>Loading timeline...</div>
+                        ) : (error || progressError) ? (
+                            <div className={styles.timelineError}>Error: {error || progressError?.message || progressError}</div>
+                        ) : history.length > 0 ? (
+                            <div className={styles.timelineList}>
+                                {history.map(instance => (
+                                    <ActivityHistoryCard
+                                        key={instance.id}
+                                        instance={instance}
+                                        activityDef={selectedDef}
+                                        progressRecord={
+                                            progressByInstanceId.get(instance.id)
+                                            || progressByInstanceId.get(instance.activity_instance_id)
+                                            || progressByInstanceId.get(instance.instance_id)
+                                            || null
+                                        }
+                                        formatDate={formatDate}
+                                        timezone={timezone}
+                                        deltaDisplayMode={deltaDisplayMode}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className={styles.timelineEmpty}>
+                                No previous sessions found for {selectedDef?.name || 'this activity'}
+                            </div>
+                        )}
+                    </div>
+                </section>
+            )}
+        </TimelineShell>
     );
 }
 
@@ -300,16 +412,16 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
 
     const renderMetricRow = (label, indicator) => {
         const indicatorClassName = indicator?.tone === 'improved'
-            ? styles.historyProgressImproved
+            ? styles.timelineProgressImproved
             : indicator?.tone === 'regressed'
-                ? styles.historyProgressRegressed
-                : styles.historyProgressNeutral;
+                ? styles.timelineProgressRegressed
+                : styles.timelineProgressNeutral;
 
         return (
-            <span className={styles.historyMetricRow}>
-                <span className={styles.historyMetric}>{label}</span>
+            <span className={styles.timelineMetricRow}>
+                <span className={styles.timelineMetric}>{label}</span>
                 {indicator ? (
-                    <span className={`${styles.historyProgressIndicator} ${indicatorClassName}`}>
+                    <span className={`${styles.timelineProgressIndicator} ${indicatorClassName}`}>
                         {indicator.label}
                     </span>
                 ) : null}
@@ -318,32 +430,32 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
     };
 
     return (
-        <div className={styles.historyCard}>
-            <div className={styles.historyCardHeader}>
-                <span className={styles.historyCardDate}>
+        <div className={styles.timelineCard}>
+            <div className={styles.timelineCardHeader}>
+                <span className={styles.timelineCardDate}>
                     {formatDate(instance.session_date || instance.created_at)}
                 </span>
                 {duration && (
-                    <span className={styles.historyCardDuration}>⏱ {duration}</span>
+                    <span className={styles.timelineCardDuration}>⏱ {duration}</span>
                 )}
             </div>
 
             {instance.session_name && (
-                <div className={styles.historyCardSession}>
+                <div className={styles.timelineCardSession}>
                     {instance.session_name}
                 </div>
             )}
 
             {/* Display sets if present */}
             {sets.length > 0 && (
-                <div className={styles.historyCardSets}>
+                <div className={styles.timelineCardSets}>
                     {sets.map((set, idx) => (
                         <div
                             key={set.instance_id || idx}
-                            className={`${styles.historySet} ${autoAgg?.best_set_index === idx ? styles.historySetBest : ''}`}
+                            className={`${styles.timelineSet} ${autoAgg?.best_set_index === idx ? styles.timelineSetBest : ''}`}
                         >
-                            <span className={styles.historySetNum}>#{idx + 1}</span>
-                            <div className={styles.historySetMetrics}>
+                            <span className={styles.timelineSetNum}>#{idx + 1}</span>
+                            <div className={styles.timelineSetMetrics}>
                                 {set.metrics?.map((m, mIdx) => {
                                     const def = activityDef?.metric_definitions?.find(d => d.id === m.metric_id);
                                     const metricLabel = (
@@ -367,15 +479,15 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
                                     ? renderYieldDelta(currYield, prevYield)
                                     : null;
                                 const indicatorClass = indicator?.tone === 'improved'
-                                    ? styles.historyProgressImproved
+                                    ? styles.timelineProgressImproved
                                     : indicator?.tone === 'regressed'
-                                        ? styles.historyProgressRegressed
-                                        : styles.historyProgressNeutral;
+                                        ? styles.timelineProgressRegressed
+                                        : styles.timelineProgressNeutral;
                                 return (
-                                    <span className={styles.historySetYield}>
+                                    <span className={styles.timelineSetYield}>
                                         Yield: {formatAggValue(currYield)}
                                         {indicator && (
-                                            <span className={`${styles.historyProgressIndicator} ${indicatorClass}`}>
+                                            <span className={`${styles.timelineProgressIndicator} ${indicatorClass}`}>
                                                 {' '}{indicator.label}
                                             </span>
                                         )}
@@ -387,22 +499,22 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
 
                     {/* Summary: total yield + best set */}
                     {(hasYield || autoAgg?.best_set_index != null) && (
-                        <div className={styles.historyAggSummary}>
+                        <div className={styles.timelineAggSummary}>
                             {hasYield && (() => {
                                 const totalIndicator = !progressRecord?.is_first_instance
                                     ? renderYieldDelta(autoAgg.total_yield, prevAutoAgg?.total_yield)
                                     : null;
                                 const totalIndicatorClass = totalIndicator?.tone === 'improved'
-                                    ? styles.historyProgressImproved
+                                    ? styles.timelineProgressImproved
                                     : totalIndicator?.tone === 'regressed'
-                                        ? styles.historyProgressRegressed
-                                        : styles.historyProgressNeutral;
+                                        ? styles.timelineProgressRegressed
+                                        : styles.timelineProgressNeutral;
                                 return (
-                                    <span className={styles.historyAggItem}>
-                                        <span className={styles.historyAggLabel}>Total yield:</span>
-                                        <span className={styles.historyAggValue}>{formatAggValue(autoAgg.total_yield)}</span>
+                                    <span className={styles.timelineAggItem}>
+                                        <span className={styles.timelineAggLabel}>Total yield:</span>
+                                        <span className={styles.timelineAggValue}>{formatAggValue(autoAgg.total_yield)}</span>
                                         {totalIndicator && (
-                                            <span className={`${styles.historyProgressIndicator} ${totalIndicatorClass}`}>
+                                            <span className={`${styles.timelineProgressIndicator} ${totalIndicatorClass}`}>
                                                 {totalIndicator.label}
                                             </span>
                                         )}
@@ -410,9 +522,9 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
                                 );
                             })()}
                             {autoAgg?.best_set_index != null && (
-                                <span className={styles.historyAggItem}>
-                                    <span className={styles.historyAggLabel}>Best:</span>
-                                    <span className={styles.historyAggValue}>
+                                <span className={styles.timelineAggItem}>
+                                    <span className={styles.timelineAggLabel}>Best:</span>
+                                    <span className={styles.timelineAggValue}>
                                         Set {autoAgg.best_set_index + 1}
                                         {hasYield && autoAgg.best_set_yield != null
                                             ? ` · ${formatAggValue(autoAgg.best_set_yield)}`
@@ -431,7 +543,7 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
 
             {/* Display metrics if no sets */}
             {sets.length === 0 && hasMetrics && (
-                <div className={styles.historyCardMetrics}>
+                <div className={styles.timelineCardMetrics}>
                     {instance.metric_values.map((mv, idx) => (
                         <React.Fragment key={idx}>
                             {renderMetricRow(
@@ -445,7 +557,7 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
 
             {/* Notes preview */}
             {instance.notes && instance.notes.length > 0 && (
-                <div className={styles.historyCardNotes}>
+                <div className={styles.timelineCardNotes}>
                     {instance.notes.map((note, nIdx) => (
                         <div key={note.id || nIdx} className={styles.noteRow}>
                             <span className={styles.noteTime}>
@@ -465,4 +577,4 @@ function ActivityHistoryCard({ instance, activityDef, progressRecord, formatDate
     );
 }
 
-export default HistoryPanel;
+export default TimelinePanel;

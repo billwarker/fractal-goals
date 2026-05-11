@@ -4,18 +4,17 @@ import { useActiveSessionActions, useActiveSessionData } from '../contexts/Activ
 
 export function useSessionSidePaneViewModel({
     selectedActivity,
-    selectedSetIndex,
     onNoteAdded,
     onGoalClick,
     onGoalCreated,
     notes,
-    previousNotes,
     previousSessionNotes,
     addNote,
     updateNote,
     deleteNote,
+    pinNote,
+    unpinNote,
     onOptions,
-    onDelete,
     onOpenGoals,
     mode,
     onModeChange,
@@ -27,11 +26,7 @@ export function useSessionSidePaneViewModel({
         activityInstances,
         activities: activityDefinitions,
     } = useActiveSessionData();
-    const {
-        toggleSessionComplete,
-        pauseSession,
-        resumeSession,
-    } = useActiveSessionActions();
+    const { toggleSessionComplete } = useActiveSessionActions();
 
     const sessionActivityDefs = useMemo(() => {
         if (!activityInstances || !activityDefinitions) return [];
@@ -39,37 +34,13 @@ export function useSessionSidePaneViewModel({
         return activityDefinitions.filter((definition) => definitionIds.has(definition.id));
     }, [activityDefinitions, activityInstances]);
 
-    const selectedActivityDef = useMemo(() => {
-        if (!selectedActivity || !activityDefinitions) return null;
-        return activityDefinitions.find((definition) => definition.id === selectedActivity.activity_definition_id) || null;
-    }, [activityDefinitions, selectedActivity]);
-
     return useMemo(() => ({
         mode,
         onModeChange,
         details: {
             isCompleted: Boolean(session?.attributes?.completed),
-            isPaused: Boolean(session?.is_paused),
             onToggleComplete: toggleSessionComplete,
-            onPauseResume: () => (session?.is_paused ? resumeSession() : pauseSession()),
             onOptions,
-            onDelete,
-            notesPanelProps: {
-                rootId,
-                sessionId,
-                selectedActivity,
-                selectedActivityDef,
-                selectedSetIndex,
-                onNoteAdded,
-                activityInstances,
-                activityDefinitions,
-                notes,
-                previousNotes,
-                previousSessionNotes,
-                addNote,
-                updateNote,
-                deleteNote,
-            },
         },
         goals: {
             selectedActivity,
@@ -77,11 +48,19 @@ export function useSessionSidePaneViewModel({
             onGoalCreated,
             onOpenGoals,
         },
-        history: {
+        timeline: {
             rootId,
             sessionId,
             selectedActivity,
             sessionActivityDefs,
+            onNoteAdded,
+            notes,
+            previousSessionNotes,
+            addNote,
+            updateNote,
+            deleteNote,
+            pinNote,
+            unpinNote,
         },
     }), [
         activityDefinitions,
@@ -90,26 +69,22 @@ export function useSessionSidePaneViewModel({
         deleteNote,
         mode,
         notes,
-        onDelete,
         onGoalClick,
         onGoalCreated,
         onModeChange,
         onNoteAdded,
         onOpenGoals,
         onOptions,
-        pauseSession,
-        previousNotes,
         previousSessionNotes,
-        resumeSession,
+        pinNote,
         rootId,
         selectedActivity,
-        selectedActivityDef,
-        selectedSetIndex,
         session?.attributes?.completed,
         session?.is_paused,
         sessionActivityDefs,
         sessionId,
         toggleSessionComplete,
+        unpinNote,
         updateNote,
     ]);
 }

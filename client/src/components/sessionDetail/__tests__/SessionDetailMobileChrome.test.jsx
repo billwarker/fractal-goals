@@ -13,7 +13,7 @@ describe('SessionDetail mobile shell', () => {
                 sessionName="Morning Session"
                 isCompleted={false}
                 totalDuration={125}
-                selectedModeLabel="Goals"
+                selectedModeLabel="Details"
                 onOpenPane={onOpenPane}
             />
         );
@@ -22,11 +22,11 @@ describe('SessionDetail mobile shell', () => {
         expect(screen.getByText('In progress')).toBeInTheDocument();
         expect(screen.getByText('Duration 02:05')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Open Goals' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Open Details' }));
         expect(onOpenPane).toHaveBeenCalledTimes(1);
     });
 
-    it('routes bottom dock mode changes through the shared mode handler', () => {
+    it('routes bottom dock mode changes through the shared two-mode handler', () => {
         const onModeSelect = vi.fn();
 
         render(
@@ -36,8 +36,11 @@ describe('SessionDetail mobile shell', () => {
             />
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'History' }));
+        expect(screen.queryByRole('button', { name: 'Goals' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Details' }).className).toMatch(/mobileDockTabActive/);
 
-        expect(onModeSelect).toHaveBeenCalledWith('history');
+        fireEvent.click(screen.getByRole('button', { name: 'Timeline' }));
+
+        expect(onModeSelect).toHaveBeenCalledWith('timeline');
     });
 });

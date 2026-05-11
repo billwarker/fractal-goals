@@ -162,6 +162,60 @@ describe('useSessionDetailMutations', () => {
         expect(selectorState[0]).toBe(false);
     });
 
+    it('updates the session goals view cache when adding an associated activity', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        queryClient.setQueryData(queryKeys.sessionActivities('root-1', 'session-1'), []);
+        queryClient.setQueryData(queryKeys.sessionGoalsView('root-1', 'session-1'), {
+            goal_tree: {
+                id: 'root-goal',
+                name: 'Root',
+                children: [{ id: 'goal-1', name: 'Goal 1', children: [] }],
+            },
+            session_activity_ids: [],
+            session_goal_ids: [],
+            activity_goal_ids_by_activity: {},
+        });
+
+        let draftState = {
+            sections: [{ activity_ids: [] }]
+        };
+
+        const options = createBaseOptions(queryClient, {
+            activities: [{ id: 'act-2', name: 'Activity 2', associated_goal_ids: ['goal-1'] }],
+            activityInstances: [],
+            updateSessionDataDraft: vi.fn((updater) => {
+                draftState = typeof updater === 'function' ? updater(draftState) : updater;
+            }),
+        });
+
+        addActivityToSession.mockResolvedValueOnce({
+            data: { id: 'inst-2', activity_definition_id: 'act-2' }
+        });
+
+        const { result } = renderHook(
+            () => useSessionDetailMutations(options),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.addActivity(0, 'act-2');
+        });
+
+        expect(draftState.sections[0].activity_ids).toEqual(['inst-2']);
+        expect(queryClient.getQueryData(queryKeys.sessionGoalsView('root-1', 'session-1'))).toMatchObject({
+            session_activity_ids: ['act-2'],
+            session_goal_ids: ['goal-1'],
+            activity_goal_ids_by_activity: {
+                'act-2': ['goal-1'],
+            },
+        });
+    });
+
     it('invalidates progress history and session summary after activity metric-like updates', async () => {
         const queryClient = new QueryClient({
             defaultOptions: {

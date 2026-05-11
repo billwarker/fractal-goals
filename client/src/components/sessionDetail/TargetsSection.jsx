@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useFractalTree } from '../../hooks/useGoalQueries';
 import TargetCard from '../TargetCard';
 
-import styles from './GoalsPanel.module.css';
+import styles from './SessionGoalHierarchyPanel.module.css';
 
 /**
  * TargetsSection - Displays a list of targets aggregated from the goal hierarchy.
@@ -12,6 +12,7 @@ function TargetsSection({
     rootId, hierarchy, activeActivityId, activeActivityInstanceId,
     allowedActivityIds, activityDefinitions = [], targetAchievements, achievedTargetIds,
     targets = null,
+    scopedActivityName = null,
 }) {
     const { data: goalTree } = useFractalTree(rootId);
 
@@ -94,7 +95,7 @@ function TargetsSection({
         <div className={styles.contextSection} style={{ marginTop: '24px' }}>
             <div className={styles.headerContainer}>
                 <div className={styles.contextLabel}>
-                    Targets
+                    {scopedActivityName ? `Targets: ${scopedActivityName}` : 'Targets'}
                 </div>
             </div>
 

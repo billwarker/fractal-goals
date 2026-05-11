@@ -2,7 +2,7 @@ import React from 'react';
 import GoalIcon from '../atoms/GoalIcon';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { parseTargets, formatTargetDescription } from '../../utils/goalUtils';
-import styles from './GoalsPanel.module.css';
+import styles from './SessionGoalHierarchyPanel.module.css';
 
 function GoalRow({
     goal, icon, color, secondaryColor,

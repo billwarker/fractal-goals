@@ -33,6 +33,10 @@ function SessionDetailModals({
     sessionName,
     onCreateTemplate,
     onDuplicateSession,
+    onPauseResume,
+    onDeleteSessionRequest,
+    isPaused,
+    isCompleted,
     isSavingTemplate,
     isDuplicatingSession,
 }) {
@@ -94,6 +98,10 @@ function SessionDetailModals({
                 sessionName={sessionName}
                 onCreateTemplate={onCreateTemplate}
                 onDuplicateSession={onDuplicateSession}
+                onPauseResume={onPauseResume}
+                onDelete={onDeleteSessionRequest}
+                isPaused={isPaused}
+                isCompleted={isCompleted}
                 isSavingTemplate={isSavingTemplate}
                 isDuplicatingSession={isDuplicatingSession}
             />

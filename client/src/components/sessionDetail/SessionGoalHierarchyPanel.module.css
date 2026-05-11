@@ -22,13 +22,6 @@
     padding-left: 2px;
 }
 
-/* View Toggle */
-.viewToggleContainer {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 20px;
-}
-
 .headerContainer {
     display: flex;
     justify-content: space-between;
@@ -50,37 +43,6 @@
 
 .editLink:hover {
     color: var(--text-primary);
-}
-
-.viewToggleButton {
-    flex: 1;
-    padding: 6px 10px;
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-muted);
-    cursor: pointer;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.viewToggleButton:hover {
-    background: var(--color-bg-card-hover);
-    color: var(--color-text-primary);
-}
-
-.activeToggleButton {
-    background: var(--color-bg-card-hover);
-    border: 1px solid var(--color-brand-success);
-    color: var(--color-brand-success);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-success) 20%, transparent);
 }
 
 .hierarchyChain {

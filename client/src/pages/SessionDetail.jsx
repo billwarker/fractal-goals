@@ -80,6 +80,8 @@ function SessionDetailContent() {
         setShowOptionsModal,
         handleCreateTemplate,
         handleDuplicateSession,
+        handlePauseResume,
+        handleDeleteSessionRequest,
         isSavingTemplate,
         isDuplicatingSession,
     } = useSessionDetailController({ rootId, sessionId, navigate, isMobile });
@@ -145,6 +147,10 @@ function SessionDetailContent() {
                     sessionName={session?.name}
                     onCreateTemplate={handleCreateTemplate}
                     onDuplicateSession={handleDuplicateSession}
+                    onPauseResume={handlePauseResume}
+                    onDeleteSessionRequest={handleDeleteSessionRequest}
+                    isPaused={Boolean(session?.is_paused)}
+                    isCompleted={Boolean(session?.attributes?.completed)}
                     isSavingTemplate={isSavingTemplate}
                     isDuplicatingSession={isDuplicatingSession}
                 />
@@ -231,6 +237,10 @@ function SessionDetailContent() {
                 sessionName={session?.name}
                 onCreateTemplate={handleCreateTemplate}
                 onDuplicateSession={handleDuplicateSession}
+                onPauseResume={handlePauseResume}
+                onDeleteSessionRequest={handleDeleteSessionRequest}
+                isPaused={Boolean(session?.is_paused)}
+                isCompleted={isCompleted}
                 isSavingTemplate={isSavingTemplate}
                 isDuplicatingSession={isDuplicatingSession}
             />

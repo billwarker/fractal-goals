@@ -1,6 +1,6 @@
 import React from 'react';
 import GoalHierarchyList from '../goals/GoalHierarchyList';
-import styles from './GoalsPanel.module.css';
+import styles from './SessionGoalHierarchyPanel.module.css';
 
 function HierarchySection({
     type = 'activity',
@@ -13,15 +13,25 @@ function HierarchySection({
     getGoalIcon,
     completedColor,
     completedSecondaryColor,
+    getGoalBranchHighlightState,
+    getGoalConnectorHighlightState,
+    getGoalConnectorEdgeHighlightState,
+    connectorHighlightMode,
+    showGoalHighlightHalo,
     onStartSubGoalCreation,
     onOpenAssociate,
     onAddTargetForGoal,
+    scopedActivityName = null,
 }) {
+    const label = scopedActivityName
+        ? `Goals: ${scopedActivityName}`
+        : (type === 'activity' ? (activityDefinition?.name || 'Activity Goals') : 'Session Goals');
+
     return (
         <div className={styles.contextSection}>
             <div className={styles.headerContainer}>
                 <div className={styles.contextLabel}>
-                    {type === 'activity' ? (activityDefinition?.name || 'Activity Goals') : 'Session Goals'}
+                    {label}
                 </div>
                 {type === 'activity' && onOpenAssociate && (
                     <button
@@ -42,6 +52,11 @@ function HierarchySection({
                 getGoalIcon={getGoalIcon}
                 completedColor={completedColor}
                 completedSecondaryColor={completedSecondaryColor}
+                getGoalBranchHighlightState={getGoalBranchHighlightState}
+                getGoalConnectorHighlightState={getGoalConnectorHighlightState}
+                getGoalConnectorEdgeHighlightState={getGoalConnectorEdgeHighlightState}
+                connectorHighlightMode={connectorHighlightMode}
+                showGoalHighlightHalo={showGoalHighlightHalo}
                 onStartSubGoalCreation={onStartSubGoalCreation}
                 onAddTargetForGoal={onAddTargetForGoal}
                 emptyState="No goals associated"

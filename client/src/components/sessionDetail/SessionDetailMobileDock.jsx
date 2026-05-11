@@ -6,9 +6,11 @@ function SessionDetailMobileDock({
     sidePaneMode,
     onModeSelect,
 }) {
+    const modes = ['details', 'timeline'];
+
     return (
         <div className={styles.mobileBottomDock}>
-            {['details', 'goals', 'history'].map((modeOption) => (
+            {modes.map((modeOption) => (
                 <button
                     key={modeOption}
                     type="button"
