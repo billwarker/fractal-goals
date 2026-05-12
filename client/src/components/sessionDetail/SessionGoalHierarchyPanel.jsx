@@ -57,6 +57,7 @@ function SessionGoalHierarchyPanel({
         session,
         sessionGoalsView,
         activityInstances,
+        activityDefinitions,
         localSessionData,
         selectedActivity,
         targetAchievements,

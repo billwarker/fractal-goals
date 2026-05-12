@@ -3,7 +3,7 @@ import {
     normalizeGoalNode,
     parseGoalTargets,
 } from '../utils/goalNodeModel';
-import { getCurrentSessionActivityDefIds } from '../utils/sessionGoalScope';
+import { getCurrentSessionActivityDefIds, mergeUniqueIds } from '../utils/sessionGoalScope';
 import { getGoalStatus, getTargetStatus } from '../utils/sessionGoalStatus';
 
 /**
@@ -63,27 +63,6 @@ function collectIdsWithAncestors(goalIds, parentMap) {
     return result;
 }
 
-function getSessionStartTimestamp(session) {
-    const rawStart = session?.session_start
-        || session?.attributes?.session_start
-        || session?.created_at
-        || session?.attributes?.created_at
-        || null;
-    if (!rawStart) return null;
-
-    const timestamp = Date.parse(rawStart);
-    return Number.isNaN(timestamp) ? null : timestamp;
-}
-
-function wasCompletedBeforeSession(goal, sessionStartTimestamp) {
-    if (sessionStartTimestamp === null) return false;
-    if (!goal?.completed) return false;
-    if (!goal.completed_at) return false;
-
-    const completedTimestamp = Date.parse(goal.completed_at);
-    return !Number.isNaN(completedTimestamp) && completedTimestamp < sessionStartTimestamp;
-}
-
 function isPausedGoal(goal) {
     return Boolean(goal?.paused || goal?.frozen);
 }
@@ -92,6 +71,7 @@ export function useSessionGoalsViewModel({
     session,
     sessionGoalsView,
     activityInstances,
+    activityDefinitions,
     localSessionData,
     selectedActivity,
     targetAchievements,
@@ -106,7 +86,6 @@ export function useSessionGoalsViewModel({
         );
     }, [sessionGoalsView]);
 
-    const sessionStartTimestamp = useMemo(() => getSessionStartTimestamp(session), [session]);
     const parentMap = useMemo(() => buildParentMap(normalizedTree), [normalizedTree]);
     const currentSessionActivityDefIds = useMemo(() => getCurrentSessionActivityDefIds({
         activityInstances,
@@ -119,14 +98,27 @@ export function useSessionGoalsViewModel({
     const selectedActivityInSession = activeActivityDefId
         ? currentSessionActivityDefIds.has(String(activeActivityDefId))
         : false;
+    const activityGoalIdsByActivity = useMemo(() => {
+        const map = { ...(sessionGoalsView?.activity_goal_ids_by_activity || {}) };
+
+        (activityDefinitions || []).forEach((definition) => {
+            if (!definition?.id) return;
+            const activityId = String(definition.id);
+            const associatedGoalIds = definition.associated_goal_ids || definition.goal_ids || [];
+            if (!associatedGoalIds.length) return;
+            map[activityId] = mergeUniqueIds(map[activityId], associatedGoalIds);
+        });
+
+        return map;
+    }, [activityDefinitions, sessionGoalsView]);
 
     const selectedActivityGoalIds = useMemo(() => {
         if (!activeActivityDefId || !selectedActivityInSession) return new Set();
         return new Set(
-            (sessionGoalsView?.activity_goal_ids_by_activity?.[activeActivityDefId] || [])
+            (activityGoalIdsByActivity[String(activeActivityDefId)] || [])
                 .map((goalId) => String(goalId))
         );
-    }, [activeActivityDefId, selectedActivityInSession, sessionGoalsView]);
+    }, [activeActivityDefId, activityGoalIdsByActivity, selectedActivityInSession]);
 
     const selectedActivityAncestorIds = useMemo(() => {
         if (!activeActivityDefId || normalizedTree.length === 0) return new Set();
@@ -148,19 +140,14 @@ export function useSessionGoalsViewModel({
 
     // 2. Derive Session Hierarchy (everything)
     const sessionHierarchy = useMemo(() => {
-        const activityGoalIds = sessionGoalsView?.activity_goal_ids_by_activity || {};
         const nodeById = new Map(normalizedTree.map((node) => [String(node.id), node]));
         const inScopeGoalIds = new Set();
 
         currentSessionActivityDefIds.forEach((activityDefId) => {
-            (activityGoalIds[activityDefId] || []).forEach((goalId) => {
+            (activityGoalIdsByActivity[activityDefId] || []).forEach((goalId) => {
                 const normalizedGoalId = String(goalId);
                 const node = nodeById.get(normalizedGoalId);
-                if (
-                    node
-                    && !isPausedGoal(node)
-                    && !wasCompletedBeforeSession(node, sessionStartTimestamp)
-                ) {
+                if (node && !isPausedGoal(node)) {
                     inScopeGoalIds.add(normalizedGoalId);
                 }
             });
@@ -174,23 +161,21 @@ export function useSessionGoalsViewModel({
                 ...node,
                 status: getGoalStatus(node, targetAchievements, achievedTargetIds)
             }));
-    }, [currentSessionActivityDefIds, normalizedTree, parentMap, sessionGoalsView, sessionStartTimestamp, targetAchievements, achievedTargetIds]);
+    }, [activityGoalIdsByActivity, currentSessionActivityDefIds, normalizedTree, parentMap, targetAchievements, achievedTargetIds]);
 
     // 3. Derive Activity Hierarchy (filtered by associated activity)
     const activityHierarchy = useMemo(() => {
         if (!activeActivityDefId || !selectedActivityInSession || normalizedTree.length === 0) return [];
 
         const associatedGoalIds = new Set(
-            sessionGoalsView.activity_goal_ids_by_activity?.[activeActivityDefId] || []
+            activityGoalIdsByActivity[String(activeActivityDefId)] || []
         );
         const nodeById = new Map(normalizedTree.map((node) => [String(node.id), node]));
         const activeAssociatedGoalIds = Array.from(associatedGoalIds)
             .map((goalId) => String(goalId))
             .filter((goalId) => {
                 const node = nodeById.get(goalId);
-                return node
-                    && !isPausedGoal(node)
-                    && !wasCompletedBeforeSession(node, sessionStartTimestamp);
+                return node && !isPausedGoal(node);
             });
         const relevantIds = collectIdsWithAncestors(
             activeAssociatedGoalIds,
@@ -209,7 +194,7 @@ export function useSessionGoalsViewModel({
                 status: getGoalStatus(node, targetAchievements, achievedTargetIds)
             }));
 
-    }, [activeActivityDefId, activeActivityInstanceId, selectedActivityInSession, sessionGoalsView, normalizedTree, parentMap, sessionStartTimestamp, targetAchievements, achievedTargetIds]);
+    }, [activeActivityDefId, activeActivityInstanceId, activityGoalIdsByActivity, selectedActivityInSession, normalizedTree, parentMap, targetAchievements, achievedTargetIds]);
 
     // 4. Build Target Cards
     const targetCards = useMemo(() => {

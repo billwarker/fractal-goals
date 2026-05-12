@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ActivitiesProvider, useActivities } from '../ActivitiesContext';
 
 const {
+    updateActivity,
     createActivityGroup,
     updateActivityGroup,
     deleteActivityGroup,
@@ -13,6 +14,7 @@ const {
     setActivityGroupGoals,
     notify,
 } = vi.hoisted(() => ({
+    updateActivity: vi.fn(),
     createActivityGroup: vi.fn(),
     updateActivityGroup: vi.fn(),
     deleteActivityGroup: vi.fn(),
@@ -26,6 +28,7 @@ const {
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
+        updateActivity: (...args) => updateActivity(...args),
         createActivityGroup: (...args) => createActivityGroup(...args),
         updateActivityGroup: (...args) => updateActivityGroup(...args),
         deleteActivityGroup: (...args) => deleteActivityGroup(...args),
@@ -107,5 +110,32 @@ describe('ActivitiesContext', () => {
 
         expect(notify.error).toHaveBeenCalledWith('Failed to reorder groups: Reorder failed');
         expect(notify.error).toHaveBeenCalledWith('Failed to update group goals: Set goals failed');
+    });
+
+    it('invalidates session goal views when updating activity goal associations', async () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+        const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+        queryClient.setQueryData(['session-goals-view', 'root-1', 'session-1'], { stale: true });
+        queryClient.setQueryData(['fractalTree', 'root-1'], { stale: true });
+        updateActivity.mockResolvedValueOnce({
+            data: {
+                id: 'activity-1',
+                name: 'Full Front Lever Hold',
+                associated_goal_ids: ['goal-front-lever'],
+            },
+        });
+
+        const { result } = renderHook(() => useActivities(), {
+            wrapper: createWrapper(queryClient),
+        });
+
+        await act(async () => {
+            await result.current.updateActivity('root-1', 'activity-1', {
+                associated_goal_ids: ['goal-front-lever'],
+            });
+        });
+
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['session-goals-view', 'root-1'] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['fractalTree', 'root-1'] });
     });
 });

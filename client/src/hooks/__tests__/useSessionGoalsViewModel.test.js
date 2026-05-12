@@ -126,7 +126,7 @@ describe('useSessionGoalsViewModel', () => {
         expect(names).not.toContain('STG B');
     });
 
-    it('excludes goals completed before the session start from the session hierarchy', () => {
+    it('keeps completed associated goals in the session hierarchy', () => {
         const sessionGoalsView = {
             goal_tree: {
                 id: 'root',
@@ -173,7 +173,7 @@ describe('useSessionGoalsViewModel', () => {
         }));
 
         const names = result.current.sessionHierarchy.map((node) => node.name);
-        expect(names).not.toContain('Already Done');
+        expect(names).toContain('Already Done');
         expect(names).toContain('Done During Session');
         expect(names).toContain('Active');
     });
@@ -280,7 +280,7 @@ describe('useSessionGoalsViewModel', () => {
         expect(result.current.sessionHierarchy).toEqual([]);
     });
 
-    it('excludes goals completed before the session start from the activity hierarchy', () => {
+    it('keeps completed associated goals in the activity hierarchy', () => {
         const sessionGoalsView = {
             goal_tree: {
                 id: 'root',
@@ -321,7 +321,7 @@ describe('useSessionGoalsViewModel', () => {
         }));
 
         const names = result.current.activityHierarchy.map((node) => node.name);
-        expect(names).not.toContain('Old Activity Goal');
+        expect(names).toContain('Old Activity Goal');
         expect(names).toContain('Current Activity Goal');
     });
 
@@ -405,5 +405,56 @@ describe('useSessionGoalsViewModel', () => {
         const names = result.current.activityHierarchy.map((node) => node.name);
         expect(names).not.toContain('Frozen Activity Goal');
         expect(names).toContain('Active Activity Goal');
+    });
+
+    it('falls back to activity definition associations when the session goals view map is stale', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root',
+                type: 'UltimateGoal',
+                name: 'Root',
+                children: [
+                    {
+                        id: 'handstand',
+                        type: 'ImmediateGoal',
+                        name: 'Handstand Goal',
+                        children: []
+                    },
+                    {
+                        id: 'muscle-up',
+                        type: 'ImmediateGoal',
+                        name: 'Muscle Up Goal',
+                        children: []
+                    }
+                ]
+            },
+            session_goal_ids: ['handstand'],
+            activity_goal_ids_by_activity: {
+                'handstand-activity': ['handstand']
+            },
+            session_activity_ids: ['handstand-activity', 'muscle-up-activity']
+        };
+
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            sessionGoalsView,
+            selectedActivity: { id: 'inst-2', activity_definition_id: 'muscle-up-activity' },
+            activityInstances: [
+                { id: 'inst-1', activity_definition_id: 'handstand-activity' },
+                { id: 'inst-2', activity_definition_id: 'muscle-up-activity' },
+            ],
+            activityDefinitions: [
+                { id: 'muscle-up-activity', name: 'Muscle Ups', associated_goal_ids: ['muscle-up'] },
+            ],
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+        }));
+
+        const sessionNames = result.current.sessionHierarchy.map((node) => node.name);
+        const activityNames = result.current.activityHierarchy.map((node) => node.name);
+
+        expect(sessionNames).toContain('Handstand Goal');
+        expect(sessionNames).toContain('Muscle Up Goal');
+        expect(activityNames).toContain('Muscle Up Goal');
+        expect(result.current.selectedActivityGoalIds).toEqual(new Set(['muscle-up']));
     });
 });

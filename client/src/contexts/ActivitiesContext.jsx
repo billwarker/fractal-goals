@@ -42,6 +42,8 @@ export function ActivitiesProvider({ children }) {
             });
             await queryClient.invalidateQueries({ queryKey: ['session', rootId] });
             await queryClient.invalidateQueries({ queryKey: ['session-activities', rootId] });
+            await queryClient.invalidateQueries({ queryKey: ['session-goals-view', rootId] });
+            await queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(rootId) });
             return updated;
         },
         {
