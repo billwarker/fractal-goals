@@ -87,7 +87,6 @@ function SessionSidePane({
                             selectedActivity={goals?.selectedActivity}
                             onGoalClick={goals?.onGoalClick}
                             onGoalCreated={goals?.onGoalCreated}
-                            onOpenGoals={goals?.onOpenGoals}
                             className={styles.detailsGoalHierarchy}
                         />
                     </div>

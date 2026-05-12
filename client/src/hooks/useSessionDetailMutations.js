@@ -478,7 +478,6 @@ export function useSessionDetailMutations({
                 return {
                     ...previous,
                     session_activity_ids: mergeUniqueIds(previous.session_activity_ids, [activityId]),
-                    session_goal_ids: mergeUniqueIds(previous.session_goal_ids, associatedGoalIds),
                     activity_goal_ids_by_activity: {
                         ...previousActivityGoalIds,
                         [activityId]: mergeUniqueIds(previousActivityGoalIds[activityId], associatedGoalIds),

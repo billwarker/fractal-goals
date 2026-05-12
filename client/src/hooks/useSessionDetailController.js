@@ -13,7 +13,6 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         autoSaveStatus,
         localSessionData,
         calculateTotalDuration,
-        sessionGoalsView,
     } = useActiveSessionData();
     const {
         updateGoal,
@@ -67,7 +66,6 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
     } = useSessionDetailGoalAssociations({
         rootId,
         sessionId,
-        sessionGoalsView,
         showAssociationModal,
         associationContext,
         setAssociationContext,
@@ -133,7 +131,6 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         updateNote,
         deleteNote,
         onOptions: () => setShowOptionsModal(true),
-        onOpenGoals: handleOpenGoals,
         mode: sidePaneMode,
         onModeChange: setSidePaneModeUi,
     });

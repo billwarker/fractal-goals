@@ -110,7 +110,8 @@ Sessions capture actual work performed against a root/fractal.
 Sessions support:
 
 - session notes
-- linked goals
+- manual session-goal links
+- activity-derived goal scope for session detail hierarchy views
 - activity instances
 - timers and manual duration updates
 
@@ -126,6 +127,16 @@ Key frontend pieces:
 - `client/src/contexts/ActiveSessionContext.jsx`
 - `client/src/pages/SessionDetail.jsx`
 - `client/src/hooks/useSessionGoalsViewModel.js`
+- `client/src/components/sessionDetail/SessionGoalHierarchyPanel.jsx`
+- `client/src/components/sessionDetail/TimelinePanel.jsx`
+- `client/src/components/common/TimelineShell.jsx`
+
+Session detail goal hierarchy contract:
+
+- `session_goals` / `session_goal_ids` represent direct manual session links.
+- Activity and activity-group associations define activity-derived scope.
+- `GoalTreeService.get_session_goals_view_payload` returns the canonical session detail goal payload, including `activity_goal_ids_by_activity`, `session_activity_ids`, and a pruned goal tree containing the complete lineage for in-scope goals.
+- The frontend should render from that canonical payload rather than rebuilding association scope from activity definition caches.
 
 ### Notes
 
@@ -153,7 +164,8 @@ Key frontend pieces:
 - `client/src/hooks/useNotesPageQuery.js`
 - `client/src/components/notes/`
 - `client/src/components/goalDetail/GoalNotesView.jsx`
-- `client/src/components/sessionDetail/NotesPanel.jsx`
+- `client/src/components/sessionDetail/TimelinePanel.jsx`
+- `client/src/components/common/TimelineShell.jsx`
 
 ### Activities
 
@@ -206,7 +218,7 @@ Key frontend pieces:
 - `client/src/hooks/useSessionProgressSummary.js`
 - `client/src/hooks/useRootProgressSettings.js`
 - `client/src/components/sessionDetail/SessionActivityItem.jsx`
-- `client/src/components/sessionDetail/HistoryPanel.jsx`
+- `client/src/components/sessionDetail/TimelinePanel.jsx`
 - `client/src/components/modals/SettingsModal.jsx`
 
 ### Programs and Templates

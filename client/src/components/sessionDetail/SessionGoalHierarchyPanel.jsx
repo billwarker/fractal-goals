@@ -15,7 +15,6 @@ function SessionGoalHierarchyPanel({
     selectedActivity,
     onGoalClick,
     onGoalCreated,
-    onOpenGoals,
     className = '',
 }) {
     const {
@@ -57,7 +56,6 @@ function SessionGoalHierarchyPanel({
         session,
         sessionGoalsView,
         activityInstances,
-        activityDefinitions,
         localSessionData,
         selectedActivity,
         targetAchievements,

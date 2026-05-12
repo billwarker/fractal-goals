@@ -15,7 +15,6 @@ export function useSessionSidePaneViewModel({
     pinNote,
     unpinNote,
     onOptions,
-    onOpenGoals,
     mode,
     onModeChange,
 }) {
@@ -46,7 +45,6 @@ export function useSessionSidePaneViewModel({
             selectedActivity,
             onGoalClick,
             onGoalCreated,
-            onOpenGoals,
         },
         timeline: {
             rootId,
@@ -73,7 +71,6 @@ export function useSessionSidePaneViewModel({
         onGoalCreated,
         onModeChange,
         onNoteAdded,
-        onOpenGoals,
         onOptions,
         previousSessionNotes,
         pinNote,

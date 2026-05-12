@@ -53,7 +53,6 @@ describe('useSessionSidePaneViewModel', () => {
         const onNoteAdded = vi.fn();
         const onGoalClick = vi.fn();
         const onGoalCreated = vi.fn();
-        const onOpenGoals = vi.fn();
         const addNote = vi.fn();
         const updateNote = vi.fn();
         const deleteNote = vi.fn();
@@ -72,7 +71,6 @@ describe('useSessionSidePaneViewModel', () => {
             updateNote,
             deleteNote,
             onOptions,
-            onOpenGoals,
             mode: 'details',
             onModeChange,
         }));
@@ -88,7 +86,6 @@ describe('useSessionSidePaneViewModel', () => {
             selectedActivity,
             onGoalClick,
             onGoalCreated,
-            onOpenGoals,
         });
         expect(result.current.timeline).toEqual({
             rootId: 'root-1',

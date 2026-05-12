@@ -100,11 +100,6 @@ class GoalTreeService:
             for row in session_goals_rows
         }
 
-        if not session_goal_ids:
-            derived_goals = session_service._derive_session_goals_from_activities(session_obj)
-            session_goal_ids = [goal.id for goal in derived_goals]
-            session_goal_sources = {goal.id: 'activity-derived' for goal in derived_goals}
-
         session_activity_instances = [
             instance
             for instance in (session_obj.activity_instances or [])

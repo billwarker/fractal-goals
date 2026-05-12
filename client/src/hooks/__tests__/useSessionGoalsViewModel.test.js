@@ -407,7 +407,7 @@ describe('useSessionGoalsViewModel', () => {
         expect(names).toContain('Active Activity Goal');
     });
 
-    it('falls back to activity definition associations when the session goals view map is stale', () => {
+    it('trusts the canonical session goals view map for activity scope', () => {
         const sessionGoalsView = {
             goal_tree: {
                 id: 'root',
@@ -430,7 +430,8 @@ describe('useSessionGoalsViewModel', () => {
             },
             session_goal_ids: ['handstand'],
             activity_goal_ids_by_activity: {
-                'handstand-activity': ['handstand']
+                'handstand-activity': ['handstand'],
+                'muscle-up-activity': ['muscle-up'],
             },
             session_activity_ids: ['handstand-activity', 'muscle-up-activity']
         };
@@ -441,9 +442,6 @@ describe('useSessionGoalsViewModel', () => {
             activityInstances: [
                 { id: 'inst-1', activity_definition_id: 'handstand-activity' },
                 { id: 'inst-2', activity_definition_id: 'muscle-up-activity' },
-            ],
-            activityDefinitions: [
-                { id: 'muscle-up-activity', name: 'Muscle Ups', associated_goal_ids: ['muscle-up'] },
             ],
             targetAchievements: new Map(),
             achievedTargetIds: new Set(),

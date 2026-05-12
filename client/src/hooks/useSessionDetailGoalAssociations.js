@@ -2,10 +2,9 @@ import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { flattenGoalTree, parseGoalTargets } from '../utils/goalNodeModel';
-import { fractalApi } from '../utils/api';
-import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
 import { useFractalTree } from './useGoalQueries';
+import { normalizeGoalIds, useActivityGoalAssociations } from './useActivityGoalAssociations';
 
 const ELIGIBLE_ACTIVITY_ASSOCIATION_TYPES = new Set([
     'UltimateGoal',
@@ -18,7 +17,6 @@ const ELIGIBLE_ACTIVITY_ASSOCIATION_TYPES = new Set([
 export function useSessionDetailGoalAssociations({
     rootId,
     sessionId,
-    sessionGoalsView,
     showAssociationModal,
     associationContext,
     setAssociationContext,
@@ -29,6 +27,7 @@ export function useSessionDetailGoalAssociations({
     const activitiesKey = queryKeys.activities(rootId);
     const fractalTreeKey = queryKeys.fractalTree(rootId);
     const { data: fractalTree = null } = useFractalTree(rootId, { enabled: showAssociationModal });
+    const { setActivityGoalIds } = useActivityGoalAssociations({ rootId, sessionId });
 
     const allAvailableGoals = useMemo(() => {
         if (!showAssociationModal || !fractalTree) return [];
@@ -67,30 +66,10 @@ export function useSessionDetailGoalAssociations({
         const activityDefinition = associationContext?.activityDefinition;
         if (!activityDefinition) return false;
 
-        const idsToAssociate = Array.isArray(goalIds) ? goalIds : [goalIds];
+        const idsToAssociate = normalizeGoalIds(goalIds);
 
         try {
-            await fractalApi.setActivityGoals(rootId, activityDefinition.id, idsToAssociate);
-
-            queryClient.setQueryData(activitiesKey, (previous) => {
-                if (!Array.isArray(previous)) return previous;
-                return previous.map((activity) => (
-                    activity.id === activityDefinition.id
-                        ? { ...activity, associated_goal_ids: idsToAssociate }
-                        : activity
-                ));
-            });
-
-            queryClient.setQueryData(sessionGoalsViewKey, (previous) => {
-                if (!previous) return previous;
-                return {
-                    ...previous,
-                    activity_goal_ids_by_activity: {
-                        ...(previous.activity_goal_ids_by_activity || {}),
-                        [activityDefinition.id]: idsToAssociate,
-                    },
-                };
-            });
+            await setActivityGoalIds(activityDefinition.id, idsToAssociate);
 
             setAssociationContext((previous) => (
                 previous
@@ -98,14 +77,8 @@ export function useSessionDetailGoalAssociations({
                     : previous
             ));
 
-            queryClient.invalidateQueries({ queryKey: activitiesKey });
-            queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
-            queryClient.invalidateQueries({ queryKey: fractalTreeKey });
-            notify.success('Activity associated successfully');
             return true;
         } catch (error) {
-            console.error('Failed to associate activity with goals', error);
-            notify.error('Failed to associate activity');
             return false;
         }
     };

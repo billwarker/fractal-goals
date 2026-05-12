@@ -209,7 +209,7 @@ describe('useSessionDetailMutations', () => {
         expect(draftState.sections[0].activity_ids).toEqual(['inst-2']);
         expect(queryClient.getQueryData(queryKeys.sessionGoalsView('root-1', 'session-1'))).toMatchObject({
             session_activity_ids: ['act-2'],
-            session_goal_ids: ['goal-1'],
+            session_goal_ids: [],
             activity_goal_ids_by_activity: {
                 'act-2': ['goal-1'],
             },

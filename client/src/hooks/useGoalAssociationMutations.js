@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { fractalApi } from '../utils/api';
 import { invalidateGoalAssociationQueries } from '../components/goals/goalDetailQueryUtils';
+import { fractalApi } from '../utils/api';
+import { useActivityGoalAssociations } from './useActivityGoalAssociations';
 
 function dedupeById(items) {
     return Array.from(new Map((items || []).map((item) => [item.id, item])).values());
@@ -82,6 +83,11 @@ export function useGoalAssociationMutations({
     const initialGroupsRef = useRef([]);
     const associatedActivitiesRef = useRef([]);
     const associatedGroupsRef = useRef([]);
+    const { setActivityGoalIds } = useActivityGoalAssociations({
+        rootId,
+        successMessage: null,
+        errorMessage: null,
+    });
 
     useEffect(() => {
         // This hook owns a locally editable copy of activity groups and must resync on upstream prop changes.
@@ -177,7 +183,7 @@ export function useGoalAssociationMutations({
                 ...(Array.isArray(newActivity.associated_goals) ? newActivity.associated_goals.map((goal) => goal?.id) : []),
             ].filter(Boolean);
             const nextGoalIds = Array.from(new Set([...existingGoalIds, goalId]));
-            await fractalApi.setActivityGoals(rootId, newActivity.id, nextGoalIds);
+            await setActivityGoalIds(newActivity.id, nextGoalIds, { goalId, notify: false });
             await refreshAssociations();
             return { associatedImmediately: true };
         }

@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { queryKeys } from '../../hooks/queryKeys';
 import { ActivitiesProvider, useActivities } from '../ActivitiesContext';
 
 const {
@@ -115,8 +116,8 @@ describe('ActivitiesContext', () => {
     it('invalidates session goal views when updating activity goal associations', async () => {
         const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
         const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
-        queryClient.setQueryData(['session-goals-view', 'root-1', 'session-1'], { stale: true });
-        queryClient.setQueryData(['fractalTree', 'root-1'], { stale: true });
+        queryClient.setQueryData(queryKeys.sessionGoalsView('root-1', 'session-1'), { stale: true });
+        queryClient.setQueryData(queryKeys.fractalTree('root-1'), { stale: true });
         updateActivity.mockResolvedValueOnce({
             data: {
                 id: 'activity-1',
@@ -135,7 +136,7 @@ describe('ActivitiesContext', () => {
             });
         });
 
-        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['session-goals-view', 'root-1'] });
-        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['fractalTree', 'root-1'] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.sessionGoalsViewRoot('root-1') });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.fractalTree('root-1') });
     });
 });

@@ -3,7 +3,7 @@ import {
     normalizeGoalNode,
     parseGoalTargets,
 } from '../utils/goalNodeModel';
-import { getCurrentSessionActivityDefIds, mergeUniqueIds } from '../utils/sessionGoalScope';
+import { getCurrentSessionActivityDefIds } from '../utils/sessionGoalScope';
 import { getGoalStatus, getTargetStatus } from '../utils/sessionGoalStatus';
 
 /**
@@ -71,7 +71,6 @@ export function useSessionGoalsViewModel({
     session,
     sessionGoalsView,
     activityInstances,
-    activityDefinitions,
     localSessionData,
     selectedActivity,
     targetAchievements,
@@ -99,18 +98,8 @@ export function useSessionGoalsViewModel({
         ? currentSessionActivityDefIds.has(String(activeActivityDefId))
         : false;
     const activityGoalIdsByActivity = useMemo(() => {
-        const map = { ...(sessionGoalsView?.activity_goal_ids_by_activity || {}) };
-
-        (activityDefinitions || []).forEach((definition) => {
-            if (!definition?.id) return;
-            const activityId = String(definition.id);
-            const associatedGoalIds = definition.associated_goal_ids || definition.goal_ids || [];
-            if (!associatedGoalIds.length) return;
-            map[activityId] = mergeUniqueIds(map[activityId], associatedGoalIds);
-        });
-
-        return map;
-    }, [activityDefinitions, sessionGoalsView]);
+        return sessionGoalsView?.activity_goal_ids_by_activity || {};
+    }, [sessionGoalsView]);
 
     const selectedActivityGoalIds = useMemo(() => {
         if (!activeActivityDefId || !selectedActivityInSession) return new Set();
