@@ -1,26 +1,19 @@
-import React, { Suspense } from 'react';
+import React from 'react';
 import Input from '../atoms/Input';
 import Checkbox from '../atoms/Checkbox';
 import CheckIcon from '../atoms/CheckIcon';
-import { isAboveShortTermGoal } from '../../utils/goalHelpers';
-import { isExecutionGoalType } from '../../utils/goalNodeModel';
-import { lazyWithRetry } from '../../utils/lazyWithRetry';
+import { getValidChildTypes } from '../../utils/goalHelpers';
+import { getGoalNodeChildren, isExecutionGoalType } from '../../utils/goalNodeModel';
 import styles from '../GoalDetailModal.module.css'; // Reusing the same styles for now
-
-const TargetManager = lazyWithRetry(() => import('../goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
-const ActivityAssociator = lazyWithRetry(() => import('../goalDetail/ActivityAssociator'), 'components/goalDetail/ActivityAssociator');
 
 function GoalEditForm({
     mode,
     goal,
-    goalId,
-    rootId,
     goalType,
     goalColor,
     textColor,
     parentGoal,
     parentGoalName,
-    isCompleted,
     // Level selection in create mode
     // Form state from useGoalForm
     name, setName,
@@ -29,23 +22,19 @@ function GoalEditForm({
     relevanceStatement, setRelevanceStatement,
     trackActivities, setTrackActivities,
     completedViaChildren, setCompletedViaChildren,
-    inheritParentActivities, setInheritParentActivities,
     allowManualCompletion, setAllowManualCompletion,
-    targets, setTargets,
-    // Association state
-    associatedActivities, setAssociatedActivities,
-    associatedActivityGroups, setAssociatedActivityGroups,
-    activityDefinitions,
-    activityGroups, setActivityGroups,
     // Handlers
-    setViewState,
-    refreshAssociations,
     handleCancel,
     handleSave,
     showActions = true,
     errors = {}
 }) {
-    const showInlineProgressManagers = mode === 'create';
+    const showActivityTargetProgress = mode !== 'create';
+    const canCompleteViaChildren = getValidChildTypes(goalType).length > 0;
+    const hasChildGoals = mode !== 'create' && getGoalNodeChildren(goal).length > 0;
+    const completedViaChildrenInfo = hasChildGoals
+        ? 'Goal will be marked as complete when all child goals are completed.'
+        : 'Goal will be marked as complete when all child goals are completed (no child goals created yet).';
 
     return (
         <div className={styles.editContainer}>
@@ -122,13 +111,15 @@ function GoalEditForm({
                     </label>
                     <div className={styles.progressBox}>
                         <div className={styles.checkboxGroup}>
-                            <Checkbox
-                                label="Activities & Targets"
-                                checked={trackActivities}
-                                onChange={(e) => setTrackActivities(e.target.checked)}
-                                className={styles.checkboxLabel}
-                            />
-                            {isAboveShortTermGoal(goalType) && (
+                            {showActivityTargetProgress && (
+                                <Checkbox
+                                    label="Activities & Targets"
+                                    checked={trackActivities}
+                                    onChange={(e) => setTrackActivities(e.target.checked)}
+                                    className={styles.checkboxLabel}
+                                />
+                            )}
+                            {canCompleteViaChildren && (
                                 <Checkbox
                                     label="Completed via Children"
                                     checked={completedViaChildren}
@@ -145,7 +136,7 @@ function GoalEditForm({
                         </div>
 
                         <div className={styles.infoList}>
-                            {trackActivities && (
+                            {showActivityTargetProgress && trackActivities && (
                                 <div className={styles.infoItem}>
                                     <CheckIcon size={13} />
                                     <span>Goal is complete when target(s) are achieved.</span>
@@ -155,7 +146,7 @@ function GoalEditForm({
                             {completedViaChildren && (
                                 <div className={styles.infoItem}>
                                     <CheckIcon size={13} />
-                                    <span>Goal is complete when all child goals are done (Delegated).</span>
+                                    <span>{completedViaChildrenInfo}</span>
                                 </div>
                             )}
 
@@ -168,60 +159,6 @@ function GoalEditForm({
                         </div>
                     </div>
                 </div>
-            )}
-
-            {/* Associated Activities Section - Create Mode */}
-            {trackActivities && showInlineProgressManagers && (
-                <Suspense fallback={null}>
-                    <ActivityAssociator
-                        associatedActivities={associatedActivities}
-                        setAssociatedActivities={setAssociatedActivities}
-                        associatedActivityGroups={associatedActivityGroups}
-                        setAssociatedActivityGroups={setAssociatedActivityGroups}
-                        activityDefinitions={activityDefinitions}
-                        activityGroups={activityGroups}
-                        setActivityGroups={setActivityGroups}
-                        rootId={rootId}
-                        goalId={goalId}
-                        parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
-                        setTargets={setTargets}
-                        isEditing={true}
-                        targets={targets}
-                        goalName={name}
-                        viewMode="list"
-                        onOpenSelector={() => setViewState('activity-associator')}
-                        completedViaChildren={completedViaChildren}
-                        isAboveShortTermGoal={isAboveShortTermGoal(goalType)}
-                        headerColor="var(--color-text-primary)"
-                        goalType={goalType}
-                        onRefreshAssociations={refreshAssociations}
-                        inheritParentActivities={inheritParentActivities}
-                        setInheritParentActivities={setInheritParentActivities}
-                    />
-                </Suspense>
-            )}
-
-            {/* Targets Section - Create Mode */}
-            {trackActivities && showInlineProgressManagers && (
-                <Suspense fallback={null}>
-                    <TargetManager
-                        targets={targets}
-                        setTargets={setTargets}
-                        activityDefinitions={activityDefinitions}
-                        associatedActivities={associatedActivities}
-                        goalId={goalId}
-                        rootId={rootId}
-                        isEditing={true}
-                        viewMode="list"
-                        onOpenBuilder={(target) => {
-                            // Let the parent modal handle this state change
-                            setViewState('target-manager', target);
-                        }}
-                        headerColor="var(--color-text-primary)"
-                        goalType={goalType}
-                        goalCompleted={isCompleted}
-                    />
-                </Suspense>
             )}
 
             {showActions && (

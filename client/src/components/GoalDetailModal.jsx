@@ -669,7 +669,7 @@ function GoalDetailModal({
                         refreshAssociations={refreshAssociations}
                         handleCancel={handleCancel}
                         handleSave={handleSave}
-                        showActions={mode === 'create'}
+                        showActions={false}
                         errors={errors}
                     />
                 ) : (
@@ -1027,6 +1027,10 @@ function GoalDetailModal({
         && mode !== 'create'
         && Boolean(rootId && goalId)
         && !['complete-confirm', 'uncomplete-confirm'].includes(viewState);
+    const showCreateFooter = viewState === 'goal'
+        && mode === 'create'
+        && isEditing
+        && !(needsLevelPicker && selectedChildType === null);
     const showEditFooter = viewState === 'goal'
         && mode !== 'create'
         && isEditing;
@@ -1044,7 +1048,7 @@ function GoalDetailModal({
             placeholder="Add a goal note..."
             className={styles.modalFooterComposer}
         />
-    ) : showEditFooter ? (
+    ) : (showCreateFooter || showEditFooter) ? (
         <div className={styles.completionFooter}>
             <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit}`}>
                 <button
@@ -1067,7 +1071,7 @@ function GoalDetailModal({
                         '--completion-text': displayTextColor,
                     }}
                 >
-                    Save
+                    {showCreateFooter ? 'Create' : 'Save'}
                 </button>
             </div>
         </div>
