@@ -9,6 +9,7 @@ import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import CheckIcon from '../atoms/CheckIcon';
 import CloseIcon from '../atoms/CloseIcon';
 import GoalIcon from '../atoms/GoalIcon';
+import Linkify from '../atoms/Linkify';
 import ImageViewerModal from '../sessionDetail/ImageViewerModal';
 import MarkdownNoteContent from './MarkdownNoteContent';
 import styles from './NoteCard.module.css';
@@ -406,7 +407,7 @@ function NoteCard({
                                     <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
                                 ) : (
                                     <div className={`${styles.markdownContent} ${styles.plainContent}`}>
-                                        {note.content}
+                                        <Linkify>{note.content}</Linkify>
                                     </div>
                                 )
                             ) : (

@@ -97,4 +97,31 @@ describe('NoteCard', () => {
         expect(screen.getByText('Standard Practice Session')).toBeInTheDocument();
     });
 
+    it('renders links in plain goal note content', () => {
+        renderWithProviders(
+            <NoteCard
+                note={{
+                    id: 'note-4',
+                    content: 'Watch this: https://youtu.be/example?si=abc123',
+                    created_at: '2026-04-04T13:37:00Z',
+                    updated_at: '2026-04-04T13:37:00Z',
+                    context_type: 'goal',
+                    context_id: 'goal-1',
+                    note_type: 'goal_note',
+                    note_type_label: 'Goal Note',
+                    goal_id: 'goal-1',
+                    goal_name: 'Girlfriend is Better',
+                    goal_type: 'mid_term',
+                    set_index: null,
+                    pinned_at: null,
+                    is_pinned: false,
+                }}
+            />,
+        );
+
+        const link = screen.getByRole('link', { name: 'https://youtu.be/example?si=abc123' });
+        expect(link).toHaveAttribute('href', 'https://youtu.be/example?si=abc123');
+        expect(link).toHaveAttribute('target', '_blank');
+    });
+
 });
