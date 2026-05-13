@@ -90,35 +90,9 @@
     color: var(--action-text, var(--color-text-inverse));
 }
 
-.goalTabRow {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
-    margin: 4px 0 0;
-}
-
-.goalTabButton {
-    min-width: 0;
-    min-height: 34px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.goalTabButton:hover {
-    border-color: color-mix(in srgb, var(--goal-tab-accent, var(--color-brand-primary)) 72%, var(--color-border));
-    color: var(--color-text-primary);
-    background: color-mix(in srgb, var(--goal-tab-accent, var(--color-brand-primary)) 8%, transparent);
-}
-
-.goalTabActive {
-    border-color: var(--goal-tab-accent, var(--color-brand-primary));
-    background: color-mix(in srgb, var(--goal-tab-accent, var(--color-brand-primary)) 16%, transparent);
-    color: var(--color-text-primary);
+.goalViewTabs {
+    margin-top: 4px;
+    margin-bottom: 0;
 }
 
 .afterHeaderContent {

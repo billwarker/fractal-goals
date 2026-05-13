@@ -12,6 +12,7 @@ import SessionInfoPanel from './SessionInfoPanel';
 import Button from '../atoms/Button';
 import SessionCompletionButton from '../common/SessionCompletionButton';
 import SidePaneHeader from '../common/SidePaneHeader';
+import ViewToggleTabs from '../common/ViewToggleTabs';
 import SessionGoalHierarchyPanel from './SessionGoalHierarchyPanel';
 import SessionNotesPanel from './SessionNotesPanel';
 import TimelinePanel from './TimelinePanel';
@@ -34,24 +35,18 @@ function SessionSidePane({
             {/* Mode Toggle Header */}
             {showModeTabs && (
                 <SidePaneHeader>
-                    <div className={styles.sidepaneTabs}>
-                        <button
-                            type="button"
-                            className={`${styles.sidepaneTab} ${mode === 'details' ? styles.sidepaneTabActive : ''}`}
-                            onClick={() => onModeChange('details')}
-                            aria-pressed={mode === 'details'}
-                        >
-                            Details
-                        </button>
-                        <button
-                            type="button"
-                            className={`${styles.sidepaneTab} ${mode === 'timeline' ? styles.sidepaneTabActive : ''}`}
-                            onClick={() => onModeChange('timeline')}
-                            aria-pressed={mode === 'timeline'}
-                        >
-                            Timeline
-                        </button>
-                    </div>
+                    <ViewToggleTabs
+                        items={[
+                            { value: 'details', label: 'Details' },
+                            { value: 'timeline', label: 'Timeline' },
+                        ]}
+                        value={mode}
+                        onChange={onModeChange}
+                        ariaLabel="Session side pane views"
+                        style={{
+                            '--view-toggle-panel-bg': 'var(--color-bg-sidebar)',
+                        }}
+                    />
                 </SidePaneHeader>
             )}
 

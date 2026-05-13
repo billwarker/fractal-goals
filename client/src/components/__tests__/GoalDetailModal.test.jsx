@@ -348,7 +348,7 @@ describe('GoalDetailModal smoke coverage', () => {
             />
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Activities' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Activities' }));
 
         await waitFor(() => {
             expect(screen.getByText('goal activities view')).toBeInTheDocument();
@@ -380,7 +380,7 @@ describe('GoalDetailModal smoke coverage', () => {
             />
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Activities' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Activities' }));
 
         await waitFor(() => {
             expect(screen.getByRole('button', { name: '+ Add Target' })).toBeInTheDocument();
@@ -429,7 +429,7 @@ describe('GoalDetailModal smoke coverage', () => {
 
         expect(screen.getByText('edit:Deep Work')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Activities' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Activities' }));
 
         await waitFor(() => {
             expect(mockResetForm).toHaveBeenCalled();

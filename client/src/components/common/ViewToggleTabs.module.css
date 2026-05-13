@@ -1,0 +1,38 @@
+.tabs {
+    --view-toggle-panel-bg: var(--color-bg-card);
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    gap: 4px;
+    padding: 3px;
+    border: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--color-bg-secondary) 72%, var(--color-bg-app));
+}
+
+.tab {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 32px;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+
+.tab:hover {
+    background: color-mix(in srgb, var(--color-bg-card) 55%, transparent);
+    color: var(--color-text-primary);
+}
+
+.tabActive {
+    background: var(--view-toggle-panel-bg);
+    color: var(--color-text-primary);
+}

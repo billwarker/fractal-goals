@@ -10,6 +10,7 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/atoms/Modal';
 import SidePaneHeader from '../components/common/SidePaneHeader';
 import SidePaneHeaderButton from '../components/common/SidePaneHeaderButton';
+import ViewToggleTabs from '../components/common/ViewToggleTabs';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import SidePaneNotePanel from '../components/common/SidePaneNotePanel';
@@ -139,22 +140,18 @@ function ProgramSidePane({
                     </SidePaneHeaderButton>
                 )}
             >
-                <div className={styles.sidePaneViewToggle} aria-label="Program side pane view">
-                    <button
-                        type="button"
-                        className={`${styles.sidePaneViewButton} ${view === 'details' ? styles.sidePaneViewButtonActive : ''}`}
-                        onClick={() => onViewChange('details')}
-                    >
-                        Details
-                    </button>
-                    <button
-                        type="button"
-                        className={`${styles.sidePaneViewButton} ${view === 'goals' ? styles.sidePaneViewButtonActive : ''}`}
-                        onClick={() => onViewChange('goals')}
-                    >
-                        Goals
-                    </button>
-                </div>
+                <ViewToggleTabs
+                    items={[
+                        { value: 'details', label: 'Details' },
+                        { value: 'goals', label: 'Goals' },
+                    ]}
+                    value={view}
+                    onChange={onViewChange}
+                    ariaLabel="Program side pane views"
+                    style={{
+                        '--view-toggle-panel-bg': 'var(--color-bg-sidebar)',
+                    }}
+                />
             </SidePaneHeader>
 
             {program && view === 'details' ? (

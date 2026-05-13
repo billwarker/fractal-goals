@@ -165,41 +165,6 @@
     overflow: hidden;
 }
 
-.sidePaneViewToggle {
-    display: flex;
-    width: 100%;
-    min-width: 0;
-    gap: 8px;
-}
-
-.sidePaneViewButton {
-    flex: 1;
-    min-height: 36px;
-    padding: 6px 10px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm);
-    background: var(--color-bg-input);
-    color: var(--color-text-muted);
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    text-align: center;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
-}
-
-.sidePaneViewButton:hover {
-    background: var(--color-bg-card-hover);
-    color: var(--color-text-primary);
-}
-
-.sidePaneViewButtonActive {
-    border-color: var(--color-brand-success);
-    background: rgba(59, 197, 124, 0.12);
-    color: var(--color-brand-success);
-    box-shadow: 0 0 0 1px rgba(59, 197, 124, 0.24);
-}
-
 .description,
 .muted {
     margin: 0;

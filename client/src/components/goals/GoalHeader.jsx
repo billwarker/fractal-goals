@@ -65,7 +65,7 @@ function GoalHeader({
             gap: '10px',
             paddingBottom: '14px',
             marginBottom: '0',
-            borderBottom: `2px solid ${goalColor}`,
+            borderBottom: headerTabs ? 'none' : `2px solid ${goalColor}`,
             position: 'sticky',
             top: '-24px', // Stick to the very top (covering parent padding)
             background: 'var(--color-bg-surface)',

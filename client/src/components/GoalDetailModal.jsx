@@ -26,6 +26,7 @@ import GoalEditForm from './goals/GoalEditForm';
 import CloseIcon from './atoms/CloseIcon';
 import GoalIcon from './atoms/GoalIcon';
 import SidePaneNotePanel from './common/SidePaneNotePanel';
+import ViewToggleTabs from './common/ViewToggleTabs';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
 
 import styles from './GoalDetailModal.module.css';
@@ -958,40 +959,21 @@ function GoalDetailModal({
         && !(needsLevelPicker && selectedChildType === null);
     if (shouldShowPersistentHeader) {
         const headerTabs = mode !== 'create' ? (
-            <div className={styles.goalTabRow} aria-label="Goal detail views">
-                <button
-                    type="button"
-                    className={`${styles.goalTabButton} ${viewState === 'goal' ? styles.goalTabActive : ''}`}
-                    onClick={() => handleGoalViewNavigation('goal')}
-                    style={{ '--goal-tab-accent': displayGoalColor }}
-                >
-                    Details
-                </button>
-                <button
-                    type="button"
-                    className={`${styles.goalTabButton} ${viewState === 'goal-timeline' ? styles.goalTabActive : ''}`}
-                    onClick={() => handleGoalViewNavigation('goal-timeline')}
-                    style={{ '--goal-tab-accent': displayGoalColor }}
-                >
-                    Timeline
-                </button>
-                <button
-                    type="button"
-                    className={`${styles.goalTabButton} ${viewState === 'goal-activities' ? styles.goalTabActive : ''}`}
-                    onClick={() => handleGoalViewNavigation('goal-activities')}
-                    style={{ '--goal-tab-accent': displayGoalColor }}
-                >
-                    Activities
-                </button>
-                <button
-                    type="button"
-                    className={`${styles.goalTabButton} ${viewState === 'goal-notes' ? styles.goalTabActive : ''}`}
-                    onClick={() => handleGoalViewNavigation('goal-notes')}
-                    style={{ '--goal-tab-accent': displayGoalColor }}
-                >
-                    Notes
-                </button>
-            </div>
+            <ViewToggleTabs
+                items={[
+                    { value: 'goal', label: 'Details' },
+                    { value: 'goal-timeline', label: 'Timeline' },
+                    { value: 'goal-activities', label: 'Activities' },
+                    { value: 'goal-notes', label: 'Notes' },
+                ]}
+                value={viewState}
+                onChange={handleGoalViewNavigation}
+                ariaLabel="Goal detail views"
+                className={styles.goalViewTabs}
+                style={{
+                    '--view-toggle-panel-bg': 'var(--color-bg-surface)',
+                }}
+            />
         ) : null;
 
         content = (
