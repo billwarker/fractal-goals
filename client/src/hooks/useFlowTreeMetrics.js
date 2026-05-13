@@ -350,6 +350,21 @@ export const getDefaultFlowTreeSessionMetricsSummary = (windowDays = ACTIVE_GOAL
     recent_program_sessions_count: 0,
 });
 
+export const countVisibleBranchLeaves = (visibleNodeIds, childrenById) => {
+    if (!visibleNodeIds || visibleNodeIds.size === 0) {
+        return [];
+    }
+    const leafIds = [];
+    visibleNodeIds.forEach((nodeId) => {
+        const childIds = childrenById?.get(nodeId) || [];
+        const hasVisibleChild = childIds.some((childId) => visibleNodeIds.has(childId));
+        if (!hasVisibleChild) {
+            leafIds.push(nodeId);
+        }
+    });
+    return leafIds;
+};
+
 export const buildGraphMetricsFromSummary = (
     rawNodes,
     visibleNodeIds,
@@ -358,7 +373,8 @@ export const buildGraphMetricsFromSummary = (
     activities,
     activityGroups,
     programs,
-    sessionMetricsSummary = getDefaultFlowTreeSessionMetricsSummary()
+    sessionMetricsSummary = getDefaultFlowTreeSessionMetricsSummary(),
+    childrenById = new Map()
 ) => {
     const safeActivities = Array.isArray(activities) ? activities : [];
     const safeActivityGroups = Array.isArray(activityGroups) ? activityGroups : [];
@@ -398,12 +414,9 @@ export const buildGraphMetricsFromSummary = (
         );
     });
 
-    const activeVisibleNodesCount = rawNodes.filter((node) => (
-        visibleNodeIds.has(node.id) && activeLineageIds.has(node.id)
-    )).length;
-    const inactiveVisibleNodesCount = rawNodes.filter((node) => (
-        visibleNodeIds.has(node.id) && inactiveNodeIds.has(node.id)
-    )).length;
+    const branchLeafIds = countVisibleBranchLeaves(visibleNodeIds, childrenById);
+    const activeBranchesCount = branchLeafIds.filter((id) => activeLineageIds.has(id)).length;
+    const inactiveBranchesCount = branchLeafIds.length - activeBranchesCount;
 
     const now = new Date();
     const sevenDaysAgo = getRecentActivityCutoff(now);
@@ -477,8 +490,8 @@ export const buildGraphMetricsFromSummary = (
             totalInstanceDuration: formatDuration(summary.total_instance_duration_seconds),
         },
         row3: {
-            activeVisibleNodesCount,
-            inactiveVisibleNodesCount,
+            activeBranchesCount,
+            inactiveBranchesCount,
         },
         row4: {
             recentSessionsCount: summary.recent_sessions_count,

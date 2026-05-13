@@ -354,8 +354,8 @@ const FlowTree = React.forwardRef(({
 
                     <div className={styles.metricsRow}>
                         <div className={styles.metricsRowTitle}>Pathways</div>
-                        <div className={styles.metricItem} title={`Branches with an associated completed activity instance in the last ${ACTIVE_GOAL_WINDOW_DAYS} days`}>Active Branches: <span className={styles.metricValue}>{graphMetrics.row3.activeVisibleNodesCount}</span></div>
-                        <div className={styles.metricItem} title={`Branches without an associated completed activity instance in the last ${ACTIVE_GOAL_WINDOW_DAYS} days`}>Inactive Branches: <span className={styles.metricValue}>{graphMetrics.row3.inactiveVisibleNodesCount}</span></div>
+                        <div className={styles.metricItem} title={`Root-to-leaf branches whose lineage has a completed activity instance in the last ${ACTIVE_GOAL_WINDOW_DAYS} days`}>Active Branches: <span className={styles.metricValue}>{graphMetrics.row3.activeBranchesCount}</span></div>
+                        <div className={styles.metricItem} title={`Root-to-leaf branches without any completed activity instance in the last ${ACTIVE_GOAL_WINDOW_DAYS} days`}>Inactive Branches: <span className={styles.metricValue}>{graphMetrics.row3.inactiveBranchesCount}</span></div>
                     </div>
 
                     <div className={styles.metricsRow}>

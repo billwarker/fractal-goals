@@ -15,9 +15,8 @@ import { buildTreeMaps, getLineagePath, sortChildren } from './flowTreeTreeUtils
 const toId = (value) => (value == null ? null : String(value));
 
 export const DEFAULT_VIEW_SETTINGS = {
-    highlightActiveBranches: false,
     fadeInactiveBranches: false,
-    showCompletionJourney: false,
+    hideCompletedGoals: false,
 };
 
 export const getLayoutedElements = (nodes, edges, direction = 'TB', compact = false) => {
@@ -64,7 +63,8 @@ export const convertTreeToFlow = (
     onNodeClick,
     onAddChild,
     selectedNodeId = null,
-    completedGoalColor = '#FFD700'
+    completedGoalColor = '#FFD700',
+    { hideCompletedGoals = false } = {}
 ) => {
     const nodes = [];
     const edges = [];
@@ -82,6 +82,7 @@ export const convertTreeToFlow = (
 
         if (addedNodeIds.has(nodeId)) return;
         if (lineagePath && !lineagePath.has(nodeId)) return;
+        if (hideCompletedGoals && Boolean(node.attributes?.completed || node.completed)) return;
 
         const nodeType = getGoalNodeType(normalizedNode);
 
@@ -142,68 +143,6 @@ export const convertTreeToFlow = (
     return { nodes, edges, visibleNodeIds };
 };
 
-export const applyCompletionJourneyYRemap = (nodes, orderedCompletedIds, enabled, isMobile, parentById, childrenById) => {
-    if (!enabled) return nodes;
-
-    const remappedNodes = nodes.map((node) => ({
-        ...node,
-        position: {
-            ...node.position,
-            y: node.position.y + (isMobile ? 70 : 110),
-        },
-    }));
-
-    const completedNodes = orderedCompletedIds
-        .map((id) => remappedNodes.find((node) => node.id === id))
-        .filter(Boolean);
-
-    if (completedNodes.length < 2) {
-        return remappedNodes;
-    }
-
-    const maxY = Math.max(...remappedNodes.map((node) => node.position.y));
-    const bottomY = maxY + (isMobile ? 120 : 180);
-    const spacing = isMobile ? 95 : 130;
-
-    completedNodes.forEach((node, index) => {
-        node.position = {
-            ...node.position,
-            y: bottomY - (index * spacing),
-        };
-    });
-
-    const nodeMap = new Map(remappedNodes.map((node) => [node.id, node]));
-    const minGap = isMobile ? 95 : 130;
-
-    const enforceChildrenBelow = (nodeId) => {
-        const childIds = childrenById?.get(nodeId) || [];
-        const parentNode = nodeMap.get(nodeId);
-        if (!parentNode || childIds.length === 0) return;
-
-        childIds.forEach((childId) => {
-            const childNode = nodeMap.get(childId);
-            if (!childNode) return;
-
-            if (childNode.position.y < parentNode.position.y + minGap) {
-                childNode.position = {
-                    ...childNode.position,
-                    y: parentNode.position.y + minGap,
-                };
-            }
-
-            enforceChildrenBelow(childId);
-        });
-    };
-
-    remappedNodes.forEach((node) => {
-        if (!parentById?.has(node.id)) {
-            enforceChildrenBelow(node.id);
-        }
-    });
-
-    return remappedNodes;
-};
-
 export const buildGraphPresentation = ({
     treeData,
     onNodeClick,
@@ -238,27 +177,15 @@ export const buildGraphPresentation = ({
         onNodeClick,
         onAddChild,
         selectedNodeId,
-        completedGoalColor
+        completedGoalColor,
+        { hideCompletedGoals: normalizedSettings.hideCompletedGoals }
     );
 
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, rawEdges, 'TB', isMobile);
 
-    const visibleCompletedIds = treeMaps.completedGoals
-        .map((entry) => entry.id)
-        .filter((id) => visibleNodeIds.has(id));
-
-    const remappedNodes = applyCompletionJourneyYRemap(
-        layoutedNodes,
-        visibleCompletedIds,
-        normalizedSettings.showCompletionJourney,
-        isMobile,
-        treeMaps.parentById,
-        treeMaps.childrenById,
-    );
-
     const nodeStyleMap = new Map();
     const pausedNodeIds = new Set();
-    remappedNodes.forEach((node) => {
+    layoutedNodes.forEach((node) => {
         const isActive = activeLineageIds.has(node.id);
         const isInactive = inactiveNodeIds.has(node.id);
         const isPaused = Boolean(node.data?.paused ?? node.data?.frozen);
@@ -277,38 +204,28 @@ export const buildGraphPresentation = ({
         }
     });
 
-    const nodes = remappedNodes.map((node) => {
+    const nodes = layoutedNodes.map((node) => {
         const style = nodeStyleMap.get(node.id);
         if (!style) return node;
         return { ...node, style };
     });
 
     const baseEdges = layoutedEdges.map((edge) => {
-        const sourceId = toId(edge.source);
         const targetId = toId(edge.target);
-        const isActiveEdge = normalizedSettings.highlightActiveBranches
-            && activeLineageIds.has(sourceId)
-            && activeLineageIds.has(targetId);
 
         const shouldFadeEdge = normalizedSettings.fadeInactiveBranches
             && (
                 pausedNodeIds.has(targetId)
-                || (inactiveNodeIds.has(targetId) && !isActiveEdge)
+                || inactiveNodeIds.has(targetId)
             );
 
         const nextClassName = [
             edge.className,
-            isActiveEdge ? 'active-branch-edge' : '',
             shouldFadeEdge ? 'faded-edge' : '',
         ].filter(Boolean).join(' ');
 
         const style = { ...(edge.style || {}) };
-        if (isActiveEdge) {
-            style.stroke = 'var(--color-brand-secondary, #ff9f1a)';
-            style.strokeWidth = isMobile ? 2.8 : 3.2;
-            style.opacity = 1;
-            style.zIndex = 3;
-        } else if (shouldFadeEdge) {
+        if (shouldFadeEdge) {
             style.opacity = pausedNodeIds.has(targetId) ? 0.26 : 0.16;
             style.strokeWidth = 1;
         }
@@ -320,28 +237,6 @@ export const buildGraphPresentation = ({
         };
     });
 
-    const journeyEdges = [];
-    if (normalizedSettings.showCompletionJourney) {
-        for (let index = 0; index < visibleCompletedIds.length - 1; index += 1) {
-            const source = visibleCompletedIds[index];
-            const target = visibleCompletedIds[index + 1];
-            journeyEdges.push({
-                id: `journey-${source}-${target}-${index}`,
-                source,
-                target,
-                type: 'straight',
-                className: 'journey-edge',
-                style: {
-                    stroke: 'var(--color-brand-primary, #38bdf8)',
-                    strokeWidth: isMobile ? 2 : 2.5,
-                    strokeDasharray: '7 4',
-                    opacity: 0.95,
-                    zIndex: 5,
-                },
-            });
-        }
-    }
-
     const metrics = buildGraphMetricsFromSummary(
         rawNodes,
         visibleNodeIds,
@@ -350,12 +245,13 @@ export const buildGraphPresentation = ({
         activities,
         activityGroups,
         programs || [],
-        metricsSummary
+        metricsSummary,
+        treeMaps.childrenById
     );
 
     return {
         nodes,
-        edges: [...baseEdges, ...journeyEdges],
+        edges: baseEdges,
         metrics,
     };
 };

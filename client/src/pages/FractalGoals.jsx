@@ -32,16 +32,16 @@ const GoalDetailModal = lazyWithRetry(() => import('../components/GoalDetailModa
  */
 const FLOWTREE_SETTINGS_STORAGE_KEY = 'flowtree-view-settings';
 const DEFAULT_VIEW_SETTINGS = {
-    highlightActiveBranches: false,
     fadeInactiveBranches: false,
-    showCompletionJourney: false,
+    hideCompletedGoals: false,
     showMetricsOverlay: false,
 };
 const EMPTY_ARRAY = [];
 
 function FractalGoals() {
-    const activeBranchTooltip = `Marks goal paths with at least one associated completed activity instance in the last ${ACTIVE_GOAL_WINDOW_DAYS} days.`;
     const inactiveBranchTooltip = `Dims branches with no associated completed activity instances in the last ${ACTIVE_GOAL_WINDOW_DAYS} days.`;
+    const hideCompletedTooltip = 'Hides completed goals from the fractal tree.';
+    const [isOptionsPaneMinimized, setIsOptionsPaneMinimized] = useState(false);
 
     const { rootId } = useParams();
     const navigate = useNavigate();
@@ -279,28 +279,38 @@ function FractalGoals() {
                         position: 'relative'
                     }}
                 >
-                    <div className={`flowtree-options-pane ${isMobile ? 'flowtree-options-pane-mobile' : ''}`}>
-                        <div className="flowtree-options-title">Graph View</div>
-                        <Checkbox
-                            label={<span title={activeBranchTooltip}>Highlight active branches</span>}
-                            checked={viewSettings.highlightActiveBranches}
-                            onChange={handleToggleViewSetting('highlightActiveBranches')}
-                        />
-                        <Checkbox
-                            label={<span title={inactiveBranchTooltip}>Fade inactive branches</span>}
-                            checked={viewSettings.fadeInactiveBranches}
-                            onChange={handleToggleViewSetting('fadeInactiveBranches')}
-                        />
-                        <Checkbox
-                            label="Show completion journey"
-                            checked={viewSettings.showCompletionJourney}
-                            onChange={handleToggleViewSetting('showCompletionJourney')}
-                        />
-                        <Checkbox
-                            label="Show metrics overlay"
-                            checked={viewSettings.showMetricsOverlay}
-                            onChange={handleToggleViewSetting('showMetricsOverlay')}
-                        />
+                    <div className={`flowtree-options-pane ${isMobile ? 'flowtree-options-pane-mobile' : ''} ${isOptionsPaneMinimized ? 'flowtree-options-pane-minimized' : ''}`}>
+                        <div className="flowtree-options-header">
+                            <div className="flowtree-options-title">Graph View</div>
+                            <button
+                                type="button"
+                                className="flowtree-options-minimize-btn"
+                                onClick={() => setIsOptionsPaneMinimized((prev) => !prev)}
+                                aria-label={isOptionsPaneMinimized ? 'Expand graph view options' : 'Minimize graph view options'}
+                                title={isOptionsPaneMinimized ? 'Expand' : 'Minimize'}
+                            >
+                                {isOptionsPaneMinimized ? '+' : '–'}
+                            </button>
+                        </div>
+                        {!isOptionsPaneMinimized && (
+                            <>
+                                <Checkbox
+                                    label={<span title={inactiveBranchTooltip}>Fade inactive branches</span>}
+                                    checked={viewSettings.fadeInactiveBranches}
+                                    onChange={handleToggleViewSetting('fadeInactiveBranches')}
+                                />
+                                <Checkbox
+                                    label={<span title={hideCompletedTooltip}>Hide completed goals</span>}
+                                    checked={viewSettings.hideCompletedGoals}
+                                    onChange={handleToggleViewSetting('hideCompletedGoals')}
+                                />
+                                <Checkbox
+                                    label="Show metrics overlay"
+                                    checked={viewSettings.showMetricsOverlay}
+                                    onChange={handleToggleViewSetting('showMetricsOverlay')}
+                                />
+                            </>
+                        )}
                     </div>
                     <FractalView
                         treeData={fractalData}
