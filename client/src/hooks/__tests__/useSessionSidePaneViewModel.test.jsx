@@ -78,9 +78,18 @@ describe('useSessionSidePaneViewModel', () => {
         expect(result.current.mode).toBe('details');
         expect(result.current.onModeChange).toBe(onModeChange);
         expect(result.current.details).toMatchObject({
+            sessionId: 'session-1',
             isCompleted: false,
             onToggleComplete: toggleSessionComplete,
             onOptions,
+            onNoteAdded,
+            notes: [{ id: 'note-1' }],
+            previousSessionNotes: [{ id: 'prev-session-1' }],
+            addNote,
+            updateNote,
+            deleteNote,
+            pinNote: undefined,
+            unpinNote: undefined,
         });
         expect(result.current.goals).toMatchObject({
             selectedActivity,
@@ -95,14 +104,6 @@ describe('useSessionSidePaneViewModel', () => {
                 { id: 'activity-1', name: 'Squat' },
                 { id: 'activity-2', name: 'Bench' },
             ],
-            onNoteAdded,
-            notes: [{ id: 'note-1' }],
-            previousSessionNotes: [{ id: 'prev-session-1' }],
-            addNote,
-            updateNote,
-            deleteNote,
-            pinNote: undefined,
-            unpinNote: undefined,
         });
     });
 });

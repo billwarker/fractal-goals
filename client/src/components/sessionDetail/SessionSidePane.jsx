@@ -4,15 +4,16 @@
  * Provides:
  * - Session info header (compact, expandable)
  * - Details: Session controls and goal hierarchy
- * - Timeline: Activity history and session notes
+ * - Timeline: Activity history
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import SessionInfoPanel from './SessionInfoPanel';
 import Button from '../atoms/Button';
 import SessionCompletionButton from '../common/SessionCompletionButton';
 import SidePaneHeader from '../common/SidePaneHeader';
 import SessionGoalHierarchyPanel from './SessionGoalHierarchyPanel';
+import SessionNotesPanel from './SessionNotesPanel';
 import TimelinePanel from './TimelinePanel';
 import styles from './SessionSidePane.module.css';
 
@@ -26,6 +27,7 @@ function SessionSidePane({
     const details = model?.details;
     const goals = model?.goals;
     const timeline = model?.timeline;
+    const [detailsPanel, setDetailsPanel] = useState('hierarchy');
 
     return (
         <div className={`${styles.sessionSidepane} ${embedded ? styles.sessionSidepaneEmbedded : ''}`}>
@@ -81,14 +83,48 @@ function SessionSidePane({
 
                             {/* Divider */}
                             <div className={styles.divider}></div>
+
+                            <div className={styles.detailsPanelToggle} aria-label="Details view">
+                                <button
+                                    type="button"
+                                    className={`${styles.detailsPanelButton} ${detailsPanel === 'hierarchy' ? styles.detailsPanelButtonActive : ''}`}
+                                    onClick={() => setDetailsPanel('hierarchy')}
+                                    aria-pressed={detailsPanel === 'hierarchy'}
+                                >
+                                    Goal Hierarchy
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`${styles.detailsPanelButton} ${detailsPanel === 'notes' ? styles.detailsPanelButtonActive : ''}`}
+                                    onClick={() => setDetailsPanel('notes')}
+                                    aria-pressed={detailsPanel === 'notes'}
+                                >
+                                    Session Notes
+                                </button>
+                            </div>
                         </div>
 
-                        <SessionGoalHierarchyPanel
-                            selectedActivity={goals?.selectedActivity}
-                            onGoalClick={goals?.onGoalClick}
-                            onGoalCreated={goals?.onGoalCreated}
-                            className={styles.detailsGoalHierarchy}
-                        />
+                        {detailsPanel === 'hierarchy' ? (
+                            <SessionGoalHierarchyPanel
+                                selectedActivity={goals?.selectedActivity}
+                                onGoalClick={goals?.onGoalClick}
+                                onGoalCreated={goals?.onGoalCreated}
+                                className={styles.detailsGoalHierarchy}
+                            />
+                        ) : (
+                            <SessionNotesPanel
+                                sessionId={details?.sessionId}
+                                onNoteAdded={details?.onNoteAdded}
+                                notes={details?.notes}
+                                previousSessionNotes={details?.previousSessionNotes}
+                                addNote={details?.addNote}
+                                updateNote={details?.updateNote}
+                                deleteNote={details?.deleteNote}
+                                pinNote={details?.pinNote}
+                                unpinNote={details?.unpinNote}
+                                className={styles.detailsSessionNotes}
+                            />
+                        )}
                     </div>
                 ) : (
                     <TimelinePanel
@@ -96,14 +132,6 @@ function SessionSidePane({
                         sessionId={timeline?.sessionId}
                         selectedActivity={timeline?.selectedActivity}
                         sessionActivityDefs={timeline?.sessionActivityDefs}
-                        onNoteAdded={timeline?.onNoteAdded}
-                        notes={timeline?.notes}
-                        previousSessionNotes={timeline?.previousSessionNotes}
-                        addNote={timeline?.addNote}
-                        updateNote={timeline?.updateNote}
-                        deleteNote={timeline?.deleteNote}
-                        pinNote={timeline?.pinNote}
-                        unpinNote={timeline?.unpinNote}
                     />
                 )}
             </div>

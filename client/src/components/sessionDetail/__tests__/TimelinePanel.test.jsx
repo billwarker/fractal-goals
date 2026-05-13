@@ -101,8 +101,6 @@ describe('TimelinePanel', () => {
             }
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Activity' }));
-
         const select = screen.getByRole('combobox');
         expect(select).toHaveValue('activity-def-1');
 
@@ -121,7 +119,7 @@ describe('TimelinePanel', () => {
         expect(screen.getByRole('combobox')).toHaveValue('activity-def-1');
     });
 
-    it('shows session notes in session mode', () => {
+    it('keeps session notes out of the activity timeline view', () => {
         renderWithProviders(
             <TimelinePanel
                 rootId="root-1"
@@ -145,11 +143,9 @@ describe('TimelinePanel', () => {
             }
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Session' }));
-
-        expect(screen.getByText('Session Notes (1)')).toBeInTheDocument();
-        expect(screen.getByText('Keep the wrist relaxed')).toBeInTheDocument();
-        expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+        expect(screen.getByText('Activity Timeline')).toBeInTheDocument();
+        expect(screen.queryByText('Session Notes (1)')).not.toBeInTheDocument();
+        expect(screen.queryByText('Keep the wrist relaxed')).not.toBeInTheDocument();
     });
 
     it('renders saved progress indicators alongside timeline metrics', () => {

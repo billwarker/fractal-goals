@@ -1,7 +1,7 @@
 /**
  * TimelinePanel - Session detail timeline adapter
  * 
- * Combines activity progress timeline data with session notes inside a reusable shell.
+ * Shows previous activity history for the focused session activity.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -12,8 +12,6 @@ import { useEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDispl
 import { useTimezone } from '../../contexts/TimezoneContext';
 import TimelineShell from '../common/TimelineShell';
 import MarkdownNoteContent from '../notes/MarkdownNoteContent';
-import NoteQuickAdd from './NoteQuickAdd';
-import NoteTimeline from './NoteTimeline';
 import {
     computeAutoAggregations,
     filterTrackedMetricDefs,
@@ -22,10 +20,6 @@ import {
 import styles from './TimelinePanel.module.css';
 
 const HISTORY_LIMIT = 10;
-const TIMELINE_MODES = [
-    { value: 'activity', label: 'Activity' },
-    { value: 'session', label: 'Session' },
-];
 
 function formatMetricNumber(value) {
     if (value == null || Number.isNaN(Number(value))) return null;
@@ -39,27 +33,12 @@ function TimelinePanel({
     sessionId,
     selectedActivity,
     sessionActivityDefs,
-    onNoteAdded,
-    notes = [],
-    previousSessionNotes = [],
-    addNote,
-    updateNote,
-    deleteNote,
-    pinNote,
-    unpinNote,
 }) {
     const [manualSelectedActivityId, setManualSelectedActivityId] = useState(null);
-    const [selectedNoteId, setSelectedNoteId] = useState(null);
-    const [viewModeOverrides, setViewModeOverrides] = useState({});
     const availableActivityIds = useMemo(
         () => sessionActivityDefs.map((definition) => definition.id),
         [sessionActivityDefs]
     );
-    const viewModeKey = selectedActivity?.id || selectedActivity?.activity_definition_id || 'session';
-    const viewMode = viewModeOverrides[viewModeKey] || (selectedActivity ? 'activity' : 'session');
-    const setViewMode = (nextMode) => {
-        setViewModeOverrides((previous) => ({ ...previous, [viewModeKey]: nextMode }));
-    };
 
     const selectedActivityId = useMemo(() => {
         const focusedActivityId = selectedActivity?.activity_definition_id;
@@ -115,46 +94,7 @@ function TimelinePanel({
     const selectedDef = sessionActivityDefs.find(d => d.id === selectedActivityId);
     const deltaDisplayMode = useEffectiveDeltaDisplayMode(selectedDef, progressSettings);
 
-    const combinedNotes = useMemo(() => {
-        const currentSessionNotes = notes.filter(n => n.context_type === 'session');
-        let allNotes = [...currentSessionNotes];
-
-        if (previousSessionNotes && previousSessionNotes.length > 0) {
-            previousSessionNotes.forEach(sessionNoteGroup => {
-                const pastNotes = (sessionNoteGroup.notes || []).map(n => ({
-                    ...n,
-                    isPast: true,
-                    session_name: sessionNoteGroup.session_name,
-                    session_date: sessionNoteGroup.session_date
-                }));
-                allNotes = [...allNotes, ...pastNotes];
-            });
-        }
-
-        return allNotes.sort((a, b) => {
-            if (a.is_pinned !== b.is_pinned) {
-                return a.is_pinned ? -1 : 1;
-            }
-            return new Date(b.created_at) - new Date(a.created_at);
-        });
-    }, [notes, previousSessionNotes]);
-
-    const handleAddNote = async (content) => {
-        if (!addNote) return;
-        try {
-            await addNote({
-                context_type: 'session',
-                context_id: sessionId,
-                session_id: sessionId,
-                content,
-            });
-            onNoteAdded?.();
-        } catch (err) {
-            console.error('Failed to add note:', err);
-        }
-    };
-
-    const activitySelector = viewMode === 'activity' ? (
+    const activitySelector = (
         <div className={styles.timelineSelector}>
             <label>Select Activity:</label>
             <select
@@ -172,89 +112,52 @@ function TimelinePanel({
                 )}
             </select>
         </div>
-    ) : null;
-
-    const composer = viewMode === 'session' ? (
-        <NoteQuickAdd
-            onSubmit={handleAddNote}
-            placeholder="Add a session note..."
-        />
-    ) : null;
+    );
 
     return (
         <TimelineShell
             className={styles.timelinePanel}
-            modeToggleClassName={styles.timelineModeToggle}
-            modeButtonClassName={styles.timelineModeButton}
-            modeButtonActiveClassName={styles.timelineModeButtonActive}
             bodyClassName={styles.timelineBody}
-            composerClassName={styles.timelineComposer}
-            modes={TIMELINE_MODES}
-            activeMode={viewMode}
-            onModeChange={setViewMode}
+            modes={[]}
             selector={activitySelector}
-            composer={composer}
         >
-            {viewMode === 'session' ? (
-                <section className={styles.timelineSection}>
-                    <div className={styles.timelineSectionHeader}>
-                        Session Notes
-                        {combinedNotes.length > 0 && ` (${combinedNotes.length})`}
-                    </div>
-                    {combinedNotes.length > 0 ? (
-                        <NoteTimeline
-                            notes={combinedNotes}
-                            onUpdate={updateNote}
-                            onDelete={deleteNote}
-                            onPin={pinNote}
-                            onUnpin={unpinNote}
-                            compact={false}
-                            selectedNoteId={selectedNoteId}
-                            onNoteSelect={setSelectedNoteId}
-                        />
+            <section className={styles.timelineSection}>
+                <div className={styles.timelineSectionHeader}>Activity Timeline</div>
+                <div className={styles.timelineContent}>
+                    {!selectedActivityId ? (
+                        <div className={styles.timelineEmpty}>
+                            Select an activity to view previous sessions
+                        </div>
+                    ) : (loading || progressLoading) ? (
+                        <div className={styles.timelineLoading}>Loading timeline...</div>
+                    ) : (error || progressError) ? (
+                        <div className={styles.timelineError}>Error: {error || progressError?.message || progressError}</div>
+                    ) : history.length > 0 ? (
+                        <div className={styles.timelineList}>
+                            {history.map(instance => (
+                                <ActivityHistoryCard
+                                    key={instance.id}
+                                    instance={instance}
+                                    activityDef={selectedDef}
+                                    progressRecord={
+                                        progressByInstanceId.get(instance.id)
+                                        || progressByInstanceId.get(instance.activity_instance_id)
+                                        || progressByInstanceId.get(instance.instance_id)
+                                        || null
+                                    }
+                                    formatDate={formatDate}
+                                    timezone={timezone}
+                                    deltaDisplayMode={deltaDisplayMode}
+                                />
+                            ))}
+                        </div>
                     ) : (
-                        <div className={styles.timelineEmpty}>No session notes yet</div>
+                        <div className={styles.timelineEmpty}>
+                            No previous sessions found for {selectedDef?.name || 'this activity'}
+                        </div>
                     )}
-                </section>
-            ) : (
-                <section className={styles.timelineSection}>
-                    <div className={styles.timelineSectionHeader}>Activity Timeline</div>
-                    <div className={styles.timelineContent}>
-                        {!selectedActivityId ? (
-                            <div className={styles.timelineEmpty}>
-                                Select an activity to view previous sessions
-                            </div>
-                        ) : (loading || progressLoading) ? (
-                            <div className={styles.timelineLoading}>Loading timeline...</div>
-                        ) : (error || progressError) ? (
-                            <div className={styles.timelineError}>Error: {error || progressError?.message || progressError}</div>
-                        ) : history.length > 0 ? (
-                            <div className={styles.timelineList}>
-                                {history.map(instance => (
-                                    <ActivityHistoryCard
-                                        key={instance.id}
-                                        instance={instance}
-                                        activityDef={selectedDef}
-                                        progressRecord={
-                                            progressByInstanceId.get(instance.id)
-                                            || progressByInstanceId.get(instance.activity_instance_id)
-                                            || progressByInstanceId.get(instance.instance_id)
-                                            || null
-                                        }
-                                        formatDate={formatDate}
-                                        timezone={timezone}
-                                        deltaDisplayMode={deltaDisplayMode}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className={styles.timelineEmpty}>
-                                No previous sessions found for {selectedDef?.name || 'this activity'}
-                            </div>
-                        )}
-                    </div>
-                </section>
-            )}
+                </div>
+            </section>
         </TimelineShell>
     );
 }
