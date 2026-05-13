@@ -24,6 +24,7 @@ const {
             unscheduleDay: vi.fn(),
             scheduleDay: vi.fn(),
             attachGoal: vi.fn(),
+            attachGoalToDay: vi.fn(),
             setProgramGoalDeadline: vi.fn(),
         },
         updateGoal: vi.fn(),
@@ -178,5 +179,25 @@ describe('useProgramDetailMutations', () => {
         expect(notify.error).toHaveBeenCalledWith(
             'Failed to set goal deadline: Child deadline cannot be later than parent deadline (parent deadline: 2026-03-13)'
         );
+    });
+
+    it('sets a deadline before attaching a goal to a specific program day', async () => {
+        const { result } = renderMutations();
+
+        await act(async () => {
+            await result.current.saveDayGoal({
+                block_id: 'block-1',
+                day_id: 'day-1',
+                goal_id: 'goal-1',
+                deadline: '2026-03-10',
+            });
+        });
+
+        expect(mockActions.setProgramGoalDeadline).toHaveBeenCalledWith({
+            goal_id: 'goal-1',
+            deadline: '2026-03-10',
+        });
+        expect(mockActions.attachGoalToDay).toHaveBeenCalledWith('block-1', 'day-1', { goal_id: 'goal-1' });
+        expect(notify.success).toHaveBeenCalledWith('Goal attached to day');
     });
 });

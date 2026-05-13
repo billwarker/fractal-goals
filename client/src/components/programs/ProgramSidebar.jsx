@@ -41,7 +41,7 @@ function ProgramSidebar({
                                 {hideMetricsHeader ? null : <h3 className={styles.sectionHeader}>Program Metrics</h3>}
                                 <div className={styles.metricsList}>
                                     <div className={styles.metricValuePrimary}>
-                                        {programMetrics.daysRemaining} Days Remaining
+                                        {programMetrics.primaryMetricValue ?? programMetrics.daysRemaining} {programMetrics.primaryMetricLabel || 'Days Remaining'}
                                     </div>
                                     <div><span className={styles.metricLabel}>Sessions:</span> {programMetrics.completedSessions} / {programMetrics.scheduledSessions}</div>
                                     <div><span className={styles.metricLabel}>Duration:</span> {formatDurationSeconds ? formatDurationSeconds(programMetrics.totalDuration) : Math.round(programMetrics.totalDuration / 60) + ' min'}</div>

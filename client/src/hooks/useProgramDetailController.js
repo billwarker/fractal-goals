@@ -75,11 +75,11 @@ export function useProgramDetailController({ goals = [] }) {
         setShowDayViewModal(true);
     }, [blockCreationMode]);
 
-    const handleAddBlockClick = useCallback(() => {
+    const handleAddBlockClick = useCallback((initialBlockData = null) => {
         setBlockModalData({
             name: '',
-            startDate: '',
-            endDate: '',
+            startDate: initialBlockData?.startDate || '',
+            endDate: initialBlockData?.endDate || '',
             color: '#3A86FF',
         });
         setShowBlockModal(true);

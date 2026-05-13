@@ -7,7 +7,7 @@ import styles from './ProgramCalendarView.module.css';
 function renderEventContent(eventInfo) {
     const { type, blockColor, isCompleted } = eventInfo.event.extendedProps;
 
-    // Block background events render themselves — skip custom content
+    // Block backgrounds render through FullCalendar background styling.
     if (type === 'block_background') return null;
 
     const title = eventInfo.event.title;
@@ -65,8 +65,20 @@ function renderEventContent(eventInfo) {
     );
 }
 
+function formatCalendarCellDate(date) {
+    if (!(date instanceof Date)) {
+        return '';
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function ProgramCalendarView({
     calendarEvents,
+    blockLabels = [],
     blockCreationMode,
     setBlockCreationMode,
     onAddBlockClick,
@@ -76,10 +88,107 @@ function ProgramCalendarView({
     isMobile = false,
     showBlockControls = true,
     initialDate = new Date(),
-    onDatesSet
+    onDatesSet,
+    selectedDate,
+    selectedRange,
+    selectedRangeLabel,
+    showAddBlockButton = true,
+    onCalendarBackgroundClick,
+    onTodayClick,
+    onBlockLabelClick,
 }) {
+    const calendarRef = React.useRef(null);
+    const calendarContainerRef = React.useRef(null);
+
+    const getDayCellClassNames = (dayInfo) => {
+        const dateStr = dayInfo.dateStr || formatCalendarCellDate(dayInfo.date);
+        const classNames = [];
+        if (selectedRange?.startDate && selectedRange?.endDate
+            && dateStr >= selectedRange.startDate
+            && dateStr <= selectedRange.endDate) {
+            classNames.push(styles.selectedRangeCell);
+        }
+        if (selectedDate && dateStr === selectedDate) {
+            classNames.push(styles.selectedDayCell);
+        }
+        return classNames;
+    };
+
+    const blockLabelsByDate = React.useMemo(() => {
+        const labels = new Map();
+        blockLabels.forEach((label) => {
+            if (!label?.date) return;
+            labels.set(label.date, {
+                title: label.title,
+                color: label.color || 'var(--color-text-primary)',
+                startDate: label.startDate || label.date,
+                endDate: label.endDate || label.date,
+                programId: label.programId,
+                blockId: label.blockId,
+            });
+        });
+        return labels;
+    }, [blockLabels]);
+
+    const syncBlockLabelForCell = React.useCallback((dayEl) => {
+        const dateStr = dayEl.getAttribute('data-date');
+        if (!dateStr) return;
+
+        const blockLabel = blockLabelsByDate.get(dateStr);
+        const frame = dayEl.querySelector('.fc-daygrid-day-frame');
+
+        if (!frame) return;
+
+        frame.querySelector(`.${styles.blockCellLabel}`)?.remove();
+        frame.removeAttribute('data-block-label');
+        frame.style.removeProperty('--program-block-label-color');
+
+        if (blockLabel) {
+            const labelButton = document.createElement('button');
+            labelButton.type = 'button';
+            labelButton.className = styles.blockCellLabel;
+            labelButton.textContent = blockLabel.title;
+            labelButton.title = blockLabel.title;
+            labelButton.setAttribute('aria-label', `Select ${blockLabel.title}`);
+            labelButton.style.setProperty('--program-block-label-color', blockLabel.color);
+            ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend'].forEach((eventName) => {
+                labelButton.addEventListener(eventName, (event) => {
+                    event.stopPropagation();
+                });
+            });
+            labelButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onBlockLabelClick?.(blockLabel);
+            });
+            labelButton.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                event.stopPropagation();
+                onBlockLabelClick?.(blockLabel);
+            });
+            frame.appendChild(labelButton);
+        }
+    }, [blockLabelsByDate, onBlockLabelClick]);
+
+    const clearBlockLabelForCell = (dayEl) => {
+        const frame = dayEl.querySelector('.fc-daygrid-day-frame');
+        frame?.querySelector(`.${styles.blockCellLabel}`)?.remove();
+    };
+
+    React.useEffect(() => {
+        calendarContainerRef.current
+            ?.querySelectorAll('.fc-daygrid-day[data-date]')
+            .forEach(syncBlockLabelForCell);
+    }, [syncBlockLabelForCell]);
+
+    const handleTodayClick = () => {
+        calendarRef.current?.getApi().today();
+        onTodayClick?.();
+    };
+
     return (
-        <div className={styles.calendarContainer}>
+        <div ref={calendarContainerRef} className={styles.calendarContainer} onClick={onCalendarBackgroundClick}>
             {/* Block creation controls - positioned at top right of calendar area */}
             {showBlockControls ? (
                 <div className={styles.headerActions}>
@@ -87,32 +196,47 @@ function ProgramCalendarView({
                         onClick={() => setBlockCreationMode(!blockCreationMode)}
                         className={`${styles.customBtn} ${styles.createModeBtn} ${blockCreationMode ? styles.createModeBtnActive : ''}`}
                     >
-                        {blockCreationMode ? '✓ Add Mode On' : (isMobile ? 'Add by Date' : 'Select Dates to Add Block')}
+                        {blockCreationMode ? 'Multi-Day Select On' : (isMobile ? 'Select Days' : 'Select Multiple Days')}
                     </button>
-                    <button
-                        onClick={onAddBlockClick}
-                        className={`${styles.customBtn} ${styles.addBlockBtn}`}
-                    >
-                        + Add Block
-                    </button>
+                    {selectedRangeLabel ? (
+                        <span className={styles.selectionLabel}>{selectedRangeLabel}</span>
+                    ) : null}
+                    {showAddBlockButton ? (
+                        <button
+                            onClick={onAddBlockClick}
+                            className={`${styles.customBtn} ${styles.addBlockBtn}`}
+                        >
+                            + Add Block
+                        </button>
+                    ) : null}
                 </div>
             ) : null}
 
             <FullCalendar
+                ref={calendarRef}
                 plugins={[dayGridPlugin, interactionPlugin]}
                 initialView="dayGridMonth"
-                headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
+                customButtons={{
+                    contextualToday: {
+                        text: 'Today',
+                        click: handleTodayClick,
+                    },
+                }}
+                headerToolbar={{ left: 'prev,next contextualToday', center: 'title', right: '' }}
                 initialDate={initialDate}
                 events={calendarEvents}
                 height={isMobile ? 560 : '100%'}
                 dayMaxEvents={5}
                 eventOrder="sortOrder"
-                selectable={true}
+                selectable={blockCreationMode}
                 select={onDateSelect}
                 dateClick={onDateClick}
                 eventClick={onEventClick}
                 eventContent={renderEventContent}
                 datesSet={onDatesSet}
+                dayCellClassNames={getDayCellClassNames}
+                dayCellDidMount={(dayInfo) => syncBlockLabelForCell(dayInfo.el)}
+                dayCellWillUnmount={(dayInfo) => clearBlockLabelForCell(dayInfo.el)}
             />
         </div>
     );

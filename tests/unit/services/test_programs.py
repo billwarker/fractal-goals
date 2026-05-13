@@ -34,20 +34,12 @@ def test_create_program(db_session, sample_goal_hierarchy):
         'start_date': datetime.now(timezone.utc).isoformat(),
         'end_date': (datetime.now(timezone.utc) + timedelta(days=90)).isoformat(),
         'selectedGoals': [goal_id],
-        'weeklySchedule': [
-            {
-                'name': 'Block 1',
-                'start_date': datetime.now(timezone.utc).isoformat(),
-                'end_date': (datetime.now(timezone.utc) + timedelta(days=30)).isoformat(),
-                'color': '#ff0000'
-            }
-        ]
+        'weeklySchedule': []
     }
     
     result = ProgramService.create_program(db_session, root_id, data)
     assert result['name'] == 'New Program'
-    assert len(result['blocks']) == 1
-    assert result['blocks'][0]['name'] == 'Block 1'
+    assert result['blocks'] == []
     
     program_db = db_session.query(Program).get(result['id'])
     assert len(program_db.goals) == 1
@@ -270,22 +262,28 @@ def test_update_block_emits_program_block_updated_event(db_session, sample_progr
     
 def test_attach_goal_to_day(db_session, sample_program, sample_goal_hierarchy):
     root_id = sample_goal_hierarchy['ultimate'].id
-    goal_id = sample_goal_hierarchy['short_term'].id
+    goal = sample_goal_hierarchy['short_term']
+    goal.deadline = date.today()
     
-    block = ProgramBlock(program_id=sample_program.id, name="B1")
+    block = ProgramBlock(
+        program_id=sample_program.id,
+        name="B1",
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=7),
+    )
     db_session.add(block)
     db_session.flush()
     
-    day = ProgramDay(block_id=block.id, name="D1", day_number=1)
+    day = ProgramDay(block_id=block.id, name="D1", day_number=1, date=date.today())
     db_session.add(day)
     db_session.commit()
     
-    res = ProgramService.attach_goal_to_day(db_session, root_id, sample_program.id, block.id, day.id, {'goal_id': goal_id})
+    res = ProgramService.attach_goal_to_day(db_session, root_id, sample_program.id, block.id, day.id, {'goal_id': goal.id})
     assert res['id'] == day.id
     
     day_db = db_session.query(ProgramDay).get(day.id)
     assert len(day_db.goals) == 1
-    assert day_db.goals[0].id == goal_id
+    assert day_db.goals[0].id == goal.id
 
 
 def test_schedule_block_day_emits_program_day_scheduled_event(db_session, sample_program, sample_goal_hierarchy, monkeypatch):

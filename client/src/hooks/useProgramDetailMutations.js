@@ -165,6 +165,17 @@ export function useProgramDetailMutations({
         }
     }, [actions, attachBlockId, onAttachGoalSaved]);
 
+    const saveDayGoal = useCallback(async ({ block_id, day_id, goal_id, deadline }) => {
+        try {
+            await actions.setProgramGoalDeadline({ goal_id, deadline });
+            await actions.attachGoalToDay(block_id, day_id, { goal_id });
+            notify.success('Goal attached to day');
+        } catch (error) {
+            console.error('Failed to attach goal to day:', error);
+            notify.error(`Failed to attach goal to day: ${formatError(error)}`);
+        }
+    }, [actions]);
+
     const setGoalDeadline = useCallback(async (goalId, deadline) => {
         try {
             await actions.setProgramGoalDeadline({ goal_id: goalId, deadline });
@@ -239,6 +250,7 @@ export function useProgramDetailMutations({
         unscheduleDay,
         scheduleDay,
         saveAttachedGoal,
+        saveDayGoal,
         setGoalDeadline,
         updateGoal,
         toggleGoalCompletion,

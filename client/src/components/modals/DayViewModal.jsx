@@ -17,6 +17,17 @@ import GoalAssociationPicker from '../goals/GoalAssociationPicker';
 import { useProgramDayViewModel } from '../../hooks/useProgramDayViewModel';
 import styles from './DayViewModal.module.css';
 
+function getGoalStartDate(goal) {
+    return getDatePart(
+        goal?.start_date
+        || goal?.startDate
+        || goal?.attributes?.start_date
+        || goal?.attributes?.startDate
+        || goal?.target?.start_date
+        || goal?.target?.startDate
+    );
+}
+
 /**
  * DayViewModal - Modal for viewing and managing program days on a specific date
  * Shows all program days scheduled for the selected date and allows adding new ones
@@ -28,6 +39,7 @@ const DayViewModal = ({
     program,
     goals,
     onSetGoalDeadline,
+    onAttachGoalToDay,
     onScheduleDay,
     onCreateDayForDate,
     onUnscheduleDay,
@@ -37,6 +49,7 @@ const DayViewModal = ({
     const { getGoalColor } = useGoalLevels();
     const { timezone } = useTimezone();
     const [selectedGoalId, setSelectedGoalId] = useState('');
+    const [selectedGoalDayId, setSelectedGoalDayId] = useState('');
     const [showGoalSection, setShowGoalSection] = useState(false);
     const [showAddDaySection, setShowAddDaySection] = useState(false);
     const [selectedBlockId, setSelectedBlockId] = useState('');
@@ -68,6 +81,7 @@ const DayViewModal = ({
         setShowAddDaySection(false);
         setShowGoalSection(false);
         setSelectedGoalId('');
+        setSelectedGoalDayId('');
     };
     const handleClose = () => {
         resetLocalState();
@@ -75,9 +89,56 @@ const DayViewModal = ({
     };
     const getLocalDateString = (dateTimeStr) => getISOYMDInTimezone(dateTimeStr, timezone);
 
-    if (!isOpen || !date || !program) return null;
+    if (!isOpen || !date) return null;
 
     const formatSessionCount = (count, label) => `${count} ${label}${count === 1 ? '' : 's'}`;
+    const selectedGoal = goals.find((goal) => goal.id === selectedGoalId);
+    const goalDayOptions = scheduledProgramDayData.map((day) => ({
+        id: day.id,
+        blockId: day.blockId,
+        name: day.name || `Day ${day.day_number}`,
+        blockName: day.blockName,
+    }));
+    const shouldAttachGoalToDay = Boolean(onAttachGoalToDay && goalDayOptions.length > 0);
+    const selectedGoalDay = goalDayOptions.length === 1
+        ? goalDayOptions[0]
+        : goalDayOptions.find((day) => day.id === selectedGoalDayId);
+    const handleDeadlineSubmit = () => {
+        if (!selectedGoalId || !onSetGoalDeadline || !selectedGoal) {
+            return;
+        }
+
+        const startDate = getGoalStartDate(selectedGoal);
+        if (startDate && date < startDate) {
+            window.alert(`Deadline cannot be before this goal starts on ${formatLiteralDate(startDate, { month: 'short', day: 'numeric', year: 'numeric' })}.`);
+            return;
+        }
+
+        const currentDeadline = getDatePart(selectedGoal.deadline || selectedGoal.attributes?.deadline);
+        if (currentDeadline && currentDeadline !== date) {
+            const shouldContinue = window.confirm(
+                `This goal already has a deadline of ${formatLiteralDate(currentDeadline, { month: 'short', day: 'numeric', year: 'numeric' })}. Move it to ${formatDate(date)}?`
+            );
+            if (!shouldContinue) {
+                return;
+            }
+        }
+
+        if (shouldAttachGoalToDay && selectedGoalDay) {
+            onAttachGoalToDay({
+                block_id: selectedGoalDay.blockId,
+                day_id: selectedGoalDay.id,
+                goal_id: selectedGoalId,
+                deadline: date,
+            });
+        } else {
+            onSetGoalDeadline(selectedGoalId, date);
+        }
+
+        setSelectedGoalId('');
+        setSelectedGoalDayId('');
+        setShowGoalSection(false);
+    };
 
     return (
         <Modal
@@ -128,6 +189,8 @@ const DayViewModal = ({
                         <div className={styles.sectionContainer}>
                             {scheduledProgramDayData.map((day, idx) => {
                                 const templates = day.templates || [];
+                                const dayGoalIds = new Set(day.goal_ids || []);
+                                const dayGoals = goals.filter((goal) => dayGoalIds.has(goal.id));
                                 const sessionsByTemplate = {};
                                 const unlinkedDaySessions = [];
 
@@ -232,6 +295,16 @@ const DayViewModal = ({
                                                 {day.notes}
                                             </div>
                                         )}
+
+                                        {dayGoals.length > 0 && (
+                                            <div className={styles.dayNotes}>
+                                                {dayGoals.map((goal) => (
+                                                    <div key={goal.id}>
+                                                        Goal: {goal.name}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -269,8 +342,12 @@ const DayViewModal = ({
                     {scheduledProgramDayData.length === 0 && looseScheduledSessions.length === 0 && (
                         <div className={styles.emptyState}>
                             <div className={styles.emptyStateIcon}>📅</div>
-                            <div className={styles.emptyStateTitle}>No program days or sessions scheduled for this date</div>
-                            <div className={styles.emptyStateSub}>Add a day to a block to schedule activities</div>
+                            <div className={styles.emptyStateTitle}>
+                                {program ? 'No program days or sessions scheduled for this date' : 'No program scheduled for this date'}
+                            </div>
+                            <div className={styles.emptyStateSub}>
+                                {program ? 'Add a day to a block to schedule activities' : 'You can still review goals due on this date or set a new deadline.'}
+                            </div>
                         </div>
                     )}
 
@@ -371,27 +448,45 @@ const DayViewModal = ({
                                                 const deadline = getDatePart(goal.deadline);
                                                 return deadline ? `Current deadline: ${formatLiteralDate(deadline, { month: 'short', day: 'numeric', year: 'numeric' })}` : null;
                                             }}
-                                            emptyState="No program goals can take this deadline. Check parent deadlines first."
+                                            emptyState="No goals can take this deadline. Check start dates and parent deadlines first."
                                             inputName="day-deadline-goal"
                                         />
                                     </div>
+                                    {shouldAttachGoalToDay && goalDayOptions.length > 1 && (
+                                        <div className={styles.formGroup}>
+                                            <label className={styles.label}>
+                                                Attach to Program Day
+                                            </label>
+                                            <select
+                                                value={selectedGoalDayId}
+                                                onChange={(event) => setSelectedGoalDayId(event.target.value)}
+                                                className={styles.select}
+                                            >
+                                                <option value="">Choose a day...</option>
+                                                {goalDayOptions.map((day) => (
+                                                    <option key={day.id} value={day.id}>
+                                                        {day.blockName} - {day.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                    {shouldAttachGoalToDay && goalDayOptions.length === 1 && (
+                                        <div className={styles.actionHint}>
+                                            This will attach the goal to {goalDayOptions[0].name} in {goalDayOptions[0].blockName}.
+                                        </div>
+                                    )}
                                     <button
-                                        onClick={() => {
-                                            if (selectedGoalId && onSetGoalDeadline) {
-                                                onSetGoalDeadline(selectedGoalId, date);
-                                                setSelectedGoalId('');
-                                                setShowGoalSection(false);
-                                            }
-                                        }}
-                                        disabled={!selectedGoalId}
+                                        onClick={handleDeadlineSubmit}
+                                        disabled={!selectedGoalId || (shouldAttachGoalToDay && !selectedGoalDay)}
                                         className={styles.primaryButton}
                                         style={{
-                                            background: selectedGoalId ? '#3A86FF' : 'var(--color-bg-input)',
-                                            color: selectedGoalId ? 'white' : 'var(--color-text-muted)',
-                                            cursor: selectedGoalId ? 'pointer' : 'not-allowed',
+                                            background: selectedGoalId && (!shouldAttachGoalToDay || selectedGoalDay) ? '#3A86FF' : 'var(--color-bg-input)',
+                                            color: selectedGoalId && (!shouldAttachGoalToDay || selectedGoalDay) ? 'white' : 'var(--color-text-muted)',
+                                            cursor: selectedGoalId && (!shouldAttachGoalToDay || selectedGoalDay) ? 'pointer' : 'not-allowed',
                                         }}
                                     >
-                                        Set Deadline
+                                        {shouldAttachGoalToDay ? 'Set Deadline and Attach' : 'Set Deadline'}
                                     </button>
                                 </div>
                             )}

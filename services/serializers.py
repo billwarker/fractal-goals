@@ -737,6 +737,7 @@ def serialize_program_day(day):
         "date": format_utc(day.date),
         "day_of_week": day.day_of_week or [],
         "templates": [serialize_session_template(t) for t in day.templates],
+        "goal_ids": [g.id for g in (day.goals or [])],
         "is_completed": day.is_completed,
         "note_condition": note_condition,
         "note_condition_satisfied": note_condition_satisfied,

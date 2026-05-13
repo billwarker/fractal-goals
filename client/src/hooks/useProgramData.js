@@ -3,29 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 
 import { flattenGoals } from '../utils/goalHelpers';
+import { flattenProgramSessions } from '../utils/programViewModel';
 import { queryKeys } from './queryKeys';
 import { useFractalTree } from './useGoalQueries';
-
-function flattenProgramSessions(program) {
-    if (!program?.blocks?.length) {
-        return [];
-    }
-
-    const sessionsById = new Map();
-
-    program.blocks.forEach((block) => {
-        (block.days || []).forEach((day) => {
-            (day.sessions || []).forEach((session) => {
-                if (!session?.id || sessionsById.has(session.id)) {
-                    return;
-                }
-                sessionsById.set(session.id, session);
-            });
-        });
-    });
-
-    return Array.from(sessionsById.values());
-}
 
 export function useProgramData(rootId, programId) {
     const queryClient = useQueryClient();
@@ -136,6 +116,19 @@ export function useProgramData(rootId, programId) {
         return flattenedGoals.find(g => g.id === goalId || (g.attributes && g.attributes.id === goalId));
     }, [flattenedGoals]);
 
+    const refreshers = useMemo(() => ({
+        all: refreshData,
+        program: refreshProgramQueries,
+        goals: refreshGoalQueries,
+        programGoals: async () => Promise.all([refreshProgramQueries(), refreshGoalQueries()]),
+        scheduling: refreshSchedulingQueries,
+    }), [
+        refreshData,
+        refreshGoalQueries,
+        refreshProgramQueries,
+        refreshSchedulingQueries,
+    ]);
+
     return {
         // Data
         program: programQuery.data || null,
@@ -151,13 +144,7 @@ export function useProgramData(rootId, programId) {
 
         // Actions
         refreshData,
-        refreshers: {
-            all: refreshData,
-            program: refreshProgramQueries,
-            goals: refreshGoalQueries,
-            programGoals: async () => Promise.all([refreshProgramQueries(), refreshGoalQueries()]),
-            scheduling: refreshSchedulingQueries,
-        },
+        refreshers,
         getGoalDetails,
 
         // Export raw queries if needed for fine-grained loading states

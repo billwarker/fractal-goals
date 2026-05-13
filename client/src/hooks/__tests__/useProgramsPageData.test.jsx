@@ -68,5 +68,6 @@ describe('useProgramsCalendarData', () => {
         expect(result.current.goals).toHaveLength(1);
         expect(result.current.treeData?.id).toBe('root-1');
         expect(result.current.calendarEvents).toEqual([]);
+        expect(result.current.blockLabels).toEqual([]);
     });
 });

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { fractalApi } from '../utils/api';
 import { localToISO } from '../utils/dateUtils';
 
@@ -21,7 +21,13 @@ function normalizeRefreshers(refreshers) {
 }
 
 export function useProgramLogic(rootId, program, refreshers) {
-    const invalidate = normalizeRefreshers(refreshers);
+    const invalidate = useMemo(() => normalizeRefreshers(refreshers), [refreshers]);
+    const invalidateProgram = invalidate.program;
+    const invalidateProgramGoals = invalidate.programGoals;
+    const invalidateScheduling = invalidate.scheduling;
+    const programId = program?.id;
+    const programBlocks = program?.blocks;
+
     const normalizeBlockPayload = useCallback((blockData) => {
         const payload = {
             name: blockData.name,
@@ -46,11 +52,10 @@ export function useProgramLogic(rootId, program, refreshers) {
             start_date: programData.startDate,
             end_date: programData.endDate,
             selectedGoals: programData.selectedGoals
-            // omitted weeklySchedule to avoid triggering legacy shadow sync
         };
-        await fractalApi.updateProgram(rootId, program.id, apiData);
-        await invalidate.program();
-    }, [invalidate.program, rootId, program]);
+        await fractalApi.updateProgram(rootId, programId, apiData);
+        await invalidateProgram();
+    }, [invalidateProgram, rootId, programId]);
 
     // --- Block Management ---
     const saveBlock = useCallback(async (blockData) => {
@@ -63,74 +68,74 @@ export function useProgramLogic(rootId, program, refreshers) {
         // Because the frontend assigns an ID before creation to handle local state in the UI builder,
         // we should check if this block actually exists in the program's relational blocks array.
 
-        const existingBlock = program.blocks?.find(b => b.id === blockData.id);
+        const existingBlock = programBlocks?.find(b => b.id === blockData.id);
 
         if (existingBlock) {
             // Update
-            await fractalApi.updateBlock(rootId, program.id, blockData.id, payload);
+            await fractalApi.updateBlock(rootId, programId, blockData.id, payload);
         } else {
             // Create
-            await fractalApi.createBlock(rootId, program.id, payload);
+            await fractalApi.createBlock(rootId, programId, payload);
         }
-        await invalidate.program();
-    }, [invalidate.program, normalizeBlockPayload, rootId, program]);
+        await invalidateProgram();
+    }, [invalidateProgram, normalizeBlockPayload, rootId, programBlocks, programId]);
 
     const deleteBlock = useCallback(async (blockId) => {
-        await fractalApi.deleteBlock(rootId, program.id, blockId);
-        await invalidate.program();
-    }, [invalidate.program, rootId, program]);
+        await fractalApi.deleteBlock(rootId, programId, blockId);
+        await invalidateProgram();
+    }, [invalidateProgram, rootId, programId]);
 
     // --- Day Management ---
     const saveDay = useCallback(async (blockId, dayId, dayData) => {
         if (dayId) {
             // Update
-            await fractalApi.updateBlockDay(rootId, program.id, blockId, dayId, dayData);
+            await fractalApi.updateBlockDay(rootId, programId, blockId, dayId, dayData);
         } else {
             // Create
-            await fractalApi.addBlockDay(rootId, program.id, blockId, dayData);
+            await fractalApi.addBlockDay(rootId, programId, blockId, dayData);
         }
-        await invalidate.program();
-    }, [invalidate.program, rootId, program]);
+        await invalidateProgram();
+    }, [invalidateProgram, rootId, programId]);
 
     const copyDay = useCallback(async (blockId, dayId, copyData) => {
-        const res = await fractalApi.copyBlockDay(rootId, program.id, blockId, dayId, copyData);
-        await invalidate.program();
+        const res = await fractalApi.copyBlockDay(rootId, programId, blockId, dayId, copyData);
+        await invalidateProgram();
         return res;
-    }, [invalidate.program, rootId, program]);
+    }, [invalidateProgram, rootId, programId]);
 
     const deleteDay = useCallback(async (blockId, dayId) => {
-        await fractalApi.deleteBlockDay(rootId, program.id, blockId, dayId);
-        await invalidate.program();
-    }, [invalidate.program, rootId, program]);
+        await fractalApi.deleteBlockDay(rootId, programId, blockId, dayId);
+        await invalidateProgram();
+    }, [invalidateProgram, rootId, programId]);
 
     // --- Scheduling (Day Instances) ---
     const scheduleDay = useCallback(async (blockId, date, templateDay) => {
         if (!templateDay) {
-            await fractalApi.addBlockDay(rootId, program.id, blockId, {
+            await fractalApi.addBlockDay(rootId, programId, blockId, {
                 name: `Day ${date}`,
                 date,
                 template_ids: [],
             });
-            await invalidate.program();
+            await invalidateProgram();
             return;
         }
 
-        await fractalApi.scheduleBlockDay(rootId, program.id, blockId, templateDay.id, {
+        await fractalApi.scheduleBlockDay(rootId, programId, blockId, templateDay.id, {
             session_start: localToISO(
                 `${date} 12:00:00`,
                 Intl.DateTimeFormat().resolvedOptions().timeZone
             ),
         });
-        await invalidate.scheduling();
-    }, [invalidate.program, invalidate.scheduling, rootId, program]);
+        await invalidateScheduling();
+    }, [invalidateProgram, invalidateScheduling, rootId, programId]);
 
     const unscheduleRecurringDay = useCallback(async ({ blockId, dayId, date, timezone }) => {
-        await fractalApi.unscheduleBlockDayOccurrence(rootId, program.id, blockId, dayId, {
+        await fractalApi.unscheduleBlockDayOccurrence(rootId, programId, blockId, dayId, {
             date,
             timezone,
         });
-        await invalidate.scheduling();
-    }, [invalidate.scheduling, program, rootId]);
+        await invalidateScheduling();
+    }, [invalidateScheduling, programId, rootId]);
 
     const unscheduleDay = useCallback(async (item) => {
         if (item.type === 'session') {
@@ -138,21 +143,26 @@ export function useProgramLogic(rootId, program, refreshers) {
         } else {
             // Legacy Program Day (Instance)
             if (!item.blockId) throw new Error("Cannot delete day without blockId");
-            await fractalApi.deleteBlockDay(rootId, program.id, item.blockId, item.id);
+            await fractalApi.deleteBlockDay(rootId, programId, item.blockId, item.id);
         }
-        await invalidate.scheduling();
-    }, [invalidate.scheduling, rootId, program]);
+        await invalidateScheduling();
+    }, [invalidateScheduling, rootId, programId]);
 
     // --- Goals ---
     const attachGoal = useCallback(async (blockId, { goal_id, deadline }) => {
-        await fractalApi.attachGoalToBlock(rootId, program.id, blockId, { goal_id, deadline });
-        await invalidate.programGoals();
-    }, [invalidate.programGoals, rootId, program]);
+        await fractalApi.attachGoalToBlock(rootId, programId, blockId, { goal_id, deadline });
+        await invalidateProgramGoals();
+    }, [invalidateProgramGoals, rootId, programId]);
+
+    const attachGoalToDay = useCallback(async (blockId, dayId, { goal_id }) => {
+        await fractalApi.attachGoalToDay(rootId, programId, blockId, dayId, { goal_id });
+        await invalidateProgramGoals();
+    }, [invalidateProgramGoals, rootId, programId]);
 
     const setProgramGoalDeadline = useCallback(async ({ goal_id, deadline }) => {
-        await fractalApi.setProgramGoalDeadline(rootId, program.id, { goal_id, deadline });
-        await invalidate.programGoals();
-    }, [invalidate.programGoals, rootId, program]);
+        await fractalApi.setProgramGoalDeadline(rootId, programId, { goal_id, deadline });
+        await invalidateProgramGoals();
+    }, [invalidateProgramGoals, rootId, programId]);
 
     return {
         saveProgram,
@@ -165,6 +175,7 @@ export function useProgramLogic(rootId, program, refreshers) {
         unscheduleRecurringDay,
         unscheduleDay,
         attachGoal,
+        attachGoalToDay,
         setProgramGoalDeadline,
     };
 }

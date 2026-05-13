@@ -25,8 +25,40 @@ function buildInitialBlockFormData(initialData) {
     };
 }
 
+function getDatePart(value) {
+    return value ? String(value).split('T')[0] : '';
+}
+
+function clampDateToRange(value, min, max) {
+    if (!value) return '';
+    if (min && value < min) return min;
+    if (max && value > max) return max;
+    return value;
+}
+
 const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDates = {} }) => {
-    const [formData, setFormData] = useState(() => buildInitialBlockFormData(initialData));
+    const programStart = getDatePart(programDates.start);
+    const programEnd = getDatePart(programDates.end);
+    const [formData, setFormData] = useState(() => {
+        const initialFormData = buildInitialBlockFormData(initialData);
+        const isNewBlock = !initialData?.id;
+        const startDate = clampDateToRange(
+            getDatePart(initialFormData.startDate) || (isNewBlock ? programStart : ''),
+            programStart,
+            programEnd
+        );
+        const endDate = clampDateToRange(
+            getDatePart(initialFormData.endDate) || (isNewBlock ? programEnd : ''),
+            startDate || programStart,
+            programEnd
+        );
+
+        return {
+            ...initialFormData,
+            startDate,
+            endDate,
+        };
+    });
     const [errors, setErrors] = useState({});
     const [isSaving, setIsSaving] = useState(false);
 
@@ -35,6 +67,22 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
         if (!formData.name.trim()) newErrors.name = 'Name is required';
         if (!formData.startDate) newErrors.startDate = 'Start date is required';
         if (!formData.endDate) newErrors.endDate = 'End date is required';
+
+        if (programStart && formData.startDate && formData.startDate < programStart) {
+            newErrors.startDate = 'Start date must be within the program dates';
+        }
+
+        if (programEnd && formData.startDate && formData.startDate > programEnd) {
+            newErrors.startDate = 'Start date must be within the program dates';
+        }
+
+        if (programStart && formData.endDate && formData.endDate < programStart) {
+            newErrors.endDate = 'End date must be within the program dates';
+        }
+
+        if (programEnd && formData.endDate && formData.endDate > programEnd) {
+            newErrors.endDate = 'End date must be within the program dates';
+        }
 
         if (formData.startDate && formData.endDate) {
             if (new Date(formData.endDate) < new Date(formData.startDate)) {
@@ -57,6 +105,27 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleStartDateChange = (event) => {
+        const nextStartDate = clampDateToRange(event.target.value, programStart, programEnd);
+        const nextEndDate = formData.endDate && formData.endDate < nextStartDate
+            ? nextStartDate
+            : clampDateToRange(formData.endDate, nextStartDate || programStart, programEnd);
+
+        setFormData({
+            ...formData,
+            startDate: nextStartDate,
+            endDate: nextEndDate,
+        });
+    };
+
+    const handleEndDateChange = (event) => {
+        const minEndDate = formData.startDate || programStart;
+        setFormData({
+            ...formData,
+            endDate: clampDateToRange(event.target.value, minEndDate, programEnd),
+        });
     };
 
     return (
@@ -83,9 +152,9 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
                             type="date"
                             label="Start Date"
                             value={formData.startDate}
-                            onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                            min={programDates.start}
-                            max={programDates.end}
+                            onChange={handleStartDateChange}
+                            min={programStart}
+                            max={programEnd}
                             fullWidth
                             error={errors.startDate}
                             required
@@ -94,14 +163,20 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
                             type="date"
                             label="End Date"
                             value={formData.endDate}
-                            onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                            min={formData.startDate || programDates.start}
-                            max={programDates.end}
+                            onChange={handleEndDateChange}
+                            min={formData.startDate || programStart}
+                            max={programEnd}
                             fullWidth
                             error={errors.endDate}
                             required
                         />
                     </div>
+
+                    {programStart && programEnd && (
+                        <div className={styles.dateHint}>
+                            Blocks must stay between {programStart} and {programEnd}.
+                        </div>
+                    )}
 
                     {errors.dateRange && (
                         <div className={styles.error}>{errors.dateRange}</div>

@@ -262,72 +262,6 @@ class ProgramService:
         return goals
 
     @staticmethod
-    def _sync_program_structure(session, program: Program, schedule_list: List[Dict]):
-        """
-        Syncs the JSON schedule list (from frontend) into ProgramBlock/Day/Session tables.
-        schedule_list matches frontend 'weeklySchedule' array (Blocks).
-        """
-        if not isinstance(schedule_list, list):
-            return
-
-        # 1. Map existing blocks
-        existing_blocks = {b.id: b for b in program.blocks}
-        processed_block_ids = set()
-
-        for block_data in schedule_list:
-            b_id = block_data.get('id') or str(uuid.uuid4())
-            
-            # Parse metadata
-            start_dt = None
-            end_dt = None
-            
-            # Handle both frontend (camelCase) and backend (snake_case) formats
-            start_str = block_data.get('startDate') or block_data.get('start_date')
-            end_str = block_data.get('endDate') or block_data.get('end_date')
-            
-            if start_str:
-                if 'T' in start_str: start_str = start_str.split('T')[0]
-                try:
-                    start_dt = datetime.fromisoformat(start_str.replace('Z', '')).date()
-                except ValueError:
-                    # Handle YYYY-MM-DD format directly if fromisoformat fails or double check
-                    try:
-                        start_dt = datetime.strptime(start_str, '%Y-%m-%d').date()
-                    except: pass
-
-            if end_str:
-                if 'T' in end_str: end_str = end_str.split('T')[0]
-                try:
-                    end_dt = datetime.fromisoformat(end_str.replace('Z', '')).date()
-                except ValueError:
-                    try:
-                        end_dt = datetime.strptime(end_str, '%Y-%m-%d').date()
-                    except: pass
-            
-            if b_id in existing_blocks:
-                block = existing_blocks[b_id]
-                block.name = block_data.get('name', 'Block')
-                block.start_date = start_dt
-                block.end_date = end_dt
-                block.color = block_data.get('color')
-            else:
-                block = ProgramBlock(
-                    id=b_id,
-                    program_id=program.id,
-                    name=block_data.get('name', 'Block'),
-                    start_date=start_dt,
-                    end_date=end_dt,
-                    color=block_data.get('color')
-                )
-                program.blocks.append(block)
-            
-            processed_block_ids.add(block.id)
-
-        # Cleanup deleted blocks
-        for bid, blk in existing_blocks.items():
-            if bid not in processed_block_ids:
-                session.delete(blk)
-
     @staticmethod
     def get_programs(session, root_id: str, current_user_id: str | None = None) -> List[Dict]:
         ProgramService._require_root_access(session, root_id, current_user_id)
@@ -449,8 +383,6 @@ class ProgramService:
         end_date = ProgramService._parse_program_datetime(validated_data['end_date'], 'end_date')
         ProgramService._check_no_program_overlap(session, root_id, start_date, end_date)
         
-        schedule_list = validated_data.get('weeklySchedule', [])
-        
         new_program = Program(
             id=str(uuid.uuid4()),
             root_id=root_id,
@@ -458,7 +390,7 @@ class ProgramService:
             description=validated_data.get('description', ''),
             start_date=start_date,
             end_date=end_date,
-            weekly_schedule=schedule_list,
+            weekly_schedule=[],
         )
         
         goal_ids = validated_data.get('selectedGoals', [])
@@ -466,9 +398,6 @@ class ProgramService:
         session.add(new_program)
         session.flush()
         ProgramService._replace_program_goals(session, new_program.id, goal_ids, root_id)
-        
-        # Sync to new tables
-        ProgramService._sync_program_structure(session, new_program, schedule_list)
         
         ProgramService._commit(session, new_program)
 
@@ -516,11 +445,6 @@ class ProgramService:
             goal_ids = validated_data['selectedGoals']
             ProgramService._replace_program_goals(session, program.id, goal_ids, root_id)
         
-        if 'weeklySchedule' in validated_data:
-            schedule_list = validated_data['weeklySchedule']
-            program.weekly_schedule = schedule_list
-            ProgramService._sync_program_structure(session, program, schedule_list)
-            
         ProgramService._commit(session, program)
         
         event_bus.emit(Event(Events.PROGRAM_UPDATED, {
@@ -1057,6 +981,25 @@ class ProgramService:
         ).first()
         if not goal:
             raise ValueError("Goal not found in this fractal")
+
+        deadline_date = ProgramService._normalize_goal_date(goal.deadline)
+        if not deadline_date:
+            raise ValueError("Goal must have a deadline before it can be attached to a program day")
+
+        block = day.block
+        if not block.start_date or not block.end_date:
+            raise ValueError("Program day block must have a start and end date")
+
+        if deadline_date < block.start_date or deadline_date > block.end_date:
+            raise ValueError("Goal deadline must fall within the selected day block")
+
+        if day.date and deadline_date != day.date:
+            raise ValueError("Goal deadline must match the selected program day date")
+
+        if day.day_of_week:
+            day_names = day.day_of_week if isinstance(day.day_of_week, list) else [day.day_of_week]
+            if day_names and deadline_date.strftime('%A') not in day_names:
+                raise ValueError("Goal deadline must match one of the selected program day weekdays")
 
         # Insert directly into program_day_goals junction
         from models.goal import program_day_goals

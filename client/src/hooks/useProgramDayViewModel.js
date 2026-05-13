@@ -12,6 +12,17 @@ function getLocalDateString(dateTimeStr, timezone) {
     return getISOYMDInTimezone(dateTimeStr, timezone);
 }
 
+function getGoalStartDate(goal) {
+    return getDatePart(
+        goal?.start_date
+        || goal?.startDate
+        || goal?.attributes?.start_date
+        || goal?.attributes?.startDate
+        || goal?.target?.start_date
+        || goal?.target?.startDate
+    );
+}
+
 export function useProgramDayViewModel({
     date,
     program,
@@ -139,7 +150,10 @@ export function useProgramDayViewModel({
     const completedSessionCount = completedSessions.length;
 
     const goalsDueOnDate = useMemo(() => {
-        return (goals || []).filter((goal) => goal.deadline && getDatePart(goal.deadline) === date);
+        return (goals || []).filter((goal) => {
+            const deadline = goal.deadline || goal.attributes?.deadline;
+            return deadline && getDatePart(deadline) === date;
+        });
     }, [date, goals]);
 
     const goalsCompletedOnDate = useMemo(() => {
@@ -154,17 +168,23 @@ export function useProgramDayViewModel({
         const goalsById = new Map((goals || []).map((goal) => [goal.id, goal]));
 
         return (goals || []).filter((goal) => {
+            const startDate = getGoalStartDate(goal);
+            if (startDate && getDatePart(date) < startDate) {
+                return false;
+            }
+
             const parentId = goal.parent_id || goal.attributes?.parent_id;
             if (!parentId) {
                 return true;
             }
 
             const parentGoal = goalsById.get(parentId);
-            if (!parentGoal?.deadline) {
+            const parentDeadline = parentGoal?.deadline || parentGoal?.attributes?.deadline;
+            if (!parentDeadline) {
                 return true;
             }
 
-            return getDatePart(date) <= getDatePart(parentGoal.deadline);
+            return getDatePart(date) <= getDatePart(parentDeadline);
         });
     }, [date, goals]);
 

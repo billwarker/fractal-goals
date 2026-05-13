@@ -109,6 +109,8 @@ describe('useProgramDetailViewModel', () => {
             completedSessions: 1,
         });
         expect(result.current.calendarEvents.some((event) => event.id === 'block-bg-block-active')).toBe(true);
+        expect(result.current.calendarEvents.some((event) => event.extendedProps?.type === 'block_label')).toBe(false);
+        expect(result.current.blockLabels.map((label) => label.id)).toEqual(['block-label-block-active', 'block-label-block-late']);
         expect(result.current.calendarEvents.some((event) => event.id === 'goal-goal-parent')).toBe(true);
         expect(result.current.calendarEvents.some((event) => event.id === 'goal-goal-child')).toBe(true);
     });

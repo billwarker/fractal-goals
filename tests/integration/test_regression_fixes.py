@@ -132,14 +132,22 @@ def test_idempotent_attach_goal(authed_client, db_session, test_user):
     block = ProgramBlock(
         id=str(uuid.uuid4()), 
         program_id=program.id, 
-        name="Block"
+        name="Block",
+        start_date=datetime.now(timezone.utc).date(),
+        end_date=datetime.now(timezone.utc).date(),
     )
     day = ProgramDay(
         id=str(uuid.uuid4()), 
         block_id=block.id, 
-        name="Day"
+        name="Day",
+        date=datetime.now(timezone.utc).date(),
     )
-    goal = Goal(id=str(uuid.uuid4()), root_id=my_root.id, name="Goal")
+    goal = Goal(
+        id=str(uuid.uuid4()),
+        root_id=my_root.id,
+        name="Goal",
+        deadline=datetime.now(timezone.utc).date(),
+    )
     
     db_session.add_all([program, block, day, goal])
     db_session.commit()

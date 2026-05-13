@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useReducer, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
@@ -24,9 +24,11 @@ import { useProgramGoalSets } from '../hooks/useProgramGoalSets';
 import { useNotesPageQuery } from '../hooks/useNotesPageQuery';
 import { useProgramsCalendarData } from '../hooks/useProgramsCalendarData';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
-import { formatLiteralDate, getDaysRemaining, getISOYMDInTimezone } from '../utils/dateUtils';
+import { formatLiteralDate, getISOYMDInTimezone, subtractDaysToDateString } from '../utils/dateUtils';
 import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
+import { createProgramCalendarContext, programCalendarContextReducer } from '../utils/programCalendarContext';
+import { buildProgramSidePaneData } from '../utils/programViewModel';
 import styles from './ProgramCalendarPage.module.css';
 
 const ProgramBlockModal = lazyWithRetry(() => import('../components/modals/ProgramBlockModal'), 'components/modals/ProgramBlockModal');
@@ -47,7 +49,12 @@ function dateInProgram(dateStr, program) {
 }
 
 function getProgramStatus(program, today) {
-    return dateInProgram(today, program) ? 'active' : 'inactive';
+    const start = getDatePart(program.start_date);
+    const end = getDatePart(program.end_date);
+
+    if (start && today < start) return 'upcoming';
+    if (end && today > end) return 'completed';
+    return 'active';
 }
 
 function getProgramBucket(program, today) {
@@ -55,8 +62,26 @@ function getProgramBucket(program, today) {
     const end = getDatePart(program.end_date);
 
     if (start && today < start) return 'upcoming';
-    if (end && today > end) return 'past';
+    if (end && today > end) return 'completed';
     return 'active';
+}
+
+function dateRangesOverlap(startA, endA, startB, endB) {
+    return Boolean(startA && endA && startB && endB && startA <= endB && endA >= startB);
+}
+
+function getStatusBadgeClass(status) {
+    if (status === 'active') return 'statusBadgeActive';
+    if (status === 'upcoming') return 'statusBadgeUpcoming';
+    if (status === 'completed') return 'statusBadgeCompleted';
+    return 'statusBadgeInactive';
+}
+
+function getStatusLabel(status) {
+    if (status === 'completed') return 'Completed';
+    if (status === 'upcoming') return 'Upcoming';
+    if (status === 'active') return 'Active';
+    return 'Inactive';
 }
 
 function getDayOffset(startDate, nextStartDate) {
@@ -75,89 +100,6 @@ function shiftDatePart(dateValue, dayOffset) {
     return shifted.toISOString().slice(0, 10);
 }
 
-function isCompletedSession(session) {
-    return Boolean(session.completed || session.attributes?.completed);
-}
-
-function flattenProgramSessions(program) {
-    const sessionsById = new Map();
-    (program?.blocks || []).forEach((block) => {
-        (block.days || []).forEach((day) => {
-            (day.sessions || []).forEach((session) => {
-                if (session?.id && !sessionsById.has(session.id)) {
-                    sessionsById.set(session.id, session);
-                }
-            });
-        });
-    });
-    return Array.from(sessionsById.values());
-}
-
-function getActiveBlock(program) {
-    const today = new Date().toISOString().slice(0, 10);
-    return (program?.blocks || []).find((block) => dateInProgram(today, block)) || null;
-}
-
-function buildSidePaneData(program, goals) {
-    if (!program) {
-        return {
-            programMetrics: null,
-            activeBlock: null,
-            blockMetrics: null,
-            programGoalSeeds: [],
-        };
-    }
-
-    const goalById = new Map(goals.map((goal) => [goal.id, goal]));
-    const programGoalSeeds = (program.goal_ids || [])
-        .map((goalId) => goalById.get(goalId))
-        .filter(Boolean);
-    const programGoalIds = new Set(program.goal_ids || []);
-    const sessions = flattenProgramSessions(program);
-    const blocks = program.blocks || [];
-    const activeBlock = getActiveBlock(program);
-
-    const programMetrics = {
-        completedSessions: sessions.filter(isCompletedSession).length,
-        scheduledSessions: blocks.reduce((sum, block) => (
-            sum + (block.days || []).reduce((daySum, day) => daySum + (day.templates?.length || 0), 0)
-        ), 0),
-        totalDuration: sessions.reduce((sum, session) => sum + (session.total_duration_seconds || 0), 0),
-        goalsMet: Array.from(programGoalIds).filter((goalId) => {
-            const goal = goalById.get(goalId);
-            return goal && (goal.completed || goal.attributes?.completed);
-        }).length,
-        totalGoals: programGoalIds.size,
-        daysRemaining: getDaysRemaining(program.end_date),
-    };
-
-    let blockMetrics = null;
-    if (activeBlock) {
-        const blockSessions = [];
-        (activeBlock.days || []).forEach((day) => {
-            blockSessions.push(...(day.sessions || []));
-        });
-
-        blockMetrics = {
-            name: activeBlock.name,
-            color: activeBlock.color || '#3A86FF',
-            completedSessions: blockSessions.filter(isCompletedSession).length,
-            scheduledSessions: (activeBlock.days || []).reduce((sum, day) => sum + (day.templates?.length || 0), 0),
-            goalsMet: 0,
-            totalGoals: activeBlock.goal_ids?.length || 0,
-            totalDuration: blockSessions.reduce((sum, session) => sum + (session.total_duration_seconds || 0), 0),
-            daysRemaining: getDaysRemaining(activeBlock.end_date),
-        };
-    }
-
-    return {
-        programMetrics,
-        activeBlock,
-        blockMetrics,
-        programGoalSeeds,
-    };
-}
-
 function ProgramSidePane({
     program,
     goals,
@@ -170,19 +112,21 @@ function ProgramSidePane({
     blockMetrics,
     programGoalSeeds,
     onGoalClick,
-    rootId,
     notesQuery,
     notes,
     onCreateNote,
 }) {
-    const fallbackSidePaneData = useMemo(() => buildSidePaneData(program, goals), [goals, program]);
+    const fallbackSidePaneData = useMemo(() => buildProgramSidePaneData({
+        program,
+        goals,
+    }), [goals, program]);
+    const getGoalDetails = (goalId) => goals.find((goal) => goal.id === goalId) || null;
     const sidePaneData = {
         programMetrics: programMetrics || fallbackSidePaneData.programMetrics,
         activeBlock: activeBlock || fallbackSidePaneData.activeBlock,
         blockMetrics: blockMetrics || fallbackSidePaneData.blockMetrics,
         programGoalSeeds: programGoalSeeds || fallbackSidePaneData.programGoalSeeds,
     };
-    const getGoalDetails = (goalId) => goals.find((goal) => goal.id === goalId) || null;
 
     return (
         <aside className={styles.sidePane} aria-label="Program side pane">
@@ -264,8 +208,10 @@ function ProgramSidePane({
 
             {!program ? (
                 <div className={styles.emptySidePane}>
-                    <p>There is no program covering today.</p>
-                    <button className={styles.primaryButton} onClick={onCreate}>New Program</button>
+                    <div className={styles.emptySidePaneCard}>
+                        <p>No program is scheduled for this day.</p>
+                        <button className={styles.emptySidePaneButton} onClick={onCreate}>New Program</button>
+                    </div>
                 </div>
             ) : null}
         </aside>
@@ -278,7 +224,21 @@ function ProgramCalendarPage() {
     const { setActiveRootId } = useGoals();
     const { getGoalColor, getGoalTextColor } = useGoalLevels();
     const { timezone } = useTimezone();
-    const [manualSelectedProgramId, setManualSelectedProgramId] = useState(null);
+    const todayInTimezone = useMemo(
+        () => getISOYMDInTimezone(new Date(), timezone || 'UTC'),
+        [timezone],
+    );
+    const [calendarContext, dispatchCalendarContext] = useReducer(
+        programCalendarContextReducer,
+        todayInTimezone,
+        createProgramCalendarContext,
+    );
+    const {
+        contextProgramId,
+        contextDate,
+        selectedRange: selectedCalendarRange,
+        pendingBlockSelection,
+    } = calendarContext;
     const [viewMode, setViewMode] = useState(programId ? 'blocks' : 'calendar');
     const [isSidePaneVisible, setIsSidePaneVisible] = useState(true);
     const [sidePaneView, setSidePaneView] = useState('details');
@@ -289,20 +249,20 @@ function ProgramCalendarPage() {
     const [builderState, setBuilderState] = useState({ open: false, mode: 'create', startDate: '', duplicateSource: null });
     const [programToDelete, setProgramToDelete] = useState(null);
     const [deleteSessionCount, setDeleteSessionCount] = useState(0);
-
     const {
         programs,
         goals,
         calendarEvents,
+        blockLabels,
         loading,
         refetchPrograms,
-    } = useProgramsCalendarData(rootId, { getGoalColor, getGoalTextColor });
+    } = useProgramsCalendarData(rootId, { getGoalColor, getGoalTextColor, timezone });
 
     const activeProgramId = useMemo(
-        () => programs.find((program) => program.is_active)?.id || null,
-        [programs],
+        () => programs.find((program) => dateInProgram(todayInTimezone, program))?.id || null,
+        [programs, todayInTimezone],
     );
-    const selectedProgramId = manualSelectedProgramId || programId || activeProgramId;
+    const selectedProgramId = contextProgramId !== undefined ? contextProgramId : (programId || activeProgramId);
     const selectedProgram = useMemo(
         () => programs.find((program) => program.id === selectedProgramId) || null,
         [programs, selectedProgramId],
@@ -332,7 +292,6 @@ function ProgramCalendarPage() {
 
     const {
         attachedGoalIds,
-        attachedGoals,
         attachableBlockGoals,
         hierarchyGoalSeeds,
     } = useProgramGoalSets({
@@ -380,7 +339,6 @@ function ProgramCalendarPage() {
         handleUnscheduleDay,
         closeUnscheduleConfirm,
         handleUnscheduleSuccess,
-        handleEventClick: handleProgramEventClick,
         handleAddChildGoal,
     } = useProgramDetailController({ goals: displayGoals });
 
@@ -392,7 +350,6 @@ function ProgramCalendarPage() {
 
     const {
         sortedBlocks,
-        calendarEvents: programCalendarEvents,
         programMetrics,
         activeBlock,
         blockMetrics,
@@ -420,7 +377,7 @@ function ProgramCalendarPage() {
         unscheduleDay,
         scheduleDay,
         saveAttachedGoal,
-        setGoalDeadline,
+        saveDayGoal,
         updateGoal,
         toggleGoalCompletion,
         deleteGoal,
@@ -437,7 +394,7 @@ function ProgramCalendarPage() {
         attachBlockId,
         selectedDate,
         itemToUnschedule,
-        onBlockSaved: handleBlockSaveSuccess,
+        onBlockSaved: handleProgramBlockSaveSuccess,
         onDaySaved: handleDaySaveSuccess,
         onAttachGoalSaved: handleAttachGoalSaveSuccess,
         onScheduleDaySaved: handleScheduleDaySuccess,
@@ -445,17 +402,13 @@ function ProgramCalendarPage() {
         onGoalEditorClosed: closeGoalModal,
     });
 
-    const todayInTimezone = useMemo(
-        () => getISOYMDInTimezone(new Date(), timezone || 'UTC'),
-        [timezone],
-    );
     const displayProgramStatus = displayProgram ? getProgramStatus(displayProgram, todayInTimezone) : null;
     const groupedPrograms = useMemo(() => {
         const normalizedQuery = programPickerQuery.trim().toLowerCase();
         const groups = {
             active: [],
             upcoming: [],
-            past: [],
+            completed: [],
         };
 
         programs.forEach((program) => {
@@ -472,16 +425,44 @@ function ProgramCalendarPage() {
 
         groups.active.sort((a, b) => (getDatePart(a.start_date) || '').localeCompare(getDatePart(b.start_date) || ''));
         groups.upcoming.sort((a, b) => (getDatePart(a.start_date) || '').localeCompare(getDatePart(b.start_date) || ''));
-        groups.past.sort((a, b) => (getDatePart(b.end_date) || '').localeCompare(getDatePart(a.end_date) || ''));
+        groups.completed.sort((a, b) => (getDatePart(b.end_date) || '').localeCompare(getDatePart(a.end_date) || ''));
 
         return groups;
     }, [programPickerFilter, programPickerQuery, programs, todayInTimezone]);
-    const filteredProgramCount = groupedPrograms.active.length + groupedPrograms.upcoming.length + groupedPrograms.past.length;
+    const filteredProgramCount = groupedPrograms.active.length + groupedPrograms.upcoming.length + groupedPrograms.completed.length;
 
-    const pageTitle = displayProgram ? displayProgram.name : 'No Program Active';
+    const selectedRangeText = selectedCalendarRange
+        ? `${formatLiteralDate(selectedCalendarRange.startDate)} - ${formatLiteralDate(selectedCalendarRange.endDate)}`
+        : null;
+    const selectedDateText = formatLiteralDate(contextDate);
+    const contextBlock = displayProgram
+        ? sortedBlocks.find((block) => dateInProgram(contextDate, block))
+        : null;
+    const contextBlockColor = contextBlock?.color || 'var(--color-brand-primary)';
+    const pageTitleParts = [
+        displayProgram?.name ? { key: 'program', label: displayProgram.name } : null,
+        contextBlock?.name ? {
+            key: 'block',
+            label: contextBlock.name,
+            style: { color: contextBlockColor },
+        } : null,
+        { key: 'date', label: selectedRangeText || selectedDateText },
+    ].filter(Boolean);
+    const pageTitle = (
+        <span className={styles.headerTitleSegments}>
+            {pageTitleParts.map((part, index) => (
+                <React.Fragment key={part.key}>
+                    {index > 0 ? <span className={styles.headerTitleSeparator}>•</span> : null}
+                    <span className={styles.headerTitleSegment} style={part.style}>
+                        {part.label}
+                    </span>
+                </React.Fragment>
+            ))}
+        </span>
+    );
     const pageSubtitle = displayProgram
-        ? `${formatLiteralDate(displayProgram.start_date)} - ${formatLiteralDate(displayProgram.end_date)}`
-        : 'There is no program covering today.';
+        ? `${formatLiteralDate(displayProgram.start_date)} - ${formatLiteralDate(displayProgram.end_date)}${selectedRangeText ? ` • Selected ${selectedRangeText}` : ''}`
+        : (selectedRangeText ? 'No program scheduled for these days.' : 'No program scheduled for this day.');
     const duplicateInitialData = useMemo(() => {
         if (builderState.mode !== 'duplicate' || !builderState.duplicateSource) return null;
         return {
@@ -508,22 +489,173 @@ function ProgramCalendarPage() {
         setBuilderState({ open: false, mode: 'create', startDate: '', duplicateSource: null });
     };
 
+    const updateCalendarRangeContext = ({ startDate, endDate = startDate, program = null }) => {
+        const programId = program?.id || null;
+        const isRangeSelection = startDate !== endDate;
+        const canAddBlockFromSelection = Boolean(
+            isRangeSelection
+            && program
+            && getProgramStatus(program, todayInTimezone) !== 'completed'
+            && dateInProgram(startDate, program)
+            && dateInProgram(endDate, program)
+            && !(program.blocks || []).some((block) =>
+                dateRangesOverlap(startDate, endDate, getDatePart(block.start_date), getDatePart(block.end_date))
+            )
+        );
+
+        if (isRangeSelection) {
+            dispatchCalendarContext({
+                type: 'focus_range',
+                startDate,
+                endDate,
+                programId,
+                pendingBlockSelection: canAddBlockFromSelection ? { startDate, endDate } : null,
+            });
+        } else {
+            dispatchCalendarContext({
+                type: 'focus_day',
+                date: startDate,
+                programId,
+            });
+        }
+        closeDayViewModal();
+    };
+
     const handleDateClick = (info) => {
         const clickedDate = info.dateStr;
         const program = programs.find((candidate) => dateInProgram(clickedDate, candidate));
-        if (program) {
-            setManualSelectedProgramId(program.id);
+        const clickedProgramId = program?.id || null;
+        const currentProgramId = selectedProgramId || null;
+
+        if (blockCreationMode) {
+            updateCalendarRangeContext({ startDate: clickedDate, program });
             return;
         }
-        openCreateProgram(clickedDate);
+
+        if (clickedProgramId !== currentProgramId || clickedDate !== contextDate || selectedCalendarRange) {
+            updateCalendarRangeContext({ startDate: clickedDate, program });
+            return;
+        }
+
+        dispatchCalendarContext({
+            type: 'focus_day',
+            date: clickedDate,
+            programId: clickedProgramId,
+        });
+        setViewMode('calendar');
+        handleProgramDateClick(info);
     };
 
     const handleEventClick = (info) => {
-        const programId = info.event.extendedProps?.programId;
-        if (programId) {
-            setManualSelectedProgramId(programId);
+        const eventType = info.event.extendedProps?.type;
+
+        if (eventType === 'block_background' || eventType === 'program_background') {
+            return;
         }
+
+        if (eventType === 'goal') {
+            const goalId = info.event.extendedProps?.goalId || info.event.extendedProps?.id;
+            const goal = displayGoals.find((entry) => entry.id === goalId);
+            if (goal) {
+                openGoalModal(goal);
+            }
+            return;
+        }
+
+        const programId = info.event.extendedProps?.programId;
+        if (!programId) {
+            return;
+        }
+
+        const clickedDate = info.event.startStr ? getDatePart(info.event.startStr) : contextDate;
+        const isSameContext = programId === selectedProgramId;
+
+        if (!isSameContext) {
+            updateCalendarRangeContext({
+                startDate: clickedDate,
+                program: programs.find((candidate) => candidate.id === programId) || null,
+            });
+            return;
+        }
+
+        if (clickedDate !== contextDate || selectedCalendarRange) {
+            updateCalendarRangeContext({
+                startDate: clickedDate,
+                program: programs.find((candidate) => candidate.id === programId) || null,
+            });
+            return;
+        }
+
+        setViewMode('calendar');
+        handleProgramDateClick({ dateStr: clickedDate });
     };
+
+    const handleDateSelectForContext = (info) => {
+        const clickedDate = info.startStr;
+        const selectionEndDate = subtractDaysToDateString(info.endStr, 1);
+        const program = programs.find((candidate) => dateInProgram(clickedDate, candidate));
+
+        if (blockCreationMode) {
+            info.view.calendar.unselect();
+            updateCalendarRangeContext({ startDate: clickedDate, endDate: selectionEndDate, program });
+            return;
+        }
+
+        handleDateSelect(info);
+    };
+
+    const handleCalendarGoalDeadline = async (goalId, deadline) => {
+        await updateGoal(goalId, { deadline });
+    };
+
+    const resetCalendarContextToToday = () => {
+        const program = programs.find((candidate) => dateInProgram(todayInTimezone, candidate));
+        dispatchCalendarContext({
+            type: 'reset_today',
+            date: todayInTimezone,
+            programId: program?.id || null,
+        });
+        setBlockCreationMode(false);
+        closeDayViewModal();
+    };
+
+    const handleCalendarBackgroundClick = (event) => {
+        const interactiveTarget = event.target.closest(
+            '.fc-daygrid-day, .fc-event, .fc-button, button, a, input, select, textarea'
+        );
+
+        if (interactiveTarget) {
+            return;
+        }
+
+        resetCalendarContextToToday();
+    };
+
+    const handleBlockLabelClick = ({ startDate, endDate, programId: blockProgramId }) => {
+        const program = programs.find((candidate) => candidate.id === blockProgramId)
+            || (displayProgram?.id === blockProgramId ? displayProgram : null);
+
+        updateCalendarRangeContext({
+            startDate,
+            endDate,
+            program,
+        });
+    };
+
+    const handleAddSelectedBlock = () => {
+        if (!pendingBlockSelection) return;
+        handleAddBlockClick(pendingBlockSelection);
+    };
+
+    const setBlockCreationModeForCalendar = (nextValue) => {
+        setBlockCreationMode(nextValue);
+        dispatchCalendarContext({ type: 'clear_pending_block_selection' });
+    };
+
+    function handleProgramBlockSaveSuccess() {
+        dispatchCalendarContext({ type: 'clear_pending_block_selection' });
+        handleBlockSaveSuccess();
+    }
 
     const handleSaveProgram = async (programData) => {
         const duplicateSource = builderState.mode === 'duplicate' ? builderState.duplicateSource : null;
@@ -533,7 +665,6 @@ function ProgramCalendarPage() {
             start_date: programData.startDate,
             end_date: programData.endDate,
             selectedGoals: programData.selectedGoals,
-            weeklySchedule: builderState.mode === 'edit' ? (displayProgram?.weekly_schedule || []) : [],
         };
 
         if (builderState.mode === 'edit' && displayProgram) {
@@ -568,7 +699,11 @@ function ProgramCalendarPage() {
                 }
             }
 
-            setManualSelectedProgramId(newProgramId);
+            dispatchCalendarContext({
+                type: 'focus_day',
+                date: programData.startDate || contextDate,
+                programId: newProgramId,
+            });
             notify.success(duplicateSource ? 'Program duplicated' : 'Program created');
         }
         await refetchPrograms();
@@ -593,7 +728,11 @@ function ProgramCalendarPage() {
             setProgramToDelete(null);
             setDeleteSessionCount(0);
             if (selectedProgramId === programToDelete.id) {
-                setManualSelectedProgramId(null);
+                dispatchCalendarContext({
+                    type: 'focus_day',
+                    date: contextDate,
+                    programId: null,
+                });
             }
             await refetchPrograms();
         } catch (error) {
@@ -643,7 +782,12 @@ function ProgramCalendarPage() {
     };
 
     const handleSelectProgramOption = (program) => {
-        setManualSelectedProgramId(program.id);
+        dispatchCalendarContext({
+            type: 'focus_day',
+            date: getDatePart(program.start_date) || contextDate,
+            programId: program.id,
+        });
+        closeDayViewModal();
         setIsProgramOptionsOpen(false);
         setProgramOptionsView('actions');
     };
@@ -704,8 +848,8 @@ function ProgramCalendarPage() {
                         hideTitleOnMobile={false}
                         titleAccessory={displayProgramStatus ? (
                             <>
-                                <span className={`${styles.statusBadge} ${displayProgramStatus === 'active' ? styles.statusBadgeActive : styles.statusBadgeInactive}`}>
-                                    {displayProgramStatus === 'active' ? 'Active' : 'Inactive'}
+                                <span className={`${styles.statusBadge} ${styles[getStatusBadgeClass(displayProgramStatus)]}`}>
+                                    {getStatusLabel(displayProgramStatus)}
                                 </span>
                                 {blockMetrics ? (
                                     <span
@@ -725,15 +869,23 @@ function ProgramCalendarPage() {
                             <div className={styles.loading}>Loading programs...</div>
                         ) : viewMode === 'calendar' ? (
                             <ProgramCalendarView
-                                calendarEvents={displayProgram ? programCalendarEvents : calendarEvents}
+                                calendarEvents={calendarEvents}
+                                blockLabels={blockLabels}
                                 blockCreationMode={blockCreationMode}
-                                setBlockCreationMode={setBlockCreationMode}
-                                onAddBlockClick={displayProgram ? handleAddBlockClick : undefined}
-                                showBlockControls={Boolean(displayProgram)}
-                                onDateClick={displayProgram ? handleProgramDateClick : handleDateClick}
-                                onEventClick={displayProgram ? handleProgramEventClick : handleEventClick}
-                                onDateSelect={displayProgram ? handleDateSelect : (info) => openCreateProgram(info.startStr)}
+                                setBlockCreationMode={setBlockCreationModeForCalendar}
+                                onAddBlockClick={handleAddSelectedBlock}
+                                showBlockControls
+                                selectedRangeLabel={selectedCalendarRange ? `${selectedCalendarRange.startDate} - ${selectedCalendarRange.endDate}` : ''}
+                                showAddBlockButton={Boolean(pendingBlockSelection)}
+                                onDateClick={handleDateClick}
+                                onEventClick={handleEventClick}
+                                onDateSelect={handleDateSelectForContext}
                                 initialDate={new Date()}
+                                selectedDate={selectedCalendarRange ? null : contextDate}
+                                selectedRange={selectedCalendarRange}
+                                onCalendarBackgroundClick={handleCalendarBackgroundClick}
+                                onTodayClick={resetCalendarContextToToday}
+                                onBlockLabelClick={handleBlockLabelClick}
                             />
                         ) : displayProgram ? (
                             <div className={styles.blocksPanel}>
@@ -772,7 +924,6 @@ function ProgramCalendarPage() {
                         blockMetrics={blockMetrics}
                         programGoalSeeds={hierarchyGoalSeeds}
                         onGoalClick={openGoalModal}
-                        rootId={rootId}
                         notesQuery={programNotesQuery}
                         notes={programNotes}
                         onCreateNote={handleCreateProgramNote}
@@ -828,7 +979,7 @@ function ProgramCalendarPage() {
                                             ['all', 'All'],
                                             ['active', 'Active'],
                                             ['upcoming', 'Upcoming'],
-                                            ['past', 'Past'],
+                                            ['completed', 'Completed'],
                                         ].map(([value, label]) => (
                                             <button
                                                 key={value}
@@ -850,7 +1001,7 @@ function ProgramCalendarPage() {
                                 {[
                                     ['Active Program', groupedPrograms.active],
                                     ['Upcoming', groupedPrograms.upcoming],
-                                    ['Past', groupedPrograms.past],
+                                    ['Completed', groupedPrograms.completed],
                                 ].map(([label, group]) => (
                                     group.length ? (
                                         <section className={styles.programPickerGroup} key={label}>
@@ -872,8 +1023,8 @@ function ProgramCalendarPage() {
                                                                     {formatLiteralDate(program.start_date)} - {formatLiteralDate(program.end_date)}
                                                                 </span>
                                                             </span>
-                                                            <span className={`${styles.statusBadge} ${status === 'active' ? styles.statusBadgeActive : styles.statusBadgeInactive}`}>
-                                                                {status === 'active' ? 'Active' : 'Inactive'}
+                                                            <span className={`${styles.statusBadge} ${styles[getStatusBadgeClass(status)]}`}>
+                                                                {getStatusLabel(status)}
                                                             </span>
                                                         </button>
                                                     );
@@ -932,7 +1083,7 @@ function ProgramCalendarPage() {
                         >
                             <span className={styles.optionTitle}>View Other Programs</span>
                             <span className={styles.optionDescription}>
-                                Browse active, upcoming, and past programs.
+                                Browse active, upcoming, and completed programs.
                             </span>
                         </button>
                         <button
@@ -1002,15 +1153,16 @@ function ProgramCalendarPage() {
                     />
                 </Suspense>
             )}
-            {showDayViewModal && displayProgram && (
+            {showDayViewModal && (
                 <Suspense fallback={null}>
                     <DayViewModal
                         isOpen={showDayViewModal}
                         onClose={closeDayViewModal}
                         date={selectedDate}
                         program={displayProgram}
-                        goals={attachedGoals}
-                        onSetGoalDeadline={setGoalDeadline}
+                        goals={displayGoals}
+                        onSetGoalDeadline={handleCalendarGoalDeadline}
+                        onAttachGoalToDay={saveDayGoal}
                         blocks={sortedBlocks}
                         onScheduleDay={scheduleDay}
                         onCreateDayForDate={handleCreateDayForDate}

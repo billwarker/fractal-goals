@@ -47,6 +47,23 @@
     white-space: nowrap;
 }
 
+.headerTitleSegments {
+    display: inline-flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    column-gap: 10px;
+    row-gap: 2px;
+}
+
+.headerTitleSegment {
+    min-width: 0;
+}
+
+.headerTitleSeparator {
+    color: var(--color-text-muted);
+    font-weight: 600;
+}
+
 .blockBadge {
     display: inline-flex;
     align-items: center;
@@ -65,6 +82,18 @@
     border-color: color-mix(in srgb, var(--color-brand-success) 62%, var(--color-border));
     background: color-mix(in srgb, var(--color-brand-success) 16%, transparent);
     color: var(--color-brand-success);
+}
+
+.statusBadgeUpcoming {
+    border-color: color-mix(in srgb, var(--color-brand-primary) 62%, var(--color-border));
+    background: color-mix(in srgb, var(--color-brand-primary) 14%, transparent);
+    color: var(--color-brand-primary);
+}
+
+.statusBadgeCompleted {
+    border-color: color-mix(in srgb, var(--color-text-muted) 62%, var(--color-border));
+    background: color-mix(in srgb, var(--color-bg-card) 72%, transparent);
+    color: var(--color-text-muted);
 }
 
 .statusBadgeInactive {
@@ -181,8 +210,6 @@
     margin: 14px 18px 0;
     line-height: 1.5;
 }
-
-
 
 .viewToggle {
     display: inline-flex;
@@ -500,18 +527,54 @@
 }
 
 .emptySidePane {
-    min-height: 220px;
+    min-height: 260px;
+    flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    gap: 18px;
-    padding: 18px;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
 }
 
-.emptySidePane p {
+.emptySidePaneCard {
+    width: min(100%, 260px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 22px 18px;
+    border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--color-bg-input) 72%, transparent);
+    text-align: center;
+}
+
+.emptySidePaneCard p {
     margin: 0;
     color: var(--color-text-secondary);
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.emptySidePaneButton {
+    min-height: 38px;
+    padding: 0 18px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.emptySidePaneButton:hover {
+    border-color: var(--color-border-hover);
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
+    transform: translateY(-1px);
 }
 
 @media (max-width: 980px) {

@@ -60,3 +60,10 @@
     margin-top: calc(var(--spacing-xs) * -1);
     margin-bottom: var(--spacing-sm);
 }
+
+.dateHint {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+    margin-top: calc(var(--spacing-sm) * -1);
+}

@@ -1,6 +1,5 @@
 import pytest
 import json
-import uuid
 from datetime import datetime, timedelta
 from services.events import Events
 
@@ -16,19 +15,7 @@ def sample_program(authed_client, sample_ultimate_goal):
         'description': 'A test program',
         'start_date': start_date.isoformat(),
         'end_date': end_date.isoformat(),
-        'weeklySchedule': [
-            {
-                'id': str(uuid.uuid4()),
-                'name': 'Week 1',
-                'startDate': start_date.isoformat(),
-                'endDate': end_date.isoformat(),
-                'color': 'blue',
-                'weeklySchedule': {
-                    'monday': [], # No templates yet
-                    'tuesday': []
-                }
-            }
-        ],
+        'weeklySchedule': [],
         'selectedGoals': []
     }
     
@@ -38,7 +25,19 @@ def sample_program(authed_client, sample_ultimate_goal):
         content_type='application/json'
     )
     assert response.status_code == 201
-    return json.loads(response.data)
+    program = json.loads(response.data)
+    block_response = authed_client.post(
+        f'/api/{root_id}/programs/{program["id"]}/blocks',
+        data=json.dumps({
+            'name': 'Week 1',
+            'start_date': start_date.date().isoformat(),
+            'end_date': end_date.date().isoformat(),
+            'color': '#3A86FF',
+        }),
+        content_type='application/json',
+    )
+    assert block_response.status_code == 201
+    return authed_client.get(f'/api/{root_id}/programs/{program["id"]}').get_json()
 
 @pytest.mark.integration
 class TestProgramCRUD:

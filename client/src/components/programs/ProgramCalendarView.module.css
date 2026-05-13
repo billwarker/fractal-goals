@@ -55,6 +55,19 @@
     filter: brightness(1.1);
 }
 
+.selectionLabel {
+    min-height: 34px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 10px;
+    border: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-bg-input) 72%, transparent);
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 /* ─── Custom Event Pills ─────────────────────────────────────────────────── */
 
 /* Reset FullCalendar's default event wrapper so our pill owns all styling */
@@ -72,6 +85,10 @@
 
 :global(.fc-event-title) {
     display: none !important;
+}
+
+:global(.fc-bg-event) {
+    pointer-events: none !important;
 }
 
 /* Base pill — shared by all event types */
@@ -94,6 +111,39 @@
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.3;
+}
+
+.blockCellLabel {
+    position: absolute;
+    top: 7px;
+    left: 7px;
+    right: 36px;
+    z-index: 6;
+    display: block;
+    max-width: calc(100% - 43px);
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: var(--program-block-label-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 800;
+    font-style: italic;
+    line-height: 1.2;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.blockCellLabel:hover,
+.blockCellLabel:focus-visible {
+    color: color-mix(in srgb, var(--program-block-label-color) 82%, white);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    outline: none;
 }
 
 /* Program day — tinted bg + block color left border (dynamic via inline style) */
@@ -223,6 +273,72 @@
     color: var(--color-brand-primary) !important;
     font-weight: 800 !important;
     text-decoration: underline !important;
+}
+
+.selectedDayCell {
+    background: color-mix(in srgb, var(--color-brand-primary) 10%, var(--color-bg-card)) !important;
+    position: relative !important;
+}
+
+.selectedDayCell :global(.fc-daygrid-day-frame) {
+    background: color-mix(in srgb, var(--color-brand-primary) 14%, transparent) !important;
+    box-shadow: inset 0 0 0 1px var(--color-brand-primary) !important;
+    position: relative !important;
+}
+
+.selectedDayCell :global(.fc-daygrid-day-frame)::after {
+    content: '' !important;
+    position: absolute !important;
+    inset: 0 !important;
+    background: color-mix(in srgb, var(--color-brand-primary) 14%, transparent) !important;
+    border: 1px solid var(--color-brand-primary) !important;
+    pointer-events: none !important;
+    z-index: 7 !important;
+}
+
+.selectedDayCell::after {
+    content: '' !important;
+    position: absolute !important;
+    inset: 0 !important;
+    border: 1px solid var(--color-brand-primary) !important;
+    pointer-events: none !important;
+    z-index: 6 !important;
+}
+
+.selectedDayCell :global(.fc-daygrid-day-number) {
+    color: var(--color-brand-primary) !important;
+    font-weight: 800 !important;
+    position: relative !important;
+    z-index: 8 !important;
+}
+
+.selectedRangeCell {
+    background: color-mix(in srgb, var(--color-brand-primary) 7%, var(--color-bg-card)) !important;
+    position: relative !important;
+}
+
+.selectedRangeCell :global(.fc-daygrid-day-frame) {
+    background: color-mix(in srgb, var(--color-brand-primary) 8%, transparent) !important;
+    position: relative !important;
+}
+
+.selectedRangeCell :global(.fc-daygrid-day-frame)::before {
+    content: '' !important;
+    position: absolute !important;
+    inset: 0 !important;
+    background: color-mix(in srgb, var(--color-brand-primary) 8%, transparent) !important;
+    pointer-events: none !important;
+    z-index: 6 !important;
+}
+
+.selectedRangeCell::before {
+    content: '' !important;
+    position: absolute !important;
+    inset: 0 !important;
+    border-top: 1px solid color-mix(in srgb, var(--color-brand-primary) 72%, transparent) !important;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-brand-primary) 72%, transparent) !important;
+    pointer-events: none !important;
+    z-index: 5 !important;
 }
 
 @media (max-width: 768px) {
