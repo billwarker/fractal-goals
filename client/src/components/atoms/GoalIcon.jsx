@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 
 /**
  * GoalIcon Component
@@ -20,6 +20,7 @@ const GoalIcon = ({
     className,
     style = {}
 }) => {
+    const uid = useId().replace(/:/g, '_');
     const viewBox = "0 0 100 100";
 
     const getPath = (s) => {
@@ -123,8 +124,191 @@ const GoalIcon = ({
     };
 
     const paths = getPath(shape);
-    const isStrokeBased = shape.toLowerCase() === 'check';
-    const STROKE_WIDTH = "5";
+    const normalizedShape = shape.toLowerCase();
+    const isStrokeBased = normalizedShape === 'check';
+    const isCircle = normalizedShape === 'circle';
+    const isTriangle = normalizedShape === 'triangle';
+    const isSquare = normalizedShape === 'square';
+    const isTwelvePointStar = normalizedShape === 'twelvepointstar' || normalizedShape === 'twelve-point-star';
+
+    const renderBaseShape = (fill = color) => React.cloneElement(paths.full, {
+        fill: isStrokeBased ? 'none' : fill,
+        stroke: isStrokeBased ? color : 'none',
+        strokeWidth: isStrokeBased ? (paths.full.props.strokeWidth || "12") : "0"
+    });
+
+    const renderOutline = (strokeWidth = isCircle ? '3' : '4') => React.cloneElement(paths.full, {
+        fill: 'none',
+        stroke: color,
+        strokeWidth,
+    });
+
+    const renderStaticSmartIcon = () => {
+        if (isStrokeBased) {
+            return React.cloneElement(paths.full, {
+                fill: 'none',
+                stroke: color,
+                strokeWidth: paths.full.props.strokeWidth || "12",
+            });
+        }
+
+        if (isCircle) {
+            return (
+                <>
+                    {renderBaseShape(secondaryColor)}
+                    <g mask={`url(#mask_${uid})`}>
+                        <g
+                            style={{
+                                transformOrigin: '50px 50px',
+                                transformBox: 'view-box',
+                                transform: 'rotate(-18deg)',
+                            }}
+                        >
+                            {[
+                                { cy: 22, ry: 3, rx: 30 },
+                                { cy: 41, ry: 5.5, rx: 43 },
+                                { cy: 59, ry: 5.5, rx: 43 },
+                                { cy: 78, ry: 3, rx: 30 },
+                            ].map((lat, i) => (
+                                <ellipse
+                                    key={`lat-${i}`}
+                                    cx="50"
+                                    cy={lat.cy}
+                                    rx={lat.rx}
+                                    ry={lat.ry}
+                                    fill="none"
+                                    stroke={color}
+                                    strokeWidth="3.5"
+                                />
+                            ))}
+                            {[
+                                { rx: 44, scaleX: 1 },
+                                { rx: 44, scaleX: 0.58 },
+                                { rx: 44, scaleX: -0.58 },
+                                { rx: 44, scaleX: 0.18 },
+                            ].map((meridian, i) => (
+                                <ellipse
+                                    key={`mer-${i}`}
+                                    cx="50"
+                                    cy="50"
+                                    rx={meridian.rx}
+                                    ry="44"
+                                    fill="none"
+                                    stroke={color}
+                                    strokeWidth="4.5"
+                                    style={{
+                                        transformOrigin: '50px 50px',
+                                        transformBox: 'view-box',
+                                        transform: `scaleX(${meridian.scaleX})`,
+                                    }}
+                                />
+                            ))}
+                        </g>
+                    </g>
+                    {renderOutline('3')}
+                </>
+            );
+        }
+
+        if (isTwelvePointStar) {
+            return (
+                <>
+                    {renderBaseShape(secondaryColor)}
+                    {[
+                        { x: 20, y: 20, size: 60 },
+                        { x: 30, y: 30, size: 40 },
+                        { x: 40, y: 40, size: 20 },
+                    ].map((layer, layerIndex) => (
+                        <g key={layerIndex} mask={layerIndex === 0 ? undefined : `url(#mask_${uid})`}>
+                            {[0, 30, 60].map((rotation) => (
+                                <rect
+                                    key={rotation}
+                                    x={layer.x}
+                                    y={layer.y}
+                                    width={layer.size}
+                                    height={layer.size}
+                                    fill={secondaryColor}
+                                    stroke={color}
+                                    strokeWidth="5"
+                                    strokeLinejoin="miter"
+                                    transform={`rotate(${rotation} 50 50)`}
+                                />
+                            ))}
+                        </g>
+                    ))}
+                    <circle cx="50" cy="50" r="6" fill={secondaryColor} stroke="none" />
+                </>
+            );
+        }
+
+        if (isTriangle) {
+            return (
+                <>
+                    {renderBaseShape(color)}
+                    <g clipPath={`url(#clip_${uid})`}>
+                        <polygon points="50 165 -40 5 140 5" fill={secondaryColor} stroke="none" />
+                    </g>
+                </>
+            );
+        }
+
+        if (isSquare) {
+            return (
+                <>
+                    {renderBaseShape(color)}
+                    <g mask={`url(#mask_${uid})`}>
+                        {[
+                            { size: 90, rotation: 0, fill: 'none', stroke: color },
+                            { size: 56, rotation: 45, fill: secondaryColor, stroke: color },
+                            { size: 24, rotation: 0, fill: color, stroke: color },
+                            { size: 10, rotation: 45, fill: secondaryColor, stroke: secondaryColor },
+                        ].map((layer, index) => {
+                            const inset = (100 - layer.size) / 2;
+                            return (
+                                <rect
+                                    key={index}
+                                    x={inset}
+                                    y={inset}
+                                    width={layer.size}
+                                    height={layer.size}
+                                    fill={layer.fill}
+                                    stroke={layer.stroke}
+                                    strokeWidth="5"
+                                    transform={`rotate(${layer.rotation} 50 50)`}
+                                />
+                            );
+                        })}
+                    </g>
+                </>
+            );
+        }
+
+        return (
+            <>
+                {renderBaseShape(color)}
+                <g mask={`url(#mask_${uid})`}>
+                    {React.cloneElement(paths.full, {
+                        fill: 'none',
+                        stroke: secondaryColor,
+                        strokeWidth: '12',
+                        style: {
+                            transformOrigin: normalizedShape === 'triangle' ? '50px 58px' : '50px 50px',
+                            transform: 'scale(0.62)'
+                        }
+                    })}
+                    {React.cloneElement(paths.full, {
+                        fill: color,
+                        stroke: 'none',
+                        style: {
+                            transformOrigin: normalizedShape === 'triangle' ? '50px 58px' : '50px 50px',
+                            transform: 'scale(0.18)'
+                        }
+                    })}
+                </g>
+                {renderOutline()}
+            </>
+        );
+    };
 
     return (
         <svg
@@ -136,34 +320,19 @@ const GoalIcon = ({
             className={className}
             style={{ display: 'block', pointerEvents: 'none', ...style }}
         >
+            <defs>
+                <mask id={`mask_${uid}`}>
+                    {React.cloneElement(paths.full, { fill: 'white', stroke: 'none' })}
+                </mask>
+                <clipPath id={`clip_${uid}`}>
+                    {React.cloneElement(paths.full, { fill: 'white', stroke: 'none' })}
+                </clipPath>
+            </defs>
             {isSmart ? (
-                <>
-                    {/* Outer Ring — stroke only */}
-                    {React.cloneElement(paths.outer, {
-                        fill: isStrokeBased ? 'none' : secondaryColor,
-                        stroke: color,
-                        strokeWidth: isStrokeBased ? (paths.outer.props.strokeWidth || STROKE_WIDTH) : STROKE_WIDTH
-                    })}
-                    {/* Middle Ring — stroke only */}
-                    {React.cloneElement(paths.middle, {
-                        fill: isStrokeBased ? 'none' : secondaryColor,
-                        stroke: color,
-                        strokeWidth: isStrokeBased ? (paths.middle.props.strokeWidth || STROKE_WIDTH) : STROKE_WIDTH
-                    })}
-                    {/* Inner Ring — stroke only, same weight */}
-                    {React.cloneElement(paths.inner, {
-                        fill: isStrokeBased ? 'none' : secondaryColor,
-                        stroke: color,
-                        strokeWidth: isStrokeBased ? (paths.inner.props.strokeWidth || STROKE_WIDTH) : STROKE_WIDTH
-                    })}
-                </>
+                renderStaticSmartIcon()
             ) : (
                 /* Non-SMART: solid shape */
-                React.cloneElement(paths.full, {
-                    fill: isStrokeBased ? 'none' : color,
-                    stroke: isStrokeBased ? color : 'none',
-                    strokeWidth: isStrokeBased ? (paths.full.props.strokeWidth || "12") : "0"
-                })
+                renderBaseShape(color)
             )}
         </svg>
     );

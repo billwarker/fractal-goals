@@ -210,8 +210,18 @@ export const buildGraphPresentation = ({
         return { ...node, style };
     });
 
-    const baseEdges = layoutedEdges.map((edge) => {
+    const baseEdges = layoutedEdges.flatMap((edge) => {
+        const sourceId = toId(edge.source);
         const targetId = toId(edge.target);
+        const isActiveBranchEdge = activeLineageIds.has(sourceId) && activeLineageIds.has(targetId);
+        const sourceNode = treeMaps.nodeById.get(sourceId);
+        const targetNode = treeMaps.nodeById.get(targetId);
+        const sourceCompleted = Boolean(sourceNode?.attributes?.completed || sourceNode?.completed);
+        const targetCompleted = Boolean(targetNode?.attributes?.completed || targetNode?.completed);
+        const connectsCompletedGoals = sourceCompleted && targetCompleted;
+        const activeBranchColor = connectsCompletedGoals
+            ? completedGoalColor
+            : 'var(--color-active-branch-line, #60a5fa)';
 
         const shouldFadeEdge = normalizedSettings.fadeInactiveBranches
             && (
@@ -221,20 +231,52 @@ export const buildGraphPresentation = ({
 
         const nextClassName = [
             edge.className,
+            isActiveBranchEdge && !shouldFadeEdge ? 'active-branch-edge' : '',
             shouldFadeEdge ? 'faded-edge' : '',
         ].filter(Boolean).join(' ');
 
         const style = { ...(edge.style || {}) };
+        if (isActiveBranchEdge && !shouldFadeEdge) {
+            style.stroke = activeBranchColor;
+            style.strokeWidth = edge.className?.includes('completed-edge') ? 3 : 2.25;
+            style.opacity = 0.88;
+            style['--active-branch-highlight-color'] = activeBranchColor;
+        }
         if (shouldFadeEdge) {
             style.opacity = pausedNodeIds.has(targetId) ? 0.26 : 0.16;
             style.strokeWidth = 1;
         }
 
-        return {
+        const baseEdge = {
             ...edge,
             className: nextClassName,
             style,
         };
+
+        if (!isActiveBranchEdge || shouldFadeEdge) {
+            return [baseEdge];
+        }
+
+        return [
+            baseEdge,
+            {
+                ...edge,
+                id: `${edge.id}-active-flow`,
+                className: 'active-branch-flow-edge journey-edge journey-edge-to-root',
+                style: {
+                    stroke: activeBranchColor,
+                    strokeWidth: 2,
+                    strokeDasharray: '7 15',
+                    opacity: 0.58,
+                    pointerEvents: 'none',
+                    '--active-branch-highlight-color': activeBranchColor,
+                },
+                data: {
+                    ...(edge.data || {}),
+                    overlay: true,
+                },
+            },
+        ];
     });
 
     const metrics = buildGraphMetricsFromSummary(

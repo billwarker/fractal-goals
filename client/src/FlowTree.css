@@ -12,7 +12,20 @@
 }
 
 .active-branch-edge .react-flow__edge-path {
-    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--color-brand-secondary, #ff9f1a) 70%, transparent));
+    filter:
+        drop-shadow(0 0 2px color-mix(in srgb, var(--active-branch-highlight-color, var(--color-active-branch-line, #60a5fa)) 55%, transparent))
+        drop-shadow(0 0 7px color-mix(in srgb, var(--active-branch-highlight-color, var(--color-active-branch-line, #60a5fa)) 24%, transparent));
+}
+
+.active-branch-flow-edge {
+    pointer-events: none;
+}
+
+.active-branch-flow-edge .react-flow__edge-path {
+    stroke: var(--active-branch-highlight-color, var(--color-active-branch-line, #60a5fa));
+    filter:
+        drop-shadow(0 0 3px color-mix(in srgb, var(--active-branch-highlight-color, var(--color-active-branch-line, #60a5fa)) 62%, transparent))
+        drop-shadow(0 0 8px color-mix(in srgb, var(--active-branch-highlight-color, var(--color-active-branch-line, #60a5fa)) 28%, transparent));
 }
 
 .faded-edge .react-flow__edge-path {
@@ -21,7 +34,11 @@
 
 .journey-edge .react-flow__edge-path {
     stroke-linecap: round;
-    animation: journeyFlow 1s linear infinite;
+    animation: journeyFlow 1.25s linear infinite;
+}
+
+.journey-edge-to-root .react-flow__edge-path {
+    animation-name: journeyFlowToRoot;
 }
 
 @keyframes journeyFlow {
@@ -30,6 +47,15 @@
     }
     to {
         stroke-dashoffset: 0;
+    }
+}
+
+@keyframes journeyFlowToRoot {
+    from {
+        stroke-dashoffset: 0;
+    }
+    to {
+        stroke-dashoffset: 22;
     }
 }
 
