@@ -133,13 +133,18 @@ function GoalDetailModal({
     // null = picker not yet confirmed; a type string = level chosen, show form
     const [selectedChildType, setSelectedChildType] = useState(needsLevelPicker ? null : defaultChildType);
     const [activitiesAssociateAction, setActivitiesAssociateAction] = useState(null);
+    const [activitiesAssociateCancelAction, setActivitiesAssociateCancelAction] = useState(null);
+    const [isActivitiesAssociationMode, setIsActivitiesAssociationMode] = useState(false);
+    const [activityPickerFooterActions, setActivityPickerFooterActions] = useState(null);
     const [activityBuilderReturnView, setActivityBuilderReturnView] = useState('activity-associator');
     const [activityBuilderTemplate, setActivityBuilderTemplate] = useState(null);
+    const [isActivityBuilderOpen, setIsActivityBuilderOpen] = useState(false);
     const [embeddedTargetBuilderTarget, setEmbeddedTargetBuilderTarget] = useState(undefined);
     const [embeddedTargetActivityId, setEmbeddedTargetActivityId] = useState(null);
     const [isTargetSelectionMode, setIsTargetSelectionMode] = useState(false);
     const [targetManagerReturnView, setTargetManagerReturnView] = useState('goal');
     const goalHeaderRef = React.useRef(null);
+    const contentScrollRef = React.useRef(null);
     const [goalHeaderStickyOffset, setGoalHeaderStickyOffset] = useState(0);
     // Reset when the parent changes (e.g. modal reused for a different goal)
     React.useEffect(() => {
@@ -405,6 +410,14 @@ function GoalDetailModal({
         setActivitiesAssociateAction(() => handler);
     }, []);
 
+    const registerActivitiesAssociateCancelAction = React.useCallback((handler) => {
+        setActivitiesAssociateCancelAction(() => handler);
+    }, []);
+
+    const registerActivityPickerFooterActions = React.useCallback((actions) => {
+        setActivityPickerFooterActions(actions);
+    }, []);
+
     const completionFooterState = useMemo(() => {
         const isManualAllowed = levelConfig.allow_manual_completion !== false;
         const canShowManual = allowManualCompletion && isManualAllowed && !isPaused;
@@ -464,7 +477,25 @@ function GoalDetailModal({
         setIsEditing(true);
     };
 
+    React.useEffect(() => {
+        if (viewState !== 'goal-activities' || !isActivitiesAssociationMode) {
+            return;
+        }
+
+        const schedule = typeof requestAnimationFrame === 'function'
+            ? requestAnimationFrame
+            : (callback) => window.setTimeout(callback, 0);
+
+        schedule(() => {
+            contentScrollRef.current?.scrollTo?.({ top: 0, behavior: 'smooth' });
+        });
+    }, [isActivitiesAssociationMode, viewState]);
+
     const handleAddTargetFromActivities = () => {
+        if (isActivitiesAssociationMode) {
+            activitiesAssociateCancelAction?.();
+            return;
+        }
         setTargetToEdit(null);
         setEmbeddedTargetActivityId(null);
         setIsTargetSelectionMode(true);
@@ -492,6 +523,26 @@ function GoalDetailModal({
         setIsTargetSelectionMode(false);
     };
 
+    const handleCreateActivityFromActivities = React.useCallback(() => {
+        setActivityBuilderReturnView('goal-activities');
+        setActivityBuilderTemplate(null);
+        setIsActivityBuilderOpen(true);
+    }, []);
+
+    const handleCopyActivityFromActivities = React.useCallback((activity) => {
+        setActivityBuilderReturnView('goal-activities');
+        setActivityBuilderTemplate(prepareActivityDefinitionCopy(activity));
+        setIsActivityBuilderOpen(true);
+    }, []);
+
+    const handleCancelActivitiesFlow = () => {
+        if (isTargetSelectionMode) {
+            handleCancelTargetSelection();
+            return;
+        }
+        activitiesAssociateCancelAction?.();
+    };
+
     const persistTargetChanges = (newTargets) => {
         if (onUpdate && goalId) {
             onUpdate(goalId, {
@@ -517,6 +568,8 @@ function GoalDetailModal({
             setEmbeddedTargetBuilderTarget(undefined);
             setEmbeddedTargetActivityId(null);
             setIsTargetSelectionMode(false);
+            setIsActivitiesAssociationMode(false);
+            setActivityPickerFooterActions(null);
         }
         setViewState(nextViewState);
     };
@@ -805,15 +858,14 @@ function GoalDetailModal({
                     inheritParentActivities={inheritParentActivities}
                     setInheritParentActivities={setInheritParentActivities}
                     onCreateActivity={() => {
-                        // Switch to activity builder view
                         setActivityBuilderReturnView('activity-associator');
                         setActivityBuilderTemplate(null);
-                        setViewState('activity-builder');
+                        setIsActivityBuilderOpen(true);
                     }}
                     onCopyActivity={(activity) => {
                         setActivityBuilderReturnView('activity-associator');
                         setActivityBuilderTemplate(prepareActivityDefinitionCopy(activity));
-                        setViewState('activity-builder');
+                        setIsActivityBuilderOpen(true);
                     }}
                 />
             </Suspense>
@@ -860,51 +912,21 @@ function GoalDetailModal({
                         embedded
                         useFooterAssociateAction
                         registerAssociateAction={registerActivitiesAssociateAction}
+                        registerAssociateCancelAction={registerActivitiesAssociateCancelAction}
+                        onAssociationFlowChange={setIsActivitiesAssociationMode}
+                        registerPickerFooterActions={registerActivityPickerFooterActions}
                         onClose={handleClose}
                         onSave={persistAssociations}
                         onRefreshAssociations={refreshAssociations}
                         inheritParentActivities={inheritParentActivities}
                         setInheritParentActivities={setInheritParentActivities}
                         dividerColor={displayGoalColor}
-                        onCreateActivity={() => {
-                            setActivityBuilderReturnView('goal-activities');
-                            setActivityBuilderTemplate(null);
-                            setViewState('activity-builder');
-                        }}
-                        onCopyActivity={(activity) => {
-                            setActivityBuilderReturnView('goal-activities');
-                            setActivityBuilderTemplate(prepareActivityDefinitionCopy(activity));
-                            setViewState('activity-builder');
-                        }}
+                        onCreateActivity={handleCreateActivityFromActivities}
+                        onCopyActivity={handleCopyActivityFromActivities}
                         isTargetSelectionMode={isTargetSelectionMode}
                         onSelectTargetActivity={handleSelectTargetActivity}
                     />
                 )}
-            </Suspense>
-        );
-    } else if (viewState === 'activity-builder') {
-        content = (
-            <Suspense fallback={null}>
-                <InlineActivityBuilder
-                    rootId={rootId}
-                    goalId={goalId}
-                    activityGroups={activityGroups}
-                    activityTemplate={activityBuilderTemplate}
-                    onSuccess={async (newActivity) => {
-                        if (newActivity && newActivity.id) {
-                            await attachInlineCreatedActivity(newActivity);
-                            if (goalId) {
-                                notify.success(`Associated "${newActivity.name}" with goal`);
-                            }
-                        }
-                        setActivityBuilderTemplate(null);
-                        setViewState(activityBuilderReturnView);
-                    }}
-                    onCancel={() => {
-                        setActivityBuilderTemplate(null);
-                        setViewState(activityBuilderReturnView);
-                    }}
-                />
             </Suspense>
         );
     } else if (viewState === 'goal-options') {
@@ -1023,6 +1045,8 @@ function GoalDetailModal({
         && mode !== 'create'
         && embeddedTargetBuilderTarget === undefined
         && Boolean(activitiesAssociateAction);
+    const isTargetFlowActive = isTargetSelectionMode;
+    const isAssociationFlowActive = isActivitiesAssociationMode;
     const footerContent = showGoalNoteComposer ? (
         <SidePaneNotePanel
             composerOnly
@@ -1059,30 +1083,83 @@ function GoalDetailModal({
         </div>
     ) : showActivitiesFooter ? (
         <div className={styles.completionFooter}>
-            <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit}`}>
-                <button
-                    type="button"
-                    onClick={activitiesAssociateAction}
-                    className={styles.completionFooterButton}
-                    style={{
-                        '--completion-accent': displayGoalColor,
-                        '--completion-text': 'var(--color-text-primary)',
-                    }}
+            {isTargetSelectionMode && (
+                <div
+                    className={styles.targetSelectionBanner}
+                    role="status"
+                    style={{ '--target-selection-accent': displayGoalColor }}
                 >
-                    + Associate Activities
-                </button>
-                <button
-                    type="button"
-                    onClick={isTargetSelectionMode ? handleCancelTargetSelection : handleAddTargetFromActivities}
-                    className={styles.completionFooterButton}
-                    style={{
-                        '--completion-accent': displayGoalColor,
-                        '--completion-text': 'var(--color-text-primary)',
-                    }}
-                >
-                    {isTargetSelectionMode ? 'Cancel' : '+ Add Target'}
-                </button>
-            </div>
+                    Select the activity you want to create a target for.
+                </div>
+            )}
+            {isAssociationFlowActive && activityPickerFooterActions ? (
+                <div className={`${styles.completionFooterActions} ${styles.activitiesFooterSelectionActions}`}>
+                    <button
+                        type="button"
+                        onClick={activityPickerFooterActions.onCancel}
+                        className={styles.completionFooterButton}
+                        style={{
+                            '--completion-accent': displayGoalColor,
+                            '--completion-text': 'var(--color-text-primary)',
+                        }}
+                    >
+                        {activityPickerFooterActions.cancelLabel}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={activityPickerFooterActions.onClear}
+                        className={styles.completionFooterButton}
+                        disabled={!activityPickerFooterActions.canClear}
+                        style={{
+                            '--completion-accent': displayGoalColor,
+                            '--completion-text': 'var(--color-text-primary)',
+                        }}
+                    >
+                        {activityPickerFooterActions.clearLabel}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={activityPickerFooterActions.onConfirm}
+                        className={`${styles.completionFooterButton} ${styles.activitiesFooterConfirmButton}`}
+                        disabled={!activityPickerFooterActions.canConfirm}
+                        style={{
+                            '--completion-accent': displayGoalColor,
+                            '--completion-text': activityPickerFooterActions.canConfirm
+                                ? displayTextColor
+                                : 'var(--color-text-secondary)',
+                        }}
+                    >
+                        {activityPickerFooterActions.confirmLabel}
+                    </button>
+                </div>
+            ) : (
+                <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit}`}>
+                    <button
+                        type="button"
+                        onClick={isTargetFlowActive ? handleCancelActivitiesFlow : activitiesAssociateAction}
+                        className={`${styles.completionFooterButton} ${isAssociationFlowActive ? styles.completionFooterButtonActive : ''}`}
+                        disabled={isAssociationFlowActive}
+                        style={{
+                            '--completion-accent': displayGoalColor,
+                            '--completion-text': 'var(--color-text-primary)',
+                        }}
+                    >
+                        {isTargetFlowActive ? 'Cancel' : '+ Associate Activities'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={isAssociationFlowActive ? handleCancelActivitiesFlow : handleAddTargetFromActivities}
+                        className={`${styles.completionFooterButton} ${isTargetFlowActive ? styles.completionFooterButtonActive : ''}`}
+                        disabled={isTargetFlowActive}
+                        style={{
+                            '--completion-accent': displayGoalColor,
+                            '--completion-text': 'var(--color-text-primary)',
+                        }}
+                    >
+                        {isAssociationFlowActive ? 'Cancel' : '+ Add Target'}
+                    </button>
+                </div>
+            )}
         </div>
     ) : showDetailFooter ? (
         <div className={styles.completionFooter}>
@@ -1141,12 +1218,39 @@ function GoalDetailModal({
         </div>
     ) : null;
 
+    const activityBuilderModal = isActivityBuilderOpen ? (
+        <Suspense fallback={null}>
+            <InlineActivityBuilder
+                rootId={rootId}
+                goalId={goalId}
+                activityGroups={activityGroups}
+                activityTemplate={activityBuilderTemplate}
+                onSuccess={async (newActivity) => {
+                    if (newActivity && newActivity.id) {
+                        await attachInlineCreatedActivity(newActivity);
+                        if (goalId) {
+                            notify.success(`Associated "${newActivity.name}" with goal`);
+                        }
+                    }
+                    setActivityBuilderTemplate(null);
+                    setIsActivityBuilderOpen(false);
+                    setViewState(activityBuilderReturnView);
+                }}
+                onCancel={() => {
+                    setActivityBuilderTemplate(null);
+                    setIsActivityBuilderOpen(false);
+                    setViewState(activityBuilderReturnView);
+                }}
+            />
+        </Suspense>
+    ) : null;
+
 
     if (displayMode === 'panel') {
         return (
             <>
                 <div className={styles.panelContainer}>
-                    <div className={styles.panelContent}>
+                    <div className={styles.panelContent} ref={contentScrollRef}>
                         {content}
                     </div>
                     {footerContent && (
@@ -1155,6 +1259,7 @@ function GoalDetailModal({
                         </div>
                     )}
                 </div>
+                {activityBuilderModal}
             </>
         );
     }
@@ -1172,7 +1277,7 @@ function GoalDetailModal({
                     borderTop: `4px solid ${displayGoalColor}`,
                 }}
             >
-                <div className={styles.modalScrollArea}>
+                <div className={styles.modalScrollArea} ref={contentScrollRef}>
                     {content}
                 </div>
                 {footerContent && (
@@ -1181,6 +1286,7 @@ function GoalDetailModal({
                     </div>
                 )}
             </div>
+            {activityBuilderModal}
         </div>
     );
 

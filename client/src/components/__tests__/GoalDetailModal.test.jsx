@@ -132,19 +132,64 @@ vi.mock('../goalDetail/ActivityAssociator', async () => {
 
     function MockActivityAssociator({
         registerAssociateAction,
+        registerAssociateCancelAction,
+        onAssociationFlowChange,
+        registerPickerFooterActions,
         isTargetSelectionMode,
         onSelectTargetActivity,
     }) {
+        const [isDiscoveryActive, setIsDiscoveryActive] = ReactModule.useState(false);
+
         ReactModule.useEffect(() => {
             if (!registerAssociateAction) return undefined;
-            registerAssociateAction(() => {});
+            registerAssociateAction(() => setIsDiscoveryActive(true));
             return () => registerAssociateAction(null);
         }, [registerAssociateAction]);
+
+        ReactModule.useEffect(() => {
+            if (!registerAssociateCancelAction) return undefined;
+            registerAssociateCancelAction(() => setIsDiscoveryActive(false));
+            return () => registerAssociateCancelAction(null);
+        }, [registerAssociateCancelAction]);
+
+        ReactModule.useEffect(() => {
+            onAssociationFlowChange?.(isDiscoveryActive);
+        }, [isDiscoveryActive, onAssociationFlowChange]);
+
+        ReactModule.useEffect(() => {
+            if (!registerPickerFooterActions) return undefined;
+            if (!isDiscoveryActive) {
+                registerPickerFooterActions(null);
+                return undefined;
+            }
+            registerPickerFooterActions({
+                selectedSummary: '2 activities',
+                clearLabel: 'Clear',
+                cancelLabel: 'Cancel',
+                confirmLabel: 'Add Selected (2 activities)',
+                canClear: true,
+                canConfirm: true,
+                onClear: vi.fn(),
+                onCancel: () => setIsDiscoveryActive(false),
+                onConfirm: vi.fn(),
+            });
+            return () => registerPickerFooterActions(null);
+        }, [isDiscoveryActive, registerPickerFooterActions]);
 
         return ReactModule.createElement(
             'div',
             null,
             ReactModule.createElement('div', null, 'goal activities view'),
+            isDiscoveryActive
+                ? ReactModule.createElement(
+                    'div',
+                    null,
+                    ReactModule.createElement('div', null, 'activity association picker'),
+                    ReactModule.createElement('button', { type: 'button' }, '+ Create New Activity Definition'),
+                    ReactModule.createElement('button', { type: 'button' }, '+ Copy Existing Activity Definition'),
+                    ReactModule.createElement('button', { type: 'button' }, '+ Create New Group')
+                )
+                : null,
             isTargetSelectionMode
                 ? ReactModule.createElement(
                     'button',
@@ -390,9 +435,10 @@ describe('GoalDetailModal smoke coverage', () => {
 
         await waitFor(() => {
             expect(screen.getByText('goal activities view')).toBeInTheDocument();
+            expect(screen.getByText('Select the activity you want to create a target for.')).toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'select target activity' })).toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-            expect(screen.queryByRole('button', { name: '+ Add Target' })).not.toBeInTheDocument();
+            expect(screen.getByRole('button', { name: '+ Add Target' })).toBeDisabled();
         }, { timeout: 5000 });
 
         fireEvent.click(screen.getByRole('button', { name: 'select target activity' }));
@@ -400,6 +446,59 @@ describe('GoalDetailModal smoke coverage', () => {
         await waitFor(() => {
             expect(screen.getByText('embedded target builder')).toBeInTheDocument();
             expect(screen.queryByText('goal activities view')).not.toBeInTheDocument();
+        }, { timeout: 5000 });
+    });
+
+    it('keeps the Activities footer visible and turns Add Target into Cancel during association flow', async () => {
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    attributes: { id: 'goal-1', type: 'ShortTermGoal', parent_id: 'parent-1' },
+                }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={vi.fn()}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root',
+                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
+                    children: [],
+                }}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Activities' }));
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: '+ Associate Activities' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: '+ Add Target' })).toBeInTheDocument();
+        }, { timeout: 5000 });
+
+        fireEvent.click(screen.getByRole('button', { name: '+ Associate Activities' }));
+
+        await waitFor(() => {
+            expect(screen.getByText('activity association picker')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: '+ Create New Activity Definition' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: '+ Copy Existing Activity Definition' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: '+ Create New Group' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Add Selected (2 activities)' })).toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: '+ Associate Activities' })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: '+ Add Target' })).not.toBeInTheDocument();
+        }, { timeout: 5000 });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+        await waitFor(() => {
+            expect(screen.queryByText('activity association picker')).not.toBeInTheDocument();
+            expect(screen.getByRole('button', { name: '+ Associate Activities' })).toBeEnabled();
+            expect(screen.getByRole('button', { name: '+ Add Target' })).toBeInTheDocument();
         }, { timeout: 5000 });
     });
 

@@ -14,6 +14,18 @@ import InlineGroupCreator from './InlineGroupCreator';
 import { useActivityAssociatorDerivedData } from './useActivityAssociatorDerivedData';
 import styles from './ActivityAssociator.module.css';
 
+const collectGroupIds = (groups = []) => {
+    const ids = [];
+    const visit = (group) => {
+        if (!group?.id) return;
+        ids.push(group.id);
+        (group.children || []).forEach(visit);
+    };
+
+    groups.forEach(visit);
+    return ids;
+};
+
 /**
  * ActivityAssociator Component
  * 
@@ -53,6 +65,9 @@ const ActivityAssociator = ({
     embedded = false,
     useFooterAssociateAction = false,
     registerAssociateAction,
+    registerAssociateCancelAction,
+    onAssociationFlowChange,
+    registerPickerFooterActions,
     dividerColor,
     onCopyActivity,
     isTargetSelectionMode = false,
@@ -72,6 +87,7 @@ const ActivityAssociator = ({
     const [newGroupParentId, setNewGroupParentId] = useState('');
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [pendingActivityRemoval, setPendingActivityRemoval] = useState(null);
+    const wasDiscoveryActiveRef = useRef(false);
     const linkedGroupIds = useMemo(
         () => new Set((associatedActivityGroups || []).map(g => g.id)),
         [associatedActivityGroups]
@@ -120,9 +136,22 @@ const ActivityAssociator = ({
             return undefined;
         }
 
-        registerAssociateAction(isDiscoveryActive ? null : () => setIsDiscoveryActive(true));
+        registerAssociateAction(() => setIsDiscoveryActive(true));
         return () => registerAssociateAction(null);
-    }, [isDiscoveryActive, registerAssociateAction, useFooterAssociateAction]);
+    }, [registerAssociateAction, useFooterAssociateAction]);
+
+    useEffect(() => {
+        onAssociationFlowChange?.(isDiscoveryActive);
+    }, [isDiscoveryActive, onAssociationFlowChange]);
+
+    useEffect(() => {
+        if (!useFooterAssociateAction || !registerAssociateCancelAction) {
+            return undefined;
+        }
+
+        registerAssociateCancelAction(() => setIsDiscoveryActive(false));
+        return () => registerAssociateCancelAction(null);
+    }, [registerAssociateCancelAction, useFooterAssociateAction]);
 
     // HANDLERS
     const toggleGroupCollapse = (groupId) => {
@@ -134,7 +163,7 @@ const ActivityAssociator = ({
         });
     };
 
-    const handleConfirmActivitySelection = async (selectedActivitiesArg, selectedGroupsArg) => {
+    const handleConfirmActivitySelection = useCallback(async (selectedActivitiesArg, selectedGroupsArg) => {
         // Fallback to state if arguments are not provided (though ActivitySearchWidget should provide them)
         const finalSelectedActivities = selectedActivitiesArg || tempSelectedActivities;
         const finalSelectedGroups = selectedGroupsArg || tempSelectedGroups;
@@ -173,7 +202,32 @@ const ActivityAssociator = ({
         if (newActivities.length > 0) parts.push(`${newActivities.length} activit${newActivities.length === 1 ? 'y' : 'ies'}`);
         if (finalSelectedGroups.length > 0) parts.push(`${finalSelectedGroups.length} group${finalSelectedGroups.length === 1 ? '' : 's'}`);
         if (parts.length > 0) notify.success(`Added ${parts.join(' and ')}`);
-    };
+    }, [
+        activityDefinitions,
+        activityGroups,
+        onSave,
+        setAssociatedActivities,
+        setAssociatedActivityGroups,
+        tempSelectedActivities,
+        tempSelectedGroups,
+    ]);
+
+    const handlePickerCancel = useCallback(() => {
+        setIsDiscoveryActive(false);
+    }, []);
+
+    const handlePickerCreateGroup = useCallback(() => {
+        setShowGroupCreator((current) => !current);
+    }, []);
+
+    const handlePickerChange = useCallback(({ activityIds, groupIds }) => {
+        setTempSelectedActivities(activityIds);
+        setTempSelectedGroups(groupIds);
+    }, []);
+
+    const handlePickerConfirm = useCallback(({ activityIds, groupIds }) => {
+        handleConfirmActivitySelection(activityIds, groupIds);
+    }, [handleConfirmActivitySelection]);
 
     const executeRemoveActivity = async (activity, removedTargetsCount = 0) => {
         const activityId = activity?.id;
@@ -378,6 +432,18 @@ const ActivityAssociator = ({
         previewParentActivities,
         parentGoalId,
     });
+
+    const availableActivityDefinitions = useMemo(
+        () => activityDefinitions.filter(a => !associatedActivities.some(aa => aa.id === a.id)),
+        [activityDefinitions, associatedActivities]
+    );
+
+    useEffect(() => {
+        if (isDiscoveryActive && !wasDiscoveryActiveRef.current) {
+            setCollapsedGroups(new Set(collectGroupIds(roots)));
+        }
+        wasDiscoveryActiveRef.current = isDiscoveryActive;
+    }, [isDiscoveryActive, roots]);
 
     const resolveLinkedGroupNameForActivity = (activity) => {
         let cursorId = activity?.group_id;
@@ -588,6 +654,50 @@ const ActivityAssociator = ({
                 </div>
             )}
 
+            {/* ============ DISCOVERY AREA (selector mode only) ============ */}
+            {isSelectorMode && isDiscoveryActive && (
+                <div className={styles.discoveryWrapper}>
+                    <ActivityPicker
+                        activities={availableActivityDefinitions}
+                        activityGroups={activityGroups}
+                        selectedActivityIds={tempSelectedActivities}
+                        selectedGroupIds={tempSelectedGroups}
+                        selectionMode="multiple"
+                        allowActivitySelection
+                        allowGroupSelection={true}
+                        allowCreateActivity={Boolean(onCreateActivity)}
+                        allowCopyActivity={Boolean(onCopyActivity)}
+                        allowCreateGroup
+                        showFooter={!useFooterAssociateAction}
+                        showRootBackButton={!useFooterAssociateAction}
+                        registerFooterActions={useFooterAssociateAction ? registerPickerFooterActions : undefined}
+                        title="Available Activities & Groups"
+                        confirmLabel="Add Selected"
+                        onCancel={handlePickerCancel}
+                        onCreateActivity={onCreateActivity}
+                        onCopyActivity={onCopyActivity}
+                        onCreateGroup={handlePickerCreateGroup}
+                        onChange={handlePickerChange}
+                        onConfirm={handlePickerConfirm}
+                    />
+
+                    {/* Inline Group Creator overlay over search widget */}
+                    {showGroupCreator && (
+                        <InlineGroupCreator
+                            eligibleParentGroups={eligibleParentGroups}
+                            groupBreadcrumb={groupBreadcrumb}
+                            isCreatingGroup={isCreatingGroup}
+                            newGroupName={newGroupName}
+                            newGroupParentId={newGroupParentId}
+                            onCancel={() => setShowGroupCreator(false)}
+                            onCreate={handleCreateGroup}
+                            onGroupNameChange={setNewGroupName}
+                            onParentChange={setNewGroupParentId}
+                        />
+                    )}
+                </div>
+            )}
+
             {/* ============ ASSOCIATED ACTIVITIES (selector mode only) ============ */}
             {isSelectorMode && (
                 (roots.length > 0 || ungrouped.activities.length > 0) ? (
@@ -637,50 +747,6 @@ const ActivityAssociator = ({
             {isSelectorMode && counts.total === 0 && isAboveShortTermGoal && !completedViaChildren && (
                 <div className={styles.helperNote}>
                     (Goal implies completion via children unless activities are added)
-                </div>
-            )}
-
-            {/* ============ DISCOVERY AREA (selector mode only) ============ */}
-            {isSelectorMode && isDiscoveryActive && (
-                    <div className={styles.discoveryWrapper}>
-                    <ActivityPicker
-                        activities={activityDefinitions.filter(a => !associatedActivities.some(aa => aa.id === a.id))}
-                        activityGroups={activityGroups}
-                        selectedActivityIds={tempSelectedActivities}
-                        selectedGroupIds={tempSelectedGroups}
-                        selectionMode="multiple"
-                        allowActivitySelection
-                        allowGroupSelection={true}
-                        allowCreateActivity={Boolean(onCreateActivity)}
-                        allowCopyActivity={Boolean(onCopyActivity)}
-                        allowCreateGroup
-                        title="Available Activities & Groups"
-                        confirmLabel="Add Selected"
-                        onCancel={() => setIsDiscoveryActive(false)}
-                        onCreateActivity={onCreateActivity}
-                        onCopyActivity={onCopyActivity}
-                        onCreateGroup={() => setShowGroupCreator(!showGroupCreator)}
-                        onChange={({ activityIds, groupIds }) => {
-                            setTempSelectedActivities(activityIds);
-                            setTempSelectedGroups(groupIds);
-                        }}
-                        onConfirm={({ activityIds, groupIds }) => handleConfirmActivitySelection(activityIds, groupIds)}
-                    />
-
-                    {/* Inline Group Creator overlay over search widget */}
-                    {showGroupCreator && (
-                        <InlineGroupCreator
-                            eligibleParentGroups={eligibleParentGroups}
-                            groupBreadcrumb={groupBreadcrumb}
-                            isCreatingGroup={isCreatingGroup}
-                            newGroupName={newGroupName}
-                            newGroupParentId={newGroupParentId}
-                            onCancel={() => setShowGroupCreator(false)}
-                            onCreate={handleCreateGroup}
-                            onGroupNameChange={setNewGroupName}
-                            onParentChange={setNewGroupParentId}
-                        />
-                    )}
                 </div>
             )}
         </div>

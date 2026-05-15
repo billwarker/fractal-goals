@@ -11,7 +11,6 @@ function GoalHeader({
     goal,
     goalType,
     goalColor,
-    goalSecondaryColor,
     textColor,
     parentGoal,
     onClose, // Callback to close modal when navigating
@@ -48,15 +47,7 @@ function GoalHeader({
             color: '#93c5fd',
         },
     }[normalizedStatus];
-    const levelBadgeBackground = goalSecondaryColor
-        ? `linear-gradient(135deg, color-mix(in srgb, ${goalColor} var(--goal-gradient-primary-weight), var(--color-bg-surface)) 0%, color-mix(in srgb, ${goalSecondaryColor} var(--goal-gradient-secondary-weight), var(--color-bg-surface)) 100%)`
-        : goalColor;
-    const levelBadgeBorder = goalSecondaryColor
-        ? `1px solid color-mix(in srgb, ${goalSecondaryColor} var(--goal-gradient-border-weight), var(--color-border))`
-        : '1px solid transparent';
-    const levelBadgeShadow = goalSecondaryColor
-        ? `inset 0 0 0 1px color-mix(in srgb, ${goalSecondaryColor} var(--goal-gradient-inner-weight), transparent)`
-        : 'none';
+    const levelBadgeBackground = goalColor;
 
     return (
         <div ref={headerRef} style={{
@@ -155,11 +146,10 @@ function GoalHeader({
                             padding: '4px 10px',
                             background: levelBadgeBackground,
                             color: textColor,
-                            border: levelBadgeBorder,
+                            border: '1px solid transparent',
                             borderRadius: '4px',
                             fontSize: '12px',
                             fontWeight: 'bold',
-                            boxShadow: levelBadgeShadow,
                             whiteSpace: 'nowrap',
                         }}>
                             {getTypeDisplayName(goalType)}
@@ -171,8 +161,6 @@ function GoalHeader({
                                 goal={goal}
                                 goalType={goalType}
                                 color={goalColor}
-                                secondaryColor={goalSecondaryColor}
-                                textColor={textColor}
                             />
                         )}
                         {mode !== 'create' && (

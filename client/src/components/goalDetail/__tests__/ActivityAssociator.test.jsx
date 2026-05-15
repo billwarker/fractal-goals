@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import ActivityAssociator from '../ActivityAssociator';
@@ -31,35 +31,52 @@ vi.mock('../../common/ActivitySearchWidget', () => ({
 
 function ActivityAssociatorHarness({
     initialActivities,
+    initialGroups = [],
+    activityDefinitions = [],
+    activityGroups = [],
     onSave = vi.fn(() => Promise.resolve()),
     parentGoalId = null,
     goalId = 'goal-1',
     inheritParentActivities = false,
+    useFooterAssociateAction = false,
 }) {
     const [activities, setActivities] = useState(initialActivities);
-    const [groups, setGroups] = useState([]);
+    const [groups, setGroups] = useState(initialGroups);
     const [inheritParent, setInheritParent] = useState(inheritParentActivities);
+    const [associateAction, setAssociateAction] = useState(null);
+    const registerAssociateAction = useCallback((handler) => {
+        setAssociateAction(() => handler);
+    }, []);
 
     return (
-        <ActivityAssociator
-            associatedActivities={activities}
-            setAssociatedActivities={setActivities}
-            associatedActivityGroups={groups}
-            setAssociatedActivityGroups={setGroups}
-            activityDefinitions={[]}
-            activityGroups={[]}
-            setActivityGroups={() => {}}
-            targets={[]}
-            setTargets={() => {}}
-            rootId="root-1"
-            goalId={goalId}
-            parentGoalId={parentGoalId}
-            onCloseSelector={() => {}}
-            onCreateActivity={() => {}}
-            onSave={onSave}
-            inheritParentActivities={inheritParent}
-            setInheritParentActivities={setInheritParent}
-        />
+        <>
+            {useFooterAssociateAction && (
+                <button type="button" onClick={associateAction || undefined}>
+                    Footer Associate Activities
+                </button>
+            )}
+            <ActivityAssociator
+                associatedActivities={activities}
+                setAssociatedActivities={setActivities}
+                associatedActivityGroups={groups}
+                setAssociatedActivityGroups={setGroups}
+                activityDefinitions={activityDefinitions}
+                activityGroups={activityGroups}
+                setActivityGroups={() => {}}
+                targets={[]}
+                setTargets={() => {}}
+                rootId="root-1"
+                goalId={goalId}
+                parentGoalId={parentGoalId}
+                onCloseSelector={() => {}}
+                onCreateActivity={() => {}}
+                onSave={onSave}
+                inheritParentActivities={inheritParent}
+                setInheritParentActivities={setInheritParent}
+                useFooterAssociateAction={useFooterAssociateAction}
+                registerAssociateAction={registerAssociateAction}
+            />
+        </>
     );
 }
 
@@ -182,5 +199,48 @@ describe('ActivityAssociator', () => {
         expect(screen.getByText('↓ inherited from parent')).toBeInTheDocument();
         expect(screen.queryByTitle('Remove association')).not.toBeInTheDocument();
         expect(updateGoal).not.toHaveBeenCalled();
+    });
+
+    it('puts the picker above collapsed associated activity groups while associating activities', async () => {
+        render(
+            <ActivityAssociatorHarness
+                initialActivities={[
+                    {
+                        id: 'associated-activity',
+                        name: 'Already Linked Exercise',
+                        group_id: 'group-1',
+                        has_direct_association: true,
+                    },
+                ]}
+                activityDefinitions={[
+                    {
+                        id: 'new-activity',
+                        name: 'New Candidate Exercise',
+                        group_id: null,
+                    },
+                ]}
+                activityGroups={[
+                    {
+                        id: 'group-1',
+                        name: 'Already Associated Group',
+                        parent_id: null,
+                        sort_order: 1,
+                    },
+                ]}
+                useFooterAssociateAction
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Footer Associate Activities' }));
+
+        const pickerTitle = await screen.findByText('Available Activities & Groups');
+        const associatedGroup = screen.getByText('Already Associated Group');
+
+        expect(screen.queryByRole('button', { name: '← Back' })).not.toBeInTheDocument();
+        expect(
+            pickerTitle.compareDocumentPosition(associatedGroup) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+        expect(screen.queryByText('Already Linked Exercise')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '+' })).toBeInTheDocument();
     });
 });

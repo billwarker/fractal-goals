@@ -96,7 +96,7 @@
 }
 
 .afterHeaderContent {
-    padding-top: 14px;
+    padding-top: 8px;
 }
 
 .completionFooter {
@@ -104,6 +104,16 @@
     padding: 18px var(--spacing-lg, 16px);
     background: var(--color-bg-sidebar);
     border-top: 1px solid var(--color-border);
+    min-width: 0;
+}
+
+.targetSelectionBanner {
+    margin-bottom: 10px;
+    color: color-mix(in srgb, var(--target-selection-accent, var(--color-brand-primary)) 78%, var(--color-text-primary));
+    font-size: 12px;
+    font-style: italic;
+    font-weight: 600;
+    line-height: 1.35;
 }
 
 .modalFooterComposer.modalFooterComposer {
@@ -125,8 +135,15 @@
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 }
 
+.activitiesFooterSelectionActions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-width: 0;
+    width: 100%;
+}
+
 .completionFooterButton {
     width: 100%;
+    min-width: 0;
     min-height: 42px;
     border: 1px solid var(--completion-accent, var(--color-border));
     border-radius: var(--radius-sm);
@@ -135,6 +152,7 @@
     font-size: 13px;
     font-weight: 800;
     cursor: pointer;
+    overflow-wrap: anywhere;
 }
 
 .completionFooterButton:not(.completionFooterDone):not(.completionFooterPaused) {
@@ -143,6 +161,13 @@
 
 .completionFooterButton:hover:not(:disabled) {
     background: color-mix(in srgb, var(--completion-accent, var(--color-brand-primary)) 16%, transparent);
+}
+
+.completionFooterButtonActive,
+.completionFooterButtonActive:disabled {
+    background: color-mix(in srgb, var(--completion-accent, var(--color-brand-primary)) 16%, transparent);
+    border-color: var(--completion-accent, var(--color-brand-primary));
+    color: var(--completion-text, var(--color-text-primary));
 }
 
 .completionFooterDone:hover:not(:disabled) {
@@ -186,6 +211,17 @@
     color: var(--completion-text, var(--color-text-inverse));
 }
 
+.activitiesFooterConfirmButton:not(:disabled) {
+    background: var(--completion-accent, var(--color-brand-primary));
+    border-color: var(--completion-accent, var(--color-brand-primary));
+    color: var(--completion-text, var(--color-text-inverse));
+}
+
+.activitiesFooterConfirmButton:hover:not(:disabled) {
+    background: var(--completion-accent, var(--color-brand-primary));
+    color: var(--completion-text, var(--color-text-inverse));
+}
+
 @media (max-width: 560px) {
     .headerActions {
         flex-direction: row;
@@ -204,6 +240,10 @@
     }
 
     .completionFooterMulti {
+        grid-template-columns: 1fr;
+    }
+
+    .activitiesFooterSelectionActions {
         grid-template-columns: 1fr;
     }
 }
@@ -553,6 +593,29 @@
 }
 
 /* Activity Builder (Nested View) */
+.topLayerModalOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 6000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--color-overlay);
+}
+
+.topLayerModalContent {
+    width: min(760px, 94vw);
+    max-height: min(86vh, 900px);
+    overflow-y: auto;
+    background: var(--color-bg-app);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    color: var(--color-text-primary);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58);
+}
+
 .activityBuilderHeader {
     display: flex;
     align-items: center;

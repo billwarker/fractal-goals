@@ -234,7 +234,7 @@ function FractalGoals() {
         );
     }
 
-    const sidebarWidth = isMobile ? '100%' : '32.5vw';
+    const sidebarWidth = isMobile ? '100%' : 'min(700px, 32.5vw)';
     const minSidebarWidth = isMobile ? '0' : '390px';
     const isSidebarOpen = showGoalModal || !!sidebarMode;
     const sheetTitle = showGoalModal

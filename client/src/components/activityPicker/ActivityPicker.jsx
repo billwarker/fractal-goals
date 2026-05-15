@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import CloseIcon from '../atoms/CloseIcon';
 import {
@@ -34,6 +34,8 @@ function ActivityPicker({
     showFooter = true,
     showSearch = true,
     showCloseButton = true,
+    showPrimaryActions = true,
+    showRootBackButton = true,
     variant = 'panel',
     confirmLabel = 'Apply',
     cancelLabel = 'Cancel',
@@ -49,6 +51,7 @@ function ActivityPicker({
     onCopyActivity,
     onCreateGroup,
     extraActions = null,
+    registerFooterActions,
 }) {
     const [pendingActivityIds, setPendingActivityIds] = useState(() => toSet(selectedActivityIds));
     const [pendingGroupIds, setPendingGroupIds] = useState(() => toSet(selectedGroupIds));
@@ -74,14 +77,14 @@ function ActivityPicker({
         [model.activityGroups, pendingGroupIds]
     );
 
-    const publishChange = (activityIds, groupIds) => {
+    const publishChange = useCallback((activityIds, groupIds) => {
         onChange?.({
             activityIds: [...activityIds],
             groupIds: [...groupIds],
             activities: model.activities.filter((activity) => activityIds.has(activity.id)),
             groups: model.activityGroups.filter((group) => groupIds.has(group.id)),
         });
-    };
+    }, [model.activities, model.activityGroups, onChange]);
 
     const toggleActivity = (activity) => {
         if (!allowActivitySelection || !activity?.id) return;
@@ -138,22 +141,26 @@ function ActivityPicker({
         publishChange(nextActivityIds, nextGroupIds);
     };
 
-    const handleClear = () => {
+    const handleClear = useCallback(() => {
         const nextActivityIds = new Set();
         const nextGroupIds = new Set();
         setPendingActivityIds(nextActivityIds);
         setPendingGroupIds(nextGroupIds);
         publishChange(nextActivityIds, nextGroupIds);
-    };
+    }, [publishChange]);
 
-    const handleConfirm = () => {
+    const handleConfirm = useCallback(() => {
         onConfirm?.({
             activityIds: [...pendingActivityIds],
             groupIds: [...pendingGroupIds],
             activities: selectedActivities,
             groups: selectedGroups,
         });
-    };
+    }, [onConfirm, pendingActivityIds, pendingGroupIds, selectedActivities, selectedGroups]);
+
+    const handleToggleCopyMode = useCallback(() => {
+        setPickerMode((mode) => (mode === COPY_MODE ? PICK_MODE : COPY_MODE));
+    }, []);
 
     const handleBack = () => {
         if (!browseGroupId) {
@@ -185,6 +192,40 @@ function ActivityPicker({
             pendingGroupIds.size ? `${pendingGroupIds.size} group${pendingGroupIds.size === 1 ? '' : 's'}` : null,
         ].filter(Boolean).join(', ')
         : 'None selected';
+
+    useEffect(() => {
+        if (!registerFooterActions) {
+            return undefined;
+        }
+
+        registerFooterActions({
+            selectedSummary,
+            totalSelected,
+            clearLabel,
+            cancelLabel,
+            confirmLabel: selectionMode === 'multiple'
+                ? `${confirmLabel} (${selectedSummary})`
+                : confirmLabel,
+            canClear: totalSelected > 0,
+            canConfirm: totalSelected > 0,
+            onClear: handleClear,
+            onCancel,
+            onConfirm: handleConfirm,
+        });
+
+        return () => registerFooterActions(null);
+    }, [
+        cancelLabel,
+        clearLabel,
+        confirmLabel,
+        handleClear,
+        handleConfirm,
+        onCancel,
+        registerFooterActions,
+        selectedSummary,
+        selectionMode,
+        totalSelected,
+    ]);
 
     const displayTitle = currentGroup ? currentGroup.name : title;
     const subtitle = currentGroup
@@ -286,7 +327,7 @@ function ActivityPicker({
                             )}
                         </div>
                         <div className={styles.headerActions}>
-                            {(browseGroupId || (variant === 'panel' && (onCancel || onClose))) && (
+                            {(browseGroupId || (showRootBackButton && variant === 'panel' && (onCancel || onClose))) && (
                                 <button type="button" className={styles.backButton} onClick={handleBack}>
                                     ← Back
                                 </button>
@@ -343,7 +384,7 @@ function ActivityPicker({
                     </>
                 )}
 
-                {(allowCreateActivity || allowCopyActivity || allowCreateGroup || extraActions) && (
+                {showPrimaryActions && (allowCreateActivity || allowCopyActivity || allowCreateGroup || extraActions) && (
                     <>
                         <div className={styles.divider} />
                         <div className={styles.primaryActions}>
@@ -356,7 +397,7 @@ function ActivityPicker({
                                 <button
                                     type="button"
                                     className={`${styles.secondaryAction} ${isCopyMode ? styles.secondaryActionActive : ''}`}
-                                    onClick={() => setPickerMode((mode) => (mode === COPY_MODE ? PICK_MODE : COPY_MODE))}
+                                    onClick={handleToggleCopyMode}
                                 >
                                     {isCopyMode ? 'Cancel Copy Mode' : '+ Copy Existing Activity Definition'}
                                 </button>
