@@ -1,4 +1,4 @@
-import React, { Suspense, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { Suspense, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import Sidebar from '../components/Sidebar';
@@ -16,6 +16,7 @@ import { ACTIVE_GOAL_WINDOW_DAYS } from '../hooks/useFlowTreeMetrics';
 import { useFlowTreeEvidence, useFlowtreeSessionMetrics } from '../hooks/useSessionQueries';
 import { getChildType } from '../utils/goalHelpers';
 import { findGoalNodeById, getGoalNodeId, getGoalNodeName, getGoalNodeType } from '../utils/goalNodeModel';
+import { getGoalSearchMatches, getVisibleGoalSearchCandidates } from '../utils/goalTypeToZoomSearch';
 import { usePrograms } from '../hooks/useProgramQueries';
 import useIsMobile from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
@@ -37,6 +38,35 @@ const DEFAULT_VIEW_SETTINGS = {
     showMetricsOverlay: false,
 };
 const EMPTY_ARRAY = [];
+const TYPE_TO_ZOOM_IDLE_MS = 2000;
+
+function shouldIgnoreTypeToZoomKey(event) {
+    const target = event.target;
+    const activeElement = document.activeElement;
+    const element = target instanceof Element ? target : activeElement;
+
+    if (!element) return false;
+    if (element.closest('[role="dialog"], [aria-modal="true"]')) return true;
+    if (element.isContentEditable) return true;
+
+    const tagName = element.tagName?.toLowerCase();
+    return ['input', 'textarea', 'select'].includes(tagName);
+}
+
+function isSearchCharacter(key) {
+    return typeof key === 'string' && key.length === 1 && /^[a-z0-9]$/i.test(key);
+}
+
+function getQueryCharacter(event) {
+    if (event.key === ' ' || event.key === 'Space' || event.key === 'Spacebar' || event.code === 'Space') {
+        return ' ';
+    }
+    return typeof event.key === 'string' && event.key.length === 1 ? event.key : null;
+}
+
+function renderTypeToZoomQuery(query) {
+    return String(query).replace(/ /g, '\u00a0');
+}
 
 function FractalGoals() {
     const inactiveBranchTooltip = `Dims branches with no associated completed activity instances in the last ${ACTIVE_GOAL_WINDOW_DAYS} days.`;
@@ -87,6 +117,11 @@ function FractalGoals() {
     // Alert state
     const [alertData, setAlertData] = useState({ isOpen: false, title: '', message: '' });
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
+    const [typeToZoomQuery, setTypeToZoomQuery] = useState('');
+    const [isTypeToZoomOpen, setIsTypeToZoomOpen] = useState(false);
+    const [duplicateCycleIndex, setDuplicateCycleIndex] = useState(0);
+    const [cycleZoomTargetNodeId, setCycleZoomTargetNodeId] = useState(null);
+    const typeToZoomIdleTimerRef = useRef(null);
     const selectedNodeId = viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null;
     const evidenceGoalIds = useMemo(() => {
         if (!evidenceData) return null;
@@ -104,6 +139,34 @@ function FractalGoals() {
         visibleGoalIds,
         { enabled: viewSettings.showMetricsOverlay }
     );
+    const typeToZoomCandidates = useMemo(() => (
+        getVisibleGoalSearchCandidates(fractalData, {
+            selectedNodeId,
+            hideCompletedGoals: viewSettings.hideCompletedGoals,
+        })
+    ), [fractalData, selectedNodeId, viewSettings.hideCompletedGoals]);
+    const typeToZoomResults = useMemo(() => (
+        getGoalSearchMatches(typeToZoomCandidates, typeToZoomQuery)
+    ), [typeToZoomCandidates, typeToZoomQuery]);
+    const activeDuplicateGroup = typeToZoomResults.activeDuplicateGroup;
+    const activeDuplicateCount = activeDuplicateGroup?.length || 0;
+    const visibleMatchCount = typeToZoomResults.matches.length;
+    const cycleZoomTargetIsCurrent = Boolean(
+        cycleZoomTargetNodeId && activeDuplicateGroup?.some((match) => match.id === cycleZoomTargetNodeId)
+    );
+    const effectiveZoomTargetNodeId = isTypeToZoomOpen && typeToZoomQuery && visibleMatchCount === 1
+        ? typeToZoomResults.matches[0].id
+        : (cycleZoomTargetIsCurrent ? cycleZoomTargetNodeId : null);
+    const duplicateCycleDisplay = activeDuplicateCount > 1
+        ? `${(duplicateCycleIndex % activeDuplicateCount) + 1}/${activeDuplicateCount}`
+        : null;
+
+    const clearTypeToZoomSearch = useCallback(() => {
+        setTypeToZoomQuery('');
+        setIsTypeToZoomOpen(false);
+        setDuplicateCycleIndex(0);
+        setCycleZoomTargetNodeId(null);
+    }, []);
 
     useEffect(() => {
         if (!rootId) {
@@ -139,6 +202,104 @@ function FractalGoals() {
             console.error('Failed to persist FlowTree settings:', err);
         }
     }, [rootId, viewSettings]);
+
+    useEffect(() => {
+        if (!isTypeToZoomOpen || !typeToZoomQuery) return undefined;
+
+        if (typeToZoomIdleTimerRef.current) {
+            clearTimeout(typeToZoomIdleTimerRef.current);
+        }
+
+        typeToZoomIdleTimerRef.current = setTimeout(() => {
+            clearTypeToZoomSearch();
+        }, TYPE_TO_ZOOM_IDLE_MS);
+
+        return () => {
+            if (typeToZoomIdleTimerRef.current) {
+                clearTimeout(typeToZoomIdleTimerRef.current);
+                typeToZoomIdleTimerRef.current = null;
+            }
+        };
+    }, [clearTypeToZoomSearch, isTypeToZoomOpen, typeToZoomQuery]);
+
+    useEffect(() => {
+        if (!isTypeToZoomOpen) return undefined;
+
+        const handleTypeToZoomKeyDown = (event) => {
+            if (event.defaultPrevented) return;
+            if (event.metaKey || event.ctrlKey || event.altKey) return;
+            if (showGoalModal || fractalToDelete || alertData.isOpen) return;
+            if (shouldIgnoreTypeToZoomKey(event)) return;
+
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                clearTypeToZoomSearch();
+                return;
+            }
+
+            if (event.key === 'Backspace') {
+                event.preventDefault();
+                setTypeToZoomQuery((current) => current.slice(0, -1));
+                setIsTypeToZoomOpen((current) => current && typeToZoomQuery.length > 1);
+                setDuplicateCycleIndex(0);
+                setCycleZoomTargetNodeId(null);
+                return;
+            }
+
+            if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && activeDuplicateCount > 1) {
+                event.preventDefault();
+                setDuplicateCycleIndex((current) => {
+                    const direction = event.key === 'ArrowDown' ? 1 : -1;
+                    const nextIndex = (current + direction + activeDuplicateCount) % activeDuplicateCount;
+                    const nextTarget = activeDuplicateGroup[nextIndex];
+                    if (nextTarget) setCycleZoomTargetNodeId(nextTarget.id);
+                    return nextIndex;
+                });
+                return;
+            }
+
+            const queryCharacter = getQueryCharacter(event);
+            if (queryCharacter) {
+                event.preventDefault();
+                setIsTypeToZoomOpen(true);
+                setDuplicateCycleIndex(0);
+                setCycleZoomTargetNodeId(null);
+                setTypeToZoomQuery((current) => `${current}${queryCharacter}`);
+            }
+        };
+
+        window.addEventListener('keydown', handleTypeToZoomKeyDown, true);
+        return () => window.removeEventListener('keydown', handleTypeToZoomKeyDown, true);
+    }, [
+        activeDuplicateCount,
+        activeDuplicateGroup,
+        alertData.isOpen,
+        clearTypeToZoomSearch,
+        fractalToDelete,
+        isTypeToZoomOpen,
+        showGoalModal,
+        typeToZoomQuery.length,
+    ]);
+
+    useEffect(() => {
+        const handleTypeToZoomStartKeyDown = (event) => {
+            if (isTypeToZoomOpen) return;
+            if (event.defaultPrevented) return;
+            if (event.metaKey || event.ctrlKey || event.altKey) return;
+            if (showGoalModal || fractalToDelete || alertData.isOpen) return;
+            if (shouldIgnoreTypeToZoomKey(event)) return;
+            if (!isSearchCharacter(event.key)) return;
+
+            event.preventDefault();
+            setIsTypeToZoomOpen(true);
+            setDuplicateCycleIndex(0);
+            setCycleZoomTargetNodeId(null);
+            setTypeToZoomQuery(event.key);
+        };
+
+        window.addEventListener('keydown', handleTypeToZoomStartKeyDown, true);
+        return () => window.removeEventListener('keydown', handleTypeToZoomStartKeyDown, true);
+    }, [alertData.isOpen, fractalToDelete, isTypeToZoomOpen, showGoalModal]);
 
     // Sync viewingGoal with fractalData updates (e.g. when completion status changes)
     useEffect(() => {
@@ -312,6 +473,20 @@ function FractalGoals() {
                             </>
                         )}
                     </div>
+                    {isTypeToZoomOpen && typeToZoomQuery && (
+                        <div className="type-to-zoom-palette" role="status" aria-live="polite">
+                            <div className="type-to-zoom-label">Find goal</div>
+                            <div className="type-to-zoom-query">{renderTypeToZoomQuery(typeToZoomQuery)}</div>
+                            <div className="type-to-zoom-meta">
+                                {visibleMatchCount === 1
+                                    ? '1 match'
+                                    : `${visibleMatchCount} matches`}
+                                {duplicateCycleDisplay && (
+                                    <span className="type-to-zoom-duplicate">Duplicate {duplicateCycleDisplay}</span>
+                                )}
+                            </div>
+                        </div>
+                    )}
                     <FractalView
                         treeData={fractalData}
                         evidenceGoalIds={evidenceGoalIds}
@@ -322,6 +497,7 @@ function FractalGoals() {
                         viewSettings={viewSettings}
                         onNodeClick={handleGoalNameClick}
                         selectedNodeId={selectedNodeId}
+                        zoomTargetNodeId={effectiveZoomTargetNodeId}
                         onAddChild={handleAddChildClick}
                         sidebarOpen={isSidebarOpen && !(isMobile && isMobilePanelCollapsed)}
                         key={rootId}

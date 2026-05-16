@@ -6,7 +6,11 @@ import ReactFlow, {
     Position,
 } from 'reactflow';
 
-import { DEFAULT_VIEW_SETTINGS, buildGraphPresentation } from './components/flowTree/flowTreeGraphUtils';
+import {
+    DEFAULT_VIEW_SETTINGS,
+    FLOWTREE_LAYOUT_NODE_DIMENSIONS,
+    buildGraphPresentation,
+} from './components/flowTree/flowTreeGraphUtils';
 import { ACTIVE_GOAL_WINDOW_DAYS } from './hooks/useFlowTreeMetrics';
 import { useTheme } from './contexts/ThemeContext'
 import { useGoalLevels } from './contexts/GoalLevelsContext';
@@ -205,7 +209,8 @@ const FlowTree = React.forwardRef(({
     onNodeClick,
     onAddChild,
     sidebarOpen,
-    selectedNodeId
+    selectedNodeId,
+    zoomTargetNodeId = null,
 }, ref) => {
     const [rfInstance, setRfInstance] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
@@ -303,6 +308,27 @@ const FlowTree = React.forwardRef(({
         }
         return undefined;
     }, [sidebarOpen, selectedNodeId, rfInstance, isMobile]);
+
+    useEffect(() => {
+        if (!rfInstance || !zoomTargetNodeId || nodes.length === 0) return;
+
+        const targetNode = nodes.find((node) => node.id === String(zoomTargetNodeId));
+        if (!targetNode) return;
+
+        const dimensions = isMobile
+            ? FLOWTREE_LAYOUT_NODE_DIMENSIONS.compact
+            : FLOWTREE_LAYOUT_NODE_DIMENSIONS.regular;
+        const centerX = targetNode.position.x + ((targetNode.width || dimensions.width) / 2);
+        const centerY = targetNode.position.y + ((targetNode.height || dimensions.height) / 2);
+
+        requestAnimationFrame(() => {
+            rfInstance.setCenter(centerX, centerY, {
+                zoom: isMobile ? 0.9 : 1.1,
+                duration: 260,
+            });
+            setIsVisible(true);
+        });
+    }, [isMobile, nodes, rfInstance, zoomTargetNodeId]);
 
     return (
         <div

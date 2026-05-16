@@ -3,32 +3,35 @@ import { act, render, screen } from '@testing-library/react';
 import FlowTree from '../FlowTree';
 
 const fitViewMock = vi.hoisted(() => vi.fn());
+const setCenterMock = vi.hoisted(() => vi.fn());
 const onInitMock = vi.hoisted(() => vi.fn());
 
 vi.mock('reactflow', async () => {
     const ReactModule = await vi.importActual('react');
 
+    const MockReactFlow = ({ onInit, nodes = [], children }) => {
+        const initCallCountRef = ReactModule.useRef(0);
+
+        ReactModule.useEffect(() => {
+            if (initCallCountRef.current >= 3) {
+                return;
+            }
+
+            initCallCountRef.current += 1;
+            onInitMock();
+            onInit?.({ fitView: fitViewMock, setCenter: setCenterMock });
+        });
+
+        return (
+            <div data-testid="react-flow">
+                <span data-testid="node-count">{nodes.length}</span>
+                {children}
+            </div>
+        );
+    };
+
     return {
-        default: ({ onInit, nodes = [], children }) => {
-            const initCallCountRef = ReactModule.useRef(0);
-
-            ReactModule.useEffect(() => {
-                if (initCallCountRef.current >= 3) {
-                    return;
-                }
-
-                initCallCountRef.current += 1;
-                onInitMock();
-                onInit?.({ fitView: fitViewMock });
-            });
-
-            return (
-                <div data-testid="react-flow">
-                    <span data-testid="node-count">{nodes.length}</span>
-                    {children}
-                </div>
-            );
-        },
+        default: MockReactFlow,
         useNodesState: (initialNodes) => {
             const [nodes, setNodes] = ReactModule.useState(initialNodes);
             return [nodes, setNodes, vi.fn()];
@@ -67,6 +70,7 @@ describe('FlowTree', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         fitViewMock.mockClear();
+        setCenterMock.mockClear();
         onInitMock.mockClear();
     });
 
@@ -98,5 +102,38 @@ describe('FlowTree', () => {
         expect(screen.getByTestId('react-flow')).toBeInTheDocument();
         expect(onInitMock).toHaveBeenCalled();
         expect(fitViewMock).toHaveBeenCalled();
+    });
+
+    it('centers the viewport on a search zoom target without selecting the node', () => {
+        render(
+            <FlowTree
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root Goal',
+                    type: 'UltimateGoal',
+                    children: [
+                        {
+                            id: 'goal-2',
+                            name: 'Target Goal',
+                            type: 'LongTermGoal',
+                            children: [],
+                        },
+                    ],
+                }}
+                onNodeClick={vi.fn()}
+                onAddChild={vi.fn()}
+                zoomTargetNodeId="goal-2"
+            />
+        );
+
+        act(() => {
+            vi.advanceTimersByTime(500);
+        });
+
+        expect(setCenterMock).toHaveBeenCalledWith(
+            expect.any(Number),
+            expect.any(Number),
+            { zoom: 1.1, duration: 260 }
+        );
     });
 });

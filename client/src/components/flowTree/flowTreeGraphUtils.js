@@ -19,12 +19,18 @@ export const DEFAULT_VIEW_SETTINGS = {
     hideCompletedGoals: false,
 };
 
+export const FLOWTREE_LAYOUT_NODE_DIMENSIONS = {
+    compact: { width: 190, height: 70 },
+    regular: { width: 250, height: 80 },
+};
+
 export const getLayoutedElements = (nodes, edges, direction = 'TB', compact = false) => {
     const dagreGraph = new dagre.graphlib.Graph();
     dagreGraph.setDefaultEdgeLabel(() => ({}));
 
-    const nodeWidth = compact ? 190 : 250;
-    const nodeHeight = compact ? 70 : 80;
+    const { width: nodeWidth, height: nodeHeight } = compact
+        ? FLOWTREE_LAYOUT_NODE_DIMENSIONS.compact
+        : FLOWTREE_LAYOUT_NODE_DIMENSIONS.regular;
 
     dagreGraph.setGraph({
         rankdir: direction,

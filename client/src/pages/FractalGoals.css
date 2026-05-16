@@ -105,6 +105,55 @@
     padding-bottom: 8px;
 }
 
+.type-to-zoom-palette {
+    position: absolute;
+    top: 16px;
+    left: 288px;
+    z-index: 45;
+    display: grid;
+    gap: 4px;
+    min-width: 190px;
+    max-width: min(320px, calc(100% - 320px));
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--color-bg-sidebar) 92%, transparent);
+    color: var(--color-text-primary);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(8px);
+}
+
+.type-to-zoom-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+}
+
+.type-to-zoom-query {
+    min-height: 22px;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: pre;
+}
+
+.type-to-zoom-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 18px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.type-to-zoom-duplicate {
+    color: var(--color-brand-primary, #38bdf8);
+    font-weight: 700;
+}
+
 /* 
    We keep .docked for flex behavior, but we use inline styles 
    in FractalGoals.jsx to achieve the "floating" look.
@@ -140,6 +189,19 @@
     .flowtree-options-pane-mobile {
         transform: scale(0.94);
         transform-origin: top left;
+    }
+
+    .type-to-zoom-palette {
+        top: 118px;
+        left: 10px;
+        right: auto;
+        min-width: 156px;
+        max-width: calc(100% - 20px);
+        padding: 9px 10px;
+    }
+
+    .type-to-zoom-query {
+        font-size: 16px;
     }
 
     .mobile-sheet-collapsed-bar {
