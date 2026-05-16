@@ -8,6 +8,7 @@ import {
 } from '../../hooks/useGoalTimeline';
 import { formatDurationSeconds } from '../../utils/formatters';
 import GoalIcon from '../atoms/GoalIcon';
+import { ActivityTimelineCard } from '../common/ActivityTimeline';
 import styles from './GoalTimelineView.module.css';
 
 const FILTERS = [
@@ -127,7 +128,7 @@ function GoalTimelineView({ rootId, goalId, metrics, onTimeSpentClick }) {
             ) : (
                 <div className={styles.timeline}>
                     {entries.map((item) => (
-                        <TimelineItem key={item.id} item={item} timezone={timezone} />
+                        <TimelineItem key={item.id} item={item} rootId={rootId} timezone={timezone} />
                     ))}
                 </div>
             )}
@@ -135,10 +136,13 @@ function GoalTimelineView({ rootId, goalId, metrics, onTimeSpentClick }) {
     );
 }
 
-function TimelineItem({ item, timezone }) {
+function TimelineItem({ item, rootId, timezone }) {
     const { date, time } = formatDateTime(item.timestamp, timezone);
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const payload = item.payload || {};
+    const activityInstance = item.event_type === 'activity.completed'
+        ? normalizeActivityTimelineInstance(item)
+        : null;
     const metrics = Array.isArray(payload.metrics) ? payload.metrics : [];
     const visibleMetrics = metrics.map(formatMetricValue).filter(Boolean).slice(0, 4);
     const duration = payload.duration_seconds ? formatDurationSeconds(payload.duration_seconds) : null;
@@ -146,6 +150,21 @@ function TimelineItem({ item, timezone }) {
     const goalColor = goalLevel ? getGoalColor(goalLevel) : null;
     const goalSecondaryColor = goalLevel ? getGoalSecondaryColor(goalLevel) : null;
     const goalIcon = goalLevel ? getGoalIcon(goalLevel) : null;
+
+    if (activityInstance) {
+        return (
+            <div className={styles.activityEvent}>
+                <ActivityTimelineCard
+                    instance={activityInstance}
+                    activityDef={payload.activity_definition || null}
+                    progressRecord={payload.progress_comparison || payload.progress_record || null}
+                    timezone={timezone}
+                    showActivityName
+                    sessionHref={buildActivityInstanceHref(rootId, activityInstance)}
+                />
+            </div>
+        );
+    }
 
     return (
         <div className={styles.item}>
@@ -197,6 +216,34 @@ function TimelineItem({ item, timezone }) {
             </div>
         </div>
     );
+}
+
+function buildActivityInstanceHref(rootId, instance) {
+    if (!rootId || !instance?.session_id || !instance?.id) return null;
+    const params = new URLSearchParams({ activityInstanceId: instance.id });
+    return `/${rootId}/session/${instance.session_id}?${params.toString()}`;
+}
+
+function normalizeActivityTimelineInstance(item) {
+    const payload = item.payload || {};
+    const notes = Array.isArray(payload.notes)
+        ? payload.notes
+        : payload.notes
+            ? [{ id: `${item.id}:note`, content: payload.notes, created_at: payload.created_at || item.timestamp }]
+            : [];
+    return {
+        ...payload,
+        id: payload.id || item.entity_id || item.id,
+        created_at: payload.created_at || item.timestamp,
+        metric_values: Array.isArray(payload.metric_values)
+            ? payload.metric_values
+            : Array.isArray(payload.metrics)
+                ? payload.metrics
+                : [],
+        session_name: payload.session_name || item.subtitle,
+        session_date: payload.session_date || payload.created_at || item.timestamp,
+        notes,
+    };
 }
 
 function getTimelineGoalLevel(payload) {

@@ -86,6 +86,10 @@
     gap: 10px;
 }
 
+.activityEvent {
+    min-width: 0;
+}
+
 .item {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 112px;

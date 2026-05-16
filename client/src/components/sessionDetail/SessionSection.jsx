@@ -199,6 +199,7 @@ const SessionSection = ({
                         <div
                             key={instanceId}
                             data-session-activity-card="true"
+                            data-session-activity-instance-id={instanceId}
                             draggable
                             onDragStart={(e) => {
                                 e.dataTransfer.effectAllowed = 'move';

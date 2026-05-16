@@ -9,6 +9,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
     const {
         session,
         activities,
+        activityInstances,
         loading,
         autoSaveStatus,
         localSessionData,
@@ -138,6 +139,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
     return {
         session,
         activities,
+        activityInstances,
         loading,
         autoSaveStatus,
         sidePaneMode,

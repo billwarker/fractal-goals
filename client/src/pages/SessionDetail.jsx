@@ -1,5 +1,5 @@
-import React from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import SessionSection from '../components/sessionDetail/SessionSection';
 import {
     SessionDetailMobileChrome,
@@ -37,10 +37,13 @@ function SessionDetail() {
 function SessionDetailContent() {
     const { rootId, sessionId } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const isMobile = useIsMobile();
+    const appliedActivityTargetRef = useRef(null);
     const {
         session,
         activities,
+        activityInstances,
         loading,
         autoSaveStatus,
         sidePaneMode,
@@ -85,6 +88,31 @@ function SessionDetailContent() {
         isSavingTemplate,
         isDuplicatingSession,
     } = useSessionDetailController({ rootId, sessionId, navigate, isMobile });
+
+    const targetActivityInstanceId = searchParams.get('activityInstanceId');
+
+    useEffect(() => {
+        if (loading || !targetActivityInstanceId || !Array.isArray(activityInstances)) return undefined;
+
+        const targetKey = `${sessionId}:${targetActivityInstanceId}`;
+        if (appliedActivityTargetRef.current === targetKey) return undefined;
+
+        const targetInstance = activityInstances.find((instance) => instance.id === targetActivityInstanceId);
+        if (!targetInstance) return undefined;
+
+        appliedActivityTargetRef.current = targetKey;
+        handleActivityFocus(targetInstance, null);
+
+        const timeoutId = window.setTimeout(() => {
+            const escapedId = typeof CSS !== 'undefined' && CSS.escape
+                ? CSS.escape(targetActivityInstanceId)
+                : targetActivityInstanceId.replace(/"/g, '\\"');
+            const element = document.querySelector(`[data-session-activity-instance-id="${escapedId}"]`);
+            element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [activityInstances, handleActivityFocus, loading, sessionId, targetActivityInstanceId]);
 
     if (loading) {
         return (
