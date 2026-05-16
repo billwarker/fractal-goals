@@ -69,7 +69,7 @@ function ActivityGraphSelector({
                     disabled={disabled}
                 >
                     <span className={styles.triggerLabel}>{triggerLabel}</span>
-                    <span className={styles.triggerChevron} aria-hidden="true">▾</span>
+                    <span className={styles.triggerChevron} aria-hidden="true">v</span>
                 </Button>
             </div>
 

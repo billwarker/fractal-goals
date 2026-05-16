@@ -76,7 +76,7 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
     if (metrics.length < 2) {
         return (
             <div className={styles.unavailableContainer}>
-                <div className={styles.unavailableIcon}>📊</div>
+                <div className={styles.unavailableIcon}>Scatter</div>
                 <div className={styles.unavailableTitle}>
                     Scatter Plot Unavailable
                 </div>

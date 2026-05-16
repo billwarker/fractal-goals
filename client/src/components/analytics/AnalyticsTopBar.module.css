@@ -4,9 +4,9 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 16px 24px;
-    padding: 24px 40px 20px;
+    padding: 18px 28px 16px;
     border-bottom: 1px solid var(--color-border);
-    background: var(--color-bg-app);
+    background: color-mix(in srgb, var(--color-bg-app) 88%, var(--color-bg-surface));
 }
 
 .viewSection,
@@ -33,16 +33,16 @@
     margin: 0;
     color: var(--color-text-primary);
     font-family: var(--font-family);
-    font-size: 26px;
+    font-size: 22px;
     font-weight: var(--font-weight-semibold);
     line-height: var(--line-height-tight);
-    letter-spacing: -0.02em;
+    letter-spacing: 0;
 }
 
 .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
 }
 
 .sectionLabel {
@@ -85,12 +85,16 @@
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     width: 100%;
     justify-content: flex-end;
     overflow-x: auto;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
+    padding: 3px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-surface);
 }
 
 .presetRow::-webkit-scrollbar {
@@ -99,13 +103,13 @@
 
 .presetBtn {
     flex: 0 0 auto;
-    padding: 7px 10px;
-    border: 1px solid var(--color-border);
+    padding: 7px 11px;
+    border: 1px solid transparent;
     border-radius: var(--border-radius-sm);
-    background: var(--color-bg-card);
+    background: transparent;
     color: var(--color-text-muted);
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
     line-height: 1;
@@ -113,16 +117,17 @@
 }
 
 .presetBtn:hover {
-    background: var(--color-bg-card-hover);
-    border-color: var(--color-border-hover);
+    background: var(--color-bg-hover);
+    border-color: transparent;
     color: var(--color-text-primary);
 }
 
 .presetBtnActive {
-    background: var(--color-brand-primary);
-    border-color: var(--color-brand-primary);
-    color: var(--color-text-inverse);
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
+    color: var(--color-text-primary);
     font-weight: 600;
+    box-shadow: var(--shadow-sm);
 }
 
 @media (max-width: 1024px) {
@@ -154,7 +159,7 @@
     }
 
     .pageTitle {
-        font-size: 24px;
+        font-size: 20px;
         line-height: 1.1;
     }
 }

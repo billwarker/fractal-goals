@@ -215,8 +215,8 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef, selectedDateRange
 
     const getTrendIcon = () => {
         switch (trend) {
-            case 'up': return '📈';
-            case 'down': return '📉';
+            case 'up': return 'Up';
+            case 'down': return 'Down';
             default: return '➡️';
         }
     };
@@ -324,7 +324,7 @@ function WeeklyBarChart({ sessions = [], weeks = 12, chartRef, selectedDateRange
         <div className={styles.panel}>
             <div className={styles.header}>
                 <h3 className={styles.title}>
-                    📊 Weekly Sessions
+                    Weekly Sessions
                 </h3>
                 <div className={`${styles.trend} ${getTrendClassName()}`}>
                     {getTrendIcon()} {getTrendText()}

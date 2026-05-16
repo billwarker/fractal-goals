@@ -155,7 +155,7 @@ function ActivityHeatmap({ sessions = [], months = 12 }) {
                     fontWeight: 600,
                     color: 'var(--color-text-secondary)'
                 }}>
-                    📅 Activity Heatmap
+                    Activity Heatmap
                 </h3>
                 <div style={{
                     display: 'flex',

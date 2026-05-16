@@ -16,8 +16,7 @@ import { chartDefaults, DISABLED_CHART_ANIMATION } from './ChartJSWrapper'; // I
  */
 function GoalTimeDistribution({ goals, chartRef }) {
     const { getGoalColor } = useGoalLevels();;
-    // Roll-up toggle: when true, child goal time is aggregated to parents
-    const [rollUpEnabled, setRollUpEnabled] = useState(false);
+    const [inheritanceMode, setInheritanceMode] = useState('direct');
     // Duration mode: 'activity' = activity instance duration, 'session' = full session duration
     const [durationMode, setDurationMode] = useState('activity');
 
@@ -38,7 +37,6 @@ function GoalTimeDistribution({ goals, chartRef }) {
             return { labels: [], datasets: [] };
         }
 
-        // Build a map of goals by ID for parent lookup
         const goalMap = {};
         goals.forEach(goal => {
             goalMap[goal.id] = goal;
@@ -58,26 +56,32 @@ function GoalTimeDistribution({ goals, chartRef }) {
                 const dateKey = item.date;
                 dateSet.add(dateKey);
 
-                // Determine target goal for this duration (for roll-up)
-                let targetGoalId = goal.id;
+                const targetGoalIds = [goal.id];
 
-                if (rollUpEnabled && goal.parent_id) {
-                    // Roll up to the highest ancestor
+                if (inheritanceMode === 'descendants') {
+                    let current = goal;
+                    while (current.parent_id && goalMap[current.parent_id]) {
+                        current = goalMap[current.parent_id];
+                        targetGoalIds.push(current.id);
+                    }
+                } else if (inheritanceMode === 'root') {
                     let current = goal;
                     while (current.parent_id && goalMap[current.parent_id]) {
                         current = goalMap[current.parent_id];
                     }
-                    targetGoalId = current.id;
+                    targetGoalIds.splice(0, targetGoalIds.length, current.id);
                 }
 
-                if (!goalTimeData[targetGoalId]) {
-                    goalTimeData[targetGoalId] = {};
-                }
+                targetGoalIds.forEach((targetGoalId) => {
+                    if (!goalTimeData[targetGoalId]) {
+                        goalTimeData[targetGoalId] = {};
+                    }
 
-                if (!goalTimeData[targetGoalId][dateKey]) {
-                    goalTimeData[targetGoalId][dateKey] = 0;
-                }
-                goalTimeData[targetGoalId][dateKey] += item.duration_seconds || 0;
+                    if (!goalTimeData[targetGoalId][dateKey]) {
+                        goalTimeData[targetGoalId][dateKey] = 0;
+                    }
+                    goalTimeData[targetGoalId][dateKey] += item.duration_seconds || 0;
+                });
             });
         });
 
@@ -150,7 +154,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
             datasets,
             sortedDates // Keep for tooltip formatting
         };
-    }, [goals, rollUpEnabled, durationMode]);
+    }, [goals, inheritanceMode, durationMode]);
 
     const chartOptions = useMemo(() => ({
         indexAxis: 'x', // Explicit: vertical bars (dates on X-axis)
@@ -268,7 +272,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
                     color: 'var(--color-text-muted)',
                     padding: '40px'
                 }}>
-                    <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }}>⏱️</div>
+                    <div style={{ fontSize: '13px', marginBottom: '12px', opacity: 0.7 }}>No tracked time</div>
                     <h3 style={{ fontSize: '16px', fontWeight: 500, color: 'var(--color-text-secondary)', margin: 0 }}>
                         No Time Recorded Yet
                     </h3>
@@ -339,29 +343,32 @@ function GoalTimeDistribution({ goals, chartRef }) {
                         </button>
                     </div>
 
-                    {/* Roll-up toggle */}
-                    <label style={{
+                    <div style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        cursor: 'pointer',
                         fontSize: '11px',
                         color: 'var(--color-text-secondary)'
                     }}>
-                        <input
-                            type="checkbox"
-                            checked={rollUpEnabled}
-                            onChange={(e) => setRollUpEnabled(e.target.checked)}
+                        <select
+                            value={inheritanceMode}
+                            onChange={(event) => setInheritanceMode(event.target.value)}
                             style={{
-                                width: '13px',
-                                height: '13px',
-                                cursor: 'pointer',
-                                accentColor: 'var(--color-brand-primary)'
+                                border: '1px solid var(--color-border)',
+                                borderRadius: '4px',
+                                background: 'var(--color-bg-input)',
+                                color: 'var(--color-text-primary)',
+                                fontSize: '11px',
+                                padding: '5px 8px',
                             }}
-                        />
-                        <span>Roll up</span>
+                            aria-label="Goal inheritance mode"
+                        >
+                            <option value="direct">Direct only</option>
+                            <option value="descendants">Include descendants</option>
+                            <option value="root">Roll up to root</option>
+                        </select>
                         <span
-                            title="When enabled, time spent on child goals is aggregated and shown under their top-level parent goal."
+                            title="Direct only keeps time on its attached goal. Include descendants also credits each ancestor. Roll up to root collapses child time into its top parent."
                             style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -377,7 +384,7 @@ function GoalTimeDistribution({ goals, chartRef }) {
                         >
                             ?
                         </span>
-                    </label>
+                    </div>
                 </div>
             </div>
 

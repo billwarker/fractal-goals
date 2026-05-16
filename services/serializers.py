@@ -213,6 +213,43 @@ def _merge_legacy_activity_payload(serialized_instance, legacy_item):
     return serialized_instance
 
 
+def _serialize_session_sections_for_analytics(session):
+    attrs = _safe_load_json(getattr(session, "attributes", None), {})
+    session_data = attrs.get("session_data") if isinstance(attrs.get("session_data"), dict) else attrs
+    sections = session_data.get("sections") if isinstance(session_data, dict) else None
+    if not isinstance(sections, list):
+        return []
+
+    serialized_sections = []
+    for index, section in enumerate(sections):
+        if not isinstance(section, dict):
+            continue
+        raw_items = section.get("exercises") or section.get("activities") or []
+        activity_ids = section.get("activity_ids") if isinstance(section.get("activity_ids"), list) else []
+        instance_ids = []
+
+        for activity_id in activity_ids:
+            if activity_id:
+                instance_ids.append(activity_id)
+
+        if isinstance(raw_items, list):
+            for item in raw_items:
+                if not isinstance(item, dict):
+                    continue
+                instance_id = item.get("instance_id") or item.get("id")
+                if instance_id and instance_id not in instance_ids:
+                    instance_ids.append(instance_id)
+
+        serialized_sections.append({
+            "id": section.get("template_section_id") or section.get("id") or f"section-{index + 1}",
+            "name": section.get("name") or f"Section {index + 1}",
+            "activity_ids": instance_ids,
+            "estimated_duration_minutes": section.get("estimated_duration_minutes") or section.get("duration_minutes"),
+        })
+
+    return serialized_sections
+
+
 def serialize_session_for_analytics(session):
     """Serialize the subset of session fields needed by analytics views."""
     return {
@@ -222,6 +259,7 @@ def serialize_session_for_analytics(session):
         "created_at": format_utc(session.created_at),
         "completed": bool(session.completed),
         "total_duration_seconds": session.total_duration_seconds,
+        "sections": _serialize_session_sections_for_analytics(session),
     }
 
 def serialize_goal(goal, include_children=True):

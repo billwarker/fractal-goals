@@ -154,7 +154,7 @@ function StreakTimeline({ sessions = [] }) {
         <div className={styles.panel}>
             <div className={styles.header}>
                 <h3 className={styles.title}>
-                    🔥 Streak Timeline
+                    Streak Timeline
                 </h3>
             </div>
 
@@ -162,7 +162,7 @@ function StreakTimeline({ sessions = [] }) {
             <div className={styles.stats}>
                 <div className={styles.stat}>
                     <div className={`${styles.statValue} ${styles.statValueRow} ${currentStreak > 0 ? styles.statValueWarning : styles.statValueMuted}`}>
-                        {currentStreak > 0 && '🔥'} {currentStreak}
+                        {currentStreak}
                     </div>
                     <div className={styles.statLabel}>
                         Current Streak
@@ -221,7 +221,7 @@ function StreakTimeline({ sessions = [] }) {
                                     {/* Badge for long streaks */}
                                     {segment.length >= 7 && (
                                         <div className={getBadgeClassName(segment.length)}>
-                                            {segment.length >= 14 ? '🏆 Great!' : '⭐ Nice!'}
+                                            {segment.length >= 14 ? 'Great' : 'Nice'}
                                         </div>
                                     )}
                                 </>
@@ -243,7 +243,7 @@ function StreakTimeline({ sessions = [] }) {
             {/* Motivational message based on current streak */}
             {currentStreak > 0 && (
                 <div className={styles.motivation}>
-                    🔥 You're on a <strong>{currentStreak}-day streak</strong>!
+                    You're on a <strong>{currentStreak}-day streak</strong>.
                     {currentStreak >= longestStreak
                         ? " This is your best streak yet!"
                         : ` Keep going to beat your record of ${longestStreak} days!`}

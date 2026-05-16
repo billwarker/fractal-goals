@@ -30,9 +30,9 @@
 .header {
     display: flex;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 8px 10px;
     border-bottom: 1px solid var(--color-border);
-    background: var(--color-bg-secondary);
+    background: color-mix(in srgb, var(--color-bg-secondary) 86%, var(--color-bg-surface));
     align-items: center;
     min-height: 48px;
     flex-wrap: nowrap;
@@ -47,7 +47,7 @@
 /* Header Navigation Group (Back/Top) */
 .navGroup {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     margin-right: 8px;
     border-right: 1px solid var(--color-border);
     padding-right: 8px;
@@ -63,17 +63,31 @@
 /* Main Action Area */
 .mainActions {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     flex: 1;
     overflow-x: auto;
     padding-bottom: 2px;
     align-items: center;
 }
 
+.mainActions button,
+.globalActions button {
+    gap: 6px;
+}
+
+.buttonIcon,
+.menuIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: currentColor;
+    flex: 0 0 auto;
+}
+
 /* Global Actions (Right side) */
 .globalActions {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     margin-left: auto;
     flex-shrink: 0;
 }
@@ -91,7 +105,7 @@
     margin-top: 4px;
     background: var(--color-bg-surface);
     border: 1px solid var(--color-border);
-    border-radius: 6px;
+    border-radius: 8px;
     box-shadow: var(--shadow-md);
     z-index: 100;
     min-width: 160px;
@@ -133,6 +147,7 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    min-width: 0;
 }
 
 .selectAtom {
@@ -166,8 +181,9 @@
 }
 
 .emptyIcon {
-    font-size: 32px;
     opacity: 0.5;
+    color: currentColor;
+    display: inline-flex;
 }
 
 /* Visualization Content Containers */

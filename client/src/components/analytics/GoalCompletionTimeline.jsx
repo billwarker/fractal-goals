@@ -204,7 +204,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
 
                         // If goals were completed on this date for this type, show them
                         if (goalNamesOnDate.length > 0) {
-                            lines.push(`  ✓ Completed: ${goalNamesOnDate.join(', ')}`);
+                            lines.push(`Completed: ${goalNamesOnDate.join(', ')}`);
                         }
 
                         return lines;
@@ -264,7 +264,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
                 color: '#666',
                 padding: '40px'
             }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }}>📈</div>
+                <div style={{ fontSize: '13px', marginBottom: '12px', opacity: 0.7 }}>No completions</div>
                 <h3 style={{ fontSize: '16px', fontWeight: 500, color: '#888', margin: 0 }}>
                     No Completed Goals Yet
                 </h3>
