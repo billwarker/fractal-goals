@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -74,6 +74,15 @@ export const DISABLED_CHART_ANIMATION = {
     },
 };
 
+const DEFAULT_LAYOUT_PADDING = Object.freeze({ top: 8, right: 16, bottom: 16, left: 8 });
+
+const resolveLayoutPadding = (layoutPadding = DEFAULT_LAYOUT_PADDING) => ({
+    top: layoutPadding.top ?? DEFAULT_LAYOUT_PADDING.top,
+    right: layoutPadding.right ?? DEFAULT_LAYOUT_PADDING.right,
+    bottom: layoutPadding.bottom ?? DEFAULT_LAYOUT_PADDING.bottom,
+    left: layoutPadding.left ?? DEFAULT_LAYOUT_PADDING.left,
+});
+
 /**
  * Hook to get chart options that update with theme changes
  * Resolves CSS variables to actual color strings for Chart.js compatibility
@@ -83,9 +92,27 @@ export function useChartOptions({
     xAxisLabel = '',
     yAxisLabel = '',
     isTimeScale = false,
-    layoutPadding = { top: 8, right: 16, bottom: 16, left: 8 }
+    layoutPadding = DEFAULT_LAYOUT_PADDING
 }) {
-    const [options, setOptions] = useState(createChartOptions({ title, xAxisLabel, yAxisLabel, isTimeScale, layoutPadding }));
+    const rawLayoutPadding = layoutPadding || DEFAULT_LAYOUT_PADDING;
+    const paddingTop = rawLayoutPadding.top ?? DEFAULT_LAYOUT_PADDING.top;
+    const paddingRight = rawLayoutPadding.right ?? DEFAULT_LAYOUT_PADDING.right;
+    const paddingBottom = rawLayoutPadding.bottom ?? DEFAULT_LAYOUT_PADDING.bottom;
+    const paddingLeft = rawLayoutPadding.left ?? DEFAULT_LAYOUT_PADDING.left;
+    const stableLayoutPadding = useMemo(() => ({
+        top: paddingTop,
+        right: paddingRight,
+        bottom: paddingBottom,
+        left: paddingLeft,
+    }), [paddingTop, paddingRight, paddingBottom, paddingLeft]);
+
+    const [options, setOptions] = useState(createChartOptions({
+        title,
+        xAxisLabel,
+        yAxisLabel,
+        isTimeScale,
+        layoutPadding: stableLayoutPadding,
+    }));
 
     useEffect(() => {
         // Function to update options based on current theme
@@ -105,7 +132,7 @@ export function useChartOptions({
                 maintainAspectRatio: false,
                 ...DISABLED_CHART_ANIMATION,
                 layout: {
-                    padding: layoutPadding
+                    padding: stableLayoutPadding
                 },
                 plugins: {
                     legend: {
@@ -203,7 +230,7 @@ export function useChartOptions({
         observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'class'] });
 
         return () => observer.disconnect();
-    }, [title, xAxisLabel, yAxisLabel, isTimeScale, layoutPadding]);
+    }, [title, xAxisLabel, yAxisLabel, isTimeScale, stableLayoutPadding]);
 
     return options;
 }
@@ -228,13 +255,15 @@ export const chartDefaults = {
  * Static creator for initial state / server side
  */
 export function createChartOptions(props) {
+    const layoutPadding = resolveLayoutPadding(props.layoutPadding);
+
     // Return safe defaults using vars (might not work in all canvas contexts but safer than nothing)
     return {
         responsive: true,
         maintainAspectRatio: false,
         ...DISABLED_CHART_ANIMATION,
         layout: {
-            padding: props.layoutPadding || { top: 8, right: 16, bottom: 16, left: 8 }
+            padding: layoutPadding
         },
         plugins: {
             legend: { display: false },
