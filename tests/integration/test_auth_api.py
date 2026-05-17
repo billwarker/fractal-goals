@@ -152,6 +152,28 @@ class TestLoginEndpoint:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert 'token' in data
+
+    def test_login_sets_http_only_cookie(self, client, test_user):
+        """Login should set a browser cookie that can authenticate follow-up requests."""
+        from config import config
+
+        response = client.post(
+            '/api/auth/login',
+            data=json.dumps({
+                'username_or_email': 'testuser',
+                'password': 'Password123'
+            }),
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+        cookie_header = response.headers.get('Set-Cookie', '')
+        assert config.AUTH_COOKIE_NAME in cookie_header
+        assert 'HttpOnly' in cookie_header
+
+        me_response = client.get('/api/auth/me')
+        assert me_response.status_code == 200
+        assert json.loads(me_response.data)['username'] == 'testuser'
     
     def test_login_wrong_password(self, client, test_user):
         """Test login with wrong password fails."""
@@ -226,6 +248,21 @@ class TestMeEndpoint:
         """Test getting user info without authentication fails."""
         response = client.get('/api/auth/me')
         assert response.status_code == 401
+
+    def test_logout_clears_cookie(self, client, test_user):
+        """Logout should clear cookie-backed authentication."""
+        client.post(
+            '/api/auth/login',
+            data=json.dumps({
+                'username_or_email': 'testuser',
+                'password': 'Password123'
+            }),
+            content_type='application/json'
+        )
+
+        logout_response = client.post('/api/auth/logout')
+        assert logout_response.status_code == 200
+        assert client.get('/api/auth/me').status_code == 401
 
 
 @pytest.mark.integration
@@ -539,4 +576,3 @@ class TestUsernameUpdateEndpoint:
             content_type='application/json'
         )
         assert response.status_code == 400
-

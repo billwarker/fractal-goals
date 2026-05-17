@@ -5,33 +5,21 @@ const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
-    const [token, setToken] = useState(localStorage.getItem('token'));
     const [loading, setLoading] = useState(true);
 
-    // Effect to handle token changes and initial load
     useEffect(() => {
-        if (token) {
-            localStorage.setItem('token', token);
-            setLoading(true);
-            fetchCurrentUser();
-        } else {
-            localStorage.removeItem('token');
-            setUser(null);
-            setLoading(false);
-        }
-    }, [token]);
+        fetchCurrentUser();
+    }, []);
 
     // Handle events from axios interceptors
     useEffect(() => {
         const handleUnauthorized = () => {
-            setToken(null);
             setUser(null);
             setLoading(false);
         };
         const handleTokenRefresh = (e) => {
-            if (e.detail?.token) {
-                setToken(e.detail.token);
-                if (e.detail.user) setUser(e.detail.user);
+            if (e.detail?.user) {
+                setUser(e.detail.user);
             }
         };
         window.addEventListener('auth:unauthorized', handleUnauthorized);
@@ -44,6 +32,16 @@ export function AuthProvider({ children }) {
 
     const fetchCurrentUser = async () => {
         try {
+            const legacyToken = localStorage.getItem('token');
+            if (legacyToken) {
+                const refreshResponse = await authApi.refresh(legacyToken);
+                localStorage.removeItem('token');
+                if (refreshResponse.data?.user) {
+                    setUser(refreshResponse.data.user);
+                    return;
+                }
+            }
+
             const res = await authApi.getMe();
             setUser(res.data);
         } catch (err) {
@@ -53,9 +51,7 @@ export function AuthProvider({ children }) {
 
             // Keep token for transient network failures so interceptor retries can recover.
             if (!isNetworkError && (status === 401 || status === 403)) {
-                setToken(null);
                 setUser(null);
-                localStorage.removeItem('token');
             }
         } finally {
             setLoading(false);
@@ -68,8 +64,7 @@ export function AuthProvider({ children }) {
                 username_or_email: usernameOrEmail,
                 password: password
             });
-            const { token: newToken, user: userData } = res.data;
-            setToken(newToken);
+            const { user: userData } = res.data;
             setUser(userData);
             return res.data;
         } catch (err) {
@@ -92,21 +87,23 @@ export function AuthProvider({ children }) {
         }
     };
 
-    const logout = () => {
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem('token');
+    const logout = async () => {
+        try {
+            await authApi.logout();
+        } finally {
+            setUser(null);
+        }
     };
 
     const value = {
         user,
-        token,
+        token: null,
         loading,
         login,
         signup,
         logout,
         setUser,
-        isAuthenticated: !!token
+        isAuthenticated: !!user
     };
 
     return (

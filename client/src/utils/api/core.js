@@ -2,16 +2,7 @@ import axios from 'axios';
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
-axios.interceptors.request.use(
-    (config) => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => Promise.reject(error)
-);
+axios.defaults.withCredentials = true;
 
 let isRefreshing = false;
 let failedQueue = [];
@@ -44,8 +35,7 @@ axios.interceptors.response.use(
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
-                }).then((token) => {
-                    originalRequest.headers.Authorization = `Bearer ${token}`;
+                }).then(() => {
                     return axios(originalRequest);
                 });
             }
@@ -54,21 +44,16 @@ axios.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                const response = await axios.post(`${API_BASE}/auth/refresh`, {}, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-                });
+                const response = await axios.post(`${API_BASE}/auth/refresh`, {});
 
-                const { token, user } = response.data;
-                localStorage.setItem('token', token);
-                window.dispatchEvent(new CustomEvent('auth:token_refreshed', { detail: { token, user } }));
+                const { user } = response.data;
+                window.dispatchEvent(new CustomEvent('auth:token_refreshed', { detail: { user } }));
 
-                originalRequest.headers.Authorization = `Bearer ${token}`;
-                processQueue(null, token);
+                processQueue(null);
 
                 return axios(originalRequest);
             } catch (refreshError) {
                 processQueue(refreshError, null);
-                localStorage.removeItem('token');
                 window.dispatchEvent(new Event('auth:unauthorized'));
                 return Promise.reject(refreshError);
             } finally {

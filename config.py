@@ -66,9 +66,28 @@ class Config:
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'default-jwt-secret-keep-it-safe')
     JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '72'))
     JWT_REFRESH_WINDOW_DAYS = int(os.getenv('JWT_REFRESH_WINDOW_DAYS', '7'))
+    AUTH_COOKIE_NAME = os.getenv('AUTH_COOKIE_NAME', 'fractal_auth_token')
+    AUTH_COOKIE_SECURE = os.getenv(
+        'AUTH_COOKIE_SECURE',
+        'true' if ENV not in ('development', 'testing', 'local') else 'false'
+    ).lower() in ('true', '1', 'yes')
+    AUTH_COOKIE_SAMESITE = os.getenv(
+        'AUTH_COOKIE_SAMESITE',
+        'Lax' if ENV in ('development', 'testing', 'local') else 'Strict'
+    )
 
     # Rate Limiting Storage URL (Redis)
     RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'memory://')
+
+    # Observability
+    SENTRY_TRACES_SAMPLE_RATE = float(os.getenv(
+        'SENTRY_TRACES_SAMPLE_RATE',
+        '0.1' if ENV not in ('development', 'testing', 'local') else '1.0'
+    ))
+    SENTRY_PROFILES_SAMPLE_RATE = float(os.getenv(
+        'SENTRY_PROFILES_SAMPLE_RATE',
+        '0.0' if ENV not in ('development', 'testing', 'local') else '1.0'
+    ))
 
     @classmethod
     def should_auto_run_migrations(cls):
@@ -88,6 +107,12 @@ class Config:
             
             if '*' in cls.CORS_ORIGINS:
                 raise ValueError(f"CRITICAL: Wildcard CORS origin (*) is NOT allowed in {cls.ENV} environment!")
+
+            if cls.AUTH_COOKIE_SAMESITE not in ('Lax', 'Strict', 'None'):
+                raise ValueError("CRITICAL: AUTH_COOKIE_SAMESITE must be Lax, Strict, or None")
+
+            if cls.AUTH_COOKIE_SAMESITE == 'None' and not cls.AUTH_COOKIE_SECURE:
+                raise ValueError("CRITICAL: AUTH_COOKIE_SECURE must be true when AUTH_COOKIE_SAMESITE=None")
 
     @classmethod
     def get_database_url(cls):

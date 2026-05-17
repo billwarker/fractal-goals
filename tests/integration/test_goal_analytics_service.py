@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from models import ActivityDefinition, ActivityGroup, ActivityInstance, Session, session_goals
+from models import ActivityDefinition, ActivityGroup, ActivityInstance, Session, User, session_goals
 from services.analytics_cache import invalidate_root
 
 
@@ -69,3 +69,40 @@ class TestGoalAnalyticsService:
         assert "goals" in payload
         assert payload["summary"]["total_goals"] >= 1
         assert any(goal["id"] == root_id and goal["session_count"] >= 1 for goal in payload["goals"])
+
+    def test_goal_analytics_cache_is_checked_after_ownership(
+        self,
+        authed_client,
+        client,
+        db_session,
+        sample_ultimate_goal,
+    ):
+        import jwt
+        from config import config
+
+        root_id = sample_ultimate_goal.id
+        invalidate_root(root_id)
+
+        owner_response = authed_client.get(f"/api/{root_id}/goals/analytics")
+        assert owner_response.status_code == 200
+
+        other_user = User(
+            id=str(uuid.uuid4()),
+            username="analytics_other_user",
+            email="analytics-other@example.com",
+        )
+        other_user.set_password("Password123")
+        db_session.add(other_user)
+        db_session.commit()
+
+        token = jwt.encode({
+            "user_id": other_user.id,
+            "exp": datetime.now(timezone.utc) + timedelta(hours=24),
+        }, config.JWT_SECRET_KEY, algorithm="HS256")
+
+        response = client.get(
+            f"/api/{root_id}/goals/analytics",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 404

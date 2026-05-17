@@ -56,6 +56,7 @@ class GoalAnalyticsService:
         ).all()
 
         goal_session_map = {}
+        session_row_by_id = {}
         for session in all_sessions:
             session_duration = session.total_duration_seconds or 0
             if session_duration == 0 and session.session_start and session.session_end:
@@ -63,22 +64,27 @@ class GoalAnalyticsService:
                 end = session.session_end.replace(tzinfo=timezone.utc) if session.session_end.tzinfo is None else session.session_end
                 session_duration = int((end - start).total_seconds())
 
+            session_payload = serialize_goal_session_analytics_row(
+                session_id=session.id,
+                session_name=session.name,
+                duration_seconds=session_duration,
+                completed=session.completed,
+                session_start=session.session_start,
+            )
+            session_row_by_id[session.id] = session_payload
             for goal in session.goals:
-                session_payload = serialize_goal_session_analytics_row(
-                    session_id=session.id,
-                    session_name=session.name,
-                    duration_seconds=session_duration,
-                    completed=session.completed,
-                    session_start=session.session_start,
-                )
                 goal_session_map.setdefault(goal.id, []).append(session_payload)
 
-        all_activity_instances = self.db_session.query(ActivityInstance).options(
-            joinedload(ActivityInstance.definition)
-        ).filter(
-            ActivityInstance.root_id == root_id,
-            ActivityInstance.deleted_at.is_(None),
-        ).all()
+        session_ids = list(session_row_by_id.keys())
+        all_activity_instances = []
+        if session_ids:
+            all_activity_instances = self.db_session.query(ActivityInstance).options(
+                joinedload(ActivityInstance.definition)
+            ).filter(
+                ActivityInstance.root_id == root_id,
+                ActivityInstance.session_id.in_(session_ids),
+                ActivityInstance.deleted_at.is_(None),
+            ).all()
 
         session_activity_map = {}
         for instance in all_activity_instances:
@@ -141,10 +147,7 @@ class GoalAnalyticsService:
 
             activity_durations_by_date = []
             for instance in goal_activity_instances:
-                session = next(
-                    (session_item for session_item in sessions_for_goal if session_item["session_id"] == instance.session_id),
-                    None,
-                )
+                session = session_row_by_id.get(instance.session_id)
                 if session and session["session_start"] and instance.duration_seconds:
                     activity_durations_by_date.append(serialize_goal_activity_duration_item(
                         date=session["session_start"],

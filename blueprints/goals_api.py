@@ -24,6 +24,7 @@ from blueprints.api_utils import (
     internal_error,
     parse_optional_pagination,
     etag_json_response,
+    require_owned_root,
 )
 from services.serializers import (
     serialize_goal,
@@ -540,6 +541,10 @@ def get_goal_analytics(current_user, root_id):
     """
     db_session = get_db_session()
     try:
+        root = require_owned_root(db_session, root_id, current_user.id)
+        if not root:
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+
         cached = get_analytics(root_id)
         if cached is not None:
             return etag_json_response(cached)

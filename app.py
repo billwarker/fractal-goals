@@ -16,11 +16,13 @@ import os
 
 # Initialize Sentry if DSN is present
 if os.getenv("SENTRY_DSN"):
+    from config import config as _sentry_config
+
     sentry_sdk.init(
         dsn=os.getenv("SENTRY_DSN"),
         integrations=[FlaskIntegration()],
-        traces_sample_rate=1.0,
-        profiles_sample_rate=1.0,  # Enable profiling
+        traces_sample_rate=_sentry_config.SENTRY_TRACES_SAMPLE_RATE,
+        profiles_sample_rate=_sentry_config.SENTRY_PROFILES_SAMPLE_RATE,
         environment=os.getenv("ENV", "development")
     )
 
@@ -74,10 +76,8 @@ def shutdown_session(exception=None):
     remove_session()
 
 # Initialize Rate Limiter
+app.config['RATELIMIT_STORAGE_URI'] = config.RATELIMIT_STORAGE_URI
 limiter.init_app(app)
-# Configure storage URI if backend is not memory
-if config.RATELIMIT_STORAGE_URI and config.RATELIMIT_STORAGE_URI != "memory://":
-    limiter._storage_uri = config.RATELIMIT_STORAGE_URI
 
 # Initialize Security Headers (Talisman)
 # In development, we allow unsafe-eval and unsafe-inline for Vite HMR and React DevTools
@@ -131,7 +131,8 @@ CORS(app, resources={
     r"/api/.*": {
         "origins": config.CORS_ORIGINS,
         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
     }
 })
 

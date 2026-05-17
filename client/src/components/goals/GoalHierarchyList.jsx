@@ -83,73 +83,6 @@ function GoalHierarchyList({
         onGoalClick(node.originalGoal || node);
     };
 
-    if (nodes.length === 0) {
-        return <div className={styles.emptyState}>{emptyState}</div>;
-    }
-
-    if (variant === 'program') {
-        return (
-            <div className={`${styles.list} ${styles.programList}`}>
-                {nodes.map((node, index) => {
-                    const isCompleted = Boolean(node.completed);
-                    const lineageColors = (node.lineage || []).map((entry) => (
-                        entry.completed ? completedColor : getGoalColor(entry.type)
-                    ));
-                    const deadlineOptions = { month: 'short', day: 'numeric' };
-
-                    return (
-                        <div key={node.id || `program-node-${index}`} className={styles.programNodeWrapper}>
-                            <div className={styles.programLineageStripes}>
-                                {lineageColors.map((stripeColor, stripeIndex) => (
-                                    <div
-                                        key={`${node.id}-stripe-${stripeIndex}`}
-                                        className={styles.programConnectingStripe}
-                                        style={{
-                                            backgroundColor: stripeColor,
-                                            left: `${stripeIndex * 4}px`,
-                                            zIndex: 10 + stripeIndex,
-                                        }}
-                                    />
-                                ))}
-                            </div>
-
-                            <div
-                                className={`${styles.programCard} ${isCompleted ? styles.programCardCompleted : ''}`}
-                                onClick={() => handleGoalClick(node)}
-                            >
-                                <div
-                                    className={styles.programCardContent}
-                                    style={{ paddingLeft: `${lineageColors.length * 4 + 12}px` }}
-                                >
-                                    <div
-                                        className={styles.programGoalType}
-                                        style={{ color: isCompleted ? completedColor : getGoalColor(node.type) }}
-                                    >
-                                        {getTypeDisplayName(node.type)}
-                                    </div>
-                                    <div
-                                        className={`${styles.programGoalName} ${isCompleted ? styles.programGoalNameCompleted : ''}`}
-                                        style={{ color: isCompleted ? completedColor : 'var(--color-text-primary)' }}
-                                    >
-                                        {node.name}
-                                    </div>
-                                    {(node.deadline || (isCompleted && node.completed_at)) && (
-                                        <div className={styles.programGoalDeadline}>
-                                            {isCompleted
-                                                ? `Completed: ${formatLiteralDate(node.completed_at, deadlineOptions)}`
-                                                : `Deadline: ${formatLiteralDate(node.deadline, deadlineOptions)}`}
-                                        </div>
-                                    )}
-                                </div>
-                                {isCompleted && <div className={styles.programCheckIcon}>✓</div>}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    }
-
     const treeRoots = useMemo(() => buildSessionHierarchyTree(nodes), [nodes]);
     const listRef = useRef(null);
     const iconRefs = useRef(new Map());
@@ -466,6 +399,73 @@ function GoalHierarchyList({
             </div>
         );
     };
+
+    if (nodes.length === 0) {
+        return <div className={styles.emptyState}>{emptyState}</div>;
+    }
+
+    if (variant === 'program') {
+        return (
+            <div className={`${styles.list} ${styles.programList}`}>
+                {nodes.map((node, index) => {
+                    const isCompleted = Boolean(node.completed);
+                    const lineageColors = (node.lineage || []).map((entry) => (
+                        entry.completed ? completedColor : getGoalColor(entry.type)
+                    ));
+                    const deadlineOptions = { month: 'short', day: 'numeric' };
+
+                    return (
+                        <div key={node.id || `program-node-${index}`} className={styles.programNodeWrapper}>
+                            <div className={styles.programLineageStripes}>
+                                {lineageColors.map((stripeColor, stripeIndex) => (
+                                    <div
+                                        key={`${node.id}-stripe-${stripeIndex}`}
+                                        className={styles.programConnectingStripe}
+                                        style={{
+                                            backgroundColor: stripeColor,
+                                            left: `${stripeIndex * 4}px`,
+                                            zIndex: 10 + stripeIndex,
+                                        }}
+                                    />
+                                ))}
+                            </div>
+
+                            <div
+                                className={`${styles.programCard} ${isCompleted ? styles.programCardCompleted : ''}`}
+                                onClick={() => handleGoalClick(node)}
+                            >
+                                <div
+                                    className={styles.programCardContent}
+                                    style={{ paddingLeft: `${lineageColors.length * 4 + 12}px` }}
+                                >
+                                    <div
+                                        className={styles.programGoalType}
+                                        style={{ color: isCompleted ? completedColor : getGoalColor(node.type) }}
+                                    >
+                                        {getTypeDisplayName(node.type)}
+                                    </div>
+                                    <div
+                                        className={`${styles.programGoalName} ${isCompleted ? styles.programGoalNameCompleted : ''}`}
+                                        style={{ color: isCompleted ? completedColor : 'var(--color-text-primary)' }}
+                                    >
+                                        {node.name}
+                                    </div>
+                                    {(node.deadline || (isCompleted && node.completed_at)) && (
+                                        <div className={styles.programGoalDeadline}>
+                                            {isCompleted
+                                                ? `Completed: ${formatLiteralDate(node.completed_at, deadlineOptions)}`
+                                                : `Deadline: ${formatLiteralDate(node.deadline, deadlineOptions)}`}
+                                        </div>
+                                    )}
+                                </div>
+                                {isCompleted && <div className={styles.programCheckIcon}>✓</div>}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }
 
     return (
         <div ref={listRef} className={`${styles.list} ${styles.sessionList}`}>

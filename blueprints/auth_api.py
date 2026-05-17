@@ -10,11 +10,46 @@ from services.auth_service import AuthService
 from services.user_service import UserService
 from blueprints.api_utils import get_db_session, internal_error
 from extensions import limiter
+from config import config
 import logging
 
 logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
+
+
+def _set_auth_cookie(response, token):
+    max_age_seconds = (
+        config.JWT_EXPIRATION_HOURS * 60 * 60
+        + config.JWT_REFRESH_WINDOW_DAYS * 24 * 60 * 60
+    )
+    response.set_cookie(
+        config.AUTH_COOKIE_NAME,
+        token,
+        max_age=max_age_seconds,
+        httponly=True,
+        secure=config.AUTH_COOKIE_SECURE,
+        samesite=config.AUTH_COOKIE_SAMESITE,
+        path='/',
+    )
+    return response
+
+
+def _clear_auth_cookie(response):
+    response.delete_cookie(
+        config.AUTH_COOKIE_NAME,
+        path='/',
+        secure=config.AUTH_COOKIE_SECURE,
+        samesite=config.AUTH_COOKIE_SAMESITE,
+    )
+    return response
+
+
+def _get_request_token():
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        return auth_header.split(" ", 1)[1]
+    return request.cookies.get(config.AUTH_COOKIE_NAME)
 
 def token_required(f):
     """Decorator to protect routes with JWT authentication."""
@@ -25,11 +60,7 @@ def token_required(f):
         if request.method == 'OPTIONS':
             return ('', 204)
 
-        token = None
-        if 'Authorization' in request.headers:
-            auth_header = request.headers['Authorization']
-            if auth_header.startswith('Bearer '):
-                token = auth_header.split(" ")[1]
+        token = _get_request_token()
         
         if not token:
             return jsonify({'error': 'Token is missing'}), 401
@@ -70,11 +101,7 @@ def signup(validated_data):
 @auth_bp.route('/refresh', methods=['POST'])
 def refresh_token():
     """Silent token refresh endpoint."""
-    token = None
-    if 'Authorization' in request.headers:
-        auth_header = request.headers['Authorization']
-        if auth_header.startswith('Bearer '):
-            token = auth_header.split(" ")[1]
+    token = _get_request_token()
             
     if not token:
         return jsonify({'error': 'Token is missing'}), 401
@@ -85,7 +112,9 @@ def refresh_token():
         payload, error, status = service.refresh_token(token)
         if error:
             return jsonify({'error': error}), status
-        return jsonify(payload), status
+        response = jsonify(payload)
+        _set_auth_cookie(response, payload['token'])
+        return response, status
     except SQLAlchemyError:
         logger.exception("Error in refresh_token")
         return jsonify({'error': 'Failed to refresh token'}), 500
@@ -107,7 +136,9 @@ def login(validated_data):
         payload, error, status = service.login(validated_data)
         if error:
             return jsonify({"error": error}), status
-        return jsonify(payload), status
+        response = jsonify(payload)
+        _set_auth_cookie(response, payload['token'])
+        return response, status
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error during login")
@@ -120,6 +151,14 @@ def login(validated_data):
 def get_me(current_user):
     """Get current user info."""
     return jsonify(serialize_user(current_user))
+
+
+@auth_bp.route('/logout', methods=['POST'])
+def logout():
+    """Clear the browser auth cookie."""
+    response = jsonify({"message": "Logged out successfully"})
+    _clear_auth_cookie(response)
+    return response, 200
 
 @auth_bp.route('/preferences', methods=['PATCH'])
 @token_required
@@ -152,7 +191,9 @@ def update_password(current_user, validated_data):
         payload, error, status = service.update_password(current_user.id, validated_data)
         if error:
             return jsonify({'error': error}), status
-        return jsonify(payload), status
+        response = jsonify(payload)
+        _clear_auth_cookie(response)
+        return response, status
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error updating password")
@@ -192,7 +233,9 @@ def delete_account(current_user, validated_data):
         payload, error, status = service.delete_account(current_user.id, validated_data)
         if error:
             return jsonify({"error": error}), status
-        return jsonify(payload), status
+        response = jsonify(payload)
+        _clear_auth_cookie(response)
+        return response, status
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error deleting account")

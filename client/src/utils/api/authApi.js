@@ -3,6 +3,12 @@ import { API_BASE, axios } from './core';
 export const authApi = {
     signup: (data) => axios.post(`${API_BASE}/auth/signup`, data),
     login: (data) => axios.post(`${API_BASE}/auth/login`, data),
+    logout: () => axios.post(`${API_BASE}/auth/logout`, {}),
+    refresh: (token) => axios.post(
+        `${API_BASE}/auth/refresh`,
+        {},
+        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+    ),
     getMe: () => axios.get(`${API_BASE}/auth/me`),
     updatePreferences: (data) => axios.patch(`${API_BASE}/auth/preferences`, data),
     updatePassword: (data) => axios.put(`${API_BASE}/auth/account/password`, data),

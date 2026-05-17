@@ -1,16 +1,46 @@
 import threading
 import time
+import json
 from typing import Any, Dict, Optional
 
 from services.events import event_bus, Event
+from config import config
 
 
 _LOCK = threading.Lock()
 _ANALYTICS_BY_ROOT: Dict[str, Dict[str, Any]] = {}
 _DEFAULT_TTL_SECONDS = 60
+_REDIS_CLIENT = None
+
+
+def _get_redis_client():
+    global _REDIS_CLIENT
+    storage_uri = config.RATELIMIT_STORAGE_URI
+    if not storage_uri or storage_uri == "memory://" or not storage_uri.startswith(("redis://", "rediss://")):
+        return None
+    if _REDIS_CLIENT is not None:
+        return _REDIS_CLIENT
+    try:
+        import redis
+        _REDIS_CLIENT = redis.Redis.from_url(storage_uri, decode_responses=True)
+        return _REDIS_CLIENT
+    except Exception:
+        return None
+
+
+def _cache_key(root_id: str) -> str:
+    return f"fractal-goals:analytics:{root_id}"
 
 
 def get_analytics(root_id: str) -> Optional[dict]:
+    redis_client = _get_redis_client()
+    if redis_client:
+        try:
+            raw = redis_client.get(_cache_key(root_id))
+            return json.loads(raw) if raw else None
+        except Exception:
+            pass
+
     now = time.time()
     with _LOCK:
         entry = _ANALYTICS_BY_ROOT.get(root_id)
@@ -23,14 +53,30 @@ def get_analytics(root_id: str) -> Optional[dict]:
 
 
 def set_analytics(root_id: str, payload: dict, ttl_seconds: int = _DEFAULT_TTL_SECONDS) -> None:
+    ttl_seconds = max(1, ttl_seconds)
+    redis_client = _get_redis_client()
+    if redis_client:
+        try:
+            redis_client.setex(_cache_key(root_id), ttl_seconds, json.dumps(payload, default=str))
+            return
+        except Exception:
+            pass
+
     with _LOCK:
         _ANALYTICS_BY_ROOT[root_id] = {
             "payload": payload,
-            "expires_at": time.time() + max(1, ttl_seconds),
+            "expires_at": time.time() + ttl_seconds,
         }
 
 
 def invalidate_root(root_id: str) -> None:
+    redis_client = _get_redis_client()
+    if redis_client:
+        try:
+            redis_client.delete(_cache_key(root_id))
+        except Exception:
+            pass
+
     with _LOCK:
         _ANALYTICS_BY_ROOT.pop(root_id, None)
 
