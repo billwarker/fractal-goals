@@ -24,6 +24,8 @@ describe('dashboardState helpers', () => {
         });
 
         expect(payload.selected_window_id).toBe('window-1');
+        expect(payload.version).toBe(2);
+        expect(payload.global_filters.goals.goalIds).toEqual([]);
         expect(Object.keys(payload.window_states)).toEqual(['window-1', 'window-3']);
         expect(payload.window_states['window-3'].selectedCategory).toBe('activities');
     });
@@ -32,7 +34,7 @@ describe('dashboardState helpers', () => {
         expect(sanitizeDashboardLayoutPayload({ version: 999 })).toBeNull();
 
         const sanitized = sanitizeDashboardLayoutPayload({
-            version: 1,
+            version: 2,
             layout: {
                 type: 'split',
                 direction: 'horizontal',
@@ -50,6 +52,32 @@ describe('dashboardState helpers', () => {
         expect(sanitized.windowStates['window-2'].selectedCategory).toBe('goals');
         expect(sanitized.selectedWindowId).toBe('window-5');
         expect(getHighestWindowIndex(sanitized.layout)).toBe(5);
+    });
+
+    it('persists global analytics filters and migrates older views to defaults', () => {
+        const payload = createDashboardLayoutPayload({
+            layout: { type: 'window', id: 'window-1' },
+            windowStates: { 'window-1': {} },
+            selectedWindowId: 'window-1',
+            globalFilters: {
+                goals: { goalIds: ['goal-1'], includeDescendants: false },
+                activities: { activityIds: ['activity-1'], groupIds: ['group-1'] },
+            },
+        });
+
+        expect(payload.global_filters.goals.goalIds).toEqual(['goal-1']);
+        expect(payload.global_filters.goals.includeDescendants).toBe(false);
+        expect(payload.global_filters.activities.groupIds).toEqual(['group-1']);
+
+        const migrated = sanitizeDashboardLayoutPayload({
+            version: 1,
+            layout: { type: 'window', id: 'window-1' },
+            window_states: { 'window-1': {} },
+            selected_window_id: 'window-1',
+        });
+
+        expect(migrated.globalFilters.goals.goalIds).toEqual([]);
+        expect(migrated.globalFilters.activities.activityIds).toEqual([]);
     });
 
     it('preserves nested split positions when saving and restoring analytics views', () => {

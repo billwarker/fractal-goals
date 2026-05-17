@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { HeaderProvider, useHeader } from './contexts/HeaderContext';
 import { useRootGoal } from './hooks/useGoalQueries';
 import useIsMobile from './hooks/useIsMobile';
@@ -32,7 +32,6 @@ import { useGoalLevels } from './contexts/GoalLevelsContext';
 
 // Navigation header component defined outside of App to avoid re-declaration
 const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
-    const navigate = useNavigate();
     const location = useLocation();
     const { headerActions } = useHeader();
     const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
@@ -102,9 +101,8 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
     const logsNavItem = { path: `/${rootId}/logs`, label: 'LOGS' };
 
     const isActive = (path) => location.pathname.startsWith(path);
-    const handleNavigate = (path) => {
+    const handleRouteLinkClick = () => {
         dismissGoalDetailsForNavigation();
-        navigate(path);
     };
     const handleOpenSettings = () => {
         dismissGoalDetailsForNavigation();
@@ -116,37 +114,40 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
             <div className="top-nav-links" ref={navRef}>
                 <div className={styles.mobileNav}>
                     <div className={styles.mobileControlsRow}>
-                        <button
+                        <Link
+                            to={`/${rootId}/create-session`}
                             className={`${styles.addSessionBtn} ${styles.mobileBtn} ${styles.mobileTopAddBtn}`}
-                            onClick={() => handleNavigate(`/${rootId}/create-session`)}
+                            onClick={handleRouteLinkClick}
                         >
                             + ADD SESSION
-                        </button>
+                        </Link>
 
                         {primaryNavItems.map(item => (
-                            <button
+                            <Link
                                 key={item.path}
+                                to={item.path}
                                 className={`nav-text-link ${styles.mobileBtn} ${isActive(item.path) ? 'active' : ''}`}
-                                onClick={() => handleNavigate(item.path)}
+                                onClick={handleRouteLinkClick}
                             >
                                 {item.label}
-                            </button>
+                            </Link>
                         ))}
 
-                        <button
+                        <Link
+                            to={logsNavItem.path}
                             className={`nav-text-link ${styles.mobileBtn} ${isActive(logsNavItem.path) ? 'active' : ''}`}
-                            onClick={() => handleNavigate(logsNavItem.path)}
+                            onClick={handleRouteLinkClick}
                         >
                             {logsNavItem.label}
-                        </button>
+                        </Link>
 
                         <button className={`nav-text-link ${styles.mobileBtn}`} onClick={handleOpenSettings}>
                             SETTINGS
                         </button>
 
-                        <button className={`nav-text-link home-link ${styles.mobileBtn}`} onClick={() => handleNavigate('/')}>
+                        <Link className={`nav-text-link home-link ${styles.mobileBtn}`} to="/" onClick={handleRouteLinkClick}>
                             EXIT
-                        </button>
+                        </Link>
                     </div>
                 </div>
             </div>
@@ -172,21 +173,23 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                         <span className={`fractal-title ${styles.fractalTitle}`}>{fractalName}</span>
                     </span>
 
-                    <button
+                    <Link
+                        to={`/${rootId}/create-session`}
                         className={styles.addSessionBtn}
-                        onClick={() => handleNavigate(`/${rootId}/create-session`)}
+                        onClick={handleRouteLinkClick}
                     >
                         + ADD SESSION
-                    </button>
+                    </Link>
 
                     {primaryNavItems.map(item => (
-                        <button
+                        <Link
                             key={item.path}
+                            to={item.path}
                             className={`nav-text-link ${isActive(item.path) ? 'active' : ''}`}
-                            onClick={() => handleNavigate(item.path)}
+                            onClick={handleRouteLinkClick}
                         >
                             {item.label}
-                        </button>
+                        </Link>
                     ))}
                 </div>
 
@@ -201,12 +204,13 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                     )}
 
                     <div className={`nav-separator ${styles.navSeparator}`}></div>
-                    <button
+                    <Link
+                        to={logsNavItem.path}
                         className={`nav-text-link ${isActive(logsNavItem.path) ? 'active' : ''}`}
-                        onClick={() => handleNavigate(logsNavItem.path)}
+                        onClick={handleRouteLinkClick}
                     >
                         {logsNavItem.label}
-                    </button>
+                    </Link>
 
                     <div className={`nav-separator ${styles.navSeparator}`}></div>
                     <button className="nav-text-link" onClick={handleOpenSettings}>
@@ -214,9 +218,9 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                     </button>
 
                     <div className={`nav-separator ${styles.navSeparator}`}></div>
-                    <button className="nav-text-link home-link" onClick={() => handleNavigate('/')}>
+                    <Link className="nav-text-link home-link" to="/" onClick={handleRouteLinkClick}>
                         {isMobile ? 'EXIT' : 'EXIT TO HOME'}
-                    </button>
+                    </Link>
                 </div>
             </div>
         </div>
@@ -332,7 +336,7 @@ function App() {
                     {location.pathname === '/' ? (
                         <Selection />
                     ) : (
-                        <Routes>
+                        <Routes key={location.pathname}>
                             <Route
                                 path="/:rootId/goals"
                                 element={

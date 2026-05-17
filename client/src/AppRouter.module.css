@@ -33,6 +33,9 @@
 }
 
 .addSessionBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background: var(--color-brand-success);
     color: white;
     padding: 6px 14px;
@@ -41,6 +44,12 @@
     border: none;
     font-size: 11px;
     margin-right: 10px;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.addSessionBtn:visited {
+    color: white;
 }
 
 .addSessionBtn:hover {

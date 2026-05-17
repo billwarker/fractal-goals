@@ -10,11 +10,8 @@ import { Bar, Line } from 'react-chartjs-2';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import Button from '../atoms/Button';
 import CloseIcon from '../atoms/CloseIcon';
-import Select from '../atoms/Select';
 import { Heading } from '../atoms/Typography';
-import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 
-import ActivityGraphSelector from './ActivityGraphSelector';
 import {
     ActivityFrequencyChart,
     ActivityGroupMixChart,
@@ -39,10 +36,13 @@ import {
     ChartIcon,
     HomeIcon,
     LightningIcon,
+    MinimizeHeaderIcon,
+    RestoreHeaderIcon,
     SplitIcon,
     TimerIcon,
 } from './AnalyticsIcons';
 import { DISABLED_CHART_ANIMATION } from './ChartJSWrapper';
+import { resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
 import styles from './ProfileWindow.module.css';
 
 /**
@@ -72,6 +72,7 @@ function ProfileWindow({
     onSelect,
     globalDateRange = null,
     onGlobalDateRangeChange,
+    globalFilters = null,
 }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const { sessions, goalAnalytics, activities, activityGroups, activityInstances, formatDuration, rootId } = data;
@@ -80,7 +81,7 @@ function ProfileWindow({
 
     // Local state for split dropdown
     const [showSplitMenu, setShowSplitMenu] = useState(false);
-    const [isGoalPickerOpen, setIsGoalPickerOpen] = useState(false);
+    const [isHeaderMinimized, setIsHeaderMinimized] = useState(false);
 
     // Track container width for responsive styling
     const [isNarrow, setIsNarrow] = useState(false);
@@ -126,8 +127,34 @@ function ProfileWindow({
     const setSelectedGoal = (value) => updateWindowState({ selectedGoal: value });
     const setSelectedGoalChart = (value) => updateWindowState({ selectedGoalChart: value });
     const setHeatmapMonths = (value) => updateWindowState({ heatmapMonths: value });
-    const effectiveSelectedActivity = selectedActivity;
     const effectiveDateRange = globalDateRange;
+    const resolvedGlobalFilters = useMemo(() => resolveAnalyticsGlobalFilters({
+        filters: globalFilters,
+        goalAnalytics,
+        activities,
+        activityGroups,
+        activityInstances,
+    }), [activities, activityGroups, activityInstances, globalFilters, goalAnalytics]);
+    const scopedActivities = useMemo(() => (
+        resolvedGlobalFilters.hasActivityFilter
+            ? activities.filter((activity) => resolvedGlobalFilters.activityIds.has(activity.id))
+            : activities
+    ), [activities, resolvedGlobalFilters.activityIds, resolvedGlobalFilters.hasActivityFilter]);
+    const effectiveSelectedActivity = selectedActivity && scopedActivities.some((activity) => activity.id === selectedActivity.id)
+        ? selectedActivity
+        : null;
+    const hasActiveDateRange = Boolean(effectiveDateRange?.start || effectiveDateRange?.end);
+
+    const isDateInRange = React.useCallback((value) => {
+        if (!hasActiveDateRange) return true;
+        const date = value ? new Date(value) : null;
+        if (!date || Number.isNaN(date.getTime())) return false;
+        const start = effectiveDateRange?.start ? new Date(`${effectiveDateRange.start}T00:00:00`) : null;
+        const end = effectiveDateRange?.end ? new Date(`${effectiveDateRange.end}T23:59:59`) : null;
+        if (start && date < start) return false;
+        if (end && date > end) return false;
+        return true;
+    }, [effectiveDateRange?.end, effectiveDateRange?.start, hasActiveDateRange]);
 
     // Reset visualization when category changes
     const handleCategoryChange = (category) => {
@@ -248,47 +275,121 @@ function ProfileWindow({
     };
 
     const filteredSessions = useMemo(() => {
-        const start = effectiveDateRange?.start ? new Date(`${effectiveDateRange.start}T00:00:00`) : null;
-        const end = effectiveDateRange?.end ? new Date(`${effectiveDateRange.end}T23:59:59`) : null;
-        if (!start && !end) {
-            return sessions;
-        }
-        return sessions.filter((session) => {
+        const dateFiltered = sessions.filter((session) => {
             const rawDate = session.session_start || session.created_at;
-            const date = rawDate ? new Date(rawDate) : null;
-            if (!date || Number.isNaN(date.getTime())) {
-                return false;
-            }
-            if (start && date < start) return false;
-            if (end && date > end) return false;
-            return true;
+            return isDateInRange(rawDate);
         });
-    }, [effectiveDateRange?.end, effectiveDateRange?.start, sessions]);
+        if (!resolvedGlobalFilters.hasActivityFilter) {
+            return dateFiltered;
+        }
+        return dateFiltered.filter((session) => resolvedGlobalFilters.sessionIds.has(session.id));
+    }, [isDateInRange, resolvedGlobalFilters.hasActivityFilter, resolvedGlobalFilters.sessionIds, sessions]);
 
     const filteredActivityInstances = useMemo(() => {
-        const start = effectiveDateRange?.start ? new Date(`${effectiveDateRange.start}T00:00:00`) : null;
-        const end = effectiveDateRange?.end ? new Date(`${effectiveDateRange.end}T23:59:59`) : null;
-        if (!start && !end) {
-            return activityInstances;
-        }
         return Object.fromEntries(Object.entries(activityInstances || {}).map(([activityId, instances]) => [
             activityId,
             (instances || []).filter((instance) => {
-                const rawDate = instance.session_date || instance.created_at;
-                const date = rawDate ? new Date(rawDate) : null;
-                if (!date || Number.isNaN(date.getTime())) {
+                if (resolvedGlobalFilters.hasActivityFilter && !resolvedGlobalFilters.activityIds.has(activityId)) {
                     return false;
                 }
-                if (start && date < start) return false;
-                if (end && date > end) return false;
-                return true;
+                const rawDate = instance.session_date || instance.created_at;
+                return isDateInRange(rawDate);
             }),
         ]));
-    }, [activityInstances, effectiveDateRange?.end, effectiveDateRange?.start]);
+    }, [activityInstances, isDateInRange, resolvedGlobalFilters.activityIds, resolvedGlobalFilters.hasActivityFilter]);
+
+    const filteredGoalAnalyticsGoals = useMemo(() => {
+        const goals = goalAnalytics?.goals || [];
+        const scopedGoals = resolvedGlobalFilters.hasGoalFilter
+            ? goals.filter((goal) => resolvedGlobalFilters.goalIds.has(goal.id))
+            : goals;
+        const allowedActivityNames = resolvedGlobalFilters.hasActivityFilter
+            ? new Set(scopedActivities.map((activity) => activity.name))
+            : null;
+
+        return scopedGoals.map((goal) => {
+            const activityDurations = (goal.activity_durations_by_date || []).filter((item) => (
+                isDateInRange(item.date)
+                && (!allowedActivityNames || allowedActivityNames.has(item.activity_name))
+            ));
+            const sessionDurations = allowedActivityNames
+                ? Object.values(activityDurations.reduce((byDate, item) => {
+                    const key = item.date || 'Unknown';
+                    byDate[key] = byDate[key] || { date: item.date, duration_seconds: 0, session_name: 'Filtered activities' };
+                    byDate[key].duration_seconds += item.duration_seconds || 0;
+                    return byDate;
+                }, {}))
+                : (goal.session_durations_by_date || []).filter((item) => isDateInRange(item.date));
+            const activityBreakdownByName = new Map();
+
+            activityDurations.forEach((item) => {
+                const name = item.activity_name || 'Unknown';
+                const current = activityBreakdownByName.get(name) || {
+                    activity_id: name,
+                    activity_name: name,
+                    instance_count: 0,
+                    total_duration_seconds: 0,
+                };
+                current.instance_count += 1;
+                current.total_duration_seconds += item.duration_seconds || 0;
+                activityBreakdownByName.set(name, current);
+            });
+
+            return {
+                ...goal,
+                completed: Boolean(goal.completed && isDateInRange(goal.completed_at)),
+                session_durations_by_date: sessionDurations,
+                activity_durations_by_date: activityDurations,
+                activity_breakdown: hasActiveDateRange || allowedActivityNames
+                    ? Array.from(activityBreakdownByName.values())
+                    : goal.activity_breakdown,
+                total_duration_seconds: sessionDurations.reduce((sum, item) => sum + (item.duration_seconds || 0), 0),
+                session_count: sessionDurations.length,
+            };
+        });
+    }, [goalAnalytics?.goals, hasActiveDateRange, isDateInRange, resolvedGlobalFilters.goalIds, resolvedGlobalFilters.hasActivityFilter, resolvedGlobalFilters.hasGoalFilter, scopedActivities]);
+
+    const filteredGoalSummary = useMemo(() => {
+        const completedGoals = filteredGoalAnalyticsGoals.filter((goal) => goal.completed);
+        const completionTimes = completedGoals.map((goal) => {
+            const created = goal.created_at ? new Date(goal.created_at) : null;
+            const completed = goal.completed_at ? new Date(goal.completed_at) : null;
+            if (!created || !completed || Number.isNaN(created.getTime()) || Number.isNaN(completed.getTime())) {
+                return null;
+            }
+            return Math.max(0, Math.round((completed - created) / 86400000));
+        }).filter((value) => value != null);
+        const durations = completedGoals.map((goal) => goal.total_duration_seconds || 0).filter((value) => value > 0);
+
+        return {
+            completed_goals: completedGoals.length,
+            completion_rate: filteredGoalAnalyticsGoals.length > 0
+                ? (completedGoals.length / filteredGoalAnalyticsGoals.length) * 100
+                : 0,
+            avg_goal_age_days: goalAnalytics?.summary?.avg_goal_age_days || 0,
+            avg_time_to_completion_days: completionTimes.length
+                ? completionTimes.reduce((sum, value) => sum + value, 0) / completionTimes.length
+                : 0,
+            avg_duration_to_completion_seconds: durations.length
+                ? durations.reduce((sum, value) => sum + value, 0) / durations.length
+                : 0,
+        };
+    }, [filteredGoalAnalyticsGoals, goalAnalytics?.summary?.avg_goal_age_days]);
+
+    const effectiveSelectedGoal = useMemo(() => {
+        if (selectedGoal?.id && filteredGoalAnalyticsGoals.some((goal) => goal.id === selectedGoal.id)) {
+            return filteredGoalAnalyticsGoals.find((goal) => goal.id === selectedGoal.id);
+        }
+        if (resolvedGlobalFilters.filters.goals.goalIds.length === 1) {
+            const goalId = resolvedGlobalFilters.filters.goals.goalIds[0];
+            return filteredGoalAnalyticsGoals.find((goal) => goal.id === goalId) || null;
+        }
+        return null;
+    }, [filteredGoalAnalyticsGoals, resolvedGlobalFilters.filters.goals.goalIds, selectedGoal?.id]);
 
     const activityCounts = useMemo(() => Object.fromEntries(
-        activities.map((activity) => [activity.id, filteredActivityInstances[activity.id]?.length || 0])
-    ), [activities, filteredActivityInstances]);
+        scopedActivities.map((activity) => [activity.id, filteredActivityInstances[activity.id]?.length || 0])
+    ), [scopedActivities, filteredActivityInstances]);
 
     const groupCounts = useMemo(() => {
         const childGroupsByParent = new Map();
@@ -301,7 +402,7 @@ function ProfileWindow({
         });
 
         const activitiesByGroup = new Map();
-        activities.forEach((activity) => {
+        scopedActivities.forEach((activity) => {
             const groupId = activity.group_id || '__ungrouped__';
             if (!activitiesByGroup.has(groupId)) {
                 activitiesByGroup.set(groupId, []);
@@ -331,14 +432,14 @@ function ProfileWindow({
         });
 
         return totals;
-    }, [activities, activityCounts, activityGroups]);
+    }, [scopedActivities, activityCounts, activityGroups]);
 
     // Prepare goal chart data
     const getActivityChartData = () => {
-        if (!selectedGoal?.activity_breakdown?.length) {
+        if (!effectiveSelectedGoal?.activity_breakdown?.length) {
             return { labels: [], datasets: [] };
         }
-        const sortedActivities = [...selectedGoal.activity_breakdown]
+        const sortedActivities = [...effectiveSelectedGoal.activity_breakdown]
             .sort((a, b) => b.instance_count - a.instance_count);
         return {
             labels: sortedActivities.map(a => a.activity_name),
@@ -354,14 +455,14 @@ function ProfileWindow({
     };
 
     const getDurationChartData = () => {
-        if (!selectedGoal?.session_durations_by_date?.length) {
+        if (!effectiveSelectedGoal?.session_durations_by_date?.length) {
             return { labels: [], datasets: [] };
         }
         return {
-            labels: selectedGoal.session_durations_by_date.map(s => new Date(s.date)),
+            labels: effectiveSelectedGoal.session_durations_by_date.map(s => new Date(s.date)),
             datasets: [{
                 label: 'Duration (minutes)',
-                data: selectedGoal.session_durations_by_date.map(s => Math.round(s.duration_seconds / 60)),
+                data: effectiveSelectedGoal.session_durations_by_date.map(s => Math.round(s.duration_seconds / 60)),
                 borderColor: '#4caf50',
                 backgroundColor: 'rgba(76, 175, 80, 0.1)',
                 fill: true,
@@ -511,21 +612,64 @@ function ProfileWindow({
                             )}
                         </div>
                     )}
-                    {canClose && (
-                        <Button
-                            onClick={(e) => { e.stopPropagation(); onClose(); }}
-                            variant="ghost"
-                            size="sm"
-                            style={{ padding: '0 8px', minWidth: '32px' }}
-                            aria-label="Close analytics window"
-                        >
-                            <CloseIcon size={16} />
-                        </Button>
-                    )}
+                    <Button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowSplitMenu(false);
+                            setIsHeaderMinimized(true);
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        style={{ padding: '0 8px', minWidth: '32px' }}
+                        aria-label="Minimize analytics panel header"
+                        title="Minimize header"
+                    >
+                        <MinimizeHeaderIcon size={16} />
+                    </Button>
+                    <Button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (canClose) {
+                                onClose();
+                            }
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        style={{ padding: '0 8px', minWidth: '32px' }}
+                        aria-label="Close analytics window"
+                        title={canClose ? 'Close analytics window' : 'At least one analytics panel is required'}
+                        disabled={!canClose}
+                    >
+                        <CloseIcon size={16} />
+                    </Button>
                 </div>
             </div>
         );
     };
+
+    const renderMinimizedHeaderOverlay = () => (
+        <div className={styles.minimizedHeaderOverlay} onClick={(event) => event.stopPropagation()}>
+            <button
+                type="button"
+                className={styles.minimizedHeaderButton}
+                onClick={() => setIsHeaderMinimized(false)}
+                aria-label="Restore analytics panel header"
+                title="Restore header"
+            >
+                <RestoreHeaderIcon size={15} />
+            </button>
+            <button
+                type="button"
+                className={styles.minimizedHeaderButton}
+                onClick={onClose}
+                aria-label="Close analytics window"
+                title={canClose ? 'Close analytics window' : 'At least one analytics panel is required'}
+                disabled={!canClose}
+            >
+                <CloseIcon size={15} />
+            </button>
+        </div>
+    );
 
     const renderLevel0 = () => (
         <>
@@ -565,120 +709,7 @@ function ProfileWindow({
     );
 
     const renderLevel2 = () => {
-        // Special renderers for Level 2 based on selected visualization
-        if (selectedCategory === 'sessions' && selectedVisualization === 'heatmap') {
-            const timeRangeOptions = [
-                { value: 12, label: '1 Year' }, { value: 6, label: '6 Months' },
-                { value: 3, label: '3 Months' }, { value: 1, label: '1 Month' }
-            ];
-            return (
-                <>
-                    <span className={styles.levelLabel} style={{ marginRight: '8px' }}>Range:</span>
-                    {timeRangeOptions.map(option => (
-                        <Button
-                            key={option.value}
-                            onClick={() => setHeatmapMonths(option.value)}
-                            variant={heatmapMonths === option.value ? 'primary' : 'secondary'}
-                            size="sm"
-                        >
-                            {option.label}
-                        </Button>
-                    ))}
-                </>
-            );
-        }
-
-        if (selectedCategory === 'activities') {
-            const sortedActivities = [...activities].sort((a, b) => (
-                (filteredActivityInstances[b.id]?.length || 0) - (filteredActivityInstances[a.id]?.length || 0)
-            ));
-            const currentActivityDef = effectiveSelectedActivity ? activities.find(a => a.id === effectiveSelectedActivity.id) : null;
-
-            return (
-                <div className={styles.level2Container}>
-                    <ActivityGraphSelector
-                        activities={sortedActivities}
-                        activityGroups={activityGroups}
-                        value={effectiveSelectedActivity}
-                        activityCounts={activityCounts}
-                        groupCounts={groupCounts}
-                        onChange={(activity) => {
-                            setSelectedActivity(activity || null);
-                            setSelectedSplit('all');
-                        }}
-                    />
-
-                    {effectiveSelectedActivity && currentActivityDef?.has_sets && (
-                        <Select
-                            value={setsHandling}
-                            onChange={(e) => setSetsHandling(e.target.value)}
-                            className={styles.selectAtom}
-                        >
-                            <option value="top">Top Set</option>
-                            <option value="average">Avg</option>
-                        </Select>
-                    )}
-
-                    {effectiveSelectedActivity && currentActivityDef?.has_splits && currentActivityDef?.split_definitions?.length > 0 && (
-                        <Select
-                            value={selectedSplit}
-                            onChange={(e) => setSelectedSplit(e.target.value)}
-                            className={styles.selectAtom}
-                        >
-                            <option value="all">All Splits</option>
-                            {currentActivityDef.split_definitions.map(split => (
-                                <option key={split.id} value={split.id}>{split.name}</option>
-                            ))}
-                        </Select>
-                    )}
-
-                </div>
-            );
-        }
-
-        if (selectedCategory === 'goals' && selectedVisualization === 'goalDetail') {
-            const goals = goalAnalytics?.goals || [];
-            return (
-                <div className={styles.level2Container} style={{ gap: '8px' }}>
-                    <Button
-                        type="button"
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            setIsGoalPickerOpen(true);
-                        }}
-                        variant={selectedGoal ? 'primary' : 'secondary'}
-                        size="sm"
-                    >
-                        {selectedGoal ? selectedGoal.name : 'Select Goal'}
-                    </Button>
-                    {selectedGoal && (
-                        <div className={styles.controlGroup}>
-                            <Button
-                                onClick={() => setSelectedGoalChart('duration')}
-                                variant={selectedGoalChart === 'duration' ? 'primary' : 'secondary'}
-                                size="sm"
-                            >
-                                Time
-                            </Button>
-                            <Button
-                                onClick={() => setSelectedGoalChart('activity')}
-                                variant={selectedGoalChart === 'activity' ? 'primary' : 'secondary'}
-                                size="sm"
-                            >
-                                Acts
-                            </Button>
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        // Just show the viz name for others
-        return (
-            <span className={styles.vizName}>
-                {visualizations[selectedCategory]?.find(v => v.id === selectedVisualization)?.name}
-            </span>
-        );
+        return null;
     };
 
 
@@ -709,7 +740,7 @@ function ProfileWindow({
             );
         }
 
-        const summary = goalAnalytics?.summary || {};
+        const summary = filteredGoalSummary;
         const completedSessions = filteredSessions.filter(s => s.completed);
         const totalDuration = filteredSessions.reduce((sum, s) => sum + (s.total_duration_seconds || 0), 0);
         const avgDuration = filteredSessions.length > 0 ? totalDuration / filteredSessions.length : 0;
@@ -732,25 +763,25 @@ function ProfileWindow({
                 case 'completionTimeline':
                     return (
                         <div className={styles.vizContainerHidden}>
-                            <GoalCompletionTimeline goals={goalAnalytics?.goals || []} chartRef={chartRef} />
+                            <GoalCompletionTimeline goals={filteredGoalAnalyticsGoals} chartRef={chartRef} />
                         </div>
                     );
                 case 'timeDistribution':
                     return (
                         <div className={styles.vizContainerHidden}>
-                            <GoalTimeDistribution goals={goalAnalytics?.goals || []} chartRef={chartRef} />
+                            <GoalTimeDistribution goals={filteredGoalAnalyticsGoals} chartRef={chartRef} />
                         </div>
                     );
                 case 'completionRateByLevel':
-                    return <div className={styles.vizContainerHidden}><GoalCompletionRateByLevel goals={goalAnalytics?.goals || []} chartRef={chartRef} /></div>;
+                    return <div className={styles.vizContainerHidden}><GoalCompletionRateByLevel goals={filteredGoalAnalyticsGoals} chartRef={chartRef} /></div>;
                 case 'goalAging':
-                    return <div className={styles.vizContainerHidden}><GoalAgingChart goals={goalAnalytics?.goals || []} chartRef={chartRef} /></div>;
+                    return <div className={styles.vizContainerHidden}><GoalAgingChart goals={filteredGoalAnalyticsGoals} chartRef={chartRef} /></div>;
                 case 'goalMomentum':
-                    return <div className={styles.vizContainerHidden}><GoalMomentumChart goals={goalAnalytics?.goals || []} chartRef={chartRef} /></div>;
+                    return <div className={styles.vizContainerHidden}><GoalMomentumChart goals={filteredGoalAnalyticsGoals} chartRef={chartRef} /></div>;
                 case 'staleGoals':
-                    return <div className={styles.vizContainer}><StaleGoalsChart goals={goalAnalytics?.goals || []} /></div>;
+                    return <div className={styles.vizContainer}><StaleGoalsChart goals={filteredGoalAnalyticsGoals} /></div>;
                 case 'goalDetail':
-                    if (!selectedGoal) {
+                    if (!effectiveSelectedGoal) {
                         return (
                             <div className={styles.emptyState}>
                                 Select a goal above to view details
@@ -761,21 +792,21 @@ function ProfileWindow({
                         <div className={styles.vizContainer}>
                             {/* Goal header */}
                             <div className={styles.goalHeader}>
-                                <Heading level={3} className={styles.goalTitle}>{selectedGoal.name}</Heading>
-                                <span className={styles.goalBadge} style={{ background: getGoalTypeColor(selectedGoal.type) }}>
-                                    {selectedGoal.type.replace('Goal', '')}
+                                <Heading level={3} className={styles.goalTitle}>{effectiveSelectedGoal.name}</Heading>
+                                <span className={styles.goalBadge} style={{ background: getGoalTypeColor(effectiveSelectedGoal.type) }}>
+                                    {effectiveSelectedGoal.type.replace('Goal', '')}
                                 </span>
                             </div>
                             {/* Goal stats */}
                             <div className={styles.statsGrid}>
-                                <StatCard value={formatDuration(selectedGoal.total_duration_seconds || 0)} label="Total Time" color="#2196f3" />
-                                <StatCard value={selectedGoal.session_count || 0} label="Sessions" color="#4caf50" />
-                                <StatCard value={`${selectedGoal.age_days || 0}d`} label="Goal Age" color="#ff9800" />
+                                <StatCard value={formatDuration(effectiveSelectedGoal.total_duration_seconds || 0)} label="Total Time" subLabel="Selected range" color="#2196f3" />
+                                <StatCard value={effectiveSelectedGoal.session_count || 0} label="Sessions" subLabel="Selected range" color="#4caf50" />
+                                <StatCard value={`${effectiveSelectedGoal.age_days || 0}d`} label="Goal Age" color="#ff9800" />
                             </div>
                             {/* Chart */}
                             <div className={styles.chartContainer}>
                                 {selectedGoalChart === 'duration' ? (
-                                    selectedGoal.session_durations_by_date?.length > 0 ? (
+                                    effectiveSelectedGoal.session_durations_by_date?.length > 0 ? (
                                         <Line data={getDurationChartData()} options={durationChartOptions} />
                                     ) : (
                                         <div className={styles.noData}>
@@ -783,7 +814,7 @@ function ProfileWindow({
                                         </div>
                                     )
                                 ) : (
-                                    selectedGoal.activity_breakdown?.length > 0 ? (
+                                    effectiveSelectedGoal.activity_breakdown?.length > 0 ? (
                                         <Bar data={getActivityChartData()} options={activityChartOptions} />
                                     ) : (
                                         <div className={styles.noData}>
@@ -837,6 +868,7 @@ function ProfileWindow({
                                 chartRef={chartRef}
                                 selectedDateRange={effectiveDateRange}
                                 onDateRangeChange={onGlobalDateRangeChange}
+                                showMetricSelectors={false}
                             />
                         </div>
                     );
@@ -875,7 +907,7 @@ function ProfileWindow({
                             <ScatterPlot
                                 selectedActivity={effectiveSelectedActivity}
                                 activityInstances={filteredActivityInstances}
-                                activities={activities}
+                                activities={scopedActivities}
                                 setsHandling={setsHandling}
                                 selectedSplit={selectedSplit}
                                 chartRef={chartRef}
@@ -888,7 +920,7 @@ function ProfileWindow({
                             <LineGraph
                                 selectedActivity={effectiveSelectedActivity}
                                 activityInstances={filteredActivityInstances}
-                                activities={activities}
+                                activities={scopedActivities}
                                 selectedMetric={selectedMetric}
                                 setSelectedMetric={setSelectedMetric}
                                 selectedMetricY2={selectedMetricY2}
@@ -898,19 +930,20 @@ function ProfileWindow({
                                 chartRef={chartRef}
                                 selectedDateRange={effectiveDateRange}
                                 onDateRangeChange={onGlobalDateRangeChange}
+                                showMetricSelectors={false}
                             />
                         </div>
                     );
                 case 'activityFrequency':
-                    return <div className={styles.vizContainerHidden}><ActivityFrequencyChart activities={activities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
+                    return <div className={styles.vizContainerHidden}><ActivityFrequencyChart activities={scopedActivities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
                 case 'timeByActivity':
-                    return <div className={styles.vizContainerHidden}><ActivityTimeByActivity activities={activities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
+                    return <div className={styles.vizContainerHidden}><ActivityTimeByActivity activities={scopedActivities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
                 case 'personalBest':
-                    return <div className={styles.vizContainerHidden}><ActivityPersonalBestTrend selectedActivity={effectiveSelectedActivity} activities={activities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
+                    return <div className={styles.vizContainerHidden}><ActivityPersonalBestTrend selectedActivity={effectiveSelectedActivity} activities={scopedActivities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
                 case 'metricVolume':
-                    return <div className={styles.vizContainerHidden}><ActivityMetricVolumeChart selectedActivity={effectiveSelectedActivity} activities={activities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
+                    return <div className={styles.vizContainerHidden}><ActivityMetricVolumeChart selectedActivity={effectiveSelectedActivity} activities={scopedActivities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
                 case 'groupMix':
-                    return <div className={styles.vizContainerHidden}><ActivityGroupMixChart activities={activities} activityGroups={activityGroups} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
+                    return <div className={styles.vizContainerHidden}><ActivityGroupMixChart activities={scopedActivities} activityGroups={activityGroups} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
             }
         }
 
@@ -927,21 +960,8 @@ function ProfileWindow({
             }}
             className={`${styles.windowContainer} ${isSelected ? styles.selected : ''}`}
         >
-            {renderUnifiedHeader()}
+            {isHeaderMinimized ? renderMinimizedHeaderOverlay() : renderUnifiedHeader()}
             {renderVisualizationContent()}
-            <GoalHierarchySelectionModal
-                isOpen={isGoalPickerOpen}
-                title="Select Goal"
-                goals={goalAnalytics?.goals || []}
-                selectedGoalIds={selectedGoal?.id ? [selectedGoal.id] : []}
-                selectionMode="single"
-                confirmLabel="Select Goal"
-                onClose={() => setIsGoalPickerOpen(false)}
-                onConfirm={(goalIds) => {
-                    const goal = (goalAnalytics?.goals || []).find((item) => item.id === goalIds[0]);
-                    setSelectedGoal(goal || null);
-                }}
-            />
         </div>
     );
 }

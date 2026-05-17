@@ -1,4 +1,6 @@
-export const ANALYTICS_DASHBOARD_VERSION = 1;
+import { DEFAULT_GLOBAL_FILTERS, normalizeGlobalFilters } from './analyticsGlobalFilters';
+
+export const ANALYTICS_DASHBOARD_VERSION = 2;
 const DEFAULT_SPLIT_POSITION = 50;
 const MIN_SPLIT_POSITION = 25;
 const MAX_SPLIT_POSITION = 75;
@@ -17,6 +19,10 @@ export function getDefaultWindowState() {
         selectedGoalChart: 'duration',
         heatmapMonths: 12,
     };
+}
+
+export function getDefaultGlobalFilters() {
+    return normalizeGlobalFilters(DEFAULT_GLOBAL_FILTERS);
 }
 
 function isPlainObject(value) {
@@ -98,7 +104,7 @@ function normalizeWindowState(state) {
     };
 }
 
-export function createDashboardLayoutPayload({ layout, windowStates, selectedWindowId }) {
+export function createDashboardLayoutPayload({ layout, windowStates, selectedWindowId, globalFilters }) {
     const normalizedLayout = normalizeLayoutNode(layout) || { type: 'window', id: 'window-1' };
     const windowIds = collectWindowIds(normalizedLayout);
     const normalizedStates = Object.fromEntries(
@@ -113,6 +119,7 @@ export function createDashboardLayoutPayload({ layout, windowStates, selectedWin
         layout: normalizedLayout,
         window_states: normalizedStates,
         selected_window_id: windowIds.includes(selectedWindowId) ? selectedWindowId : windowIds[0] || 'window-1',
+        global_filters: normalizeGlobalFilters(globalFilters),
     };
 }
 
@@ -120,7 +127,7 @@ export function sanitizeDashboardLayoutPayload(payload) {
     if (!isPlainObject(payload)) {
         return null;
     }
-    if (payload.version !== ANALYTICS_DASHBOARD_VERSION) {
+    if (![1, ANALYTICS_DASHBOARD_VERSION].includes(payload.version)) {
         return null;
     }
     const normalizedLayout = normalizeLayoutNode(payload.layout);
@@ -146,6 +153,7 @@ export function sanitizeDashboardLayoutPayload(payload) {
         selectedWindowId: windowIds.includes(payload.selected_window_id)
             ? payload.selected_window_id
             : windowIds[0],
+        globalFilters: normalizeGlobalFilters(payload.global_filters),
     };
 }
 

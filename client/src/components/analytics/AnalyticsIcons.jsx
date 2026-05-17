@@ -59,12 +59,30 @@ export function SplitIcon({ size = 16, className = '', ...props }) {
     );
 }
 
+export function MinimizeHeaderIcon({ size = 16, className = '', ...props }) {
+    return (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+            <path d="M5 7.5h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="m8.5 13 3.5 3.5 3.5-3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
+export function RestoreHeaderIcon({ size = 16, className = '', ...props }) {
+    return (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+            <path d="M5 16.5h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="m8.5 11 3.5-3.5 3.5 3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
 export function AnalyticsGoalIcon({ goal, getGoalColor, getGoalSecondaryColor, getGoalIcon, size = 16, className = '' }) {
     return (
         <GoalIcon
             size={size}
             shape={getGoalIcon?.(goal || 'UltimateGoal') || 'circle'}
-            color={getGoalColor?.(goal || 'UltimateGoal') || 'var(--color-brand-primary)'}
+            color="var(--color-text-muted)"
             secondaryColor={getGoalSecondaryColor?.(goal || 'UltimateGoal') || 'var(--color-bg-card)'}
             isSmart={Boolean(goal?.is_smart)}
             className={className}

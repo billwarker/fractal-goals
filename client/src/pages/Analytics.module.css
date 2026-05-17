@@ -1,0 +1,66 @@
+.pageContainer {
+    display: flex;
+    height: calc(100vh - var(--app-nav-height, 0px));
+    max-height: calc(100vh - var(--app-nav-height, 0px));
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+    z-index: 0;
+}
+
+.leftPanel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.workspace {
+    flex: 1;
+    display: flex;
+    padding: 20px;
+    overflow: hidden;
+    position: relative;
+}
+
+.rightPanel {
+    position: relative;
+    z-index: 1;
+    width: 390px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--color-border);
+    background: var(--color-bg-sidebar);
+    overflow: hidden;
+}
+
+.sheetBackdrop {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .sheetBackdrop {
+        display: block;
+        position: fixed;
+        top: var(--app-nav-height, 0px);
+        right: 0;
+        bottom: 0;
+        left: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 499;
+    }
+
+    .rightPanel {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: min(82vh, calc(100vh - var(--app-nav-height, 0px)));
+        max-height: calc(100vh - var(--app-nav-height, 0px));
+        border-left: none;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.4);
+        z-index: 500;
+    }
+}

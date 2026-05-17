@@ -2,12 +2,15 @@ import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from
 import { useNavigate, useParams } from 'react-router-dom';
 
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
+import AnalyticsFiltersSidebar from '../components/analytics/AnalyticsFiltersSidebar';
 import {
     createDashboardLayoutPayload,
+    getDefaultGlobalFilters,
     getDefaultWindowState,
     getHighestWindowIndex,
     sanitizeDashboardLayoutPayload,
 } from '../components/analytics/dashboardState';
+import { normalizeGlobalFilters } from '../components/analytics/analyticsGlobalFilters';
 import ProfileWindowLayout, {
     countWindows,
     getWindowIds,
@@ -18,6 +21,8 @@ import { useAnalyticsPageData } from '../hooks/useAnalyticsPageData';
 import { useAnalyticsViews } from '../hooks/useDashboardQueries';
 import '../App.css';
 import notify from '../utils/notify';
+import useIsMobile from '../hooks/useIsMobile';
+import styles from './Analytics.module.css';
 
 const AnalyticsViewNameModal = lazy(() => import('../components/analytics/AnalyticsViewNameModal'));
 const AnalyticsViewsModal = lazy(() => import('../components/analytics/AnalyticsViewsModal'));
@@ -29,7 +34,7 @@ const DEFAULT_SELECTED_WINDOW_ID = 'window-1';
 const DEFAULT_WINDOW_STATES = {
     'window-1': getDefaultWindowState(),
 };
-const EMPTY_VIEW_NAME = 'Empty View';
+const EMPTY_VIEW_NAME = 'Empty Analytics View';
 const analyticsFallback = (
     <div style={{ height: '100%', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
         Loading analytics panel...
@@ -46,12 +51,21 @@ const formatDuration = (seconds) => {
     return `${minutes}m`;
 };
 
+const getStoredBoolean = (key, fallback) => {
+    if (typeof window === 'undefined' || typeof window.localStorage?.getItem !== 'function') {
+        return fallback;
+    }
+    const stored = window.localStorage.getItem(key);
+    return stored == null ? fallback : stored === 'true';
+};
+
 let windowIdCounter = 1;
 const generateWindowId = () => `window-${++windowIdCounter}`;
 
 function Analytics() {
     const { rootId } = useParams();
     const navigate = useNavigate();
+    const isMobile = useIsMobile();
     const {
         activities,
         activityGroups,
@@ -73,6 +87,11 @@ function Analytics() {
     const [selectedViewId, setSelectedViewId] = useState('');
     const [currentViewName, setCurrentViewName] = useState(EMPTY_VIEW_NAME);
     const [globalDateRange, setGlobalDateRange] = useState({ start: null, end: null });
+    const [globalFilters, setGlobalFilters] = useState(getDefaultGlobalFilters());
+    const filtersPaneStorageKey = `analytics-filter-pane-open:${rootId || 'default'}`;
+    const [isFiltersPaneOpen, setIsFiltersPaneOpen] = useState(() => {
+        return getStoredBoolean(`analytics-filter-pane-open:${rootId || 'default'}`, false);
+    });
     const [isHydrated, setIsHydrated] = useState(false);
     const [isViewsModalOpen, setIsViewsModalOpen] = useState(false);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -85,6 +104,7 @@ function Analytics() {
         setSelectedViewId('');
         setCurrentViewName(EMPTY_VIEW_NAME);
         setGlobalDateRange({ start: null, end: null });
+        setGlobalFilters(getDefaultGlobalFilters());
     }, []);
 
     const applyAnalyticsViewLayout = useCallback((payload, { source = 'analytics-view' } = {}) => {
@@ -100,6 +120,7 @@ function Analytics() {
         setLayout(sanitized.layout);
         setWindowStates(sanitized.windowStates);
         setSelectedWindowId(sanitized.selectedWindowId);
+        setGlobalFilters(sanitized.globalFilters || getDefaultGlobalFilters());
         return true;
     }, []);
 
@@ -108,6 +129,15 @@ function Analytics() {
             navigate('/');
         }
     }, [navigate, rootId]);
+
+    useEffect(() => {
+        setIsFiltersPaneOpen(getStoredBoolean(filtersPaneStorageKey, false));
+    }, [filtersPaneStorageKey]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof window.localStorage?.setItem !== 'function') return;
+        window.localStorage.setItem(filtersPaneStorageKey, String(isFiltersPaneOpen));
+    }, [filtersPaneStorageKey, isFiltersPaneOpen]);
 
     useEffect(() => {
         if (!rootId) {
@@ -186,6 +216,14 @@ function Analytics() {
         setGlobalDateRange(normalized);
     }, []);
 
+    const handleGlobalFiltersChange = useCallback((nextFilters) => {
+        setGlobalFilters(normalizeGlobalFilters(nextFilters));
+    }, []);
+
+    const handleResetGlobalFilters = useCallback(() => {
+        setGlobalFilters(getDefaultGlobalFilters());
+    }, []);
+
     const handleSelectAnalyticsView = useCallback((viewId) => {
         if (!viewId) {
             resetToEmptyView();
@@ -209,7 +247,8 @@ function Analytics() {
         layout,
         windowStates,
         selectedWindowId,
-    }), [layout, selectedWindowId, windowStates]);
+        globalFilters,
+    }), [globalFilters, layout, selectedWindowId, windowStates]);
 
     const handleSaveView = useCallback(async () => {
         if (selectedViewId) {
@@ -287,12 +326,14 @@ function Analytics() {
                     onSelect={() => setSelectedWindowId(windowId)}
                     globalDateRange={globalDateRange}
                     onGlobalDateRangeChange={handleDateRangeChange}
+                    globalFilters={globalFilters}
                 />
             </Suspense>
         );
     }, [
         createWindowStateUpdater,
         globalDateRange,
+        globalFilters,
         handleCloseWindow,
         handleDateRangeChange,
         handleSplit,
@@ -311,39 +352,51 @@ function Analytics() {
     }
 
     return (
-        <div
-            style={{
-                display: 'flex',
-                flexDirection: 'column',
-                height: '100%',
-                width: '100%',
-                overflow: 'hidden',
-                position: 'relative',
-            }}
-        >
-            <AnalyticsTopBar
-                currentViewName={currentViewName}
-                onOpenViewsModal={() => setIsViewsModalOpen(true)}
-                onSaveView={handleSaveView}
-                dateRange={globalDateRange}
-                onDateRangeChange={handleDateRangeChange}
-            />
-
-            <div
-                style={{
-                    flex: 1,
-                    display: 'flex',
-                    padding: '20px',
-                    overflow: 'hidden',
-                    position: 'relative',
-                }}
-            >
-                <ProfileWindowLayout
-                    layout={layout}
-                    onLayoutChange={setLayout}
-                    renderWindow={renderWindow}
+        <div className={styles.pageContainer}>
+            <div className={styles.leftPanel}>
+                <AnalyticsTopBar
+                    currentViewName={currentViewName}
+                    onOpenViewsModal={() => setIsViewsModalOpen(true)}
+                    onSaveView={handleSaveView}
+                    isFiltersPaneOpen={isFiltersPaneOpen}
+                    onToggleFiltersPane={() => setIsFiltersPaneOpen((current) => !current)}
                 />
+
+                <div className={styles.workspace}>
+                    <ProfileWindowLayout
+                        layout={layout}
+                        onLayoutChange={setLayout}
+                        renderWindow={renderWindow}
+                    />
+                </div>
             </div>
+
+            {isFiltersPaneOpen && isMobile && (
+                <div
+                    className={styles.sheetBackdrop}
+                    onClick={() => setIsFiltersPaneOpen(false)}
+                    aria-hidden="true"
+                />
+            )}
+            {isFiltersPaneOpen && (
+                <div className={styles.rightPanel}>
+                    <AnalyticsFiltersSidebar
+                        filters={globalFilters}
+                        dateRange={globalDateRange}
+                        goals={goalAnalytics?.goals || []}
+                        activities={activities}
+                        activityGroups={activityGroups}
+                        activityInstances={activityInstances}
+                        selectedWindowState={windowStates[selectedWindowId] || getDefaultWindowState()}
+                        onUpdateSelectedWindowState={createWindowStateUpdater(selectedWindowId)}
+                        onChange={handleGlobalFiltersChange}
+                        onDateRangeChange={handleDateRangeChange}
+                        onReset={handleResetGlobalFilters}
+                        onToggleCollapse={() => setIsFiltersPaneOpen(false)}
+                        isMobile={isMobile}
+                    />
+                </div>
+            )}
 
             {isViewsModalOpen && (
                 <Suspense fallback={null}>

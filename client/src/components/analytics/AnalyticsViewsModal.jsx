@@ -33,7 +33,7 @@ function AnalyticsViewsModal({
                         }}
                     >
                         <div>
-                            <div className={styles.viewName}>Empty View</div>
+                            <div className={styles.viewName}>Empty Analytics View</div>
                             <div className={styles.viewMeta}>Starts with one empty analytics panel</div>
                         </div>
                     </button>

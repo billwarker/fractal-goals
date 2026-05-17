@@ -21,6 +21,7 @@ function LineGraph({
     chartRef,
     selectedDateRange = null,
     onDateRangeChange = null,
+    showMetricSelectors = true,
 }) {
     const [brushState, setBrushState] = React.useState(null);
 
@@ -340,7 +341,7 @@ function LineGraph({
                 <div style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>
                     No data available for the selected metric(s)
                 </div>
-                {renderMetricSelectors(metrics, metricToPlotY1, setSelectedMetric, metricToPlotY2, setSelectedMetricY2, activityDef, multiplicativeMetrics)}
+                {showMetricSelectors && renderMetricSelectors(metrics, metricToPlotY1, setSelectedMetric, metricToPlotY2, setSelectedMetricY2, activityDef, multiplicativeMetrics)}
             </div>
         );
     }
@@ -707,7 +708,7 @@ function LineGraph({
 
     return (
         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {renderMetricSelectors(metrics, metricToPlotY1, setSelectedMetric, metricToPlotY2, setSelectedMetricY2, activityDef, multiplicativeMetrics)}
+            {showMetricSelectors && renderMetricSelectors(metrics, metricToPlotY1, setSelectedMetric, metricToPlotY2, setSelectedMetricY2, activityDef, multiplicativeMetrics)}
             <div
                 style={{ flex: 1, minHeight: 0, position: 'relative' }}
                 onMouseDown={handleBrushStart}

@@ -50,10 +50,10 @@ describe('Analytics page', () => {
         });
     });
 
-    it('creates a saved analytics view from Empty View', async () => {
+    it('creates a saved analytics view from Empty Analytics View', async () => {
         render(<Analytics />);
 
-        expect(screen.getByText('Empty View')).toBeInTheDocument();
+        expect(screen.getByText('Empty Analytics View')).toBeInTheDocument();
 
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Save View' }));
@@ -77,7 +77,7 @@ describe('Analytics page', () => {
             expect(createAnalyticsView).toHaveBeenCalledWith({
                 name: 'My Saved View',
                 layout: {
-                    version: 1,
+                    version: 2,
                     layout: { type: 'window', id: 'window-1' },
                     window_states: {
                         'window-1': expect.objectContaining({
@@ -86,6 +86,17 @@ describe('Analytics page', () => {
                         }),
                     },
                     selected_window_id: 'window-1',
+                    global_filters: {
+                        goals: {
+                            goalIds: [],
+                            includeDescendants: true,
+                            includeInheritedActivities: true,
+                        },
+                        activities: {
+                            activityIds: [],
+                            groupIds: [],
+                        },
+                    },
                 },
             });
         });
