@@ -55,6 +55,13 @@ class Config:
         for origin in os.getenv('CORS_ORIGINS', 'http://localhost:5173').replace(';', ',').replace(' ', ',').split(',') 
         if origin.strip()
     ]
+
+    # Additional CSP connect-src entries for separately hosted API/services.
+    CSP_CONNECT_SRC = [
+        source.strip()
+        for source in os.getenv('CSP_CONNECT_SRC', '').replace(';', ',').replace(' ', ',').split(',')
+        if source.strip()
+    ]
     
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')

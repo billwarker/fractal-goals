@@ -82,13 +82,22 @@ limiter.init_app(app)
 # Initialize Security Headers (Talisman)
 # In development, we allow unsafe-eval and unsafe-inline for Vite HMR and React DevTools
 # In production, we use a stricter CSP
+def unique_sources(sources):
+    return list(dict.fromkeys(sources))
+
+
 if config.ENV == 'production':
     csp = {
         'default-src': "'self'",
         'script-src': ["'self'"],  # No unsafe-inline or unsafe-eval in production
         'style-src': ["'self'", "'unsafe-inline'"],  # Inline styles still needed for React
         'img-src': ["'self'", 'data:', 'https:'],
-        'connect-src': ["'self'", 'https://*.fractalgoals.com', 'https://*.sentry.io'],
+        'connect-src': unique_sources([
+            "'self'",
+            'https://*.fractalgoals.com',
+            'https://*.sentry.io',
+            *config.CSP_CONNECT_SRC,
+        ]),
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
         'frame-ancestors': "'none'",
         'base-uri': "'self'",

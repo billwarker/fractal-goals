@@ -4,8 +4,17 @@ export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/a
 
 axios.defaults.withCredentials = true;
 
+let accessToken = null;
 let isRefreshing = false;
 let failedQueue = [];
+
+export const setAccessToken = (token) => {
+    accessToken = token || null;
+};
+
+export const clearAccessToken = () => {
+    accessToken = null;
+};
 
 const processQueue = (error, token = null) => {
     failedQueue.forEach((pending) => {
@@ -17,6 +26,14 @@ const processQueue = (error, token = null) => {
     });
     failedQueue = [];
 };
+
+axios.interceptors.request.use((config) => {
+    if (accessToken && !config.headers?.Authorization) {
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+    return config;
+});
 
 axios.interceptors.response.use(
     (response) => response,
@@ -35,7 +52,11 @@ axios.interceptors.response.use(
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
-                }).then(() => {
+                }).then((token) => {
+                    if (token) {
+                        originalRequest.headers = originalRequest.headers || {};
+                        originalRequest.headers.Authorization = `Bearer ${token}`;
+                    }
                     return axios(originalRequest);
                 });
             }
@@ -46,13 +67,15 @@ axios.interceptors.response.use(
             try {
                 const response = await axios.post(`${API_BASE}/auth/refresh`, {});
 
-                const { user } = response.data;
-                window.dispatchEvent(new CustomEvent('auth:token_refreshed', { detail: { user } }));
+                const { token, user } = response.data;
+                setAccessToken(token);
+                window.dispatchEvent(new CustomEvent('auth:token_refreshed', { detail: { token, user } }));
 
-                processQueue(null);
+                processQueue(null, token);
 
                 return axios(originalRequest);
             } catch (refreshError) {
+                clearAccessToken();
                 processQueue(refreshError, null);
                 window.dispatchEvent(new Event('auth:unauthorized'));
                 return Promise.reject(refreshError);

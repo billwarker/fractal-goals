@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authApi } from '../utils/api';
+import { authApi, clearAccessToken, setAccessToken } from '../utils/api';
 
 const AuthContext = createContext();
 
@@ -14,10 +14,14 @@ export function AuthProvider({ children }) {
     // Handle events from axios interceptors
     useEffect(() => {
         const handleUnauthorized = () => {
+            clearAccessToken();
             setUser(null);
             setLoading(false);
         };
         const handleTokenRefresh = (e) => {
+            if (e.detail?.token) {
+                setAccessToken(e.detail.token);
+            }
             if (e.detail?.user) {
                 setUser(e.detail.user);
             }
@@ -36,6 +40,9 @@ export function AuthProvider({ children }) {
             if (legacyToken) {
                 const refreshResponse = await authApi.refresh(legacyToken);
                 localStorage.removeItem('token');
+                if (refreshResponse.data?.token) {
+                    setAccessToken(refreshResponse.data.token);
+                }
                 if (refreshResponse.data?.user) {
                     setUser(refreshResponse.data.user);
                     return;
@@ -51,6 +58,7 @@ export function AuthProvider({ children }) {
 
             // Keep token for transient network failures so interceptor retries can recover.
             if (!isNetworkError && (status === 401 || status === 403)) {
+                clearAccessToken();
                 setUser(null);
             }
         } finally {
@@ -64,7 +72,8 @@ export function AuthProvider({ children }) {
                 username_or_email: usernameOrEmail,
                 password: password
             });
-            const { user: userData } = res.data;
+            const { token, user: userData } = res.data;
+            setAccessToken(token);
             setUser(userData);
             return res.data;
         } catch (err) {
@@ -91,6 +100,7 @@ export function AuthProvider({ children }) {
         try {
             await authApi.logout();
         } finally {
+            clearAccessToken();
             setUser(null);
         }
     };
