@@ -40,6 +40,7 @@ import {
     RestoreHeaderIcon,
     SplitIcon,
     TimerIcon,
+    VisualizationIcon,
 } from './AnalyticsIcons';
 import { DISABLED_CHART_ANIMATION } from './ChartJSWrapper';
 import { resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
@@ -108,12 +109,16 @@ function ProfileWindow({
         selectedCategory,
         selectedVisualization,
         selectedActivity,
+        selectedMetricX,
+        selectedMetricY,
         selectedMetric,
         selectedMetricY2,
         setsHandling,
         selectedSplit,
         selectedGoal,
         selectedGoalChart,
+        goalTimeDurationMode,
+        goalTimeInheritanceMode,
         heatmapMonths,
     } = windowState;
 
@@ -206,66 +211,44 @@ function ProfileWindow({
         activities: <LightningIcon size={16} />,
     };
 
-    const visualizationIcons = {
-        stats: <ChartIcon size={15} />,
-        completionTimeline: <ChartIcon size={15} />,
-        timeDistribution: <ChartIcon size={15} />,
-        goalDetail: <AnalyticsGoalIcon goal={rootGoal} getGoalColor={getGoalColor} getGoalSecondaryColor={getGoalSecondaryColor} getGoalIcon={getGoalIcon} size={15} />,
-        completionRateByLevel: <ChartIcon size={15} />,
-        goalAging: <ChartIcon size={15} />,
-        goalMomentum: <ChartIcon size={15} />,
-        staleGoals: <ChartIcon size={15} />,
-        heatmap: <ChartIcon size={15} />,
-        streaks: <ChartIcon size={15} />,
-        weeklyChart: <ChartIcon size={15} />,
-        durationTrend: <ChartIcon size={15} />,
-        sectionPie: <ChartIcon size={15} />,
-        completionRate: <ChartIcon size={15} />,
-        startDistribution: <ChartIcon size={15} />,
-        durationHistogram: <ChartIcon size={15} />,
-        plannedVsActual: <ChartIcon size={15} />,
-        consistency: <ChartIcon size={15} />,
-        scatterPlot: <ChartIcon size={15} />,
-        lineGraph: <ChartIcon size={15} />,
-        activityFrequency: <ChartIcon size={15} />,
-        timeByActivity: <ChartIcon size={15} />,
-        personalBest: <ChartIcon size={15} />,
-        metricVolume: <ChartIcon size={15} />,
-        groupMix: <ChartIcon size={15} />,
+    const categoryLabels = {
+        goals: 'Goals',
+        sessions: 'Sessions',
+        activities: 'Activities',
     };
 
     const visualizations = {
         goals: [
-            { id: 'stats', name: 'Summary Stats' },
-            { id: 'completionTimeline', name: 'Completion Timeline' },
-            { id: 'timeDistribution', name: 'Time Spent Per Goal' },
-            { id: 'completionRateByLevel', name: 'Completion Rate' },
-            { id: 'goalAging', name: 'Goal Aging' },
-            { id: 'goalMomentum', name: 'Goal Momentum' },
-            { id: 'staleGoals', name: 'Stale Goals' },
-            { id: 'goalDetail', name: 'Goal Detail View' }
+            { id: 'stats', name: 'Summary Stats', iconType: 'goals:stats' },
+            { id: 'completionTimeline', name: 'Completion Timeline', iconType: 'goals:completionTimeline' },
+            { id: 'timeDistribution', name: 'Time Spent Per Goal', iconType: 'goals:timeDistribution' },
+            { id: 'completionRateByLevel', name: 'Completion Rate', iconType: 'goals:completionRateByLevel' },
+            { id: 'goalAging', name: 'Goal Aging', iconType: 'goals:goalAging' },
+            { id: 'goalMomentum', name: 'Goal Momentum', iconType: 'goals:goalMomentum' },
+            { id: 'staleGoals', name: 'Stale Goals', iconType: 'goals:staleGoals' },
+            { id: 'goalDetail', name: 'Goal Detail View', iconType: 'goals:goalDetail' }
         ],
         sessions: [
-            { id: 'stats', name: 'Summary Stats' },
-            { id: 'durationTrend', name: 'Duration Trend' },
-            { id: 'sectionPie', name: 'Section Time' },
-            { id: 'heatmap', name: 'Activity Heatmap' },
-            { id: 'streaks', name: 'Streak Timeline' },
-            { id: 'weeklyChart', name: 'Weekly Chart' },
-            { id: 'completionRate', name: 'Completion Rate' },
-            { id: 'startDistribution', name: 'Start Times' },
-            { id: 'durationHistogram', name: 'Duration Histogram' },
-            { id: 'plannedVsActual', name: 'Planned vs Actual' },
-            { id: 'consistency', name: 'Consistency' }
+            { id: 'stats', name: 'Summary Stats', iconType: 'sessions:stats' },
+            { id: 'durationTrend', name: 'Duration Trend', iconType: 'sessions:durationTrend' },
+            { id: 'sectionPie', name: 'Section Time', iconType: 'sessions:sectionPie' },
+            { id: 'heatmap', name: 'Activity Heatmap', iconType: 'sessions:heatmap' },
+            { id: 'streaks', name: 'Streak Timeline', iconType: 'sessions:streaks' },
+            { id: 'weeklyChart', name: 'Weekly Chart', iconType: 'sessions:weeklyChart' },
+            { id: 'completionRate', name: 'Completion Rate', iconType: 'sessions:completionRate' },
+            { id: 'startDistribution', name: 'Start Times', iconType: 'sessions:startDistribution' },
+            { id: 'durationHistogram', name: 'Duration Histogram', iconType: 'sessions:durationHistogram' },
+            { id: 'plannedVsActual', name: 'Planned vs Actual', iconType: 'sessions:plannedVsActual' },
+            { id: 'consistency', name: 'Consistency', iconType: 'sessions:consistency' }
         ],
         activities: [
-            { id: 'scatterPlot', name: 'Scatter Plot' },
-            { id: 'lineGraph', name: 'Line Graph' },
-            { id: 'activityFrequency', name: 'Frequency' },
-            { id: 'timeByActivity', name: 'Time Per Activity' },
-            { id: 'personalBest', name: 'Personal Best' },
-            { id: 'metricVolume', name: 'Metric Volume' },
-            { id: 'groupMix', name: 'Group Mix' }
+            { id: 'scatterPlot', name: 'Scatter Plot', iconType: 'activities:scatterPlot' },
+            { id: 'lineGraph', name: 'Line Graph', iconType: 'activities:lineGraph' },
+            { id: 'activityFrequency', name: 'Frequency', iconType: 'activities:activityFrequency' },
+            { id: 'timeByActivity', name: 'Time Per Activity', iconType: 'activities:timeByActivity' },
+            { id: 'personalBest', name: 'Personal Best', iconType: 'activities:personalBest' },
+            { id: 'metricVolume', name: 'Metric Volume', iconType: 'activities:metricVolume' },
+            { id: 'groupMix', name: 'Group Mix', iconType: 'activities:groupMix' }
         ]
     };
 
@@ -545,9 +528,12 @@ function ProfileWindow({
         }
     };
 
+    const selectedVisualizationMeta = selectedCategory
+        ? visualizations[selectedCategory]?.find((vis) => vis.id === selectedVisualization)
+        : null;
+
     const renderUnifiedHeader = () => {
         const hasCategory = !!selectedCategory;
-        const hasViz = !!selectedVisualization;
 
         return (
             <div className={`${styles.header} ${isVeryNarrow ? styles.wrap : ''}`}>
@@ -577,9 +563,18 @@ function ProfileWindow({
 
                 {/* Main Action Area */}
                 <div className={styles.mainActions}>
-                    {!hasCategory && renderLevel0()}
-                    {hasCategory && !hasViz && renderLevel1()}
-                    {hasCategory && hasViz && renderLevel2()}
+                    <div className={styles.headerContext}>
+                        <span className={styles.buttonIcon}>
+                            {selectedVisualizationMeta
+                                ? <VisualizationIcon type={selectedVisualizationMeta.iconType} size={16} />
+                                : hasCategory
+                                    ? categoryIcons[selectedCategory]
+                                    : <ChartIcon size={16} />}
+                        </span>
+                        <span>
+                            {selectedVisualizationMeta?.name || categoryLabels[selectedCategory] || 'Analytics'}
+                        </span>
+                    </div>
                 </div>
 
                 {/* Global Actions (Annotations, Split, Close) */}
@@ -671,46 +666,41 @@ function ProfileWindow({
         </div>
     );
 
-    const renderLevel0 = () => (
-        <>
-            {['goals', 'sessions', 'activities'].map(category => (
-                <Button
-                    key={category}
-                    onClick={() => handleCategoryChange(category)}
-                    variant={selectedCategory === category ? 'primary' : 'secondary'}
-                    size="sm"
-                    style={{ whiteSpace: 'nowrap' }}
-                >
-                    <span className={styles.buttonIcon}>{categoryIcons[category]}</span>
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
-                </Button>
-            ))}
-        </>
+    const renderCategoryCards = () => (
+        <div className={styles.selectionSurface}>
+            <div className={styles.selectionGrid}>
+                {['goals', 'sessions', 'activities'].map(category => (
+                    <button
+                        key={category}
+                        type="button"
+                        className={styles.selectionCard}
+                        onClick={() => handleCategoryChange(category)}
+                    >
+                        <span className={styles.selectionIcon}>{categoryIcons[category]}</span>
+                        <span className={styles.selectionName}>{categoryLabels[category]}</span>
+                    </button>
+                ))}
+            </div>
+        </div>
     );
 
-    const renderLevel1 = () => (
-        <>
-            <span className={styles.levelLabel}>
-                {selectedCategory}:
-            </span>
-            {visualizations[selectedCategory]?.map(vis => (
-                <Button
-                    key={vis.id}
-                    onClick={() => setSelectedVisualization(vis.id)}
-                    variant={selectedVisualization === vis.id ? 'primary' : 'secondary'}
-                    size="sm"
-                    style={{ whiteSpace: 'nowrap' }}
-                >
-                    <span className={styles.buttonIcon}>{visualizationIcons[vis.id]}</span>
-                    {vis.name}
-                </Button>
-            ))}
-        </>
+    const renderVisualizationCards = () => (
+        <div className={styles.selectionSurface}>
+            <div className={styles.selectionGrid}>
+                {visualizations[selectedCategory]?.map(vis => (
+                    <button
+                        key={vis.id}
+                        type="button"
+                        className={styles.selectionCard}
+                        onClick={() => setSelectedVisualization(vis.id)}
+                    >
+                        <span className={styles.selectionIcon}><VisualizationIcon type={vis.iconType} size={22} /></span>
+                        <span className={styles.selectionName}>{vis.name}</span>
+                    </button>
+                ))}
+            </div>
+        </div>
     );
-
-    const renderLevel2 = () => {
-        return null;
-    };
 
 
 
@@ -721,23 +711,11 @@ function ProfileWindow({
     // Render the actual visualization content
     const renderVisualizationContent = () => {
         if (!selectedCategory) {
-            return (
-                <div className={styles.emptyState}>
-                    <div className={styles.emptyIcon}><ChartIcon size={34} /></div>
-                    <div>Select a category above to view analytics</div>
-                </div>
-            );
+            return renderCategoryCards();
         }
 
         if (!selectedVisualization) {
-            return (
-                <div className={styles.emptyState}>
-                    <div className={styles.emptyIcon}>
-                        {categoryIcons[selectedCategory]}
-                    </div>
-                    <div>Select a visualization type above</div>
-                </div>
-            );
+            return renderVisualizationCards();
         }
 
         const summary = filteredGoalSummary;
@@ -769,7 +747,12 @@ function ProfileWindow({
                 case 'timeDistribution':
                     return (
                         <div className={styles.vizContainerHidden}>
-                            <GoalTimeDistribution goals={filteredGoalAnalyticsGoals} chartRef={chartRef} />
+                            <GoalTimeDistribution
+                                goals={filteredGoalAnalyticsGoals}
+                                chartRef={chartRef}
+                                durationMode={goalTimeDurationMode || 'activity'}
+                                inheritanceMode={goalTimeInheritanceMode || 'direct'}
+                            />
                         </div>
                     );
                 case 'completionRateByLevel':
@@ -895,7 +878,7 @@ function ProfileWindow({
             if (activityNeedsSelection && !effectiveSelectedActivity) {
                 return (
                     <div className={styles.emptyState}>
-                        Select an activity above to view data
+                        Select an activity in the filters panel
                     </div>
                 );
             }
@@ -911,6 +894,8 @@ function ProfileWindow({
                                 setsHandling={setsHandling}
                                 selectedSplit={selectedSplit}
                                 chartRef={chartRef}
+                                selectedMetricX={selectedMetricX}
+                                selectedMetricY={selectedMetricY}
                             />
                         </div>
                     );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Scatter } from 'react-chartjs-2';
 import { chartDefaults, useChartOptions } from './ChartJSWrapper'; // Import hook
 import styles from './ScatterPlot.module.css';
@@ -10,27 +10,22 @@ import styles from './ScatterPlot.module.css';
  * Requires at least 2 metrics to be meaningful
  * Supports split filtering for split-enabled activities
  */
-function ScatterPlot({ selectedActivity, activityInstances, activities, setsHandling = 'top', selectedSplit = 'all', chartRef }) {
-    const [xMetric, setXMetric] = useState(null);
-    const [yMetric, setYMetric] = useState(null);
-
+function ScatterPlot({
+    selectedActivity,
+    activityInstances,
+    activities,
+    setsHandling = 'top',
+    selectedSplit = 'all',
+    chartRef,
+    selectedMetricX = null,
+    selectedMetricY = null,
+}) {
     const activityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
     const metrics = activityDef?.metric_definitions || [];
 
-    // Reset metric selections when activity changes
-    useEffect(() => {
-        if (metrics.length >= 2) {
-            setXMetric(metrics[0]);
-            setYMetric(metrics[1]);
-        } else {
-            setXMetric(null);
-            setYMetric(null);
-        }
-    }, [selectedActivity?.id]);
-
     // Use selected metrics or defaults
-    const xMetricToPlot = xMetric || metrics[0];
-    const yMetricToPlot = yMetric || metrics[1];
+    const xMetricToPlot = metrics.find((metric) => metric.id === (selectedMetricX?.id || selectedMetricX)) || metrics[0];
+    const yMetricToPlot = metrics.find((metric) => metric.id === (selectedMetricY?.id || selectedMetricY)) || metrics[1];
 
     // Get split name for title if applicable
     let titleSuffix = '';
@@ -192,43 +187,6 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
                 <div className={styles.noDataText}>
                     No metric data available for the selected metrics
                 </div>
-                {/* Metric Selectors */}
-                <div className={styles.selectorsWrapper}>
-                    <div className={styles.selectorGroup}>
-                        <span className={styles.selectorLabel}>X-Axis:</span>
-                        <select
-                            value={xMetricToPlot.id}
-                            onChange={(e) => {
-                                const metric = metrics.find(m => m.id === e.target.value);
-                                setXMetric(metric);
-                            }}
-                            className={styles.metricSelect}
-                        >
-                            {metrics.map(metric => (
-                                <option key={metric.id} value={metric.id}>
-                                    {metric.name} ({metric.unit})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className={styles.selectorGroup}>
-                        <span className={styles.selectorLabel}>Y-Axis:</span>
-                        <select
-                            value={yMetricToPlot.id}
-                            onChange={(e) => {
-                                const metric = metrics.find(m => m.id === e.target.value);
-                                setYMetric(metric);
-                            }}
-                            className={styles.metricSelect}
-                        >
-                            {metrics.map(metric => (
-                                <option key={metric.id} value={metric.id}>
-                                    {metric.name} ({metric.unit})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
             </div>
         );
     }
@@ -297,45 +255,6 @@ function ScatterPlot({ selectedActivity, activityInstances, activities, setsHand
 
     return (
         <div className={styles.mainContainer}>
-            {/* Metric Selectors */}
-            <div className={styles.headerSelectors}>
-                <div className={styles.selectorGroup}>
-                    <span className={styles.selectorLabel}>X-Axis:</span>
-                    <select
-                        value={xMetricToPlot.id}
-                        onChange={(e) => {
-                            const metric = metrics.find(m => m.id === e.target.value);
-                            setXMetric(metric);
-                        }}
-                        className={styles.metricSelect}
-                    >
-                        {metrics.map(metric => (
-                            <option key={metric.id} value={metric.id}>
-                                {metric.name} ({metric.unit})
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                <div className={styles.selectorGroup}>
-                    <span className={styles.selectorLabel}>Y-Axis:</span>
-                    <select
-                        value={yMetricToPlot.id}
-                        onChange={(e) => {
-                            const metric = metrics.find(m => m.id === e.target.value);
-                            setYMetric(metric);
-                        }}
-                        className={styles.metricSelect}
-                    >
-                        {metrics.map(metric => (
-                            <option key={metric.id} value={metric.id}>
-                                {metric.name} ({metric.unit})
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            </div>
-
-            {/* Chart */}
             <div className={styles.chartContainer}>
                 <Scatter ref={chartRef} data={chartData} options={options} />
             </div>

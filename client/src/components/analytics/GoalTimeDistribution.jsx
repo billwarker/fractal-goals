@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { useTheme } from '../../contexts/ThemeContext'
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
@@ -14,11 +14,13 @@ import { chartDefaults, DISABLED_CHART_ANIMATION } from './ChartJSWrapper'; // I
  * - Option to roll-up child goal time to parent goals
  * - Option to measure by activity duration vs session duration
  */
-function GoalTimeDistribution({ goals, chartRef }) {
+function GoalTimeDistribution({
+    goals,
+    chartRef,
+    inheritanceMode = 'direct',
+    durationMode = 'activity',
+}) {
     const { getGoalColor } = useGoalLevels();;
-    const [inheritanceMode, setInheritanceMode] = useState('direct');
-    // Duration mode: 'activity' = activity instance duration, 'session' = full session duration
-    const [durationMode, setDurationMode] = useState('activity');
 
     // Format duration in hours and minutes
     const formatDuration = (seconds) => {
@@ -286,109 +288,17 @@ function GoalTimeDistribution({ goals, chartRef }) {
 
     return (
         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* Header with toggles */}
             <div style={{
                 display: 'flex',
-                justifyContent: 'space-between',
+                justifyContent: 'flex-start',
                 alignItems: 'center',
                 marginBottom: '12px',
-                flexWrap: 'wrap',
-                gap: '12px'
             }}>
                 <h3 style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-secondary)' }}>
                     Time Invested Over Time
                 </h3>
-
-                {/* Controls */}
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {/* Duration Mode Toggle */}
-                    <div style={{
-                        display: 'flex',
-                        gap: '4px',
-                        background: 'var(--color-bg-input)', // Replaced #252525
-                        borderRadius: '4px',
-                        padding: '2px'
-                    }}>
-                        <button
-                            onClick={() => setDurationMode('activity')}
-                            style={{
-                                padding: '4px 10px',
-                                background: durationMode === 'activity' ? 'var(--color-bg-surface)' : 'transparent',
-                                border: 'none',
-                                borderRadius: '3px',
-                                color: durationMode === 'activity' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                                fontSize: '11px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                            title="Time spent on activities associated with each goal"
-                        >
-                            Activities
-                        </button>
-                        <button
-                            onClick={() => setDurationMode('session')}
-                            style={{
-                                padding: '4px 10px',
-                                background: durationMode === 'session' ? 'var(--color-bg-surface)' : 'transparent',
-                                border: 'none',
-                                borderRadius: '3px',
-                                color: durationMode === 'session' ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
-                                fontSize: '11px',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s'
-                            }}
-                            title="Full session duration when goal is associated"
-                        >
-                            Sessions
-                        </button>
-                    </div>
-
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontSize: '11px',
-                        color: 'var(--color-text-secondary)'
-                    }}>
-                        <select
-                            value={inheritanceMode}
-                            onChange={(event) => setInheritanceMode(event.target.value)}
-                            style={{
-                                border: '1px solid var(--color-border)',
-                                borderRadius: '4px',
-                                background: 'var(--color-bg-input)',
-                                color: 'var(--color-text-primary)',
-                                fontSize: '11px',
-                                padding: '5px 8px',
-                            }}
-                            aria-label="Goal inheritance mode"
-                        >
-                            <option value="direct">Direct only</option>
-                            <option value="descendants">Include descendants</option>
-                            <option value="root">Roll up to root</option>
-                        </select>
-                        <span
-                            title="Direct only keeps time on its attached goal. Include descendants also credits each ancestor. Roll up to root collapses child time into its top parent."
-                            style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '13px',
-                                height: '13px',
-                                borderRadius: '50%',
-                                background: 'var(--color-bg-input)',
-                                color: 'var(--color-text-muted)',
-                                fontSize: '9px',
-                                cursor: 'help'
-                            }}
-                        >
-                            ?
-                        </span>
-                    </div>
-                </div>
             </div>
 
-            {/* Chart */}
             <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
                 <Bar ref={chartRef} data={chartData} options={chartOptions} />
             </div>

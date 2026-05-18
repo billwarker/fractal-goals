@@ -10,6 +10,8 @@ export function getDefaultWindowState() {
         selectedCategory: null,
         selectedVisualization: null,
         selectedActivity: null,
+        selectedMetricX: null,
+        selectedMetricY: null,
         selectedMetric: null,
         selectedMetricY2: null,
         setsHandling: 'top',
@@ -17,6 +19,8 @@ export function getDefaultWindowState() {
         selectedModeIds: [],
         selectedGoal: null,
         selectedGoalChart: 'duration',
+        goalTimeDurationMode: 'activity',
+        goalTimeInheritanceMode: 'direct',
         heatmapMonths: 12,
     };
 }

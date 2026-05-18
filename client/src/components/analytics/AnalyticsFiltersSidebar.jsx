@@ -141,6 +141,8 @@ function AnalyticsFiltersSidebar({
     ];
     const selectedMetricId = selectedWindowState?.selectedMetric?.id || selectedWindowState?.selectedMetric || metricOptions[0]?.id || '';
     const selectedMetricY2Id = selectedWindowState?.selectedMetricY2?.id || selectedWindowState?.selectedMetricY2 || '';
+    const selectedMetricXId = selectedWindowState?.selectedMetricX?.id || selectedWindowState?.selectedMetricX || metricDefinitions[0]?.id || '';
+    const selectedMetricYId = selectedWindowState?.selectedMetricY?.id || selectedWindowState?.selectedMetricY || metricDefinitions[1]?.id || '';
     const selectedPanelUsesScopedChoices = selectedWindowState?.selectedVisualization
         && (
             (selectedWindowState?.selectedCategory === 'goals' && selectedWindowState?.selectedVisualization === 'goalDetail')
@@ -401,6 +403,37 @@ function AnalyticsFiltersSidebar({
                         </>
                     )}
 
+                    {selectedWindowState?.selectedCategory === 'goals' && selectedWindowState?.selectedVisualization === 'timeDistribution' && (
+                        <>
+                            <div className="sessions-query-chip-group">
+                                {[
+                                    { value: 'activity', label: 'Activities' },
+                                    { value: 'session', label: 'Sessions' },
+                                ].map((option) => (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        className={`sessions-query-chip ${(selectedWindowState?.goalTimeDurationMode || 'activity') === option.value ? 'active' : ''}`}
+                                        onClick={() => updateSelectedWindow({ goalTimeDurationMode: option.value })}
+                                    >
+                                        {option.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <label className="sessions-query-field" style={{ marginTop: 12 }}>
+                                <span>Inheritance</span>
+                                <select
+                                    value={selectedWindowState?.goalTimeInheritanceMode || 'direct'}
+                                    onChange={(event) => updateSelectedWindow({ goalTimeInheritanceMode: event.target.value })}
+                                >
+                                    <option value="direct">Direct only</option>
+                                    <option value="descendants">Include descendants</option>
+                                    <option value="root">Roll up to root</option>
+                                </select>
+                            </label>
+                        </>
+                    )}
+
                     {selectedWindowState?.selectedCategory === 'activities' && (
                         <>
                             {['scatterPlot', 'lineGraph', 'personalBest', 'metricVolume'].includes(selectedWindowState?.selectedVisualization) && (
@@ -445,6 +478,39 @@ function AnalyticsFiltersSidebar({
                                         ))}
                                     </select>
                                 </label>
+                            )}
+
+                            {selectedWindowState?.selectedVisualization === 'scatterPlot' && metricDefinitions.length > 0 && (
+                                <>
+                                    <label className="sessions-query-field" style={{ marginTop: 12 }}>
+                                        <span>X Axis</span>
+                                        <select
+                                            value={selectedMetricXId}
+                                            onChange={(event) => {
+                                                const metric = metricDefinitions.find((item) => item.id === event.target.value);
+                                                updateSelectedWindow({ selectedMetricX: metric || null });
+                                            }}
+                                        >
+                                            {metricDefinitions.map((metric) => (
+                                                <option key={metric.id} value={metric.id}>{metric.name}{metric.unit ? ` (${metric.unit})` : ''}</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                    <label className="sessions-query-field" style={{ marginTop: 12 }}>
+                                        <span>Y Axis</span>
+                                        <select
+                                            value={selectedMetricYId}
+                                            onChange={(event) => {
+                                                const metric = metricDefinitions.find((item) => item.id === event.target.value);
+                                                updateSelectedWindow({ selectedMetricY: metric || null });
+                                            }}
+                                        >
+                                            {metricDefinitions.map((metric) => (
+                                                <option key={metric.id} value={metric.id}>{metric.name}{metric.unit ? ` (${metric.unit})` : ''}</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                </>
                             )}
 
                             {selectedWindowState?.selectedVisualization === 'lineGraph' && metricOptions.length > 0 && (
@@ -548,7 +614,14 @@ function AnalyticsFiltersSidebar({
                         const activity = activityIds.length > 0
                             ? profileActivities.find((item) => item.id === activityIds[0]) || null
                             : null;
-                        updateSelectedWindow({ selectedActivity: activity, selectedSplit: 'all' });
+                        updateSelectedWindow({
+                            selectedActivity: activity,
+                            selectedSplit: 'all',
+                            selectedMetricX: null,
+                            selectedMetricY: null,
+                            selectedMetric: null,
+                            selectedMetricY2: null,
+                        });
                     }}
                 />
             )}

@@ -59,6 +59,8 @@ describe('ProfileWindow', () => {
                     selectedCategory: 'activities',
                     selectedVisualization: 'scatterPlot',
                     selectedActivity: { id: 'activity-1', name: 'Squat', group_id: 'group-1' },
+                    selectedMetricX: { id: 'reps', name: 'Reps', unit: 'count' },
+                    selectedMetricY: { id: 'weight', name: 'Weight', unit: 'lbs' },
                     selectedMetric: 'weight',
                     selectedMetricY2: null,
                     setsHandling: 'top',
@@ -71,9 +73,11 @@ describe('ProfileWindow', () => {
             />
         );
 
-        expect(screen.getByText('Scatter Plot')).toBeInTheDocument();
+        expect(screen.getAllByText('Scatter Plot')).toHaveLength(2);
         expect(scatterPlot).toHaveBeenCalledWith(expect.objectContaining({
             selectedActivity: expect.objectContaining({ id: 'activity-1', name: 'Squat' }),
+            selectedMetricX: expect.objectContaining({ id: 'reps' }),
+            selectedMetricY: expect.objectContaining({ id: 'weight' }),
         }));
     });
 });

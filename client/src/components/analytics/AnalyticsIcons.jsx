@@ -32,6 +32,216 @@ export function ChartIcon({ size = 16, className = '', ...props }) {
     );
 }
 
+export function VisualizationIcon({ type, size = 16, className = '', ...props }) {
+    const common = {
+        className,
+        width: size,
+        height: size,
+        viewBox: '0 0 24 24',
+        fill: 'none',
+        'aria-hidden': true,
+        ...props,
+    };
+
+    switch (type) {
+        case 'goals:stats':
+            return (
+                <svg {...common}>
+                    <path d="M5 18.5h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M7 16v-4.5M12 16V7.5M17 16v-7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M6.5 5.5h11" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                </svg>
+            );
+        case 'goals:completionTimeline':
+            return (
+                <svg {...common}>
+                    <path d="M5 6.5h14M5 12h14M5 17.5h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.45" />
+                    <path d="M7 17.5 11 12l3 2.4 3-7.9" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            );
+        case 'goals:timeDistribution':
+            return (
+                <svg {...common}>
+                    <path d="M12 4.5a7.5 7.5 0 1 1-6.4 11.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M12 4.5v7.5h7.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            );
+        case 'goals:completionRateByLevel':
+            return (
+                <svg {...common}>
+                    <path d="M5 18h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M6.5 15.5h3v2.5h-3zM10.5 11.5h3v6.5h-3zM14.5 7h3v11h-3z" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="m16 5.5 1.5 1.5 2-2.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            );
+        case 'goals:goalAging':
+            return (
+                <svg {...common}>
+                    <path d="M12 5v7l4 2.4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M12 21a9 9 0 1 0-7.3-3.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M4 13.5H2.5V18H7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            );
+        case 'goals:goalMomentum':
+            return (
+                <svg {...common}>
+                    <path d="M4 17.5h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M6 15.5 10 11l3 2.5 5-7" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M15.5 6.5H18v2.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            );
+        case 'goals:staleGoals':
+            return (
+                <svg {...common}>
+                    <path d="M6.5 6.5h11v11h-11z" stroke="currentColor" strokeWidth="1.7" />
+                    <path d="M9 10h6M9 14h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M17.5 4.5 19.5 2.5M19.5 6.5l2-2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" opacity="0.7" />
+                </svg>
+            );
+        case 'goals:goalDetail':
+            return (
+                <svg {...common}>
+                    <path d="M12 3.8 19.1 8v8L12 20.2 4.9 16V8L12 3.8Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+                    <path d="M8.5 12h7M12 8.5v7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                </svg>
+            );
+        case 'sessions:stats':
+            return (
+                <svg {...common}>
+                    <path d="M5 19V5M5 19h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M8 16v-3M12 16V8M16 16v-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                </svg>
+            );
+        case 'sessions:durationTrend':
+            return (
+                <svg {...common}>
+                    <path d="M4.5 18.5h15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M6 15.5c2.6-7.6 5.7 4.6 8.3-2.9 1-2.9 2.2-4.8 3.7-5.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+            );
+        case 'sessions:sectionPie':
+            return (
+                <svg {...common}>
+                    <path d="M12 4.5v7.5h7.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M19.5 12A7.5 7.5 0 1 1 12 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+            );
+        case 'sessions:heatmap':
+            return (
+                <svg {...common}>
+                    <path d="M5 5h4v4H5zM10 5h4v4h-4zM15 5h4v4h-4zM5 10h4v4H5zM10 10h4v4h-4zM15 10h4v4h-4zM5 15h4v4H5zM10 15h4v4h-4zM15 15h4v4h-4z" stroke="currentColor" strokeWidth="1.3" />
+                    <path d="M10 10h4v4h-4zM15 15h4v4h-4z" fill="currentColor" opacity="0.35" />
+                </svg>
+            );
+        case 'sessions:streaks':
+            return (
+                <svg {...common}>
+                    <path d="M5 16.5c1.7-4.7 4.1-4.7 5.8-1.5 1.4 2.6 3.5 2.3 5-.6 1-2 1.7-4.4 2.2-7.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M4.5 19h15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                </svg>
+            );
+        case 'sessions:weeklyChart':
+            return (
+                <svg {...common}>
+                    <path d="M4.5 18.5h15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M6.5 15.5v-5M10 15.5v-8M13.5 15.5v-3M17 15.5v-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                </svg>
+            );
+        case 'sessions:completionRate':
+            return (
+                <svg {...common}>
+                    <path d="M5 12a7 7 0 1 0 2.1-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="m8.5 11.8 2.3 2.3 4.7-5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            );
+        case 'sessions:startDistribution':
+            return (
+                <svg {...common}>
+                    <path d="M12 4.5v7.2l4.4-2.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M12 21a8.5 8.5 0 1 0 0-17" stroke="currentColor" strokeWidth="1.8" />
+                    <path d="M5 17.5h3M4 12h3M5 6.5h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+            );
+        case 'sessions:durationHistogram':
+            return (
+                <svg {...common}>
+                    <path d="M4.5 18.5h15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M6 15.5h2.5v3H6zM10.2 10h2.5v8.5h-2.5zM14.4 13h2.5v5.5h-2.5z" stroke="currentColor" strokeWidth="1.5" />
+                </svg>
+            );
+        case 'sessions:plannedVsActual':
+            return (
+                <svg {...common}>
+                    <path d="M5 7h14M5 17h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" opacity="0.55" />
+                    <path d="M8 7v10M16 7v10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="m9.5 12 2 2 3.5-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            );
+        case 'sessions:consistency':
+            return (
+                <svg {...common}>
+                    <path d="M5 8h3M10.5 8h3M16 8h3M5 13h3M10.5 13h3M16 13h3M5 18h3M10.5 18h3M16 18h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M5 4.5h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                </svg>
+            );
+        case 'activities:scatterPlot':
+            return (
+                <svg {...common}>
+                    <path d="M5 19V5M5 19h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <circle cx="9" cy="14" r="1.5" fill="currentColor" />
+                    <circle cx="13" cy="10" r="1.5" fill="currentColor" />
+                    <circle cx="17" cy="7" r="1.5" fill="currentColor" />
+                </svg>
+            );
+        case 'activities:lineGraph':
+            return (
+                <svg {...common}>
+                    <path d="M5 18h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M6.5 15.5 10 11.5l3.2 2.2 4.3-6.2" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="10" cy="11.5" r="1.2" fill="currentColor" />
+                </svg>
+            );
+        case 'activities:activityFrequency':
+            return (
+                <svg {...common}>
+                    <path d="M5 18.5h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M7 15.5h10M7 11.5h7M7 7.5h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+            );
+        case 'activities:timeByActivity':
+            return (
+                <svg {...common}>
+                    <path d="M12 7v5l3 1.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17Z" stroke="currentColor" strokeWidth="1.8" />
+                    <path d="M4.5 12h2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+            );
+        case 'activities:personalBest':
+            return (
+                <svg {...common}>
+                    <path d="M12 4.5 14 9l4.8.4-3.6 3.1 1.1 4.7L12 14.7l-4.3 2.5 1.1-4.7-3.6-3.1L10 9l2-4.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                </svg>
+            );
+        case 'activities:metricVolume':
+            return (
+                <svg {...common}>
+                    <path d="M4.5 18.5h15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M7 16v-8M12 16V5M17 16v-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M6 8h2M11 5h2M16 11h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+            );
+        case 'activities:groupMix':
+            return (
+                <svg {...common}>
+                    <path d="M6.5 7.5h4v4h-4zM13.5 7.5h4v4h-4zM10 14.5h4v4h-4z" stroke="currentColor" strokeWidth="1.6" />
+                    <path d="M10.5 9.5h3M8.5 11.5l2 3M15.5 11.5l-2 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+            );
+        default:
+            return <ChartIcon size={size} className={className} {...props} />;
+    }
+}
+
 export function HomeIcon({ size = 16, className = '', ...props }) {
     return (
         <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
