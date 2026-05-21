@@ -84,6 +84,36 @@
     flex: 0 0 auto;
 }
 
+.goalDetailIconWrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    color: currentColor;
+}
+
+.goalDetailIconShape {
+    display: block;
+}
+
+.goalDetailIconPlus {
+    position: absolute;
+    right: -12%;
+    bottom: -12%;
+    width: 54%;
+    height: 54%;
+    min-width: 8px;
+    min-height: 8px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--color-bg-surface) 90%, transparent);
+    color: currentColor;
+    box-shadow: 0 0 0 1px currentColor;
+}
+
 .headerContext {
     display: inline-flex;
     align-items: center;

@@ -5,6 +5,7 @@ import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
 import ActivityFilterModal from '../common/ActivityFilterModal';
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 import { hasActiveGlobalFilters, normalizeGlobalFilters, resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
+import { ActivityTotalsControls } from './visualizations/activities/ActivityTotals';
 import '../sessions/SessionsQuerySidebar.css';
 
 const DATE_PRESET_OPTIONS = [
@@ -551,7 +552,14 @@ function AnalyticsFiltersSidebar({
                                 </>
                             )}
 
-                            {!['scatterPlot', 'lineGraph', 'personalBest', 'metricVolume'].includes(selectedWindowState?.selectedVisualization) && (
+                            {selectedWindowState?.selectedVisualization === 'activityFrequency' && (
+                                <ActivityTotalsControls
+                                    selectedWindowState={selectedWindowState}
+                                    updateSelectedWindow={updateSelectedWindow}
+                                />
+                            )}
+
+                            {!['scatterPlot', 'lineGraph', 'personalBest', 'metricVolume', 'activityFrequency'].includes(selectedWindowState?.selectedVisualization) && (
                                 <div className="sessions-query-empty">
                                     This visualization uses the global filters only.
                                 </div>

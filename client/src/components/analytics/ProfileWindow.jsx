@@ -13,7 +13,6 @@ import CloseIcon from '../atoms/CloseIcon';
 import { Heading } from '../atoms/Typography';
 
 import {
-    ActivityFrequencyChart,
     ActivityGroupMixChart,
     ActivityMetricVolumeChart,
     ActivityPersonalBestTrend,
@@ -30,6 +29,7 @@ import {
     SessionStartDistribution,
     StaleGoalsChart,
 } from './AnalyticsExtraCharts';
+import { ACTIVITY_TOTALS_VISUALIZATION, ActivityTotalsChart } from './visualizations/activities/ActivityTotals';
 import {
     AnalyticsGoalIcon,
     BackIcon,
@@ -119,6 +119,9 @@ function ProfileWindow({
         selectedGoalChart,
         goalTimeDurationMode,
         goalTimeInheritanceMode,
+        activityTotalsMetric,
+        activityTotalsShowGroups,
+        activityTotalsLimit,
         heatmapMonths,
     } = windowState;
 
@@ -217,6 +220,34 @@ function ProfileWindow({
         activities: 'Activities',
     };
 
+    const renderVisualizationIcon = (visualization, size = 16) => {
+        if (visualization?.id === 'goalDetail') {
+            return (
+                <span
+                    className={styles.goalDetailIconWrap}
+                    style={{ width: size, height: size }}
+                    aria-hidden="true"
+                >
+                    <AnalyticsGoalIcon
+                        goal={rootGoal}
+                        getGoalColor={getGoalColor}
+                        getGoalSecondaryColor={getGoalSecondaryColor}
+                        getGoalIcon={getGoalIcon}
+                        size={Math.max(10, Math.round(size * 0.82))}
+                        className={styles.goalDetailIconShape}
+                    />
+                    <span className={styles.goalDetailIconPlus}>
+                        <svg width={Math.max(8, Math.round(size * 0.46))} height={Math.max(8, Math.round(size * 0.46))} viewBox="0 0 12 12" fill="none">
+                            <path d="M6 2.4v7.2M2.4 6h7.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                        </svg>
+                    </span>
+                </span>
+            );
+        }
+
+        return <VisualizationIcon type={visualization?.iconType} size={size} />;
+    };
+
     const visualizations = {
         goals: [
             { id: 'stats', name: 'Summary Stats', iconType: 'goals:stats' },
@@ -244,7 +275,7 @@ function ProfileWindow({
         activities: [
             { id: 'scatterPlot', name: 'Scatter Plot', iconType: 'activities:scatterPlot' },
             { id: 'lineGraph', name: 'Line Graph', iconType: 'activities:lineGraph' },
-            { id: 'activityFrequency', name: 'Frequency', iconType: 'activities:activityFrequency' },
+            ACTIVITY_TOTALS_VISUALIZATION,
             { id: 'timeByActivity', name: 'Time Per Activity', iconType: 'activities:timeByActivity' },
             { id: 'personalBest', name: 'Personal Best', iconType: 'activities:personalBest' },
             { id: 'metricVolume', name: 'Metric Volume', iconType: 'activities:metricVolume' },
@@ -566,7 +597,7 @@ function ProfileWindow({
                     <div className={styles.headerContext}>
                         <span className={styles.buttonIcon}>
                             {selectedVisualizationMeta
-                                ? <VisualizationIcon type={selectedVisualizationMeta.iconType} size={16} />
+                                ? renderVisualizationIcon(selectedVisualizationMeta, 16)
                                 : hasCategory
                                     ? categoryIcons[selectedCategory]
                                     : <ChartIcon size={16} />}
@@ -694,7 +725,7 @@ function ProfileWindow({
                         className={styles.selectionCard}
                         onClick={() => setSelectedVisualization(vis.id)}
                     >
-                        <span className={styles.selectionIcon}><VisualizationIcon type={vis.iconType} size={22} /></span>
+                        <span className={styles.selectionIcon}>{renderVisualizationIcon(vis, 22)}</span>
                         <span className={styles.selectionName}>{vis.name}</span>
                     </button>
                 ))}
@@ -920,7 +951,19 @@ function ProfileWindow({
                         </div>
                     );
                 case 'activityFrequency':
-                    return <div className={styles.vizContainerHidden}><ActivityFrequencyChart activities={scopedActivities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
+                    return (
+                        <div className={styles.vizContainerHidden}>
+                            <ActivityTotalsChart
+                                activities={scopedActivities}
+                                activityInstances={filteredActivityInstances}
+                                chartRef={chartRef}
+                                metric={activityTotalsMetric || 'instances'}
+                                activityGroups={activityGroups}
+                                showGroupNames={Boolean(activityTotalsShowGroups)}
+                                limit={activityTotalsLimit || 15}
+                            />
+                        </div>
+                    );
                 case 'timeByActivity':
                     return <div className={styles.vizContainerHidden}><ActivityTimeByActivity activities={scopedActivities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
                 case 'personalBest':

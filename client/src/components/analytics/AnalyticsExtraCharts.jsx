@@ -308,15 +308,6 @@ export function SessionConsistencyChart({ sessions = [], chartRef }) {
     return <Line ref={chartRef} data={data} options={options} />;
 }
 
-export function ActivityFrequencyChart({ activities = [], activityInstances = {}, chartRef }) {
-    const data = useMemo(() => {
-        const rows = activities.map((activity) => ({ label: activity.name, count: (activityInstances[activity.id] || []).length })).filter((row) => row.count > 0).sort((a, b) => b.count - a.count).slice(0, 15);
-        return { labels: rows.map((row) => row.label), datasets: [{ label: 'Instances', data: rows.map((row) => row.count), backgroundColor: palette[0] }] };
-    }, [activities, activityInstances]);
-    if (!data.labels.length) return <EmptyChart title="Activity Frequency" />;
-    return <Bar ref={chartRef} data={data} options={{ ...chartScaffoldOptions('Activity Frequency', 'Instances'), indexAxis: 'y' }} />;
-}
-
 export function ActivityTimeByActivity({ activities = [], activityInstances = {}, chartRef }) {
     const data = useMemo(() => {
         const rows = activities.map((activity) => ({ label: activity.name, seconds: (activityInstances[activity.id] || []).reduce((sum, instance) => sum + (instance.duration_seconds || 0), 0) })).filter((row) => row.seconds > 0).sort((a, b) => b.seconds - a.seconds).slice(0, 15);

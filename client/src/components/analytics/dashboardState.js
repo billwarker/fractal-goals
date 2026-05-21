@@ -21,6 +21,9 @@ export function getDefaultWindowState() {
         selectedGoalChart: 'duration',
         goalTimeDurationMode: 'activity',
         goalTimeInheritanceMode: 'direct',
+        activityTotalsMetric: 'instances',
+        activityTotalsShowGroups: false,
+        activityTotalsLimit: 15,
         heatmapMonths: 12,
     };
 }
