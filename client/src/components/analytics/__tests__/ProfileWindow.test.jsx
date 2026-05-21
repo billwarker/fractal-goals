@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import ProfileWindow from '../ProfileWindow';
 
@@ -78,6 +78,56 @@ describe('ProfileWindow', () => {
             selectedActivity: expect.objectContaining({ id: 'activity-1', name: 'Squat' }),
             selectedMetricX: expect.objectContaining({ id: 'reps' }),
             selectedMetricY: expect.objectContaining({ id: 'weight' }),
+        }));
+    });
+
+    it('selects visualizations with keyed default state', () => {
+        const updateWindowState = vi.fn();
+
+        render(
+            <ProfileWindow
+                data={{
+                    sessions: [],
+                    goalAnalytics: { goals: [], summary: {} },
+                    activities: [],
+                    activityGroups: [],
+                    activityInstances: {},
+                    formatDuration: (seconds) => `${seconds}s`,
+                    rootId: null,
+                }}
+                windowState={{
+                    selectedCategory: 'activities',
+                    selectedVisualization: null,
+                    selectedActivity: null,
+                    selectedGoal: null,
+                    visualizationState: { metric: 'duration', limit: 8 },
+                    visualizationStateByKey: {
+                        'activities:activityFrequency': { metric: 'duration', showGroups: false, limit: 8 },
+                    },
+                }}
+                updateWindowState={updateWindowState}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Line Graph/ }));
+
+        expect(updateWindowState).toHaveBeenCalledWith(expect.objectContaining({
+            selectedVisualization: 'lineGraph',
+            visualizationState: {
+                setsHandling: 'top',
+                selectedSplit: 'all',
+                metric: null,
+                metricY2: null,
+            },
+            visualizationStateByKey: expect.objectContaining({
+                'activities:activityFrequency': { metric: 'duration', showGroups: false, limit: 8 },
+                'activities:lineGraph': {
+                    setsHandling: 'top',
+                    selectedSplit: 'all',
+                    metric: null,
+                    metricY2: null,
+                },
+            }),
         }));
     });
 });

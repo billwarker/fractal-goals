@@ -90,6 +90,11 @@ describe('dashboardState helpers', () => {
             showGroups: false,
             limit: 8,
         });
+        expect(migrated.windowStates['window-1'].visualizationStateByKey['activities:activityFrequency']).toEqual({
+            metric: 'duration',
+            showGroups: false,
+            limit: 8,
+        });
     });
 
     it('preserves nested split positions when saving and restoring analytics views', () => {

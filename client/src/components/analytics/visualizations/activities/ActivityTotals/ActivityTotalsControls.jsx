@@ -6,21 +6,13 @@ const METRIC_OPTIONS = [
 ];
 
 export default function ActivityTotalsControls({
-    selectedWindowState,
-    updateSelectedWindow,
-    visualizationState = null,
-    updateVisualizationState = null,
+    visualizationState = {},
+    updateVisualizationState,
 }) {
-    const selectedMetric = visualizationState?.metric || selectedWindowState?.activityTotalsMetric || 'instances';
-    const selectedLimit = visualizationState?.limit || selectedWindowState?.activityTotalsLimit || 15;
-    const showGroups = visualizationState?.showGroups ?? selectedWindowState?.activityTotalsShowGroups;
-    const updateState = (updates, legacyUpdates) => {
-        if (updateVisualizationState) {
-            updateVisualizationState(updates);
-            return;
-        }
-        updateSelectedWindow?.(legacyUpdates || updates);
-    };
+    const selectedMetric = visualizationState.metric || 'instances';
+    const selectedLimit = visualizationState.limit || 15;
+    const showGroups = visualizationState.showGroups;
+    const updateState = (updates) => updateVisualizationState?.(updates);
 
     return (
         <>
@@ -30,7 +22,7 @@ export default function ActivityTotalsControls({
                         key={option.value}
                         type="button"
                         className={`sessions-query-chip ${selectedMetric === option.value ? 'active' : ''}`}
-                        onClick={() => updateState({ metric: option.value }, { activityTotalsMetric: option.value })}
+                        onClick={() => updateState({ metric: option.value })}
                     >
                         {option.label}
                     </button>
@@ -40,7 +32,7 @@ export default function ActivityTotalsControls({
                 <input
                     type="checkbox"
                     checked={Boolean(showGroups)}
-                    onChange={(event) => updateState({ showGroups: event.target.checked }, { activityTotalsShowGroups: event.target.checked })}
+                    onChange={(event) => updateState({ showGroups: event.target.checked })}
                 />
                 <span>Show activity groups in hover</span>
             </label>
@@ -54,7 +46,7 @@ export default function ActivityTotalsControls({
                     value={selectedLimit}
                     onChange={(event) => {
                         const nextLimit = Math.min(50, Math.max(1, Number(event.target.value) || 15));
-                        updateState({ limit: nextLimit }, { activityTotalsLimit: nextLimit });
+                        updateState({ limit: nextLimit });
                     }}
                 />
             </label>

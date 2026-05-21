@@ -23,7 +23,8 @@ import {
     VISUALIZATION_CATEGORIES,
 } from './visualizations/registry';
 import {
-    getLegacyFlatUpdates,
+    getVisualizationSelectionUpdate,
+    getVisualizationStateUpdate,
     normalizeVisualizationState,
 } from './visualizations/state';
 
@@ -95,17 +96,10 @@ function ProfileWindow({
     const visualizationState = useMemo(() => normalizeVisualizationState(windowState), [windowState]);
 
     // Helper to update state (setSelectedCategory is handled by handleCategoryChange below)
-    const setSelectedVisualization = (value) => updateWindowState({ selectedVisualization: value });
+    const setSelectedVisualization = (value) => updateWindowState(getVisualizationSelectionUpdate(windowState, value));
     const updateVisualizationState = React.useCallback((updates) => {
-        const nextVisualizationState = {
-            ...normalizeVisualizationState(windowState),
-            ...updates,
-        };
-        updateWindowState({
-            visualizationState: nextVisualizationState,
-            ...getLegacyFlatUpdates(selectedCategory, selectedVisualization, updates),
-        });
-    }, [selectedCategory, selectedVisualization, updateWindowState, windowState]);
+        updateWindowState(getVisualizationStateUpdate(windowState, updates));
+    }, [updateWindowState, windowState]);
     const effectiveDateRange = globalDateRange;
     const resolvedGlobalFilters = useMemo(() => resolveAnalyticsGlobalFilters({
         filters: globalFilters,

@@ -1,42 +1,10 @@
-const DEFAULT_VISUALIZATION_STATE = {
-    'goals:stats': {},
-    'goals:completionTimeline': {},
-    'goals:timeDistribution': { durationMode: 'activity', inheritanceMode: 'direct' },
-    'goals:completionRateByLevel': {},
-    'goals:goalAging': {},
-    'goals:goalMomentum': {},
-    'goals:staleGoals': {},
-    'goals:goalDetail': { chart: 'duration' },
-    'sessions:stats': {},
-    'sessions:durationTrend': {},
-    'sessions:sectionPie': {},
-    'sessions:heatmap': { months: 12 },
-    'sessions:streaks': {},
-    'sessions:weeklyChart': {},
-    'sessions:completionRate': {},
-    'sessions:startDistribution': {},
-    'sessions:durationHistogram': {},
-    'sessions:plannedVsActual': {},
-    'sessions:consistency': {},
-    'activities:scatterPlot': { setsHandling: 'top', selectedSplit: 'all', metricX: null, metricY: null },
-    'activities:lineGraph': { setsHandling: 'top', selectedSplit: 'all', metric: null, metricY2: null },
-    'activities:activityFrequency': { metric: 'instances', showGroups: false, limit: 15 },
-    'activities:timeByActivity': {},
-    'activities:personalBest': {},
-    'activities:metricVolume': {},
-    'activities:groupMix': {},
-};
+import {
+    getVisualizationDefaultState,
+    getVisualizationKey,
+} from './registry';
 
-function hasOwn(value, key) {
-    return Object.prototype.hasOwnProperty.call(value, key);
-}
-
-export function getVisualizationKey(category, id) {
-    return category && id ? `${category}:${id}` : null;
-}
-
-export function getVisualizationStateDefaults(category, id) {
-    return { ...(DEFAULT_VISUALIZATION_STATE[getVisualizationKey(category, id)] || {}) };
+function isPlainObject(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function getLegacyVisualizationState(state = {}) {
@@ -77,46 +45,76 @@ export function getLegacyVisualizationState(state = {}) {
 }
 
 export function normalizeVisualizationState(state = {}) {
+    const key = getVisualizationKey(state.selectedCategory, state.selectedVisualization);
+    if (!key) return {};
+
+    const stateByKey = isPlainObject(state.visualizationStateByKey)
+        ? state.visualizationStateByKey
+        : {};
+    const keyedState = isPlainObject(stateByKey[key]) ? stateByKey[key] : {};
+    const unkeyedState = isPlainObject(stateByKey[key])
+        ? {}
+        : isPlainObject(state.visualizationState) ? state.visualizationState : {};
+
     return {
-        ...getVisualizationStateDefaults(state.selectedCategory, state.selectedVisualization),
+        ...getVisualizationDefaultState(state.selectedCategory, state.selectedVisualization),
         ...getLegacyVisualizationState(state),
-        ...(state.visualizationState || {}),
+        ...keyedState,
+        ...unkeyedState,
     };
 }
 
-export function getLegacyFlatUpdates(category, id, updates = {}) {
-    const key = getVisualizationKey(category, id);
-    switch (key) {
-        case 'goals:timeDistribution':
-            return {
-                ...(hasOwn(updates, 'durationMode') ? { goalTimeDurationMode: updates.durationMode } : {}),
-                ...(hasOwn(updates, 'inheritanceMode') ? { goalTimeInheritanceMode: updates.inheritanceMode } : {}),
-            };
-        case 'goals:goalDetail':
-            return hasOwn(updates, 'chart') ? { selectedGoalChart: updates.chart } : {};
-        case 'sessions:heatmap':
-            return hasOwn(updates, 'months') ? { heatmapMonths: updates.months } : {};
-        case 'activities:scatterPlot':
-            return {
-                ...(hasOwn(updates, 'setsHandling') ? { setsHandling: updates.setsHandling } : {}),
-                ...(hasOwn(updates, 'selectedSplit') ? { selectedSplit: updates.selectedSplit } : {}),
-                ...(hasOwn(updates, 'metricX') ? { selectedMetricX: updates.metricX } : {}),
-                ...(hasOwn(updates, 'metricY') ? { selectedMetricY: updates.metricY } : {}),
-            };
-        case 'activities:lineGraph':
-            return {
-                ...(hasOwn(updates, 'setsHandling') ? { setsHandling: updates.setsHandling } : {}),
-                ...(hasOwn(updates, 'selectedSplit') ? { selectedSplit: updates.selectedSplit } : {}),
-                ...(hasOwn(updates, 'metric') ? { selectedMetric: updates.metric } : {}),
-                ...(hasOwn(updates, 'metricY2') ? { selectedMetricY2: updates.metricY2 } : {}),
-            };
-        case 'activities:activityFrequency':
-            return {
-                ...(hasOwn(updates, 'metric') ? { activityTotalsMetric: updates.metric } : {}),
-                ...(hasOwn(updates, 'showGroups') ? { activityTotalsShowGroups: updates.showGroups } : {}),
-                ...(hasOwn(updates, 'limit') ? { activityTotalsLimit: updates.limit } : {}),
-            };
-        default:
-            return {};
+export function normalizeVisualizationStateByKey(state = {}) {
+    const stateByKey = isPlainObject(state.visualizationStateByKey)
+        ? state.visualizationStateByKey
+        : {};
+    const key = getVisualizationKey(state.selectedCategory, state.selectedVisualization);
+
+    if (!key) {
+        return { ...stateByKey };
     }
+
+    return {
+        ...stateByKey,
+        [key]: normalizeVisualizationState(state),
+    };
+}
+
+export function getVisualizationStateUpdate(state = {}, updates = {}) {
+    const key = getVisualizationKey(state.selectedCategory, state.selectedVisualization);
+    const nextActiveState = {
+        ...normalizeVisualizationState(state),
+        ...updates,
+    };
+
+    if (!key) {
+        return { visualizationState: nextActiveState };
+    }
+
+    return {
+        visualizationState: nextActiveState,
+        visualizationStateByKey: {
+            ...(isPlainObject(state.visualizationStateByKey) ? state.visualizationStateByKey : {}),
+            [key]: nextActiveState,
+        },
+    };
+}
+
+export function getVisualizationSelectionUpdate(state = {}, nextVisualizationId) {
+    const category = state.selectedCategory;
+    const key = getVisualizationKey(category, nextVisualizationId);
+    const stateByKey = isPlainObject(state.visualizationStateByKey)
+        ? state.visualizationStateByKey
+        : normalizeVisualizationStateByKey(state);
+    const nextActiveState = key && isPlainObject(stateByKey[key])
+        ? stateByKey[key]
+        : getVisualizationDefaultState(category, nextVisualizationId);
+
+    return {
+        selectedVisualization: nextVisualizationId,
+        visualizationState: nextActiveState,
+        visualizationStateByKey: key
+            ? { ...stateByKey, [key]: nextActiveState }
+            : stateByKey,
+    };
 }

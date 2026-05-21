@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import SidePaneHeader from '../common/SidePaneHeader';
 import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
@@ -6,7 +6,10 @@ import ActivityFilterModal from '../common/ActivityFilterModal';
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 import { hasActiveGlobalFilters, normalizeGlobalFilters, resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
 import { getVisualization } from './visualizations/registry';
-import { getLegacyFlatUpdates, normalizeVisualizationState } from './visualizations/state';
+import {
+    getVisualizationStateUpdate,
+    normalizeVisualizationState,
+} from './visualizations/state';
 import '../sessions/SessionsQuerySidebar.css';
 
 const DATE_PRESET_OPTIONS = [
@@ -71,7 +74,10 @@ function AnalyticsFiltersSidebar({
     const [isSelectedPanelCollapsed, setIsSelectedPanelCollapsed] = useState(false);
     const normalized = useMemo(() => normalizeGlobalFilters(filters), [filters]);
     const derivedPreset = useMemo(() => getMatchingPreset(dateRange), [dateRange]);
-    const [selectedPreset, setSelectedPreset] = useState(derivedPreset);
+    const [isCustomPresetSelected, setIsCustomPresetSelected] = useState(derivedPreset === 'custom');
+    const selectedPreset = (!dateRange?.start && !dateRange?.end)
+        ? 'all'
+        : isCustomPresetSelected ? 'custom' : derivedPreset;
     const activeFilterCount = [
         Boolean(dateRange?.start || dateRange?.end),
         normalized.goals.goalIds.length > 0,
@@ -129,17 +135,7 @@ function AnalyticsFiltersSidebar({
         [selectedWindowState]
     );
     const updateVisualizationState = (updates) => {
-        updateSelectedWindow({
-            visualizationState: {
-                ...visualizationState,
-                ...updates,
-            },
-            ...getLegacyFlatUpdates(
-                selectedWindowState?.selectedCategory,
-                selectedWindowState?.selectedVisualization,
-                updates
-            ),
-        });
+        updateSelectedWindow(getVisualizationStateUpdate(selectedWindowState || {}, updates));
     };
 
     const selectedActivity = selectedWindowState?.selectedActivity || null;
@@ -174,19 +170,8 @@ function AnalyticsFiltersSidebar({
     ), [profileActivities, activityInstances]);
     const SelectedControls = selectedVisualizationMeta?.Controls || null;
 
-    useEffect(() => {
-        if (!dateRange?.start && !dateRange?.end) {
-            setSelectedPreset('all');
-            return;
-        }
-
-        setSelectedPreset((currentPreset) => (
-            currentPreset === 'custom' ? 'custom' : derivedPreset
-        ));
-    }, [dateRange, derivedPreset]);
-
     const handlePresetClick = (preset) => {
-        setSelectedPreset(preset.value);
+        setIsCustomPresetSelected(preset.value === 'custom');
         if (preset.value === 'all') {
             onDateRangeChange?.({ start: null, end: null });
             return;
@@ -455,19 +440,13 @@ function AnalyticsFiltersSidebar({
                             : null;
                         updateSelectedWindow({
                             selectedActivity: activity,
-                            selectedSplit: 'all',
-                            selectedMetricX: null,
-                            selectedMetricY: null,
-                            selectedMetric: null,
-                            selectedMetricY2: null,
-                            visualizationState: {
-                                ...visualizationState,
+                            ...getVisualizationStateUpdate(selectedWindowState || {}, {
                                 selectedSplit: 'all',
                                 metricX: null,
                                 metricY: null,
                                 metric: null,
                                 metricY2: null,
-                            },
+                            }),
                         });
                     }}
                 />

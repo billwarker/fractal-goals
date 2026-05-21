@@ -1,5 +1,8 @@
 import { DEFAULT_GLOBAL_FILTERS, normalizeGlobalFilters } from './analyticsGlobalFilters';
-import { normalizeVisualizationState } from './visualizations/state';
+import {
+    normalizeVisualizationState,
+    normalizeVisualizationStateByKey,
+} from './visualizations/state';
 
 export const ANALYTICS_DASHBOARD_VERSION = 2;
 const DEFAULT_SPLIT_POSITION = 50;
@@ -11,22 +14,10 @@ export function getDefaultWindowState() {
         selectedCategory: null,
         selectedVisualization: null,
         selectedActivity: null,
-        selectedMetricX: null,
-        selectedMetricY: null,
-        selectedMetric: null,
-        selectedMetricY2: null,
-        setsHandling: 'top',
-        selectedSplit: 'all',
         selectedModeIds: [],
         selectedGoal: null,
-        selectedGoalChart: 'duration',
-        goalTimeDurationMode: 'activity',
-        goalTimeInheritanceMode: 'direct',
-        activityTotalsMetric: 'instances',
-        activityTotalsShowGroups: false,
-        activityTotalsLimit: 15,
-        heatmapMonths: 12,
         visualizationState: {},
+        visualizationStateByKey: {},
     };
 }
 
@@ -114,6 +105,7 @@ function normalizeWindowState(state) {
     return {
         ...normalizedState,
         visualizationState: normalizeVisualizationState(normalizedState),
+        visualizationStateByKey: normalizeVisualizationStateByKey(normalizedState),
     };
 }
 
