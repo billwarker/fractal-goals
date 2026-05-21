@@ -21,6 +21,7 @@ from services.owned_entity_queries import (
 )
 
 from services.events import Event, Events, event_bus
+from services.quota_service import QuotaService
 from services.session_runtime import is_quick_session
 from services.session_template_stats_service import SessionTemplateStatsService
 from services.serializers import serialize_activity_instance, serialize_session
@@ -173,6 +174,13 @@ class TimerService:
                 "activity_name": existing.definition.name if existing.definition else "Unknown",
                 "created": False,
             }, None, 200
+
+        _, quota_error, quota_status = QuotaService(self.db_session).check_available(
+            current_user_id,
+            "activity_instances",
+        )
+        if quota_error:
+            return None, quota_error, quota_status
 
         instance = self._build_instance(
             root_id=root_id,

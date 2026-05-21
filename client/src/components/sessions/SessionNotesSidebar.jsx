@@ -8,10 +8,9 @@
  * - Selects session when a note is clicked
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { formatDateInTimezone } from '../../utils/dateUtils';
 import { useTimezone } from '../../contexts/TimezoneContext';
-import ImageViewerModal from '../sessionDetail/ImageViewerModal';
 import MarkdownNoteContent from '../notes/MarkdownNoteContent';
 import './SessionNotesSidebar.css';
 
@@ -24,7 +23,6 @@ function SessionNotesSidebar({
     onToggleCollapse,
     isMobile = false
 }) {
-    const [viewImage, setViewImage] = useState(null);
     const { timezone } = useTimezone();
 
     const allNotes = useMemo(() => {
@@ -159,54 +157,12 @@ function SessionNotesSidebar({
                                         </>
                                     )}
                                     <MarkdownNoteContent content={note.content} className="note-content" />
-                                    {/* Show image if image_data is present (detail view) */}
-                                    {note.image_data && (
-                                        <div
-                                            className="note-image"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setViewImage(note.image_data);
-                                            }}
-                                            style={{ cursor: 'zoom-in' }}
-                                        >
-                                            <img
-                                                src={note.image_data}
-                                                alt="Note attachment"
-                                            />
-                                        </div>
-                                    )}
-                                    {/* Show image indicator if has_image but no image_data (list view) */}
-                                    {note.has_image && !note.image_data && (
-                                        <div
-                                            className="note-image-indicator"
-                                            style={{
-                                                marginTop: '8px',
-                                                padding: '6px 10px',
-                                                background: '#333',
-                                                borderRadius: '4px',
-                                                fontSize: '11px',
-                                                color: '#888',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '6px'
-                                            }}
-                                        >
-                                            📷 Image attached
-                                        </div>
-                                    )}
                                 </div>
                             );
                         })}
                     </div>
                 )}
             </div>
-
-            {viewImage && (
-                <ImageViewerModal
-                    imageData={viewImage}
-                    onClose={() => setViewImage(null)}
-                />
-            )}
         </div>
     );
 }

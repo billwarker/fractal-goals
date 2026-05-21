@@ -159,7 +159,7 @@ describe('useProgramDetailMutations', () => {
     });
 
     it('formats structured deadline update errors into a readable toast message', async () => {
-        mockActions.setProgramGoalDeadline.mockRejectedValueOnce({
+        const deadlineError = {
             response: {
                 data: {
                     error: {
@@ -168,17 +168,25 @@ describe('useProgramDetailMutations', () => {
                     },
                 },
             },
-        });
+        };
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        const { result } = renderMutations();
+        mockActions.setProgramGoalDeadline.mockRejectedValueOnce(deadlineError);
 
-        await act(async () => {
-            await result.current.setGoalDeadline('goal-1', '2026-03-16');
-        });
+        try {
+            const { result } = renderMutations();
 
-        expect(notify.error).toHaveBeenCalledWith(
-            'Failed to set goal deadline: Child deadline cannot be later than parent deadline (parent deadline: 2026-03-13)'
-        );
+            await act(async () => {
+                await result.current.setGoalDeadline('goal-1', '2026-03-16');
+            });
+
+            expect(notify.error).toHaveBeenCalledWith(
+                'Failed to set goal deadline: Child deadline cannot be later than parent deadline (parent deadline: 2026-03-13)'
+            );
+            expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to set goal deadline:', deadlineError);
+        } finally {
+            consoleErrorSpy.mockRestore();
+        }
     });
 
     it('sets a deadline before attaching a goal to a specific program day', async () => {

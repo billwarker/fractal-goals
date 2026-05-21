@@ -153,6 +153,31 @@ def get_me(current_user):
     return jsonify(serialize_user(current_user))
 
 
+@auth_bp.route('/account/usage', methods=['GET'])
+@token_required
+def get_account_usage(current_user):
+    """Get current membership tier and quota usage."""
+    db_session = get_db_session()
+    try:
+        root_ids = []
+        for raw_value in request.args.getlist('root_ids'):
+            root_ids.extend([value.strip() for value in raw_value.split(',') if value.strip()])
+        legacy_root_id = request.args.get('root_id')
+        if legacy_root_id:
+            root_ids.append(legacy_root_id.strip())
+
+        service = UserService(db_session)
+        payload, error, status = service.get_account_usage(current_user.id, root_ids=root_ids)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        logger.exception("Error fetching account usage")
+        return internal_error(logger, "Error fetching account usage")
+    finally:
+        db_session.close()
+
+
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
     """Clear the browser auth cookie."""

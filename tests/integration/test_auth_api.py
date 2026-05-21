@@ -243,6 +243,27 @@ class TestMeEndpoint:
         data = json.loads(response.data)
         assert data['username'] == 'testuser'
         assert 'email' in data
+        assert data['membership_tier'] == 'free'
+
+    def test_get_account_usage_success(self, authed_client, sample_ultimate_goal):
+        """Test getting membership and quota usage."""
+        response = authed_client.get('/api/auth/account/usage')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['tier'] == 'free'
+        assert data['unlimited'] is False
+        assert data['usage']['fractals'] == 1
+        assert data['limits']['activity_instances'] == 500
+        assert data['limits']['metrics'] == 20
+        assert data['limits']['session_templates'] == 10
+        assert data['scope'] == 'account'
+
+        scoped_response = authed_client.get(f'/api/auth/account/usage?root_ids={sample_ultimate_goal.id}')
+        assert scoped_response.status_code == 200
+        scoped_data = json.loads(scoped_response.data)
+        assert scoped_data['scope'] == 'fractals'
+        assert scoped_data['root_ids'] == [sample_ultimate_goal.id]
+        assert scoped_data['usage']['fractals'] == 1
     
     def test_get_me_without_auth(self, client):
         """Test getting user info without authentication fails."""

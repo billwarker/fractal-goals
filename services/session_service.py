@@ -15,6 +15,7 @@ from models import (
 import models
 from services import event_bus, Event, Events
 from services.payload_normalizers import normalize_session_payload
+from services.quota_service import QuotaService
 from services.owned_entity_queries import (
     get_owned_activity_definition,
     get_owned_activity_instance,
@@ -589,7 +590,7 @@ class SessionService:
             *self._session_read_options(),
         ).order_by(*self._build_session_ordering(normalized_filters)).offset(offset).limit(limit).all()
 
-        result = [serialize_session(s, include_image_data=False) for s in sessions]
+        result = [serialize_session(s) for s in sessions]
 
         return {
             "sessions": result,
@@ -1055,7 +1056,7 @@ class SessionService:
             sessions_q = sessions_q.offset(offset).limit(limit)
 
         sessions = sessions_q.all()
-        return [serialize_session(s, include_image_data=False) for s in sessions], None, 200
+        return [serialize_session(s) for s in sessions], None, 200
 
     def get_session_details(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:
         """Get a single session with full details."""
@@ -1103,7 +1104,7 @@ class SessionService:
             )
             self.db_session.commit()
 
-        return serialize_session(session, include_image_data=True), None, 200
+        return serialize_session(session), None, 200
 
     def get_session_activities(self, root_id, session_id, current_user_id) -> ServiceResult[list[JsonDict]]:
         """Get all non-deleted activity instances for a session in display order."""
@@ -1143,6 +1144,13 @@ class SessionService:
         activity_def = get_owned_activity_definition(self.db_session, root_id, activity_definition_id)
         if not activity_def:
             return None, "Activity definition not found in this fractal", 404
+
+        _, quota_error, quota_status = QuotaService(self.db_session).check_available(
+            current_user_id,
+            "activity_instances",
+        )
+        if quota_error:
+            return None, quota_error, quota_status
 
         instance = ActivityInstance(
             id=data.get('instance_id') or str(uuid.uuid4()),
@@ -1441,6 +1449,11 @@ class SessionService:
         if not root:
             return None, "Fractal not found or access denied", 404
 
+        quota_service = QuotaService(self.db_session)
+        _, quota_error, quota_status = quota_service.check_available(current_user_id, "sessions")
+        if quota_error:
+            return None, quota_error, quota_status
+
         # Parse dates (strict ISO-8601)
         try:
             s_start = _parse_iso_datetime_strict(data.get('session_start')) if 'session_start' in data else None
@@ -1560,6 +1573,14 @@ class SessionService:
             if missing_activity_ids:
                 return None, f"Invalid activity IDs for this fractal: {', '.join(sorted(missing_activity_ids))}", 400
 
+            _, quota_error, quota_status = quota_service.check_available(
+                current_user_id,
+                "activity_instances",
+                len(normalized_quick_items),
+            )
+            if quota_error:
+                return None, quota_error, quota_status
+
             created_activity_ids = []
             for raw_item, activity_id in normalized_quick_items:
                 raw_dict = raw_item if isinstance(raw_item, dict) else {}
@@ -1603,6 +1624,14 @@ class SessionService:
                 missing_activity_ids = activity_def_ids - found_activity_ids
                 if missing_activity_ids:
                     return None, f"Invalid activity IDs for this fractal: {', '.join(sorted(missing_activity_ids))}", 400
+                instance_increment = sum(len(normalized_exercises) for _, normalized_exercises in section_exercises)
+                _, quota_error, quota_status = quota_service.check_available(
+                    current_user_id,
+                    "activity_instances",
+                    instance_increment,
+                )
+                if quota_error:
+                    return None, quota_error, quota_status
                 activity_map = {a.id: a for a in activities}
 
                 # Persist activity instances and canonical activity ordering for section rendering.

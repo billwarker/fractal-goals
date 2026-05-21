@@ -8,6 +8,7 @@ from models import Session, SessionTemplate
 from sqlalchemy.orm import selectinload, with_loader_criteria
 from services.events import Event, Events, event_bus
 from services.owned_entity_queries import get_owned_session_template
+from services.quota_service import QuotaService
 from services.session_runtime import is_quick_session
 from services.session_structure import build_template_data_from_session
 from services.session_template_stats_service import SessionTemplateStatsService
@@ -80,6 +81,10 @@ class TemplateService:
         if error:
             return None, *error
 
+        _, quota_error, quota_status = QuotaService(self.db_session).check_available(current_user_id, "session_templates")
+        if quota_error:
+            return None, quota_error, quota_status
+
         try:
             template_data = validate_session_template_data(data.get('template_data') or {})
         except ValueError as exc:
@@ -113,6 +118,10 @@ class TemplateService:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
+
+        _, quota_error, quota_status = QuotaService(self.db_session).check_available(current_user_id, "session_templates")
+        if quota_error:
+            return None, quota_error, quota_status
 
         session = self.db_session.query(Session).options(
             selectinload(Session.template),

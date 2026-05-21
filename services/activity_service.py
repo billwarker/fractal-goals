@@ -14,6 +14,7 @@ from services.payload_normalizers import (
     normalize_activity_splits,
     normalize_id_list,
 )
+from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
 
 logger = logging.getLogger(__name__)
@@ -319,6 +320,10 @@ class ActivityService:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
+
+        _, quota_error, quota_status = QuotaService(self.db_session).check_available(current_user_id, "metrics")
+        if quota_error:
+            return None, quota_error, quota_status
 
         name = (data.get('name') or '').strip()
         unit = (data.get('unit') or '').strip()
@@ -1159,6 +1164,20 @@ class ActivityService:
         if validation_error:
             return None, *validation_error
 
+        quota_service = QuotaService(self.db_session)
+        _, quota_error, quota_status = quota_service.check_available(current_user_id, "activities")
+        if quota_error:
+            return None, quota_error, quota_status
+
+        metric_increment = sum(
+            1
+            for metric in validated_data.get('metrics', [])
+            if metric.get('name') and metric.get('unit') and not metric.get('fractal_metric_id')
+        )
+        _, quota_error, quota_status = quota_service.check_available(current_user_id, "metrics", metric_increment)
+        if quota_error:
+            return None, quota_error, quota_status
+
         activity_name = validated_data['name']
         new_activity = self.create_activity(root_id, activity_name, validated_data)
         return new_activity, None, 201
@@ -1189,6 +1208,44 @@ class ActivityService:
         )
         if validation_error:
             return None, *validation_error
+
+        if 'metrics' in validated_data:
+            existing_metrics = self.db_session.query(MetricDefinition).filter(
+                MetricDefinition.activity_id == activity.id,
+                MetricDefinition.deleted_at.is_(None),
+            ).all()
+            existing_by_id = {metric.id: metric for metric in existing_metrics}
+            existing_by_signature = {
+                (metric.name, metric.unit): metric
+                for metric in existing_metrics
+            }
+            new_standalone_count = 0
+            retained_standalone_ids = set()
+            for metric in normalize_activity_metrics(validated_data.get('metrics')):
+                if not metric.get('name') or not metric.get('unit') or metric.get('fractal_metric_id'):
+                    continue
+                metric_id = metric.get('id')
+                existing_metric = existing_by_id.get(metric_id) if metric_id else None
+                if not existing_metric:
+                    existing_metric = existing_by_signature.get((metric['name'], metric['unit']))
+                if existing_metric:
+                    retained_standalone_ids.add(existing_metric.id)
+                else:
+                    new_standalone_count += 1
+
+            removed_standalone_count = sum(
+                1
+                for metric in existing_metrics
+                if metric.fractal_metric_id is None and metric.id not in retained_standalone_ids
+            )
+            net_metric_increment = max(0, new_standalone_count - removed_standalone_count)
+            _, quota_error, quota_status = QuotaService(self.db_session).check_available(
+                current_user_id,
+                "metrics",
+                net_metric_increment,
+            )
+            if quota_error:
+                return None, quota_error, quota_status
 
         updated_activity = self.update_activity(root_id, activity, validated_data)
         return updated_activity, None, 200

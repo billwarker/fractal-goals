@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useGoals } from '../../contexts/GoalsContext';
-import { authApi, fractalApi } from '../../utils/api';
+import { authApi, fractalApi, globalApi } from '../../utils/api';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import GoalCharacteristicsSettings from '../GoalCharacteristicsSettings';
@@ -31,11 +31,16 @@ const SettingsModalInner = ({ onClose }) => {
     const { preference, setPreference } = useTimezone();
 
     const [activeTab, setActiveTab] = useState('general');
-    const { logout } = useAuth();
+    const { logout, user } = useAuth();
     const { activeRootId } = useGoals();
     const isMobile = useIsMobile();
     const [availableTimezones] = useState(getAvailableTimezones);
     const [recomputeLoading, setRecomputeLoading] = useState(false);
+    const [accountUsage, setAccountUsage] = useState(null);
+    const [accountUsageLoading, setAccountUsageLoading] = useState(false);
+    const [availableFractals, setAvailableFractals] = useState([]);
+    const [fractalsLoading, setFractalsLoading] = useState(false);
+    const [selectedQuotaRootIds, setSelectedQuotaRootIds] = useState([]);
 
     const { progressSettings, updateProgressSettings } = useRootProgressSettings(activeRootId);
     const progressEnabled = progressSettings?.enabled !== false;
@@ -71,6 +76,99 @@ const SettingsModalInner = ({ onClose }) => {
     const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '' });
     const [emailData, setEmailData] = useState({ email: '', password: '' });
     const [deleteData, setDeleteData] = useState({ password: '', confirmation: '' });
+
+    useEffect(() => {
+        if (activeTab !== 'account') return;
+
+        let cancelled = false;
+        setAccountUsageLoading(true);
+        const params = selectedQuotaRootIds.length > 0
+            ? { root_ids: selectedQuotaRootIds.join(',') }
+            : {};
+        authApi.getAccountUsage(params)
+            .then((res) => {
+                if (!cancelled) {
+                    setAccountUsage(res.data);
+                }
+            })
+            .catch((err) => {
+                if (!cancelled) {
+                    notify.error(`Failed to load account usage: ${formatError(err)}`);
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setAccountUsageLoading(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [activeTab, selectedQuotaRootIds]);
+
+    useEffect(() => {
+        if (activeTab !== 'account') return;
+
+        let cancelled = false;
+        setFractalsLoading(true);
+        globalApi.getAllFractals()
+            .then((res) => {
+                if (!cancelled) {
+                    const fractals = Array.isArray(res.data) ? res.data : [];
+                    setAvailableFractals(fractals);
+                    const availableIds = new Set(fractals.map((fractal) => fractal.id));
+                    setSelectedQuotaRootIds((current) => current.filter((rootId) => availableIds.has(rootId)));
+                }
+            })
+            .catch((err) => {
+                if (!cancelled) {
+                    notify.error(`Failed to load fractals: ${formatError(err)}`);
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setFractalsLoading(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [activeTab]);
+
+    const quotaRows = useMemo(() => {
+        if (!accountUsage) return [];
+        const resources = accountUsage.resources || Object.keys(accountUsage.usage || {});
+        const labels = accountUsage.labels || {};
+        return resources.map((resource) => {
+            const used = accountUsage.usage?.[resource] ?? 0;
+            const limit = accountUsage.limits?.[resource] ?? null;
+            const percent = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+            return {
+                resource,
+                label: labels[resource] || resource.replace(/_/g, ' '),
+                used,
+                limit,
+                percent,
+            };
+        });
+    }, [accountUsage]);
+
+    const displayTier = accountUsage?.tier || user?.membership_tier || 'free';
+    const displayStatus = accountUsage?.subscription_status || user?.subscription_status || 'none';
+    const quotaScopeLabel = selectedQuotaRootIds.length === 0
+        ? 'All fractals'
+        : `${selectedQuotaRootIds.length} selected`;
+
+    const handleQuotaRootToggle = (rootId) => {
+        setSelectedQuotaRootIds((current) => {
+            if (current.includes(rootId)) {
+                return current.filter((id) => id !== rootId);
+            }
+            return [...current, rootId];
+        });
+    };
 
     const handlePasswordUpdate = async (e) => {
         e.preventDefault();
@@ -317,6 +415,83 @@ const SettingsModalInner = ({ onClose }) => {
 
                         {activeTab === 'account' && (
                             <div className={styles.tabContent}>
+                                <section>
+                                    <h3 className={styles.sectionTitle}>
+                                        Membership
+                                    </h3>
+                                    <div className={styles.membershipPanel}>
+                                        <div>
+                                            <div className={styles.membershipTier}>
+                                                {displayTier.charAt(0).toUpperCase() + displayTier.slice(1)}
+                                            </div>
+                                            <div className={styles.membershipStatus}>
+                                                Subscription: {displayStatus.replace(/_/g, ' ')}
+                                            </div>
+                                        </div>
+                                        {accountUsageLoading && (
+                                            <span className={styles.membershipStatus}>Loading usage...</span>
+                                        )}
+                                    </div>
+
+                                    {accountUsage && (
+                                        <>
+                                            <div className={styles.quotaFilterPanel}>
+                                                <div className={styles.quotaFilterHeader}>
+                                                    <span className={styles.quotaFilterTitle}>Quota counts</span>
+                                                    <span className={styles.quotaFilterSummary}>{quotaScopeLabel}</span>
+                                                </div>
+                                                <div className={styles.quotaCheckboxList}>
+                                                    <label className={styles.quotaCheckboxItem}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedQuotaRootIds.length === 0}
+                                                            onChange={() => setSelectedQuotaRootIds([])}
+                                                            className={styles.checkboxInput}
+                                                        />
+                                                        <span>All fractals</span>
+                                                    </label>
+                                                    {availableFractals.map((fractal) => (
+                                                        <label key={fractal.id} className={styles.quotaCheckboxItem}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedQuotaRootIds.includes(fractal.id)}
+                                                                onChange={() => handleQuotaRootToggle(fractal.id)}
+                                                                className={styles.checkboxInput}
+                                                            />
+                                                            <span>
+                                                                {fractal.name}
+                                                                {fractal.id === activeRootId ? ' (current)' : ''}
+                                                            </span>
+                                                        </label>
+                                                    ))}
+                                                    {fractalsLoading && (
+                                                        <span className={styles.membershipStatus}>Loading fractals...</span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className={styles.quotaGrid}>
+                                                {quotaRows.map((row) => (
+                                                    <div key={row.resource} className={styles.quotaRow}>
+                                                        <div className={styles.quotaHeader}>
+                                                            <span className={styles.quotaLabel}>{row.label}</span>
+                                                            <span className={styles.quotaValue}>
+                                                                {row.limit === null ? `${row.used} / unlimited` : `${row.used} / ${row.limit}`}
+                                                            </span>
+                                                        </div>
+                                                        <div className={styles.quotaBarTrack}>
+                                                            <div
+                                                                className={styles.quotaBarFill}
+                                                                style={{ width: row.limit === null ? '100%' : `${row.percent}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </section>
+
                                 {/* Change Password */}
                                 <section>
                                     <h3 className={styles.sectionTitle}>

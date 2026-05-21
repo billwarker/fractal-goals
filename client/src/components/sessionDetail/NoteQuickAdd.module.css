@@ -70,37 +70,6 @@
     color: var(--color-text-muted);
 }
 
-.noteImagePreviewContainer {
-    position: relative;
-    display: inline-block;
-    margin-bottom: 10px;
-}
-
-.noteImagePreview {
-    max-width: 100%;
-    max-height: 150px;
-    border-radius: 4px;
-    border: 1px solid var(--color-border);
-}
-
-.noteImageRemove {
-    position: absolute;
-    top: -8px;
-    right: -8px;
-    background: var(--color-brand-danger);
-    color: white;
-    border: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 14px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
 .noteHint {
     margin-top: 8px;
     font-size: 11px;

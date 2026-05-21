@@ -6,6 +6,7 @@ from sqlalchemy.orm.attributes import flag_modified
 import models
 from models import User
 from services.serializers import serialize_user
+from services.quota_service import QuotaService
 from services.service_types import JsonDict, ServiceResult
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,9 @@ class UserService:
         self.db_session.commit()
         logger.info("Updated preferences for user_id=%s", user.id)
         return serialize_user(user), None, 200
+
+    def get_account_usage(self, user_id: str, root_ids=None) -> ServiceResult[JsonDict]:
+        return QuotaService(self.db_session).get_account_usage(user_id, root_ids=root_ids)
 
     def update_password(self, user_id: str, data) -> ServiceResult[JsonDict]:
         user = self._get_user(user_id)

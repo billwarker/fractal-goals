@@ -115,15 +115,6 @@ function SessionNotesPreview({ rootId, sessionId }) {
                                 {formatNoteTime(note.created_at)}
                             </div>
                             <MarkdownNoteContent content={note.content} className="note-content" />
-                            {note.image_data && (
-                                <div className="note-image">
-                                    <img
-                                        src={note.image_data}
-                                        alt="Note attachment"
-                                        style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '4px' }}
-                                    />
-                                </div>
-                            )}
                         </div>
                     );
                 })}

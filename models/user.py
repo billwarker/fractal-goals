@@ -16,6 +16,12 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
     preferences = Column(JSON_TYPE, default={})  # Store UI preferences like goal colors
+    membership_tier = Column(String(32), default='free', nullable=False)
+    quota_overrides = Column(JSON_TYPE, nullable=True)
+    stripe_customer_id = Column(String(255), nullable=True)
+    stripe_subscription_id = Column(String(255), nullable=True)
+    subscription_status = Column(String(32), default='none', nullable=False)
+    paid_amount_cad_cents = Column(Integer, nullable=True)
     
     # Auth & Security Improvements
     last_login_at = Column(DateTime, nullable=True)

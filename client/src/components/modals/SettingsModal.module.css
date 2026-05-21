@@ -303,6 +303,130 @@
     font-size: 14px;
 }
 
+.membershipPanel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-card-alt);
+}
+
+.membershipTier {
+    color: var(--color-text-primary);
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.membershipStatus {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    margin-top: 4px;
+    text-transform: capitalize;
+}
+
+.quotaFilterPanel {
+    margin-bottom: 16px;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-secondary);
+}
+
+.quotaFilterHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.quotaFilterTitle {
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.quotaFilterSummary {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}
+
+.quotaCheckboxList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.quotaCheckboxItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.quotaCheckboxItem span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.quotaGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.quotaRow {
+    padding: 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-secondary);
+}
+
+.quotaHeader {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.quotaLabel {
+    color: var(--color-text-primary);
+    font-size: 13px;
+    text-transform: capitalize;
+}
+
+.quotaValue {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.quotaBarTrack {
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--color-bg-input);
+}
+
+.quotaBarFill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-brand-primary);
+    transition: width 0.2s ease;
+}
+
 .formContainer {
     display: flex;
     flex-direction: column;

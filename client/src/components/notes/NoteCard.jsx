@@ -1,6 +1,6 @@
 /**
  * NoteCard — shared note component used across all surfaces (notes page, goal modal, session detail).
- * Renders markdown content, options menu (edit/pin/delete), context badges, and image support.
+ * Renders markdown content, options menu (edit/pin/delete), and context badges.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -10,7 +10,6 @@ import CheckIcon from '../atoms/CheckIcon';
 import CloseIcon from '../atoms/CloseIcon';
 import GoalIcon from '../atoms/GoalIcon';
 import Linkify from '../atoms/Linkify';
-import ImageViewerModal from '../sessionDetail/ImageViewerModal';
 import MarkdownNoteContent from './MarkdownNoteContent';
 import styles from './NoteCard.module.css';
 
@@ -77,7 +76,6 @@ function NoteCard({
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(note.content);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [showImageViewer, setShowImageViewer] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef(null);
     const textareaRef = useRef(null);
@@ -189,13 +187,11 @@ function NoteCard({
         }
     };
 
-    const isImageOnly = note.content === '[Image]' && note.image_data;
-    const hasImage = !!note.image_data;
-    const canEdit = (!!onEdit || !!onEditRequest) && !isImageOnly && !note.isPast;
+    const canEdit = (!!onEdit || !!onEditRequest) && !note.isPast;
     const canPin = (!!onPin || !!onUnpin) && !note.isPast && resolvedNoteType !== 'activity_set_note';
     const canDelete = !!onDelete && !note.isPast;
     const hasMenu = canEdit || canPin || canDelete;
-    const shouldDeferRichContent = !hasImage && !note.is_pinned && !isSelected && !minimal && !compact;
+    const shouldDeferRichContent = !note.is_pinned && !isSelected && !minimal && !compact;
     const [shouldRenderRichContent, setShouldRenderRichContent] = useState(
         typeof window === 'undefined' || typeof window.IntersectionObserver === 'undefined' || !shouldDeferRichContent
     );
@@ -273,7 +269,6 @@ function NoteCard({
                     styles.noteCard,
                     variant === 'flat' ? styles.flat : '',
                     compact ? styles.compact : '',
-                    hasImage ? styles.hasImage : '',
                     isSelected ? styles.selected : '',
                     note.isPast ? styles.pastNote : '',
                     note.is_pinned ? styles.pinned : '',
@@ -364,17 +359,6 @@ function NoteCard({
                     </div>
                 </div>
 
-                {/* Image */}
-                {hasImage && (
-                    <div
-                        className={styles.imageWrapper}
-                        onClick={(e) => { e.stopPropagation(); setShowImageViewer(true); }}
-                    >
-                        <img src={note.image_data} alt="Note attachment" className={styles.imageThumbnail} />
-                        <div className={styles.imageOverlay}><span>Click to view</span></div>
-                    </div>
-                )}
-
                 {/* Content */}
                 {isEditing ? (
                     <div className={styles.editArea}>
@@ -400,32 +384,23 @@ function NoteCard({
                         </div>
                     </div>
                 ) : (
-                    !isImageOnly && (
-                        <div className={styles.content}>
-                            {shouldShowRichContent ? (
-                                supportsMarkdown ? (
-                                    <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
-                                ) : (
-                                    <div className={`${styles.markdownContent} ${styles.plainContent}`}>
-                                        <Linkify>{note.content}</Linkify>
-                                    </div>
-                                )
+                    <div className={styles.content}>
+                        {shouldShowRichContent ? (
+                            supportsMarkdown ? (
+                                <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
                             ) : (
-                                <div className={`${styles.markdownContent} ${styles.previewContent}`}>
-                                    {previewContent || ' '}
+                                <div className={`${styles.markdownContent} ${styles.plainContent}`}>
+                                    <Linkify>{note.content}</Linkify>
                                 </div>
-                            )}
-                        </div>
-                    )
+                            )
+                        ) : (
+                            <div className={`${styles.markdownContent} ${styles.previewContent}`}>
+                                {previewContent || ' '}
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
-
-            {showImageViewer && note.image_data && (
-                <ImageViewerModal
-                    imageData={note.image_data}
-                    onClose={() => setShowImageViewer(false)}
-                />
-            )}
         </>
     );
 }

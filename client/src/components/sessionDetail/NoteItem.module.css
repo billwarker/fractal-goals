@@ -78,56 +78,6 @@
     color: var(--color-text-muted);
 }
 
-.noteImageWrapper {
-    position: relative;
-    max-width: 200px;
-    margin: 8px 0;
-    border-radius: 8px;
-    overflow: hidden;
-    cursor: pointer;
-    border: 1px solid var(--color-border);
-    transition: border-color 0.2s, transform 0.2s;
-}
-
-.noteImageWrapper:hover {
-    border-color: var(--color-brand-success);
-    transform: scale(1.02);
-}
-
-.noteImageThumbnail {
-    width: 100%;
-    max-height: 150px;
-    object-fit: cover;
-    display: block;
-}
-
-.noteImageOverlay {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-    padding: 20px 8px 8px;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.noteImageWrapper:hover .noteImageOverlay {
-    opacity: 1;
-}
-
-.noteImageOverlay span {
-    font-size: 11px;
-    color: var(--color-text-inverse);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.noteItem.hasImage .noteItemActions {
-    top: auto;
-    bottom: 8px;
-}
-
 .noteItemActions {
     position: absolute;
     top: 8px;

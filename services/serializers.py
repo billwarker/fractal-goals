@@ -344,7 +344,7 @@ def serialize_goal(goal, include_children=True):
         
     return result
 
-def serialize_session(session, include_image_data=False):
+def serialize_session(session):
     """Serialize a Session object."""
     active_instances = _active_session_instances(session)
     template_payload = _safe_load_json(getattr(getattr(session, "template", None), "template_data", None), {})
@@ -390,7 +390,7 @@ def serialize_session(session, include_image_data=False):
             "activity_durations": activity_duration_stats,
         },
         "activity_instances": serialized_activity_instances,
-        "notes": [serialize_note(n, include_image=include_image_data) for n in session.notes_list if not n.deleted_at] if hasattr(session, 'notes_list') else []
+        "notes": [serialize_note(n) for n in session.notes_list if not n.deleted_at] if hasattr(session, 'notes_list') else []
     }
     
     # Parse session data from attributes
@@ -611,6 +611,9 @@ def serialize_user(user):
         "email": user.email,
         "is_active": user.is_active,
         "preferences": _safe_load_json(user.preferences, {}),
+        "membership_tier": getattr(user, "membership_tier", "free") or "free",
+        "subscription_status": getattr(user, "subscription_status", "none") or "none",
+        "paid_amount_cad_cents": getattr(user, "paid_amount_cad_cents", None),
         "created_at": format_utc(user.created_at)
     }
 
@@ -789,7 +792,7 @@ def serialize_program_day(day):
         } for ds in (day.day_sessions or [])]
     }
 
-def serialize_note(note, include_image=False):
+def serialize_note(note):
     """Serialize a Note object."""
     resolved_note_type = derive_note_type(note.context_type, note.set_index)
     result = {
@@ -803,15 +806,12 @@ def serialize_note(note, include_image=False):
         "content": note.content,
         "note_type": resolved_note_type,
         "note_type_label": note_type_label(resolved_note_type),
-        "has_image": note.image_data is not None and len(note.image_data) > 0,
         "created_at": format_utc(note.created_at),
         "updated_at": format_utc(note.updated_at),
         "goal_id": note.goal_id,
         "pinned_at": format_utc(note.pinned_at) if note.pinned_at else None,
         "is_pinned": note.pinned_at is not None,
     }
-    if include_image:
-        result["image_data"] = note.image_data
     return result
 
 
@@ -846,9 +846,9 @@ def note_type_label(note_type):
     return labels.get(note_type, "Note")
 
 
-def serialize_note_display(note, include_image=False):
+def serialize_note_display(note):
     """Serialize a note with the display context used on note-dedicated surfaces."""
-    result = serialize_note(note, include_image=include_image)
+    result = serialize_note(note)
 
     if note.session:
         result["session_name"] = note.session.name

@@ -12,6 +12,7 @@ from models import (
 )
 from services import event_bus, Event, Events
 from services.owned_entity_queries import get_owned_program
+from services.quota_service import QuotaService
 from services.serializers import serialize_program, serialize_program_block, serialize_program_day, serialize_goal
 from services.session_service import SessionService
 from services.goal_service import GoalService, sync_goal_targets
@@ -377,6 +378,10 @@ class ProgramService:
     @staticmethod
     def create_program(session, root_id: str, validated_data: Dict, current_user_id: str | None = None) -> Dict:
         ProgramService._require_root_access(session, root_id, current_user_id)
+        if current_user_id:
+            _, quota_error, quota_status = QuotaService(session).check_available(current_user_id, "programs")
+            if quota_error:
+                raise ProgramServiceValidationError(quota_error, quota_status)
         
         # Parse dates
         start_date = ProgramService._parse_program_datetime(validated_data['start_date'], 'start_date')

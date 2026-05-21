@@ -86,6 +86,8 @@ def create_program(current_user, root_id, validated_data):
     try:
         result = ProgramService.create_program(session, root_id, validated_data, current_user.id)
         return jsonify(result), 201
+    except ProgramServiceValidationError as e:
+        return _program_service_error_response(e)
     except ValueError as e:
         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:

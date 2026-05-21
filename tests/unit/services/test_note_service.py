@@ -142,7 +142,25 @@ def test_create_note_rejects_removed_nano_goal_id_field(
     assert error == 'nano_goal_id is no longer supported'
 
 
-def test_get_goal_notes_returns_display_context_and_images(db_session, sample_goal_hierarchy, test_user):
+def test_create_note_ignores_image_data_payload(db_session, sample_goal_hierarchy, test_user):
+    root = sample_goal_hierarchy['ultimate']
+
+    service = NoteService(db_session)
+    payload, error, status = service.create_note(root.id, test_user.id, {
+        'content': 'Text only note',
+        'context_type': 'root',
+        'context_id': root.id,
+        'image_data': 'data:image/png;base64,discard-me',
+    })
+
+    assert error is None
+    assert status == 201
+    assert payload['content'] == 'Text only note'
+    assert 'image_data' not in payload
+    assert 'has_image' not in payload
+
+
+def test_get_goal_notes_returns_display_context(db_session, sample_goal_hierarchy, test_user):
     goal = sample_goal_hierarchy['short_term']
     note = Note(
         id=str(uuid.uuid4()),
@@ -151,7 +169,6 @@ def test_get_goal_notes_returns_display_context_and_images(db_session, sample_go
         context_id=goal.id,
         goal_id=goal.id,
         content='Goal note',
-        image_data='data:image/png;base64,goalnote',
     )
     db_session.add(note)
     db_session.commit()
@@ -166,7 +183,8 @@ def test_get_goal_notes_returns_display_context_and_images(db_session, sample_go
     assert error is None
     assert status == 200
     assert payload[0]['goal_name'] == goal.name
-    assert payload[0]['image_data'] == 'data:image/png;base64,goalnote'
+    assert 'image_data' not in payload[0]
+    assert 'has_image' not in payload[0]
 
 
 def test_derive_note_type_distinguishes_activity_set_notes():

@@ -19,6 +19,7 @@ from services.events import Event, Events, event_bus
 from services.goal_service import GoalService, sync_goal_targets
 from services.owned_entity_queries import get_owned_activity_instance, get_owned_session
 from services.payload_normalizers import normalize_note_payload
+from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
 from services.serializers import derive_note_type, serialize_goal, serialize_note_display
 from services.session_runtime import is_quick_session
@@ -86,7 +87,7 @@ class NoteService:
             Note.pinned_at.desc().nullslast(),
             Note.created_at.desc(),
         ).all()
-        return [serialize_note_display(note, include_image=True) for note in notes], None, 200
+        return [serialize_note_display(note) for note in notes], None, 200
 
     def get_activity_instance_notes(self, root_id, instance_id, current_user_id) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -105,7 +106,7 @@ class NoteService:
             Note.pinned_at.desc().nullslast(),
             Note.created_at.desc(),
         ).all()
-        return [serialize_note_display(note, include_image=True) for note in notes], None, 200
+        return [serialize_note_display(note) for note in notes], None, 200
 
     def get_previous_session_notes(self, root_id, session_id, current_user_id) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -362,7 +363,7 @@ class NoteService:
             Note.pinned_at.desc().nullslast(),
             Note.created_at.desc(),
         ).all()
-        return [serialize_note_display(note, include_image=True) for note in notes], None, 200
+        return [serialize_note_display(note) for note in notes], None, 200
 
     def _collect_descendant_goal_ids(self, root_id, goal_id):
         """BFS to collect all descendant goal IDs including the given goal_id."""
@@ -451,7 +452,7 @@ class NoteService:
                 Note.created_at.desc(),
             ).all()
             serialized_notes = [
-                serialize_note_display(note, include_image=True)
+                serialize_note_display(note)
                 for note in ordered_notes
             ]
             filtered_results = [
@@ -469,7 +470,7 @@ class NoteService:
                 Note.pinned_at.desc().nullslast(),
                 Note.created_at.desc(),
             ).limit(page_size).offset(page * page_size).all()
-            results = [serialize_note_display(note, include_image=True) for note in notes]
+            results = [serialize_note_display(note) for note in notes]
             self._attach_program_names(results)
 
         return {
@@ -499,7 +500,7 @@ class NoteService:
         note.pinned_at = datetime.now(timezone.utc)
         self.db_session.commit()
         logger.info("Pinned note %s", note_id)
-        return serialize_note_display(note, include_image=True), None, 200
+        return serialize_note_display(note), None, 200
 
     def unpin_note(self, root_id, note_id, current_user_id) -> ServiceResult[JsonDict]:
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -517,7 +518,7 @@ class NoteService:
         note.pinned_at = None
         self.db_session.commit()
         logger.info("Unpinned note %s", note_id)
-        return serialize_note_display(note, include_image=True), None, 200
+        return serialize_note_display(note), None, 200
 
     def create_note(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         data = normalize_note_payload(data)
@@ -526,6 +527,9 @@ class NoteService:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
+        _, quota_error, quota_status = QuotaService(self.db_session).check_available(current_user_id, "notes")
+        if quota_error:
+            return None, quota_error, quota_status
         content = data.get('content', '')
 
         session_id = data.get('session_id')
@@ -596,7 +600,7 @@ class NoteService:
             },
             source='note_service.create_note',
         ))
-        return self._attach_program_names(serialize_note_display(note, include_image=True)), None, 201
+        return self._attach_program_names(serialize_note_display(note)), None, 201
 
     def update_note(self, root_id, note_id, current_user_id, data) -> ServiceResult[JsonDict]:
         data = normalize_note_payload(data, partial=True)
@@ -639,7 +643,7 @@ class NoteService:
             },
             source='note_service.update_note',
         ))
-        return serialize_note_display(note, include_image=True), None, 200
+        return serialize_note_display(note), None, 200
 
     def delete_note(self, root_id, note_id, current_user_id) -> ServiceResult[JsonDict]:
         _, error = self._validate_owned_root(root_id, current_user_id)

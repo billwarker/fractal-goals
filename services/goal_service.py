@@ -37,6 +37,7 @@ from services.goal_domain_rules import (
 )
 from services.metrics import GoalMetricsService
 from services.payload_normalizers import normalize_goal_payload
+from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
 from services.serializers import (
     calculate_smart_status,
@@ -662,6 +663,12 @@ class GoalService:
         return [serialize_goal(root) for root in roots], None, 200
 
     def create_fractal(self, current_user_id, data) -> ServiceResult[Goal]:
+        quota_service = QuotaService(self.db_session)
+        for resource in ("fractals", "goals"):
+            _, quota_error, quota_status = quota_service.check_available(current_user_id, resource)
+            if quota_error:
+                return None, quota_error, quota_status
+
         level = self.db_session.query(GoalLevel).filter_by(name="Ultimate Goal").first()
         if not level:
             level = GoalLevel(name="Ultimate Goal", rank=0)
@@ -741,6 +748,15 @@ class GoalService:
 
     def create_global_goal(self, current_user_id, data) -> ServiceResult[Goal]:
         data = normalize_goal_payload(data)
+        quota_service = QuotaService(self.db_session)
+        _, quota_error, quota_status = quota_service.check_available(current_user_id, "goals")
+        if quota_error:
+            return None, quota_error, quota_status
+        if not data.get('parent_id'):
+            _, quota_error, quota_status = quota_service.check_available(current_user_id, "fractals")
+            if quota_error:
+                return None, quota_error, quota_status
+
         parent = None
         parent_id = data.get('parent_id')
         if parent_id:
@@ -876,6 +892,10 @@ class GoalService:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
+
+        _, quota_error, quota_status = QuotaService(self.db_session).check_available(current_user_id, "goals")
+        if quota_error:
+            return None, quota_error, quota_status
 
         activity_definition_id = data.get('activity_definition_id')
         activity = None
