@@ -1,4 +1,5 @@
 import { DEFAULT_GLOBAL_FILTERS, normalizeGlobalFilters } from './analyticsGlobalFilters';
+import { normalizeVisualizationState } from './visualizations/state';
 
 export const ANALYTICS_DASHBOARD_VERSION = 2;
 const DEFAULT_SPLIT_POSITION = 50;
@@ -25,6 +26,7 @@ export function getDefaultWindowState() {
         activityTotalsShowGroups: false,
         activityTotalsLimit: 15,
         heatmapMonths: 12,
+        visualizationState: {},
     };
 }
 
@@ -105,9 +107,13 @@ function normalizeLayoutNode(node) {
 }
 
 function normalizeWindowState(state) {
-    return {
+    const normalizedState = {
         ...getDefaultWindowState(),
         ...(isPlainObject(state) ? state : {}),
+    };
+    return {
+        ...normalizedState,
+        visualizationState: normalizeVisualizationState(normalizedState),
     };
 }
 

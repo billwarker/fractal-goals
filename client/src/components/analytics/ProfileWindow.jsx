@@ -1,35 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
-import ScatterPlot from './ScatterPlot';
-import LineGraph from './LineGraph';
-import GoalCompletionTimeline from './GoalCompletionTimeline';
-import GoalTimeDistribution from './GoalTimeDistribution';
-import ActivityHeatmap from './ActivityHeatmap';
-import StreakTimeline from './StreakTimeline';
-import WeeklyBarChart from './WeeklyBarChart';
-import { Bar, Line } from 'react-chartjs-2';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import Button from '../atoms/Button';
 import CloseIcon from '../atoms/CloseIcon';
-import { Heading } from '../atoms/Typography';
 
-import {
-    ActivityGroupMixChart,
-    ActivityMetricVolumeChart,
-    ActivityPersonalBestTrend,
-    ActivityTimeByActivity,
-    GoalAgingChart,
-    GoalCompletionRateByLevel,
-    GoalMomentumChart,
-    SessionCompletionRateChart,
-    SessionConsistencyChart,
-    SessionDurationHistogram,
-    SessionDurationTrend,
-    SessionPlannedVsActualChart,
-    SessionSectionPie,
-    SessionStartDistribution,
-    StaleGoalsChart,
-} from './AnalyticsExtraCharts';
-import { ACTIVITY_TOTALS_VISUALIZATION, ActivityTotalsChart } from './visualizations/activities/ActivityTotals';
 import {
     AnalyticsGoalIcon,
     BackIcon,
@@ -42,9 +15,17 @@ import {
     TimerIcon,
     VisualizationIcon,
 } from './AnalyticsIcons';
-import { DISABLED_CHART_ANIMATION } from './ChartJSWrapper';
 import { resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
 import styles from './ProfileWindow.module.css';
+import {
+    getVisualization,
+    getVisualizationsByCategory,
+    VISUALIZATION_CATEGORIES,
+} from './visualizations/registry';
+import {
+    getLegacyFlatUpdates,
+    normalizeVisualizationState,
+} from './visualizations/state';
 
 /**
  * ProfileWindow - A single analytics window that can display various visualizations
@@ -76,7 +57,7 @@ function ProfileWindow({
     globalFilters = null,
 }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
-    const { sessions, goalAnalytics, activities, activityGroups, activityInstances, formatDuration, rootId } = data;
+    const { sessions, goalAnalytics, activities, activityGroups, activityInstances, rootId } = data;
     const chartRef = useRef(null);
     const containerRef = useRef(null);
 
@@ -109,32 +90,22 @@ function ProfileWindow({
         selectedCategory,
         selectedVisualization,
         selectedActivity,
-        selectedMetricX,
-        selectedMetricY,
-        selectedMetric,
-        selectedMetricY2,
-        setsHandling,
-        selectedSplit,
         selectedGoal,
-        selectedGoalChart,
-        goalTimeDurationMode,
-        goalTimeInheritanceMode,
-        activityTotalsMetric,
-        activityTotalsShowGroups,
-        activityTotalsLimit,
-        heatmapMonths,
     } = windowState;
+    const visualizationState = useMemo(() => normalizeVisualizationState(windowState), [windowState]);
 
     // Helper to update state (setSelectedCategory is handled by handleCategoryChange below)
     const setSelectedVisualization = (value) => updateWindowState({ selectedVisualization: value });
-    const setSelectedActivity = (value) => updateWindowState({ selectedActivity: value });
-    const setSelectedMetric = (value) => updateWindowState({ selectedMetric: value });
-    const setSelectedMetricY2 = (value) => updateWindowState({ selectedMetricY2: value });
-    const setSetsHandling = (value) => updateWindowState({ setsHandling: value });
-    const setSelectedSplit = (value) => updateWindowState({ selectedSplit: value });
-    const setSelectedGoal = (value) => updateWindowState({ selectedGoal: value });
-    const setSelectedGoalChart = (value) => updateWindowState({ selectedGoalChart: value });
-    const setHeatmapMonths = (value) => updateWindowState({ heatmapMonths: value });
+    const updateVisualizationState = React.useCallback((updates) => {
+        const nextVisualizationState = {
+            ...normalizeVisualizationState(windowState),
+            ...updates,
+        };
+        updateWindowState({
+            visualizationState: nextVisualizationState,
+            ...getLegacyFlatUpdates(selectedCategory, selectedVisualization, updates),
+        });
+    }, [selectedCategory, selectedVisualization, updateWindowState, windowState]);
     const effectiveDateRange = globalDateRange;
     const resolvedGlobalFilters = useMemo(() => resolveAnalyticsGlobalFilters({
         filters: globalFilters,
@@ -162,7 +133,7 @@ function ProfileWindow({
         if (start && date < start) return false;
         if (end && date > end) return false;
         return true;
-    }, [effectiveDateRange?.end, effectiveDateRange?.start, hasActiveDateRange]);
+    }, [effectiveDateRange, hasActiveDateRange]);
 
     // Reset visualization when category changes
     const handleCategoryChange = (category) => {
@@ -214,11 +185,7 @@ function ProfileWindow({
         activities: <LightningIcon size={16} />,
     };
 
-    const categoryLabels = {
-        goals: 'Goals',
-        sessions: 'Sessions',
-        activities: 'Activities',
-    };
+    const categoryLabels = Object.fromEntries(VISUALIZATION_CATEGORIES.map((category) => [category.id, category.name]));
 
     const renderVisualizationIcon = (visualization, size = 16) => {
         if (visualization?.id === 'goalDetail') {
@@ -248,40 +215,9 @@ function ProfileWindow({
         return <VisualizationIcon type={visualization?.iconType} size={size} />;
     };
 
-    const visualizations = {
-        goals: [
-            { id: 'stats', name: 'Summary Stats', iconType: 'goals:stats' },
-            { id: 'completionTimeline', name: 'Completion Timeline', iconType: 'goals:completionTimeline' },
-            { id: 'timeDistribution', name: 'Time Spent Per Goal', iconType: 'goals:timeDistribution' },
-            { id: 'completionRateByLevel', name: 'Completion Rate', iconType: 'goals:completionRateByLevel' },
-            { id: 'goalAging', name: 'Goal Aging', iconType: 'goals:goalAging' },
-            { id: 'goalMomentum', name: 'Goal Momentum', iconType: 'goals:goalMomentum' },
-            { id: 'staleGoals', name: 'Stale Goals', iconType: 'goals:staleGoals' },
-            { id: 'goalDetail', name: 'Goal Detail View', iconType: 'goals:goalDetail' }
-        ],
-        sessions: [
-            { id: 'stats', name: 'Summary Stats', iconType: 'sessions:stats' },
-            { id: 'durationTrend', name: 'Duration Trend', iconType: 'sessions:durationTrend' },
-            { id: 'sectionPie', name: 'Section Time', iconType: 'sessions:sectionPie' },
-            { id: 'heatmap', name: 'Activity Heatmap', iconType: 'sessions:heatmap' },
-            { id: 'streaks', name: 'Streak Timeline', iconType: 'sessions:streaks' },
-            { id: 'weeklyChart', name: 'Weekly Chart', iconType: 'sessions:weeklyChart' },
-            { id: 'completionRate', name: 'Completion Rate', iconType: 'sessions:completionRate' },
-            { id: 'startDistribution', name: 'Start Times', iconType: 'sessions:startDistribution' },
-            { id: 'durationHistogram', name: 'Duration Histogram', iconType: 'sessions:durationHistogram' },
-            { id: 'plannedVsActual', name: 'Planned vs Actual', iconType: 'sessions:plannedVsActual' },
-            { id: 'consistency', name: 'Consistency', iconType: 'sessions:consistency' }
-        ],
-        activities: [
-            { id: 'scatterPlot', name: 'Scatter Plot', iconType: 'activities:scatterPlot' },
-            { id: 'lineGraph', name: 'Line Graph', iconType: 'activities:lineGraph' },
-            ACTIVITY_TOTALS_VISUALIZATION,
-            { id: 'timeByActivity', name: 'Time Per Activity', iconType: 'activities:timeByActivity' },
-            { id: 'personalBest', name: 'Personal Best', iconType: 'activities:personalBest' },
-            { id: 'metricVolume', name: 'Metric Volume', iconType: 'activities:metricVolume' },
-            { id: 'groupMix', name: 'Group Mix', iconType: 'activities:groupMix' }
-        ]
-    };
+    const visualizations = Object.fromEntries(
+        VISUALIZATION_CATEGORIES.map((category) => [category.id, getVisualizationsByCategory(category.id)])
+    );
 
     // Get goal type color
     const getGoalTypeColor = (type) => {
@@ -399,169 +335,9 @@ function ProfileWindow({
             return filteredGoalAnalyticsGoals.find((goal) => goal.id === goalId) || null;
         }
         return null;
-    }, [filteredGoalAnalyticsGoals, resolvedGlobalFilters.filters.goals.goalIds, selectedGoal?.id]);
+    }, [filteredGoalAnalyticsGoals, resolvedGlobalFilters.filters.goals.goalIds, selectedGoal]);
 
-    const activityCounts = useMemo(() => Object.fromEntries(
-        scopedActivities.map((activity) => [activity.id, filteredActivityInstances[activity.id]?.length || 0])
-    ), [scopedActivities, filteredActivityInstances]);
-
-    const groupCounts = useMemo(() => {
-        const childGroupsByParent = new Map();
-        activityGroups.forEach((group) => {
-            const parentId = group.parent_id || '__root__';
-            if (!childGroupsByParent.has(parentId)) {
-                childGroupsByParent.set(parentId, []);
-            }
-            childGroupsByParent.get(parentId).push(group);
-        });
-
-        const activitiesByGroup = new Map();
-        scopedActivities.forEach((activity) => {
-            const groupId = activity.group_id || '__ungrouped__';
-            if (!activitiesByGroup.has(groupId)) {
-                activitiesByGroup.set(groupId, []);
-            }
-            activitiesByGroup.get(groupId).push(activity);
-        });
-
-        const totals = {};
-        const collectTotal = (groupId) => {
-            const directTotal = (activitiesByGroup.get(groupId) || []).reduce(
-                (sum, activity) => sum + (activityCounts[activity.id] || 0),
-                0
-            );
-            const childTotal = (childGroupsByParent.get(groupId) || []).reduce(
-                (sum, group) => sum + collectTotal(group.id),
-                0
-            );
-            const total = directTotal + childTotal;
-            totals[groupId] = total;
-            return total;
-        };
-
-        activityGroups.forEach((group) => {
-            if (!(group.id in totals)) {
-                collectTotal(group.id);
-            }
-        });
-
-        return totals;
-    }, [scopedActivities, activityCounts, activityGroups]);
-
-    // Prepare goal chart data
-    const getActivityChartData = () => {
-        if (!effectiveSelectedGoal?.activity_breakdown?.length) {
-            return { labels: [], datasets: [] };
-        }
-        const sortedActivities = [...effectiveSelectedGoal.activity_breakdown]
-            .sort((a, b) => b.instance_count - a.instance_count);
-        return {
-            labels: sortedActivities.map(a => a.activity_name),
-            datasets: [{
-                label: 'Instances',
-                data: sortedActivities.map(a => a.instance_count),
-                backgroundColor: '#2196f3',
-                borderColor: '#1976d2',
-                borderWidth: 1,
-                borderRadius: 4
-            }]
-        };
-    };
-
-    const getDurationChartData = () => {
-        if (!effectiveSelectedGoal?.session_durations_by_date?.length) {
-            return { labels: [], datasets: [] };
-        }
-        return {
-            labels: effectiveSelectedGoal.session_durations_by_date.map(s => new Date(s.date)),
-            datasets: [{
-                label: 'Duration (minutes)',
-                data: effectiveSelectedGoal.session_durations_by_date.map(s => Math.round(s.duration_seconds / 60)),
-                borderColor: '#4caf50',
-                backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 4,
-                pointHoverRadius: 6
-            }]
-        };
-    };
-
-    const activityChartOptions = {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        ...DISABLED_CHART_ANIMATION,
-        plugins: {
-            legend: { display: false },
-            tooltip: {
-                backgroundColor: 'rgba(30, 30, 30, 0.95)',
-                titleColor: '#fff',
-                bodyColor: '#ccc',
-                padding: 12,
-                callbacks: {
-                    label: (ctx) => `${ctx.raw} instance${ctx.raw !== 1 ? 's' : ''}`
-                }
-            }
-        },
-        scales: {
-            x: {
-                beginAtZero: true,
-                ticks: { color: '#888', stepSize: 1 },
-                grid: { color: '#333' }
-            },
-            y: {
-                ticks: { color: '#ccc', font: { size: 11 } },
-                grid: { display: false }
-            }
-        }
-    };
-
-    const durationChartOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        ...DISABLED_CHART_ANIMATION,
-        plugins: {
-            legend: { display: false },
-            tooltip: {
-                backgroundColor: 'rgba(30, 30, 30, 0.95)',
-                titleColor: '#fff',
-                bodyColor: '#ccc',
-                padding: 12,
-                callbacks: {
-                    title: (ctx) => {
-                        const date = new Date(ctx[0].label);
-                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                    },
-                    label: (ctx) => {
-                        const minutes = ctx.raw;
-                        if (minutes >= 60) {
-                            return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-                        }
-                        return `${minutes}m`;
-                    }
-                }
-            }
-        },
-        scales: {
-            x: {
-                type: 'time',
-                time: { unit: 'day', displayFormats: { day: 'MMM d' } },
-                ticks: { color: '#888' },
-                grid: { color: '#333' }
-            },
-            y: {
-                beginAtZero: true,
-                title: { display: true, text: 'Duration (min)', color: '#888' },
-                ticks: { color: '#888' },
-                grid: { color: '#333' }
-            }
-        }
-    };
-
-    const selectedVisualizationMeta = selectedCategory
-        ? visualizations[selectedCategory]?.find((vis) => vis.id === selectedVisualization)
-        : null;
+    const selectedVisualizationMeta = getVisualization(selectedCategory, selectedVisualization);
 
     const renderUnifiedHeader = () => {
         const hasCategory = !!selectedCategory;
@@ -749,233 +525,35 @@ function ProfileWindow({
             return renderVisualizationCards();
         }
 
-        const summary = filteredGoalSummary;
-        const completedSessions = filteredSessions.filter(s => s.completed);
-        const totalDuration = filteredSessions.reduce((sum, s) => sum + (s.total_duration_seconds || 0), 0);
-        const avgDuration = filteredSessions.length > 0 ? totalDuration / filteredSessions.length : 0;
+        const VisualizationChart = selectedVisualizationMeta?.Chart;
+        if (!VisualizationChart) return null;
 
-        // Goals visualizations
-        if (selectedCategory === 'goals') {
-            switch (selectedVisualization) {
-                case 'stats':
-                    return (
-                        <div className={styles.vizContainer}>
-                            <Heading level={3} className={styles.vizTitle}>Goal Summary</Heading>
-                            <div className={styles.statsGrid}>
-                                <StatCard value={summary.completed_goals || 0} label="Completed" subLabel={`${summary.completion_rate?.toFixed(1) || 0}% rate`} color="#4caf50" />
-                                <StatCard value={`${summary.avg_goal_age_days || 0}d`} label="Avg Age" subLabel="Days old" color="#2196f3" />
-                                <StatCard value={`${summary.avg_time_to_completion_days || 0}d`} label="Avg to Complete" subLabel="Days" color="#ff9800" />
-                                <StatCard value={formatDuration(summary.avg_duration_to_completion_seconds || 0)} label="Avg Time" subLabel="Per goal" color="#9c27b0" />
-                            </div>
-                        </div>
-                    );
-                case 'completionTimeline':
-                    return (
-                        <div className={styles.vizContainerHidden}>
-                            <GoalCompletionTimeline goals={filteredGoalAnalyticsGoals} chartRef={chartRef} />
-                        </div>
-                    );
-                case 'timeDistribution':
-                    return (
-                        <div className={styles.vizContainerHidden}>
-                            <GoalTimeDistribution
-                                goals={filteredGoalAnalyticsGoals}
-                                chartRef={chartRef}
-                                durationMode={goalTimeDurationMode || 'activity'}
-                                inheritanceMode={goalTimeInheritanceMode || 'direct'}
-                            />
-                        </div>
-                    );
-                case 'completionRateByLevel':
-                    return <div className={styles.vizContainerHidden}><GoalCompletionRateByLevel goals={filteredGoalAnalyticsGoals} chartRef={chartRef} /></div>;
-                case 'goalAging':
-                    return <div className={styles.vizContainerHidden}><GoalAgingChart goals={filteredGoalAnalyticsGoals} chartRef={chartRef} /></div>;
-                case 'goalMomentum':
-                    return <div className={styles.vizContainerHidden}><GoalMomentumChart goals={filteredGoalAnalyticsGoals} chartRef={chartRef} /></div>;
-                case 'staleGoals':
-                    return <div className={styles.vizContainer}><StaleGoalsChart goals={filteredGoalAnalyticsGoals} /></div>;
-                case 'goalDetail':
-                    if (!effectiveSelectedGoal) {
-                        return (
-                            <div className={styles.emptyState}>
-                                Select a goal above to view details
-                            </div>
-                        );
-                    }
-                    return (
-                        <div className={styles.vizContainer}>
-                            {/* Goal header */}
-                            <div className={styles.goalHeader}>
-                                <Heading level={3} className={styles.goalTitle}>{effectiveSelectedGoal.name}</Heading>
-                                <span className={styles.goalBadge} style={{ background: getGoalTypeColor(effectiveSelectedGoal.type) }}>
-                                    {effectiveSelectedGoal.type.replace('Goal', '')}
-                                </span>
-                            </div>
-                            {/* Goal stats */}
-                            <div className={styles.statsGrid}>
-                                <StatCard value={formatDuration(effectiveSelectedGoal.total_duration_seconds || 0)} label="Total Time" subLabel="Selected range" color="#2196f3" />
-                                <StatCard value={effectiveSelectedGoal.session_count || 0} label="Sessions" subLabel="Selected range" color="#4caf50" />
-                                <StatCard value={`${effectiveSelectedGoal.age_days || 0}d`} label="Goal Age" color="#ff9800" />
-                            </div>
-                            {/* Chart */}
-                            <div className={styles.chartContainer}>
-                                {selectedGoalChart === 'duration' ? (
-                                    effectiveSelectedGoal.session_durations_by_date?.length > 0 ? (
-                                        <Line data={getDurationChartData()} options={durationChartOptions} />
-                                    ) : (
-                                        <div className={styles.noData}>
-                                            No session data available
-                                        </div>
-                                    )
-                                ) : (
-                                    effectiveSelectedGoal.activity_breakdown?.length > 0 ? (
-                                        <Bar data={getActivityChartData()} options={activityChartOptions} />
-                                    ) : (
-                                        <div className={styles.noData}>
-                                            No activities recorded
-                                        </div>
-                                    )
-                                )}
-                            </div>
-                        </div>
-                    );
-            }
-        }
-
-        // Sessions visualizations
-        if (selectedCategory === 'sessions') {
-            switch (selectedVisualization) {
-                case 'stats':
-                    return (
-                        <div className={styles.vizContainer}>
-                            <Heading level={3} className={styles.vizTitle}>Session Summary</Heading>
-                            <div className={styles.statsGrid}>
-                                <StatCard value={filteredSessions.length} label="Total Sessions" subLabel="Selected range" color="#2196f3" />
-                                <StatCard value={completedSessions.length} label="Completed" subLabel={`${filteredSessions.length > 0 ? Math.round((completedSessions.length / filteredSessions.length) * 100) : 0}% rate`} color="#4caf50" />
-                                <StatCard value={formatDuration(totalDuration)} label="Total Time" subLabel="Practiced" color="#ff9800" />
-                                <StatCard value={formatDuration(avgDuration)} label="Avg Duration" subLabel="Per session" color="#9c27b0" />
-                            </div>
-                        </div>
-                    );
-                case 'heatmap': {
-                    return (
-                        <div className={styles.vizContainerHeatmap}>
-                            <ActivityHeatmap
-                                sessions={filteredSessions}
-                                months={heatmapMonths || 12}
-                            />
-                        </div>
-                    );
-                }
-                case 'streaks':
-                    return (
-                        <div className={styles.vizContainerHidden}>
-                            <StreakTimeline sessions={filteredSessions} />
-                        </div>
-                    );
-                case 'weeklyChart':
-                    return (
-                        <div className={styles.vizContainerHidden}>
-                            <WeeklyBarChart
-                                sessions={filteredSessions}
-                                weeks={12}
-                                chartRef={chartRef}
-                                selectedDateRange={effectiveDateRange}
-                                onDateRangeChange={onGlobalDateRangeChange}
-                                showMetricSelectors={false}
-                            />
-                        </div>
-                    );
-                case 'durationTrend':
-                    return <div className={styles.vizContainerHidden}><SessionDurationTrend sessions={filteredSessions} chartRef={chartRef} /></div>;
-                case 'sectionPie':
-                    return <div className={styles.vizContainerHidden}><SessionSectionPie sessions={filteredSessions} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
-                case 'completionRate':
-                    return <div className={styles.vizContainerHidden}><SessionCompletionRateChart sessions={filteredSessions} chartRef={chartRef} /></div>;
-                case 'startDistribution':
-                    return <div className={styles.vizContainerHidden}><SessionStartDistribution sessions={filteredSessions} chartRef={chartRef} /></div>;
-                case 'durationHistogram':
-                    return <div className={styles.vizContainerHidden}><SessionDurationHistogram sessions={filteredSessions} chartRef={chartRef} /></div>;
-                case 'plannedVsActual':
-                    return <div className={styles.vizContainerHidden}><SessionPlannedVsActualChart sessions={filteredSessions} chartRef={chartRef} /></div>;
-                case 'consistency':
-                    return <div className={styles.vizContainerHidden}><SessionConsistencyChart sessions={filteredSessions} chartRef={chartRef} /></div>;
-            }
-        }
-
-        // Activities visualizations
-        if (selectedCategory === 'activities') {
-            const activityNeedsSelection = ['scatterPlot', 'lineGraph', 'personalBest', 'metricVolume'].includes(selectedVisualization);
-            if (activityNeedsSelection && !effectiveSelectedActivity) {
-                return (
-                    <div className={styles.emptyState}>
-                        Select an activity in the filters panel
-                    </div>
-                );
-            }
-
-            switch (selectedVisualization) {
-                case 'scatterPlot':
-                    return (
-                        <div className={styles.vizContainerHidden}>
-                            <ScatterPlot
-                                selectedActivity={effectiveSelectedActivity}
-                                activityInstances={filteredActivityInstances}
-                                activities={scopedActivities}
-                                setsHandling={setsHandling}
-                                selectedSplit={selectedSplit}
-                                chartRef={chartRef}
-                                selectedMetricX={selectedMetricX}
-                                selectedMetricY={selectedMetricY}
-                            />
-                        </div>
-                    );
-                case 'lineGraph':
-                    return (
-                        <div className={styles.vizContainerHidden}>
-                            <LineGraph
-                                selectedActivity={effectiveSelectedActivity}
-                                activityInstances={filteredActivityInstances}
-                                activities={scopedActivities}
-                                selectedMetric={selectedMetric}
-                                setSelectedMetric={setSelectedMetric}
-                                selectedMetricY2={selectedMetricY2}
-                                setSelectedMetricY2={setSelectedMetricY2}
-                                setsHandling={setsHandling}
-                                selectedSplit={selectedSplit}
-                                chartRef={chartRef}
-                                selectedDateRange={effectiveDateRange}
-                                onDateRangeChange={onGlobalDateRangeChange}
-                                showMetricSelectors={false}
-                            />
-                        </div>
-                    );
-                case 'activityFrequency':
-                    return (
-                        <div className={styles.vizContainerHidden}>
-                            <ActivityTotalsChart
-                                activities={scopedActivities}
-                                activityInstances={filteredActivityInstances}
-                                chartRef={chartRef}
-                                metric={activityTotalsMetric || 'instances'}
-                                activityGroups={activityGroups}
-                                showGroupNames={Boolean(activityTotalsShowGroups)}
-                                limit={activityTotalsLimit || 15}
-                            />
-                        </div>
-                    );
-                case 'timeByActivity':
-                    return <div className={styles.vizContainerHidden}><ActivityTimeByActivity activities={scopedActivities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
-                case 'personalBest':
-                    return <div className={styles.vizContainerHidden}><ActivityPersonalBestTrend selectedActivity={effectiveSelectedActivity} activities={scopedActivities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
-                case 'metricVolume':
-                    return <div className={styles.vizContainerHidden}><ActivityMetricVolumeChart selectedActivity={effectiveSelectedActivity} activities={scopedActivities} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
-                case 'groupMix':
-                    return <div className={styles.vizContainerHidden}><ActivityGroupMixChart activities={scopedActivities} activityGroups={activityGroups} activityInstances={filteredActivityInstances} chartRef={chartRef} /></div>;
-            }
-        }
-
-        return null;
+        return (
+            <VisualizationChart
+                context={{
+                    data,
+                    scopedData: {
+                        activities: scopedActivities,
+                        activityInstances: filteredActivityInstances,
+                        goals: filteredGoalAnalyticsGoals,
+                        goalSummary: filteredGoalSummary,
+                        sessions: filteredSessions,
+                    },
+                    globalFilters: resolvedGlobalFilters,
+                    dateRange: effectiveDateRange,
+                    windowState,
+                    updateWindowState,
+                    visualization: selectedVisualizationMeta,
+                    visualizationState,
+                    updateVisualizationState,
+                    chartRef,
+                    effectiveSelectedActivity,
+                    effectiveSelectedGoal,
+                    getGoalTypeColor,
+                    onGlobalDateRangeChange,
+                }}
+            />
+        );
     };
 
     return (
@@ -990,27 +568,6 @@ function ProfileWindow({
         >
             {isHeaderMinimized ? renderMinimizedHeaderOverlay() : renderUnifiedHeader()}
             {renderVisualizationContent()}
-        </div>
-    );
-}
-
-// StatCard helper component
-function StatCard({ value, label, subLabel, color }) {
-    return (
-        <div className={styles.statCard}>
-            <div className={styles.statValue} style={{ color }}>
-                {value}
-            </div>
-            <div>
-                <div className={styles.statLabel}>
-                    {label}
-                </div>
-                {subLabel && (
-                    <div className={styles.statSubLabel}>
-                        {subLabel}
-                    </div>
-                )}
-            </div>
         </div>
     );
 }

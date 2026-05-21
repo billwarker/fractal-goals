@@ -72,12 +72,24 @@ describe('dashboardState helpers', () => {
         const migrated = sanitizeDashboardLayoutPayload({
             version: 1,
             layout: { type: 'window', id: 'window-1' },
-            window_states: { 'window-1': {} },
+            window_states: {
+                'window-1': {
+                    selectedCategory: 'activities',
+                    selectedVisualization: 'activityFrequency',
+                    activityTotalsMetric: 'duration',
+                    activityTotalsLimit: 8,
+                },
+            },
             selected_window_id: 'window-1',
         });
 
         expect(migrated.globalFilters.goals.goalIds).toEqual([]);
         expect(migrated.globalFilters.activities.activityIds).toEqual([]);
+        expect(migrated.windowStates['window-1'].visualizationState).toEqual({
+            metric: 'duration',
+            showGroups: false,
+            limit: 8,
+        });
     });
 
     it('preserves nested split positions when saving and restoring analytics views', () => {

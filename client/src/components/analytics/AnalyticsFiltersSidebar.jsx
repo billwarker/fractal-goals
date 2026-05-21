@@ -5,7 +5,8 @@ import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
 import ActivityFilterModal from '../common/ActivityFilterModal';
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 import { hasActiveGlobalFilters, normalizeGlobalFilters, resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
-import { ActivityTotalsControls } from './visualizations/activities/ActivityTotals';
+import { getVisualization } from './visualizations/registry';
+import { getLegacyFlatUpdates, normalizeVisualizationState } from './visualizations/state';
 import '../sessions/SessionsQuerySidebar.css';
 
 const DATE_PRESET_OPTIONS = [
@@ -119,6 +120,27 @@ function AnalyticsFiltersSidebar({
     const updateSelectedWindow = (updates) => {
         onUpdateSelectedWindowState?.(updates);
     };
+    const selectedVisualizationMeta = getVisualization(
+        selectedWindowState?.selectedCategory,
+        selectedWindowState?.selectedVisualization
+    );
+    const visualizationState = useMemo(
+        () => normalizeVisualizationState(selectedWindowState || {}),
+        [selectedWindowState]
+    );
+    const updateVisualizationState = (updates) => {
+        updateSelectedWindow({
+            visualizationState: {
+                ...visualizationState,
+                ...updates,
+            },
+            ...getLegacyFlatUpdates(
+                selectedWindowState?.selectedCategory,
+                selectedWindowState?.selectedVisualization,
+                updates
+            ),
+        });
+    };
 
     const selectedActivity = selectedWindowState?.selectedActivity || null;
     const selectedActivityDef = selectedActivity
@@ -140,20 +162,17 @@ function AnalyticsFiltersSidebar({
             ? [{ id: '__product__', name: multiplicativeMetrics.map((metric) => metric.name).join(' x '), unit: 'Product' }]
             : []),
     ];
-    const selectedMetricId = selectedWindowState?.selectedMetric?.id || selectedWindowState?.selectedMetric || metricOptions[0]?.id || '';
-    const selectedMetricY2Id = selectedWindowState?.selectedMetricY2?.id || selectedWindowState?.selectedMetricY2 || '';
-    const selectedMetricXId = selectedWindowState?.selectedMetricX?.id || selectedWindowState?.selectedMetricX || metricDefinitions[0]?.id || '';
-    const selectedMetricYId = selectedWindowState?.selectedMetricY?.id || selectedWindowState?.selectedMetricY || metricDefinitions[1]?.id || '';
+    const selectedMetricId = visualizationState?.metric?.id || visualizationState?.metric || metricOptions[0]?.id || '';
+    const selectedMetricY2Id = visualizationState?.metricY2?.id || visualizationState?.metricY2 || '';
+    const selectedMetricXId = visualizationState?.metricX?.id || visualizationState?.metricX || metricDefinitions[0]?.id || '';
+    const selectedMetricYId = visualizationState?.metricY?.id || visualizationState?.metricY || metricDefinitions[1]?.id || '';
     const selectedPanelUsesScopedChoices = selectedWindowState?.selectedVisualization
-        && (
-            (selectedWindowState?.selectedCategory === 'goals' && selectedWindowState?.selectedVisualization === 'goalDetail')
-            || (selectedWindowState?.selectedCategory === 'activities'
-                && ['scatterPlot', 'lineGraph', 'personalBest', 'metricVolume'].includes(selectedWindowState?.selectedVisualization))
-        );
+        && (selectedVisualizationMeta?.selectionRequirements?.goal || selectedVisualizationMeta?.selectionRequirements?.activity);
     const hasScopedChoices = resolvedGlobalScope.hasGoalFilter || resolvedGlobalScope.hasActivityFilter;
     const activityInstanceCounts = useMemo(() => Object.fromEntries(
         profileActivities.map((activity) => [activity.id, (activityInstances[activity.id] || []).length])
     ), [profileActivities, activityInstances]);
+    const SelectedControls = selectedVisualizationMeta?.Controls || null;
 
     useEffect(() => {
         if (!dateRange?.start && !dateRange?.end) {
@@ -354,217 +373,29 @@ function AnalyticsFiltersSidebar({
                         </div>
                     )}
 
-                    {selectedWindowState?.selectedCategory === 'sessions' && selectedWindowState?.selectedVisualization === 'heatmap' && (
-                        <div className="sessions-query-chip-group">
-                            {[
-                                { value: 12, label: '1 Year' },
-                                { value: 6, label: '6 Months' },
-                                { value: 3, label: '3 Months' },
-                                { value: 1, label: '1 Month' },
-                            ].map((option) => (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    className={`sessions-query-chip ${(selectedWindowState?.heatmapMonths || 12) === option.value ? 'active' : ''}`}
-                                    onClick={() => updateSelectedWindow({ heatmapMonths: option.value })}
-                                >
-                                    {option.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {selectedWindowState?.selectedCategory === 'goals' && selectedWindowState?.selectedVisualization === 'goalDetail' && (
-                        <>
-                            <button
-                                type="button"
-                                className="sessions-query-picker-button"
-                                onClick={() => setIsProfileGoalModalOpen(true)}
-                                disabled={profileGoals.length === 0}
-                            >
-                                {selectedGoalDef ? selectedGoalDef.name : 'Choose Goal'}
-                            </button>
-                            {selectedGoalDef && (
-                                <div className="sessions-query-chip-group" style={{ marginTop: 10 }}>
-                                    {[
-                                        { value: 'duration', label: 'Duration' },
-                                        { value: 'activity', label: 'Activities' },
-                                    ].map((option) => (
-                                        <button
-                                            key={option.value}
-                                            type="button"
-                                            className={`sessions-query-chip ${(selectedWindowState?.selectedGoalChart || 'duration') === option.value ? 'active' : ''}`}
-                                            onClick={() => updateSelectedWindow({ selectedGoalChart: option.value })}
-                                        >
-                                            {option.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </>
-                    )}
-
-                    {selectedWindowState?.selectedCategory === 'goals' && selectedWindowState?.selectedVisualization === 'timeDistribution' && (
-                        <>
-                            <div className="sessions-query-chip-group">
-                                {[
-                                    { value: 'activity', label: 'Activities' },
-                                    { value: 'session', label: 'Sessions' },
-                                ].map((option) => (
-                                    <button
-                                        key={option.value}
-                                        type="button"
-                                        className={`sessions-query-chip ${(selectedWindowState?.goalTimeDurationMode || 'activity') === option.value ? 'active' : ''}`}
-                                        onClick={() => updateSelectedWindow({ goalTimeDurationMode: option.value })}
-                                    >
-                                        {option.label}
-                                    </button>
-                                ))}
-                            </div>
-                            <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                                <span>Inheritance</span>
-                                <select
-                                    value={selectedWindowState?.goalTimeInheritanceMode || 'direct'}
-                                    onChange={(event) => updateSelectedWindow({ goalTimeInheritanceMode: event.target.value })}
-                                >
-                                    <option value="direct">Direct only</option>
-                                    <option value="descendants">Include descendants</option>
-                                    <option value="root">Roll up to root</option>
-                                </select>
-                            </label>
-                        </>
-                    )}
-
-                    {selectedWindowState?.selectedCategory === 'activities' && (
-                        <>
-                            {['scatterPlot', 'lineGraph', 'personalBest', 'metricVolume'].includes(selectedWindowState?.selectedVisualization) && (
-                                <>
-                                    <button
-                                        type="button"
-                                        className="sessions-query-picker-button"
-                                        onClick={() => setIsProfileActivityModalOpen(true)}
-                                        disabled={profileActivities.length === 0}
-                                    >
-                                        {selectedActivityDef ? selectedActivityDef.name : 'Choose Activity'}
-                                    </button>
-                                    <div className="sessions-query-selection-preview">
-                                        {selectedActivityDef ? selectedActivityDef.name : 'No activity selected'}
-                                    </div>
-                                </>
-                            )}
-
-                            {selectedActivityDef?.has_sets && (
-                                <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                                    <span>Sets</span>
-                                    <select
-                                        value={selectedWindowState?.setsHandling || 'top'}
-                                        onChange={(event) => updateSelectedWindow({ setsHandling: event.target.value })}
-                                    >
-                                        <option value="top">Top Set</option>
-                                        <option value="average">Average</option>
-                                    </select>
-                                </label>
-                            )}
-
-                            {selectedActivityDef?.has_splits && selectedActivityDef?.split_definitions?.length > 0 && (
-                                <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                                    <span>Split</span>
-                                    <select
-                                        value={selectedWindowState?.selectedSplit || 'all'}
-                                        onChange={(event) => updateSelectedWindow({ selectedSplit: event.target.value })}
-                                    >
-                                        <option value="all">All Splits</option>
-                                        {selectedActivityDef.split_definitions.map((split) => (
-                                            <option key={split.id} value={split.id}>{split.name}</option>
-                                        ))}
-                                    </select>
-                                </label>
-                            )}
-
-                            {selectedWindowState?.selectedVisualization === 'scatterPlot' && metricDefinitions.length > 0 && (
-                                <>
-                                    <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                                        <span>X Axis</span>
-                                        <select
-                                            value={selectedMetricXId}
-                                            onChange={(event) => {
-                                                const metric = metricDefinitions.find((item) => item.id === event.target.value);
-                                                updateSelectedWindow({ selectedMetricX: metric || null });
-                                            }}
-                                        >
-                                            {metricDefinitions.map((metric) => (
-                                                <option key={metric.id} value={metric.id}>{metric.name}{metric.unit ? ` (${metric.unit})` : ''}</option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                    <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                                        <span>Y Axis</span>
-                                        <select
-                                            value={selectedMetricYId}
-                                            onChange={(event) => {
-                                                const metric = metricDefinitions.find((item) => item.id === event.target.value);
-                                                updateSelectedWindow({ selectedMetricY: metric || null });
-                                            }}
-                                        >
-                                            {metricDefinitions.map((metric) => (
-                                                <option key={metric.id} value={metric.id}>{metric.name}{metric.unit ? ` (${metric.unit})` : ''}</option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                </>
-                            )}
-
-                            {selectedWindowState?.selectedVisualization === 'lineGraph' && metricOptions.length > 0 && (
-                                <>
-                                    <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                                        <span>Left Axis</span>
-                                        <select
-                                            value={selectedMetricId}
-                                            onChange={(event) => {
-                                                const metric = metricOptions.find((item) => item.id === event.target.value);
-                                                updateSelectedWindow({ selectedMetric: metric || null });
-                                            }}
-                                        >
-                                            {metricOptions.map((metric) => (
-                                                <option key={metric.id} value={metric.id}>{metric.name}{metric.unit ? ` (${metric.unit})` : ''}</option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                    <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                                        <span>Right Axis</span>
-                                        <select
-                                            value={selectedMetricY2Id}
-                                            onChange={(event) => {
-                                                if (!event.target.value) {
-                                                    updateSelectedWindow({ selectedMetricY2: null });
-                                                    return;
-                                                }
-                                                const metric = metricOptions.find((item) => item.id === event.target.value);
-                                                updateSelectedWindow({ selectedMetricY2: metric || null });
-                                            }}
-                                        >
-                                            <option value="">None</option>
-                                            {metricOptions.map((metric) => (
-                                                <option key={metric.id} value={metric.id}>{metric.name}{metric.unit ? ` (${metric.unit})` : ''}</option>
-                                            ))}
-                                        </select>
-                                    </label>
-                                </>
-                            )}
-
-                            {selectedWindowState?.selectedVisualization === 'activityFrequency' && (
-                                <ActivityTotalsControls
-                                    selectedWindowState={selectedWindowState}
-                                    updateSelectedWindow={updateSelectedWindow}
-                                />
-                            )}
-
-                            {!['scatterPlot', 'lineGraph', 'personalBest', 'metricVolume', 'activityFrequency'].includes(selectedWindowState?.selectedVisualization) && (
-                                <div className="sessions-query-empty">
-                                    This visualization uses the global filters only.
-                                </div>
-                            )}
-                        </>
+                    {SelectedControls && (
+                        <SelectedControls
+                            context={{
+                                metricDefinitions,
+                                metricOptions,
+                                onOpenActivityModal: () => setIsProfileActivityModalOpen(true),
+                                onOpenGoalModal: () => setIsProfileGoalModalOpen(true),
+                                profileActivities,
+                                profileGoals,
+                                selectedActivityDef,
+                                selectedGoalDef,
+                                selectedMetricId,
+                                selectedMetricXId,
+                                selectedMetricYId,
+                                selectedMetricY2Id,
+                                selectedWindowState,
+                                selectedVisualizationMeta,
+                                updateSelectedWindow,
+                                updateVisualizationState,
+                                visualization: selectedVisualizationMeta,
+                                visualizationState,
+                            }}
+                        />
                     )}
                     </section>
                     )}
@@ -629,6 +460,14 @@ function AnalyticsFiltersSidebar({
                             selectedMetricY: null,
                             selectedMetric: null,
                             selectedMetricY2: null,
+                            visualizationState: {
+                                ...visualizationState,
+                                selectedSplit: 'all',
+                                metricX: null,
+                                metricY: null,
+                                metric: null,
+                                metricY2: null,
+                            },
                         });
                     }}
                 />

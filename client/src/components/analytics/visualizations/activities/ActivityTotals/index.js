@@ -7,9 +7,9 @@ export const ACTIVITY_TOTALS_VISUALIZATION = {
     name: 'Activity Totals',
     iconType: 'activities:activityFrequency',
     defaultState: {
-        activityTotalsMetric: 'instances',
-        activityTotalsShowGroups: false,
-        activityTotalsLimit: 15,
+        metric: 'instances',
+        showGroups: false,
+        limit: 15,
     },
     Chart: ActivityTotalsChart,
     Controls: ActivityTotalsControls,
