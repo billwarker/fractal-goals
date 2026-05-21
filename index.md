@@ -10,7 +10,8 @@ Fractal Goals is a full-stack goal and practice-tracking application built aroun
 - Goals flow from `Ultimate` down through `Immediate`
 - Sessions capture real execution work
 - Activities, templates, and programs structure recurring practice
-- Analytics, annotations, and logs explain what happened over time
+- Analytics, dashboards, annotations, and logs explain what happened over time
+- Auth, quotas, and tier limits provide the current SaaS account boundary
 
 The codebase is now organized around two main ideas:
 
@@ -52,6 +53,8 @@ Important backend design choices:
 - Serialization is separated from business logic.
 - Main domain events are emitted from services after successful commits.
 - Soft-delete behavior is standardized across the main app surfaces.
+- Ownership checks are centralized around user-owned roots/fractals and shared query helpers.
+- Quota checks are enforced in service write paths for SaaS resource limits.
 
 ### Frontend shape
 
@@ -75,6 +78,39 @@ Important frontend design choices:
 - Large multi-mode components were decomposed into coordinators plus focused subcomponents/hooks.
 - Modal behavior and state reset patterns are more standardized than before.
 
+## SaaS And Account Layer
+
+The app has a real account boundary rather than a purely local/single-user model.
+
+Current SaaS/account pieces:
+
+- JWT auth with HttpOnly cookie support
+- user profile, password, email, username, and preferences endpoints
+- membership tiers and quota limits for free/paid/legacy users
+- quota usage reporting in account settings
+- production security checks for JWT secrets, CORS, and cookie settings
+- rate limiting on sensitive auth and selected write endpoints
+
+Key backend pieces:
+
+- `services/auth_service.py`
+- `services/user_service.py`
+- `services/quota_service.py`
+- `blueprints/auth_api.py`
+- `models/user.py`
+
+Key frontend pieces:
+
+- `client/src/contexts/AuthContext.jsx`
+- `client/src/components/modals/AuthModal.jsx`
+- `client/src/components/modals/SettingsModal.jsx`
+
+Remaining SaaS build-out to know:
+
+- Stripe/customer-portal/webhook integration is not yet wired as a full billing system.
+- Email workflows such as password reset, verification, billing notices, and quota warnings are not yet present.
+- Admin/support tooling is not yet a first-class product surface.
+
 ## Core Domain Areas
 
 ### Goals
@@ -91,9 +127,14 @@ Key supporting backend pieces:
 
 - `services/goal_service.py`
 - `services/goal_tree_service.py`
+- `services/goal_level_service.py`
 - `services/goal_domain_rules.py`
 - `services/goal_target_rules.py`
+- `services/goal_target_service.py`
+- `services/goal_timeline_service.py`
 - `services/goal_analytics_service.py`
+- `blueprints/goals_api.py`
+- `blueprints/goal_levels_api.py`
 
 Key supporting frontend pieces:
 
@@ -118,15 +159,25 @@ Sessions support:
 Key backend pieces:
 
 - `services/session_service.py`
+- `services/session_runtime.py`
+- `services/session_structure.py`
+- `services/session_template_stats_service.py`
+- `services/timer_service.py`
 - `blueprints/sessions_api.py`
 - `blueprints/timers_api.py`
 
 Key frontend pieces:
 
 - `client/src/hooks/useSessionQueries.js`
+- `client/src/hooks/useSessionDetailData.js`
+- `client/src/hooks/useSessionDetailMutations.js`
+- `client/src/hooks/useSessionDetailController.js`
 - `client/src/contexts/ActiveSessionContext.jsx`
+- `client/src/pages/Sessions.jsx`
+- `client/src/pages/CreateSession.jsx`
 - `client/src/pages/SessionDetail.jsx`
 - `client/src/hooks/useSessionGoalsViewModel.js`
+- `client/src/hooks/useSessionSidePaneViewModel.js`
 - `client/src/components/sessionDetail/SessionGoalHierarchyPanel.jsx`
 - `client/src/components/sessionDetail/TimelinePanel.jsx`
 - `client/src/components/common/TimelineShell.jsx`
@@ -182,11 +233,15 @@ They support:
 Key backend pieces:
 
 - `services/activity_service.py`
+- `services/activity_group_service.py`
+- `services/activity_metric_service.py`
+- `services/metrics.py`
 - `blueprints/activities_api.py`
 
 Key frontend pieces:
 
 - `client/src/hooks/useActivityQueries.js`
+- `client/src/hooks/useActivityHistory.js`
 - `client/src/components/ActivityBuilder.jsx`
 - `client/src/components/common/ActivitySearchWidget.jsx`
 - `client/src/pages/ManageActivities.jsx`
@@ -251,11 +306,19 @@ Program-day scheduling now goes through the programs service/API as a validated 
 
 Key frontend pieces:
 
-- `client/src/pages/Programs.jsx`
-- `client/src/pages/ProgramDetail.jsx`
+- `client/src/pages/ProgramCalendarPage.jsx`
+- `client/src/hooks/useProgramsCalendarData.js`
+- `client/src/hooks/useProgramData.js`
+- `client/src/hooks/useProgramDetailController.js`
+- `client/src/hooks/useProgramDetailMutations.js`
+- `client/src/hooks/useProgramDetailViewModel.js`
 - `client/src/pages/CreateSessionTemplate.jsx`
 - `client/src/components/modals/ProgramBuilder.jsx`
+- `client/src/components/modals/ProgramBlockModal.jsx`
 - `client/src/components/modals/ProgramDayModal.jsx`
+- `client/src/components/programs/ProgramCalendarView.jsx`
+- `client/src/components/programs/ProgramBlockView.jsx`
+- `client/src/components/programs/ProgramSidebar.jsx`
 
 ### Auth and User Settings
 
@@ -272,29 +335,34 @@ Key frontend pieces:
 - `client/src/contexts/AuthContext.jsx`
 - `client/src/components/modals/SettingsModal.jsx`
 
-### Analytics, Annotations, and Logs
+### Analytics, Dashboards, Annotations, and Logs
 
 The app includes historical and analytical tooling on top of the core execution data.
 
 This includes:
 
-- analytics views and goal metrics
-- chart and heatmap annotations
+- analytics views, dashboards, visualization state, and goal metrics
+- frontend chart and heatmap annotations
 - event logging and audit history
 
 Key backend pieces:
 
+- `services/analytics_cache.py`
+- `services/dashboard_service.py`
 - `services/event_logger.py`
 - `services/events.py`
-- `services/annotation_service.py`
+- `services/goal_analytics_service.py`
 - `services/log_service.py`
-- `blueprints/annotations_api.py`
+- `blueprints/dashboards_api.py`
 - `blueprints/logs_api.py`
 
 Key frontend pieces:
 
 - `client/src/pages/Analytics.jsx`
 - `client/src/components/analytics/`
+- `client/src/components/analytics/visualizations/registry.js`
+- `client/src/hooks/useAnalyticsPageData.js`
+- `client/src/hooks/useDashboardQueries.js`
 - `client/src/components/modals/LogsModal.jsx`
 - `client/src/pages/Logs.jsx`
 
@@ -325,6 +393,8 @@ Shared backend infrastructure to know:
 - `services/serializers.py`
 - `services/owned_entity_queries.py`
 - `services/service_types.py`
+- `services/db_migration_service.py`
+- `services/analytics_cache.py`
 
 ### Frontend
 
@@ -340,6 +410,8 @@ Shared frontend infrastructure to know:
 - `client/src/hooks/queryKeys.js`
 - `client/src/utils/optimisticQuery.js`
 - `client/src/utils/goalNodeModel.js`
+- `client/src/utils/programViewModel.js`
+- `client/src/utils/sessionRuntime.js`
 
 ## Repository Map
 
@@ -402,12 +474,15 @@ Useful modes:
 
 - split CI for frontend, backend unit, backend integration, and coverage
 - repo-tracked git hooks for pre-commit and pre-push verification
+- Cloud Build deploys backend/frontend Cloud Run services and runs migration jobs with Secret Manager-backed database/JWT settings
 
 ## Architectural Improvements Already Landed
 
 This repo recently went through a large quality pass. The most important outcomes were:
 
 - The frontend data layer is now query-first.
+- Auth, quotas, user settings, and tier-aware usage reporting are now part of the core product layer.
+- Analytics dashboards, visualization registry/state, and cache helpers have become first-class infrastructure.
 - Service coverage is broad across goals, sessions, activities, notes, templates, programs, and goal levels.
 - Major route files were reduced and simplified.
 - Serialization, payload normalization, and domain rules were separated into dedicated modules.
@@ -445,6 +520,12 @@ At a high level, the repo is in strong shape structurally:
 - Architecture: much cleaner than before
 - Testing: broad and meaningful
 - Tooling: solid
-- Maintainability: improved substantially
+- Maintainability: improved substantially, with a known decomposition backlog for the largest services, hooks, and React components
 
-The main remaining work at any given moment is likely to be incremental product bugs or cleanup, not missing core architecture.
+The main remaining work is no longer just incremental cleanup. The highest-leverage next phase is SaaS hardening and scale-readiness:
+
+- decompose large services and UI coordinators before they calcify
+- wire real billing, webhook, and email workflows into the quota/account layer
+- add async/background job execution for analytics, email, billing sync, and heavy recomputation
+- expand observability beyond exception capture into request, latency, quota, and business metrics
+- add admin/support tooling for paid-customer operations

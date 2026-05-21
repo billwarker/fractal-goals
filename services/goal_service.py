@@ -18,15 +18,12 @@ from models import (
     SessionTemplate,
     SplitDefinition,
     Target,
-    TargetMetricCondition,
     activity_goal_associations,
     goal_activity_group_associations,
     get_goal_by_id,
-    get_session_by_id,
     session_goals,
     validate_root_goal,
 )
-from services.goal_target_rules import check_metrics_meet_target
 from services.goal_type_utils import get_canonical_goal_type
 from services.events import event_bus, Event, Events
 from services.goal_domain_rules import (
@@ -39,17 +36,13 @@ from services.metrics import GoalMetricsService
 from services.payload_normalizers import normalize_goal_payload
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
-from services.serializers import (
-    calculate_smart_status,
-    format_utc,
-    serialize_activity_instance,
-    serialize_target,
-)
+from services.serializers import calculate_smart_status
 from services.view_serializers import (
     serialize_fractal_summary,
     serialize_goal_selection_item,
-    serialize_goal_target_evaluation_result,
 )
+from services.goal_target_service import GoalTargetService, sync_goal_targets, normalize_target_metrics
+from services.goal_timeline_service import GoalTimelineService
 from validators import parse_date_string
 
 logger = logging.getLogger(__name__)
@@ -70,13 +63,6 @@ _DEFAULT_LEVEL_RANKS = {
     'Short Term Goal': 3,
     'Immediate Goal': 4,
 }
-
-_GOAL_TIMELINE_TYPES = {
-    'activity',
-    'target',
-    'child_goal',
-}
-
 
 def resolve_level_id(db_session, type_value) -> str | None:
     level_name = _TYPE_TO_LEVEL_NAME.get(type_value)
@@ -132,164 +118,6 @@ def authorize_goal_access(db_session, current_user_id, goal, root_id_hint=None) 
     if goal.root_id and goal.root_id != authorized_root_id:
         return None
     return authorized_root_id
-
-
-def sync_goal_targets(db_session, goal, incoming_targets) -> None:
-    def _parse_date(value):
-        if not value:
-            return None
-        if isinstance(value, str):
-            if not value.strip():
-                return None
-            try:
-                if 'T' in value:
-                    value = value.split('T')[0]
-                return datetime.strptime(value, '%Y-%m-%d')
-            except ValueError:
-                logger.warning("Invalid target date format: %s", value)
-                return None
-        return value
-
-    def _parse_int(value):
-        if value is None or value == '':
-            return None
-        try:
-            return int(value)
-        except Exception:
-            return None
-
-    def _clean_metrics(value):
-        if not isinstance(value, list):
-            return []
-
-        cleaned = []
-        for metric in value:
-            metric_id = metric.get('metric_id') or metric.get('metric_definition_id')
-            if not metric_id:
-                continue
-
-            raw_target = metric.get('value', metric.get('target_value', 0))
-            try:
-                target_value = float(raw_target)
-                import math
-                if not math.isfinite(target_value):
-                    target_value = 0.0
-            except Exception:
-                target_value = 0.0
-
-            cleaned.append({
-                'metric_definition_id': metric_id,
-                'target_value': target_value,
-                'operator': metric.get('operator', '>='),
-            })
-        return cleaned
-
-    current_targets = {target.id: target for target in goal.targets_rel if target.deleted_at is None}
-    incoming_ids = {target.get('id') for target in incoming_targets if target.get('id')}
-
-    for target_id, target in current_targets.items():
-        if target_id not in incoming_ids:
-            target.deleted_at = datetime.now(timezone.utc)
-            logger.debug("Soft-deleted target %s", target_id)
-
-    for target_data in incoming_targets:
-        target_id = target_data.get('id')
-        activity_id = target_data.get('activity_id') or None
-        activity_instance_id = target_data.get('activity_instance_id') or None
-        linked_block_id = target_data.get('linked_block_id') or None
-        start_date = _parse_date(target_data.get('start_date'))
-        end_date = _parse_date(target_data.get('end_date'))
-        frequency_days = _parse_int(target_data.get('frequency_days'))
-        frequency_count = _parse_int(target_data.get('frequency_count'))
-        metrics = _clean_metrics(target_data.get('metrics'))
-
-        if target_id and target_id in current_targets:
-            target = current_targets[target_id]
-            target.name = target_data.get('name', target.name)
-            target.activity_id = activity_id
-            target.activity_instance_id = activity_instance_id
-            target.type = target_data.get('type', target.type)
-            target.time_scope = target_data.get('time_scope', target.time_scope)
-            target.start_date = start_date
-            target.end_date = end_date
-            target.linked_block_id = linked_block_id
-            target.frequency_days = frequency_days
-            target.frequency_count = frequency_count
-
-            existing_conditions = {condition.metric_definition_id: condition for condition in (target.metric_conditions or [])}
-            incoming_metric_ids = {metric['metric_definition_id'] for metric in metrics}
-
-            for condition in list(target.metric_conditions or []):
-                if condition.metric_definition_id not in incoming_metric_ids:
-                    db_session.delete(condition)
-
-            for metric in metrics:
-                condition = existing_conditions.get(metric['metric_definition_id'])
-                if condition:
-                    condition.operator = metric['operator']
-                    condition.target_value = metric['target_value']
-                else:
-                    db_session.add(TargetMetricCondition(
-                        target_id=target.id,
-                        metric_definition_id=metric['metric_definition_id'],
-                        operator=metric['operator'],
-                        target_value=metric['target_value'],
-                    ))
-            logger.debug("Updated target %s", target_id)
-            continue
-
-        new_target = Target(
-            id=target_id or str(uuid.uuid4()),
-            goal_id=goal.id,
-            root_id=goal.root_id or goal.id,
-            activity_id=activity_id,
-            activity_instance_id=activity_instance_id,
-            name=target_data.get('name', 'Measure'),
-            type=target_data.get('type', 'threshold'),
-            time_scope=target_data.get('time_scope', 'all_time'),
-            start_date=start_date,
-            end_date=end_date,
-            linked_block_id=linked_block_id,
-            frequency_days=frequency_days,
-            frequency_count=frequency_count,
-            completed=target_data.get('completed', False),
-        )
-        db_session.add(new_target)
-        db_session.flush()
-
-        for metric in metrics:
-            db_session.add(TargetMetricCondition(
-                target_id=new_target.id,
-                metric_definition_id=metric['metric_definition_id'],
-                operator=metric['operator'],
-                target_value=metric['target_value'],
-            ))
-        logger.debug("Created new target %s with activity_id=%s", new_target.id, activity_id)
-
-
-def normalize_target_metrics(metrics) -> list[JsonDict]:
-    if not isinstance(metrics, list):
-        return []
-
-    normalized = []
-    for metric in metrics:
-        metric_id = metric.get('metric_id') or metric.get('metric_definition_id')
-        if not metric_id:
-            continue
-
-        raw_target = metric.get('value', metric.get('target_value', 0))
-        try:
-            target_value = float(raw_target)
-        except (TypeError, ValueError):
-            target_value = 0.0
-
-        normalized.append({
-            'metric_definition_id': metric_id,
-            'operator': metric.get('operator', '>='),
-            'target_value': target_value,
-        })
-
-    return normalized
 
 
 class GoalService:
@@ -1133,311 +961,14 @@ class GoalService:
         include_children=True,
         limit=50,
     ) -> ServiceResult[JsonDict]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        goal = self.db_session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
-        if not goal:
-            return None, "Goal not found", 404
-
-        limit = max(1, min(int(limit or 50), 200))
-        if types is None:
-            requested_types = set(_GOAL_TIMELINE_TYPES)
-        else:
-            requested_types = set(types) & _GOAL_TIMELINE_TYPES
-
-        all_subtree_goals = self._collect_goal_subtree(goal)
-        timeline_goals = all_subtree_goals if include_children else [goal]
-        timeline_goal_ids = {item.id for item in timeline_goals}
-        all_subtree_ids = {item.id for item in all_subtree_goals}
-        goals_by_id = {item.id: item for item in all_subtree_goals}
-        entries = []
-
-        def source_relationship(source_goal_id):
-            if source_goal_id == goal.id:
-                return 'self'
-            if source_goal_id in all_subtree_ids:
-                return 'descendant'
-            return 'parent_inherited'
-
-        def append_entry(entry_id, entry_type, timestamp, title, *, category,
-                         subtitle=None,
-                         entity_id=None, entity_type=None, source_goal=None,
-                         relationship=None, payload=None):
-            if not timestamp or category not in requested_types:
-                return
-            entries.append({
-                'id': entry_id,
-                'type': category,
-                'category': category,
-                'event_type': entry_type,
-                'timestamp': format_utc(timestamp),
-                'title': title,
-                'subtitle': subtitle,
-                'entity_id': entity_id,
-                'entity_type': entity_type,
-                'source_goal_id': source_goal.id if source_goal else None,
-                'source_goal_name': source_goal.name if source_goal else None,
-                'relationship': relationship or (source_relationship(source_goal.id) if source_goal else 'self'),
-                'payload': payload or {},
-            })
-
-        def occurred_while_goal_active(instance, source_goal):
-            occurred_at = instance.time_start or instance.created_at
-            if not occurred_at:
-                return False
-            if source_goal.created_at and occurred_at < source_goal.created_at:
-                return False
-            if source_goal.completed_at and occurred_at >= source_goal.completed_at:
-                return False
-            return True
-
-        def serialize_timeline_goal(goal_item):
-            level = getattr(goal_item, 'level', None)
-            return {
-                'goal_id': goal_item.id,
-                'goal_name': goal_item.name,
-                'type': get_canonical_goal_type(goal_item),
-                'level_id': goal_item.level_id,
-                'level_name': getattr(level, 'name', None) if level else None,
-                'is_smart': all(calculate_smart_status(goal_item).values()),
-                'level': {
-                    'id': getattr(level, 'id', None),
-                    'name': getattr(level, 'name', None),
-                    'color': getattr(level, 'color', None),
-                    'secondary_color': getattr(level, 'secondary_color', None),
-                    'icon': getattr(level, 'icon', None),
-                } if level else None,
-            }
-
-        effective_goal_ids = set(timeline_goal_ids)
-        parent_goal = None
-        if goal.inherit_parent_activities and goal.parent_id:
-            parent_goal = self.db_session.query(Goal).filter(
-                Goal.id == goal.parent_id,
-                Goal.root_id == root_id,
-                Goal.deleted_at.is_(None),
-            ).first()
-            if parent_goal:
-                effective_goal_ids.add(parent_goal.id)
-
-        activity_contexts = {}
-        direct_activity_rows = self.db_session.execute(
-            select(
-                activity_goal_associations.c.activity_id,
-                activity_goal_associations.c.goal_id,
-                activity_goal_associations.c.created_at,
-            ).where(
-                activity_goal_associations.c.goal_id.in_(effective_goal_ids),
-                activity_goal_associations.c.deleted_at.is_(None),
-            )
-        ).all()
-        for activity_id, source_goal_id, associated_at in direct_activity_rows:
-            source_goal = goals_by_id.get(source_goal_id) or parent_goal
-            if source_goal:
-                activity_contexts.setdefault(activity_id, []).append((source_goal, associated_at))
-
-        group_rows = self.db_session.execute(
-            select(
-                goal_activity_group_associations.c.activity_group_id,
-                goal_activity_group_associations.c.goal_id,
-                goal_activity_group_associations.c.created_at,
-            ).where(
-                goal_activity_group_associations.c.goal_id.in_(effective_goal_ids),
-                goal_activity_group_associations.c.deleted_at.is_(None),
-            )
-        ).all()
-        group_ids = {row.activity_group_id for row in group_rows}
-        activities_by_group = {}
-        if group_ids:
-            group_activities = self.db_session.query(ActivityDefinition).filter(
-                ActivityDefinition.root_id == root_id,
-                ActivityDefinition.group_id.in_(group_ids),
-                ActivityDefinition.deleted_at.is_(None),
-            ).all()
-            for activity in group_activities:
-                activities_by_group.setdefault(activity.group_id, []).append(activity)
-        for group_id, source_goal_id, associated_at in group_rows:
-            source_goal = goals_by_id.get(source_goal_id) or parent_goal
-            if not source_goal:
-                continue
-            for activity in activities_by_group.get(group_id, []):
-                activity_contexts.setdefault(activity.id, []).append((source_goal, associated_at))
-
-        if 'activity' in requested_types and activity_contexts:
-            instances = self.db_session.query(ActivityInstance).options(
-                selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
-                selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
-                selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
-                selectinload(ActivityInstance.session),
-            ).filter(
-                ActivityInstance.root_id == root_id,
-                ActivityInstance.activity_definition_id.in_(list(activity_contexts.keys())),
-                ActivityInstance.completed.is_(True),
-                ActivityInstance.deleted_at.is_(None),
-            ).all()
-            for instance in instances:
-                source_goal = next(
-                    (
-                        candidate_goal
-                        for candidate_goal, _ in activity_contexts.get(instance.activity_definition_id, [])
-                        if occurred_while_goal_active(instance, candidate_goal)
-                    ),
-                    None,
-                )
-                if not source_goal:
-                    continue
-                serialized = serialize_activity_instance(instance)
-                session = instance.session
-                append_entry(
-                    f"activity_completed:{instance.id}",
-                    'activity.completed',
-                    instance.time_stop or instance.time_start or instance.created_at,
-                    f"Completed {serialized.get('name') or 'activity'}",
-                    category='activity',
-                    subtitle=session.name if session else None,
-                    entity_id=instance.id,
-                    entity_type='activity_instance',
-                    source_goal=source_goal,
-                    payload={
-                        **serialized,
-                        'session_name': session.name if session else None,
-                        'session_date': format_utc((session.session_start or session.created_at) if session else None),
-                    },
-                )
-
-        if 'activity' in requested_types:
-            activity_ids = {row.activity_id for row in direct_activity_rows}
-            activities_by_id = {}
-            if activity_ids:
-                activities = self.db_session.query(ActivityDefinition).filter(
-                    ActivityDefinition.id.in_(activity_ids),
-                    ActivityDefinition.root_id == root_id,
-                    ActivityDefinition.deleted_at.is_(None),
-                ).all()
-                activities_by_id = {activity.id: activity for activity in activities}
-            for activity_id, source_goal_id, associated_at in direct_activity_rows:
-                source_goal = goals_by_id.get(source_goal_id) or parent_goal
-                activity = activities_by_id.get(activity_id)
-                if not source_goal or not activity:
-                    continue
-                append_entry(
-                    f"activity_associated:{source_goal_id}:{activity_id}",
-                    'activity.associated',
-                    associated_at,
-                    f"Associated activity: {activity.name}",
-                    category='activity',
-                    entity_id=activity.id,
-                    entity_type='activity_definition',
-                    source_goal=source_goal,
-                    payload={'activity_definition_id': activity.id, 'activity_name': activity.name},
-                )
-            if group_ids:
-                groups = self.db_session.query(ActivityGroup).filter(
-                    ActivityGroup.id.in_(group_ids),
-                    ActivityGroup.root_id == root_id,
-                    ActivityGroup.deleted_at.is_(None),
-                ).all()
-                groups_by_id = {group.id: group for group in groups}
-                for group_id, source_goal_id, associated_at in group_rows:
-                    source_goal = goals_by_id.get(source_goal_id) or parent_goal
-                    group = groups_by_id.get(group_id)
-                    if not source_goal or not group:
-                        continue
-                    append_entry(
-                        f"activity_group_associated:{source_goal_id}:{group_id}",
-                        'activity_group.associated',
-                        associated_at,
-                        f"Associated activity group: {group.name}",
-                        category='activity',
-                        entity_id=group.id,
-                        entity_type='activity_group',
-                        source_goal=source_goal,
-                        payload={'activity_group_id': group.id, 'activity_group_name': group.name},
-                    )
-
-        if 'target' in requested_types:
-            targets = self.db_session.query(Target).options(
-                selectinload(Target.completed_session),
-                selectinload(Target.metric_conditions),
-            ).filter(
-                Target.root_id == root_id,
-                Target.goal_id.in_(timeline_goal_ids),
-                Target.deleted_at.is_(None),
-            ).all()
-            for target in targets:
-                source_goal = goals_by_id.get(target.goal_id, goal)
-                append_entry(
-                    f"target_created:{target.id}",
-                    'target.created',
-                    target.created_at,
-                    f"Created target: {target.name}",
-                    category='target',
-                    entity_id=target.id,
-                    entity_type='target',
-                    source_goal=source_goal,
-                    payload=serialize_target(target),
-                )
-                if not target.completed or not target.completed_at:
-                    continue
-                append_entry(
-                    f"target_achieved:{target.id}",
-                    'target.achieved',
-                    target.completed_at,
-                    f"Achieved target: {target.name}",
-                    category='target',
-                    subtitle=target.completed_session.name if target.completed_session else None,
-                    entity_id=target.id,
-                    entity_type='target',
-                    source_goal=source_goal,
-                    payload=serialize_target(target),
-                )
-
-        if 'child_goal' in requested_types and include_children:
-            for child in all_subtree_goals:
-                if child.id == goal.id:
-                    continue
-                append_entry(
-                    f"child_goal_created:{child.id}",
-                    'goal.created',
-                    child.created_at,
-                    f"Created goal: {child.name}",
-                    category='child_goal',
-                    entity_id=child.id,
-                    entity_type='goal',
-                    source_goal=child,
-                    relationship='descendant',
-                    payload=serialize_timeline_goal(child),
-                )
-                if not child.completed or not child.completed_at:
-                    continue
-                append_entry(
-                    f"child_goal_completed:{child.id}",
-                    'goal.completed',
-                    child.completed_at,
-                    f"Completed goal: {child.name}",
-                    category='child_goal',
-                    entity_id=child.id,
-                    entity_type='goal',
-                    source_goal=child,
-                    relationship='descendant',
-                    payload=serialize_timeline_goal(child),
-                )
-
-        entries.sort(key=lambda item: item['timestamp'] or '', reverse=True)
-        sliced = entries[:limit]
-        return {
-            'entries': sliced,
-            'available_types': sorted(_GOAL_TIMELINE_TYPES),
-            'filters': sorted(requested_types),
-            'pagination': {
-                'limit': limit,
-                'count': len(sliced),
-                'total': len(entries),
-                'has_more': len(entries) > limit,
-            },
-        }, None, 200
+        return GoalTimelineService(self.db_session).get_goal_timeline(
+            root_id,
+            goal_id,
+            current_user_id,
+            types=types,
+            include_children=include_children,
+            limit=limit,
+        )
 
     def delete_fractal_goal(self, root_id, goal_id, current_user_id, *, emit_event=True) -> ServiceResult[Goal]:
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -1463,77 +994,10 @@ class GoalService:
         return goal, None, 200
 
     def add_goal_target(self, goal_id, current_user_id, data) -> ServiceResult[JsonDict]:
-        goal = get_goal_by_id(self.db_session, goal_id)
-        if not goal:
-            return None, "Goal not found", 404
-        if not self._authorize_goal_access(current_user_id, goal):
-            return None, "Goal not found or access denied", 404
-
-        metrics = normalize_target_metrics(data.get('metrics'))
-
-        new_target = Target(
-            id=data.get('id') or str(uuid.uuid4()),
-            goal_id=goal_id,
-            root_id=goal.root_id or goal_id,
-            activity_id=data.get('activity_id'),
-            activity_instance_id=data.get('activity_instance_id'),
-            name=data.get('name', 'Measure'),
-            type=data.get('type', 'threshold'),
-            time_scope=data.get('time_scope', 'all_time'),
-            start_date=data.get('start_date'),
-            end_date=data.get('end_date'),
-            linked_block_id=data.get('linked_block_id'),
-            frequency_days=data.get('frequency_days'),
-            frequency_count=data.get('frequency_count'),
-            completed=False,
-        )
-        self.db_session.add(new_target)
-        self.db_session.flush()
-
-        for metric in metrics:
-            self.db_session.add(TargetMetricCondition(
-                target_id=new_target.id,
-                metric_definition_id=metric['metric_definition_id'],
-                operator=metric['operator'],
-                target_value=metric['target_value'],
-            ))
-
-        self.db_session.commit()
-        self.db_session.refresh(new_target)
-        event_bus.emit(Event(Events.TARGET_CREATED, {
-            'target_id': new_target.id,
-            'target_name': new_target.name,
-            'goal_id': goal.id,
-            'goal_name': goal.name,
-            'root_id': goal.root_id or goal_id,
-        }, source='goal_service.add_goal_target'))
-        return {"goal": goal, "target": new_target}, None, 201
+        return GoalTargetService(self.db_session).add_goal_target(goal_id, current_user_id, data)
 
     def remove_goal_target(self, goal_id, target_id, current_user_id) -> ServiceResult[JsonDict]:
-        goal = get_goal_by_id(self.db_session, goal_id)
-        if not goal:
-            return None, "Goal not found", 404
-        if not self._authorize_goal_access(current_user_id, goal):
-            return None, "Goal not found or access denied", 404
-
-        target = self.db_session.query(Target).filter(
-            Target.id == target_id,
-            Target.goal_id == goal_id,
-            Target.deleted_at.is_(None),
-        ).first()
-        if not target:
-            return None, "Target not found", 404
-
-        target.deleted_at = datetime.now(timezone.utc)
-        self.db_session.commit()
-        event_bus.emit(Event(Events.TARGET_DELETED, {
-            'target_id': target.id,
-            'target_name': target.name,
-            'goal_id': goal.id,
-            'goal_name': goal.name,
-            'root_id': goal.root_id or goal_id,
-        }, source='goal_service.remove_goal_target'))
-        return {"goal": goal, "target": target}, None, 200
+        return GoalTargetService(self.db_session).remove_goal_target(goal_id, target_id, current_user_id)
 
     def update_goal_completion(self, goal_id, current_user_id, data, root_id=None) -> ServiceResult[Goal]:
         goal = get_goal_by_id(self.db_session, goal_id)
@@ -1587,104 +1051,12 @@ class GoalService:
         return goal, None, 200
 
     def evaluate_goal_targets(self, root_id, goal_id, current_user_id, session_id) -> ServiceResult[JsonDict]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        goal = get_goal_by_id(self.db_session, goal_id)
-        if not goal:
-            return None, "Goal not found", 404
-        if goal.root_id != root_id:
-            return None, "Goal not found in this fractal", 404
-        if not session_id:
-            return None, "session_id is required", 400
-
-        session = get_session_by_id(self.db_session, session_id)
-        if not session:
-            return None, "Session not found", 404
-
-        targets = [target for target in goal.targets_rel if target.deleted_at is None]
-        if not targets:
-            return serialize_goal_target_evaluation_result(
-                goal,
-                targets_evaluated=0,
-                targets_completed=0,
-                newly_completed_targets=[],
-                goal_completed=False,
-            ), None, 200
-
-        activity_instances = self.db_session.query(ActivityInstance).filter(
-            ActivityInstance.session_id == session_id,
-            ActivityInstance.deleted_at.is_(None),
-        ).all()
-
-        instances_by_activity = {}
-        for instance in activity_instances:
-            instances_by_activity.setdefault(instance.activity_definition_id, []).append(
-                serialize_activity_instance(instance)
-            )
-
-        now = datetime.now(timezone.utc)
-        newly_completed_targets = []
-
-        for target in targets:
-            if target.completed:
-                continue
-
-            activity_id = target.activity_id
-            target_metrics = [
-                {
-                    'metric_id': condition.metric_definition_id,
-                    'metric_definition_id': condition.metric_definition_id,
-                    'value': condition.target_value,
-                    'target_value': condition.target_value,
-                    'operator': condition.operator,
-                }
-                for condition in (target.metric_conditions or [])
-            ]
-            if not activity_id or not target_metrics:
-                continue
-
-            target_achieved = False
-            for instance in instances_by_activity.get(activity_id, []):
-                for instance_set in (instance.get('sets') or []):
-                    if check_metrics_meet_target(target_metrics, instance_set.get('metrics', [])):
-                        target_achieved = True
-                        break
-                if target_achieved:
-                    break
-                if check_metrics_meet_target(target_metrics, instance.get('metrics', [])):
-                    target_achieved = True
-                    break
-
-            if not target_achieved:
-                continue
-
-            target.completed = True
-            target.completed_at = now
-            target.completed_session_id = session_id
-            newly_completed_targets.append(serialize_target(target))
-
-        targets_completed = sum(1 for target in targets if target.completed)
-        targets_total = len(targets)
-        goal_was_completed = False
-
-        if targets_completed == targets_total and targets_total > 0 and not goal.completed and not goal.frozen:
-            goal.completed = True
-            goal.completed_at = now
-            goal_was_completed = True
-            logger.info("Auto-completing goal %s - all %s targets met", goal_id, targets_total)
-
-        self.db_session.commit()
-        self.db_session.refresh(goal)
-
-        return serialize_goal_target_evaluation_result(
-            goal,
-            targets_evaluated=targets_total,
-            targets_completed=targets_completed,
-            newly_completed_targets=newly_completed_targets,
-            goal_completed=goal_was_completed,
-        ), None, 200
+        return GoalTargetService(self.db_session).evaluate_goal_targets(
+            root_id,
+            goal_id,
+            current_user_id,
+            session_id,
+        )
 
     # ========== GOAL OPTIONS ==========
 
