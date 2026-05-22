@@ -17,6 +17,7 @@ vi.mock('../../components/FractalView', () => ({
             data-testid="fractal-view"
             data-zoom-target={props.zoomTargetNodeId || ''}
             data-selected-node={props.selectedNodeId || ''}
+            data-hide-inactive-goals={String(Boolean(props.viewSettings?.hideInactiveGoals))}
         />
     ),
 }));
@@ -255,5 +256,16 @@ describe('FractalGoals type-to-zoom search', () => {
         expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-zoom-target', '');
 
         document.body.removeChild(input);
+    });
+
+    it('offers a graph option to hide inactive goals', () => {
+        renderFractalGoals();
+
+        const hideInactiveToggle = screen.getByLabelText('Hide inactive goals');
+        expect(hideInactiveToggle).not.toBeChecked();
+
+        fireEvent.click(hideInactiveToggle);
+
+        expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-hide-inactive-goals', 'true');
     });
 });

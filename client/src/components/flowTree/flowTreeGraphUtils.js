@@ -16,6 +16,7 @@ const toId = (value) => (value == null ? null : String(value));
 
 export const DEFAULT_VIEW_SETTINGS = {
     fadeInactiveBranches: false,
+    hideInactiveGoals: false,
     hideCompletedGoals: false,
 };
 
@@ -70,7 +71,11 @@ export const convertTreeToFlow = (
     onAddChild,
     selectedNodeId = null,
     completedGoalColor = '#FFD700',
-    { hideCompletedGoals = false } = {}
+    {
+        hideCompletedGoals = false,
+        hiddenInactiveGoalIds = null,
+        activeLineageIds = new Set(),
+    } = {}
 ) => {
     const nodes = [];
     const edges = [];
@@ -89,6 +94,7 @@ export const convertTreeToFlow = (
         if (addedNodeIds.has(nodeId)) return;
         if (lineagePath && !lineagePath.has(nodeId)) return;
         if (hideCompletedGoals && Boolean(node.attributes?.completed || node.completed)) return;
+        if (hiddenInactiveGoalIds?.has(nodeId) && !activeLineageIds.has(nodeId)) return;
 
         const nodeType = getGoalNodeType(normalizedNode);
 
@@ -184,7 +190,11 @@ export const buildGraphPresentation = ({
         onAddChild,
         selectedNodeId,
         completedGoalColor,
-        { hideCompletedGoals: normalizedSettings.hideCompletedGoals }
+        {
+            hideCompletedGoals: normalizedSettings.hideCompletedGoals,
+            hiddenInactiveGoalIds: normalizedSettings.hideInactiveGoals ? inactiveNodeIds : null,
+            activeLineageIds,
+        }
     );
 
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, rawEdges, 'TB', isMobile);

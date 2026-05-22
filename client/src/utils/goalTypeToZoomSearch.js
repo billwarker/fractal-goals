@@ -37,6 +37,7 @@ export function fuzzyGoalNameMatches(name, query) {
 export function getVisibleGoalSearchCandidates(treeData, {
     selectedNodeId = null,
     hideCompletedGoals = false,
+    hiddenInactiveGoalIds = null,
 } = {}) {
     if (!treeData) return [];
 
@@ -52,6 +53,7 @@ export function getVisibleGoalSearchCandidates(treeData, {
 
         if (selectedLineage && !selectedLineage.has(nodeId)) return;
         if (hideCompletedGoals && Boolean(normalizedNode.completed)) return;
+        if (hiddenInactiveGoalIds?.has(nodeId)) return;
 
         const name = getGoalNodeName(normalizedNode);
         candidates.push({

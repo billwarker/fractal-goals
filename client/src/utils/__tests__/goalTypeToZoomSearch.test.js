@@ -70,4 +70,32 @@ describe('goalTypeToZoomSearch', () => {
 
         expect(candidates.map((candidate) => candidate.id)).toEqual(['root', 'visible']);
     });
+
+    it('omits hidden inactive candidates', () => {
+        const tree = {
+            id: 'root',
+            name: 'Root',
+            type: 'UltimateGoal',
+            children: [
+                {
+                    id: 'inactive',
+                    name: 'Inactive Goal',
+                    type: 'LongTermGoal',
+                    children: [],
+                },
+                {
+                    id: 'active',
+                    name: 'Active Goal',
+                    type: 'LongTermGoal',
+                    children: [],
+                },
+            ],
+        };
+
+        const candidates = getVisibleGoalSearchCandidates(tree, {
+            hiddenInactiveGoalIds: new Set(['inactive']),
+        });
+
+        expect(candidates.map((candidate) => candidate.id)).toEqual(['root', 'active']);
+    });
 });

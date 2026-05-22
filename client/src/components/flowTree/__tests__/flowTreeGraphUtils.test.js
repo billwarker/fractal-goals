@@ -38,6 +38,57 @@ describe('buildGraphPresentation', () => {
         expect(pausedEdge?.style?.opacity).toBe(0.26);
     });
 
+    it('hides inactive goals while keeping active lineage visible', () => {
+        const treeData = {
+            id: 'root-1',
+            name: 'Root Goal',
+            type: 'UltimateGoal',
+            children: [
+                {
+                    id: 'active-parent',
+                    name: 'Active Parent',
+                    type: 'LongTermGoal',
+                    children: [
+                        {
+                            id: 'active-leaf',
+                            name: 'Active Leaf',
+                            type: 'MidTermGoal',
+                            children: [],
+                        },
+                    ],
+                },
+                {
+                    id: 'inactive-goal',
+                    name: 'Inactive Goal',
+                    type: 'LongTermGoal',
+                    children: [],
+                },
+            ],
+        };
+
+        const graph = buildGraphPresentation({
+            treeData,
+            onNodeClick: () => {},
+            onAddChild: () => {},
+            selectedNodeId: null,
+            completedGoalColor: '#FFD700',
+            viewSettings: { hideInactiveGoals: true },
+            sessions: [],
+            evidenceGoalIds: new Set(['active-leaf']),
+            activities: [],
+            activityGroups: [],
+            programs: [],
+            isMobile: false,
+        });
+
+        expect(graph.nodes.map((node) => node.id)).toEqual([
+            'root-1',
+            'active-parent',
+            'active-leaf',
+        ]);
+        expect(graph.edges.find((edge) => edge.target === 'inactive-goal')).toBeUndefined();
+    });
+
     it('highlights active lineage edges and adds a visible journey-to-root overlay', () => {
         const treeData = {
             id: 'root-1',

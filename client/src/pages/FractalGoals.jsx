@@ -12,7 +12,7 @@ import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { buildTreeMaps, getLineagePath } from '../components/flowTree/flowTreeTreeUtils';
 import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
-import { getActiveGoalWindowDaysFromSettings } from '../hooks/useFlowTreeMetrics';
+import { getActiveGoalWindowDaysFromSettings, getInactiveNodeIds } from '../hooks/useFlowTreeMetrics';
 import { useFlowTreeEvidence, useFlowtreeSessionMetrics } from '../hooks/useSessionQueries';
 import { getChildType } from '../utils/goalHelpers';
 import { findGoalNodeById, getGoalNodeId, getGoalNodeName, getGoalNodeType } from '../utils/goalNodeModel';
@@ -34,6 +34,7 @@ const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalD
 const FLOWTREE_SETTINGS_STORAGE_KEY = 'flowtree-view-settings';
 const DEFAULT_VIEW_SETTINGS = {
     fadeInactiveBranches: false,
+    hideInactiveGoals: false,
     hideCompletedGoals: false,
     showMetricsOverlay: false,
 };
@@ -70,6 +71,7 @@ function renderTypeToZoomQuery(query) {
 
 function FractalGoals() {
     const hideCompletedTooltip = 'Hides completed goals from the fractal tree.';
+    const hideInactiveTooltip = 'Hides goals with no completed activity evidence in the active window.';
     const [isOptionsPaneMinimized, setIsOptionsPaneMinimized] = useState(false);
 
     const { rootId } = useParams();
@@ -130,13 +132,25 @@ function FractalGoals() {
         if (!evidenceData) return null;
         return new Set((evidenceData.goal_ids || []).map((goalId) => String(goalId)));
     }, [evidenceData]);
+    const flowtreeMaps = useMemo(() => buildTreeMaps(fractalData), [fractalData]);
+    const hiddenInactiveGoalIds = useMemo(() => {
+        if (!viewSettings.hideInactiveGoals) return null;
+        return getInactiveNodeIds(
+            flowtreeMaps.nodeById,
+            flowtreeMaps.childrenById,
+            evidenceGoalIds || new Set()
+        );
+    }, [evidenceGoalIds, flowtreeMaps, viewSettings.hideInactiveGoals]);
     const visibleGoalIds = useMemo(() => {
         if (!fractalData) return [];
+        const filterHiddenInactive = (ids) => (
+            hiddenInactiveGoalIds ? ids.filter((id) => !hiddenInactiveGoalIds.has(id)) : ids
+        );
         if (selectedNodeId) {
-            return Array.from(getLineagePath(fractalData, selectedNodeId));
+            return filterHiddenInactive(Array.from(getLineagePath(fractalData, selectedNodeId)));
         }
-        return Array.from(buildTreeMaps(fractalData).nodeById.keys());
-    }, [fractalData, selectedNodeId]);
+        return filterHiddenInactive(Array.from(flowtreeMaps.nodeById.keys()));
+    }, [flowtreeMaps, fractalData, hiddenInactiveGoalIds, selectedNodeId]);
     const { data: flowtreeMetricsSummary } = useFlowtreeSessionMetrics(
         rootId,
         visibleGoalIds,
@@ -146,8 +160,9 @@ function FractalGoals() {
         getVisibleGoalSearchCandidates(fractalData, {
             selectedNodeId,
             hideCompletedGoals: viewSettings.hideCompletedGoals,
+            hiddenInactiveGoalIds,
         })
-    ), [fractalData, selectedNodeId, viewSettings.hideCompletedGoals]);
+    ), [fractalData, hiddenInactiveGoalIds, selectedNodeId, viewSettings.hideCompletedGoals]);
     const typeToZoomResults = useMemo(() => (
         getGoalSearchMatches(typeToZoomCandidates, typeToZoomQuery)
     ), [typeToZoomCandidates, typeToZoomQuery]);
@@ -462,6 +477,11 @@ function FractalGoals() {
                                     label={<span title={inactiveBranchTooltip}>Fade inactive branches</span>}
                                     checked={viewSettings.fadeInactiveBranches}
                                     onChange={handleToggleViewSetting('fadeInactiveBranches')}
+                                />
+                                <Checkbox
+                                    label={<span title={hideInactiveTooltip}>Hide inactive goals</span>}
+                                    checked={viewSettings.hideInactiveGoals}
+                                    onChange={handleToggleViewSetting('hideInactiveGoals')}
                                 />
                                 <Checkbox
                                     label={<span title={hideCompletedTooltip}>Hide completed goals</span>}
