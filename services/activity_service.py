@@ -1,12 +1,10 @@
 import logging
-from sqlalchemy.orm import joinedload
-from sqlalchemy import select
 from models import (
     ActivityDefinition, MetricDefinition,
-    SplitDefinition, ActivityGroup, Goal,
-    activity_goal_associations, goal_activity_group_associations,
+    SplitDefinition, Goal,
     validate_root_goal, utc_now
 )
+from services.activity_association_service import ActivityAssociationService
 from services.activity_group_service import ActivityGroupService, validate_activity_group_id
 from services.activity_metric_service import (
     ALLOWED_PROGRESS_AGGREGATIONS,
@@ -18,7 +16,6 @@ from services.payload_normalizers import (
     normalize_activity_metrics,
     normalize_activity_payload,
     normalize_activity_splits,
-    normalize_id_list,
 )
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
@@ -110,342 +107,104 @@ class ActivityService:
             return None, ("Fractal not found or access denied", 404)
         return root, None
 
+    def _activity_association_service(self) -> ActivityAssociationService:
+        return ActivityAssociationService(self.db_session)
+
     def _replace_activity_goal_associations(self, activity_id, root_id, goal_ids) -> list[str]:
-        goal_ids = normalize_id_list(goal_ids)
-        valid_goal_ids = []
-        if goal_ids:
-            valid_goal_ids = [
-                goal_id
-                for (goal_id,) in self.db_session.query(Goal.id).filter(
-                    Goal.id.in_(goal_ids),
-                    Goal.root_id == root_id,
-                    Goal.deleted_at.is_(None),
-                ).all()
-            ]
-
-        self.db_session.execute(
-            activity_goal_associations.delete().where(
-                activity_goal_associations.c.activity_id == activity_id
-            )
+        return self._activity_association_service().replace_activity_goal_associations(
+            activity_id,
+            root_id,
+            goal_ids,
         )
-        if valid_goal_ids:
-            self.db_session.execute(
-                activity_goal_associations.insert(),
-                [
-                    {"activity_id": activity_id, "goal_id": goal_id}
-                    for goal_id in valid_goal_ids
-                ],
-            )
-        return valid_goal_ids
 
-    def list_activity_groups(self, root_id, current_user_id):
+    def list_activity_groups(self, root_id, current_user_id) -> ServiceResult[list]:
         return ActivityGroupService(self.db_session).list_activity_groups(root_id, current_user_id)
 
     # ── Fractal Metrics ─────────────────────────────────────────────────────
 
-    def list_fractal_metrics(self, root_id, current_user_id):
+    def list_fractal_metrics(self, root_id, current_user_id) -> ServiceResult[list]:
         return ActivityMetricService(self.db_session).list_fractal_metrics(root_id, current_user_id)
 
-    def create_fractal_metric(self, root_id, current_user_id, data):
+    def create_fractal_metric(self, root_id, current_user_id, data) -> ServiceResult:
         return ActivityMetricService(self.db_session).create_fractal_metric(root_id, current_user_id, data)
 
-    def update_fractal_metric(self, root_id, metric_id, current_user_id, data):
+    def update_fractal_metric(self, root_id, metric_id, current_user_id, data) -> ServiceResult:
         return ActivityMetricService(self.db_session).update_fractal_metric(root_id, metric_id, current_user_id, data)
 
-    def delete_fractal_metric(self, root_id, metric_id, current_user_id):
+    def delete_fractal_metric(self, root_id, metric_id, current_user_id) -> ServiceResult[JsonDict]:
         return ActivityMetricService(self.db_session).delete_fractal_metric(root_id, metric_id, current_user_id)
 
-    def create_activity_group(self, root_id, current_user_id, data):
+    def create_activity_group(self, root_id, current_user_id, data) -> ServiceResult:
         return ActivityGroupService(self.db_session).create_activity_group(root_id, current_user_id, data)
 
-    def update_activity_group(self, root_id, group_id, current_user_id, data):
+    def update_activity_group(self, root_id, group_id, current_user_id, data) -> ServiceResult:
         return ActivityGroupService(self.db_session).update_activity_group(root_id, group_id, current_user_id, data)
 
-    def delete_activity_group(self, root_id, group_id, current_user_id):
+    def delete_activity_group(self, root_id, group_id, current_user_id) -> ServiceResult[JsonDict]:
         return ActivityGroupService(self.db_session).delete_activity_group(root_id, group_id, current_user_id)
 
-    def reorder_activity_groups(self, root_id, current_user_id, group_ids):
+    def reorder_activity_groups(self, root_id, current_user_id, group_ids) -> ServiceResult[JsonDict]:
         return ActivityGroupService(self.db_session).reorder_activity_groups(root_id, current_user_id, group_ids)
 
-    def set_activity_group_goals(self, root_id, group_id, current_user_id, goal_ids):
+    def set_activity_group_goals(self, root_id, group_id, current_user_id, goal_ids) -> ServiceResult:
         return ActivityGroupService(self.db_session).set_activity_group_goals(root_id, group_id, current_user_id, goal_ids)
 
     def set_activity_goals(self, root_id, activity_id, current_user_id, goal_ids) -> ServiceResult[ActivityDefinition]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        activity = self.db_session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
-        if not activity:
-            return None, "Activity not found", 404
-
-        self._replace_activity_goal_associations(activity_id, root_id, goal_ids)
-
-        self.db_session.commit()
-        self.db_session.expire(activity, ['associated_goals'])
-
-        event_bus.emit(Event(Events.ACTIVITY_UPDATED, {
-            'activity_id': activity_id,
-            'activity_name': activity.name,
-            'root_id': root_id,
-            'updated_fields': ['associated_goals'],
-        }, source='activity_service.set_activity_goals'))
-
-        return activity, None, 200
+        return self._activity_association_service().set_activity_goals(
+            root_id,
+            activity_id,
+            current_user_id,
+            goal_ids,
+        )
 
     def remove_activity_goal(self, root_id, activity_id, goal_id, current_user_id) -> ServiceResult[JsonDict]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        activity = self.db_session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
-        if not activity:
-            return None, "Activity not found", 404
-
-        result = self.db_session.execute(
-            activity_goal_associations.delete().where(
-                activity_goal_associations.c.activity_id == activity_id,
-                activity_goal_associations.c.goal_id == goal_id,
-            )
+        return self._activity_association_service().remove_activity_goal(
+            root_id,
+            activity_id,
+            goal_id,
+            current_user_id,
         )
-        if result.rowcount == 0:
-            return None, "Association not found", 404
-
-        self.db_session.commit()
-
-        event_bus.emit(Event(Events.ACTIVITY_UPDATED, {
-            'activity_id': activity_id,
-            'activity_name': activity.name,
-            'root_id': root_id,
-            'updated_fields': ['associated_goals'],
-        }, source='activity_service.remove_activity_goal'))
-
-        return {"message": "Goal association removed"}, None, 200
 
     def set_goal_associations_batch(
         self, root_id, goal_id, current_user_id, activity_ids, group_ids
     ) -> ServiceResult[JsonDict]:
-        activity_ids = normalize_id_list(activity_ids)
-        group_ids = normalize_id_list(group_ids)
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        goal = self.db_session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
-        if not goal:
-            return None, "Goal not found", 404
-
-        if not isinstance(activity_ids, list) or not isinstance(group_ids, list):
-            return None, "activity_ids and group_ids must be lists", 400
-
-        valid_activities = self.db_session.query(ActivityDefinition.id).filter(
-            ActivityDefinition.root_id == root_id,
-            ActivityDefinition.id.in_(activity_ids),
-            ActivityDefinition.deleted_at.is_(None),
-        ).all()
-        valid_groups = self.db_session.query(ActivityGroup.id).filter(
-            ActivityGroup.root_id == root_id,
-            ActivityGroup.id.in_(group_ids),
-            ActivityGroup.deleted_at.is_(None),
-        ).all()
-        valid_activity_ids = {row[0] for row in valid_activities}
-        valid_group_ids = {row[0] for row in valid_groups}
-
-        self.db_session.execute(
-            activity_goal_associations.delete().where(activity_goal_associations.c.goal_id == goal_id)
+        return self._activity_association_service().set_goal_associations_batch(
+            root_id,
+            goal_id,
+            current_user_id,
+            activity_ids,
+            group_ids,
         )
-        if valid_activity_ids:
-            self.db_session.execute(
-                activity_goal_associations.insert(),
-                [{"goal_id": goal_id, "activity_id": activity_id} for activity_id in valid_activity_ids],
-            )
-
-        self.db_session.execute(
-            goal_activity_group_associations.delete().where(goal_activity_group_associations.c.goal_id == goal_id)
-        )
-        if valid_group_ids:
-            self.db_session.execute(
-                goal_activity_group_associations.insert(),
-                [{"goal_id": goal_id, "activity_group_id": group_id} for group_id in valid_group_ids],
-            )
-
-        self.db_session.commit()
-        return {
-            "activity_ids": list(valid_activity_ids),
-            "group_ids": list(valid_group_ids),
-        }, None, 200
 
     def get_goal_activities(self, root_id, goal_id, current_user_id) -> ServiceResult[JsonList]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        goal = self.db_session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
-        if not goal:
-            return None, "Goal not found", 404
-
-        def upsert_activity(
-            activity,
-            activities_map,
-            *,
-            is_inherited,
-            source_name=None,
-            source_goal_id=None,
-            from_linked_group=False,
-            direction=None,
-        ):
-            entry = activities_map.get(activity.id)
-            if entry is None:
-                entry = {
-                    "id": activity.id,
-                    "name": activity.name,
-                    "description": activity.description,
-                    "group_id": activity.group_id,
-                    "from_linked_group": from_linked_group,
-                    "has_direct_association": not is_inherited,
-                    "inherited_from_children": direction == "child",
-                    "inherited_from_parent": direction == "parent",
-                    "inherited_source_goal_names": [source_name] if direction == "child" and source_name else [],
-                    "inherited_source_goal_ids": [source_goal_id] if direction == "child" and source_goal_id else [],
-                    "is_inherited": is_inherited,
-                    "source_goal_name": source_name if is_inherited else None,
-                    "source_goal_id": source_goal_id if is_inherited else None,
-                }
-                activities_map[activity.id] = entry
-                return
-
-            if is_inherited:
-                if direction == "parent":
-                    entry["inherited_from_parent"] = True
-                else:
-                    entry["inherited_from_children"] = True
-                    if source_name and source_name not in entry["inherited_source_goal_names"]:
-                        entry["inherited_source_goal_names"].append(source_name)
-                    if source_goal_id and source_goal_id not in entry["inherited_source_goal_ids"]:
-                        entry["inherited_source_goal_ids"].append(source_goal_id)
-                if entry["source_goal_name"] is None and source_name:
-                    entry["source_goal_name"] = source_name
-                if entry["source_goal_id"] is None and source_goal_id:
-                    entry["source_goal_id"] = source_goal_id
-                return
-
-            entry["has_direct_association"] = True
-            entry["is_inherited"] = False
-            entry["from_linked_group"] = from_linked_group
-            if not entry["inherited_from_children"]:
-                entry["source_goal_name"] = None
-                entry["source_goal_id"] = None
-
-        def process_goal(goal_node, activities_map, *, is_inherited=False, source_name=None, direction=None):
-            source_goal_id = goal_node.id if is_inherited else None
-
-            for activity in goal_node.associated_activities:
-                if activity.deleted_at:
-                    continue
-
-                upsert_activity(
-                    activity,
-                    activities_map,
-                    is_inherited=is_inherited,
-                    source_name=source_name,
-                    source_goal_id=source_goal_id,
-                    from_linked_group=False,
-                    direction=direction,
-                )
-
-            for group in goal_node.associated_activity_groups:
-                for activity in group.activities:
-                    if activity.deleted_at:
-                        continue
-
-                    upsert_activity(
-                        activity,
-                        activities_map,
-                        is_inherited=is_inherited,
-                        source_name=source_name,
-                        source_goal_id=source_goal_id,
-                        from_linked_group=True,
-                        direction=direction,
-                    )
-
-        activities = {}
-        process_goal(goal, activities, is_inherited=False)
-
-        stack = [goal]
-        while stack:
-            current = stack.pop(0)
-            for child in current.children:
-                if child.deleted_at:
-                    continue
-                process_goal(child, activities, is_inherited=True, source_name=child.name, direction="child")
-                stack.append(child)
-
-        if goal.inherit_parent_activities and goal.parent_id:
-            parent = self.db_session.query(Goal).filter_by(id=goal.parent_id, root_id=root_id).first()
-            if parent and not parent.deleted_at:
-                process_goal(parent, activities, is_inherited=True, source_name=parent.name, direction="parent")
-
-        return list(activities.values()), None, 200
+        return self._activity_association_service().get_goal_activities(
+            root_id,
+            goal_id,
+            current_user_id,
+        )
 
     def get_goal_activity_groups(self, root_id, goal_id, current_user_id) -> ServiceResult[JsonList]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        goal = self.db_session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
-        if not goal:
-            return None, "Goal not found", 404
-
-        groups = [{"id": group.id, "name": group.name} for group in goal.associated_activity_groups]
-        return groups, None, 200
+        return self._activity_association_service().get_goal_activity_groups(
+            root_id,
+            goal_id,
+            current_user_id,
+        )
 
     def link_goal_activity_group(self, root_id, goal_id, group_id, current_user_id) -> ServiceResult[JsonDict]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        goal = self.db_session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
-        if not goal:
-            return None, "Goal not found", 404
-
-        group = self.db_session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
-        if not group:
-            return None, "Activity group not found", 404
-
-        existing = self.db_session.execute(
-            select(goal_activity_group_associations).where(
-                goal_activity_group_associations.c.goal_id == goal_id,
-                goal_activity_group_associations.c.activity_group_id == group_id,
-            )
-        ).first()
-        if existing:
-            return {"message": "Group already linked"}, None, 200
-
-        self.db_session.execute(
-            goal_activity_group_associations.insert().values(
-                goal_id=goal_id,
-                activity_group_id=group_id,
-            )
+        return self._activity_association_service().link_goal_activity_group(
+            root_id,
+            goal_id,
+            group_id,
+            current_user_id,
         )
-        self.db_session.commit()
-        return {"message": "Group linked successfully"}, None, 201
 
     def unlink_goal_activity_group(self, root_id, goal_id, group_id, current_user_id) -> ServiceResult[JsonDict]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        result = self.db_session.execute(
-            goal_activity_group_associations.delete().where(
-                goal_activity_group_associations.c.goal_id == goal_id,
-                goal_activity_group_associations.c.activity_group_id == group_id,
-            )
+        return self._activity_association_service().unlink_goal_activity_group(
+            root_id,
+            goal_id,
+            group_id,
+            current_user_id,
         )
-        if result.rowcount == 0:
-            return None, "Link not found", 404
-
-        self.db_session.commit()
-        return {"message": "Group unlinked successfully"}, None, 200
 
     def create_activity(self, root_id, activity_name, data) -> ActivityDefinition:
         """Handle full creation lifecycle of an ActivityDefinition including Metrics and Splits."""

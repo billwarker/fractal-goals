@@ -132,6 +132,7 @@ Key supporting backend pieces:
 - `services/goal_target_rules.py`
 - `services/goal_target_service.py`
 - `services/goal_timeline_service.py`
+- `services/goal_workflow_service.py`
 - `services/goal_analytics_service.py`
 - `blueprints/goals_api.py`
 - `blueprints/goal_levels_api.py`
@@ -159,6 +160,10 @@ Sessions support:
 Key backend pieces:
 
 - `services/session_service.py`
+- `services/session_activity_service.py`
+- `services/session_analytics_service.py`
+- `services/session_filters.py`
+- `services/session_lifecycle_service.py`
 - `services/session_runtime.py`
 - `services/session_structure.py`
 - `services/session_template_stats_service.py`
@@ -233,6 +238,7 @@ They support:
 Key backend pieces:
 
 - `services/activity_service.py`
+- `services/activity_association_service.py`
 - `services/activity_group_service.py`
 - `services/activity_metric_service.py`
 - `services/metrics.py`

@@ -43,6 +43,7 @@ from services.view_serializers import (
 )
 from services.goal_target_service import GoalTargetService, sync_goal_targets, normalize_target_metrics
 from services.goal_timeline_service import GoalTimelineService
+from services.goal_workflow_service import GoalWorkflowService
 from validators import parse_date_string
 
 logger = logging.getLogger(__name__)
@@ -368,8 +369,6 @@ class GoalService:
         right_rank = self._get_goal_level_rank(right_goal)
         if left_rank is not None and right_rank is not None:
             return left_rank == right_rank
-
-        from services.goal_type_utils import get_canonical_goal_type
 
         return get_canonical_goal_type(left_goal) == get_canonical_goal_type(right_goal)
 
@@ -1135,212 +1134,26 @@ class GoalService:
         return new_goal, None, 201
 
     def toggle_pause(self, root_id, goal_id, current_user_id, paused: bool) -> ServiceResult[Goal]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        goal = self.db_session.query(Goal).filter_by(
-            id=goal_id, root_id=root_id, deleted_at=None,
-        ).first()
-        if not goal:
-            return None, "Goal not found", 404
-
-        goal.frozen = paused
-        goal.frozen_at = datetime.now(timezone.utc) if paused else None
-        self.db_session.commit()
-        self.db_session.refresh(goal)
-        return goal, None, 200
+        return GoalWorkflowService(self.db_session).toggle_pause(root_id, goal_id, current_user_id, paused)
 
     def toggle_freeze(self, root_id, goal_id, current_user_id, frozen: bool) -> ServiceResult[Goal]:
-        return self.toggle_pause(root_id, goal_id, current_user_id, frozen)
+        return GoalWorkflowService(self.db_session).toggle_freeze(root_id, goal_id, current_user_id, frozen)
 
     def move_goal(self, root_id, goal_id, current_user_id, new_parent_id) -> ServiceResult[Goal]:
-        from services.goal_type_utils import get_canonical_goal_type
-
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        goal = self.db_session.query(Goal).options(
-            selectinload(Goal.level),
-        ).filter_by(id=goal_id, root_id=root_id, deleted_at=None).first()
-        if not goal:
-            return None, "Goal not found", 404
-
-        if goal.parent_id is None:
-            return None, "Root goals cannot be moved", 400
-
-        if not new_parent_id:
-            return None, "Move goal requires selecting a new parent", 400
-
-        if new_parent_id == goal_id:
-            return None, "A goal cannot be its own parent", 400
-
-        current_parent = self.db_session.query(Goal).options(
-            selectinload(Goal.level),
-        ).filter_by(id=goal.parent_id, root_id=root_id, deleted_at=None).first()
-        if not current_parent:
-            return None, "Current parent goal not found in this fractal", 400
-
-        if new_parent_id == current_parent.id:
-            return goal, None, 200
-
-        new_parent = self.db_session.query(Goal).options(
-            selectinload(Goal.level),
-        ).filter_by(id=new_parent_id, root_id=root_id, deleted_at=None).first()
-        if not new_parent:
-            return None, "New parent goal not found in this fractal", 404
-
-        goal_type = get_canonical_goal_type(goal)
-
-        # Prevent circular references — walk up from new_parent
-        current = new_parent
-        while current.parent_id:
-            if current.parent_id == goal_id:
-                return None, "Cannot move goal under one of its own descendants", 400
-            current = self.db_session.query(Goal).filter_by(id=current.parent_id).first()
-            if not current:
-                break
-
-        # Validate full ancestor rank monotonicity
-        if goal.level:
-            mono_error = self._validate_ancestor_rank_monotonicity(goal.level, new_parent)
-            if mono_error:
-                return None, mono_error, 400
-
-        # Validate parent capacity
-        capacity_error = self._validate_parent_capacity(
-            new_parent,
-            error_prefix="Cannot move goal: Parent level",
-        )
-        if capacity_error:
-            return None, capacity_error, 400
-
-        goal.parent_id = new_parent_id
-        self.db_session.commit()
-        self.db_session.refresh(goal)
-        return goal, None, 200
+        return GoalWorkflowService(self.db_session).move_goal(root_id, goal_id, current_user_id, new_parent_id)
 
     def get_eligible_move_parents(self, root_id, goal_id, current_user_id, search=None):
-        """
-        Returns all goals in the fractal that are valid move targets for goal_id.
-        Excludes: the goal itself, its descendants, and goals that would violate
-        path monotonicity.
-        """
-        from services.goal_type_utils import get_canonical_goal_type
-
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        # Load the goal
-        goal = self.db_session.query(Goal).options(
-            selectinload(Goal.level),
-        ).filter_by(id=goal_id, deleted_at=None).first()
-        if not goal or goal.root_id != root_id:
-            return None, "Goal not found", 404
-
-        # Load all non-deleted goals in this fractal
-        all_goals = self.db_session.query(Goal).options(
-            selectinload(Goal.level),
-        ).filter_by(root_id=root_id, deleted_at=None).all()
-
-        # Build descendant set (BFS)
-        children_map = {}
-        for g in all_goals:
-            if g.parent_id:
-                children_map.setdefault(g.parent_id, []).append(g.id)
-
-        descendant_ids = set()
-        queue = [goal_id]
-        while queue:
-            current = queue.pop()
-            for child_id in children_map.get(current, []):
-                descendant_ids.add(child_id)
-                queue.append(child_id)
-
-        # Execution tier rules
-        goal_type = get_canonical_goal_type(goal)
-        current_parent = next((candidate for candidate in all_goals if candidate.id == goal.parent_id), None)
-
-        eligible = []
-        for candidate in all_goals:
-            if candidate.id == goal_id:
-                continue
-            if candidate.id in descendant_ids:
-                continue
-            if not candidate.level:
-                continue
-
-            if current_parent and not self._goals_share_same_tier(candidate, current_parent):
-                continue
-            # Candidate must have lower rank
-            if not goal.level or candidate.level.rank >= goal.level.rank:
-                continue
-            # Full monotonicity check
-            error = self._validate_ancestor_rank_monotonicity(goal.level, candidate)
-            if error:
-                continue
-
-            # Optional search filter
-            if search and search.lower() not in candidate.name.lower():
-                continue
-
-            eligible.append({
-                'id': candidate.id,
-                'name': candidate.name,
-                'level_name': candidate.level.name if candidate.level else None,
-                'level_rank': candidate.level.rank if candidate.level else None,
-                'parent_id': candidate.parent_id,
-                'is_current_parent': candidate.id == goal.parent_id,
-            })
-
-        # Sort by level rank then name
-        eligible.sort(key=lambda x: (x['level_rank'] or 99, x['name']))
-        return eligible, None, 200
+        return GoalWorkflowService(self.db_session).get_eligible_move_parents(
+            root_id,
+            goal_id,
+            current_user_id,
+            search=search,
+        )
 
     def convert_goal_level(self, root_id, goal_id, current_user_id, level_id) -> ServiceResult[Goal]:
-        root, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        goal = self.db_session.query(Goal).options(
-            selectinload(Goal.level),
-            selectinload(Goal.children),
-        ).filter_by(id=goal_id, root_id=root_id, deleted_at=None).first()
-        if not goal:
-            return None, "Goal not found", 404
-
-        new_level = self.db_session.query(GoalLevel).filter_by(id=level_id).first()
-        if not new_level:
-            return None, "Goal level not found", 404
-
-        EXECUTION_TIER_NAMES = {'Immediate Goal'}
-        current_level_name = getattr(goal.level, 'name', None)
-        if current_level_name in EXECUTION_TIER_NAMES:
-            return None, f"Cannot convert an execution-tier goal ('{current_level_name}')", 400
-
-        root_level_rank = self._get_goal_level_rank(root)
-        if root_level_rank is not None and new_level.rank <= root_level_rank:
-            return None, "Cannot convert a goal to the fractal root level", 400
-
-        # Validate against parent
-        if goal.parent_id:
-            parent = self.db_session.query(Goal).options(
-                selectinload(Goal.level),
-            ).filter_by(id=goal.parent_id).first()
-            if parent and parent.level and new_level.rank <= parent.level.rank:
-                return None, f"New level '{new_level.name}' must be below parent level '{parent.level.name}'", 400
-
-        # Validate against children
-        for child in (goal.children or []):
-            if child.deleted_at:
-                continue
-            child_level = child.level or self.db_session.query(GoalLevel).filter_by(id=child.level_id).first()
-            if child_level and new_level.rank >= child_level.rank:
-                return None, f"New level '{new_level.name}' must be above child level '{child_level.name}'", 400
-
-        goal.level_id = level_id
-        self.db_session.commit()
-        self.db_session.refresh(goal)
-        return goal, None, 200
+        return GoalWorkflowService(self.db_session).convert_goal_level(
+            root_id,
+            goal_id,
+            current_user_id,
+            level_id,
+        )
