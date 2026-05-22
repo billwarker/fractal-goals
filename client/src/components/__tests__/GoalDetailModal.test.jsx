@@ -137,6 +137,7 @@ vi.mock('../goalDetail/ActivityAssociator', async () => {
         registerPickerFooterActions,
         isTargetSelectionMode,
         onSelectTargetActivity,
+        activityGroups,
     }) {
         const [isDiscoveryActive, setIsDiscoveryActive] = ReactModule.useState(false);
 
@@ -180,6 +181,7 @@ vi.mock('../goalDetail/ActivityAssociator', async () => {
             'div',
             null,
             ReactModule.createElement('div', null, 'goal activities view'),
+            ReactModule.createElement('div', null, `activity groups:${activityGroups.length}`),
             isDiscoveryActive
                 ? ReactModule.createElement(
                     'div',
@@ -399,6 +401,38 @@ describe('GoalDetailModal smoke coverage', () => {
             expect(screen.getByText('goal activities view')).toBeInTheDocument();
             expect(screen.getByRole('button', { name: '+ Associate Activities' })).toBeInTheDocument();
             expect(screen.getByRole('button', { name: '+ Add Target' })).toBeInTheDocument();
+        }, { timeout: 5000 });
+    });
+
+    it('passes provided activity groups into the activities view', async () => {
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    attributes: { id: 'goal-1', type: 'ShortTermGoal', parent_id: 'parent-1' },
+                }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={vi.fn()}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                activityDefinitions={[]}
+                activityGroups={[{ id: 'group-1', name: 'Technique', parent_id: null }]}
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root',
+                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
+                    children: [],
+                }}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Activities' }));
+
+        await waitFor(() => {
+            expect(screen.getByText('activity groups:1')).toBeInTheDocument();
         }, { timeout: 5000 });
     });
 

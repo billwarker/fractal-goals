@@ -5,12 +5,13 @@ import SessionOptionsModal from './SessionOptionsModal';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
 const ActivityBuilder = lazyWithRetry(() => import('../ActivityBuilder'), 'components/ActivityBuilder');
-const GoalDetailModal = lazyWithRetry(() => import('../GoalDetailModal'), 'components/GoalDetailModal');
+const GoalDetailModal = lazyWithRetry(() => import('../ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 const ActivityAssociationModal = lazyWithRetry(() => import('./ActivityAssociationModal'), 'components/sessionDetail/ActivityAssociationModal');
 
 function SessionDetailModals({
     rootId,
     activities,
+    activityGroups = [],
     showDeleteConfirm,
     onCloseDeleteConfirm,
     onConfirmDelete,
@@ -72,6 +73,7 @@ function SessionDetailModals({
                         onUpdate={onUpdateGoal}
                         onToggleCompletion={onToggleGoalCompletion}
                         activityDefinitions={activities}
+                        activityGroups={activityGroups}
                         rootId={rootId}
                         onAssociationsChanged={onGoalAssociationsChanged}
                     />

@@ -2,8 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 
-export function useActivities(rootId) {
+export function useActivities(rootId, options = {}) {
     const isReady = Boolean(rootId);
+    const enabled = options.enabled ?? true;
 
     const { data: activities = [], isLoading, error } = useQuery({
         queryKey: queryKeys.activities(rootId),
@@ -11,15 +12,16 @@ export function useActivities(rootId) {
             const res = await fractalApi.getActivities(rootId);
             return res.data || [];
         },
-        enabled: isReady,
+        enabled: isReady && enabled,
         staleTime: 5 * 60 * 1000,
     });
 
     return { activities, isLoading, error };
 }
 
-export function useActivityGroups(rootId) {
+export function useActivityGroups(rootId, options = {}) {
     const isReady = Boolean(rootId);
+    const enabled = options.enabled ?? true;
 
     const { data: activityGroups = [], isLoading, error } = useQuery({
         queryKey: queryKeys.activityGroups(rootId),
@@ -27,7 +29,7 @@ export function useActivityGroups(rootId) {
             const res = await fractalApi.getActivityGroups(rootId);
             return res.data || [];
         },
-        enabled: isReady,
+        enabled: isReady && enabled,
         staleTime: 5 * 60 * 1000,
     });
 

@@ -36,7 +36,7 @@ const ProgramBlockModal = lazyWithRetry(() => import('../components/modals/Progr
 const ProgramDayModal = lazyWithRetry(() => import('../components/modals/ProgramDayModal'), 'components/modals/ProgramDayModal');
 const AttachGoalModal = lazyWithRetry(() => import('../components/modals/AttachGoalModal'), 'components/modals/AttachGoalModal');
 const DayViewModal = lazyWithRetry(() => import('../components/modals/DayViewModal'), 'components/modals/DayViewModal');
-const GoalDetailModal = lazyWithRetry(() => import('../components/GoalDetailModal'), 'components/GoalDetailModal');
+const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 
 function getDatePart(dateValue) {
     if (!dateValue) return null;

@@ -43,6 +43,7 @@ function SessionDetailContent() {
     const {
         session,
         activities,
+        activityGroups,
         activityInstances,
         loading,
         autoSaveStatus,
@@ -151,6 +152,7 @@ function SessionDetailContent() {
                 <SessionDetailModals
                     rootId={rootId}
                     activities={activities}
+                    activityGroups={activityGroups}
                     showDeleteConfirm={showDeleteConfirm}
                     onCloseDeleteConfirm={() => setShowDeleteConfirm(false)}
                     onConfirmDelete={handleConfirmDelete}
@@ -241,6 +243,7 @@ function SessionDetailContent() {
             <SessionDetailModals
                 rootId={rootId}
                 activities={activities}
+                activityGroups={activityGroups}
                 showDeleteConfirm={showDeleteConfirm}
                 onCloseDeleteConfirm={() => setShowDeleteConfirm(false)}
                 onConfirmDelete={handleConfirmDelete}

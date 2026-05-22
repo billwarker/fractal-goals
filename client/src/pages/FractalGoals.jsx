@@ -23,7 +23,7 @@ import { lazyWithRetry } from '../utils/lazyWithRetry';
 import '../App.css';
 import './FractalGoals.css';
 
-const GoalDetailModal = lazyWithRetry(() => import('../components/GoalDetailModal'), 'components/GoalDetailModal');
+const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 
 /**
  * FractalGoals Page - FlowTree visualization with sidebar

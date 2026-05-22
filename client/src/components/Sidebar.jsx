@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
-const GoalDetailModal = lazyWithRetry(() => import('./GoalDetailModal'), 'components/GoalDetailModal');
+const GoalDetailModal = lazyWithRetry(() => import('./ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 import './Sidebar.css';
 
 /**

@@ -13,7 +13,7 @@ vi.mock('../../ActivityBuilder', () => ({
     default: () => <div data-testid="activity-builder" />,
 }));
 
-vi.mock('../../GoalDetailModal', () => ({
+vi.mock('../../ConnectedGoalDetailModal', () => ({
     default: (props) => {
         goalDetailModalSpy(props);
         return <div data-testid="goal-detail-modal" />;
@@ -36,6 +36,7 @@ describe('SessionDetailModals', () => {
             <SessionDetailModals
                 rootId="root-1"
                 activities={[]}
+                activityGroups={[{ id: 'group-1', name: 'Technique', parent_id: null }]}
                 showDeleteConfirm={false}
                 onCloseDeleteConfirm={vi.fn()}
                 onConfirmDelete={vi.fn()}
@@ -59,6 +60,7 @@ describe('SessionDetailModals', () => {
         expect(await screen.findByTestId('goal-detail-modal')).toBeInTheDocument();
         expect(goalDetailModalSpy).toHaveBeenCalledWith(expect.objectContaining({
             onToggleCompletion: onToggleGoalCompletion,
+            activityGroups: [{ id: 'group-1', name: 'Technique', parent_id: null }],
         }));
     });
 });

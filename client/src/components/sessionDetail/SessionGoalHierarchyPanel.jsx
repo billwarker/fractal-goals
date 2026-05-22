@@ -9,7 +9,7 @@ import HierarchySection from './HierarchySection';
 import TargetsSection from './TargetsSection';
 import styles from './SessionGoalHierarchyPanel.module.css';
 
-const GoalDetailModal = lazyWithRetry(() => import('../GoalDetailModal'), 'components/GoalDetailModal');
+const GoalDetailModal = lazyWithRetry(() => import('../ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 
 function SessionGoalHierarchyPanel({
     selectedActivity,
@@ -23,6 +23,7 @@ function SessionGoalHierarchyPanel({
         localSessionData,
         activityInstances,
         activities: activityDefinitions,
+        activityGroups,
         targetAchievements,
         achievedTargetIds,
         sessionGoalsView,
@@ -165,6 +166,7 @@ function SessionGoalHierarchyPanel({
                         onCreate={handleSubGoalCreated}
                         rootId={rootId}
                         activityDefinitions={activityDefinitions}
+                        activityGroups={activityGroups}
                         initialActivities={activeActivityDef ? [activeActivityDef] : []}
                     />
                 </React.Suspense>,
