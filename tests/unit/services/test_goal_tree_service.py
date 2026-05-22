@@ -82,13 +82,14 @@ def test_session_goal_payload_keeps_structural_ancestors_for_activity_derived_go
     assert sample_goal_hierarchy["short_term"].id in tree_ids
 
 
-def test_session_goal_payload_keeps_completed_activity_association_lineage(
+def test_session_goal_payload_rolls_completed_before_session_activity_association_to_ancestor(
     db_session,
     test_user,
     sample_goal_hierarchy,
     sample_practice_session,
     sample_activity_definition,
 ):
+    sample_practice_session.session_start = datetime(2026, 2, 10, tzinfo=timezone.utc)
     sample_goal_hierarchy["short_term"].completed = True
     sample_goal_hierarchy["short_term"].completed_at = datetime(2026, 2, 9, tzinfo=timezone.utc)
     db_session.execute(
@@ -119,13 +120,56 @@ def test_session_goal_payload_keeps_completed_activity_association_lineage(
     assert status == 200
     assert payload["session_goal_ids"] == []
     assert payload["activity_goal_ids_by_activity"][sample_activity_definition.id] == [
-        sample_goal_hierarchy["short_term"].id
+        sample_goal_hierarchy["mid_term"].id
     ]
 
     tree_ids = _collect_tree_ids(payload["goal_tree"])
     assert sample_goal_hierarchy["ultimate"].id in tree_ids
     assert sample_goal_hierarchy["long_term"].id in tree_ids
     assert sample_goal_hierarchy["mid_term"].id in tree_ids
+    assert sample_goal_hierarchy["short_term"].id not in tree_ids
+
+
+def test_session_goal_payload_keeps_goal_completed_during_or_after_session(
+    db_session,
+    test_user,
+    sample_goal_hierarchy,
+    sample_practice_session,
+    sample_activity_definition,
+):
+    sample_practice_session.session_start = datetime(2026, 2, 10, tzinfo=timezone.utc)
+    sample_goal_hierarchy["short_term"].completed = True
+    sample_goal_hierarchy["short_term"].completed_at = datetime(2026, 2, 10, 1, tzinfo=timezone.utc)
+    db_session.execute(
+        activity_goal_associations.insert().values(
+            activity_id=sample_activity_definition.id,
+            goal_id=sample_goal_hierarchy["short_term"].id,
+        )
+    )
+    db_session.add(
+        ActivityInstance(
+            id=str(uuid4()),
+            session_id=sample_practice_session.id,
+            activity_definition_id=sample_activity_definition.id,
+            root_id=sample_practice_session.root_id,
+            created_at=datetime(2026, 2, 10, tzinfo=timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    service = GoalTreeService(db_session)
+    payload, error, status = service.get_session_goals_view_payload(
+        test_user,
+        sample_goal_hierarchy["ultimate"].id,
+        sample_practice_session.id,
+    )
+
+    assert error is None
+    assert status == 200
+    assert payload["activity_goal_ids_by_activity"][sample_activity_definition.id] == [
+        sample_goal_hierarchy["short_term"].id
+    ]
+    tree_ids = _collect_tree_ids(payload["goal_tree"])
     assert sample_goal_hierarchy["short_term"].id in tree_ids
 
 

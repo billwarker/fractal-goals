@@ -6,6 +6,7 @@ from models import Goal, Session, ActivityInstance, session_goals
 from services.serializers import serialize_goal
 from services.goal_type_utils import get_canonical_goal_type
 from services.view_serializers import serialize_session_goals_view_payload
+from services.goal_contribution import resolve_contribution_goal
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,31 @@ class GoalTreeService:
             return next_node
 
         return None
+
+    @staticmethod
+    def _session_contribution_timestamp(session_obj):
+        return (
+            session_obj.session_start
+            or session_obj.session_end
+            or session_obj.completed_at
+            or session_obj.created_at
+        )
+
+    @staticmethod
+    def _resolve_activity_goal_ids_for_session(goals, goals_by_id, timestamp):
+        resolved_ids = []
+        seen = set()
+        for goal in goals:
+            if not goal or goal.deleted_at:
+                continue
+            contribution_goal = resolve_contribution_goal(goal, timestamp, goals_by_id)
+            if not contribution_goal:
+                continue
+            if contribution_goal.id in seen:
+                continue
+            seen.add(contribution_goal.id)
+            resolved_ids.append(contribution_goal.id)
+        return resolved_ids
 
     def get_session_goals_view_payload(self, current_user, root_id, session_id):
         from services.session_service import SessionService
@@ -114,11 +140,16 @@ class GoalTreeService:
         activity_goal_ids_by_activity = {}
         if session_activity_ids:
             effective_goals_by_activity = session_service._get_effective_activity_goals(root_id, session_activity_ids)
+            session_contribution_timestamp = self._session_contribution_timestamp(session_obj)
             for activity_id, goals in effective_goals_by_activity.items():
-                activity_goal_ids_by_activity[activity_id] = [
-                    goal.id for goal in goals
-                    if not goal.deleted_at and goal.root_id == root_id
-                ]
+                activity_goal_ids_by_activity[activity_id] = self._resolve_activity_goal_ids_for_session(
+                    [
+                        goal for goal in goals
+                        if goal.root_id == root_id
+                    ],
+                    goals_by_id,
+                    session_contribution_timestamp,
+                )
 
         associated_goal_ids = {
             goal_id

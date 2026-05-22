@@ -49,6 +49,11 @@ const SettingsModalInner = ({ onClose }) => {
 
     const { progressSettings, activeGoalWindowDays, updateProgressSettings } = useRootProgressSettings(activeRootId);
     const progressEnabled = progressSettings?.enabled !== false;
+    const [activeGoalWindowDraft, setActiveGoalWindowDraft] = useState(String(activeGoalWindowDays));
+
+    useEffect(() => {
+        setActiveGoalWindowDraft(String(activeGoalWindowDays));
+    }, [activeGoalWindowDays]);
 
     const handleProgressEnabledToggle = async (e) => {
         try {
@@ -58,11 +63,20 @@ const SettingsModalInner = ({ onClose }) => {
         }
     };
 
-    const handleActiveGoalWindowChange = async (e) => {
+    const handleActiveGoalWindowChange = (e) => {
+        setActiveGoalWindowDraft(e.target.value);
+    };
+
+    const handleActiveGoalWindowCommit = async () => {
+        const normalizedDays = normalizeActiveGoalWindowDays(activeGoalWindowDraft);
+        setActiveGoalWindowDraft(String(normalizedDays));
+        if (normalizedDays === activeGoalWindowDays) {
+            return;
+        }
         try {
             await updateProgressSettings({
                 ...(progressSettings || {}),
-                active_goal_window_days: normalizeActiveGoalWindowDays(e.target.value),
+                active_goal_window_days: normalizedDays,
             });
         } catch (err) {
             notify.error(`Failed to update active goal window: ${formatError(err)}`);
@@ -373,8 +387,14 @@ const SettingsModalInner = ({ onClose }) => {
                                                     min={MIN_ACTIVE_GOAL_WINDOW_DAYS}
                                                     max={MAX_ACTIVE_GOAL_WINDOW_DAYS}
                                                     step="1"
-                                                    value={activeGoalWindowDays}
+                                                    value={activeGoalWindowDraft}
                                                     onChange={handleActiveGoalWindowChange}
+                                                    onBlur={handleActiveGoalWindowCommit}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.currentTarget.blur();
+                                                        }
+                                                    }}
                                                     className={styles.selectInput}
                                                 />
                                             </div>

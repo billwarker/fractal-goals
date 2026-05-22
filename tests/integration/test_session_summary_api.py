@@ -201,6 +201,74 @@ class TestSessionSummaryApi:
         payload = json.loads(response.data)
         assert paused_goal.id not in payload['goal_ids']
 
+    def test_evidence_goals_rolls_completed_child_to_open_ancestor(
+        self,
+        authed_client,
+        db_session,
+        sample_practice_session,
+        sample_activity_definition,
+        sample_goal_hierarchy,
+        sample_activity_instance,
+    ):
+        root_id = sample_practice_session.root_id
+        recent_stop = datetime.now(timezone.utc) - timedelta(days=1)
+        sample_goal_hierarchy['short_term'].completed = True
+        sample_goal_hierarchy['short_term'].completed_at = recent_stop - timedelta(days=1)
+        db_session.execute(
+            activity_goal_associations.insert().values(
+                activity_id=sample_activity_definition.id,
+                goal_id=sample_goal_hierarchy['short_term'].id,
+            )
+        )
+        sample_activity_instance.completed = True
+        sample_activity_instance.time_stop = recent_stop
+        db_session.commit()
+
+        response = authed_client.get(f'/api/{root_id}/sessions/evidence-goals?days=7')
+        assert response.status_code == 200
+        payload = json.loads(response.data)
+        assert sample_goal_hierarchy['short_term'].id not in payload['goal_ids']
+        assert sample_goal_hierarchy['mid_term'].id in payload['goal_ids']
+
+    def test_flowtree_metrics_counts_activity_rolled_up_to_open_ancestor(
+        self,
+        authed_client,
+        db_session,
+        sample_practice_session,
+        sample_activity_definition,
+        sample_goal_hierarchy,
+        sample_activity_instance,
+    ):
+        root_id = sample_practice_session.root_id
+        visible_goal_id = sample_goal_hierarchy['mid_term'].id
+        recent_stop = datetime.now(timezone.utc) - timedelta(days=1)
+        sample_goal_hierarchy['short_term'].completed = True
+        sample_goal_hierarchy['short_term'].completed_at = recent_stop - timedelta(days=1)
+        db_session.execute(
+            activity_goal_associations.insert().values(
+                activity_id=sample_activity_definition.id,
+                goal_id=sample_goal_hierarchy['short_term'].id,
+            )
+        )
+        sample_practice_session.completed = True
+        sample_practice_session.session_start = recent_stop - timedelta(minutes=10)
+        sample_practice_session.session_end = recent_stop
+        sample_practice_session.completed_at = recent_stop
+        sample_practice_session.total_duration_seconds = 600
+        sample_activity_instance.completed = True
+        sample_activity_instance.time_stop = recent_stop
+        sample_activity_instance.duration_seconds = 420
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions/flowtree-metrics?goal_ids={visible_goal_id}&days=7'
+        )
+        assert response.status_code == 200
+        payload = json.loads(response.data)
+        assert payload['completed_sessions_count'] == 1
+        assert payload['completed_instances_count'] == 1
+        assert payload['total_instance_duration_seconds'] == 420
+
     def test_flowtree_metrics_counts_activity_and_direct_goal_sessions(
         self,
         authed_client,
