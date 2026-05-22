@@ -2,6 +2,22 @@ import { useMemo } from 'react';
 
 const toId = (value) => (value == null ? null : String(value));
 export const ACTIVE_GOAL_WINDOW_DAYS = 7;
+export const MIN_ACTIVE_GOAL_WINDOW_DAYS = 1;
+export const MAX_ACTIVE_GOAL_WINDOW_DAYS = 90;
+
+export const normalizeActiveGoalWindowDays = (value, fallback = ACTIVE_GOAL_WINDOW_DAYS) => {
+    const numeric = Number.parseInt(value, 10);
+    const fallbackNumeric = Number.parseInt(fallback, 10);
+    const safeFallback = Number.isFinite(fallbackNumeric) ? fallbackNumeric : ACTIVE_GOAL_WINDOW_DAYS;
+    if (!Number.isFinite(numeric)) {
+        return Math.max(MIN_ACTIVE_GOAL_WINDOW_DAYS, Math.min(safeFallback, MAX_ACTIVE_GOAL_WINDOW_DAYS));
+    }
+    return Math.max(MIN_ACTIVE_GOAL_WINDOW_DAYS, Math.min(numeric, MAX_ACTIVE_GOAL_WINDOW_DAYS));
+};
+
+export const getActiveGoalWindowDaysFromSettings = (settings) => (
+    normalizeActiveGoalWindowDays(settings?.active_goal_window_days)
+);
 
 export const getRecentActivityCutoff = (now = new Date()) => (
     new Date(now.getTime() - ACTIVE_GOAL_WINDOW_DAYS * 24 * 60 * 60 * 1000)
@@ -95,12 +111,23 @@ export const deriveEvidenceGoalIds = (sessions = [], activities = [], activityGr
     return evidenceGoalIds;
 };
 
-export const getActiveLineageIds = (evidenceGoalIds, parentById) => {
+const goalSuppressesActiveEvidence = (goal) => Boolean(
+    goal?.paused
+    || goal?.frozen
+    || goal?.attributes?.paused
+    || goal?.attributes?.frozen
+);
+
+export const getActiveLineageIds = (evidenceGoalIds, parentById, nodeById = new Map()) => {
     const activeNodeIds = new Set();
 
     evidenceGoalIds.forEach((goalId) => {
         let current = goalId;
         while (current) {
+            const node = nodeById?.get ? nodeById.get(current) : null;
+            if (goalSuppressesActiveEvidence(node)) {
+                break;
+            }
             activeNodeIds.add(current);
             current = parentById.get(current) || null;
         }
@@ -532,7 +559,7 @@ export function useFlowTreeMetrics(props) {
         const evidenceGoalIds = deriveEvidenceGoalIds(sessions, activities, activityGroups);
         const hasAnyEvidence = evidenceGoalIds.size > 0;
 
-        const activeLineageIds = getActiveLineageIds(evidenceGoalIds, treeMaps.parentById);
+        const activeLineageIds = getActiveLineageIds(evidenceGoalIds, treeMaps.parentById, treeMaps.nodeById);
         const inactiveNodeIds = getInactiveNodeIds(treeMaps.nodeById, treeMaps.childrenById, evidenceGoalIds);
 
         const metrics = deriveGraphMetrics(

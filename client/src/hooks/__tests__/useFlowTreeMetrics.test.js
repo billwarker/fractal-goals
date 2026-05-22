@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
     ACTIVE_GOAL_WINDOW_DAYS,
     deriveEvidenceGoalIds,
+    getActiveLineageIds,
     isRecentCompletedActivityInstance,
+    normalizeActiveGoalWindowDays,
 } from '../useFlowTreeMetrics';
 
 describe('useFlowTreeMetrics activity evidence helpers', () => {
@@ -97,5 +99,27 @@ describe('useFlowTreeMetrics activity evidence helpers', () => {
             completed: true,
             time_stop: `2026-03-${19 - ACTIVE_GOAL_WINDOW_DAYS}T12:00:00Z`,
         }, now)).toBe(true);
+    });
+
+    it('builds active lineage until a paused ancestor is reached', () => {
+        const parentById = new Map([
+            ['child', 'paused-parent'],
+            ['paused-parent', 'root'],
+        ]);
+        const nodeById = new Map([
+            ['child', { id: 'child' }],
+            ['paused-parent', { id: 'paused-parent', frozen: true }],
+            ['root', { id: 'root' }],
+        ]);
+
+        expect(Array.from(getActiveLineageIds(new Set(['child']), parentById, nodeById))).toEqual(['child']);
+        expect(Array.from(getActiveLineageIds(new Set(['paused-parent']), parentById, nodeById))).toEqual([]);
+    });
+
+    it('normalizes active goal window days to the supported range', () => {
+        expect(normalizeActiveGoalWindowDays(undefined)).toBe(7);
+        expect(normalizeActiveGoalWindowDays(0)).toBe(1);
+        expect(normalizeActiveGoalWindowDays(365)).toBe(90);
+        expect(normalizeActiveGoalWindowDays('14')).toBe(14);
     });
 });

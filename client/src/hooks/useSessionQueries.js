@@ -55,14 +55,15 @@ export function useFlowtreeSessionMetrics(rootId, goalIds = [], options = {}) {
     const normalizedGoalIds = Array.isArray(goalIds)
         ? [...new Set(goalIds.map((goalId) => String(goalId)).filter(Boolean))].sort()
         : [];
+    const days = options.days || ACTIVE_GOAL_WINDOW_DAYS;
     const isReady = Boolean(rootId) && normalizedGoalIds.length > 0 && options.enabled !== false;
 
     return useQuery({
-        queryKey: queryKeys.sessionsFlowtreeMetrics(rootId, normalizedGoalIds, ACTIVE_GOAL_WINDOW_DAYS),
+        queryKey: queryKeys.sessionsFlowtreeMetrics(rootId, normalizedGoalIds, days),
         queryFn: async () => {
             const res = await fractalApi.getFlowtreeSessionMetrics(rootId, {
                 goal_ids: normalizedGoalIds,
-                days: ACTIVE_GOAL_WINDOW_DAYS,
+                days,
             });
             return res.data;
         },

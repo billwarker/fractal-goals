@@ -82,6 +82,49 @@ describe('buildGraphPresentation', () => {
         expect(activeOverlay?.style?.opacity).toBe(0.58);
     });
 
+    it('does not derive active evidence locally when backend evidence is absent', () => {
+        const treeData = {
+            id: 'root-1',
+            name: 'Root Goal',
+            type: 'UltimateGoal',
+            children: [
+                {
+                    id: 'goal-1',
+                    name: 'Mapped Goal',
+                    type: 'LongTermGoal',
+                    children: [],
+                },
+            ],
+        };
+
+        const graph = buildGraphPresentation({
+            treeData,
+            onNodeClick: () => {},
+            onAddChild: () => {},
+            selectedNodeId: null,
+            completedGoalColor: '#FFD700',
+            viewSettings: {},
+            sessions: [
+                {
+                    activity_instances: [
+                        {
+                            completed: true,
+                            activity_definition_id: 'activity-1',
+                            time_stop: new Date().toISOString(),
+                        },
+                    ],
+                },
+            ],
+            activities: [{ id: 'activity-1', associated_goal_ids: ['goal-1'] }],
+            activityGroups: [],
+            programs: [],
+            isMobile: false,
+        });
+
+        const edge = graph.edges.find((entry) => entry.id === 'root-1-goal-1');
+        expect(edge?.className || '').not.toContain('active-branch-edge');
+    });
+
     it('uses the completed color for active branches connecting two completed goals', () => {
         const treeData = {
             id: 'root-1',

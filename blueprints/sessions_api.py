@@ -61,8 +61,10 @@ def _get_session_query_filters():
     }
 
 
-def _parse_window_days(default=7):
+def _parse_window_days(default=None):
     raw_days = request.args.get('days', default)
+    if raw_days is None:
+        return None
     try:
         return int(raw_days)
     except (TypeError, ValueError):

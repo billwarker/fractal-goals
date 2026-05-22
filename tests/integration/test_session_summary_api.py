@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from models import ActivityInstance, Program, ProgramBlock, ProgramDay, Session, activity_goal_associations, session_goals
+from models import ActivityInstance, Goal, Program, ProgramBlock, ProgramDay, Session, activity_goal_associations, session_goals
 
 
 @pytest.mark.integration
@@ -85,6 +85,121 @@ class TestSessionSummaryApi:
         payload = json.loads(response.data)
         assert sample_goal_hierarchy['short_term'].id in payload['goal_ids']
         assert payload['window_days'] == 7
+
+    def test_evidence_goals_uses_root_active_window_when_days_omitted(
+        self,
+        authed_client,
+        db_session,
+        sample_practice_session,
+        sample_activity_definition,
+        sample_goal_hierarchy,
+        sample_activity_instance,
+    ):
+        root_id = sample_practice_session.root_id
+        sample_goal_hierarchy['ultimate'].progress_settings = {'active_goal_window_days': 3}
+        stop_time = datetime.now(timezone.utc) - timedelta(days=5)
+
+        db_session.execute(
+            activity_goal_associations.insert().values(
+                activity_id=sample_activity_definition.id,
+                goal_id=sample_goal_hierarchy['short_term'].id,
+            )
+        )
+        sample_activity_instance.completed = True
+        sample_activity_instance.time_stop = stop_time
+        db_session.commit()
+
+        default_response = authed_client.get(f'/api/{root_id}/sessions/evidence-goals')
+        assert default_response.status_code == 200
+        default_payload = json.loads(default_response.data)
+        assert default_payload['window_days'] == 3
+        assert sample_goal_hierarchy['short_term'].id not in default_payload['goal_ids']
+
+        metrics_response = authed_client.get(
+            f"/api/{root_id}/sessions/flowtree-metrics?goal_ids={sample_goal_hierarchy['short_term'].id}"
+        )
+        assert metrics_response.status_code == 200
+        metrics_payload = json.loads(metrics_response.data)
+        assert metrics_payload['window_days'] == 3
+
+        explicit_response = authed_client.get(f'/api/{root_id}/sessions/evidence-goals?days=7')
+        assert explicit_response.status_code == 200
+        explicit_payload = json.loads(explicit_response.data)
+        assert explicit_payload['window_days'] == 7
+        assert sample_goal_hierarchy['short_term'].id in explicit_payload['goal_ids']
+
+    def test_evidence_goals_clamps_explicit_window_days(
+        self,
+        authed_client,
+        sample_practice_session,
+    ):
+        response = authed_client.get(f'/api/{sample_practice_session.root_id}/sessions/evidence-goals?days=365')
+        assert response.status_code == 200
+        payload = json.loads(response.data)
+        assert payload['window_days'] == 90
+
+    def test_evidence_goals_counts_completed_activity_in_incomplete_session(
+        self,
+        authed_client,
+        db_session,
+        sample_practice_session,
+        sample_activity_definition,
+        sample_goal_hierarchy,
+        sample_activity_instance,
+    ):
+        root_id = sample_practice_session.root_id
+        recent_stop = datetime.now(timezone.utc) - timedelta(days=1)
+        db_session.execute(
+            activity_goal_associations.insert().values(
+                activity_id=sample_activity_definition.id,
+                goal_id=sample_goal_hierarchy['short_term'].id,
+            )
+        )
+        sample_practice_session.completed = False
+        sample_activity_instance.completed = True
+        sample_activity_instance.time_stop = recent_stop
+        db_session.commit()
+
+        response = authed_client.get(f'/api/{root_id}/sessions/evidence-goals?days=7')
+        assert response.status_code == 200
+        payload = json.loads(response.data)
+        assert sample_goal_hierarchy['short_term'].id in payload['goal_ids']
+
+    def test_evidence_goals_excludes_paused_goals(
+        self,
+        authed_client,
+        db_session,
+        sample_practice_session,
+        sample_activity_definition,
+        sample_goal_hierarchy,
+        sample_activity_instance,
+    ):
+        root_id = sample_practice_session.root_id
+        recent_stop = datetime.now(timezone.utc) - timedelta(days=1)
+        paused_goal = Goal(
+            id=str(uuid4()),
+            name='Paused child',
+            parent_id=sample_goal_hierarchy['short_term'].id,
+            root_id=root_id,
+            frozen=True,
+            created_at=datetime.now(timezone.utc),
+        )
+        db_session.add(paused_goal)
+        db_session.flush()
+        db_session.execute(
+            activity_goal_associations.insert().values(
+                activity_id=sample_activity_definition.id,
+                goal_id=paused_goal.id,
+            )
+        )
+        sample_activity_instance.completed = True
+        sample_activity_instance.time_stop = recent_stop
+        db_session.commit()
+
+        response = authed_client.get(f'/api/{root_id}/sessions/evidence-goals?days=7')
+        assert response.status_code == 200
+        payload = json.loads(response.data)
+        assert paused_goal.id not in payload['goal_ids']
 
     def test_flowtree_metrics_counts_activity_and_direct_goal_sessions(
         self,

@@ -9,6 +9,11 @@ import notify from '../../utils/notify';
 import GoalCharacteristicsSettings from '../GoalCharacteristicsSettings';
 import useIsMobile from '../../hooks/useIsMobile';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
+import {
+    MAX_ACTIVE_GOAL_WINDOW_DAYS,
+    MIN_ACTIVE_GOAL_WINDOW_DAYS,
+    normalizeActiveGoalWindowDays,
+} from '../../hooks/useFlowTreeMetrics';
 import styles from './SettingsModal.module.css';
 
 function getAvailableTimezones() {
@@ -42,7 +47,7 @@ const SettingsModalInner = ({ onClose }) => {
     const [fractalsLoading, setFractalsLoading] = useState(false);
     const [selectedQuotaRootIds, setSelectedQuotaRootIds] = useState([]);
 
-    const { progressSettings, updateProgressSettings } = useRootProgressSettings(activeRootId);
+    const { progressSettings, activeGoalWindowDays, updateProgressSettings } = useRootProgressSettings(activeRootId);
     const progressEnabled = progressSettings?.enabled !== false;
 
     const handleProgressEnabledToggle = async (e) => {
@@ -50,6 +55,17 @@ const SettingsModalInner = ({ onClose }) => {
             await updateProgressSettings({ ...(progressSettings || {}), enabled: e.target.checked });
         } catch (err) {
             notify.error(`Failed to update progress settings: ${formatError(err)}`);
+        }
+    };
+
+    const handleActiveGoalWindowChange = async (e) => {
+        try {
+            await updateProgressSettings({
+                ...(progressSettings || {}),
+                active_goal_window_days: normalizeActiveGoalWindowDays(e.target.value),
+            });
+        } catch (err) {
+            notify.error(`Failed to update active goal window: ${formatError(err)}`);
         }
     };
 
@@ -341,9 +357,31 @@ const SettingsModalInner = ({ onClose }) => {
                                 {activeRootId && (
                                     <section>
                                         <h3 className={styles.sectionTitle}>
-                                            Progress Tracking
+                                            Fractal Activity
                                         </h3>
                                         <div className={styles.sectionContentStack}>
+                                            <div className={styles.themeRow}>
+                                                <label htmlFor="active-goal-window-days" className={styles.checkboxLabel} style={{ marginBottom: 4 }}>
+                                                    Active goal window
+                                                    <span className={styles.checkboxDescription}>
+                                                        Goals show as active when contributed activity was completed within this many days
+                                                    </span>
+                                                </label>
+                                                <input
+                                                    id="active-goal-window-days"
+                                                    type="number"
+                                                    min={MIN_ACTIVE_GOAL_WINDOW_DAYS}
+                                                    max={MAX_ACTIVE_GOAL_WINDOW_DAYS}
+                                                    step="1"
+                                                    value={activeGoalWindowDays}
+                                                    onChange={handleActiveGoalWindowChange}
+                                                    className={styles.selectInput}
+                                                />
+                                            </div>
+
+                                            <h3 className={styles.sectionTitle}>
+                                                Progress Tracking
+                                            </h3>
                                             <div className={styles.checkboxRow}>
                                                 <input
                                                     type="checkbox"

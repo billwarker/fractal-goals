@@ -12,7 +12,7 @@ import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { buildTreeMaps, getLineagePath } from '../components/flowTree/flowTreeTreeUtils';
 import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
-import { ACTIVE_GOAL_WINDOW_DAYS } from '../hooks/useFlowTreeMetrics';
+import { getActiveGoalWindowDaysFromSettings } from '../hooks/useFlowTreeMetrics';
 import { useFlowTreeEvidence, useFlowtreeSessionMetrics } from '../hooks/useSessionQueries';
 import { getChildType } from '../utils/goalHelpers';
 import { findGoalNodeById, getGoalNodeId, getGoalNodeName, getGoalNodeType } from '../utils/goalNodeModel';
@@ -69,7 +69,6 @@ function renderTypeToZoomQuery(query) {
 }
 
 function FractalGoals() {
-    const inactiveBranchTooltip = `Dims branches with no associated completed activity instances in the last ${ACTIVE_GOAL_WINDOW_DAYS} days.`;
     const hideCompletedTooltip = 'Hides completed goals from the fractal tree.';
     const [isOptionsPaneMinimized, setIsOptionsPaneMinimized] = useState(false);
 
@@ -91,7 +90,11 @@ function FractalGoals() {
         data: fractalData,
         isLoading: goalsLoading
     } = useFractalTree(rootId);
-    const { data: evidenceData, isLoading: evidenceLoading } = useFlowTreeEvidence(rootId);
+    const activeGoalWindowDays = getActiveGoalWindowDaysFromSettings(
+        fractalData?.attributes?.progress_settings
+    );
+    const inactiveBranchTooltip = `Dims branches with no associated completed activity instances in the last ${activeGoalWindowDays} days.`;
+    const { data: evidenceData, isLoading: evidenceLoading } = useFlowTreeEvidence(rootId, activeGoalWindowDays);
 
     const { activities = EMPTY_ARRAY, isLoading: activitiesLoading } = useActivitiesQuery(rootId);
     const { activityGroups = EMPTY_ARRAY, isLoading: activityGroupsLoading } = useActivityGroups(rootId);
@@ -137,7 +140,7 @@ function FractalGoals() {
     const { data: flowtreeMetricsSummary } = useFlowtreeSessionMetrics(
         rootId,
         visibleGoalIds,
-        { enabled: viewSettings.showMetricsOverlay }
+        { enabled: viewSettings.showMetricsOverlay, days: activeGoalWindowDays }
     );
     const typeToZoomCandidates = useMemo(() => (
         getVisibleGoalSearchCandidates(fractalData, {
@@ -491,6 +494,7 @@ function FractalGoals() {
                         treeData={fractalData}
                         evidenceGoalIds={evidenceGoalIds}
                         metricsSummary={flowtreeMetricsSummary}
+                        activeGoalWindowDays={activeGoalWindowDays}
                         activities={activities}
                         activityGroups={activityGroups}
                         programs={programs}

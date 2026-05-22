@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { invalidateGoalAssociationQueries } from '../components/goals/goalDetailQueryUtils';
 import { fractalApi } from '../utils/api';
 import { useActivityGoalAssociations } from './useActivityGoalAssociations';
+import { queryKeys } from './queryKeys';
 
 function dedupeById(items) {
     return Array.from(new Map((items || []).map((item) => [item.id, item])).values());
@@ -157,6 +158,8 @@ export function useGoalAssociationMutations({
             });
 
             await invalidateGoalAssociationQueries(queryClient, rootId, targetGoalId);
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionsEvidenceGoalsRoot(rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionsFlowtreeMetricsRoot(rootId) });
 
             initialActivitiesRef.current = activityIds;
             initialGroupsRef.current = groupIds;

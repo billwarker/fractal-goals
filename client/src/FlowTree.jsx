@@ -211,6 +211,7 @@ const FlowTree = React.forwardRef(({
     sidebarOpen,
     selectedNodeId,
     zoomTargetNodeId = null,
+    activeGoalWindowDays = ACTIVE_GOAL_WINDOW_DAYS,
 }, ref) => {
     const [rfInstance, setRfInstance] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
@@ -380,8 +381,8 @@ const FlowTree = React.forwardRef(({
 
                     <div className={styles.metricsRow}>
                         <div className={styles.metricsRowTitle}>Pathways</div>
-                        <div className={styles.metricItem} title={`Root-to-leaf branches whose lineage has a completed activity instance in the last ${ACTIVE_GOAL_WINDOW_DAYS} days`}>Active Branches: <span className={styles.metricValue}>{graphMetrics.row3.activeBranchesCount}</span></div>
-                        <div className={styles.metricItem} title={`Root-to-leaf branches without any completed activity instance in the last ${ACTIVE_GOAL_WINDOW_DAYS} days`}>Inactive Branches: <span className={styles.metricValue}>{graphMetrics.row3.inactiveBranchesCount}</span></div>
+                        <div className={styles.metricItem} title={`Root-to-leaf branches whose lineage has a completed activity instance in the last ${activeGoalWindowDays} days`}>Active Branches: <span className={styles.metricValue}>{graphMetrics.row3.activeBranchesCount}</span></div>
+                        <div className={styles.metricItem} title={`Root-to-leaf branches without any completed activity instance in the last ${activeGoalWindowDays} days`}>Inactive Branches: <span className={styles.metricValue}>{graphMetrics.row3.inactiveBranchesCount}</span></div>
                     </div>
 
                     <div className={styles.metricsRow}>

@@ -233,10 +233,10 @@ class SessionService:
     def get_activity_instantiation_summary(self, root_id, current_user_id) -> ServiceResult[JsonDict]:
         return self._analytics_service().get_activity_instantiation_summary(root_id, current_user_id)
 
-    def get_recent_evidence_goal_ids(self, root_id, current_user_id, days=7) -> ServiceResult[JsonDict]:
+    def get_recent_evidence_goal_ids(self, root_id, current_user_id, days=None) -> ServiceResult[JsonDict]:
         return self._analytics_service().get_recent_evidence_goal_ids(root_id, current_user_id, days=days)
 
-    def get_flowtree_session_metrics(self, root_id, current_user_id, goal_ids=None, days=7) -> ServiceResult[JsonDict]:
+    def get_flowtree_session_metrics(self, root_id, current_user_id, goal_ids=None, days=None) -> ServiceResult[JsonDict]:
         return self._analytics_service().get_flowtree_session_metrics(
             root_id,
             current_user_id,

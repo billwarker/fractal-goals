@@ -2,17 +2,21 @@ import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useSessionNotes, useSessionsHeatmap, useSessionsSearch } from '../useSessionQueries';
+import { useFlowTreeEvidence, useFlowtreeSessionMetrics, useSessionNotes, useSessionsHeatmap, useSessionsSearch } from '../useSessionQueries';
 
 const getSessionNotes = vi.fn();
 const getSessions = vi.fn();
 const getSessionsHeatmap = vi.fn();
+const getSessionEvidenceGoals = vi.fn();
+const getFlowtreeSessionMetrics = vi.fn();
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
         getSessions: (...args) => getSessions(...args),
         getSessionsHeatmap: (...args) => getSessionsHeatmap(...args),
         getSessionNotes: (...args) => getSessionNotes(...args),
+        getSessionEvidenceGoals: (...args) => getSessionEvidenceGoals(...args),
+        getFlowtreeSessionMetrics: (...args) => getFlowtreeSessionMetrics(...args),
     }
 }));
 
@@ -164,6 +168,53 @@ describe('useSessionsHeatmap', () => {
             sort_order: 'desc',
             timezone: 'UTC',
             activity_ids: ['activity-1', 'activity-2'],
+        });
+    });
+});
+
+describe('FlowTree session evidence hooks', () => {
+    it('uses the configured active window in evidence and metrics queries', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: {
+                    retry: false,
+                }
+            }
+        });
+
+        getSessionEvidenceGoals.mockResolvedValueOnce({
+            data: { goal_ids: ['goal-1'], window_days: 14 },
+        });
+        getFlowtreeSessionMetrics.mockResolvedValueOnce({
+            data: { window_days: 14, completed_instances_count: 1 },
+        });
+
+        const { result: evidenceResult } = renderHook(
+            () => useFlowTreeEvidence('root-1', 14),
+            { wrapper: createWrapper(queryClient) }
+        );
+        const { result: metricsResult } = renderHook(
+            () => useFlowtreeSessionMetrics('root-1', ['goal-1'], { enabled: true, days: 14 }),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await waitFor(() => {
+            expect(evidenceResult.current.data?.window_days).toBe(14);
+            expect(metricsResult.current.data?.window_days).toBe(14);
+        });
+
+        expect(getSessionEvidenceGoals).toHaveBeenCalledWith('root-1', { days: 14 });
+        expect(getFlowtreeSessionMetrics).toHaveBeenCalledWith('root-1', {
+            goal_ids: ['goal-1'],
+            days: 14,
+        });
+        expect(queryClient.getQueryData(['sessions', 'root-1', 'evidence-goals', 14])).toEqual({
+            goal_ids: ['goal-1'],
+            window_days: 14,
+        });
+        expect(queryClient.getQueryData(['sessions', 'root-1', 'flowtree-metrics', ['goal-1'], 14])).toEqual({
+            window_days: 14,
+            completed_instances_count: 1,
         });
     });
 });

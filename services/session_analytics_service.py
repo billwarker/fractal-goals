@@ -72,10 +72,21 @@ class SessionAnalyticsService:
     @staticmethod
     def _normalize_window_days(raw_days, default=7, max_days=MAX_FLOWTREE_WINDOW_DAYS) -> int:
         try:
-            days = int(raw_days or default)
+            days = int(default if raw_days is None or raw_days == '' else raw_days)
         except (TypeError, ValueError):
             return default
         return max(1, min(days, max_days))
+
+    @classmethod
+    def _active_goal_window_days_for_root(cls, root) -> int:
+        settings = getattr(root, 'progress_settings', None)
+        if not isinstance(settings, dict):
+            return cls._normalize_window_days(None)
+        return cls._normalize_window_days(settings.get('active_goal_window_days'))
+
+    @staticmethod
+    def _goal_suppresses_active_evidence(goal) -> bool:
+        return bool(getattr(goal, 'frozen', False))
 
     @staticmethod
     def _empty_flowtree_session_metrics(window_days: int) -> JsonDict:
@@ -341,12 +352,12 @@ class SessionAnalyticsService:
             "summary_by_activity": summary_by_activity,
         }, None, 200
 
-    def get_recent_evidence_goal_ids(self, root_id, current_user_id, days=7) -> ServiceResult[JsonDict]:
+    def get_recent_evidence_goal_ids(self, root_id, current_user_id, days=None) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
 
-        window_days = self._normalize_window_days(days)
+        window_days = self._normalize_window_days(days, self._active_goal_window_days_for_root(root))
         cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
 
         recent_instance_rows = self.db_session.query(
@@ -376,6 +387,8 @@ class SessionAnalyticsService:
         for activity_id, time_stop, updated_at, created_at in recent_instance_rows:
             completed_timestamp = time_stop or updated_at or created_at
             for goal in effective_goals_by_activity.get(activity_id, []):
+                if self._goal_suppresses_active_evidence(goal):
+                    continue
                 if self._timestamp_contributes_to_goal(completed_timestamp, goal):
                     goal_ids.add(str(goal.id))
 
@@ -385,12 +398,12 @@ class SessionAnalyticsService:
             "cutoff": format_utc(cutoff),
         }, None, 200
 
-    def get_flowtree_session_metrics(self, root_id, current_user_id, goal_ids=None, days=7) -> ServiceResult[JsonDict]:
+    def get_flowtree_session_metrics(self, root_id, current_user_id, goal_ids=None, days=None) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
 
-        window_days = self._normalize_window_days(days)
+        window_days = self._normalize_window_days(days, self._active_goal_window_days_for_root(root))
         visible_goal_ids = set(normalize_id_list(goal_ids))
         if not visible_goal_ids:
             return self._empty_flowtree_session_metrics(window_days), None, 200
@@ -401,6 +414,8 @@ class SessionAnalyticsService:
 
         def activity_instance_contributes(activity_id, timestamp):
             for goal in effective_goals_by_activity.get(activity_id, []):
+                if self._goal_suppresses_active_evidence(goal):
+                    continue
                 if str(goal.id) not in target_goal_ids:
                     continue
                 if self._timestamp_contributes_to_goal(timestamp, goal):
@@ -457,6 +472,8 @@ class SessionAnalyticsService:
         }
         for session_id, goal_id, session_start, session_end, completed_at, created_at in session_goal_rows:
             goal = goals_by_id.get(goal_id)
+            if self._goal_suppresses_active_evidence(goal):
+                continue
             session_timestamp = session_end or completed_at or session_start or created_at
             if session_id and self._timestamp_contributes_to_goal(session_timestamp, goal):
                 relevant_session_ids.add(session_id)

@@ -9,7 +9,7 @@ import useGoalDurationModal from '../hooks/useGoalDurationModal';
 import { useGoalForm } from '../hooks/useGoalForm';
 import { useGoalNotes } from '../hooks/useGoalNotes';
 import { useGoalAssociations, useGoalMetrics } from '../hooks/useGoalQueries';
-import { deriveEvidenceGoalIds, getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
+import { getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
 import { getChildType, getValidChildTypes, getTypeDisplayName } from '../utils/goalHelpers';
 import { flattenGoalTree, isExecutionGoalType } from '../utils/goalNodeModel';
 import { isSMART } from '../utils/smartHelpers';
@@ -347,10 +347,7 @@ function GoalDetailModal({
             return 'active';
         }
 
-        const hasSignalInputs = evidenceGoalIds !== null
-            || activityDefinitions.length > 0
-            || activityGroupsFromProps.length > 0;
-        if (!hasSignalInputs) {
+        if (evidenceGoalIds === null) {
             return 'active';
         }
 
@@ -358,14 +355,17 @@ function GoalDetailModal({
         const parentById = new Map(
             flattenedTree.map((node) => [String(node.id), node.parent_id ? String(node.parent_id) : null])
         );
-        const activeEvidenceGoalIds = evidenceGoalIds || deriveEvidenceGoalIds(sessions, activityDefinitions, activityGroupsFromProps);
+        const nodeById = new Map(
+            flattenedTree.map((node) => [String(node.id), node])
+        );
+        const activeEvidenceGoalIds = evidenceGoalIds || new Set();
         if (activeEvidenceGoalIds.size === 0) {
             return 'inactive';
         }
 
-        const activeLineageIds = getActiveLineageIds(activeEvidenceGoalIds, parentById);
+        const activeLineageIds = getActiveLineageIds(activeEvidenceGoalIds, parentById, nodeById);
         return activeLineageIds.has(String(depGoalId)) ? 'active' : 'inactive';
-    }, [activityDefinitions, activityGroupsFromProps, depGoalId, evidenceGoalIds, isPaused, mode, sessions, treeData]);
+    }, [depGoalId, evidenceGoalIds, isPaused, mode, treeData]);
 
     React.useEffect(() => {
         if (!shouldMeasureStickyHeader(viewState)) {

@@ -1,6 +1,6 @@
 import dagre from 'dagre';
 
-import { buildGraphMetricsFromSummary, deriveEvidenceGoalIds, getActiveLineageIds, getInactiveNodeIds } from '../../hooks/useFlowTreeMetrics';
+import { buildGraphMetricsFromSummary, getActiveLineageIds, getInactiveNodeIds } from '../../hooks/useFlowTreeMetrics';
 import { getValidChildTypes } from '../../utils/goalHelpers';
 import {
     getGoalNodeChildren,
@@ -174,8 +174,8 @@ export const buildGraphPresentation = ({
     };
 
     const treeMaps = buildTreeMaps(treeData);
-    const effectiveEvidenceGoalIds = evidenceGoalIds || deriveEvidenceGoalIds(sessions, activities, activityGroups);
-    const activeLineageIds = getActiveLineageIds(effectiveEvidenceGoalIds, treeMaps.parentById);
+    const effectiveEvidenceGoalIds = evidenceGoalIds || new Set();
+    const activeLineageIds = getActiveLineageIds(effectiveEvidenceGoalIds, treeMaps.parentById, treeMaps.nodeById);
     const inactiveNodeIds = getInactiveNodeIds(treeMaps.nodeById, treeMaps.childrenById, effectiveEvidenceGoalIds);
 
     const { nodes: rawNodes, edges: rawEdges, visibleNodeIds } = convertTreeToFlow(

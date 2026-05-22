@@ -47,6 +47,11 @@ export function useSessionDetailMutations({
         queryClient.invalidateQueries({ queryKey: sessionsPaginatedKey });
     }, [queryClient, sessionsAllKey, sessionsKey, sessionsPaginatedKey]);
 
+    const invalidateFlowTreeActivityEvidence = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.sessionsEvidenceGoalsRoot(rootId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.sessionsFlowtreeMetricsRoot(rootId) });
+    }, [queryClient, rootId]);
+
     const invalidateGoalQueries = useCallback(() => {
         queryClient.invalidateQueries({ queryKey: goalsKey });
         queryClient.invalidateQueries({ queryKey: goalsForSelectionKey });
@@ -289,6 +294,7 @@ export function useSessionDetailMutations({
                 queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
                 queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
                 invalidateSessionListQueries();
+                invalidateFlowTreeActivityEvidence();
             }
 
             // Invalidate progress comparison when metrics are updated
@@ -384,12 +390,13 @@ export function useSessionDetailMutations({
                 queryClient.invalidateQueries({ queryKey: sessionKey });
                 queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
                 invalidateSessionListQueries();
+                invalidateFlowTreeActivityEvidence();
             }
         } catch (error) {
             console.error('Timer action failed', error);
             notify.error(`Timer action failed: ${error.response?.data?.error || error.message}`);
         }
-    }, [activityInstances, invalidateSessionListQueries, queryClient, rootId, sessionActivitiesKey, sessionGoalsViewKey, sessionId, sessionKey]);
+    }, [activityInstances, invalidateFlowTreeActivityEvidence, invalidateSessionListQueries, queryClient, rootId, sessionActivitiesKey, sessionGoalsViewKey, sessionId, sessionKey]);
 
     const handleReorderActivity = useCallback((sectionIndex, exerciseIndex, direction) => {
         updateSessionDataDraft((currentData) => {

@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 import { useFractalTree } from './useGoalQueries';
+import { getActiveGoalWindowDaysFromSettings } from './useFlowTreeMetrics';
 
 /**
  * Read and write progress_settings for the active root goal.
@@ -39,11 +40,14 @@ export function useRootProgressSettings(rootId) {
                 });
             }
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionsEvidenceGoalsRoot(rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionsFlowtreeMetricsRoot(rootId) });
         },
     });
 
     return {
         progressSettings,
+        activeGoalWindowDays: getActiveGoalWindowDaysFromSettings(progressSettings),
         updateProgressSettings: (settings) => mutation.mutateAsync(settings),
         isUpdating: mutation.isPending,
     };
