@@ -17,20 +17,14 @@ def goal_was_completed_before(goal, timestamp) -> bool:
     return bool(occurred_at and completed_at and completed_at < occurred_at)
 
 
-def resolve_contribution_goal(goal, timestamp, goals_by_id):
-    """Return the nearest goal that can receive contribution at timestamp."""
+def resolve_contribution_goal(goal, timestamp, goals_by_id=None):
+    """Return the associated goal only if it can receive contribution at timestamp."""
     occurred_at = as_utc_datetime(timestamp)
     if not occurred_at or not goal:
         return None
 
-    current = goal
-    visited = set()
-    while current and current.id not in visited:
-        visited.add(current.id)
-        if goal_suppresses_contribution(current):
-            return None
-        if not goal_was_completed_before(current, occurred_at):
-            return current
-        current = goals_by_id.get(current.parent_id)
-
-    return None
+    if goal_suppresses_contribution(goal):
+        return None
+    if goal_was_completed_before(goal, occurred_at):
+        return None
+    return goal

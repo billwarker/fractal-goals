@@ -82,7 +82,7 @@ def test_session_goal_payload_keeps_structural_ancestors_for_activity_derived_go
     assert sample_goal_hierarchy["short_term"].id in tree_ids
 
 
-def test_session_goal_payload_rolls_completed_before_session_activity_association_to_ancestor(
+def test_session_goal_payload_omits_completed_before_session_activity_association(
     db_session,
     test_user,
     sample_goal_hierarchy,
@@ -119,14 +119,12 @@ def test_session_goal_payload_rolls_completed_before_session_activity_associatio
     assert error is None
     assert status == 200
     assert payload["session_goal_ids"] == []
-    assert payload["activity_goal_ids_by_activity"][sample_activity_definition.id] == [
-        sample_goal_hierarchy["mid_term"].id
-    ]
+    assert payload["activity_goal_ids_by_activity"][sample_activity_definition.id] == []
 
     tree_ids = _collect_tree_ids(payload["goal_tree"])
     assert sample_goal_hierarchy["ultimate"].id in tree_ids
-    assert sample_goal_hierarchy["long_term"].id in tree_ids
-    assert sample_goal_hierarchy["mid_term"].id in tree_ids
+    assert sample_goal_hierarchy["long_term"].id not in tree_ids
+    assert sample_goal_hierarchy["mid_term"].id not in tree_ids
     assert sample_goal_hierarchy["short_term"].id not in tree_ids
 
 
