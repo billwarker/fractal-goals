@@ -171,11 +171,6 @@ export function useSessionGoalsViewModel({
             parentMap
         );
 
-        if (normalizedTree[0]) {
-            collectIdsWithAncestors([String(normalizedTree[0].id)], parentMap)
-                .forEach((goalId) => relevantIds.add(goalId));
-        }
-
         return normalizedTree
             .filter(node => relevantIds.has(String(node.id)))
             .map(node => ({

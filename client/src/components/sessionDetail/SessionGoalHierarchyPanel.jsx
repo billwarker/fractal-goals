@@ -49,6 +49,7 @@ function SessionGoalHierarchyPanel({
 
     const {
         sessionHierarchy,
+        activityHierarchy,
         targetCards,
         selectedActivityGoalIds,
         selectedActivityAncestorIds,
@@ -62,6 +63,7 @@ function SessionGoalHierarchyPanel({
         achievedTargetIds,
     });
 
+    const displayHierarchy = selectedActivity ? activityHierarchy : sessionHierarchy;
     const hasActivityHighlight = selectedActivityGoalIds.size > 0;
 
     const getGoalBranchHighlightState = useCallback((goal) => {
@@ -115,8 +117,8 @@ function SessionGoalHierarchyPanel({
             <div className={`${styles.goalsPanel} ${className}`}>
                 <div className={styles.sessionActivitiesList}>
                     <HierarchySection
-                        type="session"
-                        flattenedHierarchy={sessionHierarchy}
+                        type={selectedActivity ? 'activity' : 'session'}
+                        flattenedHierarchy={displayHierarchy}
                         onGoalClick={onGoalClick}
                         getScopedCharacteristics={getLevelByName}
                         getGoalColor={getGoalColor}
@@ -131,10 +133,17 @@ function SessionGoalHierarchyPanel({
                         onStartSubGoalCreation={handleStartSubGoalCreation}
                         scopedActivityName={scopedActivityName}
                     />
-                    {sessionHierarchy.length === 0 && (
+                    {displayHierarchy.length === 0 && (
                         <div className={styles.emptyState}>
-                            No goals associated with this session. <br />
-                            <small>Select an activity to add goals.</small>
+                            {selectedActivity
+                                ? 'No outstanding goals associated with this activity.'
+                                : 'No goals associated with this session.'}
+                            <br />
+                            <small>
+                                {selectedActivity
+                                    ? 'Associate this activity with an outstanding goal to show it here.'
+                                    : 'Select an activity to add goals.'}
+                            </small>
                         </div>
                     )}
                     <TargetsSection

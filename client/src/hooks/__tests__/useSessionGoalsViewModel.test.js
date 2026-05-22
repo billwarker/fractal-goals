@@ -126,6 +126,55 @@ describe('useSessionGoalsViewModel', () => {
         expect(names).not.toContain('STG B');
     });
 
+    it('returns an empty activity hierarchy when focused activity has no eligible goal ids', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root',
+                type: 'UltimateGoal',
+                name: 'Root',
+                children: [
+                    {
+                        id: 'lesson-path',
+                        type: 'LongTermGoal',
+                        name: 'Lesson Path',
+                        children: [{ id: 'voyage', type: 'ShortTermGoal', name: 'Voyage', children: [] }]
+                    },
+                    {
+                        id: 'jamming-path',
+                        type: 'LongTermGoal',
+                        name: 'Jamming Path',
+                        children: []
+                    }
+                ]
+            },
+            session_goal_ids: ['voyage'],
+            activity_goal_ids_by_activity: {
+                'learning-intro': ['voyage'],
+                jamming: []
+            },
+            session_activity_ids: ['learning-intro', 'jamming']
+        };
+
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            sessionGoalsView,
+            selectedActivity: { id: 'inst-2', activity_definition_id: 'jamming' },
+            activityInstances: [
+                { id: 'inst-1', activity_definition_id: 'learning-intro' },
+                { id: 'inst-2', activity_definition_id: 'jamming' },
+            ],
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+        }));
+
+        expect(result.current.sessionHierarchy.map((node) => node.name)).toEqual([
+            'Root',
+            'Lesson Path',
+            'Voyage',
+        ]);
+        expect(result.current.activityHierarchy).toEqual([]);
+        expect(result.current.selectedActivityGoalIds).toEqual(new Set());
+    });
+
     it('keeps completed associated goals in the session hierarchy', () => {
         const sessionGoalsView = {
             goal_tree: {

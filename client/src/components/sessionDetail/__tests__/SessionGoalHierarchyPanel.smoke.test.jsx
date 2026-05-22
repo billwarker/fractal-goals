@@ -121,7 +121,7 @@ describe('SessionGoalHierarchyPanel smoke', () => {
         expect(screen.queryByText('Session Focus')).not.toBeInTheDocument();
     });
 
-    it('keeps the full session hierarchy visible when an activity is selected', async () => {
+    it('shows the focused activity hierarchy when an activity is selected', async () => {
         renderWithProviders(
             <SessionGoalHierarchyPanel
                 selectedActivity={{
@@ -149,5 +149,53 @@ describe('SessionGoalHierarchyPanel smoke', () => {
         expect(screen.getByText('STG')).toBeInTheDocument();
         expect(screen.getByText('IG')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Activity' })).not.toBeInTheDocument();
+    });
+
+    it('does not fall back to session hierarchy when focused activity has no eligible goals', async () => {
+        activeSessionMock = {
+            ...activeSessionMock,
+            activityInstances: [
+                { id: 'instance-1', activity_definition_id: 'activity-1' },
+                { id: 'instance-2', activity_definition_id: 'activity-2' },
+            ],
+            activities: [
+                { id: 'activity-1', name: 'Learning the Intro', associated_goal_ids: ['ig-1'] },
+                { id: 'activity-2', name: 'Jamming', associated_goal_ids: [] },
+            ],
+            sessionGoalsView: {
+                ...activeSessionMock.sessionGoalsView,
+                activity_goal_ids_by_activity: {
+                    'activity-1': ['ig-1'],
+                    'activity-2': [],
+                },
+                session_activity_ids: ['activity-1', 'activity-2'],
+            },
+        };
+
+        renderWithProviders(
+            <SessionGoalHierarchyPanel
+                selectedActivity={{
+                    id: 'instance-2',
+                    activity_definition_id: 'activity-2',
+                    name: 'Jamming'
+                }}
+                onGoalClick={vi.fn()}
+                onGoalCreated={vi.fn()}
+                onOpenGoals={vi.fn()}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Goals: Jamming')).toBeInTheDocument();
+        });
+        expect(screen.getByText('No outstanding goals associated with this activity.')).toBeInTheDocument();
+        expect(screen.queryByText('STG')).not.toBeInTheDocument();
+        expect(screen.queryByText('IG')).not.toBeInTheDocument();
     });
 });
