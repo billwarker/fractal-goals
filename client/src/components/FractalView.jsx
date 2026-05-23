@@ -7,11 +7,15 @@ import FlowTree from '../FlowTree';
  * NOTE: Sessions are NO LONGER displayed in the goal tree.
  * The showSessions toggle has been removed.
  */
-const FractalView = ({
+const FractalView = React.forwardRef(({
     treeData,
     ...props
-}) => {
+}, ref) => {
     const flowTreeRef = React.useRef();
+
+    React.useImperativeHandle(ref, () => ({
+        startFadeOut: () => flowTreeRef.current?.startFadeOut?.(),
+    }), []);
 
     return (
         <FlowTree
@@ -20,7 +24,8 @@ const FractalView = ({
             {...props}
         />
     );
-};
+});
+
+FractalView.displayName = 'FractalView';
 
 export default FractalView;
-

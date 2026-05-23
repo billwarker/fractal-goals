@@ -8,19 +8,31 @@ const updateGoalMock = vi.fn();
 const deleteGoalMock = vi.fn();
 const toggleGoalCompletionMock = vi.fn();
 const setActiveRootIdMock = vi.fn();
+const startFadeOutMock = vi.hoisted(() => vi.fn());
 
 let fractalTree;
 
-vi.mock('../../components/FractalView', () => ({
-    default: (props) => (
-        <div
-            data-testid="fractal-view"
-            data-zoom-target={props.zoomTargetNodeId || ''}
-            data-selected-node={props.selectedNodeId || ''}
-            data-hide-inactive-goals={String(Boolean(props.viewSettings?.hideInactiveGoals))}
-        />
-    ),
-}));
+vi.mock('../../components/FractalView', async () => {
+    const ReactModule = await vi.importActual('react');
+    return {
+        default: ReactModule.forwardRef((props, ref) => {
+            ReactModule.useImperativeHandle(ref, () => ({
+                startFadeOut: startFadeOutMock,
+            }), []);
+
+            return (
+                <div
+                    data-testid="fractal-view"
+                    data-zoom-target={props.zoomTargetNodeId || ''}
+                    data-selected-node={props.selectedNodeId || ''}
+                    data-hide-inactive-goals={String(Boolean(props.viewSettings?.hideInactiveGoals))}
+                    data-hide-completed-goals={String(Boolean(props.viewSettings?.hideCompletedGoals))}
+                    data-scope-transition-key={String(props.scopeTransitionKey || 0)}
+                />
+            );
+        }),
+    };
+});
 
 vi.mock('../../components/Sidebar', () => ({
     default: () => <div data-testid="sidebar" />,
@@ -136,9 +148,12 @@ describe('FractalGoals type-to-zoom search', () => {
                 },
             ],
         };
+        startFadeOutMock.mockClear();
     });
 
     afterEach(() => {
+        vi.clearAllTimers();
+        vi.useRealTimers();
         vi.unstubAllGlobals();
     });
 
@@ -259,6 +274,7 @@ describe('FractalGoals type-to-zoom search', () => {
     });
 
     it('offers a graph option to hide inactive goals', () => {
+        vi.useFakeTimers();
         renderFractalGoals();
 
         const hideInactiveToggle = screen.getByLabelText('Hide inactive goals');
@@ -266,6 +282,33 @@ describe('FractalGoals type-to-zoom search', () => {
 
         fireEvent.click(hideInactiveToggle);
 
+        expect(startFadeOutMock).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-hide-inactive-goals', 'false');
+        expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-scope-transition-key', '0');
+
+        act(() => {
+            vi.advanceTimersByTime(170);
+        });
+
         expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-hide-inactive-goals', 'true');
+        expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-scope-transition-key', '1');
+    });
+
+    it('transitions before applying the hide completed goals graph option', () => {
+        vi.useFakeTimers();
+        renderFractalGoals();
+
+        fireEvent.click(screen.getByLabelText('Hide completed goals'));
+
+        expect(startFadeOutMock).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-hide-completed-goals', 'false');
+        expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-scope-transition-key', '0');
+
+        act(() => {
+            vi.advanceTimersByTime(170);
+        });
+
+        expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-hide-completed-goals', 'true');
+        expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-scope-transition-key', '1');
     });
 });

@@ -4,6 +4,7 @@ import FlowTree from '../FlowTree';
 
 const fitViewMock = vi.hoisted(() => vi.fn());
 const setCenterMock = vi.hoisted(() => vi.fn());
+const setViewportMock = vi.hoisted(() => vi.fn());
 const onInitMock = vi.hoisted(() => vi.fn());
 
 vi.mock('reactflow', async () => {
@@ -19,7 +20,7 @@ vi.mock('reactflow', async () => {
 
             initCallCountRef.current += 1;
             onInitMock();
-            onInit?.({ fitView: fitViewMock, setCenter: setCenterMock });
+            onInit?.({ fitView: fitViewMock, setCenter: setCenterMock, setViewport: setViewportMock });
         });
 
         return (
@@ -40,6 +41,11 @@ vi.mock('reactflow', async () => {
             const [edges, setEdges] = ReactModule.useState(initialEdges);
             return [edges, setEdges, vi.fn()];
         },
+        getViewportForBounds: ({ x, y, width, height }, viewportWidth, viewportHeight, minZoom, maxZoom, padding) => ({
+            x: viewportWidth / 2 - (x + width / 2),
+            y: viewportHeight / 2 - (y + height / 2),
+            zoom: Math.min(maxZoom, Math.max(minZoom, 1 - padding)),
+        }),
         Handle: () => null,
         Position: {
             Top: 'top',
@@ -71,10 +77,23 @@ describe('FlowTree', () => {
         vi.useFakeTimers();
         fitViewMock.mockClear();
         setCenterMock.mockClear();
+        setViewportMock.mockClear();
         onInitMock.mockClear();
+        vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+            width: 1200,
+            height: 800,
+            top: 0,
+            left: 0,
+            right: 1200,
+            bottom: 800,
+            x: 0,
+            y: 0,
+            toJSON: () => {},
+        });
     });
 
     afterEach(() => {
+        vi.restoreAllMocks();
         vi.clearAllTimers();
         vi.useRealTimers();
     });
@@ -135,5 +154,99 @@ describe('FlowTree', () => {
             expect.any(Number),
             { zoom: 1.1, duration: 260 }
         );
+    });
+
+    it('fits re-scoped graph nodes instantly before revealing them', () => {
+        const ref = React.createRef();
+        const treeData = {
+            id: 'root-1',
+            name: 'Root Goal',
+            type: 'UltimateGoal',
+            children: [
+                {
+                    id: 'active-goal',
+                    name: 'Active Goal',
+                    type: 'LongTermGoal',
+                    children: [],
+                },
+                {
+                    id: 'inactive-goal',
+                    name: 'Inactive Goal',
+                    type: 'LongTermGoal',
+                    children: [],
+                },
+            ],
+        };
+
+        const { rerender } = render(
+            <FlowTree
+                ref={ref}
+                treeData={treeData}
+                evidenceGoalIds={new Set(['active-goal'])}
+                viewSettings={{ hideInactiveGoals: false }}
+                scopeTransitionKey={0}
+                onNodeClick={vi.fn()}
+                onAddChild={vi.fn()}
+            />
+        );
+
+        act(() => {
+            vi.advanceTimersByTime(500);
+        });
+        fitViewMock.mockClear();
+
+        act(() => {
+            ref.current.startFadeOut();
+        });
+
+        act(() => {
+            rerender(
+                <FlowTree
+                    ref={ref}
+                    treeData={treeData}
+                    evidenceGoalIds={new Set(['active-goal'])}
+                    viewSettings={{ hideInactiveGoals: true }}
+                    scopeTransitionKey={1}
+                    onNodeClick={vi.fn()}
+                    onAddChild={vi.fn()}
+                />
+            );
+        });
+
+        act(() => {
+            vi.advanceTimersByTime(100);
+        });
+
+        expect(setViewportMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                x: expect.any(Number),
+                y: expect.any(Number),
+                zoom: expect.any(Number),
+            }),
+            { duration: 0 }
+        );
+        expect(fitViewMock).not.toHaveBeenCalledWith(expect.objectContaining({
+            duration: 220,
+        }));
+    });
+
+    it('shows an empty state when hiding inactive goals removes every goal', () => {
+        render(
+            <FlowTree
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root Goal',
+                    type: 'UltimateGoal',
+                    children: [],
+                }}
+                evidenceGoalIds={new Set()}
+                viewSettings={{ hideInactiveGoals: true }}
+                onNodeClick={vi.fn()}
+                onAddChild={vi.fn()}
+            />
+        );
+
+        expect(screen.getByTestId('node-count')).toHaveTextContent('0');
+        expect(screen.getByRole('status')).toHaveTextContent('No active goals exist');
     });
 });

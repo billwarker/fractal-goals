@@ -2,6 +2,7 @@ import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import ReactFlow, {
     useNodesState,
     useEdgesState,
+    getViewportForBounds,
     Handle,
     Position,
 } from 'reactflow';
@@ -197,6 +198,38 @@ const nodeTypes = {
 
 const EMPTY_ARRAY = [];
 
+function getGraphBounds(nodes, dimensions) {
+    if (!nodes.length) return null;
+
+    const bounds = nodes.reduce((acc, node) => {
+        const width = node.width || dimensions.width;
+        const height = node.height || dimensions.height;
+        const minX = node.position.x;
+        const minY = node.position.y;
+        const maxX = node.position.x + width;
+        const maxY = node.position.y + height;
+
+        return {
+            minX: Math.min(acc.minX, minX),
+            minY: Math.min(acc.minY, minY),
+            maxX: Math.max(acc.maxX, maxX),
+            maxY: Math.max(acc.maxY, maxY),
+        };
+    }, {
+        minX: Infinity,
+        minY: Infinity,
+        maxX: -Infinity,
+        maxY: -Infinity,
+    });
+
+    return {
+        x: bounds.minX,
+        y: bounds.minY,
+        width: Math.max(bounds.maxX - bounds.minX, 1),
+        height: Math.max(bounds.maxY - bounds.minY, 1),
+    };
+}
+
 const FlowTree = React.forwardRef(({
     treeData,
     sessions = EMPTY_ARRAY,
@@ -212,9 +245,16 @@ const FlowTree = React.forwardRef(({
     selectedNodeId,
     zoomTargetNodeId = null,
     activeGoalWindowDays = ACTIVE_GOAL_WINDOW_DAYS,
+    scopeTransitionKey = 0,
 }, ref) => {
     const [rfInstance, setRfInstance] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
+    const processedScopeTransitionKeyRef = React.useRef(scopeTransitionKey);
+    const pendingScopeTransitionKeyRef = React.useRef(null);
+    const scopeRevealTimerRef = React.useRef(null);
+    const scopeCenterFrameRef = React.useRef(null);
+    const skipNextVisibleFitViewRef = React.useRef(false);
+    const flowTreeContainerRef = React.useRef(null);
     const isMobile = useIsMobile();
 
     const { getGoalColor } = useGoalLevels();
@@ -222,6 +262,7 @@ const FlowTree = React.forwardRef(({
 
     React.useImperativeHandle(ref, () => ({
         startFadeOut: () => {
+            skipNextVisibleFitViewRef.current = true;
             setIsVisible(false);
         }
     }), []);
@@ -260,9 +301,27 @@ const FlowTree = React.forwardRef(({
 
     const [nodes, setNodes, onNodesChange] = useNodesState(graphNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(graphEdges);
+    const showNoActiveGoalsMessage = Boolean(viewSettings?.hideInactiveGoals) && nodes.length === 0;
+    const renderedNodeSignature = useMemo(
+        () => nodes.map((node) => node.id).join('|'),
+        [nodes]
+    );
+    const graphNodeSignature = useMemo(
+        () => graphNodes.map((node) => node.id).join('|'),
+        [graphNodes]
+    );
 
     const handleReactFlowInit = useCallback((instance) => {
         setRfInstance((currentInstance) => currentInstance || instance);
+    }, []);
+
+    useEffect(() => () => {
+        if (scopeRevealTimerRef.current) {
+            clearTimeout(scopeRevealTimerRef.current);
+        }
+        if (scopeCenterFrameRef.current) {
+            cancelAnimationFrame(scopeCenterFrameRef.current);
+        }
     }, []);
 
     useEffect(() => {
@@ -285,13 +344,70 @@ const FlowTree = React.forwardRef(({
         return undefined;
     }, [rfInstance, isMobile]);
 
+    React.useLayoutEffect(() => {
+        if (processedScopeTransitionKeyRef.current !== scopeTransitionKey) {
+            pendingScopeTransitionKeyRef.current = scopeTransitionKey;
+        }
+
+        if (pendingScopeTransitionKeyRef.current !== scopeTransitionKey) return undefined;
+        if (renderedNodeSignature !== graphNodeSignature) return undefined;
+
+        skipNextVisibleFitViewRef.current = true;
+        processedScopeTransitionKeyRef.current = scopeTransitionKey;
+        pendingScopeTransitionKeyRef.current = null;
+
+        if (scopeRevealTimerRef.current) {
+            clearTimeout(scopeRevealTimerRef.current);
+        }
+        if (scopeCenterFrameRef.current) {
+            cancelAnimationFrame(scopeCenterFrameRef.current);
+        }
+
+        scopeCenterFrameRef.current = requestAnimationFrame(() => {
+            scopeCenterFrameRef.current = null;
+
+            const containerRect = flowTreeContainerRef.current?.getBoundingClientRect();
+            const dimensions = isMobile
+                ? FLOWTREE_LAYOUT_NODE_DIMENSIONS.compact
+                : FLOWTREE_LAYOUT_NODE_DIMENSIONS.regular;
+            const graphBounds = getGraphBounds(nodes, dimensions);
+
+            if (rfInstance && graphBounds && containerRect?.width && containerRect?.height) {
+                const viewport = getViewportForBounds(
+                    graphBounds,
+                    containerRect.width,
+                    containerRect.height,
+                    isMobile ? 0.06 : 0.1,
+                    isMobile ? 1.6 : 2,
+                    isMobile ? 0.08 : 0.2
+                );
+                rfInstance.setViewport?.(viewport, { duration: 0 });
+            } else if (rfInstance && nodes.length > 0) {
+                rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration: 0 });
+            }
+
+            scopeRevealTimerRef.current = setTimeout(() => {
+                setIsVisible(true);
+                scopeRevealTimerRef.current = null;
+            }, 60);
+        });
+
+        return undefined;
+    }, [graphNodeSignature, isMobile, nodes, renderedNodeSignature, rfInstance, scopeTransitionKey]);
+
     useEffect(() => {
-        if (rfInstance && graphNodes.length > 0) {
-            requestAnimationFrame(() => {
+        if (rfInstance && nodes.length > 0 && isVisible) {
+            if (skipNextVisibleFitViewRef.current) {
+                skipNextVisibleFitViewRef.current = false;
+                return undefined;
+            }
+            const frameId = requestAnimationFrame(() => {
                 rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration: 220 });
             });
+            return () => cancelAnimationFrame(frameId);
         }
-    }, [graphNodes, rfInstance, isMobile]);
+        return undefined;
+    }, [nodes, rfInstance, isMobile, isVisible]);
 
     useEffect(() => {
         if (rfInstance) {
@@ -333,6 +449,7 @@ const FlowTree = React.forwardRef(({
 
     return (
         <div
+            ref={flowTreeContainerRef}
             className={styles.flowTreeContainer}
             style={{ opacity: isVisible ? 1 : 0 }}
         >
@@ -360,6 +477,12 @@ const FlowTree = React.forwardRef(({
                 proOptions={{ hideAttribution: true }}
             >
             </ReactFlow>
+
+            {showNoActiveGoalsMessage && (
+                <div className={styles.emptyState} role="status">
+                    No active goals exist
+                </div>
+            )}
 
             {viewSettings.showMetricsOverlay && graphMetrics && (
                 <div className={`${styles.metricsOverlay} ${sidebarOpen ? styles.metricsOverlayVertical : ''}`}>

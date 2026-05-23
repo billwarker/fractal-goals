@@ -40,6 +40,7 @@ const DEFAULT_VIEW_SETTINGS = {
 };
 const EMPTY_ARRAY = [];
 const TYPE_TO_ZOOM_IDLE_MS = 2000;
+const FLOWTREE_SCOPE_TRANSITION_MS = 160;
 
 function shouldIgnoreTypeToZoomKey(event) {
     const target = event.target;
@@ -122,11 +123,14 @@ function FractalGoals() {
     // Alert state
     const [alertData, setAlertData] = useState({ isOpen: false, title: '', message: '' });
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
+    const [flowTreeScopeTransitionKey, setFlowTreeScopeTransitionKey] = useState(0);
     const [typeToZoomQuery, setTypeToZoomQuery] = useState('');
     const [isTypeToZoomOpen, setIsTypeToZoomOpen] = useState(false);
     const [duplicateCycleIndex, setDuplicateCycleIndex] = useState(0);
     const [cycleZoomTargetNodeId, setCycleZoomTargetNodeId] = useState(null);
     const typeToZoomIdleTimerRef = useRef(null);
+    const flowTreeRef = useRef(null);
+    const flowTreeScopeTransitionTimerRef = useRef(null);
     const selectedNodeId = viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null;
     const evidenceGoalIds = useMemo(() => {
         if (!evidenceData) return null;
@@ -239,6 +243,12 @@ function FractalGoals() {
             }
         };
     }, [clearTypeToZoomSearch, isTypeToZoomOpen, typeToZoomQuery]);
+
+    useEffect(() => () => {
+        if (flowTreeScopeTransitionTimerRef.current) {
+            clearTimeout(flowTreeScopeTransitionTimerRef.current);
+        }
+    }, []);
 
     useEffect(() => {
         if (!isTypeToZoomOpen) return undefined;
@@ -424,10 +434,29 @@ function FractalGoals() {
         : getGoalNodeType(viewingGoal);
     const sheetTitleColor = activeGoalType ? getGoalColor(activeGoalType) : 'var(--color-text-primary)';
     const handleToggleViewSetting = (settingKey) => (event) => {
-        setViewSettings((prev) => ({
-            ...prev,
-            [settingKey]: event.target.checked
-        }));
+        const nextChecked = event.target.checked;
+        const shouldTransitionScope = settingKey === 'hideInactiveGoals' || settingKey === 'hideCompletedGoals';
+
+        if (!shouldTransitionScope) {
+            setViewSettings((prev) => ({
+                ...prev,
+                [settingKey]: nextChecked
+            }));
+            return;
+        }
+
+        flowTreeRef.current?.startFadeOut?.();
+        if (flowTreeScopeTransitionTimerRef.current) {
+            clearTimeout(flowTreeScopeTransitionTimerRef.current);
+        }
+        flowTreeScopeTransitionTimerRef.current = setTimeout(() => {
+            setViewSettings((prev) => ({
+                ...prev,
+                [settingKey]: nextChecked
+            }));
+            setFlowTreeScopeTransitionKey((prev) => prev + 1);
+            flowTreeScopeTransitionTimerRef.current = null;
+        }, FLOWTREE_SCOPE_TRANSITION_MS);
     };
 
     return (
@@ -511,6 +540,7 @@ function FractalGoals() {
                         </div>
                     )}
                     <FractalView
+                        ref={flowTreeRef}
                         treeData={fractalData}
                         evidenceGoalIds={evidenceGoalIds}
                         metricsSummary={flowtreeMetricsSummary}
@@ -519,6 +549,7 @@ function FractalGoals() {
                         activityGroups={activityGroups}
                         programs={programs}
                         viewSettings={viewSettings}
+                        scopeTransitionKey={flowTreeScopeTransitionKey}
                         onNodeClick={handleGoalNameClick}
                         selectedNodeId={selectedNodeId}
                         zoomTargetNodeId={effectiveZoomTargetNodeId}
