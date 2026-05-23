@@ -33,12 +33,14 @@ def test_create_program(db_session, sample_goal_hierarchy):
         'name': 'New Program',
         'start_date': datetime.now(timezone.utc).isoformat(),
         'end_date': (datetime.now(timezone.utc) + timedelta(days=90)).isoformat(),
+        'color': '#06A77D',
         'selectedGoals': [goal_id],
         'weeklySchedule': []
     }
     
     result = ProgramService.create_program(db_session, root_id, data)
     assert result['name'] == 'New Program'
+    assert result['color'] == '#06A77D'
     assert result['blocks'] == []
     
     program_db = db_session.query(Program).get(result['id'])
@@ -53,11 +55,13 @@ def test_update_program(db_session, sample_program, sample_goal_hierarchy):
         'name': 'Updated Program',
         'start_date': (date.today() - timedelta(days=1)).isoformat(),
         'end_date': (date.today() + timedelta(days=90)).isoformat(),
+        'color': '#EF476F',
         'selectedGoals': [goal_id],
     }
     
     result = ProgramService.update_program(db_session, root_id, sample_program.id, data)
     assert result['name'] == 'Updated Program'
+    assert result['color'] == '#EF476F'
     assert result['is_active'] is True
     
     program_db = db_session.query(Program).get(result['id'])

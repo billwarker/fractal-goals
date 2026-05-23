@@ -6,9 +6,10 @@ import {
     getRecurringDatesWithinRange,
 } from './dateUtils';
 import { getGoalDeadline, isGoalAssociatedWithBlock } from './programGoalAssociations';
+import { buildProgramGoalScope } from './programGoalWindow';
 import { isBlockActive } from './programUtils.jsx';
 
-const PROGRAM_COLORS = ['#3A86FF', '#06A77D', '#FFBE0B', '#EF476F', '#7B5CFF', '#4ECDC4'];
+export const PROGRAM_COLORS = ['#3A86FF', '#06A77D', '#FFBE0B', '#EF476F', '#7B5CFF', '#4ECDC4'];
 
 function getColorChannels(color) {
     if (typeof color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(color.trim())) {
@@ -111,6 +112,9 @@ export function sortProgramBlocks(blocks = []) {
 }
 
 export function getProgramColor(program, index = 0) {
+    if (program?.color) {
+        return program.color;
+    }
     const blockColor = (program?.blocks || []).find((block) => block.color)?.color;
     return blockColor || PROGRAM_COLORS[index % PROGRAM_COLORS.length];
 }
@@ -653,14 +657,17 @@ export function buildProgramSidePaneData({ program, goals = [], attachedGoalIds,
         };
     }
 
-    const goalById = new Map(goals.map((goal) => [goal.id, goal]));
-    const programGoalSeeds = (program.goal_ids || [])
-        .map((goalId) => goalById.get(goalId))
-        .filter(Boolean);
+    const goalScope = buildProgramGoalScope({ program, goals, getGoalDetails });
+    const goalById = goalScope.goalById;
+    const programGoalSeeds = goalScope.hierarchyGoalSeeds;
+    const scopedAttachedGoalIds = attachedGoalIds || new Set([
+        ...goalScope.expandAssociatedGoalIds(program.goal_ids || []),
+        ...(program.blocks || []).flatMap((block) => block.goal_ids || []),
+    ]);
     const sessions = flattenProgramSessions(program);
     const programDaysMap = buildProgramDaysMap(program.blocks || []);
     const activeBlock = (program.blocks || []).find((block) => isBlockActive(block)) || null;
-    const associatedGoals = Array.from(attachedGoalIds || getProgramGoalIds(program))
+    const associatedGoals = Array.from(scopedAttachedGoalIds)
         .map((goalId) => getGoalDetails?.(goalId) || goalById.get(goalId))
         .filter(Boolean);
     const blockGoalsByBlockId = buildBlockGoalsByBlockId({
@@ -673,7 +680,7 @@ export function buildProgramSidePaneData({ program, goals = [], attachedGoalIds,
             program,
             sessions,
             programDaysMap,
-            attachedGoalIds: attachedGoalIds || getProgramGoalIds(program),
+            attachedGoalIds: scopedAttachedGoalIds,
             getGoalDetails: (goalId) => getGoalDetails?.(goalId) || goalById.get(goalId) || null,
         }),
         activeBlock,

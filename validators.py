@@ -1165,6 +1165,7 @@ class ProgramCreateSchema(BaseModel):
     
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
+    color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
     start_date: str = Field(...)  # Required
     end_date: str = Field(...)  # Required
     weeklySchedule: Optional[List[Dict[str, Any]]] = None
@@ -1205,6 +1206,7 @@ class ProgramUpdateSchema(BaseModel):
     
     name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
+    color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     weeklySchedule: Optional[List[Dict[str, Any]]] = None

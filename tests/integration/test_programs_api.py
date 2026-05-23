@@ -53,6 +53,7 @@ class TestProgramCRUD:
             'name': 'New Program',
             'start_date': start_date.isoformat(),
             'end_date': end_date.isoformat(),
+            'color': '#06A77D',
             'weeklySchedule': []
         }
         
@@ -65,7 +66,28 @@ class TestProgramCRUD:
         assert response.status_code == 201
         data = json.loads(response.data)
         assert data['name'] == 'New Program'
+        assert data['color'] == '#06A77D'
         assert data['root_id'] == root_id
+
+    def test_create_program_rejects_invalid_color(self, authed_client, sample_ultimate_goal):
+        """Test creating a program rejects non-hex colors."""
+        root_id = sample_ultimate_goal.id
+        start_date = datetime.utcnow()
+        end_date = start_date + timedelta(days=14)
+
+        response = authed_client.post(
+            f'/api/{root_id}/programs',
+            data=json.dumps({
+                'name': 'New Program',
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'color': 'blue',
+                'weeklySchedule': [],
+            }),
+            content_type='application/json'
+        )
+
+        assert response.status_code == 400
 
     def test_get_programs(self, authed_client, sample_ultimate_goal, sample_program):
         """Test listing programs."""
@@ -119,7 +141,8 @@ class TestProgramCRUD:
         
         payload = {
             'name': 'Updated Program Name',
-            'description': 'Updated description'
+            'description': 'Updated description',
+            'color': '#EF476F'
         }
         
         response = authed_client.put(
@@ -132,6 +155,20 @@ class TestProgramCRUD:
         data = json.loads(response.data)
         assert data['name'] == 'Updated Program Name'
         assert data['description'] == 'Updated description'
+        assert data['color'] == '#EF476F'
+
+    def test_update_program_rejects_invalid_color(self, authed_client, sample_ultimate_goal, sample_program):
+        """Test updating a program rejects malformed hex colors."""
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+
+        response = authed_client.put(
+            f'/api/{root_id}/programs/{program_id}',
+            data=json.dumps({'color': '#12345'}),
+            content_type='application/json'
+        )
+
+        assert response.status_code == 400
 
     def test_delete_program(self, authed_client, sample_ultimate_goal, sample_program):
         """Test deleting a program."""

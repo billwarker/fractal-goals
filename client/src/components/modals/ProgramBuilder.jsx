@@ -4,11 +4,13 @@ import { useParams } from 'react-router-dom';
 import { flattenGoals } from '../../utils/goalHelpers';
 import { useFractalTree } from '../../hooks/useGoalQueries';
 import { getWeeksSpanned } from '../../utils/dateUtils';
+import { PROGRAM_COLORS } from '../../utils/programViewModel';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
+import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 import styles from './ProgramBuilder.module.css';
 
 function buildInitialProgramData(initialData, initialStartDate = '', initialEndDate = '') {
@@ -16,6 +18,7 @@ function buildInitialProgramData(initialData, initialStartDate = '', initialEndD
         return {
             name: '',
             description: '',
+            color: PROGRAM_COLORS[0],
             selectedGoals: [],
             startDate: initialStartDate,
             endDate: initialEndDate,
@@ -25,6 +28,7 @@ function buildInitialProgramData(initialData, initialStartDate = '', initialEndD
     return {
         name: initialData.name || '',
         description: initialData.description || '',
+        color: initialData.color || PROGRAM_COLORS[0],
         selectedGoals: initialData.goal_ids || [],
         startDate: initialData.start_date ? initialData.start_date.split('T')[0] : '',
         endDate: initialData.end_date ? initialData.end_date.split('T')[0] : '',
@@ -46,6 +50,7 @@ function ProgramBuilderInner({
     const { rootId } = useParams();
     const [errors, setErrors] = useState({});
     const [isSaving, setIsSaving] = useState(false);
+    const [isGoalPickerOpen, setIsGoalPickerOpen] = useState(false);
 
     const [programData, setProgramData] = useState(() => buildInitialProgramData(initialData, initialStartDate, initialEndDate));
 
@@ -63,17 +68,13 @@ function ProgramBuilderInner({
             return [];
         }
 
-        return flattenGoals([goalsTreeQuery.data]).filter((goal) =>
-            ['MidTermGoal', 'LongTermGoal'].includes(goal.attributes?.type)
-        );
+        return flattenGoals([goalsTreeQuery.data]);
     }, [goalsTreeQuery.data]);
 
-    const toggleGoal = (goalId) => {
+    const handleSelectedGoalsChange = (selectedGoals) => {
         setProgramData({
             ...programData,
-            selectedGoals: programData.selectedGoals.includes(goalId)
-                ? programData.selectedGoals.filter(id => id !== goalId)
-                : [...programData.selectedGoals, goalId]
+            selectedGoals,
         });
     };
 
@@ -116,18 +117,31 @@ function ProgramBuilderInner({
     };
 
     const handleClose = () => {
+        if (isGoalPickerOpen) {
+            setIsGoalPickerOpen(false);
+            return;
+        }
         onClose();
     };
 
+    const selectedGoalNames = useMemo(() => {
+        const goalById = new Map(goals.map((goal) => [goal.id || goal.attributes?.id, goal.name || goal.attributes?.name]));
+        return programData.selectedGoals
+            .map((goalId) => goalById.get(goalId))
+            .filter(Boolean);
+    }, [goals, programData.selectedGoals]);
+
     return (
-        <Modal
-            isOpen={true}
-            onClose={handleClose}
-            title={title || (initialData ? 'Edit Program' : 'Create Program')}
-            size="md"
-        >
-            <ModalBody>
-                <div className={styles.form}>
+        <>
+            <Modal
+                isOpen={true}
+                onClose={handleClose}
+                title={title || (initialData ? 'Edit Program' : 'Create Program')}
+                size="md"
+                closeOnEsc={!isGoalPickerOpen}
+            >
+                <ModalBody>
+                    <div className={styles.form}>
                     <Input
                         label="Program Name *"
                         value={programData.name}
@@ -150,76 +164,52 @@ function ProgramBuilderInner({
                         />
                     </div>
 
-                    <div className={styles.field}>
-                        <label className={styles.label}>Target Goals * (Select at least one)</label>
-                        <div className={styles.goalsContainer}>
-                            {goals.length === 0 ? (
+                        <div className={styles.field}>
+                            <label className={styles.label}>Target Goals * (Select at least one)</label>
+                            <div className={styles.goalPickerSummary}>
+                                <div className={styles.goalPickerSummaryText}>
+                                    <span className={styles.goalPickerCount}>
+                                        {programData.selectedGoals.length} / {goals.length} selected
+                                    </span>
+                                    {selectedGoalNames.length > 0 ? (
+                                        <span className={styles.goalPickerNames}>
+                                            {selectedGoalNames.slice(0, 3).join(', ')}
+                                            {selectedGoalNames.length > 3 ? ` +${selectedGoalNames.length - 3} more` : ''}
+                                        </span>
+                                    ) : (
+                                        <span className={styles.goalPickerNames}>No target goals selected</span>
+                                    )}
+                                </div>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setIsGoalPickerOpen(true)}
+                                    disabled={goals.length === 0}
+                                >
+                                    Select Goals
+                                </Button>
+                            </div>
+                            {goals.length === 0 && (
                                 <div className={styles.emptyGoals}>
                                     No eligible goals found
                                 </div>
-                            ) : (
-                                <div className={styles.goalList}>
-                                    {['LongTermGoal', 'MidTermGoal'].map(goalType => {
-                                        const typeGoals = goals.filter(g => g.attributes?.type === goalType);
-                                        if (typeGoals.length === 0) return null;
-
-                                        const typeLabel = goalType === 'LongTermGoal' ? 'Long Term Goals' :
-                                            goalType === 'MidTermGoal' ? 'Mid Term Goals' :
-                                                'Short Term Goals';
-                                        const typeColor = goalType === 'LongTermGoal' ? '#7B5CFF' :
-                                            goalType === 'MidTermGoal' ? '#3A86FF' :
-                                                '#4ECDC4';
-
-                                        return (
-                                            <div key={goalType} className={styles.goalTypeGroup}>
-                                                <div
-                                                    className={styles.goalTypeHeader}
-                                                    style={{ '--type-color': typeColor }}
-                                                >
-                                                    <span>{typeLabel}</span>
-                                                    <span style={{ fontSize: '11px', opacity: 0.7 }}>
-                                                        {typeGoals.filter(g => programData.selectedGoals.includes(g.id)).length} / {typeGoals.length} selected
-                                                    </span>
-                                                </div>
-
-                                                <div className={styles.goalList}>
-                                                    {typeGoals.map(goal => {
-                                                        const isSelected = programData.selectedGoals.includes(goal.id);
-                                                        return (
-                                                            <div
-                                                                key={goal.id}
-                                                                onClick={() => toggleGoal(goal.id)}
-                                                                className={`${styles.goalItem} ${isSelected ? styles.goalItemSelected : ''}`}
-                                                                style={{
-                                                                    '--selection-bg': typeColor + '22',
-                                                                    '--type-color': typeColor
-                                                                }}
-                                                            >
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={isSelected}
-                                                                    onChange={() => { }}
-                                                                    style={{ accentColor: typeColor }}
-                                                                />
-                                                                <div className={styles.goalInfo}>
-                                                                    <div className={styles.goalName}>{goal.name}</div>
-                                                                    {goal.attributes?.description && (
-                                                                        <div className={styles.goalDescription}>
-                                                                            {goal.attributes.description.length > 60 ? goal.attributes.description.substring(0, 60) + '...' : goal.attributes.description}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
                             )}
+                            {errors.goals && <div className={styles.errorText}>{errors.goals}</div>}
                         </div>
-                        {errors.goals && <div className={styles.errorText}>{errors.goals}</div>}
+
+                    <div className={styles.field}>
+                        <label className={styles.colorLabel}>
+                            Color Code
+                        </label>
+                        <div className={styles.colorRow}>
+                            <input
+                                type="color"
+                                className={styles.colorInput}
+                                value={programData.color}
+                                onChange={(event) => setProgramData({ ...programData, color: event.target.value })}
+                                aria-label="Program color"
+                            />
+                            <span className={styles.colorValue}>{programData.color}</span>
+                        </div>
                     </div>
 
                     <div className={styles.dateGrid}>
@@ -253,18 +243,34 @@ function ProgramBuilderInner({
                         </div>
                     )}
                     {errors.form && <div className={styles.errorText}>{errors.form}</div>}
-                </div>
-            </ModalBody>
+                    </div>
+                </ModalBody>
 
-            <ModalFooter>
-                <Button variant="secondary" onClick={handleClose}>
-                    Cancel
-                </Button>
-                <Button variant="primary" onClick={handleSave} disabled={isSaving}>
-                    {isSaving ? 'Saving...' : (submitLabel || (initialData ? 'Save Changes' : 'Create Program'))}
-                </Button>
-            </ModalFooter>
-        </Modal>
+                <ModalFooter>
+                    <Button variant="secondary" onClick={handleClose}>
+                        Cancel
+                    </Button>
+                    <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? 'Saving...' : (submitLabel || (initialData ? 'Save Changes' : 'Create Program'))}
+                    </Button>
+                </ModalFooter>
+            </Modal>
+
+            <GoalHierarchySelectionModal
+                isOpen={isGoalPickerOpen}
+                onClose={() => setIsGoalPickerOpen(false)}
+                title="Select Target Goals"
+                goals={goals}
+                selectedGoalIds={programData.selectedGoals}
+                selectionMode="multiple"
+                searchPlaceholder="Search target goals..."
+                emptyState="No goals available."
+                highlightSelectionAncestors
+                connectorHighlightMode="lineage"
+                showGoalHighlightHalo
+                onConfirm={handleSelectedGoalsChange}
+            />
+        </>
     );
 }
 

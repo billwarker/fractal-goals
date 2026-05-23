@@ -6,6 +6,7 @@ import { useProgramGoalsHierarchyViewModel } from '../../hooks/useProgramGoalsHi
 import styles from './ProgramSidebar.module.css';
 
 function ProgramSidebar({
+    program = null,
     programMetrics,
     activeBlock,
     blockMetrics,
@@ -27,6 +28,8 @@ function ProgramSidebar({
     const hierarchyNodes = useProgramGoalsHierarchyViewModel({
         goalSeeds: programGoalSeeds,
         getGoalDetails,
+        startDate: program?.start_date,
+        endDate: program?.end_date,
     });
 
     return (

@@ -393,6 +393,7 @@ class ProgramService:
             root_id=root_id,
             name=validated_data['name'],
             description=validated_data.get('description', ''),
+            color=validated_data.get('color'),
             start_date=start_date,
             end_date=end_date,
             weekly_schedule=[],
@@ -442,6 +443,8 @@ class ProgramService:
             program.name = validated_data['name']
         if 'description' in validated_data:
             program.description = validated_data['description']
+        if 'color' in validated_data:
+            program.color = validated_data['color']
         if 'start_date' in validated_data:
             program.start_date = next_start_date
         if 'end_date' in validated_data:

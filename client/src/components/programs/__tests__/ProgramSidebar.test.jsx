@@ -84,4 +84,63 @@ describe('ProgramSidebar', () => {
         fireEvent.click(screen.getByText('Immediate Goal'));
         expect(onGoalClick).toHaveBeenCalledWith(byId.immediate);
     });
+
+    it('filters completed goals outside the program date range', () => {
+        const nestedGoal = {
+            id: 'mid',
+            type: 'MidTermGoal',
+            name: 'Mid Goal',
+            children: [
+                {
+                    id: 'outside',
+                    type: 'ShortTermGoal',
+                    name: 'Completed Before Program',
+                    completed: true,
+                    completed_at: '2026-05-10T12:00:00Z',
+                    children: [],
+                },
+                {
+                    id: 'inside',
+                    type: 'ShortTermGoal',
+                    name: 'Completed During Program',
+                    completed: true,
+                    completed_at: '2026-05-24T12:00:00Z',
+                    children: [],
+                },
+            ],
+        };
+
+        const byId = {
+            mid: nestedGoal,
+            outside: nestedGoal.children[0],
+            inside: nestedGoal.children[1],
+        };
+
+        renderWithProviders(
+            <ProgramSidebar
+                program={{
+                    start_date: '2026-05-22T00:00:00Z',
+                    end_date: '2026-05-26T00:00:00Z',
+                }}
+                programMetrics={null}
+                activeBlock={null}
+                blockMetrics={null}
+                programGoalSeeds={[nestedGoal]}
+                onGoalClick={vi.fn()}
+                getGoalDetails={(id) => byId[id]}
+                compact
+                hideMetrics
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.getByText('Mid Goal')).toBeInTheDocument();
+        expect(screen.queryByText('Completed Before Program')).not.toBeInTheDocument();
+        expect(screen.getByText('Completed During Program')).toBeInTheDocument();
+    });
 });

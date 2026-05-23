@@ -29,7 +29,7 @@ import { formatLiteralDate, getISOYMDInTimezone, subtractDaysToDateString } from
 import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
 import { createProgramCalendarContext, programCalendarContextReducer } from '../utils/programCalendarContext';
-import { buildProgramSidePaneData } from '../utils/programViewModel';
+import { buildProgramSidePaneData, getProgramColor } from '../utils/programViewModel';
 import styles from './ProgramCalendarPage.module.css';
 
 const ProgramBlockModal = lazyWithRetry(() => import('../components/modals/ProgramBlockModal'), 'components/modals/ProgramBlockModal');
@@ -159,6 +159,7 @@ function ProgramSidePane({
                     {program.description ? <p className={styles.description}>{program.description}</p> : null}
 
                     <ProgramSidebar
+                        program={program}
                         programMetrics={sidePaneData.programMetrics}
                         activeBlock={sidePaneData.activeBlock}
                         blockMetrics={sidePaneData.blockMetrics}
@@ -190,6 +191,7 @@ function ProgramSidePane({
             {program && view === 'goals' ? (
                 <div className={styles.goalsPane}>
                     <ProgramSidebar
+                        program={program}
                         programMetrics={sidePaneData.programMetrics}
                         activeBlock={sidePaneData.activeBlock}
                         blockMetrics={sidePaneData.blockMetrics}
@@ -400,6 +402,7 @@ function ProgramCalendarPage() {
     });
 
     const displayProgramStatus = displayProgram ? getProgramStatus(displayProgram, todayInTimezone) : null;
+    const displayProgramColor = displayProgram ? getProgramColor(displayProgram) : null;
     const groupedPrograms = useMemo(() => {
         const normalizedQuery = programPickerQuery.trim().toLowerCase();
         const groups = {
@@ -437,7 +440,11 @@ function ProgramCalendarPage() {
         : null;
     const contextBlockColor = contextBlock?.color || 'var(--color-brand-primary)';
     const pageTitleParts = [
-        displayProgram?.name ? { key: 'program', label: displayProgram.name } : null,
+        displayProgram?.name ? {
+            key: 'program',
+            label: displayProgram.name,
+            style: displayProgramColor ? { color: displayProgramColor } : undefined,
+        } : null,
         contextBlock?.name ? {
             key: 'block',
             label: contextBlock.name,
@@ -659,6 +666,7 @@ function ProgramCalendarPage() {
         const apiData = {
             name: programData.name,
             description: programData.description || '',
+            color: programData.color || null,
             start_date: programData.startDate,
             end_date: programData.endDate,
             selectedGoals: programData.selectedGoals,
@@ -842,6 +850,9 @@ function ProgramCalendarPage() {
                     <PageHeader
                         title={pageTitle}
                         subtitle={pageSubtitle}
+                        style={displayProgramColor ? {
+                            '--page-header-accent-color': displayProgramColor,
+                        } : undefined}
                         hideTitleOnMobile={false}
                         titleAccessory={displayProgramStatus ? (
                             <>

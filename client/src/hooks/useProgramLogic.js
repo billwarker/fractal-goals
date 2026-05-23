@@ -49,6 +49,7 @@ export function useProgramLogic(rootId, program, refreshers) {
         const apiData = {
             name: programData.name,
             description: programData.description || '',
+            color: programData.color || null,
             start_date: programData.startDate,
             end_date: programData.endDate,
             selectedGoals: programData.selectedGoals

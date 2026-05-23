@@ -721,6 +721,7 @@ def serialize_program(program):
         "root_id": program.root_id,
         "name": program.name,
         "description": program.description,
+        "color": getattr(program, 'color', None),
         "is_active": is_active,
         "is_completed": program.is_completed,
         "goals_completed": program.goals_completed,

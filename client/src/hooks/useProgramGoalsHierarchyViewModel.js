@@ -1,7 +1,13 @@
 import { useMemo } from 'react';
 import { normalizeGoalNode } from '../utils/goalNodeModel';
+import { isGoalCompletedOutsideProgramWindow } from '../utils/programGoalWindow';
 
-export function useProgramGoalsHierarchyViewModel({ goalSeeds = [], getGoalDetails }) {
+export function useProgramGoalsHierarchyViewModel({
+    goalSeeds = [],
+    getGoalDetails,
+    startDate = null,
+    endDate = null,
+}) {
     return useMemo(() => {
         const flattened = [];
         const seenIds = new Set();
@@ -17,7 +23,7 @@ export function useProgramGoalsHierarchyViewModel({ goalSeeds = [], getGoalDetai
                 return;
             }
 
-            seenIds.add(normalized.id);
+            const shouldHideGoal = isGoalCompletedOutsideProgramWindow(resolvedGoal, startDate, endDate);
 
             const nextLineage = [
                 ...lineage,
@@ -27,20 +33,23 @@ export function useProgramGoalsHierarchyViewModel({ goalSeeds = [], getGoalDetai
                 },
             ];
 
-            flattened.push({
-                ...normalized,
-                lineage: nextLineage,
-                originalGoal: resolvedGoal,
-            });
+            if (!shouldHideGoal) {
+                seenIds.add(normalized.id);
+                flattened.push({
+                    ...normalized,
+                    lineage: nextLineage,
+                    originalGoal: resolvedGoal,
+                });
+            }
 
             (resolvedGoal.children || []).forEach((child) => {
-                walk(child, depth + 1, nextLineage);
+                walk(child, shouldHideGoal ? depth : depth + 1, shouldHideGoal ? lineage : nextLineage);
             });
         };
 
         goalSeeds.forEach((seed) => walk(seed, 0, []));
         return flattened;
-    }, [goalSeeds, getGoalDetails]);
+    }, [endDate, goalSeeds, getGoalDetails, startDate]);
 }
 
 export default useProgramGoalsHierarchyViewModel;

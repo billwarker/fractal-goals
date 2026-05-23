@@ -2,12 +2,12 @@ import React from 'react';
 import useIsMobile from '../../hooks/useIsMobile';
 import styles from './PageHeader.module.css';
 
-function PageHeader({ title, subtitle, actions, className = '', hideTitleOnMobile = true, titleAccessory = null }) {
+function PageHeader({ title, subtitle, actions, className = '', hideTitleOnMobile = true, titleAccessory = null, style }) {
     const isMobile = useIsMobile();
     const hideHeaderCopyVisually = isMobile && hideTitleOnMobile;
 
     return (
-        <div className={`${styles.pageHeader} ${className}`.trim()}>
+        <div className={`${styles.pageHeader} ${className}`.trim()} style={style}>
             <div className={`${styles.headerCopy} ${hideHeaderCopyVisually ? styles.mobileHiddenCopy : ''}`.trim()}>
                 <div className={styles.titleRow}>
                     <h1 className={styles.pageTitle}>{title}</h1>

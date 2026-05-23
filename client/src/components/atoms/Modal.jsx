@@ -15,23 +15,29 @@ const Modal = ({
     children,
     size = 'md', // sm, md, lg, xl
     className = '',
-    showCloseButton = true
+    showCloseButton = true,
+    closeOnEsc = true
 }) => {
     useEffect(() => {
         const handleEsc = (e) => {
-            if (e.key === 'Escape') onClose();
+            if (e.key === 'Escape' && closeOnEsc) onClose();
         };
 
         if (isOpen) {
             document.addEventListener('keydown', handleEsc);
+            const previousOverflow = document.body.style.overflow;
             document.body.style.overflow = 'hidden';
+
+            return () => {
+                document.removeEventListener('keydown', handleEsc);
+                document.body.style.overflow = previousOverflow;
+            };
         }
 
         return () => {
             document.removeEventListener('keydown', handleEsc);
-            document.body.style.overflow = 'unset';
         };
-    }, [isOpen, onClose]);
+    }, [closeOnEsc, isOpen, onClose]);
 
     if (!isOpen) return null;
 

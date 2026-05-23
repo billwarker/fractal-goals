@@ -34,6 +34,7 @@ class Program(Base):
     root_id = Column(String, ForeignKey('goals.id'), nullable=False, index=True)
     name = Column(String, nullable=False)
     description = Column(String, default='')
+    color = Column(String, nullable=True)
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=utc_now)
