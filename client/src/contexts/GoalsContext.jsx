@@ -12,6 +12,46 @@ function formatGoalTypeLabel(type) {
     return type.replace(/Goal$/, ' Goal').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
 }
 
+function getGoalId(goal) {
+    return goal?.id || goal?.attributes?.id || null;
+}
+
+function mergeGoalRecord(existing, updated) {
+    return {
+        ...existing,
+        ...updated,
+        attributes: {
+            ...(existing?.attributes || {}),
+            ...(updated?.attributes || {}),
+        },
+    };
+}
+
+function replaceGoalInTree(node, updatedGoal) {
+    const updatedGoalId = getGoalId(updatedGoal);
+    if (!node || !updatedGoalId) return node;
+
+    const children = Array.isArray(node.children)
+        ? node.children.map((child) => replaceGoalInTree(child, updatedGoal))
+        : node.children;
+
+    if (String(getGoalId(node)) === String(updatedGoalId)) {
+        return mergeGoalRecord({ ...node, children }, updatedGoal);
+    }
+
+    return children !== node.children ? { ...node, children } : node;
+}
+
+function replaceGoalInList(list, updatedGoal) {
+    const updatedGoalId = getGoalId(updatedGoal);
+    if (!Array.isArray(list) || !updatedGoalId) return list;
+    return list.map((goal) => (
+        String(getGoalId(goal)) === String(updatedGoalId)
+            ? mergeGoalRecord(goal, updatedGoal)
+            : goal
+    ));
+}
+
 export function GoalsProvider({ children }) {
     const queryClient = useQueryClient();
 
@@ -67,7 +107,18 @@ export function GoalsProvider({ children }) {
             return res.data;
         },
         onSuccess: (data, variables) => {
+            queryClient.setQueryData(queryKeys.fractalTree(variables.rootId), (previous) => replaceGoalInTree(previous, data));
+            queryClient.setQueryData(queryKeys.goals(variables.rootId), (previous) => replaceGoalInList(previous, data));
+            queryClient.setQueryData(queryKeys.goalsForSelection(variables.rootId), (previous) => replaceGoalInList(previous, data));
+            queryClient.setQueryData(queryKeys.rootGoal(variables.rootId), (previous) => (
+                String(getGoalId(previous)) === String(getGoalId(data)) ? mergeGoalRecord(previous, data) : previous
+            ));
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goals(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalsForSelection(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.rootGoal(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionGoalsViewRoot(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalAnalytics(variables.rootId) });
             const goalType = formatGoalTypeLabel(data?.attributes?.type || data?.type);
             const action = variables.completed ? 'Completed' : 'Uncompleted';
             const goalName = data?.name;

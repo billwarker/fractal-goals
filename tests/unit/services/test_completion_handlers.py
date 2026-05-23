@@ -121,6 +121,7 @@ def test_handle_session_completed(db_session, sample_practice_session, sample_me
         assert sample_metric_target.completed is True
         assert sample_metric_target.completed_session_id == sample_practice_session.id
         assert short_term_goal.completed is True
+        assert short_term_goal.completed_session_id == sample_practice_session.id
 
 
 def test_handle_session_completed_records_threshold_instance_that_met_target(
@@ -188,6 +189,8 @@ def test_handle_session_completed_records_threshold_instance_that_met_target(
     db_session.refresh(sample_metric_target)
     assert sample_metric_target.completed is True
     assert sample_metric_target.completed_instance_id == high_instance.id
+    short_term_goal = db_session.query(Goal).get(sample_goal_hierarchy['short_term'].id)
+    assert short_term_goal.completed_session_id == sample_practice_session.id
 
 
 def test_handle_activity_instance_completed(db_session, sample_practice_session, sample_metric_target, sample_activity_definition, sample_goal_hierarchy):
@@ -244,6 +247,8 @@ def test_handle_activity_instance_completed(db_session, sample_practice_session,
         db_session.refresh(sample_metric_target)
         assert sample_metric_target.completed is True
         assert sample_metric_target.completed_instance_id == instance.id
+        short_term_goal = db_session.query(Goal).get(sample_goal_hierarchy['short_term'].id)
+        assert short_term_goal.completed_session_id == sample_practice_session.id
 
 
 def test_handle_goal_completed(db_session, sample_goal_hierarchy):

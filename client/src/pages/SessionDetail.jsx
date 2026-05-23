@@ -163,9 +163,11 @@ function SessionDetailContent() {
                     selectedGoal={selectedGoal}
                     onCloseGoal={() => setSelectedGoal(null)}
                     onUpdateGoal={(goalId, updates) => updateGoal({ goalId, updates })}
-                    onToggleGoalCompletion={(goalId, currentStatus) =>
-                        toggleGoalCompletion({ goalId, completed: !currentStatus })
-                    }
+                    onToggleGoalCompletion={async (goalId, currentStatus) => {
+                        const response = await toggleGoalCompletion({ goalId, completed: !currentStatus });
+                        if (response?.data) setSelectedGoal(response.data);
+                        return response;
+                    }}
                     onGoalAssociationsChanged={handleGoalAssociationsChanged}
                     showAssociationModal={showAssociationModal}
                     onCloseAssociationModal={() => setShowAssociationModal(false)}
@@ -254,9 +256,11 @@ function SessionDetailContent() {
                 selectedGoal={selectedGoal}
                 onCloseGoal={() => setSelectedGoal(null)}
                 onUpdateGoal={(goalId, updates) => updateGoal({ goalId, updates })}
-                onToggleGoalCompletion={(goalId, currentStatus) =>
-                    toggleGoalCompletion({ goalId, completed: !currentStatus })
-                }
+                onToggleGoalCompletion={async (goalId, currentStatus) => {
+                    const response = await toggleGoalCompletion({ goalId, completed: !currentStatus });
+                    if (response?.data) setSelectedGoal(response.data);
+                    return response;
+                }}
                 onGoalAssociationsChanged={handleGoalAssociationsChanged}
                 showAssociationModal={showAssociationModal}
                 onCloseAssociationModal={() => setShowAssociationModal(false)}

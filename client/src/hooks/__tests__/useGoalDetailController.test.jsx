@@ -51,6 +51,32 @@ describe('useGoalDetailController', () => {
         expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', false);
     });
 
+    it('lets an explicit local uncomplete override stale completed props', () => {
+        const onToggleCompletion = vi.fn();
+
+        const { result } = renderHook(() => useGoalDetailController({
+            goal: {
+                id: 'goal-1',
+                completed: true,
+                attributes: { id: 'goal-1', completed: true, completed_at: '2026-03-01T12:00:00.000Z' },
+            },
+            goalId: 'goal-1',
+            mode: 'view',
+            isOpen: true,
+            onClose: vi.fn(),
+            onToggleCompletion,
+            resetForm: vi.fn(),
+        }));
+
+        act(() => {
+            result.current.handleUncompletionConfirm();
+        });
+
+        expect(result.current.isCompleted).toBe(false);
+        expect(result.current.localCompletedAt).toBe(null);
+        expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', true);
+    });
+
     it('resets state when the controlled goal changes', () => {
         const { result, rerender } = renderHook(
             ({ goal, goalId }) => useGoalDetailController({

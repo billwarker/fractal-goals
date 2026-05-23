@@ -265,6 +265,55 @@ describe('useSessionGoalsViewModel', () => {
         ]);
     });
 
+    it('does not derive canonical goal completion from completed targets', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root',
+                type: 'UltimateGoal',
+                name: 'Root',
+                children: [
+                    {
+                        id: 'handstand',
+                        type: 'MidTermGoal',
+                        name: 'Achieve Proper Handstand Form',
+                        completed: false,
+                        targets: [
+                            {
+                                id: 'target-1',
+                                activity_id: 'activity-1',
+                                type: 'threshold',
+                                completed: true,
+                                completed_session_id: 'session-1',
+                                metrics: [{ metric_id: 'form', value: 9 }],
+                            },
+                        ],
+                        children: [],
+                    },
+                ],
+            },
+            session_goal_ids: ['handstand'],
+            activity_goal_ids_by_activity: { 'activity-1': ['handstand'] },
+            session_activity_ids: ['activity-1'],
+        };
+
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            session: { id: 'session-1' },
+            sessionGoalsView,
+            selectedActivity: null,
+            activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1', completed: true }],
+            targetAchievements: new Map([
+                ['target-1', { achieved: true }],
+            ]),
+            achievedTargetIds: new Set(['target-1']),
+        }));
+
+        const handstand = result.current.sessionHierarchy.find((node) => node.id === 'handstand');
+        expect(handstand.status.completed).toBe(false);
+        expect(handstand.status.allTargetsSatisfied).toBe(true);
+        expect(handstand.status.readyForCompletion).toBe(true);
+        expect(handstand.status.reason).toBe('targets_satisfied');
+    });
+
     it('returns an empty session hierarchy when the current session has no activities', () => {
         const sessionGoalsView = {
             goal_tree: {

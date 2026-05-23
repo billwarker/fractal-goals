@@ -14,6 +14,54 @@ function formatGoalTypeLabel(type) {
     return type.replace(/Goal$/, ' Goal').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
 }
 
+function getGoalId(goal) {
+    return goal?.id || goal?.attributes?.id || null;
+}
+
+function replaceGoalInTree(node, updatedGoal) {
+    const updatedGoalId = getGoalId(updatedGoal);
+    if (!node || !updatedGoalId) return node;
+
+    const nodeId = getGoalId(node);
+    const children = Array.isArray(node.children)
+        ? node.children.map((child) => replaceGoalInTree(child, updatedGoal))
+        : node.children;
+
+    if (String(nodeId) === String(updatedGoalId)) {
+        return {
+            ...node,
+            ...updatedGoal,
+            attributes: {
+                ...(node.attributes || {}),
+                ...(updatedGoal.attributes || {}),
+            },
+            children,
+        };
+    }
+
+    if (children !== node.children) {
+        return { ...node, children };
+    }
+    return node;
+}
+
+function replaceGoalInList(list, updatedGoal) {
+    const updatedGoalId = getGoalId(updatedGoal);
+    if (!Array.isArray(list) || !updatedGoalId) return list;
+    return list.map((goal) => (
+        String(getGoalId(goal)) === String(updatedGoalId)
+            ? {
+                ...goal,
+                ...updatedGoal,
+                attributes: {
+                    ...(goal.attributes || {}),
+                    ...(updatedGoal.attributes || {}),
+                },
+            }
+            : goal
+    ));
+}
+
 export function useSessionDetailMutations({
     rootId,
     sessionId,
@@ -56,8 +104,11 @@ export function useSessionDetailMutations({
         queryClient.invalidateQueries({ queryKey: goalsKey });
         queryClient.invalidateQueries({ queryKey: goalsForSelectionKey });
         queryClient.invalidateQueries({ queryKey: fractalTreeKey });
+        queryClient.invalidateQueries({ queryKey: queryKeys.rootGoal(rootId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.sessionGoalsViewRoot(rootId) });
         queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
-    }, [fractalTreeKey, goalsForSelectionKey, goalsKey, queryClient, sessionGoalsViewKey]);
+        queryClient.invalidateQueries({ queryKey: queryKeys.goalAnalytics(rootId) });
+    }, [fractalTreeKey, goalsForSelectionKey, goalsKey, queryClient, rootId, sessionGoalsViewKey]);
 
     const addActivityMutation = useMutation({
         mutationFn: (data) => fractalApi.addActivityToSession(rootId, sessionId, data),
@@ -180,11 +231,21 @@ export function useSessionDetailMutations({
             completed ? sessionId : null
         ),
         onSuccess: (response, variables) => {
+            const goalResponse = response?.data;
+            if (goalResponse) {
+                queryClient.setQueryData(fractalTreeKey, (previous) => replaceGoalInTree(previous, goalResponse));
+                queryClient.setQueryData(sessionGoalsViewKey, (previous) => (
+                    previous?.goal_tree
+                        ? { ...previous, goal_tree: replaceGoalInTree(previous.goal_tree, goalResponse) }
+                        : previous
+                ));
+                queryClient.setQueryData(goalsKey, (previous) => replaceGoalInList(previous, goalResponse));
+                queryClient.setQueryData(goalsForSelectionKey, (previous) => replaceGoalInList(previous, goalResponse));
+            }
             invalidateGoalQueries();
             queryClient.invalidateQueries({ queryKey: sessionKey });
             queryClient.invalidateQueries({ queryKey: sessionNotesKey });
 
-            const goalResponse = response?.data;
             if (goalResponse) {
                 const goalType = formatGoalTypeLabel(goalResponse.attributes?.type || goalResponse.type);
                 const action = variables.completed ? 'Completed' : 'Uncompleted';

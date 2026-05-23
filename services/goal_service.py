@@ -18,6 +18,7 @@ from models import (
     SessionTemplate,
     SplitDefinition,
     Target,
+    TargetContributionLedger,
     activity_goal_associations,
     goal_activity_group_associations,
     get_goal_by_id,
@@ -1028,6 +1029,34 @@ class GoalService:
 
         goal.completed_at = datetime.now(timezone.utc) if goal.completed else None
         goal.completed_session_id = data.get('session_id') if goal.completed else None
+        reset_target_events = []
+        if not goal.completed:
+            active_completed_targets = [
+                target
+                for target in (goal.targets_rel or [])
+                if target.deleted_at is None and target.completed
+            ]
+            for target in active_completed_targets:
+                target.completed = False
+                target.completed_at = None
+                target.completed_session_id = None
+                target.completed_instance_id = None
+                self.db_session.query(TargetContributionLedger).filter(
+                    TargetContributionLedger.target_id == target.id
+                ).delete(synchronize_session=False)
+                reset_target_events.append(Event(
+                    Events.TARGET_REVERTED,
+                    {
+                        'target_id': target.id,
+                        'target_name': target.name,
+                        'goal_id': goal.id,
+                        'goal_name': goal.name,
+                        'root_id': goal.root_id or goal.id,
+                        'reason': 'goal_manually_uncompleted',
+                    },
+                    source='goal_service.update_goal_completion',
+                    context={'db_session': self.db_session},
+                ))
         self.db_session.commit()
         self.db_session.refresh(goal)
         event_name = Events.GOAL_COMPLETED if goal.completed else Events.GOAL_UNCOMPLETED
@@ -1047,6 +1076,8 @@ class GoalService:
             source='goal_service.update_goal_completion',
             context={'db_session': self.db_session},
         ))
+        for target_event in reset_target_events:
+            event_bus.emit(target_event)
         return goal, None, 200
 
     def evaluate_goal_targets(self, root_id, goal_id, current_user_id, session_id) -> ServiceResult[JsonDict]:

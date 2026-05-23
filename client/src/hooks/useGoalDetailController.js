@@ -7,7 +7,7 @@ function resolveNextValue(nextValue, currentValue) {
 function buildDefaultControllerState(mode, completed, completedAt) {
     return {
         isEditing: mode === 'create' || mode === 'edit',
-        localCompleted: mode === 'create' ? false : (completed || false),
+        localCompleted: mode === 'create' ? false : (completed ?? false),
         localCompletedAt: mode === 'create' ? null : (completedAt || null),
         targetToEdit: null,
         viewState: 'goal',
@@ -24,8 +24,8 @@ export function useGoalDetailController({
 }) {
     const [controllerStateByKey, setControllerStateByKey] = useState({});
     const depGoalIdentity = goal?.attributes?.id || goal?.id;
-    const depGoalCompleted = goal?.attributes?.completed;
-    const depGoalCompletedAt = goal?.attributes?.completed_at;
+    const depGoalCompleted = goal?.attributes?.completed ?? goal?.completed;
+    const depGoalCompletedAt = goal?.attributes?.completed_at ?? goal?.completed_at;
     const controllerKey = `${mode}:${depGoalIdentity || 'new-goal'}`;
     const defaultState = useMemo(
         () => buildDefaultControllerState(mode, depGoalCompleted, depGoalCompletedAt),
@@ -122,7 +122,7 @@ export function useGoalDetailController({
         isEditing: controllerState.isEditing,
         setIsEditing,
         localCompletedAt: controllerState.localCompletedAt,
-        isCompleted: controllerState.localCompleted || depGoalCompleted || goal?.completed || false,
+        isCompleted: controllerState.localCompleted,
         targetToEdit: controllerState.targetToEdit,
         setTargetToEdit,
         viewState: controllerState.viewState,

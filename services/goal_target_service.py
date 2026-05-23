@@ -338,6 +338,7 @@ class GoalTargetService:
         if targets_completed == targets_total and targets_total > 0 and not goal.completed and not goal.frozen:
             goal.completed = True
             goal.completed_at = now
+            goal.completed_session_id = session_id
             goal_was_completed = True
             logger.info("Auto-completing goal %s - all %s targets met", goal_id, targets_total)
 

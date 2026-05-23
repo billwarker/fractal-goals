@@ -268,6 +268,23 @@ def serialize_goal(goal, include_children=True):
     
     goal_type = get_canonical_goal_type(goal)
     goal_level_name = getattr(goal.level, 'name', None) if getattr(goal, 'level', None) else None
+    active_targets = [t for t in (goal.targets_rel or []) if t.deleted_at is None]
+    completed_target_count = sum(1 for target in active_targets if target.completed)
+    all_targets_satisfied = bool(active_targets) and completed_target_count == len(active_targets)
+    completion_state = {
+        "completed": bool(goal.completed),
+        "completed_at": format_utc(goal.completed_at),
+        "completed_session_id": getattr(goal, 'completed_session_id', None),
+        "source": (
+            "target" if goal.completed and all_targets_satisfied else
+            "session" if goal.completed and getattr(goal, 'completed_session_id', None) else
+            "manual" if goal.completed else
+            None
+        ),
+        "all_targets_satisfied": all_targets_satisfied,
+        "completed_targets": completed_target_count,
+        "total_targets": len(active_targets),
+    }
     
     result = {
         "name": goal.name,
@@ -278,6 +295,7 @@ def serialize_goal(goal, include_children=True):
         "completed": goal.completed,
         "completed_at": format_utc(goal.completed_at),
         "completed_session_id": getattr(goal, 'completed_session_id', None),
+        "completion_state": completion_state,
         "is_smart": all(smart_status.values()),
         "smart_status": smart_status,
         "paused": bool(getattr(goal, 'frozen', False)),
@@ -298,6 +316,7 @@ def serialize_goal(goal, include_children=True):
             "completed": goal.completed,
             "completed_at": format_utc(goal.completed_at),
             "completed_session_id": getattr(goal, 'completed_session_id', None),
+            "completion_state": completion_state,
             "created_at": format_utc(goal.created_at),
             "updated_at": format_utc(goal.updated_at),
             "targets": [serialize_target(t) for t in (goal.targets_rel or []) if t.deleted_at is None],

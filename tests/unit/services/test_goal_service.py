@@ -1,6 +1,8 @@
 import uuid
 
-from models import Goal, GoalLevel
+from datetime import datetime, timezone
+
+from models import Goal, GoalLevel, Target
 from services.goal_service import GoalService, sync_goal_targets
 
 
@@ -41,6 +43,51 @@ def test_update_goal_completion_sets_and_clears_completed_session_id(
     assert status == 200
     assert uncompleted_goal.completed is False
     assert uncompleted_goal.completed_session_id is None
+
+
+def test_update_goal_completion_clears_completed_targets_when_manually_uncompleted(
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+    sample_practice_session,
+    sample_activity_definition,
+    sample_activity_instance,
+):
+    target = Target(
+        id=str(uuid.uuid4()),
+        goal_id=sample_ultimate_goal.id,
+        root_id=sample_ultimate_goal.id,
+        activity_id=sample_activity_definition.id,
+        name='Form target',
+        type='threshold',
+        completed=True,
+        completed_at=datetime.now(timezone.utc),
+        completed_session_id=sample_practice_session.id,
+        completed_instance_id=sample_activity_instance.id,
+    )
+    sample_ultimate_goal.completed = True
+    sample_ultimate_goal.completed_at = datetime.now(timezone.utc)
+    sample_ultimate_goal.completed_session_id = sample_practice_session.id
+    db_session.add(target)
+    db_session.commit()
+
+    service = GoalService(db_session, sync_targets=sync_goal_targets)
+
+    uncompleted_goal, error, status = service.update_goal_completion(
+        sample_ultimate_goal.id,
+        test_user.id,
+        {'completed': False},
+        root_id=sample_ultimate_goal.id,
+    )
+
+    assert error is None
+    assert status == 200
+    assert uncompleted_goal.completed is False
+    db_session.refresh(target)
+    assert target.completed is False
+    assert target.completed_at is None
+    assert target.completed_session_id is None
+    assert target.completed_instance_id is None
 
 
 def test_update_goal_completion_rejects_paused_goal(

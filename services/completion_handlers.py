@@ -404,6 +404,7 @@ def _evaluate_threshold_targets_for_activity(
     if all_active_targets_completed(goal) and not goal.completed:
         goal.completed = True
         goal.completed_at = completed_at
+        goal.completed_session_id = session_id
         logger.info(f"Auto-completing goal {goal.id} - all active targets met")
         
         # Track for API response
@@ -507,6 +508,7 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
     if all_active_targets_completed(goal) and not goal.completed:
         goal.completed = True
         goal.completed_at = now
+        goal.completed_session_id = session_id
         logger.info(f"Auto-completing goal {goal.id} - all active targets met")
         
         # Emit goal completed event

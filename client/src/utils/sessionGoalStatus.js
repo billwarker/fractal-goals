@@ -29,18 +29,20 @@ export function getGoalStatus(goal, targetAchievements, achievedTargetIds) {
     const allTargetsCompleted = targetStatuses.length > 0 && targetStatuses.every((status) => status.isCompleted);
     const hasTargets = targets.length > 0;
     const persistedCompleted = Boolean(goal.completed || goal.attributes?.completed);
-    const completed = hasTargets ? allTargetsCompleted : persistedCompleted;
 
     let reason = 'pending';
-    if (hasTargets) {
-        if (allTargetsCompleted) reason = 'targets_completed';
-    } else if (persistedCompleted) {
+    if (persistedCompleted) {
         reason = 'goal_completed';
+    } else if (hasTargets && allTargetsCompleted) {
+        reason = 'targets_satisfied';
     }
 
     return {
-        completed,
+        completed: persistedCompleted,
         reason,
+        hasTargets,
+        allTargetsSatisfied: allTargetsCompleted,
+        readyForCompletion: !persistedCompleted && allTargetsCompleted,
         totalTargets: targets.length,
         completedTargets: targetStatuses.filter((status) => status.isCompleted).length
     };
