@@ -46,6 +46,109 @@ function formatMetricValue(metric) {
     return `${metric.name || 'Metric'}: ${formatted}${metric.unit ? ` ${metric.unit}` : ''}`;
 }
 
+function formatTimelineTitle(item) {
+    const payload = item.payload || {};
+    const activityName = payload.activity_name || payload.name || payload.definition_name;
+    const targetName = payload.name || item.title?.replace(/^(Created|Achieved) target:\s*/i, '');
+    const goalName = payload.goal_name || item.title?.replace(/^(Created|Completed) goal:\s*/i, '');
+
+    switch (item.event_type) {
+        case 'activity.completed':
+            return `Completed activity: ${activityName || 'Activity'}`;
+        case 'activity.associated':
+            return `Associated activity: ${activityName || 'Activity'}`;
+        case 'activity_group.associated':
+            return `Associated activity group: ${payload.activity_group_name || 'Activity group'}`;
+        case 'target.created':
+            return `Created target: ${targetName || 'Target'}`;
+        case 'target.achieved':
+            return `Achieved target: ${targetName || 'Target'}`;
+        case 'goal.created':
+            return `Created goal: ${goalName || 'Goal'}`;
+        case 'goal.completed':
+            return `Completed goal: ${goalName || 'Goal'}`;
+        default:
+            return item.title || 'Timeline event';
+    }
+}
+
+function isGoalLifecycleEvent(item) {
+    return item.event_type === 'goal.created' || item.event_type === 'goal.completed';
+}
+
+function formatGoalLevelForTitle(levelName) {
+    if (!levelName) return '';
+    return levelName.replace(/\s+goal$/i, '').trim();
+}
+
+function formatEventLabel(item) {
+    switch (item.event_type) {
+        case 'activity.completed': return 'Completed activity';
+        case 'activity.associated': return 'Activity association';
+        case 'activity_group.associated': return 'Activity group association';
+        case 'target.created': return 'Target created';
+        case 'target.achieved': return 'Target achieved';
+        case 'goal.created': return 'Goal created';
+        case 'goal.completed': return 'Goal completed';
+        default: return 'Timeline event';
+    }
+}
+
+function formatContextText(item) {
+    if (!item.relationship || item.relationship === 'self') return null;
+    const sourceName = item.source_goal_name;
+
+    if (item.relationship === 'descendant') {
+        if (isGoalLifecycleEvent(item)) return null;
+        if (item.type === 'child_goal') return 'via child goal';
+        return sourceName ? `via child goal: ${sourceName}` : 'via child goal';
+    }
+
+    if (item.relationship === 'parent_inherited') {
+        return sourceName ? `inherited from parent: ${sourceName}` : 'inherited from parent';
+    }
+
+    return null;
+}
+
+function normalizeTimelineEntry(item, goalLevelHelpers) {
+    const payload = item.payload || {};
+    const activityInstance = item.event_type === 'activity.completed'
+        ? normalizeActivityTimelineInstance(item)
+        : null;
+    const metrics = Array.isArray(payload.metrics) ? payload.metrics : [];
+    const visibleMetrics = metrics.map(formatMetricValue).filter(Boolean).slice(0, 4);
+    const duration = payload.duration_seconds ? formatDurationSeconds(payload.duration_seconds) : null;
+    const goalLevel = item.type === 'child_goal' ? getTimelineGoalLevel(payload) : null;
+    const goalColor = goalLevel ? goalLevelHelpers.getGoalColor(goalLevel) : null;
+
+    return {
+        eventLabel: item.subtitle || (isGoalLifecycleEvent(item) ? '' : formatEventLabel(item)),
+        title: formatTimelineTitle(item),
+        goalTitle: isGoalLifecycleEvent(item) ? {
+            action: item.event_type === 'goal.completed' ? 'Completed' : 'Created',
+            level: formatGoalLevelForTitle(goalLevel?.level_name),
+            name: payload.goal_name || 'Goal',
+        } : null,
+        timestamp: item.timestamp,
+        contextText: formatContextText(item),
+        duration,
+        metrics: visibleMetrics,
+        activityInstance,
+        activityDef: payload.activity_definition || null,
+        progressRecord: payload.progress_comparison || payload.progress_record || null,
+        iconConfig: goalLevel ? {
+            shape: goalLevelHelpers.getGoalIcon(goalLevel),
+            color: goalColor,
+            secondaryColor: goalLevelHelpers.getGoalSecondaryColor(goalLevel),
+            isSmart: Boolean(goalLevel.is_smart),
+        } : null,
+        levelBadge: goalLevel?.level_name && !isGoalLifecycleEvent(item)
+            ? { label: goalLevel.level_name, color: goalColor }
+            : null,
+    };
+}
+
 function GoalTimelineView({ rootId, goalId, metrics, onTimeSpentClick }) {
     const { timezone } = useTimezone();
     const [selectedTypes, setSelectedTypes] = useState(DEFAULT_GOAL_TIMELINE_TYPES);
@@ -138,29 +241,22 @@ function GoalTimelineView({ rootId, goalId, metrics, onTimeSpentClick }) {
 
 function TimelineItem({ item, rootId, timezone }) {
     const { date, time } = formatDateTime(item.timestamp, timezone);
-    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
-    const payload = item.payload || {};
-    const activityInstance = item.event_type === 'activity.completed'
-        ? normalizeActivityTimelineInstance(item)
-        : null;
-    const metrics = Array.isArray(payload.metrics) ? payload.metrics : [];
-    const visibleMetrics = metrics.map(formatMetricValue).filter(Boolean).slice(0, 4);
-    const duration = payload.duration_seconds ? formatDurationSeconds(payload.duration_seconds) : null;
-    const goalLevel = item.type === 'child_goal' ? getTimelineGoalLevel(payload) : null;
-    const goalColor = goalLevel ? getGoalColor(goalLevel) : null;
-    const goalSecondaryColor = goalLevel ? getGoalSecondaryColor(goalLevel) : null;
-    const goalIcon = goalLevel ? getGoalIcon(goalLevel) : null;
+    const goalLevelHelpers = useGoalLevels();
+    const card = normalizeTimelineEntry(item, goalLevelHelpers);
 
-    if (activityInstance) {
+    if (card.activityInstance) {
         return (
             <div className={styles.activityEvent}>
                 <ActivityTimelineCard
-                    instance={activityInstance}
-                    activityDef={payload.activity_definition || null}
-                    progressRecord={payload.progress_comparison || payload.progress_record || null}
+                    instance={card.activityInstance}
+                    activityDef={card.activityDef}
+                    progressRecord={card.progressRecord}
                     timezone={timezone}
                     showActivityName
-                    sessionHref={buildActivityInstanceHref(rootId, activityInstance)}
+                    sessionHref={buildActivityInstanceHref(rootId, card.activityInstance)}
+                    timestamp={card.timestamp}
+                    showTime
+                    variant="goalTimeline"
                 />
             </div>
         );
@@ -168,51 +264,71 @@ function TimelineItem({ item, rootId, timezone }) {
 
     return (
         <div className={styles.item}>
+            <div className={styles.cardHeader}>
+                <span className={styles.eventLabel}>{card.eventLabel}</span>
+                <span className={styles.time}>
+                    <span>{date}</span>
+                    <span>{time}</span>
+                </span>
+            </div>
             <div className={styles.card}>
                 <div className={styles.itemTitleRow}>
-                    {goalLevel && (
-                        <GoalIcon
-                            shape={goalIcon}
-                            color={goalColor}
-                            secondaryColor={goalSecondaryColor}
-                            isSmart={Boolean(goalLevel.is_smart)}
-                            size={20}
-                            className={styles.goalEventIcon}
-                        />
+                    {card.goalTitle ? (
+                        <>
+                            <span className={styles.itemTitle}>
+                                {[
+                                    card.goalTitle.action,
+                                    card.goalTitle.level,
+                                ].filter(Boolean).join(' ')} goal:
+                            </span>
+                            {card.iconConfig && (
+                                <GoalIcon
+                                    shape={card.iconConfig.shape}
+                                    color={card.iconConfig.color}
+                                    secondaryColor={card.iconConfig.secondaryColor}
+                                    isSmart={card.iconConfig.isSmart}
+                                    size={20}
+                                    className={styles.goalEventIcon}
+                                />
+                            )}
+                            <span className={styles.itemTitle}>{card.goalTitle.name}</span>
+                        </>
+                    ) : (
+                        <>
+                            {card.iconConfig && (
+                                <GoalIcon
+                                    shape={card.iconConfig.shape}
+                                    color={card.iconConfig.color}
+                                    secondaryColor={card.iconConfig.secondaryColor}
+                                    isSmart={card.iconConfig.isSmart}
+                                    size={20}
+                                    className={styles.goalEventIcon}
+                                />
+                            )}
+                            <span className={styles.itemTitle}>{card.title}</span>
+                        </>
                     )}
-                    <span className={styles.itemTitle}>{item.title}</span>
-                </div>
-                {(item.subtitle || duration) && (
-                    <div className={styles.subtitle}>
-                        {[item.subtitle, duration].filter(Boolean).join(' · ')}
-                    </div>
-                )}
-                <div className={styles.meta}>
-                    <span className={styles.pill}>{labelType(item.type)}</span>
-                    {goalLevel?.level_name && (
+                    {card.levelBadge && (
                         <span
-                            className={styles.levelPill}
-                            style={{ '--timeline-goal-color': goalColor }}
+                            className={styles.levelBadge}
+                            style={{ '--timeline-goal-color': card.levelBadge.color }}
                         >
-                            {goalLevel.level_name}
+                            {card.levelBadge.label}
                         </span>
                     )}
-                    {item.relationship && <span className={styles.pill}>{labelRelationship(item.relationship)}</span>}
-                    {item.source_goal_name && item.relationship !== 'self' && (
-                        <span className={styles.pill}>{item.source_goal_name}</span>
-                    )}
                 </div>
-                {visibleMetrics.length > 0 && (
+                {(card.contextText || card.duration) && (
+                    <div className={styles.subtitle}>
+                        {[card.contextText, card.duration].filter(Boolean).join(' · ')}
+                    </div>
+                )}
+                {card.metrics.length > 0 && (
                     <div className={styles.metrics}>
-                        {visibleMetrics.map((metric) => (
+                        {card.metrics.map((metric) => (
                             <span key={metric} className={styles.metricPill}>{metric}</span>
                         ))}
                     </div>
                 )}
-            </div>
-            <div className={styles.time}>
-                <div>{date}</div>
-                <div>{time}</div>
             </div>
         </div>
     );
@@ -257,24 +373,6 @@ function getTimelineGoalLevel(payload) {
         is_smart: Boolean(payload.is_smart),
         level,
     };
-}
-
-function labelType(type) {
-    switch (type) {
-        case 'activity': return 'Activity';
-        case 'target': return 'Target';
-        case 'child_goal': return 'Child Goal';
-        default: return 'Event';
-    }
-}
-
-function labelRelationship(relationship) {
-    switch (relationship) {
-        case 'self': return 'This goal';
-        case 'descendant': return 'Child contribution';
-        case 'parent_inherited': return 'Inherited from parent';
-        default: return relationship;
-    }
 }
 
 export default GoalTimelineView;

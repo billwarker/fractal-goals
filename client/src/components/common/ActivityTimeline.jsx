@@ -16,6 +16,14 @@ function formatMetricNumber(value) {
     return numericValue.toFixed(1).replace(/\.0$/, '');
 }
 
+function resolveMetricId(metric) {
+    return metric?.metric_id || metric?.metric_definition_id || null;
+}
+
+function resolveSplitId(metric) {
+    return metric?.split_id || metric?.split_definition_id || null;
+}
+
 function formatDuration(seconds) {
     if (!seconds) return null;
     const mins = Math.floor(seconds / 60);
@@ -95,10 +103,14 @@ export function ActivityTimelineCard({
     deltaDisplayMode = 'percent',
     showActivityName = false,
     sessionHref = null,
+    timestamp = null,
+    showTime = false,
+    variant = 'default',
 }) {
     const sets = useMemo(() => instance.sets || [], [instance.sets]);
     const hasMetrics = instance.metric_values && instance.metric_values.length > 0;
     const metricDefs = useMemo(() => activityDef?.metric_definitions || [], [activityDef?.metric_definitions]);
+    const splitDefs = useMemo(() => activityDef?.split_definitions || [], [activityDef?.split_definitions]);
     const trackedMetricDefs = useMemo(() => filterTrackedMetricDefs(metricDefs), [metricDefs]);
 
     const autoAgg = useMemo(() => {
@@ -139,6 +151,10 @@ export function ActivityTimelineCard({
         }
         return instance.duration_seconds ? formatDuration(instance.duration_seconds) : null;
     })();
+    const isGoalTimeline = variant === 'goalTimeline';
+    const displayTimestamp = timestamp || instance.session_date || instance.created_at;
+    const displayDate = (formatDate || ((value) => defaultFormatDate(value, timezone)))(displayTimestamp);
+    const displayTime = showTime ? formatTime(displayTimestamp, timezone) : null;
 
     const progressComparisons = Array.isArray(progressRecord?.metric_comparisons)
         ? progressRecord.metric_comparisons
@@ -235,35 +251,68 @@ export function ActivityTimelineCard({
     };
 
     return (
-        <div className={styles.timelineCard}>
-            <div className={styles.timelineCardHeader}>
-                <span className={styles.timelineCardDate}>
-                    {(formatDate || ((value) => defaultFormatDate(value, timezone)))(instance.session_date || instance.created_at)}
-                </span>
-                {duration && (
-                    <span className={styles.timelineCardDuration}>⏱ {duration}</span>
-                )}
-            </div>
-
-            {instance.session_name && (
-                sessionHref ? (
-                    <Link
-                        to={sessionHref}
-                        className={styles.timelineCardSessionLink}
-                        title={`Open ${instance.session_name}`}
-                    >
-                        {instance.session_name}
-                    </Link>
-                ) : (
-                    <div className={styles.timelineCardSession}>
-                        {instance.session_name}
+        <div className={`${styles.timelineCard} ${isGoalTimeline ? styles.timelineCardGoalTimeline : ''}`}>
+            {isGoalTimeline ? (
+                <div className={styles.timelineCardHeader}>
+                    {instance.session_name ? (
+                        sessionHref ? (
+                            <Link
+                                to={sessionHref}
+                                className={styles.timelineCardSessionLink}
+                                title={`Open ${instance.session_name}`}
+                            >
+                                {instance.session_name}
+                            </Link>
+                        ) : (
+                            <span className={styles.timelineCardSession}>
+                                {instance.session_name}
+                            </span>
+                        )
+                    ) : (
+                        <span className={styles.timelineCardLabel}>Completed activity</span>
+                    )}
+                    <span className={styles.timelineCardTimestamp}>
+                        <span className={styles.timelineCardDate}>{displayDate}</span>
+                        {displayTime && <span>{displayTime}</span>}
+                    </span>
+                </div>
+            ) : (
+                <>
+                    <div className={styles.timelineCardHeader}>
+                        <span className={styles.timelineCardDate}>{displayDate}</span>
+                        {duration && (
+                            <span className={styles.timelineCardDuration}>⏱ {duration}</span>
+                        )}
                     </div>
-                )
+
+                    {instance.session_name && (
+                        sessionHref ? (
+                            <Link
+                                to={sessionHref}
+                                className={styles.timelineCardSessionLink}
+                                title={`Open ${instance.session_name}`}
+                            >
+                                {instance.session_name}
+                            </Link>
+                        ) : (
+                            <div className={styles.timelineCardSession}>
+                                {instance.session_name}
+                            </div>
+                        )
+                    )}
+                </>
             )}
 
             {showActivityName && (instance.name || instance.definition_name) && (
                 <div className={styles.timelineCardActivityName}>
-                    {instance.name || instance.definition_name}
+                    <span>
+                        {isGoalTimeline
+                            ? `Completed activity: ${instance.name || instance.definition_name}`
+                            : (instance.name || instance.definition_name)}
+                    </span>
+                    {isGoalTimeline && duration && (
+                        <span className={styles.timelineCardTitleDuration}>⏱ {duration}</span>
+                    )}
                 </div>
             )}
 
@@ -277,9 +326,13 @@ export function ActivityTimelineCard({
                             <span className={styles.timelineSetNum}>#{idx + 1}</span>
                             <div className={styles.timelineSetMetrics}>
                                 {set.metrics?.map((m, mIdx) => {
-                                    const def = activityDef?.metric_definitions?.find(d => d.id === m.metric_id);
+                                    const metricId = resolveMetricId(m);
+                                    const splitId = resolveSplitId(m);
+                                    const def = metricDefs.find(d => d.id === metricId);
+                                    const splitDef = splitDefs.find(d => d.id === splitId);
                                     const metricLabel = (
                                         <>
+                                            {splitDef?.name && <span className={styles.splitLabel}>{splitDef.name}</span>}
                                             {def?.name && <span className={styles.metricLabel}>{def.name}:</span>}
                                             {m.value}
                                             {def?.unit && <span className={styles.metricUnit}>{def.unit}</span>}
@@ -287,7 +340,7 @@ export function ActivityTimelineCard({
                                     );
                                     return (
                                         <React.Fragment key={mIdx}>
-                                            {renderMetricRow(metricLabel, renderProgressIndicator(m.metric_id, def?.name, idx))}
+                                            {renderMetricRow(metricLabel, renderProgressIndicator(metricId, def?.name, idx))}
                                         </React.Fragment>
                                     );
                                 })}

@@ -33,4 +33,50 @@ describe('ActivityTimelineCard', () => {
             .toHaveAttribute('href', '/root-1/session/session-1?activityInstanceId=instance-1');
         expect(screen.getByText('Blues Chug')).toBeInTheDocument();
     });
+
+    it('renders metric labels, units, and split names for set-based timeline entries', () => {
+        renderWithProviders(
+            <ActivityTimelineCard
+                instance={{
+                    id: 'instance-1',
+                    session_name: 'Upper Body Day 2',
+                    session_date: '2026-05-13T12:00:00.000Z',
+                    name: 'Freestanding HSPU Eccentrics',
+                    metric_values: [],
+                    sets: [
+                        {
+                            metrics: [
+                                { metric_definition_id: 'reps', split_definition_id: 'left', value: 6 },
+                                { metric_id: 'tempo', split_id: 'left', value: 3 },
+                            ],
+                        },
+                    ],
+                    notes: [],
+                }}
+                activityDef={{
+                    metric_definitions: [
+                        { id: 'reps', name: 'Reps', unit: 'reps' },
+                        { id: 'tempo', name: 'Tempo', unit: 'sec' },
+                    ],
+                    split_definitions: [
+                        { id: 'left', name: 'Left side' },
+                    ],
+                }}
+                timezone="UTC"
+                showActivityName
+            />,
+            {
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+                withTimezone: false,
+            }
+        );
+
+        expect(screen.getAllByText('Left side')).toHaveLength(2);
+        expect(screen.getByText('Reps:')).toBeInTheDocument();
+        expect(screen.getByText('reps')).toBeInTheDocument();
+        expect(screen.getByText('Tempo:')).toBeInTheDocument();
+        expect(screen.getByText('sec')).toBeInTheDocument();
+    });
 });

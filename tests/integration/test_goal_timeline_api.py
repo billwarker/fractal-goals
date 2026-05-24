@@ -37,7 +37,18 @@ class TestGoalTimelineApi:
             time_start=datetime.now(timezone.utc),
             time_stop=datetime.now(timezone.utc),
             duration_seconds=300,
-            data={},
+            data={
+                'sets': [
+                    {
+                        'metrics': [
+                            {
+                                'metric_id': sample_activity_definition.metric_definitions[0].id,
+                                'value': 135,
+                            },
+                        ],
+                    },
+                ],
+            },
         )
         target = Target(
             id=str(uuid.uuid4()),
@@ -66,6 +77,12 @@ class TestGoalTimelineApi:
         assert activity_entry['type'] == 'activity'
         assert activity_entry['relationship'] == 'descendant'
         assert activity_entry['source_goal_id'] == child_goal.id
+        assert activity_entry['payload']['activity_definition']['id'] == sample_activity_definition.id
+        assert any(
+            metric['name'] == 'Weight'
+            for metric in activity_entry['payload']['activity_definition']['metric_definitions']
+        )
+        assert activity_entry['payload']['sets'][0]['metrics'][0]['metric_id'] == sample_activity_definition.metric_definitions[0].id
 
     def test_timeline_includes_parent_inherited_activity_when_enabled(self, authed_client, db_session, sample_goal_hierarchy, sample_activity_definition):
         root_id = sample_goal_hierarchy['ultimate'].id

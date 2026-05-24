@@ -17,6 +17,8 @@ from services.serializers import (
     calculate_smart_status,
     format_utc,
     serialize_activity_instance,
+    serialize_metric_definition,
+    serialize_split_definition,
     serialize_target,
 )
 from services.service_types import JsonDict, ServiceResult
@@ -138,6 +140,27 @@ class GoalTimelineService:
                 } if level else None,
             }
 
+        def serialize_timeline_activity_definition(activity):
+            if not activity:
+                return None
+            return {
+                'id': activity.id,
+                'name': activity.name,
+                'has_sets': activity.has_sets,
+                'has_metrics': activity.has_metrics,
+                'has_splits': activity.has_splits,
+                'metric_definitions': [
+                    serialize_metric_definition(metric)
+                    for metric in (activity.metric_definitions or [])
+                    if not metric.deleted_at
+                ],
+                'split_definitions': [
+                    serialize_split_definition(split)
+                    for split in (activity.split_definitions or [])
+                    if not split.deleted_at
+                ],
+            }
+
         effective_goal_ids = set(timeline_goal_ids)
         parent_goal = None
         if goal.inherit_parent_activities and goal.parent_id:
@@ -195,6 +218,8 @@ class GoalTimelineService:
         if 'activity' in requested_types and activity_contexts:
             instances = self.db_session.query(ActivityInstance).options(
                 selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
+                selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.metric_definitions),
+                selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.split_definitions),
                 selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
                 selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
                 selectinload(ActivityInstance.session),
@@ -229,6 +254,7 @@ class GoalTimelineService:
                     source_goal=source_goal,
                     payload={
                         **serialized,
+                        'activity_definition': serialize_timeline_activity_definition(instance.definition),
                         'session_name': session.name if session else None,
                         'session_date': format_utc((session.session_start or session.created_at) if session else None),
                     },
