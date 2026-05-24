@@ -405,6 +405,9 @@ def _evaluate_threshold_targets_for_activity(
         goal.completed = True
         goal.completed_at = completed_at
         goal.completed_session_id = session_id
+        goal.completion_source = 'target'
+        goal.completion_reason = 'all_targets_achieved'
+        goal.manually_uncompleted_at = None
         logger.info(f"Auto-completing goal {goal.id} - all active targets met")
         
         # Track for API response
@@ -509,6 +512,9 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
         goal.completed = True
         goal.completed_at = now
         goal.completed_session_id = session_id
+        goal.completion_source = 'target'
+        goal.completion_reason = 'all_targets_achieved'
+        goal.manually_uncompleted_at = None
         logger.info(f"Auto-completing goal {goal.id} - all active targets met")
         
         # Emit goal completed event
@@ -812,6 +818,9 @@ def _revert_achievements_for_instance(db_session, instance_id: str, pending_even
                 logger.info(f"[REVERSION] Goal '{goal.name}' no longer has all targets met. Un-completing.")
                 goal.completed = False
                 goal.completed_at = None
+                goal.completed_session_id = None
+                goal.completion_source = None
+                goal.completion_reason = 'target_reverted'
                 
                 _queue_event(pending_events, _build_event(Events.GOAL_UNCOMPLETED, {
                     'goal_id': goal.id,
@@ -1052,6 +1061,9 @@ def _check_parent_completion(db_session, parent: Goal, pending_events=None):
     if all_completed and not parent.completed:
         parent.completed = True
         parent.completed_at = datetime.now(timezone.utc)
+        parent.completion_source = 'children'
+        parent.completion_reason = 'all_children_completed'
+        parent.manually_uncompleted_at = None
         logger.info(f"Auto-completing parent goal {parent.id} - all children complete")
         
         # Emit event for cascade

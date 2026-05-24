@@ -2,7 +2,7 @@ import uuid
 
 from datetime import datetime, timezone
 
-from models import Goal, GoalLevel, Target
+from models import Goal, GoalLevel, Target, TargetContributionLedger, TargetMetricCondition
 from services.goal_service import GoalService, sync_goal_targets
 
 
@@ -28,6 +28,8 @@ def test_update_goal_completion_sets_and_clears_completed_session_id(
     assert status == 200
     assert completed_goal.completed is True
     assert completed_goal.completed_session_id == sample_practice_session.id
+    assert completed_goal.completion_source == 'manual'
+    assert completed_goal.completion_reason == 'manual'
 
     uncompleted_goal, error, status = service.update_goal_completion(
         sample_ultimate_goal.id,
@@ -43,6 +45,9 @@ def test_update_goal_completion_sets_and_clears_completed_session_id(
     assert status == 200
     assert uncompleted_goal.completed is False
     assert uncompleted_goal.completed_session_id is None
+    assert uncompleted_goal.completion_source is None
+    assert uncompleted_goal.completion_reason == 'manual_uncompleted'
+    assert uncompleted_goal.manually_uncompleted_at is not None
 
 
 def test_update_goal_completion_clears_completed_targets_when_manually_uncompleted(
@@ -65,10 +70,26 @@ def test_update_goal_completion_clears_completed_targets_when_manually_uncomplet
         completed_session_id=sample_practice_session.id,
         completed_instance_id=sample_activity_instance.id,
     )
+    condition = TargetMetricCondition(
+        id=str(uuid.uuid4()),
+        target_id=target.id,
+        metric_definition_id=sample_activity_definition.metric_definitions[0].id,
+        operator='>=',
+        target_value=9,
+    )
+    ledger = TargetContributionLedger(
+        id=str(uuid.uuid4()),
+        target_id=target.id,
+        activity_instance_id=sample_activity_instance.id,
+        metric_condition_id=condition.id,
+        contributed_value=9,
+    )
+    target.metric_conditions = [condition]
     sample_ultimate_goal.completed = True
     sample_ultimate_goal.completed_at = datetime.now(timezone.utc)
     sample_ultimate_goal.completed_session_id = sample_practice_session.id
     db_session.add(target)
+    db_session.add(ledger)
     db_session.commit()
 
     service = GoalService(db_session, sync_targets=sync_goal_targets)
@@ -88,6 +109,7 @@ def test_update_goal_completion_clears_completed_targets_when_manually_uncomplet
     assert target.completed_at is None
     assert target.completed_session_id is None
     assert target.completed_instance_id is None
+    assert db_session.query(TargetContributionLedger).filter_by(id=ledger.id).first() is not None
 
 
 def test_update_goal_completion_rejects_paused_goal(

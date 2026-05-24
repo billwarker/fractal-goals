@@ -18,7 +18,6 @@ from models import (
     SessionTemplate,
     SplitDefinition,
     Target,
-    TargetContributionLedger,
     activity_goal_associations,
     goal_activity_group_associations,
     get_goal_by_id,
@@ -1027,8 +1026,17 @@ class GoalService:
                         "smart_status": smart_status,
                     }, 400
 
-        goal.completed_at = datetime.now(timezone.utc) if goal.completed else None
+        completion_time = datetime.now(timezone.utc)
+        goal.completed_at = completion_time if goal.completed else None
         goal.completed_session_id = data.get('session_id') if goal.completed else None
+        if goal.completed:
+            goal.completion_source = 'manual'
+            goal.completion_reason = 'manual'
+            goal.manually_uncompleted_at = None
+        else:
+            goal.completion_source = None
+            goal.completion_reason = 'manual_uncompleted'
+            goal.manually_uncompleted_at = completion_time
         reset_target_events = []
         if not goal.completed:
             active_completed_targets = [
@@ -1041,9 +1049,6 @@ class GoalService:
                 target.completed_at = None
                 target.completed_session_id = None
                 target.completed_instance_id = None
-                self.db_session.query(TargetContributionLedger).filter(
-                    TargetContributionLedger.target_id == target.id
-                ).delete(synchronize_session=False)
                 reset_target_events.append(Event(
                     Events.TARGET_REVERTED,
                     {

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { parseGoalTargets } from '../utils/goalNodeModel';
 
 function formatGoalTypeLabel(type) {
     if (!type) return 'Goal';
@@ -53,7 +54,7 @@ export function useTargetAchievements(activityInstances, parentGoals, sessionId 
 
         // Check each goal's targets
         for (const goal of parentGoals) {
-            const targets = parseTargets(goal);
+            const targets = parseGoalTargets(goal);
             const achievedForGoal = [];
 
             for (const target of targets) {
@@ -132,34 +133,6 @@ export function useTargetAchievements(activityInstances, parentGoals, sessionId 
     }, [activityInstances, parentGoals, sessionId]);
 
     return achievementStatus;
-}
-
-/**
- * Parse targets from a goal object
- */
-function parseTargets(goal) {
-    let targets = [];
-
-    // Check attributes first (common structure)
-    if (goal.attributes?.targets) {
-        try {
-            targets = typeof goal.attributes.targets === 'string'
-                ? JSON.parse(goal.attributes.targets)
-                : goal.attributes.targets;
-        } catch (e) {
-            targets = [];
-        }
-    } else if (goal.targets) {
-        try {
-            targets = typeof goal.targets === 'string'
-                ? JSON.parse(goal.targets)
-                : goal.targets;
-        } catch (e) {
-            targets = [];
-        }
-    }
-
-    return Array.isArray(targets) ? targets : [];
 }
 
 /**

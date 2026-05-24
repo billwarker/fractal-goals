@@ -339,6 +339,9 @@ class GoalTargetService:
             goal.completed = True
             goal.completed_at = now
             goal.completed_session_id = session_id
+            goal.completion_source = 'target'
+            goal.completion_reason = 'all_targets_achieved'
+            goal.manually_uncompleted_at = None
             goal_was_completed = True
             logger.info("Auto-completing goal %s - all %s targets met", goal_id, targets_total)
 

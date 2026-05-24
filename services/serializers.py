@@ -275,12 +275,9 @@ def serialize_goal(goal, include_children=True):
         "completed": bool(goal.completed),
         "completed_at": format_utc(goal.completed_at),
         "completed_session_id": getattr(goal, 'completed_session_id', None),
-        "source": (
-            "target" if goal.completed and all_targets_satisfied else
-            "session" if goal.completed and getattr(goal, 'completed_session_id', None) else
-            "manual" if goal.completed else
-            None
-        ),
+        "source": getattr(goal, 'completion_source', None),
+        "reason": getattr(goal, 'completion_reason', None),
+        "manually_uncompleted_at": format_utc(getattr(goal, 'manually_uncompleted_at', None)),
         "all_targets_satisfied": all_targets_satisfied,
         "completed_targets": completed_target_count,
         "total_targets": len(active_targets),

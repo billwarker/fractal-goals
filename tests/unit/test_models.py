@@ -95,12 +95,17 @@ class TestGoalHierarchy:
         sample_ultimate_goal.completed = True
         sample_ultimate_goal.completed_at = datetime.utcnow()
         sample_ultimate_goal.completed_session_id = sample_practice_session.id
+        sample_ultimate_goal.completion_source = 'manual'
+        sample_ultimate_goal.completion_reason = 'manual'
         db_session.commit()
 
         goal_dict = serialize_goal(sample_ultimate_goal)
 
         assert goal_dict['completed_session_id'] == sample_practice_session.id
         assert goal_dict['attributes']['completed_session_id'] == sample_practice_session.id
+        assert goal_dict['completion_state']['source'] == 'manual'
+        assert goal_dict['completion_state']['reason'] == 'manual'
+        assert goal_dict['attributes']['completion_state']['source'] == 'manual'
 
 
 @pytest.mark.unit

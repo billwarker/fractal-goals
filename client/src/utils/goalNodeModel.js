@@ -45,6 +45,41 @@ export const parseGoalTargets = (goal) => {
     }
 };
 
+export const getGoalTargetsSignature = (goal) => {
+    const targets = parseGoalTargets(goal);
+    if (targets.length === 0) return 'targets:[]';
+
+    const normalizedTargets = targets.map((target) => ({
+        id: target?.id ?? null,
+        name: target?.name ?? null,
+        type: target?.type ?? null,
+        activity_id: target?.activity_id ?? null,
+        activity_instance_id: target?.activity_instance_id ?? null,
+        activity_group_id: target?.activity_group_id ?? null,
+        completed: Boolean(target?.completed),
+        completed_at: target?.completed_at ?? null,
+        completed_session_id: target?.completed_session_id ?? null,
+        completed_instance_id: target?.completed_instance_id ?? null,
+        metrics: Array.isArray(target?.metrics) ? target.metrics : [],
+        time_scope: target?.time_scope ?? null,
+        start_date: target?.start_date ?? null,
+        end_date: target?.end_date ?? null,
+        linked_block_id: target?.linked_block_id ?? null,
+        frequency_days: target?.frequency_days ?? null,
+        frequency_count: target?.frequency_count ?? null,
+    }));
+
+    return `targets:${JSON.stringify(normalizedTargets)}`;
+};
+
+export const getGoalNodeRevision = (goal) => {
+    if (!goal) return 'initial';
+    return goal.attributes?.updated_at
+        || goal.updated_at
+        || getGoalTargetsSignature(goal)
+        || 'initial';
+};
+
 export const getGoalNodeCategory = (goalOrType) => {
     const type = typeof goalOrType === 'string' ? goalOrType : getGoalNodeType(goalOrType);
     return EXECUTION_GOAL_TYPES.has(type) ? 'execution' : 'structural';

@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 
+import { getGoalNodeRevision, parseGoalTargets } from '../utils/goalNodeModel';
+
 function buildInitialGoalFormState(goal, mode) {
     let deadline = '';
     if (goal) {
@@ -9,16 +11,7 @@ function buildInitialGoalFormState(goal, mode) {
         }
     }
 
-    let parsedTargets = [];
-    if (goal?.attributes?.targets) {
-        try {
-            parsedTargets = typeof goal.attributes.targets === 'string'
-                ? JSON.parse(goal.attributes.targets)
-                : goal.attributes.targets;
-        } catch {
-            parsedTargets = [];
-        }
-    }
+    const parsedTargets = parseGoalTargets(goal);
 
     return {
         name: mode === 'create' ? '' : (goal?.name || ''),
@@ -47,7 +40,7 @@ export function useGoalForm(goal, mode) {
         deadline: () => null,
         relevanceStatement: () => null,
     }), []);
-    const formKey = `${mode}:${goal?.attributes?.id || goal?.id || 'new-goal'}`;
+    const formKey = `${mode}:${goal?.attributes?.id || goal?.id || 'new-goal'}:${getGoalNodeRevision(goal)}`;
     const [formStateByKey, setFormStateByKey] = useState({});
     const currentFormState = formStateByKey[formKey] || {
         values: initialState,

@@ -7,6 +7,7 @@ import {
     getGoalNodeCategory,
     isExecutionGoalNode,
     normalizeGoalNode,
+    getGoalTargetsSignature,
     parseGoalTargets,
 } from '../goalNodeModel';
 
@@ -102,6 +103,33 @@ describe('goalNodeModel', () => {
 
         expect(findGoalNodeById(tree, 'child')).toBe(tree.children[0]);
         expect(parseGoalTargets(tree.children[0])).toEqual([]);
+    });
+
+    it('builds target signatures from full target content, not only ids', () => {
+        const baseGoal = {
+            id: 'goal-1',
+            targets: [
+                {
+                    id: 'target-1',
+                    name: 'Section 1',
+                    completed: false,
+                    metrics: [{ metric_id: 'speed', value: 80 }],
+                },
+            ],
+        };
+        const editedGoal = {
+            ...baseGoal,
+            targets: [
+                {
+                    id: 'target-1',
+                    name: 'Section 1',
+                    completed: false,
+                    metrics: [{ metric_id: 'speed', value: 90 }],
+                },
+            ],
+        };
+
+        expect(getGoalTargetsSignature(baseGoal)).not.toEqual(getGoalTargetsSignature(editedGoal));
     });
 
     it('flattens sessionGoalsView into a deduplicated canonical goal list', () => {

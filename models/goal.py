@@ -108,6 +108,9 @@ class Goal(Base):
     deadline = Column(DateTime, nullable=True)
     completed = Column(Boolean, default=False)
     completed_at = Column(DateTime, nullable=True)
+    completion_source = Column(String, nullable=True)
+    completion_reason = Column(String, nullable=True)
+    manually_uncompleted_at = Column(DateTime, nullable=True)
     completed_session_id = Column(
         String,
         ForeignKey(

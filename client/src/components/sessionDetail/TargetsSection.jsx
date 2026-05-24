@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useFractalTree } from '../../hooks/useGoalQueries';
+import { parseGoalTargets } from '../../utils/goalNodeModel';
 import TargetCard from '../TargetCard';
 
 import styles from './SessionGoalHierarchyPanel.module.css';
@@ -26,20 +27,7 @@ function TargetsSection({
         if (nodesToProcess.length === 0) return [];
 
         const processGoal = (goal, depth = 0) => {
-            // Targets can be in goal.targets or goal.attributes.targets depending on serialization/eager loading
-            const rawTargets = goal.attributes?.targets || goal.targets;
-            let targetsList = [];
-
-            if (Array.isArray(rawTargets)) {
-                targetsList = rawTargets;
-            } else if (typeof rawTargets === 'string' && rawTargets.length > 0) {
-                try {
-                    targetsList = JSON.parse(rawTargets);
-                } catch (e) {
-                    console.error("Failed to parse targets JSON", e);
-                    targetsList = [];
-                }
-            }
+            const targetsList = parseGoalTargets(goal);
 
             if (targetsList && Array.isArray(targetsList)) {
                 targetsList.forEach(target => {
