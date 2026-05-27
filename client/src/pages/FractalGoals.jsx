@@ -8,14 +8,13 @@ import AlertModal from '../components/modals/AlertModal';
 import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
 import { useGoals } from '../contexts/GoalsContext';
 import { useDebug } from '../contexts/DebugContext';
-import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { buildTreeMaps, getLineagePath } from '../components/flowTree/flowTreeTreeUtils';
 import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { getActiveGoalWindowDaysFromSettings, getInactiveNodeIds } from '../hooks/useFlowTreeMetrics';
 import { useFlowTreeEvidence, useFlowtreeSessionMetrics } from '../hooks/useSessionQueries';
 import { getChildType } from '../utils/goalHelpers';
-import { findGoalNodeById, getGoalNodeId, getGoalNodeName, getGoalNodeType } from '../utils/goalNodeModel';
+import { findGoalNodeById, getGoalNodeId } from '../utils/goalNodeModel';
 import { getGoalSearchMatches, getVisibleGoalSearchCandidates } from '../utils/goalTypeToZoomSearch';
 import { usePrograms } from '../hooks/useProgramQueries';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
@@ -34,6 +33,7 @@ const DEFAULT_VIEW_SETTINGS = {
 };
 const EMPTY_ARRAY = [];
 const TYPE_TO_ZOOM_IDLE_MS = 2000;
+const TYPE_TO_ZOOM_LOCKED_IDLE_MS = 10000;
 const FLOWTREE_SCOPE_TRANSITION_MS = 160;
 
 function shouldIgnoreTypeToZoomKey(event) {
@@ -95,7 +95,6 @@ function FractalGoals() {
     const { activityGroups = EMPTY_ARRAY, isLoading: activityGroupsLoading } = useActivityGroups(rootId);
 
     const { debugMode } = useDebug();
-    const { getGoalColor } = useGoalLevels();
     const isMobile = useIsMobile();
     const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
 
@@ -115,6 +114,7 @@ function FractalGoals() {
     const [flowTreeScopeTransitionKey, setFlowTreeScopeTransitionKey] = useState(0);
     const [typeToZoomQuery, setTypeToZoomQuery] = useState('');
     const [isTypeToZoomOpen, setIsTypeToZoomOpen] = useState(false);
+    const [isTypeToZoomLocked, setIsTypeToZoomLocked] = useState(false);
     const [duplicateCycleIndex, setDuplicateCycleIndex] = useState(0);
     const [cycleZoomTargetNodeId, setCycleZoomTargetNodeId] = useState(null);
     const typeToZoomIdleTimerRef = useRef(null);
@@ -162,19 +162,25 @@ function FractalGoals() {
     const activeDuplicateGroup = typeToZoomResults.activeDuplicateGroup;
     const activeDuplicateCount = activeDuplicateGroup?.length || 0;
     const visibleMatchCount = typeToZoomResults.matches.length;
+    const activeCycleGroup = isTypeToZoomLocked ? typeToZoomResults.matches : activeDuplicateGroup;
+    const activeCycleCount = activeCycleGroup?.length || 0;
     const cycleZoomTargetIsCurrent = Boolean(
-        cycleZoomTargetNodeId && activeDuplicateGroup?.some((match) => match.id === cycleZoomTargetNodeId)
+        cycleZoomTargetNodeId && activeCycleGroup?.some((match) => match.id === cycleZoomTargetNodeId)
     );
-    const effectiveZoomTargetNodeId = isTypeToZoomOpen && typeToZoomQuery && visibleMatchCount === 1
+    const effectiveZoomTargetNodeId = isTypeToZoomOpen && typeToZoomQuery && !isTypeToZoomLocked && visibleMatchCount === 1
         ? typeToZoomResults.matches[0].id
         : (cycleZoomTargetIsCurrent ? cycleZoomTargetNodeId : null);
     const duplicateCycleDisplay = activeDuplicateCount > 1
         ? `${(duplicateCycleIndex % activeDuplicateCount) + 1}/${activeDuplicateCount}`
         : null;
+    const lockedCycleDisplay = isTypeToZoomLocked && activeCycleCount > 0
+        ? `${(duplicateCycleIndex % activeCycleCount) + 1}/${activeCycleCount}`
+        : null;
 
     const clearTypeToZoomSearch = useCallback(() => {
         setTypeToZoomQuery('');
         setIsTypeToZoomOpen(false);
+        setIsTypeToZoomLocked(false);
         setDuplicateCycleIndex(0);
         setCycleZoomTargetNodeId(null);
     }, []);
@@ -221,9 +227,10 @@ function FractalGoals() {
             clearTimeout(typeToZoomIdleTimerRef.current);
         }
 
+        const idleDuration = isTypeToZoomLocked ? TYPE_TO_ZOOM_LOCKED_IDLE_MS : TYPE_TO_ZOOM_IDLE_MS;
         typeToZoomIdleTimerRef.current = setTimeout(() => {
             clearTypeToZoomSearch();
-        }, TYPE_TO_ZOOM_IDLE_MS);
+        }, idleDuration);
 
         return () => {
             if (typeToZoomIdleTimerRef.current) {
@@ -231,7 +238,14 @@ function FractalGoals() {
                 typeToZoomIdleTimerRef.current = null;
             }
         };
-    }, [clearTypeToZoomSearch, isTypeToZoomOpen, typeToZoomQuery]);
+    }, [
+        clearTypeToZoomSearch,
+        cycleZoomTargetNodeId,
+        duplicateCycleIndex,
+        isTypeToZoomLocked,
+        isTypeToZoomOpen,
+        typeToZoomQuery,
+    ]);
 
     useEffect(() => () => {
         if (flowTreeScopeTransitionTimerRef.current) {
@@ -258,17 +272,26 @@ function FractalGoals() {
                 event.preventDefault();
                 setTypeToZoomQuery((current) => current.slice(0, -1));
                 setIsTypeToZoomOpen((current) => current && typeToZoomQuery.length > 1);
+                setIsTypeToZoomLocked(false);
                 setDuplicateCycleIndex(0);
                 setCycleZoomTargetNodeId(null);
                 return;
             }
 
-            if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && activeDuplicateCount > 1) {
+            if (event.key === 'Enter' && typeToZoomQuery && visibleMatchCount > 0) {
+                event.preventDefault();
+                setIsTypeToZoomLocked(true);
+                setDuplicateCycleIndex(0);
+                setCycleZoomTargetNodeId(typeToZoomResults.matches[0].id);
+                return;
+            }
+
+            if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && activeCycleCount > 1) {
                 event.preventDefault();
                 setDuplicateCycleIndex((current) => {
                     const direction = event.key === 'ArrowDown' ? 1 : -1;
-                    const nextIndex = (current + direction + activeDuplicateCount) % activeDuplicateCount;
-                    const nextTarget = activeDuplicateGroup[nextIndex];
+                    const nextIndex = (current + direction + activeCycleCount) % activeCycleCount;
+                    const nextTarget = activeCycleGroup[nextIndex];
                     if (nextTarget) setCycleZoomTargetNodeId(nextTarget.id);
                     return nextIndex;
                 });
@@ -279,6 +302,7 @@ function FractalGoals() {
             if (queryCharacter) {
                 event.preventDefault();
                 setIsTypeToZoomOpen(true);
+                setIsTypeToZoomLocked(false);
                 setDuplicateCycleIndex(0);
                 setCycleZoomTargetNodeId(null);
                 setTypeToZoomQuery((current) => `${current}${queryCharacter}`);
@@ -288,14 +312,17 @@ function FractalGoals() {
         window.addEventListener('keydown', handleTypeToZoomKeyDown, true);
         return () => window.removeEventListener('keydown', handleTypeToZoomKeyDown, true);
     }, [
-        activeDuplicateCount,
-        activeDuplicateGroup,
+        activeCycleCount,
+        activeCycleGroup,
         alertData.isOpen,
         clearTypeToZoomSearch,
         fractalToDelete,
         isTypeToZoomOpen,
         showGoalModal,
         typeToZoomQuery.length,
+        typeToZoomQuery,
+        typeToZoomResults.matches,
+        visibleMatchCount,
     ]);
 
     useEffect(() => {
@@ -309,6 +336,7 @@ function FractalGoals() {
 
             event.preventDefault();
             setIsTypeToZoomOpen(true);
+            setIsTypeToZoomLocked(false);
             setDuplicateCycleIndex(0);
             setCycleZoomTargetNodeId(null);
             setTypeToZoomQuery(event.key);
@@ -488,7 +516,10 @@ function FractalGoals() {
                                 {visibleMatchCount === 1
                                     ? '1 match'
                                     : `${visibleMatchCount} matches`}
-                                {duplicateCycleDisplay && (
+                                {lockedCycleDisplay && (
+                                    <span className="type-to-zoom-duplicate">Locked {lockedCycleDisplay}</span>
+                                )}
+                                {!lockedCycleDisplay && duplicateCycleDisplay && (
                                     <span className="type-to-zoom-duplicate">Duplicate {duplicateCycleDisplay}</span>
                                 )}
                             </div>

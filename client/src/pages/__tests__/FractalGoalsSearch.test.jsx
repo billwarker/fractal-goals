@@ -196,6 +196,32 @@ describe('FractalGoals type-to-zoom search', () => {
         });
     });
 
+    it('locks a multi-match search with Enter and cycles all matched goals', async () => {
+        renderFractalGoals();
+
+        fireEvent.keyDown(window, { key: 'p' });
+        fireEvent.keyDown(window, { key: 'Enter' });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-zoom-target', 'zebra');
+        });
+        expect(screen.getByText('Locked 1/3')).toBeInTheDocument();
+
+        fireEvent.keyDown(window, { key: 'ArrowDown' });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-zoom-target', 'scales-1');
+        });
+        expect(screen.getByText('Locked 2/3')).toBeInTheDocument();
+
+        fireEvent.keyDown(window, { key: 'ArrowUp' });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-zoom-target', 'zebra');
+        });
+        expect(screen.getByText('Locked 1/3')).toBeInTheDocument();
+    });
+
     it('clears the palette on Escape', async () => {
         renderFractalGoals();
 
@@ -231,6 +257,48 @@ describe('FractalGoals type-to-zoom search', () => {
         });
 
         expect(screen.queryByText('Find goal')).not.toBeInTheDocument();
+    });
+
+    it('keeps a locked search open for 10 seconds of inactivity', async () => {
+        vi.useFakeTimers();
+        renderFractalGoals();
+
+        fireEvent.keyDown(window, { key: 'p' });
+        fireEvent.keyDown(window, { key: 'Enter' });
+
+        expect(screen.getByText('Locked 1/3')).toBeInTheDocument();
+
+        act(() => {
+            vi.advanceTimersByTime(9900);
+        });
+
+        expect(screen.getByText('Find goal')).toBeInTheDocument();
+
+        act(() => {
+            vi.advanceTimersByTime(200);
+        });
+
+        expect(screen.queryByText('Find goal')).not.toBeInTheDocument();
+    });
+
+    it('resets locked search idle when cycling results', async () => {
+        vi.useFakeTimers();
+        renderFractalGoals();
+
+        fireEvent.keyDown(window, { key: 'p' });
+        fireEvent.keyDown(window, { key: 'Enter' });
+
+        act(() => {
+            vi.advanceTimersByTime(9000);
+        });
+
+        fireEvent.keyDown(window, { key: 'ArrowDown' });
+
+        act(() => {
+            vi.advanceTimersByTime(1500);
+        });
+
+        expect(screen.getByText('Find goal')).toBeInTheDocument();
     });
 
     it('continues capturing spaces after the query already has a unique match', async () => {
