@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import ReactFlow, {
+    BaseEdge,
     useNodesState,
     useEdgesState,
     getViewportForBounds,
@@ -20,6 +21,24 @@ import styles from './FlowTree.module.css';
 
 const nodeTypes = {
     custom: FlowTreeNode,
+};
+
+function TreeCenterEdge({ data, style, className }) {
+    const source = data?.sourceCenter;
+    const target = data?.targetCenter;
+    if (!source || !target) return null;
+
+    return (
+        <BaseEdge
+            path={`M ${source.x} ${source.y} L ${target.x} ${target.y}`}
+            style={style}
+            className={className}
+        />
+    );
+}
+
+const edgeTypes = {
+    treeCenter: TreeCenterEdge,
 };
 
 const EMPTY_ARRAY = [];
@@ -342,6 +361,7 @@ const FlowTree = React.forwardRef(({
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
                 onInit={handleReactFlowInit}
                 fitView
                 fitViewOptions={{ padding: isMobile ? 0.08 : 0.2 }}

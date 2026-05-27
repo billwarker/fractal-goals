@@ -14,6 +14,14 @@ import { buildTreeMaps, getLineagePath, sortChildren } from './flowTreeTreeUtils
 
 const toId = (value) => (value == null ? null : String(value));
 
+const getTreeIconCenter = (node, compact = false) => {
+    const iconSize = compact ? 22 : 30;
+    return {
+        x: node.position.x + (iconSize / 2),
+        y: node.position.y + (iconSize / 2),
+    };
+};
+
 export const DEFAULT_VIEW_SETTINGS = {
     fadeInactiveBranches: false,
     hideInactiveGoals: false,
@@ -32,6 +40,7 @@ export const getLayoutedElements = (nodes, edges, direction = 'TB', compact = fa
     const { width: nodeWidth, height: nodeHeight } = compact
         ? FLOWTREE_LAYOUT_NODE_DIMENSIONS.compact
         : FLOWTREE_LAYOUT_NODE_DIMENSIONS.regular;
+    const iconSize = compact ? 22 : 30;
 
     dagreGraph.setGraph({
         rankdir: direction,
@@ -56,8 +65,8 @@ export const getLayoutedElements = (nodes, edges, direction = 'TB', compact = fa
         return {
             ...node,
             position: {
-                x: nodeWithPosition.x - nodeWidth / 2,
-                y: nodeWithPosition.y - nodeHeight / 2,
+                x: nodeWithPosition.x - iconSize / 2,
+                y: nodeWithPosition.y - iconSize / 2,
             },
         };
     });
@@ -262,6 +271,7 @@ export const buildGraphPresentation = ({
     const { nodes: layoutedNodes, edges: layoutedEdges } = layoutMode === 'hierarchy'
         ? getHierarchyLayoutedElements(rawNodes, rawEdges, isMobile)
         : getLayoutedElements(rawNodes, rawEdges, 'TB', isMobile);
+    const layoutedNodeById = new Map(layoutedNodes.map((node) => [node.id, node]));
 
     const nodeStyleMap = new Map();
     const pausedNodeIds = new Set();
@@ -333,8 +343,20 @@ export const buildGraphPresentation = ({
 
         const baseEdge = {
             ...edge,
+            type: layoutMode === 'tree' ? 'treeCenter' : edge.type,
             className: nextClassName,
             style,
+            data: layoutMode === 'tree'
+                ? {
+                    ...(edge.data || {}),
+                    sourceCenter: layoutedNodeById.has(sourceId)
+                        ? getTreeIconCenter(layoutedNodeById.get(sourceId), isMobile)
+                        : null,
+                    targetCenter: layoutedNodeById.has(targetId)
+                        ? getTreeIconCenter(layoutedNodeById.get(targetId), isMobile)
+                        : null,
+                }
+                : edge.data,
         };
 
         if (layoutMode === 'hierarchy' || !isActiveBranchEdge || shouldFadeEdge) {
@@ -346,6 +368,7 @@ export const buildGraphPresentation = ({
             {
                 ...edge,
                 id: `${edge.id}-active-flow`,
+                type: 'treeCenter',
                 className: 'active-branch-flow-edge journey-edge journey-edge-to-root',
                 style: {
                     stroke: activeBranchColor,
@@ -358,6 +381,12 @@ export const buildGraphPresentation = ({
                 data: {
                     ...(edge.data || {}),
                     overlay: true,
+                    sourceCenter: layoutedNodeById.has(sourceId)
+                        ? getTreeIconCenter(layoutedNodeById.get(sourceId), isMobile)
+                        : null,
+                    targetCenter: layoutedNodeById.has(targetId)
+                        ? getTreeIconCenter(layoutedNodeById.get(targetId), isMobile)
+                        : null,
                 },
             },
         ];

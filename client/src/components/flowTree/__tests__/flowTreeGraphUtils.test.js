@@ -154,7 +154,18 @@ describe('buildGraphPresentation', () => {
 
         const activeEdge = graph.edges.find((edge) => edge.id === 'root-1-goal-1');
         const activeOverlay = graph.edges.find((edge) => edge.id === 'root-1-goal-1-active-flow');
+        const root = graph.nodes.find((node) => node.id === 'root-1');
+        const child = graph.nodes.find((node) => node.id === 'goal-1');
 
+        expect(activeEdge?.type).toBe('treeCenter');
+        expect(activeEdge?.data?.sourceCenter).toEqual({
+            x: root.position.x + 15,
+            y: root.position.y + 15,
+        });
+        expect(activeEdge?.data?.targetCenter).toEqual({
+            x: child.position.x + 15,
+            y: child.position.y + 15,
+        });
         expect(activeEdge?.className).toContain('active-branch-edge');
         expect(activeEdge?.style?.stroke).toBe('var(--color-active-branch-line, #60a5fa)');
         expect(activeEdge?.style?.strokeWidth).toBe(2.25);

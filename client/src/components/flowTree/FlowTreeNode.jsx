@@ -6,6 +6,17 @@ import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import styles from '../../FlowTree.module.css';
 
+const hiddenHandleStyle = {
+    opacity: 0,
+    width: 1,
+    height: 1,
+    minWidth: 1,
+    minHeight: 1,
+    border: 'none',
+    background: 'transparent',
+    pointerEvents: 'none',
+};
+
 function getAgeLabel(createdAt) {
     if (!createdAt) return null;
     const created = new Date(createdAt);
@@ -145,8 +156,18 @@ export default function FlowTreeNode({ data }) {
                     className={isCompleted ? styles.nodeCircleCompleted : ''}
                     style={{ filter: isCompleted ? `drop-shadow(0 0 3px ${glowColor})` : undefined }}
                 />
-                <Handle type="target" position={isHierarchyLayout ? Position.Left : Position.Top} className={styles.handle} />
-                <Handle type="source" position={isHierarchyLayout ? Position.Left : Position.Bottom} className={styles.handle} />
+                <Handle
+                    type="target"
+                    position={isHierarchyLayout ? Position.Left : Position.Top}
+                    isConnectable={false}
+                    style={hiddenHandleStyle}
+                />
+                <Handle
+                    type="source"
+                    position={isHierarchyLayout ? Position.Left : Position.Bottom}
+                    isConnectable={false}
+                    style={hiddenHandleStyle}
+                />
             </div>
 
             <div className={`${styles.nodeTextContainer} ${isHierarchyLayout ? styles.nodeTextContainerHierarchy : ''}`}>

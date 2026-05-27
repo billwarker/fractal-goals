@@ -1,4 +1,20 @@
 /* ReactFlow Edge Overrides */
+.react-flow__edges {
+    z-index: 0 !important;
+}
+
+.react-flow__nodes {
+    z-index: 2 !important;
+}
+
+.react-flow__edge {
+    z-index: 0 !important;
+}
+
+.react-flow__node {
+    z-index: 2 !important;
+}
+
 .react-flow__edge-path {
     stroke: var(--color-connection-line);
     stroke-width: 1px;
