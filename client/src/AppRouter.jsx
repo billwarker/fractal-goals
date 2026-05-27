@@ -330,7 +330,6 @@ function App() {
                         onHeightChange={setNavHeight}
                     />
                 )}
-                {location.pathname !== '/' ? <div aria-hidden="true" style={{ height: navHeight, flexShrink: 0 }} /> : null}
 
                 <div className="content-container">
                     {location.pathname === '/' ? (
