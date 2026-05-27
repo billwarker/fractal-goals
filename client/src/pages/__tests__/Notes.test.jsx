@@ -62,6 +62,7 @@ vi.mock('../../components/common/GoalTreePicker', () => ({
 
 vi.mock('../../hooks/useIsMobile', () => ({
     default: () => false,
+    getIsMobileViewport: () => false,
 }));
 
 vi.mock('../../components/layout/PageHeader', () => ({

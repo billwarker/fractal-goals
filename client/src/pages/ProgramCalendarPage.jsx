@@ -24,6 +24,7 @@ import { useProgramDetailViewModel } from '../hooks/useProgramDetailViewModel';
 import { useProgramGoalSets } from '../hooks/useProgramGoalSets';
 import { useNotesPageQuery } from '../hooks/useNotesPageQuery';
 import { useProgramsCalendarData } from '../hooks/useProgramsCalendarData';
+import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { formatLiteralDate, getISOYMDInTimezone, subtractDaysToDateString } from '../utils/dateUtils';
 import { fractalApi } from '../utils/api';
@@ -220,6 +221,7 @@ function ProgramSidePane({
 function ProgramCalendarPage() {
     const { rootId, programId } = useParams();
     const location = useLocation();
+    const isMobile = useIsMobile();
     const { setActiveRootId } = useGoals();
     const { getGoalColor, getGoalTextColor } = useGoalLevels();
     const { timezone } = useTimezone();
@@ -239,7 +241,9 @@ function ProgramCalendarPage() {
         pendingBlockSelection,
     } = calendarContext;
     const [viewMode, setViewMode] = useState(programId ? 'blocks' : 'calendar');
-    const [isSidePaneVisible, setIsSidePaneVisible] = useState(true);
+    const [isSidePaneVisible, setIsSidePaneVisible] = useState(() => {
+        return !getIsMobileViewport();
+    });
     const [sidePaneView, setSidePaneView] = useState('details');
     const [isProgramOptionsOpen, setIsProgramOptionsOpen] = useState(false);
     const [programOptionsView, setProgramOptionsView] = useState('actions');
@@ -484,6 +488,12 @@ function ProgramCalendarPage() {
         }
         return () => setActiveRootId(null);
     }, [rootId, setActiveRootId]);
+
+    useEffect(() => {
+        if (isMobile) {
+            setIsSidePaneVisible(false);
+        }
+    }, [isMobile, rootId]);
 
     const openCreateProgram = (startDate = '') => {
         setBuilderState({ open: true, mode: 'create', startDate, duplicateSource: null });
@@ -854,6 +864,7 @@ function ProgramCalendarPage() {
                             '--page-header-accent-color': displayProgramColor,
                         } : undefined}
                         hideTitleOnMobile={false}
+                        compactMobileContext
                         titleAccessory={displayProgramStatus ? (
                             <>
                                 <span className={`${styles.statusBadge} ${styles[getStatusBadgeClass(displayProgramStatus)]}`}>
@@ -888,7 +899,8 @@ function ProgramCalendarPage() {
                                 onDateClick={handleDateClick}
                                 onEventClick={handleEventClick}
                                 onDateSelect={handleDateSelectForContext}
-                                initialDate={new Date()}
+                                initialDate={contextDate}
+                                isMobile={isMobile}
                                 selectedDate={selectedCalendarRange ? null : contextDate}
                                 selectedRange={selectedCalendarRange}
                                 onCalendarBackgroundClick={handleCalendarBackgroundClick}

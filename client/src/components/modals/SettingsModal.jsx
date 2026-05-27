@@ -14,16 +14,12 @@ import {
     MIN_ACTIVE_GOAL_WINDOW_DAYS,
     normalizeActiveGoalWindowDays,
 } from '../../hooks/useFlowTreeMetrics';
+import {
+    buildQuotaRows,
+    getAvailableTimezones,
+    toggleQuotaRootId,
+} from './settingsModalUtils';
 import styles from './SettingsModal.module.css';
-
-function getAvailableTimezones() {
-    try {
-        return Intl.supportedValuesOf('timeZone');
-    } catch (error) {
-        console.error('Timezone API not supported', error);
-        return ['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo'];
-    }
-}
 
 const SettingsModalInner = ({ onClose }) => {
     const {
@@ -167,23 +163,7 @@ const SettingsModalInner = ({ onClose }) => {
         };
     }, [activeTab]);
 
-    const quotaRows = useMemo(() => {
-        if (!accountUsage) return [];
-        const resources = accountUsage.resources || Object.keys(accountUsage.usage || {});
-        const labels = accountUsage.labels || {};
-        return resources.map((resource) => {
-            const used = accountUsage.usage?.[resource] ?? 0;
-            const limit = accountUsage.limits?.[resource] ?? null;
-            const percent = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-            return {
-                resource,
-                label: labels[resource] || resource.replace(/_/g, ' '),
-                used,
-                limit,
-                percent,
-            };
-        });
-    }, [accountUsage]);
+    const quotaRows = useMemo(() => buildQuotaRows(accountUsage), [accountUsage]);
 
     const displayTier = accountUsage?.tier || user?.membership_tier || 'free';
     const displayStatus = accountUsage?.subscription_status || user?.subscription_status || 'none';
@@ -192,12 +172,7 @@ const SettingsModalInner = ({ onClose }) => {
         : `${selectedQuotaRootIds.length} selected`;
 
     const handleQuotaRootToggle = (rootId) => {
-        setSelectedQuotaRootIds((current) => {
-            if (current.includes(rootId)) {
-                return current.filter((id) => id !== rootId);
-            }
-            return [...current, rootId];
-        });
+        setSelectedQuotaRootIds((current) => toggleQuotaRootId(current, rootId));
     };
 
     const handlePasswordUpdate = async (e) => {

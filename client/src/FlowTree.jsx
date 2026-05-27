@@ -3,8 +3,6 @@ import ReactFlow, {
     useNodesState,
     useEdgesState,
     getViewportForBounds,
-    Handle,
-    Position,
 } from 'reactflow';
 
 import {
@@ -12,188 +10,16 @@ import {
     FLOWTREE_LAYOUT_NODE_DIMENSIONS,
     buildGraphPresentation,
 } from './components/flowTree/flowTreeGraphUtils';
+import FlowTreeNode from './components/flowTree/FlowTreeNode';
 import { ACTIVE_GOAL_WINDOW_DAYS } from './hooks/useFlowTreeMetrics';
-import { useTheme } from './contexts/ThemeContext'
 import { useGoalLevels } from './contexts/GoalLevelsContext';
-import GoalIcon from './components/atoms/GoalIcon';
-import AnimatedGoalIcon from './components/atoms/AnimatedGoalIcon';
 import useIsMobile from './hooks/useIsMobile';
 import './FlowTree.css';
 import 'reactflow/dist/style.css';
-
 import styles from './FlowTree.module.css';
 
-const CustomNode = ({ data }) => {
-    const { getGoalColor, getGoalSecondaryColor, getLevelByName, getCompletionColor, getGoalIcon } = useGoalLevels();;
-    const { animatedIcons } = useTheme();
-    const isCompleted = data.completed || false;
-    const isSmartGoal = data.isSmart || false;
-
-    const completionChar = getLevelByName('Completed') || { icon: 'check' };
-    const levelChar = { icon: getGoalIcon(data.type) };
-    const config = (isCompleted ? { ...completionChar, icon: levelChar.icon } : levelChar);
-
-    const fillColor = isCompleted ? getCompletionColor() : getGoalColor(data.type);
-    const isUltimate = data.type === 'UltimateGoal';
-
-    const getAge = () => {
-        if (!data.created_at) return null;
-        const created = new Date(data.created_at);
-        const now = new Date();
-        const diffMs = now - created;
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-        if (diffDays < 7) return `${diffDays}d`;
-        if (diffDays < 30) return `${(diffDays / 7).toFixed(1)}w`;
-        if (diffDays < 365) return `${(diffDays / 30).toFixed(1)}m`;
-        return `${(diffDays / 365).toFixed(1)}y`;
-    };
-
-    const getDueTime = () => {
-        if (!data.deadline) return null;
-        const deadlineDate = new Date(data.deadline);
-        const now = new Date();
-        const diffMs = deadlineDate - now;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-        const isPast = diffDays < 0;
-        const absDays = Math.abs(diffDays);
-
-        let timeStr;
-        if (absDays >= 365) {
-            timeStr = `${(absDays / 365).toFixed(1)}y`;
-        } else if (absDays >= 30) {
-            timeStr = `${(absDays / 30.44).toFixed(1)}mo`;
-        } else {
-            timeStr = `${Math.ceil(absDays)}d`;
-        }
-
-        return isPast ? `-${timeStr}` : timeStr;
-    };
-
-    const getCompletedDateLabel = () => {
-        if (!data.completed_at) return null;
-        const completedDate = new Date(data.completed_at);
-        return `Completed: ${completedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
-    };
-
-    const age = getAge();
-    const dueTime = getDueTime();
-    const timingLabel = age ? `Age: ${age}` : null;
-
-    const smartRingFillColor = isCompleted
-        ? getGoalSecondaryColor('Completed')
-        : getGoalSecondaryColor(data.type);
-
-    const hexToRgba = (hex, alpha) => {
-        if (!hex) return `rgba(255, 215, 0, ${alpha})`;
-        let r = 0;
-        let g = 0;
-        let b = 0;
-        if (hex.length === 4) {
-            r = parseInt(hex[1] + hex[1], 16);
-            g = parseInt(hex[2] + hex[2], 16);
-            b = parseInt(hex[3] + hex[3], 16);
-        } else if (hex.length === 7) {
-            r = parseInt(hex.slice(1, 3), 16);
-            g = parseInt(hex.slice(3, 5), 16);
-            b = parseInt(hex.slice(5, 7), 16);
-        }
-        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    };
-
-    const glowColor = isCompleted ? hexToRgba(fillColor, 0.6) : null;
-
-    const IconComponent = animatedIcons ? AnimatedGoalIcon : GoalIcon;
-    const iconProps = animatedIcons
-        ? { shape: config.icon, color: fillColor, secondaryColor: smartRingFillColor, isSmart: isSmartGoal, size: 30, reduced: true }
-        : { shape: config.icon, color: fillColor, secondaryColor: smartRingFillColor, isSmart: isSmartGoal, size: 30 };
-
-    return (
-        <div className={styles.nodeContainer}>
-            <div
-                className={`${styles.nodeCircleWrapper}`}
-                onClick={data.onClick}
-                style={{
-                    position: 'relative',
-                    width: '30px',
-                    height: '30px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                }}
-            >
-                <IconComponent
-                    {...iconProps}
-                    className={isCompleted ? styles.nodeCircleCompleted : ''}
-                    style={{
-                        filter: isCompleted ? `drop-shadow(0 0 3px ${glowColor})` : undefined
-                    }}
-                />
-
-                <Handle
-                    type="target"
-                    position={Position.Top}
-                    className={styles.handle}
-                />
-
-                <Handle
-                    type="source"
-                    position={Position.Bottom}
-                    className={styles.handle}
-                />
-            </div>
-
-            <div className={styles.nodeTextContainer}>
-                <div
-                    className={`${styles.nodeLabel} ${isUltimate ? styles.nodeLabelUltimate : ''} ${data.label.length > 30 ? styles.nodeLabelLongText : ''}`}
-                    style={{
-                        color: isCompleted ? fillColor : 'var(--color-text-primary)',
-                    }}
-                    onClick={data.onClick}
-                >
-                    {data.label}
-                </div>
-                {
-                    isCompleted ? (
-                        <div
-                            className={styles.completedDateLabel}
-                            style={{ color: fillColor }}
-                        >
-                            {getCompletedDateLabel()}
-                        </div>
-                    ) : (timingLabel || dueTime) && (
-                        <div className={styles.timingContainer}>
-                            {timingLabel && <span>{timingLabel}</span>}
-                            {timingLabel && dueTime && <span className={styles.timingSeparator}>|</span>}
-                            {dueTime && (
-                                <span className={dueTime.startsWith('-') ? styles.dueTimeOverdue : styles.dueTimeOnTime}>
-                                    Due: {dueTime}
-                                </span>
-                            )}
-                        </div>
-                    )
-                }
-                {
-                    !isCompleted && data.onAddChild && data.childTypeName && (
-                        <div
-                            className={styles.addChildButton}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                data.onAddChild();
-                            }}
-                        >
-                            + Add {data.childTypeName}
-                        </div>
-                    )
-                }
-            </div>
-        </div>
-    );
-};
-
 const nodeTypes = {
-    custom: CustomNode,
+    custom: FlowTreeNode,
 };
 
 const EMPTY_ARRAY = [];
@@ -230,6 +56,29 @@ function getGraphBounds(nodes, dimensions) {
     };
 }
 
+function getHierarchyViewport(bounds, viewportWidth, viewportHeight, isMobile, sidebarOpen = false) {
+    if (!bounds || !viewportWidth || !viewportHeight) return null;
+
+    const leftInset = sidebarOpen && !isMobile
+        ? Math.min(420, viewportWidth * 0.32)
+        : 0;
+    const paddingX = isMobile ? 56 : 120;
+    const paddingY = isMobile ? 120 : 96;
+    const safeWidth = Math.max(viewportWidth - leftInset, 1);
+    const safeHeight = Math.max(viewportHeight, 1);
+    const zoomX = (safeWidth - paddingX) / Math.max(bounds.width, 1);
+    const zoomY = (safeHeight - paddingY) / Math.max(bounds.height, 1);
+    const zoom = Math.min(isMobile ? 1 : 1.08, Math.max(isMobile ? 0.22 : 0.28, Math.min(zoomX, zoomY)));
+    const centerX = leftInset + (safeWidth / 2);
+    const centerY = safeHeight / 2;
+
+    return {
+        x: centerX - ((bounds.x + (bounds.width / 2)) * zoom),
+        y: centerY - ((bounds.y + (bounds.height / 2)) * zoom),
+        zoom,
+    };
+}
+
 const FlowTree = React.forwardRef(({
     treeData,
     sessions = EMPTY_ARRAY,
@@ -246,6 +95,7 @@ const FlowTree = React.forwardRef(({
     zoomTargetNodeId = null,
     activeGoalWindowDays = ACTIVE_GOAL_WINDOW_DAYS,
     scopeTransitionKey = 0,
+    layoutMode = 'tree',
 }, ref) => {
     const [rfInstance, setRfInstance] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
@@ -282,6 +132,7 @@ const FlowTree = React.forwardRef(({
             activityGroups,
             programs,
             isMobile,
+            layoutMode,
         });
     }, [
         treeData,
@@ -297,6 +148,7 @@ const FlowTree = React.forwardRef(({
         activityGroups,
         programs,
         isMobile,
+        layoutMode,
     ]);
 
     const [nodes, setNodes, onNodesChange] = useNodesState(graphNodes);
@@ -310,6 +162,35 @@ const FlowTree = React.forwardRef(({
         () => graphNodes.map((node) => node.id).join('|'),
         [graphNodes]
     );
+    const setInitialViewport = useCallback((duration = 0) => {
+        if (!rfInstance) return false;
+
+        if (layoutMode !== 'hierarchy') {
+            rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration });
+            return true;
+        }
+
+        const containerRect = flowTreeContainerRef.current?.getBoundingClientRect();
+        const dimensions = isMobile
+            ? FLOWTREE_LAYOUT_NODE_DIMENSIONS.compact
+            : FLOWTREE_LAYOUT_NODE_DIMENSIONS.regular;
+        const graphBounds = getGraphBounds(nodes, dimensions);
+        const viewport = getHierarchyViewport(
+            graphBounds,
+            containerRect?.width,
+            containerRect?.height,
+            isMobile,
+            sidebarOpen
+        );
+
+        if (viewport) {
+            rfInstance.setViewport?.(viewport, { duration });
+            return true;
+        }
+
+        rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration });
+        return true;
+    }, [isMobile, layoutMode, nodes, rfInstance, sidebarOpen]);
 
     const handleReactFlowInit = useCallback((instance) => {
         setRfInstance((currentInstance) => currentInstance || instance);
@@ -333,7 +214,7 @@ const FlowTree = React.forwardRef(({
         if (rfInstance) {
             const hideTimer = setTimeout(() => setIsVisible(false), 0);
             const timer = setTimeout(() => {
-                rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration: 200 });
+                setInitialViewport(200);
                 setTimeout(() => setIsVisible(true), 200);
             }, 100);
             return () => {
@@ -342,7 +223,7 @@ const FlowTree = React.forwardRef(({
             };
         }
         return undefined;
-    }, [rfInstance, isMobile]);
+    }, [rfInstance, setInitialViewport]);
 
     React.useLayoutEffect(() => {
         if (processedScopeTransitionKeyRef.current !== scopeTransitionKey) {
@@ -366,13 +247,15 @@ const FlowTree = React.forwardRef(({
         scopeCenterFrameRef.current = requestAnimationFrame(() => {
             scopeCenterFrameRef.current = null;
 
-            const containerRect = flowTreeContainerRef.current?.getBoundingClientRect();
             const dimensions = isMobile
                 ? FLOWTREE_LAYOUT_NODE_DIMENSIONS.compact
                 : FLOWTREE_LAYOUT_NODE_DIMENSIONS.regular;
             const graphBounds = getGraphBounds(nodes, dimensions);
 
-            if (rfInstance && graphBounds && containerRect?.width && containerRect?.height) {
+            if (rfInstance && layoutMode === 'hierarchy') {
+                setInitialViewport(0);
+            } else if (rfInstance && graphBounds) {
+                const containerRect = flowTreeContainerRef.current?.getBoundingClientRect();
                 const viewport = getViewportForBounds(
                     graphBounds,
                     containerRect.width,
@@ -393,7 +276,7 @@ const FlowTree = React.forwardRef(({
         });
 
         return undefined;
-    }, [graphNodeSignature, isMobile, nodes, renderedNodeSignature, rfInstance, scopeTransitionKey]);
+    }, [graphNodeSignature, isMobile, layoutMode, nodes, renderedNodeSignature, rfInstance, scopeTransitionKey, setInitialViewport]);
 
     useEffect(() => {
         if (rfInstance && nodes.length > 0 && isVisible) {
@@ -402,19 +285,19 @@ const FlowTree = React.forwardRef(({
                 return undefined;
             }
             const frameId = requestAnimationFrame(() => {
-                rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration: 220 });
+                setInitialViewport(220);
             });
             return () => cancelAnimationFrame(frameId);
         }
         return undefined;
-    }, [nodes, rfInstance, isMobile, isVisible]);
+    }, [nodes, rfInstance, isVisible, setInitialViewport]);
 
     useEffect(() => {
         if (rfInstance) {
             const hideTimer = setTimeout(() => setIsVisible(false), 0);
 
             const timer = setTimeout(() => {
-                rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration: 200 });
+                setInitialViewport(200);
                 setTimeout(() => setIsVisible(true), 220);
             }, 220);
 
@@ -424,7 +307,7 @@ const FlowTree = React.forwardRef(({
             };
         }
         return undefined;
-    }, [sidebarOpen, selectedNodeId, rfInstance, isMobile]);
+    }, [sidebarOpen, selectedNodeId, rfInstance, setInitialViewport]);
 
     useEffect(() => {
         if (!rfInstance || !zoomTargetNodeId || nodes.length === 0) return;
@@ -469,7 +352,7 @@ const FlowTree = React.forwardRef(({
                 nodesDraggable={false}
                 panOnScroll={isMobile}
                 zoomOnScroll={true}
-                panOnDrag={isMobile ? true : [0]}
+                panOnDrag={layoutMode === 'hierarchy' ? true : (isMobile ? true : [0])}
                 defaultEdgeOptions={{
                     type: 'straight',
                     style: { stroke: 'var(--color-connection-line)', strokeWidth: 1.5 }

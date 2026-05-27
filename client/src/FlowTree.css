@@ -32,6 +32,11 @@
     opacity: 0.16;
 }
 
+.hierarchy-edge .react-flow__edge-path {
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+}
+
 .journey-edge .react-flow__edge-path {
     stroke-linecap: round;
     animation: journeyFlow 1.25s linear infinite;

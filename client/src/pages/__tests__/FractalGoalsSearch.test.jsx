@@ -9,6 +9,7 @@ const deleteGoalMock = vi.fn();
 const toggleGoalCompletionMock = vi.fn();
 const setActiveRootIdMock = vi.fn();
 const startFadeOutMock = vi.hoisted(() => vi.fn());
+const isMobileMock = vi.hoisted(() => ({ value: false }));
 
 let fractalTree;
 
@@ -28,6 +29,7 @@ vi.mock('../../components/FractalView', async () => {
                     data-hide-inactive-goals={String(Boolean(props.viewSettings?.hideInactiveGoals))}
                     data-hide-completed-goals={String(Boolean(props.viewSettings?.hideCompletedGoals))}
                     data-scope-transition-key={String(props.scopeTransitionKey || 0)}
+                    data-layout-mode={props.layoutMode || 'tree'}
                 />
             );
         }),
@@ -76,6 +78,8 @@ vi.mock('../../contexts/DebugContext', () => ({
 vi.mock('../../contexts/GoalLevelsContext', () => ({
     useGoalLevels: () => ({
         getGoalColor: () => '#38bdf8',
+        getGoalSecondaryColor: () => '#0f766e',
+        getGoalIcon: () => 'circle',
     }),
 }));
 
@@ -98,7 +102,8 @@ vi.mock('../../hooks/useProgramQueries', () => ({
 }));
 
 vi.mock('../../hooks/useIsMobile', () => ({
-    default: () => false,
+    default: () => isMobileMock.value,
+    getIsMobileViewport: () => isMobileMock.value,
 }));
 
 vi.mock('../../utils/lazyWithRetry', () => ({
@@ -117,6 +122,7 @@ function renderFractalGoals() {
 
 describe('FractalGoals type-to-zoom search', () => {
     beforeEach(() => {
+        isMobileMock.value = false;
         vi.stubGlobal('localStorage', {
             getItem: vi.fn(() => null),
             setItem: vi.fn(),
@@ -273,7 +279,7 @@ describe('FractalGoals type-to-zoom search', () => {
         document.body.removeChild(input);
     });
 
-    it('offers a graph option to hide inactive goals', () => {
+    it('offers a tree option to hide inactive goals', () => {
         vi.useFakeTimers();
         renderFractalGoals();
 
@@ -294,7 +300,7 @@ describe('FractalGoals type-to-zoom search', () => {
         expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-scope-transition-key', '1');
     });
 
-    it('transitions before applying the hide completed goals graph option', () => {
+    it('transitions before applying the hide completed goals tree option', () => {
         vi.useFakeTimers();
         renderFractalGoals();
 
@@ -310,5 +316,31 @@ describe('FractalGoals type-to-zoom search', () => {
 
         expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-hide-completed-goals', 'true');
         expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-scope-transition-key', '1');
+    });
+
+    it('defaults to the FlowTree hierarchy layout on mobile and swaps to tree when toggled', () => {
+        isMobileMock.value = true;
+        renderFractalGoals();
+
+        expect(screen.getByRole('button', { name: 'Hierarchy' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Tree' })).toBeInTheDocument();
+        expect(screen.getByText('Hierarchy View')).toBeInTheDocument();
+        expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-layout-mode', 'hierarchy');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Tree' }));
+
+        expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-layout-mode', 'tree');
+    });
+
+    it('allows desktop users to switch from tree to hierarchy view', () => {
+        renderFractalGoals();
+
+        expect(screen.getByTestId('fractal-view')).toBeInTheDocument();
+        expect(screen.getByText('Tree View')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Hierarchy' }));
+
+        expect(screen.getByText('Hierarchy View')).toBeInTheDocument();
+        expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-layout-mode', 'hierarchy');
     });
 });

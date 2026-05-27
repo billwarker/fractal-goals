@@ -21,7 +21,7 @@ import { useAnalyticsPageData } from '../hooks/useAnalyticsPageData';
 import { useAnalyticsViews } from '../hooks/useDashboardQueries';
 import '../App.css';
 import notify from '../utils/notify';
-import useIsMobile from '../hooks/useIsMobile';
+import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import styles from './Analytics.module.css';
 
 const AnalyticsViewNameModal = lazy(() => import('../components/analytics/AnalyticsViewNameModal'));
@@ -90,7 +90,9 @@ function Analytics() {
     const [globalFilters, setGlobalFilters] = useState(getDefaultGlobalFilters());
     const filtersPaneStorageKey = `analytics-filter-pane-open:${rootId || 'default'}`;
     const [isFiltersPaneOpen, setIsFiltersPaneOpen] = useState(() => {
-        return getStoredBoolean(`analytics-filter-pane-open:${rootId || 'default'}`, false);
+        return getIsMobileViewport()
+            ? false
+            : getStoredBoolean(`analytics-filter-pane-open:${rootId || 'default'}`, false);
     });
     const [isHydrated, setIsHydrated] = useState(false);
     const [isViewsModalOpen, setIsViewsModalOpen] = useState(false);
@@ -131,8 +133,14 @@ function Analytics() {
     }, [navigate, rootId]);
 
     useEffect(() => {
-        setIsFiltersPaneOpen(getStoredBoolean(filtersPaneStorageKey, false));
+        setIsFiltersPaneOpen(getIsMobileViewport() ? false : getStoredBoolean(filtersPaneStorageKey, false));
     }, [filtersPaneStorageKey]);
+
+    useEffect(() => {
+        if (isMobile) {
+            setIsFiltersPaneOpen(false);
+        }
+    }, [isMobile, rootId]);
 
     useEffect(() => {
         if (typeof window === 'undefined' || typeof window.localStorage?.setItem !== 'function') return;

@@ -572,7 +572,9 @@
 
     .calendarPanel {
         min-height: 560px;
-        margin: 12px;
+        margin: 0;
+        border-left: none;
+        border-right: none;
     }
 
     .blocksPanel {

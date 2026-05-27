@@ -39,6 +39,10 @@
 }
 
 @media (max-width: 768px) {
+    .workspace {
+        padding: 12px;
+    }
+
     .sheetBackdrop {
         display: block;
         position: fixed;

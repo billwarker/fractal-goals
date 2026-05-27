@@ -8,7 +8,7 @@ import { useActivities, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { useSessionsHeatmap, useSessionsSearch } from '../hooks/useSessionQueries';
 import useSessionsPageFilters from '../hooks/useSessionsPageFilters';
-import useIsMobile from '../hooks/useIsMobile';
+import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { SessionCardExpanded, SessionsQuerySidebar } from '../components/sessions';
 import { QuickSessionWorkspace } from '../components/sessionDetail';
 import CardCornerActionButton from '../components/common/CardCornerActionButton';
@@ -48,7 +48,7 @@ function Sessions() {
     const [isFiltersPaneOpen, setIsFiltersPaneOpen] = useState(() => {
         if (typeof window === 'undefined') return true;
         const stored = window.localStorage.getItem(`sessions-query-pane-open:${rootId || 'default'}`);
-        return stored == null ? true : stored === 'true';
+        return getIsMobileViewport() ? false : (stored == null ? true : stored === 'true');
     });
     const [hiddenSessionIds, setHiddenSessionIds] = useState(() => {
         const deletedId = location.state?.deletedSessionId;
@@ -109,8 +109,14 @@ function Sessions() {
     useEffect(() => {
         if (typeof window === 'undefined') return;
         const stored = window.localStorage.getItem(filtersPaneStorageKey);
-        setIsFiltersPaneOpen(stored == null ? true : stored === 'true');
+        setIsFiltersPaneOpen(getIsMobileViewport() ? false : (stored == null ? true : stored === 'true'));
     }, [filtersPaneStorageKey]);
+
+    useEffect(() => {
+        if (isMobile) {
+            setIsFiltersPaneOpen(false);
+        }
+    }, [isMobile, rootId]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -279,7 +285,7 @@ function Sessions() {
                 <PageHeader
                     title="Sessions"
                     subtitle="Query sessions by date range, completion, activity, and activity-linked goals."
-                    hideTitleOnMobile={false}
+                    hideTitleOnMobile
                     actions={(
                         <>
                             <HeaderButton variant="primary" onClick={() => navigate(`/${rootId}/manage-session-templates`)}>

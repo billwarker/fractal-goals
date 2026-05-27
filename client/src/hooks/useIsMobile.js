@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
-const MOBILE_MEDIA_QUERY = '(max-width: 768px)';
+export const MOBILE_MEDIA_QUERY = '(max-width: 768px)';
 
-function getMatches() {
+export function getIsMobileViewport() {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
         return false;
     }
@@ -10,7 +10,7 @@ function getMatches() {
 }
 
 export default function useIsMobile() {
-    const [isMobile, setIsMobile] = useState(getMatches);
+    const [isMobile, setIsMobile] = useState(getIsMobileViewport);
 
     useEffect(() => {
         if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {

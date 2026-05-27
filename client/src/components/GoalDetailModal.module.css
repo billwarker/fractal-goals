@@ -307,6 +307,30 @@
     margin-top: auto;
 }
 
+@media (max-width: 768px) {
+    .modalOverlay {
+        align-items: stretch;
+        justify-content: stretch;
+        padding: 0;
+    }
+
+    .modalContent {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        max-height: none;
+        border-right: none;
+        border-bottom: none;
+        border-left: none;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .modalScrollArea {
+        padding: 18px 16px 24px;
+    }
+}
+
 /* Form Elements */
 .fieldGroup {
     display: block;

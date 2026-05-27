@@ -143,7 +143,19 @@ Key supporting frontend pieces:
 - `client/src/hooks/useGoalQueries.js`
 - `client/src/hooks/useGoalDetailController.js`
 - `client/src/components/GoalDetailModal.jsx`
+- `client/src/components/goals/GoalHierarchyList.jsx`
+- `client/src/components/flowTree/FlowTreeNode.jsx`
+- `client/src/components/flowTree/FlowTreeOptionsPane.jsx`
+- `client/src/components/flowTree/flowTreeGraphUtils.js`
 - `client/src/pages/FractalGoals.jsx`
+
+Goals page view modes:
+
+- The goals page uses the FlowTree/ReactFlow renderer for both tree and experimental hierarchy layouts.
+- Desktop defaults to tree layout; mobile defaults to hierarchy layout.
+- `flowTreeGraphUtils.buildGraphPresentation` owns both Dagre tree layout and deterministic hierarchy layout from the same node/edge presentation data.
+- `FlowTreeNode` owns custom ReactFlow node rendering, while `FlowTreeOptionsPane` owns the tree/hierarchy widget and shared view options.
+- Goal detail/create interactions on the mobile goals page open `GoalDetailModal` as a full-screen modal instead of a docked side panel.
 
 ### Sessions
 

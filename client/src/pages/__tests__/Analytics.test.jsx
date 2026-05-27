@@ -48,6 +48,14 @@ describe('Analytics page', () => {
             id: 'view-1',
             name: 'My Saved View',
         });
+        Object.defineProperty(window, 'matchMedia', {
+            value: vi.fn(() => ({
+                matches: false,
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+            })),
+            configurable: true,
+        });
     });
 
     it('creates a saved analytics view from Empty Analytics View', async () => {
@@ -100,5 +108,28 @@ describe('Analytics page', () => {
                 },
             });
         });
+    });
+
+    it('keeps filters collapsed on mobile even when stored open', () => {
+        Object.defineProperty(window, 'matchMedia', {
+            value: vi.fn(() => ({
+                matches: true,
+                addEventListener: vi.fn(),
+                removeEventListener: vi.fn(),
+            })),
+            configurable: true,
+        });
+        Object.defineProperty(window, 'localStorage', {
+            value: {
+                getItem: vi.fn(() => 'true'),
+                setItem: vi.fn(),
+            },
+            configurable: true,
+        });
+
+        render(<Analytics />);
+
+        expect(screen.getByRole('button', { name: 'Show Filters' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Hide Filters' })).not.toBeInTheDocument();
     });
 });

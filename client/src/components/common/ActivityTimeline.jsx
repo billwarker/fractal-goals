@@ -412,7 +412,6 @@ export function ActivityTimelineCard({
                     )}
                 </div>
             )}
-
             {sets.length === 0 && hasMetrics && (
                 <div className={styles.timelineCardMetrics}>
                     {instance.metric_values.map((mv, idx) => (

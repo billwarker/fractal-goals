@@ -1,6 +1,39 @@
 import { buildGraphPresentation } from '../flowTreeGraphUtils';
 
 describe('buildGraphPresentation', () => {
+    it('defaults FlowTree presentation nodes to tree layout mode', () => {
+        const treeData = {
+            id: 'root-1',
+            name: 'Root Goal',
+            type: 'UltimateGoal',
+            children: [
+                {
+                    id: 'goal-1',
+                    name: 'Child Goal',
+                    type: 'LongTermGoal',
+                    children: [],
+                },
+            ],
+        };
+
+        const graph = buildGraphPresentation({
+            treeData,
+            onNodeClick: () => {},
+            onAddChild: () => {},
+            selectedNodeId: null,
+            completedGoalColor: '#FFD700',
+            viewSettings: {},
+            sessions: [],
+            activities: [],
+            activityGroups: [],
+            programs: [],
+            isMobile: false,
+        });
+
+        expect(graph.nodes.every((node) => node.data.layoutMode === 'tree')).toBe(true);
+        expect(graph.edges.some((edge) => edge.type === 'step')).toBe(false);
+    });
+
     it('dims paused goals when fade inactive branches is enabled even without recent evidence', () => {
         const treeData = {
             id: 'root-1',
@@ -217,5 +250,53 @@ describe('buildGraphPresentation', () => {
         expect(activeEdge?.style?.['--active-branch-highlight-color']).toBe('#facc15');
         expect(activeOverlay?.style?.stroke).toBe('#facc15');
         expect(activeOverlay?.style?.['--active-branch-highlight-color']).toBe('#facc15');
+    });
+
+    it('can arrange the same FlowTree nodes in hierarchy layout mode', () => {
+        const treeData = {
+            id: 'root-1',
+            name: 'Root Goal',
+            type: 'UltimateGoal',
+            children: [
+                {
+                    id: 'parent-1',
+                    name: 'Parent Goal',
+                    type: 'LongTermGoal',
+                    children: [
+                        {
+                            id: 'child-1',
+                            name: 'Child Goal',
+                            type: 'MidTermGoal',
+                            children: [],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const graph = buildGraphPresentation({
+            treeData,
+            onNodeClick: () => {},
+            onAddChild: () => {},
+            selectedNodeId: null,
+            completedGoalColor: '#FFD700',
+            viewSettings: {},
+            sessions: [],
+            activities: [],
+            activityGroups: [],
+            programs: [],
+            isMobile: false,
+            layoutMode: 'hierarchy',
+        });
+
+        const root = graph.nodes.find((node) => node.id === 'root-1');
+        const parent = graph.nodes.find((node) => node.id === 'parent-1');
+        const child = graph.nodes.find((node) => node.id === 'child-1');
+
+        expect(parent.position.x).toBeGreaterThan(root.position.x);
+        expect(child.position.x).toBeGreaterThan(parent.position.x);
+        expect(parent.position.y).toBeGreaterThan(root.position.y);
+        expect(child.position.y).toBeGreaterThan(parent.position.y);
+        expect(graph.edges.every((edge) => edge.type === 'step')).toBe(true);
     });
 });

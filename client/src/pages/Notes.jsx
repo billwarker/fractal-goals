@@ -21,7 +21,7 @@ import ActivityFilterModal from '../components/common/ActivityFilterModal';
 import GoalTreePicker from '../components/common/GoalTreePicker';
 import SidePaneHeader from '../components/common/SidePaneHeader';
 import SidePaneHeaderButton from '../components/common/SidePaneHeaderButton';
-import useIsMobile from '../hooks/useIsMobile';
+import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import styles from './Notes.module.css';
@@ -99,7 +99,7 @@ function Notes() {
     const [isFiltersPaneOpen, setIsFiltersPaneOpen] = useState(() => {
         if (typeof window === 'undefined') return true;
         const stored = window.localStorage.getItem(`notes-filter-pane-open:${rootId || 'default'}`);
-        return stored === null ? true : stored === 'true';
+        return getIsMobileViewport() ? false : (stored === null ? true : stored === 'true');
     });
     const [composing, setComposing] = useState(false);
     const [editingNote, setEditingNote] = useState(null); // note object being edited
@@ -110,6 +110,13 @@ function Notes() {
     useEffect(() => {
         window.localStorage.setItem(filtersPaneStorageKey, String(isFiltersPaneOpen));
     }, [filtersPaneStorageKey, isFiltersPaneOpen]);
+
+    useEffect(() => {
+        if (isMobile) {
+            setIsFiltersPaneOpen(false);
+            setMobilePanelOpen(false);
+        }
+    }, [isMobile, rootId]);
 
     // Compose link state
     const [composeGoalId, setComposeGoalId] = useState(null);

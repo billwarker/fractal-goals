@@ -67,6 +67,12 @@
     gap: 12px;
 }
 
+.flowtree-options-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .flowtree-options-title {
     margin: 0;
     font-size: 12px;
@@ -103,6 +109,79 @@
     gap: 0;
     padding-top: 8px;
     padding-bottom: 8px;
+}
+
+.mobile-goals-view-toolbar {
+    display: inline-flex;
+    width: auto;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--color-bg-sidebar) 92%, transparent);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(8px);
+}
+
+.mobile-goals-view-toolbar-integrated {
+    position: static;
+    z-index: auto;
+    align-self: auto;
+    gap: 2px;
+    margin-bottom: 0;
+    padding: 2px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--color-bg-input) 62%, transparent);
+}
+
+.mobile-goals-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 34px;
+    min-width: 40px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.mobile-goals-view-toolbar-integrated .mobile-goals-view-toggle {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    border-radius: 5px;
+}
+
+.mobile-goals-view-icon {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.mobile-goals-view-toolbar-integrated .mobile-goals-view-icon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2;
+}
+
+.mobile-goals-hierarchy-icon {
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+}
+
+.mobile-goals-view-toggle-active {
+    background: var(--color-bg-input);
+    border-color: color-mix(in srgb, var(--color-brand-primary) 42%, var(--color-border));
+    color: var(--color-text-primary);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 12%, transparent);
 }
 
 .type-to-zoom-palette {
@@ -175,12 +254,19 @@
 
     .fractal-view-wrapper {
         min-height: 0;
+        overflow: hidden;
+    }
+
+    .mobile-goals-view-toolbar-integrated {
+        top: auto;
+        left: auto;
     }
 
     .flowtree-options-pane {
         top: 10px;
         left: 10px;
-        min-width: 210px;
+        width: min(320px, calc(100% - 20px));
+        min-width: 0;
         max-width: calc(100% - 20px);
         gap: 6px;
         padding: 10px 12px;
@@ -204,45 +290,4 @@
         font-size: 16px;
     }
 
-    .mobile-sheet-collapsed-bar {
-        height: 112px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        justify-content: flex-start;
-        padding: 0 20px;
-        padding-right: 190px;
-        border-bottom: 1px solid var(--color-border);
-        background: var(--color-bg-sidebar);
-        flex-shrink: 0;
-        width: 100%;
-        border: none;
-        cursor: pointer;
-        text-align: left;
-        box-sizing: border-box;
-        overflow: hidden;
-    }
-
-    .mobile-sheet-collapsed-chevron {
-        width: 22px;
-        flex-shrink: 0;
-        font-size: 22px;
-        line-height: 1;
-        color: var(--color-text-secondary);
-    }
-
-    .mobile-sheet-collapsed-title {
-        font-size: 18px;
-        font-weight: 700;
-        line-height: 1.25;
-        letter-spacing: 0.01em;
-        color: var(--collapsed-goal-color, var(--color-text-primary));
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        min-width: 0;
-        flex: 1;
-        margin: 0;
-        align-self: center;
-    }
 }

@@ -50,6 +50,7 @@ function buildSessionHierarchyTree(nodes) {
 function GoalHierarchyList({
     nodes = [],
     variant = 'session',
+    density = 'default',
     onGoalClick,
     isGoalSelectable,
     getGoalMetaLabel,
@@ -467,8 +468,14 @@ function GoalHierarchyList({
         );
     }
 
+    const sessionListClassName = [
+        styles.list,
+        styles.sessionList,
+        density === 'comfortable' ? styles.sessionListComfortable : '',
+    ].filter(Boolean).join(' ');
+
     return (
-        <div ref={listRef} className={`${styles.list} ${styles.sessionList}`}>
+        <div ref={listRef} className={sessionListClassName}>
             {renderConnectorEdges()}
             {sessionRows.map(renderSessionTreeRow)}
         </div>

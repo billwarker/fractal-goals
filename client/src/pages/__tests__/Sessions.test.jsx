@@ -6,8 +6,18 @@ import Sessions from '../Sessions';
 const getSessions = vi.fn();
 const getActivities = vi.fn();
 const getSessionActivities = vi.fn();
+const mockIsMobile = vi.hoisted(() => ({ value: false }));
 
 vi.mock('../../utils/api', () => ({
+    authApi: {
+        getMe: vi.fn().mockResolvedValue({ data: null }),
+        refresh: vi.fn().mockResolvedValue({ data: {} }),
+        login: vi.fn(),
+        signup: vi.fn(),
+        logout: vi.fn(),
+    },
+    clearAccessToken: vi.fn(),
+    setAccessToken: vi.fn(),
     fractalApi: {
         getSessions: (...args) => getSessions(...args),
         getActivities: (...args) => getActivities(...args),
@@ -28,7 +38,8 @@ vi.mock('../../contexts/GoalsContext', () => ({
 }));
 
 vi.mock('../../hooks/useIsMobile', () => ({
-    default: () => false
+    default: () => mockIsMobile.value,
+    getIsMobileViewport: () => mockIsMobile.value,
 }));
 
 vi.mock('../../hooks/useActivityQueries', async (importOriginal) => {
@@ -65,6 +76,7 @@ vi.mock('../../contexts/ActiveSessionContext', () => ({
 
 describe('Sessions page data loading', () => {
     beforeEach(() => {
+        mockIsMobile.value = false;
         Object.defineProperty(window, 'localStorage', {
             value: {
                 getItem: vi.fn(() => null),
@@ -142,6 +154,47 @@ describe('Sessions page data loading', () => {
         });
 
         expect(screen.getByText('expanded:s2:instances:1')).toBeInTheDocument();
+    });
+
+    it('keeps the filters sidebar collapsed on mobile even when stored open', async () => {
+        mockIsMobile.value = true;
+        Object.defineProperty(window, 'localStorage', {
+            value: {
+                getItem: vi.fn(() => 'true'),
+                setItem: vi.fn(),
+                removeItem: vi.fn(),
+            },
+            configurable: true
+        });
+        getSessions.mockResolvedValue({
+            data: {
+                sessions: [
+                    {
+                        id: 's1',
+                        name: 'Session 1',
+                        attributes: { completed: false, session_data: { sections: [] } },
+                        activity_instances: [],
+                        notes: []
+                    }
+                ],
+                pagination: { limit: 10, offset: 0, total: 1, has_more: false }
+            }
+        });
+        getActivities.mockResolvedValue({ data: [] });
+
+        renderWithProviders(<Sessions />, {
+            route: '/root-1/sessions',
+            path: '/:rootId/sessions',
+            withTimezone: false,
+            withTheme: false
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText('expanded:s1:instances:0')).toBeInTheDocument();
+        });
+
+        expect(screen.queryByTestId('sessions-query-sidebar')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Show Filters' })).toBeInTheDocument();
     });
 
     it('renders quick sessions in a sessions-page modal when quickSessionId is present in the route', async () => {

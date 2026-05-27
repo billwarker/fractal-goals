@@ -68,6 +68,7 @@ vi.mock('../../components/common/GoalTreePicker', () => ({
 
 vi.mock('../../hooks/useIsMobile', () => ({
     default: () => true,
+    getIsMobileViewport: () => true,
 }));
 
 describe('Notes mobile compose shell', () => {

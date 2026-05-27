@@ -13,6 +13,50 @@
     position: relative;
 }
 
+.sessionListComfortable {
+    --tree-indent: 18px;
+    --icon-size: 17px;
+    --tree-row-height: 34px;
+    --tree-item-pad-y: 6px;
+    padding: 4px 0 24px;
+}
+
+.sessionListComfortable .sessionTreeNode {
+    gap: 8px;
+}
+
+.sessionListComfortable .sessionNodeContent {
+    min-width: 0;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.sessionListComfortable .sessionNodeName {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: visible;
+    color: var(--color-text-primary);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.25;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.sessionListComfortable .addSubGoalBtn {
+    opacity: 1;
+    flex: 0 0 auto;
+    min-width: 28px;
+    min-height: 28px;
+    margin-left: auto;
+    border: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-bg-input) 72%, transparent);
+    color: var(--color-text-secondary);
+    font-size: 16px;
+}
+
 .programList {
     gap: 24px;
 }

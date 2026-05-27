@@ -8,6 +8,14 @@
     position: relative;
 }
 
+.nodeContainerHierarchy {
+    width: min(58vw, 340px);
+    min-height: 58px;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 0;
+}
+
 .nodeCircle {
     width: 30px;
     height: 30px;
@@ -63,6 +71,11 @@
     align-items: flex-start;
 }
 
+.nodeTextContainerHierarchy {
+    min-width: 0;
+    margin-left: 0;
+}
+
 .nodeLabel {
     color: var(--color-text-primary);
     font-size: 14px;
@@ -82,6 +95,22 @@
 
 .nodeLabelLongText {
     white-space: normal;
+}
+
+.nodeLabelHierarchy {
+    display: -webkit-box;
+    max-width: none;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 750;
+    line-height: 1.22;
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: anywhere;
+    text-shadow: none;
 }
 
 .completedDateLabel {
@@ -125,6 +154,27 @@
     text-shadow: var(--text-shadow-default);
 }
 
+.hierarchyMetaRow {
+    max-width: 100%;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    line-height: 1.2;
+}
+
+.hierarchyTimingGroup {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+}
+
+.hierarchyMetaRow .addChildButton {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 0;
+    line-height: 1.2;
+}
+
 .flowTreeContainer {
     width: 100%;
     height: 100%;
@@ -150,13 +200,29 @@
 }
 
 @media (max-width: 768px) {
+    .nodeContainerHierarchy {
+        width: min(72vw, 270px);
+        min-height: 64px;
+        padding: 4px 0;
+    }
+
     .nodeTextContainer {
         margin-left: 8px;
+    }
+
+    .nodeTextContainerHierarchy {
+        margin-left: 0;
     }
 
     .nodeLabel {
         font-size: 12px;
         max-width: 132px;
+    }
+
+    .nodeLabelHierarchy {
+        max-width: none;
+        font-size: 12px;
+        line-height: 1.2;
     }
 
     .nodeLabelUltimate {
@@ -166,6 +232,10 @@
     .timingContainer {
         font-size: 10px;
         gap: 4px;
+    }
+
+    .hierarchyMetaRow {
+        gap: 5px;
     }
 
     .addChildButton {

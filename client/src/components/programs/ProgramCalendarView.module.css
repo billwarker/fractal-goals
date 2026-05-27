@@ -281,19 +281,7 @@
 }
 
 .selectedDayCell :global(.fc-daygrid-day-frame) {
-    background: color-mix(in srgb, var(--color-brand-primary) 14%, transparent) !important;
-    box-shadow: inset 0 0 0 1px var(--color-brand-primary) !important;
     position: relative !important;
-}
-
-.selectedDayCell :global(.fc-daygrid-day-frame)::after {
-    content: '' !important;
-    position: absolute !important;
-    inset: 0 !important;
-    background: color-mix(in srgb, var(--color-brand-primary) 14%, transparent) !important;
-    border: 1px solid var(--color-brand-primary) !important;
-    pointer-events: none !important;
-    z-index: 7 !important;
 }
 
 .selectedDayCell::after {
@@ -318,17 +306,7 @@
 }
 
 .selectedRangeCell :global(.fc-daygrid-day-frame) {
-    background: color-mix(in srgb, var(--color-brand-primary) 8%, transparent) !important;
     position: relative !important;
-}
-
-.selectedRangeCell :global(.fc-daygrid-day-frame)::before {
-    content: '' !important;
-    position: absolute !important;
-    inset: 0 !important;
-    background: color-mix(in srgb, var(--color-brand-primary) 8%, transparent) !important;
-    pointer-events: none !important;
-    z-index: 6 !important;
 }
 
 .selectedRangeCell::before {
@@ -343,17 +321,19 @@
 
 @media (max-width: 768px) {
     .calendarContainer {
-        min-height: 420px;
-        height: auto;
+        min-height: 640px;
+        height: 640px;
         padding: 12px;
     }
 
     .headerActions {
-        position: static;
-        width: 100%;
-        margin-bottom: 10px;
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        width: auto;
+        margin-bottom: 0;
         justify-content: flex-end;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
 
     .customBtn {
@@ -363,11 +343,11 @@
     }
 
     :global(.fc-header-toolbar) {
-        margin-bottom: 12px !important;
+        margin-bottom: 8px !important;
         height: auto !important;
         align-items: flex-start !important;
         flex-direction: column !important;
-        gap: 8px !important;
+        gap: 4px !important;
     }
 
     :global(.fc-toolbar-title) {
@@ -375,10 +355,42 @@
         transform: none !important;
         font-size: 1rem !important;
         white-space: normal !important;
+        text-align: center !important;
     }
 
     :global(.fc-toolbar-chunk) {
-        width: 100% !important;
+        width: auto !important;
         justify-content: flex-start !important;
+    }
+
+    :global(.fc-toolbar-chunk:first-child) {
+        min-height: 32px !important;
+        padding-right: 116px !important;
+    }
+
+    :global(.fc-toolbar-chunk:nth-child(2)) {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+
+    :global(.fc-button) {
+        height: 32px !important;
+        padding: 0 10px !important;
+        font-size: 11px !important;
+    }
+
+    :global(.fc),
+    :global(.fc-view-harness),
+    :global(.fc-daygrid) {
+        min-height: 500px !important;
+    }
+
+    :global(.fc-daygrid-day-frame) {
+        min-height: 72px !important;
+    }
+
+    :global(.fc-col-header-cell-cushion),
+    :global(.fc-daygrid-day-number) {
+        font-size: 12px !important;
     }
 }

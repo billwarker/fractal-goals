@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar';
 import ErrorBoundary from '../components/ErrorBoundary';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import AlertModal from '../components/modals/AlertModal';
-import Checkbox from '../components/atoms/Checkbox';
+import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
 import { useGoals } from '../contexts/GoalsContext';
 import { useDebug } from '../contexts/DebugContext';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
@@ -18,19 +18,13 @@ import { getChildType } from '../utils/goalHelpers';
 import { findGoalNodeById, getGoalNodeId, getGoalNodeName, getGoalNodeType } from '../utils/goalNodeModel';
 import { getGoalSearchMatches, getVisibleGoalSearchCandidates } from '../utils/goalTypeToZoomSearch';
 import { usePrograms } from '../hooks/useProgramQueries';
-import useIsMobile from '../hooks/useIsMobile';
+import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import '../App.css';
 import './FractalGoals.css';
 
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 
-/**
- * FractalGoals Page - FlowTree visualization with sidebar
- * 
- * NOTE: Sessions are NO LONGER displayed in the goal tree.
- * They are managed separately via the /sessions page.
- */
 const FLOWTREE_SETTINGS_STORAGE_KEY = 'flowtree-view-settings';
 const DEFAULT_VIEW_SETTINGS = {
     fadeInactiveBranches: false,
@@ -79,7 +73,6 @@ function FractalGoals() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Contexts
     const {
         createGoal,
         updateGoal,
@@ -88,7 +81,6 @@ function FractalGoals() {
         setActiveRootId
     } = useGoals();
 
-    // 1. Data Query (TanStack Query)
     const {
         data: fractalData,
         isLoading: goalsLoading
@@ -105,22 +97,19 @@ function FractalGoals() {
     const { debugMode } = useDebug();
     const { getGoalColor } = useGoalLevels();
     const isMobile = useIsMobile();
+    const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
 
     const { programs = EMPTY_ARRAY } = usePrograms(rootId);
 
     const loading = goalsLoading || activitiesLoading || activityGroupsLoading || evidenceLoading;
 
-    // Sidebar state
     const [sidebarMode, setSidebarMode] = useState(null);
     const [viewingGoal, setViewingGoal] = useState(null);
-    const [isMobilePanelCollapsed, setIsMobilePanelCollapsed] = useState(true);
 
-    // Modal state
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [selectedParent, setSelectedParent] = useState(null);
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
-    // Alert state
     const [alertData, setAlertData] = useState({ isOpen: false, title: '', message: '' });
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
     const [flowTreeScopeTransitionKey, setFlowTreeScopeTransitionKey] = useState(0);
@@ -329,7 +318,6 @@ function FractalGoals() {
         return () => window.removeEventListener('keydown', handleTypeToZoomStartKeyDown, true);
     }, [alertData.isOpen, fractalToDelete, isTypeToZoomOpen, showGoalModal]);
 
-    // Sync viewingGoal with fractalData updates (e.g. when completion status changes)
     useEffect(() => {
         if (!fractalData || !viewingGoal) return;
         const viewingId = getGoalNodeId(viewingGoal);
@@ -340,18 +328,14 @@ function FractalGoals() {
         }
     }, [fractalData, viewingGoal]);
 
-    // Helper to show alert
     const showAlert = useCallback((title, message) => {
         setAlertData({ isOpen: true, title, message });
     }, []);
 
-    // Handlers
-
     const handleGoalNameClick = useCallback((nodeDatum) => {
         setViewingGoal(nodeDatum);
         setSidebarMode('goal-details');
-        if (isMobile) setIsMobilePanelCollapsed(false);
-    }, [isMobile]);
+    }, []);
 
     const handleAddChildClick = useCallback((nodeDatum) => {
         const parentType = nodeDatum.attributes?.type || nodeDatum.type;
@@ -362,11 +346,9 @@ function FractalGoals() {
             return;
         }
 
-        // Show the Goal creation modal
         setSelectedParent(nodeDatum);
         setShowGoalModal(true);
-        if (isMobile) setIsMobilePanelCollapsed(false);
-    }, [isMobile, showAlert]);
+    }, [showAlert]);
 
     const handleCreateGoal = async (goalData) => {
         try {
@@ -411,6 +393,12 @@ function FractalGoals() {
         }
     };
 
+    const handleCloseGoalDetails = useCallback(() => {
+        setShowGoalModal(false);
+        setSidebarMode(null);
+        setViewingGoal(null);
+    }, []);
+
     if (rootId && location.pathname !== `/${rootId}/goals`) {
         return null;
     }
@@ -426,13 +414,8 @@ function FractalGoals() {
     const sidebarWidth = isMobile ? '100%' : 'min(700px, 32.5vw)';
     const minSidebarWidth = isMobile ? '0' : '390px';
     const isSidebarOpen = showGoalModal || !!sidebarMode;
-    const sheetTitle = showGoalModal
-        ? 'Create Goal'
-        : (getGoalNodeName(viewingGoal) || 'Goal Details');
-    const activeGoalType = showGoalModal
-        ? getChildType(getGoalNodeType(selectedParent))
-        : getGoalNodeType(viewingGoal);
-    const sheetTitleColor = activeGoalType ? getGoalColor(activeGoalType) : 'var(--color-text-primary)';
+    const shouldShowMobileGoalModal = isMobile && isSidebarOpen;
+    const shouldShowDockedGoalPanel = isSidebarOpen && !isMobile;
     const handleToggleViewSetting = (settingKey) => (event) => {
         const nextChecked = event.target.checked;
         const shouldTransitionScope = settingKey === 'hideInactiveGoals' || settingKey === 'hideCompletedGoals';
@@ -458,7 +441,6 @@ function FractalGoals() {
             flowTreeScopeTransitionTimerRef.current = null;
         }, FLOWTREE_SCOPE_TRANSITION_MS);
     };
-
     return (
         <div className="fractal-page-container" style={{
             height: '100%',
@@ -475,7 +457,6 @@ function FractalGoals() {
                 position: 'relative',
                 overflow: 'hidden'
             }}>
-                {/* Main Content - FlowTree (Debug border visible when Ctrl+Shift+D) */}
                 <div
                     className="fractal-view-wrapper"
                     style={{
@@ -487,44 +468,18 @@ function FractalGoals() {
                         position: 'relative'
                     }}
                 >
-                    <div className={`flowtree-options-pane ${isMobile ? 'flowtree-options-pane-mobile' : ''} ${isOptionsPaneMinimized ? 'flowtree-options-pane-minimized' : ''}`}>
-                        <div className="flowtree-options-header">
-                            <div className="flowtree-options-title">Graph View</div>
-                            <button
-                                type="button"
-                                className="flowtree-options-minimize-btn"
-                                onClick={() => setIsOptionsPaneMinimized((prev) => !prev)}
-                                aria-label={isOptionsPaneMinimized ? 'Expand graph view options' : 'Minimize graph view options'}
-                                title={isOptionsPaneMinimized ? 'Expand' : 'Minimize'}
-                            >
-                                {isOptionsPaneMinimized ? '+' : '–'}
-                            </button>
-                        </div>
-                        {!isOptionsPaneMinimized && (
-                            <>
-                                <Checkbox
-                                    label={<span title={inactiveBranchTooltip}>Fade inactive branches</span>}
-                                    checked={viewSettings.fadeInactiveBranches}
-                                    onChange={handleToggleViewSetting('fadeInactiveBranches')}
-                                />
-                                <Checkbox
-                                    label={<span title={hideInactiveTooltip}>Hide inactive goals</span>}
-                                    checked={viewSettings.hideInactiveGoals}
-                                    onChange={handleToggleViewSetting('hideInactiveGoals')}
-                                />
-                                <Checkbox
-                                    label={<span title={hideCompletedTooltip}>Hide completed goals</span>}
-                                    checked={viewSettings.hideCompletedGoals}
-                                    onChange={handleToggleViewSetting('hideCompletedGoals')}
-                                />
-                                <Checkbox
-                                    label="Show metrics overlay"
-                                    checked={viewSettings.showMetricsOverlay}
-                                    onChange={handleToggleViewSetting('showMetricsOverlay')}
-                                />
-                            </>
-                        )}
-                    </div>
+                    <FlowTreeOptionsPane
+                        isMobile={isMobile}
+                        isMinimized={isOptionsPaneMinimized}
+                        onToggleMinimized={() => setIsOptionsPaneMinimized((prev) => !prev)}
+                        goalsViewMode={goalsViewMode}
+                        onGoalsViewModeChange={setGoalsViewMode}
+                        viewSettings={viewSettings}
+                        onToggleViewSetting={handleToggleViewSetting}
+                        inactiveBranchTooltip={inactiveBranchTooltip}
+                        hideInactiveTooltip={hideInactiveTooltip}
+                        hideCompletedTooltip={hideCompletedTooltip}
+                    />
                     {isTypeToZoomOpen && typeToZoomQuery && (
                         <div className="type-to-zoom-palette" role="status" aria-live="polite">
                             <div className="type-to-zoom-label">Find goal</div>
@@ -554,99 +509,122 @@ function FractalGoals() {
                         selectedNodeId={selectedNodeId}
                         zoomTargetNodeId={effectiveZoomTargetNodeId}
                         onAddChild={handleAddChildClick}
-                        sidebarOpen={isSidebarOpen && !(isMobile && isMobilePanelCollapsed)}
-                        key={rootId}
+                        sidebarOpen={isSidebarOpen}
+                        layoutMode={goalsViewMode}
+                        key={`${rootId}-${goalsViewMode}`}
                     />
                 </div>
 
-                {/* Side Panel (View or Create) */}
-                {isSidebarOpen && (
+                {shouldShowDockedGoalPanel && (
                     <div className="details-window sidebar docked" style={{
                         width: sidebarWidth,
                         minWidth: minSidebarWidth,
-                        height: isMobile ? (isMobilePanelCollapsed ? '112px' : '70vh') : 'calc(100% - 40px)',
-                        position: isMobile ? 'absolute' : 'relative',
-                        top: isMobile ? 'auto' : 'auto',
-                        right: isMobile ? 0 : 'auto',
-                        bottom: isMobile ? 0 : 'auto',
-                        left: isMobile ? 0 : 'auto',
-                        margin: isMobile ? 0 : '20px',
+                        height: 'calc(100% - 40px)',
+                        position: 'relative',
+                        top: 'auto',
+                        right: 'auto',
+                        bottom: 'auto',
+                        left: 'auto',
+                        margin: '20px',
                         border: '1px solid var(--color-border)',
                         background: 'var(--color-bg-sidebar)',
-                        zIndex: isMobile ? 1200 : 10,
+                        zIndex: 10,
                         display: 'flex',
                         flexDirection: 'column',
-                        borderRadius: isMobile ? '12px 12px 0 0' : '12px',
+                        borderRadius: '12px',
                         boxShadow: 'var(--shadow-md)',
                         backdropFilter: 'blur(10px)'
                     }}>
-                        {isMobile && isMobilePanelCollapsed && (
-                            <button
-                                type="button"
-                                className="mobile-sheet-collapsed-bar"
-                                onClick={() => setIsMobilePanelCollapsed(false)}
-                                style={{ '--collapsed-goal-color': sheetTitleColor }}
-                            >
-                                <span className="mobile-sheet-collapsed-chevron">▲</span>
-                                <span className="mobile-sheet-collapsed-title">{sheetTitle}</span>
-                            </button>
-                        )}
-
-                        {(!isMobile || !isMobilePanelCollapsed) && (
-                            <div className="window-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-                                {showGoalModal ? (
-                                    <Suspense fallback={<div style={{ padding: '20px' }}>Loading Goal Details...</div>}>
-                                        <GoalDetailModal
-                                            isOpen={true}
-                                            onClose={() => setShowGoalModal(false)}
-                                            mode="create"
-                                            onCreate={handleCreateGoal}
-                                            parentGoal={selectedParent}
-                                            activityDefinitions={activities}
-                                            activityGroups={activityGroups}
-                                            rootId={rootId}
-                                            displayMode="panel"
-                                            onMobileCollapse={isMobile ? () => setIsMobilePanelCollapsed(true) : undefined}
-                                            onGoalSelect={(goal) => {
-                                                setShowGoalModal(false);
-                                                handleGoalNameClick(goal);
-                                            }}
-                                        />
-                                    </Suspense>
-                                ) : (
-                                    <ErrorBoundary>
-                                        <Sidebar
-                                            selectedNode={viewingGoal}
-                                            selectedRootId={rootId}
-                                            onClose={() => {
-                                                setSidebarMode(null);
-                                                setViewingGoal(null);
-                                            }}
-                                            onUpdate={handleUpdateNode}
-                                            onDelete={(node) => setFractalToDelete(node)}
-                                            onAddChild={handleAddChildClick}
-                                            onAddSession={() => {
-                                                const goalId = viewingGoal?.id || viewingGoal?.attributes?.id;
-                                                navigate(`/${rootId}/create-session?goalId=${goalId}`);
-                                            }}
-                                            onToggleCompletion={handleToggleCompletion}
-                                            treeData={fractalData}
-                                            evidenceGoalIds={evidenceGoalIds}
-                                            activityDefinitions={activities}
-                                            activityGroups={activityGroups}
-                                            programs={programs}
-                                            onGoalSelect={handleGoalNameClick}
-                                            onMobileCollapse={isMobile ? () => setIsMobilePanelCollapsed(true) : undefined}
-                                        />
-                                    </ErrorBoundary>
-                                )}
-                            </div>
-                        )}
+                        <div className="window-content" style={{ padding: 0, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                            {showGoalModal ? (
+                                <Suspense fallback={<div style={{ padding: '20px' }}>Loading Goal Details...</div>}>
+                                    <GoalDetailModal
+                                        isOpen={true}
+                                        onClose={() => setShowGoalModal(false)}
+                                        mode="create"
+                                        onCreate={handleCreateGoal}
+                                        parentGoal={selectedParent}
+                                        activityDefinitions={activities}
+                                        activityGroups={activityGroups}
+                                        rootId={rootId}
+                                        displayMode="panel"
+                                        onGoalSelect={(goal) => {
+                                            setShowGoalModal(false);
+                                            handleGoalNameClick(goal);
+                                        }}
+                                    />
+                                </Suspense>
+                            ) : (
+                                <ErrorBoundary>
+                                    <Sidebar
+                                        selectedNode={viewingGoal}
+                                        selectedRootId={rootId}
+                                        onClose={() => {
+                                            setSidebarMode(null);
+                                            setViewingGoal(null);
+                                        }}
+                                        onUpdate={handleUpdateNode}
+                                        onDelete={(node) => setFractalToDelete(node)}
+                                        onAddChild={handleAddChildClick}
+                                        onAddSession={() => {
+                                            const goalId = viewingGoal?.id || viewingGoal?.attributes?.id;
+                                            navigate(`/${rootId}/create-session?goalId=${goalId}`);
+                                        }}
+                                        onToggleCompletion={handleToggleCompletion}
+                                        treeData={fractalData}
+                                        evidenceGoalIds={evidenceGoalIds}
+                                        activityDefinitions={activities}
+                                        activityGroups={activityGroups}
+                                        programs={programs}
+                                        onGoalSelect={handleGoalNameClick}
+                                    />
+                                </ErrorBoundary>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
 
-            {/* Modals (Delete/Alert only) */}
+            {shouldShowMobileGoalModal && (
+                <Suspense fallback={<div className="loading-spinner">Loading Goal Details...</div>}>
+                    {showGoalModal ? (
+                        <GoalDetailModal
+                            isOpen={true}
+                            onClose={handleCloseGoalDetails}
+                            mode="create"
+                            onCreate={handleCreateGoal}
+                            parentGoal={selectedParent}
+                            activityDefinitions={activities}
+                            activityGroups={activityGroups}
+                            rootId={rootId}
+                            displayMode="modal"
+                            onGoalSelect={(goal) => {
+                                setShowGoalModal(false);
+                                handleGoalNameClick(goal);
+                            }}
+                        />
+                    ) : (
+                        <GoalDetailModal
+                            isOpen={true}
+                            onClose={handleCloseGoalDetails}
+                            goal={viewingGoal}
+                            onUpdate={handleUpdateNode}
+                            activityDefinitions={activities}
+                            onToggleCompletion={handleToggleCompletion}
+                            onAddChild={handleAddChildClick}
+                            onDelete={(node) => setFractalToDelete(node)}
+                            evidenceGoalIds={evidenceGoalIds}
+                            rootId={rootId}
+                            treeData={fractalData}
+                            displayMode="modal"
+                            programs={programs}
+                            activityGroups={activityGroups}
+                            onGoalSelect={handleGoalNameClick}
+                        />
+                    )}
+                </Suspense>
+            )}
+
             <DeleteConfirmModal
                 isOpen={!!fractalToDelete}
                 onClose={() => setFractalToDelete(null)}

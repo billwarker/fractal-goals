@@ -65,6 +65,66 @@ export const getLayoutedElements = (nodes, edges, direction = 'TB', compact = fa
     return { nodes: layoutedNodes, edges };
 };
 
+export const getHierarchyLayoutedElements = (nodes, edges, compact = false) => {
+    const childrenById = new Map();
+    const incomingIds = new Set();
+    const nodeOrder = new Map(nodes.map((node, index) => [node.id, index]));
+
+    nodes.forEach((node) => childrenById.set(node.id, []));
+    edges.forEach((edge) => {
+        if (!childrenById.has(edge.source) || !childrenById.has(edge.target)) return;
+        childrenById.get(edge.source).push(edge.target);
+        incomingIds.add(edge.target);
+    });
+
+    childrenById.forEach((children) => {
+        children.sort((a, b) => (nodeOrder.get(a) ?? 0) - (nodeOrder.get(b) ?? 0));
+    });
+
+    const roots = nodes
+        .filter((node) => !incomingIds.has(node.id))
+        .map((node) => node.id);
+
+    const rowById = new Map();
+    const depthById = new Map();
+    const visited = new Set();
+    let rowIndex = 0;
+
+    const visit = (nodeId, depth) => {
+        if (visited.has(nodeId)) return;
+        visited.add(nodeId);
+        rowById.set(nodeId, rowIndex);
+        depthById.set(nodeId, depth);
+        rowIndex += 1;
+
+        (childrenById.get(nodeId) || []).forEach((childId) => visit(childId, depth + 1));
+    };
+
+    roots.forEach((rootId) => visit(rootId, 0));
+    nodes.forEach((node) => visit(node.id, 0));
+
+    const depthIndent = compact ? 28 : 44;
+    const rowHeight = compact ? 84 : 72;
+    const originX = compact ? 24 : 56;
+    const originY = compact ? 32 : 48;
+
+    const layoutedNodes = nodes.map((node) => ({
+        ...node,
+        position: {
+            x: originX + ((depthById.get(node.id) || 0) * depthIndent),
+            y: originY + ((rowById.get(node.id) || 0) * rowHeight),
+        },
+    }));
+
+    const layoutedEdges = edges.map((edge) => ({
+        ...edge,
+        type: 'step',
+        className: [edge.className, 'hierarchy-edge'].filter(Boolean).join(' '),
+    }));
+
+    return { nodes: layoutedNodes, edges: layoutedEdges };
+};
+
 export const convertTreeToFlow = (
     treeData,
     onNodeClick,
@@ -136,6 +196,7 @@ export const convertTreeToFlow = (
                 deadline: normalizedNode.deadline,
                 hasChildren: normalizedNode.children.length > 0,
                 isSmart: normalizedNode.is_smart || isSMART(node),
+                layoutMode: 'tree',
                 onClick: () => onNodeClick(node),
                 onAddChild: hasAddChild ? () => onAddChild(node) : null,
                 childTypeName,
@@ -169,6 +230,7 @@ export const buildGraphPresentation = ({
     activityGroups,
     programs,
     isMobile,
+    layoutMode = 'tree',
 }) => {
     if (!treeData) {
         return { nodes: [], edges: [], metrics: null };
@@ -197,7 +259,9 @@ export const buildGraphPresentation = ({
         }
     );
 
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(rawNodes, rawEdges, 'TB', isMobile);
+    const { nodes: layoutedNodes, edges: layoutedEdges } = layoutMode === 'hierarchy'
+        ? getHierarchyLayoutedElements(rawNodes, rawEdges, isMobile)
+        : getLayoutedElements(rawNodes, rawEdges, 'TB', isMobile);
 
     const nodeStyleMap = new Map();
     const pausedNodeIds = new Set();
@@ -222,8 +286,12 @@ export const buildGraphPresentation = ({
 
     const nodes = layoutedNodes.map((node) => {
         const style = nodeStyleMap.get(node.id);
-        if (!style) return node;
-        return { ...node, style };
+        const data = {
+            ...node.data,
+            layoutMode,
+        };
+        if (!style) return { ...node, data };
+        return { ...node, data, style };
     });
 
     const baseEdges = layoutedEdges.flatMap((edge) => {
@@ -269,7 +337,7 @@ export const buildGraphPresentation = ({
             style,
         };
 
-        if (!isActiveBranchEdge || shouldFadeEdge) {
+        if (layoutMode === 'hierarchy' || !isActiveBranchEdge || shouldFadeEdge) {
             return [baseEdge];
         }
 

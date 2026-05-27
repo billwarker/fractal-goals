@@ -54,22 +54,59 @@
 
 @media (max-width: 760px) {
     .topBar {
+        display: flex;
+        flex-wrap: wrap;
         align-items: stretch;
+        gap: 8px;
+        min-height: 0;
+        max-height: none;
+        overflow: hidden;
         padding: 12px;
     }
 
-    .viewSection,
-    .rightActions {
+    .viewSection {
+        display: contents;
+    }
+
+    .viewMeta {
+        flex: 0 0 100%;
         width: 100%;
-        align-items: flex-start;
     }
 
     .rightActions {
+        width: auto;
         justify-content: flex-start;
+        align-items: center;
     }
 
     .pageTitle {
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 1;
         font-size: 20px;
         line-height: 1.1;
+    }
+
+    .actions,
+    .rightActions {
+        min-width: 0;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .actions {
+        flex: 1 1 auto;
+    }
+
+    .rightActions {
+        flex: 0 0 auto;
+    }
+
+    .actions::-webkit-scrollbar,
+    .rightActions::-webkit-scrollbar {
+        display: none;
     }
 }

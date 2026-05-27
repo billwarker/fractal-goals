@@ -50,6 +50,8 @@ vi.mock('reactflow', async () => {
         Position: {
             Top: 'top',
             Bottom: 'bottom',
+            Left: 'left',
+            Right: 'right',
         },
     };
 });
@@ -156,7 +158,82 @@ describe('FlowTree', () => {
         );
     });
 
-    it('fits re-scoped graph nodes instantly before revealing them', () => {
+    it('recenters hierarchy layout when the selected goal clears', () => {
+        const treeData = {
+            id: 'root-1',
+            name: 'Root Goal',
+            type: 'UltimateGoal',
+            children: [
+                {
+                    id: 'goal-1',
+                    name: 'Parent Goal',
+                    type: 'LongTermGoal',
+                    children: [
+                        {
+                            id: 'goal-2',
+                            name: 'Child Goal',
+                            type: 'MidTermGoal',
+                            children: [],
+                        },
+                    ],
+                },
+            ],
+        };
+
+        const { rerender } = render(
+            <FlowTree
+                treeData={treeData}
+                layoutMode="hierarchy"
+                selectedNodeId="goal-2"
+                onNodeClick={vi.fn()}
+                onAddChild={vi.fn()}
+            />
+        );
+
+        act(() => {
+            vi.advanceTimersByTime(500);
+        });
+
+        expect(setViewportMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                x: expect.any(Number),
+                y: expect.any(Number),
+                zoom: expect.any(Number),
+            }),
+            { duration: 200 }
+        );
+        setViewportMock.mockClear();
+
+        act(() => {
+            rerender(
+                <FlowTree
+                    treeData={treeData}
+                    layoutMode="hierarchy"
+                    selectedNodeId={null}
+                    onNodeClick={vi.fn()}
+                    onAddChild={vi.fn()}
+                />
+            );
+        });
+
+        act(() => {
+            vi.advanceTimersByTime(500);
+        });
+
+        expect(setViewportMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+                x: expect.any(Number),
+                y: expect.any(Number),
+                zoom: expect.any(Number),
+            }),
+            { duration: 200 }
+        );
+        expect(fitViewMock).not.toHaveBeenCalledWith(expect.objectContaining({
+            duration: 220,
+        }));
+    });
+
+    it('fits re-scoped tree nodes instantly before revealing them', () => {
         const ref = React.createRef();
         const treeData = {
             id: 'root-1',
