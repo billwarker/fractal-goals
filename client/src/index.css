@@ -33,7 +33,7 @@ a:hover {
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: var(--app-viewport-height, 100vh);
   font-family: var(--font-family);
   background: var(--color-bg-app);
   color: var(--color-text-primary);

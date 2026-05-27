@@ -3,7 +3,7 @@ export function isFlowTreeRoute(pathname = '') {
 }
 
 export function shouldAllowZoom({ isMobile, pathname = '' }) {
-    return !isMobile || isFlowTreeRoute(pathname);
+    return !isMobile;
 }
 
 export function getViewportMetaContent({ isMobile, allowZoom }) {

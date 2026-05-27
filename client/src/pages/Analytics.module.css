@@ -1,7 +1,7 @@
 .pageContainer {
     display: flex;
-    height: calc(100vh - var(--app-nav-height, 0px));
-    max-height: calc(100vh - var(--app-nav-height, 0px));
+    height: calc(var(--app-viewport-height, 100vh) - var(--app-nav-height, 0px));
+    max-height: calc(var(--app-viewport-height, 100vh) - var(--app-nav-height, 0px));
     width: 100%;
     overflow: hidden;
     position: relative;
@@ -60,8 +60,8 @@
         bottom: 0;
         left: 0;
         width: 100%;
-        height: min(82vh, calc(100vh - var(--app-nav-height, 0px)));
-        max-height: calc(100vh - var(--app-nav-height, 0px));
+        height: min(82vh, calc(var(--app-viewport-height, 100vh) - var(--app-nav-height, 0px)));
+        max-height: calc(var(--app-viewport-height, 100vh) - var(--app-nav-height, 0px));
         border-left: none;
         border-radius: 16px 16px 0 0;
         box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.4);

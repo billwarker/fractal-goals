@@ -77,6 +77,7 @@ Important frontend design choices:
 - Older hand-managed fetch state has largely been removed.
 - Large multi-mode components were decomposed into coordinators plus focused subcomponents/hooks.
 - Modal behavior and state reset patterns are more standardized than before.
+- The app shell exposes `--app-viewport-height`, using dynamic viewport units when available, so mobile browser chrome does not hide headers or bottom content.
 
 ## SaaS And Account Layer
 

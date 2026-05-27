@@ -16,14 +16,18 @@ import { useFlowTreeEvidence, useFlowtreeSessionMetrics } from '../hooks/useSess
 import { getChildType } from '../utils/goalHelpers';
 import { findGoalNodeById, getGoalNodeId } from '../utils/goalNodeModel';
 import { getGoalSearchMatches, getVisibleGoalSearchCandidates } from '../utils/goalTypeToZoomSearch';
+import {
+    getQueryCharacter,
+    isSearchCharacter,
+    renderTypeToZoomQuery,
+    shouldIgnoreTypeToZoomKey,
+} from '../utils/typeToZoomInput';
 import { usePrograms } from '../hooks/useProgramQueries';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import '../App.css';
 import './FractalGoals.css';
-
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
-
 const FLOWTREE_SETTINGS_STORAGE_KEY = 'flowtree-view-settings';
 const DEFAULT_VIEW_SETTINGS = {
     fadeInactiveBranches: false,
@@ -36,43 +40,13 @@ const TYPE_TO_ZOOM_IDLE_MS = 2000;
 const TYPE_TO_ZOOM_LOCKED_IDLE_MS = 10000;
 const FLOWTREE_SCOPE_TRANSITION_MS = 160;
 
-function shouldIgnoreTypeToZoomKey(event) {
-    const target = event.target;
-    const activeElement = document.activeElement;
-    const element = target instanceof Element ? target : activeElement;
-
-    if (!element) return false;
-    if (element.closest('[role="dialog"], [aria-modal="true"]')) return true;
-    if (element.isContentEditable) return true;
-
-    const tagName = element.tagName?.toLowerCase();
-    return ['input', 'textarea', 'select'].includes(tagName);
-}
-
-function isSearchCharacter(key) {
-    return typeof key === 'string' && key.length === 1 && /^[a-z0-9]$/i.test(key);
-}
-
-function getQueryCharacter(event) {
-    if (event.key === ' ' || event.key === 'Space' || event.key === 'Spacebar' || event.code === 'Space') {
-        return ' ';
-    }
-    return typeof event.key === 'string' && event.key.length === 1 ? event.key : null;
-}
-
-function renderTypeToZoomQuery(query) {
-    return String(query).replace(/ /g, '\u00a0');
-}
-
 function FractalGoals() {
     const hideCompletedTooltip = 'Hides completed goals from the fractal tree.';
     const hideInactiveTooltip = 'Hides goals with no completed activity evidence in the active window.';
     const [isOptionsPaneMinimized, setIsOptionsPaneMinimized] = useState(false);
-
     const { rootId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
-
     const {
         createGoal,
         updateGoal,
@@ -80,7 +54,6 @@ function FractalGoals() {
         toggleGoalCompletion,
         setActiveRootId
     } = useGoals();
-
     const {
         data: fractalData,
         isLoading: goalsLoading
@@ -90,18 +63,13 @@ function FractalGoals() {
     );
     const inactiveBranchTooltip = `Dims branches with no associated completed activity instances in the last ${activeGoalWindowDays} days.`;
     const { data: evidenceData, isLoading: evidenceLoading } = useFlowTreeEvidence(rootId, activeGoalWindowDays);
-
     const { activities = EMPTY_ARRAY, isLoading: activitiesLoading } = useActivitiesQuery(rootId);
     const { activityGroups = EMPTY_ARRAY, isLoading: activityGroupsLoading } = useActivityGroups(rootId);
-
     const { debugMode } = useDebug();
     const isMobile = useIsMobile();
     const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
-
     const { programs = EMPTY_ARRAY } = usePrograms(rootId);
-
     const loading = goalsLoading || activitiesLoading || activityGroupsLoading || evidenceLoading;
-
     const [sidebarMode, setSidebarMode] = useState(null);
     const [viewingGoal, setViewingGoal] = useState(null);
 

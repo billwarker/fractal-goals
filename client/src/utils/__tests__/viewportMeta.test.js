@@ -8,8 +8,11 @@ describe('getViewportMetaContent', () => {
         expect(getViewportMetaContent({ isMobile: true, allowZoom: false })).toContain('maximum-scale=1.0');
     });
 
-    it('keeps zoom enabled for the mobile flowtree route', () => {
-        expect(getViewportMetaContent({ isMobile: true, allowZoom: true })).not.toContain('user-scalable=no');
+    it('disables browser zoom for the mobile flowtree route so the app shell remains anchored', () => {
+        expect(getViewportMetaContent({
+            isMobile: true,
+            allowZoom: shouldAllowZoom({ isMobile: true, pathname: '/root-1/goals' }),
+        })).toContain('user-scalable=no');
     });
 
     it('keeps the desktop viewport unrestricted', () => {
@@ -18,13 +21,13 @@ describe('getViewportMetaContent', () => {
         );
     });
 
-    it('detects the goals route as the only mobile zoom-enabled route', () => {
+    it('still detects the goals route for route-specific viewport decisions', () => {
         expect(isFlowTreeRoute('/root-1/goals')).toBe(true);
         expect(isFlowTreeRoute('/root-1/sessions')).toBe(false);
     });
 
-    it('allows zoom only for desktop or the mobile goals route', () => {
-        expect(shouldAllowZoom({ isMobile: true, pathname: '/root-1/goals' })).toBe(true);
+    it('allows browser zoom only on desktop', () => {
+        expect(shouldAllowZoom({ isMobile: true, pathname: '/root-1/goals' })).toBe(false);
         expect(shouldAllowZoom({ isMobile: true, pathname: '/root-1/sessions' })).toBe(false);
         expect(shouldAllowZoom({ isMobile: false, pathname: '/root-1/sessions' })).toBe(true);
     });

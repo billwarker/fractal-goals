@@ -2,7 +2,7 @@
 
 .sessionDetailContainer {
     display: flex;
-    height: calc(100vh - var(--app-nav-height, 0px));
+    height: calc(var(--app-viewport-height, 100vh) - var(--app-nav-height, 0px));
     width: 100%;
     position: relative;
     color: var(--color-text-primary);
@@ -216,7 +216,7 @@
         --mobile-dock-reserved-space: calc(76px + env(safe-area-inset-bottom));
         display: block;
         height: auto;
-        min-height: calc(100vh - var(--app-nav-height, 0px));
+        min-height: calc(var(--app-viewport-height, 100vh) - var(--app-nav-height, 0px));
         overflow: visible;
     }
 
