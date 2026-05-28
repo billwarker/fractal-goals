@@ -44,7 +44,6 @@ function ActivityBuilderForm({
     const [metrics, setMetrics] = useState(initialState.metrics);
     const [hasSets, setHasSets] = useState(initialState.hasSets);
     const [hasMetrics, setHasMetrics] = useState(initialState.hasMetrics);
-    const [metricsMultiplicative, setMetricsMultiplicative] = useState(initialState.metricsMultiplicative);
     const [hasSplits, setHasSplits] = useState(initialState.hasSplits);
     const [splits, setSplits] = useState(initialState.splits);
     const [groupId, setGroupId] = useState(initialState.groupId);
@@ -59,7 +58,6 @@ function ActivityBuilderForm({
         setMetrics([DEFAULT_METRIC]);
         setHasSets(false);
         setHasMetrics(true);
-        setMetricsMultiplicative(false);
         setHasSplits(false);
         setSplits(DEFAULT_SPLITS);
         setGroupId('');
@@ -110,6 +108,15 @@ function ActivityBuilderForm({
         }));
     };
 
+    const handleHasMetricsChange = (event) => {
+        const enabled = event.target.checked;
+        setHasMetrics(enabled);
+        setTrackProgress(enabled);
+        if (!enabled) {
+            setDeltaDisplayMode(null);
+        }
+    };
+
     const handleAddSplit = () => {
         if (splits.length < 5) {
             setSplits([...splits, { name: `Split #${splits.length + 1}` }]);
@@ -148,11 +155,10 @@ function ActivityBuilderForm({
                 splits,
                 hasSets,
                 hasMetrics,
-                metricsMultiplicative,
                 hasSplits,
                 groupId,
                 selectedGoalIds,
-                trackProgress,
+                trackProgress: hasMetrics && trackProgress,
                 deltaDisplayMode,
             });
 
@@ -196,12 +202,11 @@ function ActivityBuilderForm({
             splits,
             hasSets,
             hasMetrics,
-            metricsMultiplicative,
             hasSplits,
             groupId,
             selectedGoalIds,
-            trackProgress,
-            deltaDisplayMode,
+            trackProgress: hasMetrics && trackProgress,
+            deltaDisplayMode: hasMetrics && trackProgress ? deltaDisplayMode : null,
         });
 
         const persistedMetrics = editingActivity?.id
@@ -302,18 +307,20 @@ function ActivityBuilderForm({
                         <Checkbox
                             label="Enable Metrics"
                             checked={hasMetrics}
-                            onChange={(event) => setHasMetrics(event.target.checked)}
+                            onChange={handleHasMetricsChange}
                         />
-                        <div className={styles.trackProgressFlag}>
-                            <Checkbox
-                                label="Track Progress"
-                                checked={trackProgress}
-                                onChange={(event) => setTrackProgress(event.target.checked)}
-                            />
-                        </div>
+                        {hasMetrics && (
+                            <div className={styles.trackProgressFlag}>
+                                <Checkbox
+                                    label="Track Progress"
+                                    checked={trackProgress}
+                                    onChange={(event) => setTrackProgress(event.target.checked)}
+                                />
+                            </div>
+                        )}
                     </div>
 
-                    {trackProgress && (
+                    {hasMetrics && trackProgress && (
                         <div>
                             <Select
                                 label="Delta display (overrides root setting)"

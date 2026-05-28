@@ -1,7 +1,9 @@
+import copy
 import uuid
 
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import joinedload
+from sqlalchemy.orm.attributes import flag_modified
 
 import models
 from models import (
@@ -32,6 +34,69 @@ class SessionActivityService:
     def __init__(self, db_session):
         self.db_session = db_session
         self._session_goals_has_source = None
+
+    @staticmethod
+    def _session_runtime_data(session):
+        attrs = models._safe_load_json(getattr(session, 'attributes', None), {})
+        if not isinstance(attrs, dict):
+            attrs = {}
+        if isinstance(attrs.get('session_data'), dict):
+            return attrs, attrs['session_data']
+        return attrs, attrs
+
+    @classmethod
+    def _append_instance_to_session_section(cls, session, instance_id, section_index=None):
+        attrs, session_data = cls._session_runtime_data(session)
+        raw_sections = session_data.get('sections')
+        sections = copy.deepcopy(raw_sections) if isinstance(raw_sections, list) else []
+
+        target_index = 0 if section_index is None else section_index
+        if not isinstance(target_index, int) or target_index < 0:
+            return "section_index must be a non-negative integer"
+
+        if not sections:
+            if target_index != 0:
+                return "section_index out of range"
+            sections = [{'name': 'Main', 'activity_ids': []}]
+        elif target_index >= len(sections):
+            return "section_index out of range"
+
+        section = sections[target_index] if isinstance(sections[target_index], dict) else {}
+        activity_ids = section.get('activity_ids') if isinstance(section.get('activity_ids'), list) else []
+        next_activity_ids = [item for item in activity_ids if item != instance_id]
+        next_activity_ids.append(instance_id)
+        section['activity_ids'] = next_activity_ids
+        sections[target_index] = section
+
+        session_data['sections'] = sections
+        session.attributes = attrs
+        flag_modified(session, "attributes")
+        return None
+
+    @classmethod
+    def _remove_instance_from_session_sections(cls, session, instance_id):
+        attrs, session_data = cls._session_runtime_data(session)
+        raw_sections = session_data.get('sections')
+        if not isinstance(raw_sections, list):
+            return
+
+        next_sections = []
+        changed = False
+        for raw_section in raw_sections:
+            if not isinstance(raw_section, dict):
+                next_sections.append(raw_section)
+                continue
+            section = copy.deepcopy(raw_section)
+            activity_ids = section.get('activity_ids')
+            if isinstance(activity_ids, list) and instance_id in activity_ids:
+                section['activity_ids'] = [item for item in activity_ids if item != instance_id]
+                changed = True
+            next_sections.append(section)
+
+        if changed:
+            session_data['sections'] = next_sections
+            session.attributes = attrs
+            flag_modified(session, "attributes")
 
     @staticmethod
     def _session_activity_read_options():
@@ -125,6 +190,15 @@ class SessionActivityService:
         )
         self.db_session.add(instance)
         self.db_session.flush()
+
+        section_error = self._append_instance_to_session_section(
+            session,
+            instance.id,
+            data.get('section_index'),
+        )
+        if section_error:
+            self.db_session.rollback()
+            return None, section_error, 400
 
         associated_goals = [goal for goal in (activity_def.associated_goals or []) if not goal.deleted_at]
         program_goal_ids = set()
@@ -273,6 +347,7 @@ class SessionActivityService:
             return None, "Activity instance not found", 404
 
         instance.deleted_at = models.utc_now()
+        self._remove_instance_from_session_sections(session, instance_id)
         self.db_session.commit()
         self._recompute_and_attach_stats(session)
         event_bus.emit(Event(

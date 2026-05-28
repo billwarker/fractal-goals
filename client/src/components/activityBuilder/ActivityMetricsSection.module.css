@@ -69,6 +69,13 @@
     border-radius: 6px;
 }
 
+.progressTrackingControls {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+
 .progressTrackingRow {
     display: flex;
     align-items: center;

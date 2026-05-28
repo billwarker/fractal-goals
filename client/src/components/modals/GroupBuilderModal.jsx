@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { useActivities } from '../../contexts/ActivitiesContext';
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useFractalTree } from '../../hooks/useGoalQueries';
 import useIsMobile from '../../hooks/useIsMobile';
 import notify from '../../utils/notify';
@@ -9,16 +8,22 @@ import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
+import GoalHierarchySelector from '../goals/GoalHierarchySelector';
 
-function flattenGoals(node, goals = []) {
+function flattenGoals(node, goals = [], parentId = null) {
     if (!node) return goals;
+    const nodeId = node.id || node.attributes?.id;
+    const children = Array.isArray(node.children) ? node.children : [];
     goals.push({
-        id: node.id || node.attributes?.id,
-        name: node.name,
+        id: nodeId,
+        name: node.name || node.attributes?.name || 'Untitled goal',
         type: node.attributes?.type || node.type,
+        parent_id: parentId,
+        childrenIds: children.map((child) => child.id || child.attributes?.id).filter(Boolean),
+        completed: Boolean(node.completed || node.attributes?.completed),
     });
-    if (node.children && node.children.length > 0) {
-        node.children.forEach((child) => flattenGoals(child, goals));
+    if (children.length > 0) {
+        children.forEach((child) => flattenGoals(child, goals, nodeId));
     }
     return goals;
 }
@@ -56,9 +61,68 @@ function buildInitialGroupFormState(editingGroup) {
     };
 }
 
+function GroupGoalSelectorModal({
+    isOpen,
+    onClose,
+    goals,
+    selectedGoalIds,
+    onSave,
+    groupName,
+}) {
+    const [draftGoalIds, setDraftGoalIds] = useState(selectedGoalIds);
+
+    if (!isOpen) {
+        return null;
+    }
+
+    const handleSave = () => {
+        onSave(draftGoalIds);
+        onClose();
+    };
+    const linkedGoalCount = draftGoalIds.length;
+    const saveLabel = `Save ${linkedGoalCount} Linked ${linkedGoalCount === 1 ? 'Goal' : 'Goals'}`;
+
+    return (
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={`Link Goals${groupName ? `: ${groupName}` : ''}`}
+            size="lg"
+        >
+            <ModalBody>
+                <GoalHierarchySelector
+                    goals={goals}
+                    selectedGoalIds={draftGoalIds}
+                    onSelectionChange={setDraftGoalIds}
+                    selectionMode="multiple"
+                    searchPlaceholder="Search goals..."
+                    emptyState="No goals found."
+                    highlightSelectionAncestors
+                    showAncestorControls={false}
+                />
+            </ModalBody>
+
+            <ModalFooter>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', width: '100%' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', lineHeight: 1.4 }}>
+                        All activities in this group will be linked to these goals.
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexShrink: 0 }}>
+                        <Button variant="secondary" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button variant="primary" onClick={handleSave}>
+                            {saveLabel}
+                        </Button>
+                    </div>
+                </div>
+            </ModalFooter>
+        </Modal>
+    );
+}
+
 function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups, onSave }) {
     const { createActivityGroup, updateActivityGroup, setActivityGroupGoals } = useActivities();
-    const { getGoalColor } = useGoalLevels();
     const initialState = buildInitialGroupFormState(editingGroup);
 
     // Use the query hook to get the fractal tree for goal selection
@@ -166,8 +230,9 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
 
                         {/* Name */}
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '5px' }}>Name</label>
+                            <label htmlFor="activity-group-name" style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '5px' }}>Name</label>
                             <input
+                                id="activity-group-name"
                                 type="text"
                                 value={name}
                                 onChange={e => setName(e.target.value)}
@@ -179,8 +244,9 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
 
                         {/* Description */}
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '5px' }}>Description</label>
+                            <label htmlFor="activity-group-description" style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '5px' }}>Description</label>
                             <textarea
+                                id="activity-group-description"
                                 value={description}
                                 onChange={e => setDescription(e.target.value)}
                                 style={{ width: '100%', padding: '10px', background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', minHeight: '60px', fontFamily: 'inherit', boxSizing: 'border-box' }}
@@ -189,8 +255,9 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
 
                         {/* Parent Group */}
                         <div>
-                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '5px' }}>Parent Group (Optional)</label>
+                            <label htmlFor="activity-group-parent" style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '5px' }}>Parent Group (Optional)</label>
                             <select
+                                id="activity-group-parent"
                                 value={parentId}
                                 onChange={e => setParentId(e.target.value)}
                                 style={{ width: '100%', padding: '10px', background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: '4px', color: 'var(--color-text-primary)', boxSizing: 'border-box' }}
@@ -204,71 +271,27 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
                             </select>
                         </div>
 
-                        {/* Associated Goals */}
+                        {/* Linked Goals */}
                         <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                                <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)' }}>Associated Goals</label>
+                                <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)' }}>Linked Goals</label>
                                 <button
                                     type="button"
-                                    onClick={() => setShowGoalSelector(!showGoalSelector)}
+                                    onClick={() => setShowGoalSelector(true)}
                                     style={{ background: 'transparent', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer', fontSize: '12px' }}
                                 >
-                                    {showGoalSelector ? 'Hide Goals' : 'Select Goals'}
+                                    {selectedGoalIds.length > 0 ? 'Edit Linked Goals' : 'Link Goals'}
                                 </button>
                             </div>
 
-                            {/* Selected Goals Tags */}
-                            {selectedGoalIds.length > 0 && !showGoalSelector && (
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '5px' }}>
-                                    {selectedGoalIds.map(id => {
-                                        const goal = allGoals.find(g => g.id === id);
-                                        if (!goal) return null;
-                                        const color = getGoalColor(goal.type);
-                                        return (
-                                            <span key={id} style={{
-                                                fontSize: '11px', padding: '2px 6px', borderRadius: '4px',
-                                                background: `${color}30`, border: `1px solid ${color}`, color: color
-                                            }}>
-                                                {goal.name}
-                                            </span>
-                                        );
-                                    })}
-                                </div>
-                            )}
+                            <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
+                                {selectedGoalIds.length === 0
+                                    ? 'No linked goals'
+                                    : `${selectedGoalIds.length} linked ${selectedGoalIds.length === 1 ? 'goal' : 'goals'}`}
+                            </div>
 
-                            {/* Goal Selector Area */}
-                            {showGoalSelector && (
-                                <div style={{
-                                    background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: '4px',
-                                    padding: '10px', maxHeight: '200px', overflowY: 'auto'
-                                }}>
-                                    {allGoals.length === 0 ? (
-                                        <div style={{ color: 'var(--color-text-muted)', fontStyle: 'italic', fontSize: '12px' }}>No goals found.</div>
-                                    ) : (
-                                        allGoals.map(goal => {
-                                            const isSelected = selectedGoalIds.includes(goal.id);
-                                            const color = getGoalColor(goal.type);
-                                            return (
-                                                <div key={goal.id} style={{ marginBottom: '4px' }}>
-                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isSelected}
-                                                            onChange={(e) => {
-                                                                if (e.target.checked) setSelectedGoalIds([...selectedGoalIds, goal.id]);
-                                                                else setSelectedGoalIds(selectedGoalIds.filter(id => id !== goal.id));
-                                                            }}
-                                                        />
-                                                        <span style={{ color: isSelected ? color : 'var(--color-text-secondary)', fontSize: '13px' }}>{goal.name}</span>
-                                                    </label>
-                                                </div>
-                                            );
-                                        })
-                                    )}
-                                </div>
-                            )}
                             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                                All activities in this group will be associated with these goals.
+                                All activities in this group will be linked to these goals.
                             </div>
                         </div>
                     </div>
@@ -285,6 +308,15 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
                     </div>
                 </ModalFooter>
             </form>
+            <GroupGoalSelectorModal
+                key={`${editingGroup?.id || 'new'}:${showGoalSelector ? 'open' : 'closed'}`}
+                isOpen={showGoalSelector}
+                onClose={() => setShowGoalSelector(false)}
+                goals={allGoals}
+                selectedGoalIds={selectedGoalIds}
+                onSave={setSelectedGoalIds}
+                groupName={name.trim()}
+            />
         </Modal>
     );
 }

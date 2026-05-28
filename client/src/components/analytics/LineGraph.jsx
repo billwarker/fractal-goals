@@ -628,8 +628,7 @@ function LineGraph({
                                 {metric.name} ({metric.unit})
                             </option>
                         ))}
-                        {/* Add Product option if activity has metrics_multiplicative */}
-                        {activityDef.metrics_multiplicative && multiplicativeMetrics.length > 1 && (
+                        {multiplicativeMetrics.length > 1 && (
                             <option value="__product__" style={{ color: '#e91e63' }}>
                                 ({multiplicativeMetrics.map(m => m.name).join(' × ')})
                             </option>
@@ -667,8 +666,7 @@ function LineGraph({
                                     {metric.name} ({metric.unit})
                                 </option>
                             ))}
-                            {/* Add Product option if activity has metrics_multiplicative */}
-                            {activityDef.metrics_multiplicative && multiplicativeMetrics.length > 1 && (
+                            {multiplicativeMetrics.length > 1 && (
                                 <option value="__product__" style={{ color: '#e91e63' }}>
                                     ({multiplicativeMetrics.map(m => m.name).join(' × ')})
                                 </option>

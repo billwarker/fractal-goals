@@ -359,7 +359,6 @@ function ManageActivities() {
                     marginBottom: '24px',
                     marginLeft: 0,
                     border: isRoot ? 'none' : '1px solid var(--color-border)',
-                    borderLeft: `3px solid ${isRoot ? 'var(--color-border)' : 'var(--color-brand-primary)'}`,
                     backgroundColor: 'var(--color-bg-card-alt)',
                     padding: '20px 24px',
                     borderRadius: isRoot ? '0' : '8px'

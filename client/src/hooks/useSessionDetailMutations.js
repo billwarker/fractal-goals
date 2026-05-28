@@ -470,6 +470,7 @@ export function useSessionDetailMutations({
         try {
             const response = await addActivityMutation.mutateAsync({
                 activity_definition_id: activityDefinition.id,
+                section_index: sectionIndex,
             });
             const newInstance = response.data;
             const associatedGoalIds = mergeUniqueIds(

@@ -138,7 +138,6 @@ export function getInitialActivityBuilderState(editingActivity) {
             metrics: [DEFAULT_METRIC],
             hasSets: false,
             hasMetrics: true,
-            metricsMultiplicative: false,
             hasSplits: false,
             splits: DEFAULT_SPLITS,
             groupId: '',
@@ -167,7 +166,6 @@ export function getInitialActivityBuilderState(editingActivity) {
             : [DEFAULT_METRIC],
         hasSets: editingActivity.has_sets,
         hasMetrics: metricDefinitions.length > 0 || editingActivity.has_metrics,
-        metricsMultiplicative: editingActivity.metrics_multiplicative || false,
         hasSplits: editingActivity.has_splits || false,
         splits: splitDefinitions.length > 0
             ? splitDefinitions.map((split) => ({ id: split.id, name: split.name }))

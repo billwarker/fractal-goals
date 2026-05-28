@@ -29,6 +29,9 @@ function ActivityCard({
     };
     const instanceCount = instantiationSummary?.instance_count;
     const averageDuration = formatAverageDuration(instantiationSummary?.average_duration_seconds, '—');
+    const multiplicativeMetricCount = (activity.metric_definitions || [])
+        .filter((metric) => metric.is_multiplicative !== false)
+        .length;
 
     const handleDragStart = (e) => {
         e.dataTransfer.setData('activityId', activity.id);
@@ -80,9 +83,9 @@ function ActivityCard({
                         No Metrics
                     </span>
                 )}
-                {activity.metrics_multiplicative && (
+                {multiplicativeMetricCount > 1 && (
                     <span className={`${styles.indicator} ${styles.indicatorMulti}`}>
-                        Multiplicative
+                        Product
                     </span>
                 )}
                 {activity.metric_definitions?.map(m => (

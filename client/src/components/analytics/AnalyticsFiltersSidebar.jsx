@@ -154,7 +154,7 @@ function AnalyticsFiltersSidebar({
     const multiplicativeMetrics = metricDefinitions.filter((metric) => metric.is_multiplicative !== false);
     const metricOptions = [
         ...metricDefinitions,
-        ...(selectedActivityDef?.metrics_multiplicative && multiplicativeMetrics.length > 1
+        ...(multiplicativeMetrics.length > 1
             ? [{ id: '__product__', name: multiplicativeMetrics.map((metric) => metric.name).join(' x '), unit: 'Product' }]
             : []),
     ];

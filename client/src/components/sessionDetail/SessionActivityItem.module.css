@@ -531,6 +531,24 @@
     max-width: 100%;
 }
 
+.metricValueControl {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.metricSelect {
+    cursor: pointer;
+}
+
+.metricAllowedValues {
+    color: var(--color-text-muted);
+    font-size: 10px;
+    line-height: 1.25;
+    max-width: 180px;
+}
+
 .metricLabel {
     font-size: 11px;
     color: var(--color-text-muted);

@@ -733,6 +733,42 @@ class TestSessionActivityEndpoints:
         data = json.loads(response.data)
         assert 'id' in data  # Should return the created activity instance
 
+    def test_add_activity_to_session_persists_section_assignment(
+        self,
+        authed_client,
+        sample_practice_session,
+        sample_activity_definition,
+    ):
+        """Adding an activity should persist the section placement used by session cards."""
+        root_id = sample_practice_session.root_id
+        session_id = sample_practice_session.id
+
+        response = authed_client.post(
+            f'/api/{root_id}/sessions/{session_id}/activities',
+            data=json.dumps({
+                'activity_definition_id': sample_activity_definition.id,
+                'section_index': 0,
+            }),
+            content_type='application/json'
+        )
+        assert response.status_code == 201
+        created = json.loads(response.data)
+        instance_id = created['id']
+
+        detail_response = authed_client.get(f'/api/{root_id}/sessions/{session_id}')
+        assert detail_response.status_code == 200
+        detail_payload = json.loads(detail_response.data)
+        sections = detail_payload['attributes']['session_data']['sections']
+        assert sections[0]['activity_ids'] == [instance_id]
+        assert detail_payload['activity_instances'][0]['id'] == instance_id
+
+        list_response = authed_client.get(f'/api/{root_id}/sessions')
+        assert list_response.status_code == 200
+        list_payload = json.loads(list_response.data)
+        matching_session = next(item for item in list_payload['sessions'] if item['id'] == session_id)
+        assert matching_session['attributes']['session_data']['sections'][0]['activity_ids'] == [instance_id]
+        assert matching_session['activity_instances'][0]['id'] == instance_id
+
     def test_remove_activity_from_session(self, authed_client, db_session, sample_activity_instance):
         """Test removing an activity from a session."""
         # Get session info from the instance

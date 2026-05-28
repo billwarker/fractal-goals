@@ -145,25 +145,27 @@ function ActivityMetricsSection({
                             )}
 
                             <div className={metricStyles.progressTrackingSection}>
-                                <div className={styles.metricFlags}>
-                                    <Checkbox
-                                        label="Track Progress"
-                                        checked={metricTracksProgress}
-                                        onChange={(e) => onMetricChange(idx, 'track_progress', e.target.checked)}
-                                        className={styles.subFlagLabel}
-                                    />
-                                </div>
-
-                                {hasSets && (
+                                <div className={metricStyles.progressTrackingControls}>
                                     <div className={styles.metricFlags}>
                                         <Checkbox
-                                            label="Best Set Metric"
-                                            checked={metric.is_best_set_metric || false}
-                                            onChange={(e) => onMetricChange(idx, 'is_best_set_metric', e.target.checked)}
+                                            label="Track Progress"
+                                            checked={metricTracksProgress}
+                                            onChange={(e) => onMetricChange(idx, 'track_progress', e.target.checked)}
                                             className={styles.subFlagLabel}
                                         />
                                     </div>
-                                )}
+
+                                    {hasSets && (
+                                        <div className={styles.metricFlags}>
+                                            <Checkbox
+                                                label="Best Set Metric"
+                                                checked={metric.is_best_set_metric || false}
+                                                onChange={(e) => onMetricChange(idx, 'is_best_set_metric', e.target.checked)}
+                                                className={styles.subFlagLabel}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
 
                                 {!metricTracksProgress && (
                                     <div className={metricStyles.progressTrackingPreview}>

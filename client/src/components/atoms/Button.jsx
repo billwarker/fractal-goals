@@ -15,6 +15,7 @@ const Button = ({
     disabled = false,
     isLoading = false,
     type = 'button',
+    fullWidth = false,
     leftIcon,
     rightIcon,
     ...props
@@ -25,7 +26,7 @@ const Button = ({
     return (
         <button
             type={type}
-            className={`${styles.button} ${variantClass} ${sizeClass} ${className}`}
+            className={`${styles.button} ${variantClass} ${sizeClass} ${fullWidth ? styles.fullWidth : ''} ${className}`}
             disabled={disabled || isLoading}
             {...props}
         >

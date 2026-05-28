@@ -209,6 +209,48 @@ class TestActivityGroups:
 
 
 @pytest.mark.integration
+class TestFractalMetricEndpoints:
+    """Test fractal metric configuration validation."""
+
+    def test_create_metric_rejects_conflicting_constraints(self, authed_client, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+
+        response = authed_client.post(
+            f'/api/{root_id}/fractal-metrics',
+            json={
+                'name': 'Conflicting Reps',
+                'unit': 'reps',
+                'input_type': 'integer',
+                'default_value': 100,
+                'predefined_values': [5, 10],
+                'min_value': 5,
+                'max_value': 10,
+            },
+        )
+
+        assert response.status_code == 400
+        assert 'Default value' in response.get_json()['error']
+
+    def test_create_metric_requires_bounds_in_predefined_values(self, authed_client, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+
+        response = authed_client.post(
+            f'/api/{root_id}/fractal-metrics',
+            json={
+                'name': 'Bounded Reps',
+                'unit': 'reps',
+                'input_type': 'integer',
+                'predefined_values': [6, 8, 10],
+                'min_value': 5,
+                'max_value': 10,
+            },
+        )
+
+        assert response.status_code == 400
+        assert 'Min value' in response.get_json()['error']
+
+
+@pytest.mark.integration
 class TestActivities:
     """Test Activity Definition endpoints."""
     

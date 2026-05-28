@@ -45,6 +45,74 @@ function parsePredefinedValues(str) {
     return nums;
 }
 
+function numbersEqual(left, right) {
+    return Math.abs(Number(left) - Number(right)) < 0.000001;
+}
+
+function isIntegerMetricValue(inputType, value) {
+    return inputType !== 'integer' || Number.isInteger(Number(value));
+}
+
+function validateMetricSettings({ inputType, defaultValue, predefinedValues, minValue, maxValue }) {
+    if (minValue != null && maxValue != null && minValue > maxValue) {
+        return 'Min value cannot be greater than max value.';
+    }
+
+    const valuesToCheck = [
+        ['Default value', defaultValue],
+        ['Min value', minValue],
+        ['Max value', maxValue],
+        ...(predefinedValues || []).map((value, index) => [`Predefined value ${index + 1}`, value]),
+    ];
+
+    for (const [label, value] of valuesToCheck) {
+        if (value == null) continue;
+        if (!isIntegerMetricValue(inputType, value)) {
+            return `${label} must be a whole number for integer metrics.`;
+        }
+        if (inputType === 'duration' && Number(value) < 0) {
+            return `${label} cannot be negative for duration metrics.`;
+        }
+    }
+
+    if (defaultValue != null) {
+        if (minValue != null && defaultValue < minValue) {
+            return 'Default value cannot be less than min value.';
+        }
+        if (maxValue != null && defaultValue > maxValue) {
+            return 'Default value cannot be greater than max value.';
+        }
+    }
+
+    if (predefinedValues?.length) {
+        const uniqueValues = new Set(predefinedValues.map((value) => Number(value).toFixed(6)));
+        if (uniqueValues.size !== predefinedValues.length) {
+            return 'Predefined values cannot contain duplicates.';
+        }
+
+        for (const value of predefinedValues) {
+            if (minValue != null && value < minValue) {
+                return 'Predefined values cannot be less than min value.';
+            }
+            if (maxValue != null && value > maxValue) {
+                return 'Predefined values cannot be greater than max value.';
+            }
+        }
+
+        if (defaultValue != null && !predefinedValues.some((value) => numbersEqual(value, defaultValue))) {
+            return 'Default value must be one of the predefined values.';
+        }
+        if (minValue != null && !predefinedValues.some((value) => numbersEqual(value, minValue))) {
+            return 'Min value must be included in the predefined values.';
+        }
+        if (maxValue != null && !predefinedValues.some((value) => numbersEqual(value, maxValue))) {
+            return 'Max value must be included in the predefined values.';
+        }
+    }
+
+    return null;
+}
+
 function MetricBadge({ label }) {
     return <span className={styles.badge}>{label}</span>;
 }
@@ -59,18 +127,21 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
     const [copyingFrom, setCopyingFrom] = useState(null); // name of metric being copied
     const [form, setForm] = useState(EMPTY_FORM);
     const [metricToDelete, setMetricToDelete] = useState(null);
+    const [validationMessage, setValidationMessage] = useState('');
 
     const handleClose = () => {
         setEditingId(null);
         setCopyingFrom(null);
         setMetricToDelete(null);
         setForm(EMPTY_FORM);
+        setValidationMessage('');
         onClose();
     };
 
     const handleEdit = (metric) => {
         setEditingId(metric.id);
         setCopyingFrom(null);
+        setValidationMessage('');
         setForm({
             name: metric.name || '',
             unit: metric.unit || '',
@@ -89,6 +160,7 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
     const handleCopy = (metric) => {
         setEditingId(null);
         setCopyingFrom(metric.name);
+        setValidationMessage('');
         setForm({
             name: metric.name || '',
             unit: metric.unit || '',
@@ -108,14 +180,37 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
         setEditingId(null);
         setCopyingFrom(null);
         setForm(EMPTY_FORM);
+        setValidationMessage('');
     };
 
-    const setField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+    const setField = (field, value) => {
+        setValidationMessage('');
+        setForm((prev) => ({ ...prev, [field]: value }));
+    };
 
     const handleSubmit = async () => {
+        setValidationMessage('');
         const predefined = parsePredefinedValues(form.predefined_values);
         if (form.predefined_values.trim() && predefined === null) {
-            notify.error('Predefined values must be comma-separated numbers');
+            const message = 'Predefined values must be comma-separated numbers.';
+            setValidationMessage(message);
+            notify.error(message);
+            return;
+        }
+
+        const defaultValue = form.default_value !== '' ? Number(form.default_value) : null;
+        const minValue = form.min_value !== '' ? Number(form.min_value) : null;
+        const maxValue = form.max_value !== '' ? Number(form.max_value) : null;
+        const settingsError = validateMetricSettings({
+            inputType: form.input_type,
+            defaultValue,
+            predefinedValues: predefined,
+            minValue,
+            maxValue,
+        });
+        if (settingsError) {
+            setValidationMessage(settingsError);
+            notify.error(settingsError);
             return;
         }
 
@@ -125,11 +220,11 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
             is_multiplicative: form.is_multiplicative,
             is_additive: form.is_additive,
             input_type: form.input_type,
-            default_value: form.default_value !== '' ? Number(form.default_value) : null,
+            default_value: defaultValue,
             higher_is_better: form.higher_is_better,
             predefined_values: predefined,
-            min_value: form.min_value !== '' ? Number(form.min_value) : null,
-            max_value: form.max_value !== '' ? Number(form.max_value) : null,
+            min_value: minValue,
+            max_value: maxValue,
             description: form.description.trim() || null,
         };
 
@@ -145,9 +240,12 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
                 notify.success(`"${payload.name}" created`);
             }
             setCopyingFrom(null);
+            setValidationMessage('');
             handleCancelEdit();
         } catch (error) {
-            notify.error(`Failed to save metric: ${formatError(error)}`);
+            const message = `Failed to save metric: ${formatError(error)}`;
+            setValidationMessage(message);
+            notify.error(message);
         }
     };
 
@@ -324,7 +422,7 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
                                     placeholder="5, 8, 10, 12, 15"
                                     fullWidth
                                 />
-                                <div className={styles.inputHint}>Comma-separated numbers shown as quick-pick buttons in sessions</div>
+                                <div className={styles.inputHint}>Comma-separated numbers. When set, session inputs only allow these values.</div>
 
                                 <div className={styles.formRow}>
                                     <Input
@@ -356,6 +454,11 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
 
                             {/* Sticky submit area — always visible */}
                             <div className={styles.formFooter}>
+                                {validationMessage && (
+                                    <div className={styles.validationMessage} role="alert">
+                                        {validationMessage}
+                                    </div>
+                                )}
                                 {editingId ? (
                                     <Button variant="secondary" onClick={handleCancelEdit}>
                                         Cancel Edit

@@ -112,6 +112,16 @@ export default function useMetricDrafts({ exercise, updateExercise }) {
         return getMetricValue(metricsList, metricId, splitId);
     }, [getMetricValue, singleMetricDraftKey, singleMetricDrafts]);
 
+    const hasSetMetricDraft = useCallback((setIndex, metricId, splitId = null) => {
+        const key = setMetricDraftKey(setIndex, metricId, splitId);
+        return Object.prototype.hasOwnProperty.call(setMetricDrafts, key);
+    }, [setMetricDraftKey, setMetricDrafts]);
+
+    const hasSingleMetricDraft = useCallback((metricId, splitId = null) => {
+        const key = singleMetricDraftKey(metricId, splitId);
+        return Object.prototype.hasOwnProperty.call(singleMetricDrafts, key);
+    }, [singleMetricDraftKey, singleMetricDrafts]);
+
     const handleSetMetricDraftChange = useCallback((setIndex, metricId, value, splitId = null) => {
         const key = setMetricDraftKey(setIndex, metricId, splitId);
         setSetMetricDrafts((prev) => ({ ...prev, [key]: value }));
@@ -122,11 +132,12 @@ export default function useMetricDrafts({ exercise, updateExercise }) {
         setSingleMetricDrafts((prev) => ({ ...prev, [key]: value }));
     }, [singleMetricDraftKey]);
 
-    const commitSetMetricChange = useCallback((setIndex, metricId, splitId = null) => {
+    const commitSetMetricChange = useCallback((setIndex, metricId, splitId = null, overrideValue = undefined) => {
         const key = setMetricDraftKey(setIndex, metricId, splitId);
-        if (!Object.prototype.hasOwnProperty.call(setMetricDrafts, key)) return;
+        const hasDraft = Object.prototype.hasOwnProperty.call(setMetricDrafts, key);
+        if (!hasDraft && overrideValue === undefined) return;
 
-        const nextValue = setMetricDrafts[key];
+        const nextValue = overrideValue === undefined ? setMetricDrafts[key] : overrideValue;
         const nextSets = applySingleSetDraft(latestSetsRef.current, {
             setIndex,
             metricId,
@@ -142,11 +153,12 @@ export default function useMetricDrafts({ exercise, updateExercise }) {
         });
     }, [setMetricDraftKey, setMetricDrafts, updateExercise]);
 
-    const commitSingleMetricChange = useCallback((metricId, splitId = null) => {
+    const commitSingleMetricChange = useCallback((metricId, splitId = null, overrideValue = undefined) => {
         const key = singleMetricDraftKey(metricId, splitId);
-        if (!Object.prototype.hasOwnProperty.call(singleMetricDrafts, key)) return;
+        const hasDraft = Object.prototype.hasOwnProperty.call(singleMetricDrafts, key);
+        if (!hasDraft && overrideValue === undefined) return;
 
-        const value = singleMetricDrafts[key];
+        const value = overrideValue === undefined ? singleMetricDrafts[key] : overrideValue;
         const currentMetrics = [...(exercise.metrics || [])];
         const metricIndex = currentMetrics.findIndex((metric) => (
             resolveMetricId(metric) === metricId
@@ -181,6 +193,8 @@ export default function useMetricDrafts({ exercise, updateExercise }) {
         getMetricValue,
         getSetMetricDisplayValue,
         getSingleMetricDisplayValue,
+        hasSetMetricDraft,
+        hasSingleMetricDraft,
         handleSetMetricDraftChange,
         handleSingleMetricDraftChange,
         commitSetMetricChange,

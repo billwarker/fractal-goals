@@ -154,6 +154,10 @@ describe('useSessionDetailMutations', () => {
         });
 
         expect(newInstance).toEqual({ id: 'inst-2', activity_definition_id: 'act-1' });
+        expect(addActivityToSession).toHaveBeenCalledWith('root-1', 'session-1', {
+            activity_definition_id: 'act-1',
+            section_index: 0,
+        });
         expect(queryClient.getQueryData(queryKeys.sessionActivities('root-1', 'session-1'))).toEqual([
             { id: 'inst-1', activity_definition_id: 'act-1' },
             { id: 'inst-2', activity_definition_id: 'act-1' },

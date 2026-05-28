@@ -50,6 +50,66 @@ class ActivityMetricService:
             )
         return aggregation, None
 
+    @staticmethod
+    def _numbers_equal(left, right):
+        return abs(float(left) - float(right)) < 0.000001
+
+    @classmethod
+    def _validate_metric_constraints(
+        cls,
+        *,
+        input_type,
+        default_value=None,
+        predefined_values=None,
+        min_value=None,
+        max_value=None,
+    ):
+        if min_value is not None and max_value is not None and min_value > max_value:
+            return "Min value cannot be greater than max value", 400
+
+        values_to_check = [
+            ("Default value", default_value),
+            ("Min value", min_value),
+            ("Max value", max_value),
+            *[
+                (f"Predefined value {index + 1}", value)
+                for index, value in enumerate(predefined_values or [])
+            ],
+        ]
+        for label, value in values_to_check:
+            if value is None:
+                continue
+            if input_type == 'integer' and int(value) != float(value):
+                return f"{label} must be a whole number for integer metrics", 400
+            if input_type == 'duration' and value < 0:
+                return f"{label} cannot be negative for duration metrics", 400
+
+        if default_value is not None:
+            if min_value is not None and default_value < min_value:
+                return "Default value cannot be less than min value", 400
+            if max_value is not None and default_value > max_value:
+                return "Default value cannot be greater than max value", 400
+
+        if predefined_values:
+            unique_values = {round(float(value), 6) for value in predefined_values}
+            if len(unique_values) != len(predefined_values):
+                return "Predefined values cannot contain duplicates", 400
+
+            for value in predefined_values:
+                if min_value is not None and value < min_value:
+                    return "Predefined values cannot be less than min value", 400
+                if max_value is not None and value > max_value:
+                    return "Predefined values cannot be greater than max value", 400
+
+            if default_value is not None and not any(cls._numbers_equal(value, default_value) for value in predefined_values):
+                return "Default value must be one of the predefined values", 400
+            if min_value is not None and not any(cls._numbers_equal(value, min_value) for value in predefined_values):
+                return "Min value must be included in the predefined values", 400
+            if max_value is not None and not any(cls._numbers_equal(value, max_value) for value in predefined_values):
+                return "Max value must be included in the predefined values", 400
+
+        return None
+
     def list_fractal_metrics(self, root_id, current_user_id) -> ServiceResult[list[FractalMetricDefinition]]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
@@ -109,6 +169,16 @@ class ActivityMetricService:
         if aggregation_error:
             return None, *aggregation_error
 
+        constraint_error = self._validate_metric_constraints(
+            input_type=input_type,
+            default_value=data.get('default_value'),
+            predefined_values=data.get('predefined_values'),
+            min_value=data.get('min_value'),
+            max_value=data.get('max_value'),
+        )
+        if constraint_error:
+            return None, *constraint_error
+
         metric = FractalMetricDefinition(
             root_id=root_id,
             name=name,
@@ -166,15 +236,26 @@ class ActivityMetricService:
             metric.name = name
             metric.unit = unit
 
+        next_input_type = data.get('input_type', metric.input_type)
+        if next_input_type not in ('number', 'integer', 'duration'):
+            return None, "input_type must be 'number', 'integer', or 'duration'", 400
+
+        constraint_error = self._validate_metric_constraints(
+            input_type=next_input_type,
+            default_value=data.get('default_value', metric.default_value),
+            predefined_values=data.get('predefined_values', metric.predefined_values),
+            min_value=data.get('min_value', metric.min_value),
+            max_value=data.get('max_value', metric.max_value),
+        )
+        if constraint_error:
+            return None, *constraint_error
+
         if 'is_multiplicative' in data:
             metric.is_multiplicative = data['is_multiplicative']
         if 'is_additive' in data:
             metric.is_additive = data['is_additive']
         if 'input_type' in data:
-            input_type = data['input_type']
-            if input_type not in ('number', 'integer', 'duration'):
-                return None, "input_type must be 'number', 'integer', or 'duration'", 400
-            metric.input_type = input_type
+            metric.input_type = next_input_type
         if 'default_progress_aggregation' in data:
             default_progress_aggregation, aggregation_error = self._validate_progress_aggregation(
                 data.get('default_progress_aggregation'),

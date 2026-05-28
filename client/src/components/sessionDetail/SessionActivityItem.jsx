@@ -58,6 +58,116 @@ function formatMetricNumber(value) {
     return numericValue.toFixed(1).replace(/\.0$/, '');
 }
 
+function formatDurationMetricValue(value) {
+    if (value == null || value === '') return '';
+    const rawValue = String(value);
+    if (rawValue.includes(':')) return rawValue;
+    const numericValue = Number(rawValue);
+    if (Number.isNaN(numericValue)) return rawValue;
+    const totalSeconds = Math.max(0, Math.round(numericValue));
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function parseDurationMetricInput(value) {
+    const trimmed = String(value ?? '').trim();
+    if (!trimmed) return '';
+    if (/^\d+(\.\d+)?$/.test(trimmed)) {
+        return Math.max(0, Math.round(Number(trimmed)));
+    }
+    const match = trimmed.match(/^(\d+):(\d{1,2})$/);
+    if (!match) return null;
+    const mins = Number(match[1]);
+    const secs = Number(match[2]);
+    if (!Number.isInteger(mins) || !Number.isInteger(secs) || secs > 59) return null;
+    return (mins * 60) + secs;
+}
+
+function clampMetricValue(metricDef, value) {
+    if (value === '' || value == null) return value;
+    let nextValue = Number(value);
+    if (Number.isNaN(nextValue)) return value;
+    if (metricDef?.min_value != null) {
+        nextValue = Math.max(Number(metricDef.min_value), nextValue);
+    }
+    if (metricDef?.max_value != null) {
+        nextValue = Math.min(Number(metricDef.max_value), nextValue);
+    }
+    return nextValue;
+}
+
+function normalizeMetricValueForStorage(metricDef, value) {
+    const trimmed = String(value ?? '').trim();
+    if (!trimmed) return '';
+
+    let normalized;
+    if (metricDef?.input_type === 'duration') {
+        normalized = parseDurationMetricInput(trimmed);
+        if (normalized == null) return trimmed;
+    } else {
+        const numericValue = Number(trimmed);
+        if (Number.isNaN(numericValue)) return trimmed;
+        normalized = metricDef?.input_type === 'integer'
+            ? Math.trunc(numericValue)
+            : numericValue;
+    }
+
+    const clamped = clampMetricValue(metricDef, normalized);
+    return String(clamped);
+}
+
+function getMetricDefaultStorageValue(metricDef) {
+    if (metricDef?.default_value == null || metricDef.default_value === '') return '';
+    return normalizeMetricValueForStorage(metricDef, metricDef.default_value);
+}
+
+function formatMetricValueForInput(metricDef, value) {
+    if (value == null || value === '') return '';
+    if (metricDef?.input_type === 'duration') {
+        return formatDurationMetricValue(value);
+    }
+    return String(value);
+}
+
+function formatAllowedMetricValueLabel(metricDef, value) {
+    if (metricDef?.input_type === 'duration') {
+        return formatDurationMetricValue(value);
+    }
+    return String(value);
+}
+
+function getAllowedMetricValues(metricDef) {
+    return Array.isArray(metricDef?.predefined_values)
+        ? metricDef.predefined_values
+            .filter((value) => value !== '' && value != null)
+            .map((value) => normalizeMetricValueForStorage(metricDef, value))
+        : [];
+}
+
+function formatAllowedMetricValues(metricDef) {
+    const values = getAllowedMetricValues(metricDef);
+    if (values.length === 0) return null;
+    return values.map((value) => formatAllowedMetricValueLabel(metricDef, value)).join(', ');
+}
+
+function getMetricInputProps(metricDef) {
+    if (metricDef?.input_type === 'duration') {
+        return {
+            type: 'text',
+            inputMode: 'numeric',
+            placeholder: 'MM:SS',
+        };
+    }
+
+    return {
+        type: 'number',
+        step: metricDef?.input_type === 'integer' ? 1 : 'any',
+        min: metricDef?.min_value ?? undefined,
+        max: metricDef?.max_value ?? undefined,
+    };
+}
+
 function formatInlineProgressValue(comparison, displayMode = 'percent') {
     if (!comparison) return null;
 
@@ -231,11 +341,11 @@ function buildEmptySet(definition, hasSplits) {
         ? definition.split_definitions.flatMap((split) => definition.metric_definitions.map((metric) => ({
             metric_id: metric.id,
             split_id: split.id,
-            value: '',
+            value: getMetricDefaultStorageValue(metric),
         })))
         : definition.metric_definitions.map((metric) => ({
             metric_id: metric.id,
-            value: '',
+            value: getMetricDefaultStorageValue(metric),
         }));
 
     return {
@@ -435,6 +545,8 @@ function SessionActivityItem({
         getMetricValue,
         getSetMetricDisplayValue,
         getSingleMetricDisplayValue,
+        hasSetMetricDraft,
+        hasSingleMetricDraft,
         handleSetMetricDraftChange,
         handleSingleMetricDraftChange,
         commitSetMetricChange,
@@ -446,6 +558,128 @@ function SessionActivityItem({
         exercise,
         updateExercise: onUpdate,
     });
+    const appliedMetricDefaultsRef = React.useRef('');
+
+    useEffect(() => {
+        if (!hasMetrics) return;
+
+        const metricDefinitions = def.metric_definitions || [];
+        const metricsWithDefaults = metricDefinitions.filter((metric) => getMetricDefaultStorageValue(metric) !== '');
+        if (metricsWithDefaults.length === 0) return;
+        const missingDefaultKeys = [];
+
+        if (hasSets && Array.isArray(exercise.sets) && exercise.sets.length > 0) {
+            let changed = false;
+            const nextSets = exercise.sets.map((set) => {
+                const existingMetrics = Array.isArray(set.metrics) ? set.metrics : [];
+                const nextMetrics = [...existingMetrics];
+
+                if (hasSplits && Array.isArray(def.split_definitions)) {
+                    def.split_definitions.forEach((split) => {
+                        metricsWithDefaults.forEach((metric) => {
+                            const exists = existingMetrics.some((item) => (
+                                resolveMetricId(item) === metric.id
+                                && resolveSplitId(item) === split.id
+                            ));
+                            if (!exists) {
+                                missingDefaultKeys.push(`${set.instance_id || 'set'}:${split.id}:${metric.id}`);
+                                nextMetrics.push({
+                                    metric_id: metric.id,
+                                    split_id: split.id,
+                                    value: getMetricDefaultStorageValue(metric),
+                                });
+                                changed = true;
+                            }
+                        });
+                    });
+                } else {
+                    metricsWithDefaults.forEach((metric) => {
+                        const exists = existingMetrics.some((item) => (
+                            resolveMetricId(item) === metric.id && !resolveSplitId(item)
+                        ));
+                        if (!exists) {
+                            missingDefaultKeys.push(`${set.instance_id || 'set'}:${metric.id}`);
+                            nextMetrics.push({
+                                metric_id: metric.id,
+                                value: getMetricDefaultStorageValue(metric),
+                            });
+                            changed = true;
+                        }
+                    });
+                }
+
+                return changed ? { ...set, metrics: nextMetrics } : set;
+            });
+
+            if (changed) {
+                const signature = `${exercise.id}:sets:${missingDefaultKeys.sort().join('|')}`;
+                if (signature && appliedMetricDefaultsRef.current !== signature) {
+                    appliedMetricDefaultsRef.current = signature;
+                    onUpdate('sets', nextSets);
+                }
+            }
+            return;
+        }
+
+        if (!hasSets) {
+            const existingMetrics = Array.isArray(exercise.metrics) ? exercise.metrics : [];
+            const nextMetrics = [...existingMetrics];
+            let changed = false;
+
+            if (hasSplits && Array.isArray(def.split_definitions)) {
+                def.split_definitions.forEach((split) => {
+                    metricsWithDefaults.forEach((metric) => {
+                        const exists = existingMetrics.some((item) => (
+                            resolveMetricId(item) === metric.id
+                            && resolveSplitId(item) === split.id
+                        ));
+                        if (!exists) {
+                            missingDefaultKeys.push(`${split.id}:${metric.id}`);
+                            nextMetrics.push({
+                                metric_id: metric.id,
+                                split_id: split.id,
+                                value: getMetricDefaultStorageValue(metric),
+                            });
+                            changed = true;
+                        }
+                    });
+                });
+            } else {
+                metricsWithDefaults.forEach((metric) => {
+                    const exists = existingMetrics.some((item) => (
+                        resolveMetricId(item) === metric.id && !resolveSplitId(item)
+                    ));
+                    if (!exists) {
+                        missingDefaultKeys.push(metric.id);
+                        nextMetrics.push({
+                            metric_id: metric.id,
+                            value: getMetricDefaultStorageValue(metric),
+                        });
+                        changed = true;
+                    }
+                });
+            }
+
+            if (changed) {
+                const signature = `${exercise.id}:metrics:${missingDefaultKeys.sort().join('|')}`;
+                if (signature && appliedMetricDefaultsRef.current !== signature) {
+                    appliedMetricDefaultsRef.current = signature;
+                    onUpdate('metrics', nextMetrics);
+                }
+            }
+        }
+    }, [
+        def.metric_definitions,
+        def.split_definitions,
+        exercise.metrics,
+        exercise.sets,
+        hasMetrics,
+        hasSets,
+        hasSplits,
+        onUpdate,
+        resolveMetricId,
+        resolveSplitId,
+    ]);
     // Fetch live progress comparison while the activity is incomplete and no completion result yet
     const isCompleted = Boolean(exercise.time_stop);
     const activityProgress = exercise?.progress_comparison || null;
@@ -698,6 +932,77 @@ function SessionActivityItem({
         const val = getMetricValue(nextSet.metrics, metricId, splitId);
 
         return val === '' || val === null || val === undefined;
+    };
+
+    const commitSetMetricInput = (setIndex, metricDef, splitId = null, displayValue) => {
+        const normalizedValue = normalizeMetricValueForStorage(metricDef, displayValue);
+        commitSetMetricChange(setIndex, metricDef.id, splitId, normalizedValue);
+    };
+
+    const commitSingleMetricInput = (metricDef, splitId = null, displayValue) => {
+        const normalizedValue = normalizeMetricValueForStorage(metricDef, displayValue);
+        commitSingleMetricChange(metricDef.id, splitId, normalizedValue);
+    };
+
+    const renderMetricEditor = ({
+        metricDef,
+        value,
+        inputClassName,
+        metaClassName,
+        unitClassName,
+        onDraftChange,
+        onCommit,
+        progress,
+        isDraft = false,
+    }) => {
+        const allowedValues = getAllowedMetricValues(metricDef);
+        const allowedValuesText = formatAllowedMetricValues(metricDef);
+        const displayValue = isDraft ? String(value ?? '') : formatMetricValueForInput(metricDef, value);
+        const selectedAllowedValue = normalizeMetricValueForStorage(metricDef, value);
+        return (
+            <>
+                <div className={styles.metricValueControl}>
+                    {allowedValues.length > 0 ? (
+                        <select
+                            className={`${inputClassName} ${styles.metricSelect}`}
+                            value={allowedValues.includes(String(selectedAllowedValue)) ? String(selectedAllowedValue) : ''}
+                            onChange={(event) => {
+                                const nextValue = allowedValues.includes(event.target.value) ? event.target.value : '';
+                                onDraftChange(nextValue);
+                                onCommit(nextValue);
+                            }}
+                        >
+                            <option value="">--</option>
+                            {allowedValues.map((allowedValue) => (
+                                <option key={`${metricDef.id}-${allowedValue}`} value={allowedValue}>
+                                    {formatAllowedMetricValueLabel(metricDef, allowedValue)}
+                                </option>
+                            ))}
+                        </select>
+                    ) : (
+                        <input
+                            {...getMetricInputProps(metricDef)}
+                            className={inputClassName}
+                            value={displayValue}
+                            onChange={(event) => onDraftChange(event.target.value)}
+                            onBlur={(event) => onCommit(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') event.currentTarget.blur();
+                            }}
+                        />
+                    )}
+                    {allowedValuesText && (
+                        <div className={styles.metricAllowedValues}>
+                            Allowed: {allowedValuesText}
+                        </div>
+                    )}
+                </div>
+                <span className={metaClassName}>
+                    <span className={unitClassName}>{metricDef.unit}</span>
+                    {progress}
+                </span>
+            </>
+        );
     };
 
     // Handler for clicking on the activity panel (not a specific set)
@@ -1033,20 +1338,17 @@ function SessionActivityItem({
                                                         {def.metric_definitions.map(m => (
                                                             <div key={m.id} className={styles.metricInputContainer}>
                                                                 <label className={styles.metricLabel}>{m.name}</label>
-                                                                <input
-                                                                    type="number"
-                                                                    className={`${styles.metricInput} ${styles.metricInputSmall}`}
-                                                                    value={getSetMetricDisplayValue(setIdx, set.metrics, m.id, split.id)}
-                                                                    onChange={(e) => handleSetMetricDraftChange(setIdx, m.id, e.target.value, split.id)}
-                                                                    onBlur={() => commitSetMetricChange(setIdx, m.id, split.id)}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === 'Enter') e.currentTarget.blur();
-                                                                    }}
-                                                                />
-                                                                <span className={styles.metricMeta}>
-                                                                    <span className={styles.metricUnit}>{m.unit}</span>
-                                                                    {renderMetricProgress(m.id, { setIndex: setIdx })}
-                                                                </span>
+                                                                {renderMetricEditor({
+                                                                    metricDef: m,
+                                                                    value: getSetMetricDisplayValue(setIdx, set.metrics, m.id, split.id),
+                                                                    isDraft: hasSetMetricDraft(setIdx, m.id, split.id),
+                                                                    inputClassName: `${styles.metricInput} ${styles.metricInputSmall}`,
+                                                                    metaClassName: styles.metricMeta,
+                                                                    unitClassName: styles.metricUnit,
+                                                                    onDraftChange: (value) => handleSetMetricDraftChange(setIdx, m.id, value, split.id),
+                                                                    onCommit: (value) => commitSetMetricInput(setIdx, m, split.id, value),
+                                                                    progress: renderMetricProgress(m.id, { setIndex: setIdx }),
+                                                                })}
                                                             </div>
                                                         ))}
                                                     </div>
@@ -1056,20 +1358,17 @@ function SessionActivityItem({
                                                 def.metric_definitions.map(m => (
                                                     <div key={m.id} className={styles.metricInputContainer}>
                                                         <label className={styles.metricLabelLarge}>{m.name}</label>
-                                                        <input
-                                                            type="number"
-                                                            className={`${styles.metricInput} ${styles.metricInputLarge}`}
-                                                            value={getSetMetricDisplayValue(setIdx, set.metrics, m.id)}
-                                                            onChange={(e) => handleSetMetricDraftChange(setIdx, m.id, e.target.value)}
-                                                            onBlur={() => commitSetMetricChange(setIdx, m.id)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') e.currentTarget.blur();
-                                                            }}
-                                                        />
-                                                        <span className={`${styles.metricMeta} ${styles.metricMetaLarge}`}>
-                                                            <span className={styles.metricUnitLarge}>{m.unit}</span>
-                                                            {renderMetricProgress(m.id, { setIndex: setIdx })}
-                                                        </span>
+                                                        {renderMetricEditor({
+                                                            metricDef: m,
+                                                            value: getSetMetricDisplayValue(setIdx, set.metrics, m.id),
+                                                            isDraft: hasSetMetricDraft(setIdx, m.id),
+                                                            inputClassName: `${styles.metricInput} ${styles.metricInputLarge}`,
+                                                            metaClassName: `${styles.metricMeta} ${styles.metricMetaLarge}`,
+                                                            unitClassName: styles.metricUnitLarge,
+                                                            onDraftChange: (value) => handleSetMetricDraftChange(setIdx, m.id, value),
+                                                            onCommit: (value) => commitSetMetricInput(setIdx, m, null, value),
+                                                            progress: renderMetricProgress(m.id, { setIndex: setIdx }),
+                                                        })}
                                                     </div>
                                                 ))
                                             )
@@ -1157,20 +1456,17 @@ function SessionActivityItem({
                                             {def.metric_definitions.map(m => (
                                                 <div key={m.id} className={styles.metricInputContainer}>
                                                     <label className={styles.metricLabelLarge}>{m.name}</label>
-                                                    <input
-                                                        type="number"
-                                                        className={`${styles.metricInput} ${styles.metricInputLarge}`}
-                                                        value={getSingleMetricDisplayValue(exercise.metrics, m.id, split.id)}
-                                                        onChange={(e) => handleSingleMetricDraftChange(m.id, e.target.value, split.id)}
-                                                        onBlur={() => commitSingleMetricChange(m.id, split.id)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') e.currentTarget.blur();
-                                                        }}
-                                                    />
-                                                    <span className={`${styles.metricMeta} ${styles.metricMetaLarge}`}>
-                                                        <span className={styles.metricUnitLarge}>{m.unit}</span>
-                                                        {renderMetricProgress(m.id)}
-                                                    </span>
+                                                    {renderMetricEditor({
+                                                        metricDef: m,
+                                                        value: getSingleMetricDisplayValue(exercise.metrics, m.id, split.id),
+                                                        isDraft: hasSingleMetricDraft(m.id, split.id),
+                                                        inputClassName: `${styles.metricInput} ${styles.metricInputLarge}`,
+                                                        metaClassName: `${styles.metricMeta} ${styles.metricMetaLarge}`,
+                                                        unitClassName: styles.metricUnitLarge,
+                                                        onDraftChange: (value) => handleSingleMetricDraftChange(m.id, value, split.id),
+                                                        onCommit: (value) => commitSingleMetricInput(m, split.id, value),
+                                                        progress: renderMetricProgress(m.id),
+                                                    })}
                                                 </div>
                                             ))}
                                         </div>
@@ -1183,20 +1479,17 @@ function SessionActivityItem({
                                 {def.metric_definitions.map(m => (
                                     <div key={m.id} className={styles.metricInputContainer}>
                                         <label className={styles.metricLabelLarge}>{m.name}</label>
-                                        <input
-                                            type="number"
-                                            className={`${styles.metricInput} ${styles.metricInputLarge}`}
-                                            value={getSingleMetricDisplayValue(exercise.metrics, m.id)}
-                                            onChange={(e) => handleSingleMetricDraftChange(m.id, e.target.value)}
-                                            onBlur={() => commitSingleMetricChange(m.id)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') e.currentTarget.blur();
-                                            }}
-                                        />
-                                        <span className={`${styles.metricMeta} ${styles.metricMetaLarge}`}>
-                                            <span className={styles.metricUnitLarge}>{m.unit}</span>
-                                            {renderMetricProgress(m.id)}
-                                        </span>
+                                        {renderMetricEditor({
+                                            metricDef: m,
+                                            value: getSingleMetricDisplayValue(exercise.metrics, m.id),
+                                            isDraft: hasSingleMetricDraft(m.id),
+                                            inputClassName: `${styles.metricInput} ${styles.metricInputLarge}`,
+                                            metaClassName: `${styles.metricMeta} ${styles.metricMetaLarge}`,
+                                            unitClassName: styles.metricUnitLarge,
+                                            onDraftChange: (value) => handleSingleMetricDraftChange(m.id, value),
+                                            onCommit: (value) => commitSingleMetricInput(m, null, value),
+                                            progress: renderMetricProgress(m.id),
+                                        })}
                                     </div>
                                 ))}
                             </div>

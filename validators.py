@@ -698,6 +698,7 @@ class ActivityInstanceCreateSchema(BaseModel):
     session_id: Optional[str] = None
     activity_definition_id: str = Field(..., min_length=1)
     instance_id: Optional[str] = None
+    section_index: Optional[int] = Field(None, ge=0)
 
 
 class ActivityInstanceUpdateSchema(BaseModel):

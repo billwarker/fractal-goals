@@ -152,6 +152,175 @@ describe('SessionActivityItem metric and timer editing', () => {
         });
     });
 
+    it('applies metric defaults, presets, integer bounds, and duration formatting', async () => {
+        const boundedMetricDefinition = {
+            id: 'activity-1',
+            name: 'Skill Hold',
+            metric_definitions: [
+                {
+                    id: 'm1',
+                    name: 'Reps',
+                    unit: 'reps',
+                    input_type: 'integer',
+                    default_value: 5,
+                    predefined_values: [5, 7],
+                    min_value: 1,
+                    max_value: 10,
+                },
+            ],
+            split_definitions: [],
+            has_sets: false,
+            has_splits: false,
+        };
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-defaults',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: null,
+                    time_stop: null,
+                    duration_seconds: 0,
+                }}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+                activityDefinition={boundedMetricDefinition}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        await waitFor(() => {
+            expect(updateInstance).toHaveBeenCalledWith('instance-defaults', {
+                metrics: [{ metric_id: 'm1', value: '5' }],
+            });
+        });
+
+        updateInstance.mockClear();
+    });
+
+    it('normalizes configured metric inputs when committing edits', async () => {
+        const activityDefinition = {
+            id: 'activity-1',
+            name: 'Skill Hold',
+            metric_definitions: [
+                {
+                    id: 'm1',
+                    name: 'Reps',
+                    unit: 'reps',
+                    input_type: 'integer',
+                    predefined_values: [5, 7],
+                    min_value: 1,
+                    max_value: 10,
+                },
+                {
+                    id: 'm2',
+                    name: 'Hold Time',
+                    unit: 'sec',
+                    input_type: 'duration',
+                    predefined_values: [30, 90],
+                },
+            ],
+            split_definitions: [],
+            has_sets: false,
+            has_splits: false,
+        };
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-configured',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [
+                        { metric_id: 'm1', value: '5' },
+                        { metric_id: 'm2', value: '90' },
+                    ],
+                    time_start: null,
+                    time_stop: null,
+                    duration_seconds: 0,
+                }}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+                activityDefinition={activityDefinition}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.queryByRole('button', { name: '7' })).not.toBeInTheDocument();
+        expect(screen.getByText('Allowed: 5, 7')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByDisplayValue('5'), { target: { value: '7' } });
+        await waitFor(() => {
+            expect(updateInstance).toHaveBeenCalledWith('instance-configured', {
+                metrics: [
+                    { metric_id: 'm1', value: '7' },
+                    { metric_id: 'm2', value: '90' },
+                ],
+            });
+        });
+
+        updateInstance.mockClear();
+        const repsInput = screen.getByDisplayValue('5');
+        fireEvent.change(repsInput, { target: { value: '99' } });
+        await waitFor(() => {
+            expect(updateInstance).toHaveBeenCalledWith('instance-configured', {
+                metrics: [
+                    { metric_id: 'm1', value: '' },
+                    { metric_id: 'm2', value: '90' },
+                ],
+            });
+        });
+
+        updateInstance.mockClear();
+        expect(screen.getByText('Allowed: 00:30, 01:30')).toBeInTheDocument();
+        const durationInput = screen.getAllByRole('combobox')[1];
+        fireEvent.change(durationInput, { target: { value: '30' } });
+        await waitFor(() => {
+            expect(updateInstance).toHaveBeenCalledWith('instance-configured', {
+                metrics: [
+                    { metric_id: 'm1', value: '5' },
+                    { metric_id: 'm2', value: '30' },
+                ],
+            });
+        });
+    });
+
     it('buffers timer input edits and commits start time on blur', async () => {
         renderWithProviders(
             <SessionActivityItem

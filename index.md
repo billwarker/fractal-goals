@@ -170,6 +170,13 @@ Sessions support:
 - activity instances
 - timers and manual duration updates
 
+Session activity placement contract:
+
+- the add-activity API accepts `section_index` and persists the new instance id into `attributes.session_data.sections[section_index].activity_ids`
+- if a session has no section structure yet, adding to section `0` creates a default `Main` section
+- removing an activity marks the instance deleted and removes that instance id from persisted section activity lists
+- session detail and session cards both depend on this persisted section ordering, while `activity_instances` remains the canonical instance payload source
+
 Key backend pieces:
 
 - `services/session_service.py`
@@ -247,6 +254,14 @@ They support:
 - splits
 - goal associations
 - progress tracking and comparison settings
+
+Activity metrics now use fractal-level metric definitions as the user-facing configuration source:
+
+- session metric inputs honor metric input type, default value, predefined allowed values, and min/max bounds
+- predefined values render as constrained session input options with helper text, not optional quick-pick buttons
+- metric definition validation prevents conflicting default/min/max/predefined value settings
+- duration metrics are entered as `MM:SS` but stored numerically as seconds for progress calculations
+- product/yield behavior is driven by metric-level `is_multiplicative` flags, not the legacy activity-level `metrics_multiplicative` switch
 
 Key backend pieces:
 
