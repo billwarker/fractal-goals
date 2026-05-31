@@ -400,6 +400,20 @@ Key frontend pieces:
 - `client/src/components/modals/LogsModal.jsx`
 - `client/src/pages/Logs.jsx`
 
+Session analytics note:
+
+- Session trend analytics are consolidated under `sessions:sessionTrends`, a bar chart with configurable day/week/month/year grain and optional session count and summed duration metrics. Retired duration trend, weekly chart, consistency, activity heatmap, completion rate, and planned-vs-actual panel ids are migrated to this visualization.
+- Session start/end time distribution supports optional start and end markers, and the session duration histogram supports configurable bucket counts.
+
+Activity analytics note:
+
+- Activity trend analytics are consolidated under `activities:activityTrends`, a mixed chart where completed activity instances render as bars and activity duration renders as a line on a separate y-axis.
+- Activity totals live under `activities:activityFrequency` and can switch between completed instance counts and duration. Retired line graph, time-per-activity, personal-best, and metric-volume panel ids are migrated to the consolidated activity visualizations.
+- Individual activity metric analytics include `activities:metricTrends`, which plots up to two selected activity metrics as lines over time, and `activities:metricProgress`, which renders persisted progress-comparison percent improvement bars for progress-tracked metrics.
+- When global filters resolve to exactly one activity or goal, single-selection analytics panels use that scoped item as their effective selected activity/goal. Multi-item global scopes continue to filter aggregate panels without pretending there is a single selected item.
+- Analytics panels now use the app-wide graph-paper visual model: a bounded 20px cell grid using `--color-grid`, with panel geometry stored in whole cells. Only the selected panel can be dragged or resized; selected panels drag from any non-interactive panel space and resize from any edge or corner. Blank graph-paper clicks, including gaps between absolute-positioned panels, clear panel selection. Panel moves preserve dropped positions instead of auto-compacting upward, reject drag/resize proposals that would overlap another panel with a red conflict highlight, rescale proportionally when the filters pane changes workspace bounds, and persist saved-view workspace bounds so restored views scale into the current open/closed filters workspace. Restored views render only after the fitted layout has settled, avoiding visible load-time resize artifacts. A legacy restore fallback expands views that were saved at roughly one filters-pane width narrower than the current closed-pane workspace. The standard Cmd/Ctrl+Shift+D red debug outline remains available around the analytics workspace. The first empty-view panel defaults to the full measured workspace, and layout migration preserves older split-pane saved views.
+- The analytics views modal supports saved-view search by name or displayed update date and highlights rows/buttons on hover or keyboard focus.
+
 ## Data And State Flow
 
 ### Backend

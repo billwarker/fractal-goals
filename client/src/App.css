@@ -6,6 +6,7 @@
 :root {
     --app-nav-height: 0px;
     --app-viewport-height: 100vh;
+    --grid-unit: 20px;
 }
 
 @supports (height: 100dvh) {
@@ -45,7 +46,7 @@ html {
     background-image:
         linear-gradient(var(--color-grid) 1px, transparent 1px),
         linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
-    background-size: 24px 24px;
+    background-size: var(--grid-unit) var(--grid-unit);
 }
 
 /* Metrics Overlay */

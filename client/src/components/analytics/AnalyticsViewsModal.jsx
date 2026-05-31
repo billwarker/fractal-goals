@@ -1,8 +1,14 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import CloseIcon from '../atoms/CloseIcon';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 import styles from './AnalyticsViewsModal.module.css';
+
+const formatUpdatedDate = (value) => new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+});
 
 function AnalyticsViewsModal({
     views = [],
@@ -12,6 +18,19 @@ function AnalyticsViewsModal({
     onClose,
 }) {
     const [viewToDelete, setViewToDelete] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+    const filteredViews = useMemo(() => {
+        if (!normalizedSearch) return views;
+        return views.filter((view) => {
+            const updatedDate = formatUpdatedDate(view.updated_at);
+            return [
+                view.name,
+                updatedDate,
+                `updated ${updatedDate}`,
+            ].some((value) => String(value || '').toLowerCase().includes(normalizedSearch));
+        });
+    }, [normalizedSearch, views]);
 
     return (
         <div className={styles.overlay} onClick={onClose}>
@@ -24,6 +43,18 @@ function AnalyticsViewsModal({
                 </div>
 
                 <div className={styles.body}>
+                    <label className={styles.searchWrap}>
+                        <span className={styles.searchLabel}>Search views</span>
+                        <input
+                            type="search"
+                            className={styles.searchInput}
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            placeholder="Search analytics views"
+                            autoFocus
+                        />
+                    </label>
+
                     <button
                         type="button"
                         className={`${styles.viewRow} ${!selectedViewId ? styles.selected : ''}`}
@@ -38,41 +69,42 @@ function AnalyticsViewsModal({
                         </div>
                     </button>
 
-                    {views.length > 0 ? (
-                        views.map((view) => (
-                            <div
-                                key={view.id}
-                                className={`${styles.viewRow} ${selectedViewId === view.id ? styles.selected : ''}`}
-                            >
-                                <button
-                                    type="button"
-                                    className={styles.viewSelectButton}
-                                    onClick={() => {
-                                        onSelectView?.(view.id);
-                                        onClose?.();
-                                    }}
+                    {filteredViews.length > 0 ? (
+                        filteredViews.map((view) => {
+                            const updatedDate = formatUpdatedDate(view.updated_at);
+                            return (
+                                <div
+                                    key={view.id}
+                                    className={`${styles.viewRow} ${selectedViewId === view.id ? styles.selected : ''}`}
                                 >
-                                    <div className={styles.viewName}>{view.name}</div>
-                                    <div className={styles.viewMeta}>
-                                        Updated {new Date(view.updated_at).toLocaleDateString('en-US', {
-                                            month: 'short',
-                                            day: 'numeric',
-                                            year: 'numeric',
-                                        })}
-                                    </div>
-                                </button>
-                                <button
-                                    type="button"
-                                    className={styles.deleteButton}
-                                    onClick={() => setViewToDelete(view)}
-                                    title={`Delete ${view.name}`}
-                                >
-                                    Delete
-                                </button>
-                            </div>
-                        ))
+                                    <button
+                                        type="button"
+                                        className={styles.viewSelectButton}
+                                        onClick={() => {
+                                            onSelectView?.(view.id);
+                                            onClose?.();
+                                        }}
+                                    >
+                                        <div className={styles.viewName}>{view.name}</div>
+                                        <div className={styles.viewMeta}>
+                                            Updated {updatedDate}
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={styles.deleteButton}
+                                        onClick={() => setViewToDelete(view)}
+                                        title={`Delete ${view.name}`}
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                            );
+                        })
                     ) : (
-                        <div className={styles.emptyState}>No saved analytics views yet.</div>
+                        <div className={styles.emptyState}>
+                            {views.length > 0 ? 'No analytics views match your search.' : 'No saved analytics views yet.'}
+                        </div>
                     )}
                 </div>
             </div>

@@ -1,21 +1,16 @@
 import React from 'react';
 
-import ActivityHeatmap from '../../ActivityHeatmap';
 import {
-    SessionCompletionRateChart,
-    SessionConsistencyChart,
     SessionDurationHistogram,
-    SessionDurationTrend,
-    SessionPlannedVsActualChart,
     SessionSectionPie,
     SessionStartDistribution,
 } from '../../AnalyticsExtraCharts';
 import StreakTimeline from '../../StreakTimeline';
-import WeeklyBarChart from '../../WeeklyBarChart';
 import styles from '../../ProfileWindow.module.css';
 import { Heading } from '../../../atoms/Typography';
 import EmptyControls from '../shared/EmptyControls';
 import StatCard from '../shared/StatCard';
+import { SessionTrendsChart, SessionTrendsControls } from './SessionTrends';
 
 function SessionSummaryChart({ context }) {
     const { sessions } = context.scopedData;
@@ -35,76 +30,106 @@ function SessionSummaryChart({ context }) {
     );
 }
 
-function SessionHeatmapChart({ context }) {
-    return <div className={styles.vizContainerHeatmap}><ActivityHeatmap sessions={context.scopedData.sessions} months={context.visualizationState.months || 12} /></div>;
-}
-
 function SessionStreaksChart({ context }) {
-    return <div className={styles.vizContainerHidden}><StreakTimeline sessions={context.scopedData.sessions} /></div>;
+    return <div className={styles.vizContainerHidden}><StreakTimeline sessions={context.scopedData.sessions} dateRange={context.dateRange} /></div>;
 }
 
-function SessionWeeklyChart({ context }) {
+function SessionTrendsVisualizationChart({ context }) {
     return (
         <div className={styles.vizContainerHidden}>
-            <WeeklyBarChart
+            <SessionTrendsChart
                 sessions={context.scopedData.sessions}
-                weeks={12}
                 chartRef={context.chartRef}
-                selectedDateRange={context.dateRange}
-                onDateRangeChange={context.onGlobalDateRangeChange}
-                showMetricSelectors={false}
+                grain={context.visualizationState.grain || 'week'}
+                metrics={context.visualizationState.metrics || ['sessions', 'duration']}
             />
         </div>
     );
-}
-
-function SessionDurationTrendVisualizationChart({ context }) {
-    return <div className={styles.vizContainerHidden}><SessionDurationTrend sessions={context.scopedData.sessions} chartRef={context.chartRef} /></div>;
 }
 
 function SessionSectionPieVisualizationChart({ context }) {
     return <div className={styles.vizContainerHidden}><SessionSectionPie sessions={context.scopedData.sessions} activityInstances={context.scopedData.activityInstances} chartRef={context.chartRef} /></div>;
 }
 
-function SessionCompletionRateVisualizationChart({ context }) {
-    return <div className={styles.vizContainerHidden}><SessionCompletionRateChart sessions={context.scopedData.sessions} chartRef={context.chartRef} /></div>;
-}
-
 function SessionStartDistributionVisualizationChart({ context }) {
-    return <div className={styles.vizContainerHidden}><SessionStartDistribution sessions={context.scopedData.sessions} chartRef={context.chartRef} /></div>;
+    return (
+        <div className={styles.vizContainerHidden}>
+            <SessionStartDistribution
+                sessions={context.scopedData.sessions}
+                chartRef={context.chartRef}
+                markers={context.visualizationState.markers || ['start']}
+            />
+        </div>
+    );
 }
 
 function SessionDurationHistogramVisualizationChart({ context }) {
-    return <div className={styles.vizContainerHidden}><SessionDurationHistogram sessions={context.scopedData.sessions} chartRef={context.chartRef} /></div>;
+    return (
+        <div className={styles.vizContainerHidden}>
+            <SessionDurationHistogram
+                sessions={context.scopedData.sessions}
+                chartRef={context.chartRef}
+                bucketCount={context.visualizationState.bucketCount || 5}
+            />
+        </div>
+    );
 }
 
-function SessionPlannedVsActualVisualizationChart({ context }) {
-    return <div className={styles.vizContainerHidden}><SessionPlannedVsActualChart sessions={context.scopedData.sessions} chartRef={context.chartRef} /></div>;
-}
+export function SessionTimeDistributionControls({ context }) {
+    const selectedMarkers = context.visualizationState.markers?.length
+        ? context.visualizationState.markers
+        : ['start'];
+    const toggleMarker = (marker) => {
+        const nextMarkers = selectedMarkers.includes(marker)
+            ? selectedMarkers.filter((value) => value !== marker)
+            : [...selectedMarkers, marker];
+        context.updateVisualizationState({ markers: nextMarkers.length ? nextMarkers : selectedMarkers });
+    };
 
-function SessionConsistencyVisualizationChart({ context }) {
-    return <div className={styles.vizContainerHidden}><SessionConsistencyChart sessions={context.scopedData.sessions} chartRef={context.chartRef} /></div>;
-}
-
-export function HeatmapControls({ context }) {
     return (
         <div className="sessions-query-chip-group">
             {[
-                { value: 12, label: '1 Year' },
-                { value: 6, label: '6 Months' },
-                { value: 3, label: '3 Months' },
-                { value: 1, label: '1 Month' },
+                { value: 'start', label: 'Session Start' },
+                { value: 'end', label: 'Session End' },
             ].map((option) => (
                 <button
                     key={option.value}
                     type="button"
-                    className={`sessions-query-chip ${(context.visualizationState.months || 12) === option.value ? 'active' : ''}`}
-                    onClick={() => context.updateVisualizationState({ months: option.value })}
+                    className={`sessions-query-chip ${selectedMarkers.includes(option.value) ? 'active' : ''}`}
+                    onClick={() => toggleMarker(option.value)}
                 >
                     {option.label}
                 </button>
             ))}
         </div>
+    );
+}
+
+export function DurationHistogramControls({ context }) {
+    const bucketCount = context.visualizationState.bucketCount || 5;
+    const handleBucketChange = (event) => {
+        const rawValue = event.target.value;
+        if (rawValue === '') {
+            context.updateVisualizationState({ bucketCount: '' });
+            return;
+        }
+
+        const nextValue = Math.max(1, Math.min(30, Number(rawValue) || 5));
+        context.updateVisualizationState({ bucketCount: nextValue });
+    };
+
+    return (
+        <label className="sessions-query-field">
+            <span>Buckets</span>
+            <input
+                type="number"
+                min="1"
+                max="30"
+                step="1"
+                value={bucketCount}
+                onChange={handleBucketChange}
+            />
+        </label>
     );
 }
 
@@ -120,14 +145,14 @@ export const SESSION_VISUALIZATIONS = [
         Controls: EmptyControls,
     },
     {
-        id: 'durationTrend',
+        id: 'sessionTrends',
         category: 'sessions',
-        name: 'Duration Trend',
-        iconType: 'sessions:durationTrend',
-        defaultState: {},
+        name: 'Session Trends',
+        iconType: 'sessions:sessionTrends',
+        defaultState: { grain: 'week', metrics: ['sessions', 'duration'] },
         selectionRequirements: {},
-        Chart: SessionDurationTrendVisualizationChart,
-        Controls: EmptyControls,
+        Chart: SessionTrendsVisualizationChart,
+        Controls: SessionTrendsControls,
     },
     {
         id: 'sectionPie',
@@ -140,16 +165,6 @@ export const SESSION_VISUALIZATIONS = [
         Controls: EmptyControls,
     },
     {
-        id: 'heatmap',
-        category: 'sessions',
-        name: 'Activity Heatmap',
-        iconType: 'sessions:heatmap',
-        defaultState: { months: 12 },
-        selectionRequirements: {},
-        Chart: SessionHeatmapChart,
-        Controls: HeatmapControls,
-    },
-    {
         id: 'streaks',
         category: 'sessions',
         name: 'Streak Timeline',
@@ -160,63 +175,23 @@ export const SESSION_VISUALIZATIONS = [
         Controls: EmptyControls,
     },
     {
-        id: 'weeklyChart',
-        category: 'sessions',
-        name: 'Weekly Chart',
-        iconType: 'sessions:weeklyChart',
-        defaultState: {},
-        selectionRequirements: {},
-        Chart: SessionWeeklyChart,
-        Controls: EmptyControls,
-    },
-    {
-        id: 'completionRate',
-        category: 'sessions',
-        name: 'Completion Rate',
-        iconType: 'sessions:completionRate',
-        defaultState: {},
-        selectionRequirements: {},
-        Chart: SessionCompletionRateVisualizationChart,
-        Controls: EmptyControls,
-    },
-    {
         id: 'startDistribution',
         category: 'sessions',
-        name: 'Start Times',
+        name: 'Start and End Times',
         iconType: 'sessions:startDistribution',
-        defaultState: {},
+        defaultState: { markers: ['start'] },
         selectionRequirements: {},
         Chart: SessionStartDistributionVisualizationChart,
-        Controls: EmptyControls,
+        Controls: SessionTimeDistributionControls,
     },
     {
         id: 'durationHistogram',
         category: 'sessions',
         name: 'Duration Histogram',
         iconType: 'sessions:durationHistogram',
-        defaultState: {},
+        defaultState: { bucketCount: 5 },
         selectionRequirements: {},
         Chart: SessionDurationHistogramVisualizationChart,
-        Controls: EmptyControls,
-    },
-    {
-        id: 'plannedVsActual',
-        category: 'sessions',
-        name: 'Planned vs Actual',
-        iconType: 'sessions:plannedVsActual',
-        defaultState: {},
-        selectionRequirements: {},
-        Chart: SessionPlannedVsActualVisualizationChart,
-        Controls: EmptyControls,
-    },
-    {
-        id: 'consistency',
-        category: 'sessions',
-        name: 'Consistency',
-        iconType: 'sessions:consistency',
-        defaultState: {},
-        selectionRequirements: {},
-        Chart: SessionConsistencyVisualizationChart,
-        Controls: EmptyControls,
+        Controls: DurationHistogramControls,
     },
 ];

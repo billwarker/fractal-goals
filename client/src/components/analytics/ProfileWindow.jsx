@@ -53,6 +53,7 @@ function ProfileWindow({
     updateWindowState,
     isSelected = false,
     onSelect,
+    dragHandleProps = null,
     globalDateRange = null,
     onGlobalDateRangeChange,
     globalFilters = null,
@@ -113,9 +114,20 @@ function ProfileWindow({
             ? activities.filter((activity) => resolvedGlobalFilters.activityIds.has(activity.id))
             : activities
     ), [activities, resolvedGlobalFilters.activityIds, resolvedGlobalFilters.hasActivityFilter]);
-    const effectiveSelectedActivity = selectedActivity && scopedActivities.some((activity) => activity.id === selectedActivity.id)
-        ? selectedActivity
-        : null;
+    const selectedVisualizationMeta = getVisualization(selectedCategory, selectedVisualization);
+    const effectiveSelectedActivity = useMemo(() => {
+        if (selectedActivity?.id && scopedActivities.some((activity) => activity.id === selectedActivity.id)) {
+            return scopedActivities.find((activity) => activity.id === selectedActivity.id);
+        }
+        if (
+            selectedVisualizationMeta?.selectionRequirements?.activity
+            && resolvedGlobalFilters.hasActivityFilter
+            && scopedActivities.length === 1
+        ) {
+            return scopedActivities[0];
+        }
+        return null;
+    }, [resolvedGlobalFilters.hasActivityFilter, scopedActivities, selectedActivity, selectedVisualizationMeta]);
     const hasActiveDateRange = Boolean(effectiveDateRange?.start || effectiveDateRange?.end);
 
     const isDateInRange = React.useCallback((value) => {
@@ -328,16 +340,31 @@ function ProfileWindow({
             const goalId = resolvedGlobalFilters.filters.goals.goalIds[0];
             return filteredGoalAnalyticsGoals.find((goal) => goal.id === goalId) || null;
         }
+        if (
+            selectedVisualizationMeta?.selectionRequirements?.goal
+            && (resolvedGlobalFilters.hasGoalFilter || resolvedGlobalFilters.hasActivityFilter)
+            && filteredGoalAnalyticsGoals.length === 1
+        ) {
+            return filteredGoalAnalyticsGoals[0];
+        }
         return null;
-    }, [filteredGoalAnalyticsGoals, resolvedGlobalFilters.filters.goals.goalIds, selectedGoal]);
-
-    const selectedVisualizationMeta = getVisualization(selectedCategory, selectedVisualization);
+    }, [
+        filteredGoalAnalyticsGoals,
+        resolvedGlobalFilters.filters.goals.goalIds,
+        resolvedGlobalFilters.hasActivityFilter,
+        resolvedGlobalFilters.hasGoalFilter,
+        selectedGoal,
+        selectedVisualizationMeta,
+    ]);
 
     const renderUnifiedHeader = () => {
         const hasCategory = !!selectedCategory;
 
         return (
-            <div className={`${styles.header} ${isVeryNarrow ? styles.wrap : ''}`}>
+            <div
+                className={`${styles.header} ${isVeryNarrow ? styles.wrap : ''}`}
+                {...(dragHandleProps || {})}
+            >
                 {/* Navigation Controls (Back/Top) */}
                 {hasCategory && (
                     <div className={styles.navGroup}>

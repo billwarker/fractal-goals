@@ -3,20 +3,33 @@ import React from 'react';
 export default function ActivityMetricControls({ context }) {
     const {
         metricDefinitions,
-        metricOptions,
         onOpenActivityModal,
         selectedActivityDef,
-        selectedMetricId,
         selectedMetricXId,
         selectedMetricYId,
-        selectedMetricY2Id,
         updateVisualizationState,
         visualization,
         visualizationState,
     } = context;
 
     const usesScatterMetrics = visualization.id === 'scatterPlot';
-    const usesLineMetrics = visualization.id === 'lineGraph';
+    const usesMetricTrendMetrics = visualization.id === 'metricTrends';
+    const usesMetricProgressMetrics = visualization.id === 'metricProgress';
+    const selectedTrendMetrics = visualizationState.metrics?.length
+        ? visualizationState.metrics
+        : metricDefinitions.slice(0, 2).map((metric) => metric.id);
+    const progressMetricDefinitions = metricDefinitions.filter((metric) => metric.track_progress !== false);
+    const selectedProgressMetricId = visualizationState?.metric?.id
+        || visualizationState?.metric
+        || progressMetricDefinitions[0]?.id
+        || '';
+
+    const toggleTrendMetric = (metricId) => {
+        const nextMetrics = selectedTrendMetrics.includes(metricId)
+            ? selectedTrendMetrics.filter((id) => id !== metricId)
+            : [...selectedTrendMetrics, metricId].slice(-2);
+        updateVisualizationState({ metrics: nextMetrics.length ? nextMetrics : selectedTrendMetrics });
+    };
 
     return (
         <>
@@ -32,7 +45,7 @@ export default function ActivityMetricControls({ context }) {
                 {selectedActivityDef ? selectedActivityDef.name : 'No activity selected'}
             </div>
 
-            {selectedActivityDef?.has_sets && (
+            {selectedActivityDef?.has_sets && (usesScatterMetrics || usesMetricTrendMetrics) && (
                 <label className="sessions-query-field" style={{ marginTop: 12 }}>
                     <span>Sets</span>
                     <select
@@ -93,42 +106,41 @@ export default function ActivityMetricControls({ context }) {
                 </>
             )}
 
-            {usesLineMetrics && metricOptions.length > 0 && (
+            {usesMetricTrendMetrics && metricDefinitions.length > 0 && (
                 <>
-                    <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                        <span>Left Axis</span>
-                        <select
-                            value={selectedMetricId}
-                            onChange={(event) => {
-                                const metric = metricOptions.find((item) => item.id === event.target.value);
-                                updateVisualizationState({ metric: metric || null });
-                            }}
-                        >
-                            {metricOptions.map((metric) => (
-                                <option key={metric.id} value={metric.id}>{metric.name}{metric.unit ? ` (${metric.unit})` : ''}</option>
-                            ))}
-                        </select>
-                    </label>
-                    <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                        <span>Right Axis</span>
-                        <select
-                            value={selectedMetricY2Id}
-                            onChange={(event) => {
-                                if (!event.target.value) {
-                                    updateVisualizationState({ metricY2: null });
-                                    return;
-                                }
-                                const metric = metricOptions.find((item) => item.id === event.target.value);
-                                updateVisualizationState({ metricY2: metric || null });
-                            }}
-                        >
-                            <option value="">None</option>
-                            {metricOptions.map((metric) => (
-                                <option key={metric.id} value={metric.id}>{metric.name}{metric.unit ? ` (${metric.unit})` : ''}</option>
-                            ))}
-                        </select>
-                    </label>
+                    <div className="sessions-query-sidebar-section-header" style={{ marginTop: 12 }}>
+                        <h4>Metrics</h4>
+                    </div>
+                    <div className="sessions-query-chip-group">
+                        {metricDefinitions.map((metric) => (
+                            <button
+                                key={metric.id}
+                                type="button"
+                                className={`sessions-query-chip ${selectedTrendMetrics.includes(metric.id) ? 'active' : ''}`}
+                                onClick={() => toggleTrendMetric(metric.id)}
+                            >
+                                {metric.name}
+                            </button>
+                        ))}
+                    </div>
                 </>
+            )}
+
+            {usesMetricProgressMetrics && progressMetricDefinitions.length > 0 && (
+                <label className="sessions-query-field" style={{ marginTop: 12 }}>
+                    <span>Metric</span>
+                    <select
+                        value={selectedProgressMetricId}
+                        onChange={(event) => {
+                            const metric = progressMetricDefinitions.find((item) => item.id === event.target.value);
+                            updateVisualizationState({ metric: metric || null });
+                        }}
+                    >
+                        {progressMetricDefinitions.map((metric) => (
+                            <option key={metric.id} value={metric.id}>{metric.name}{metric.unit ? ` (${metric.unit})` : ''}</option>
+                        ))}
+                    </select>
+                </label>
             )}
         </>
     );

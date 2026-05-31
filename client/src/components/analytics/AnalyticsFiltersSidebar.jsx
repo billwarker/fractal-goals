@@ -139,13 +139,44 @@ function AnalyticsFiltersSidebar({
     };
 
     const selectedActivity = selectedWindowState?.selectedActivity || null;
-    const selectedActivityDef = selectedActivity
-        ? profileActivities.find((activity) => activity.id === selectedActivity.id)
-        : null;
+    const selectedActivityDef = useMemo(() => {
+        if (selectedActivity?.id) {
+            return profileActivities.find((activity) => activity.id === selectedActivity.id) || null;
+        }
+        if (
+            selectedVisualizationMeta?.selectionRequirements?.activity
+            && resolvedGlobalScope.hasActivityFilter
+            && profileActivities.length === 1
+        ) {
+            return profileActivities[0];
+        }
+        return null;
+    }, [profileActivities, resolvedGlobalScope.hasActivityFilter, selectedActivity, selectedVisualizationMeta]);
     const selectedGoal = selectedWindowState?.selectedGoal || null;
-    const selectedGoalDef = selectedGoal
-        ? profileGoals.find((goal) => goal.id === selectedGoal.id)
-        : null;
+    const selectedGoalDef = useMemo(() => {
+        if (selectedGoal?.id) {
+            return profileGoals.find((goal) => goal.id === selectedGoal.id) || null;
+        }
+        if (resolvedGlobalScope.filters.goals.goalIds.length === 1) {
+            const goalId = resolvedGlobalScope.filters.goals.goalIds[0];
+            return profileGoals.find((goal) => goal.id === goalId) || null;
+        }
+        if (
+            selectedVisualizationMeta?.selectionRequirements?.goal
+            && (resolvedGlobalScope.hasGoalFilter || resolvedGlobalScope.hasActivityFilter)
+            && profileGoals.length === 1
+        ) {
+            return profileGoals[0];
+        }
+        return null;
+    }, [
+        profileGoals,
+        resolvedGlobalScope.filters.goals.goalIds,
+        resolvedGlobalScope.hasActivityFilter,
+        resolvedGlobalScope.hasGoalFilter,
+        selectedGoal,
+        selectedVisualizationMeta,
+    ]);
     const selectedVisualizationLabel = [
         selectedWindowState?.selectedCategory,
         selectedWindowState?.selectedVisualization,

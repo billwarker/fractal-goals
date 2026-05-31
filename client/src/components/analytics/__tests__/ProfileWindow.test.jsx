@@ -10,12 +10,9 @@ vi.mock('../ScatterPlot', () => ({
     default: (props) => scatterPlot(props),
 }));
 
-vi.mock('../LineGraph', () => ({ default: () => <div /> }));
 vi.mock('../GoalCompletionTimeline', () => ({ default: () => <div /> }));
 vi.mock('../GoalTimeDistribution', () => ({ default: () => <div /> }));
-vi.mock('../ActivityHeatmap', () => ({ default: () => <div /> }));
 vi.mock('../StreakTimeline', () => ({ default: () => <div /> }));
-vi.mock('../WeeklyBarChart', () => ({ default: () => <div /> }));
 vi.mock('react-chartjs-2', () => ({
     Bar: () => <div />,
     Line: () => <div />,
@@ -67,18 +64,87 @@ describe('ProfileWindow', () => {
                     selectedSplit: 'all',
                     selectedGoal: null,
                     selectedGoalChart: 'duration',
-                    heatmapMonths: 12,
                 }}
                 updateWindowState={vi.fn()}
             />
         );
 
-        expect(screen.getAllByText('Scatter Plot')).toHaveLength(2);
+        expect(screen.getByText('Metric Scatter Plot')).toBeInTheDocument();
+        expect(screen.getByText('Scatter Plot')).toBeInTheDocument();
         expect(scatterPlot).toHaveBeenCalledWith(expect.objectContaining({
             selectedActivity: expect.objectContaining({ id: 'activity-1', name: 'Squat' }),
             selectedMetricX: expect.objectContaining({ id: 'reps' }),
             selectedMetricY: expect.objectContaining({ id: 'weight' }),
         }));
+    });
+
+    it('uses a single globally scoped activity as the effective activity selection', () => {
+        render(
+            <ProfileWindow
+                data={{
+                    sessions: [],
+                    goalAnalytics: { goals: [], summary: {} },
+                    activities: [
+                        { id: 'activity-1', name: 'Squat', group_id: 'group-1' },
+                        { id: 'activity-2', name: 'Press', group_id: 'group-1' },
+                    ],
+                    activityGroups: [
+                        { id: 'group-1', name: 'Strength', parent_id: null },
+                    ],
+                    activityInstances: {
+                        'activity-1': [{ id: 'instance-1' }],
+                        'activity-2': [{ id: 'instance-2' }],
+                    },
+                    formatDuration: (seconds) => `${seconds}s`,
+                    rootId: null,
+                }}
+                windowState={{
+                    selectedCategory: 'activities',
+                    selectedVisualization: 'scatterPlot',
+                    selectedActivity: null,
+                    selectedGoal: null,
+                }}
+                globalFilters={{
+                    activities: { activityIds: ['activity-1'], groupIds: [] },
+                }}
+                updateWindowState={vi.fn()}
+            />
+        );
+
+        expect(scatterPlot).toHaveBeenCalledWith(expect.objectContaining({
+            selectedActivity: expect.objectContaining({ id: 'activity-1', name: 'Squat' }),
+        }));
+    });
+
+    it('does not infer a single activity when the global scope contains multiple activities', () => {
+        render(
+            <ProfileWindow
+                data={{
+                    sessions: [],
+                    goalAnalytics: { goals: [], summary: {} },
+                    activities: [
+                        { id: 'activity-1', name: 'Squat', group_id: 'group-1' },
+                        { id: 'activity-2', name: 'Press', group_id: 'group-1' },
+                    ],
+                    activityGroups: [],
+                    activityInstances: {},
+                    formatDuration: (seconds) => `${seconds}s`,
+                    rootId: null,
+                }}
+                windowState={{
+                    selectedCategory: 'activities',
+                    selectedVisualization: 'scatterPlot',
+                    selectedActivity: null,
+                    selectedGoal: null,
+                }}
+                globalFilters={{
+                    activities: { activityIds: ['activity-1', 'activity-2'], groupIds: [] },
+                }}
+                updateWindowState={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('Select an activity in the filters panel')).toBeInTheDocument();
     });
 
     it('selects visualizations with keyed default state', () => {
@@ -109,24 +175,14 @@ describe('ProfileWindow', () => {
             />
         );
 
-        fireEvent.click(screen.getByRole('button', { name: /Line Graph/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Activity Trends/ }));
 
         expect(updateWindowState).toHaveBeenCalledWith(expect.objectContaining({
-            selectedVisualization: 'lineGraph',
-            visualizationState: {
-                setsHandling: 'top',
-                selectedSplit: 'all',
-                metric: null,
-                metricY2: null,
-            },
+            selectedVisualization: 'activityTrends',
+            visualizationState: { metrics: ['instances', 'duration'] },
             visualizationStateByKey: expect.objectContaining({
                 'activities:activityFrequency': { metric: 'duration', showGroups: false, limit: 8 },
-                'activities:lineGraph': {
-                    setsHandling: 'top',
-                    selectedSplit: 'all',
-                    metric: null,
-                    metricY2: null,
-                },
+                'activities:activityTrends': { metrics: ['instances', 'duration'] },
             }),
         }));
     });

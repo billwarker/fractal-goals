@@ -80,7 +80,7 @@ function ScatterPlot({
                     This activity only has {metrics.length === 0 ? 'no metrics' : '1 metric'}.
                 </div>
                 <div className={styles.unavailableSuggestion}>
-                    Try the Line Graph view instead to see metric progression over time.
+                    Try Activity Trends to compare activity frequency and duration over time.
                 </div>
             </div>
         );

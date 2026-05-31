@@ -180,6 +180,7 @@ def serialize_activity_instance_for_analytics(instance, *, session_name=None, se
         "sets": data_dict.get('sets', []),
         "metric_values": metric_values_list,
         "metrics": metric_values_list,
+        "progress_comparison": serialize_progress_record(instance.progress_record) if getattr(instance, 'progress_record', None) else None,
     }
 
 
@@ -250,15 +251,58 @@ def _serialize_session_sections_for_analytics(session):
     return serialized_sections
 
 
+def _positive_int(value):
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if numeric > 0 else None
+
+
+def _session_duration_seconds_for_analytics(session):
+    attrs = _safe_load_json(getattr(session, "attributes", None), {})
+    session_data = attrs.get("session_data") if isinstance(attrs.get("session_data"), dict) else attrs
+
+    persisted_duration = _positive_int(getattr(session, "total_duration_seconds", None))
+    if persisted_duration is not None:
+        return persisted_duration
+
+    if isinstance(session_data, dict):
+        attribute_duration = _positive_int(session_data.get("total_duration_seconds") or attrs.get("total_duration_seconds"))
+        if attribute_duration is not None:
+            return attribute_duration
+
+    start_at = getattr(session, "session_start", None)
+    end_at = getattr(session, "session_end", None)
+    if isinstance(session_data, dict):
+        start_at = start_at or session_data.get("session_start") or attrs.get("session_start")
+        end_at = end_at or session_data.get("session_end") or attrs.get("session_end")
+
+    if start_at and end_at:
+        start = start_at if isinstance(start_at, datetime) else datetime.fromisoformat(str(start_at).replace("Z", "+00:00"))
+        end = end_at if isinstance(end_at, datetime) else datetime.fromisoformat(str(end_at).replace("Z", "+00:00"))
+        paused_seconds = _positive_int(getattr(session, "total_paused_seconds", None)) or 0
+        if isinstance(session_data, dict):
+            paused_seconds = _positive_int(session_data.get("total_paused_seconds") or attrs.get("total_paused_seconds")) or paused_seconds
+        return max(0, int((end - start).total_seconds()) - paused_seconds)
+
+    duration_minutes = _positive_int(getattr(session, "duration_minutes", None))
+    if duration_minutes is not None:
+        return duration_minutes * 60
+
+    return 0
+
+
 def serialize_session_for_analytics(session):
     """Serialize the subset of session fields needed by analytics views."""
     return {
         "id": session.id,
         "name": session.name,
         "session_start": format_utc(session.session_start),
+        "session_end": format_utc(session.session_end),
         "created_at": format_utc(session.created_at),
         "completed": bool(session.completed),
-        "total_duration_seconds": session.total_duration_seconds,
+        "total_duration_seconds": _session_duration_seconds_for_analytics(session),
         "sections": _serialize_session_sections_for_analytics(session),
     }
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { queryKeys } from '../../hooks/queryKeys';
 import { ActivitiesProvider, useActivities } from '../ActivitiesContext';
@@ -53,8 +53,15 @@ function createWrapper(queryClient) {
 }
 
 describe('ActivitiesContext', () => {
+    let consoleErrorSpy;
+
     beforeEach(() => {
         vi.clearAllMocks();
+        consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        consoleErrorSpy.mockRestore();
     });
 
     it('shows activity group create/update/delete success and error toasts', async () => {

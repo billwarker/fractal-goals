@@ -85,13 +85,24 @@ describe('Analytics page', () => {
             expect(createAnalyticsView).toHaveBeenCalledWith({
                 name: 'My Saved View',
                 layout: {
-                    version: 2,
-                    layout: { type: 'window', id: 'window-1' },
+                    version: 3,
+                    layout: {
+                        type: 'grid',
+                        panels: [
+                            { id: 'window-1', x: 0, y: 0, w: 96, h: 48 },
+                        ],
+                    },
+                    layout_bounds: { columns: 12, rows: 6 },
                     window_states: {
-                        'window-1': expect.objectContaining({
+                        'window-1': {
+                            selectedActivity: null,
                             selectedCategory: null,
+                            selectedGoal: null,
+                            selectedModeIds: [],
                             selectedVisualization: null,
-                        }),
+                            visualizationState: {},
+                            visualizationStateByKey: {},
+                        },
                     },
                     selected_window_id: 'window-1',
                     global_filters: {

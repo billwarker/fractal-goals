@@ -37,9 +37,12 @@ class SessionAnalyticsService:
                 Session.id,
                 Session.name,
                 Session.session_start,
+                Session.session_end,
                 Session.created_at,
                 Session.completed,
                 Session.total_duration_seconds,
+                Session.duration_minutes,
+                Session.total_paused_seconds,
                 Session.attributes,
             ),
         )
@@ -50,6 +53,7 @@ class SessionAnalyticsService:
             joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split),
+            joinedload(ActivityInstance.progress_record),
         )
 
     @staticmethod

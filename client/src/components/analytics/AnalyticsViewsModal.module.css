@@ -60,6 +60,41 @@
     overflow: auto;
 }
 
+.searchWrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.searchLabel {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.searchInput {
+    width: 100%;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    padding: 11px 13px;
+    font: inherit;
+}
+
+.searchInput::placeholder {
+    color: var(--color-text-muted);
+}
+
+.searchInput:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--color-brand-primary) 70%, var(--color-border));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-primary) 22%, transparent);
+}
+
 .viewRow {
     display: flex;
     align-items: center;
@@ -72,6 +107,15 @@
     color: var(--color-text-primary);
     text-align: left;
     padding: 16px 18px;
+    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.viewRow:hover,
+.viewRow:focus-visible,
+.viewRow:focus-within {
+    border-color: color-mix(in srgb, var(--color-brand-primary) 46%, var(--color-border));
+    background: color-mix(in srgb, var(--color-bg-surface) 78%, white 22%);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 18%, transparent);
 }
 
 .selected {
@@ -116,6 +160,16 @@
     border: 1px solid var(--color-border);
     background: transparent;
     color: var(--color-text-secondary);
+}
+
+.deleteButton:hover,
+.deleteButton:focus-visible,
+.secondaryButton:hover,
+.secondaryButton:focus-visible {
+    outline: none;
+    border-color: color-mix(in srgb, var(--color-brand-primary) 48%, var(--color-border));
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
 }
 
 .primaryButton {

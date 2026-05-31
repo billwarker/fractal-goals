@@ -3,13 +3,16 @@ import { useTimezone } from '../../contexts/TimezoneContext';
 import { getShiftedDate } from '../../utils/dateUtils';
 import styles from './StreakTimeline.module.css';
 
+const ALL_TIME_SEGMENT_LIMIT = 12;
+
 /**
  * StreakTimeline - Visual timeline showing streaks and breaks
  * Highlights consecutive days with activity and gaps between them
  * 
  * @param {Array} sessions - Array of session objects with session_start dates
+ * @param {Object|null} dateRange - Selected analytics time range
  */
-function StreakTimeline({ sessions = [] }) {
+function StreakTimeline({ sessions = [], dateRange = null }) {
     const { timezone } = useTimezone();
 
     // Calculate streaks and breaks
@@ -112,14 +115,22 @@ function StreakTimeline({ sessions = [] }) {
         };
     }, [sessions, timezone]);
 
-    // Get recent streaks for display (last 90 days worth)
-    const recentStreaks = useMemo(() => {
-        const ninetyDaysAgo = new Date();
-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-        const cutoffStr = ninetyDaysAgo.toISOString().split('T')[0];
-
-        return streaks.filter(s => s.end >= cutoffStr).slice(-10);
-    }, [streaks]);
+    const allVisibleStreaks = useMemo(() => {
+        const start = dateRange?.start || null;
+        const end = dateRange?.end || null;
+        if (!start && !end) return streaks;
+        return streaks.filter((segment) => (
+            (!start || segment.end >= start)
+            && (!end || segment.start <= end)
+        ));
+    }, [dateRange?.end, dateRange?.start, streaks]);
+    const isAllTime = !(dateRange?.start || dateRange?.end);
+    const visibleStreaks = useMemo(() => (
+        isAllTime
+            ? allVisibleStreaks.slice(-ALL_TIME_SEGMENT_LIMIT)
+            : allVisibleStreaks
+    ), [allVisibleStreaks, isAllTime]);
+    const hiddenSegmentCount = Math.max(0, allVisibleStreaks.length - visibleStreaks.length);
 
     const formatDate = (dateStr) => {
         const date = new Date(dateStr + 'T00:00:00');
@@ -148,7 +159,10 @@ function StreakTimeline({ sessions = [] }) {
             : `${styles.breakLine} ${styles.breakLineShort}`;
 
     // Calculate width percentages for visualization
-    const maxLength = Math.max(...recentStreaks.map(s => s.length), 1);
+    const maxLength = Math.max(...visibleStreaks.map(s => s.length), 1);
+    const rangeLabel = isAllTime
+        ? `All Time: Latest ${visibleStreaks.length} Segments`
+        : 'Selected Time Range';
 
     return (
         <div className={styles.panel}>
@@ -189,12 +203,17 @@ function StreakTimeline({ sessions = [] }) {
             </div>
 
             {/* Timeline Visualization */}
-            {recentStreaks.length > 0 ? (
+            {visibleStreaks.length > 0 ? (
                 <div className={styles.timeline}>
                     <div className={styles.timelineHeader}>
-                        Recent Activity (Last 90 Days)
+                        Activity ({rangeLabel})
                     </div>
-                    {recentStreaks.map((segment, index) => (
+                    {hiddenSegmentCount > 0 && (
+                        <div className={styles.timelineNote}>
+                            Showing the latest {visibleStreaks.length} of {allVisibleStreaks.length} streak and break segments.
+                        </div>
+                    )}
+                    {visibleStreaks.map((segment, index) => (
                         <div key={index} className={styles.segmentRow}>
                             {/* Date range */}
                             <div className={getSegmentDateRangeClassName(segment.type)}>

@@ -112,11 +112,12 @@ export function VisualizationIcon({ type, size = 16, className = '', ...props })
                     <path d="M8 16v-3M12 16V8M16 16v-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
                 </svg>
             );
-        case 'sessions:durationTrend':
+        case 'sessions:sessionTrends':
             return (
                 <svg {...common}>
                     <path d="M4.5 18.5h15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                    <path d="M6 15.5c2.6-7.6 5.7 4.6 8.3-2.9 1-2.9 2.2-4.8 3.7-5.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M6.5 15.5v-5M10 15.5v-8M13.5 15.5v-3M17 15.5v-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M6.5 10.5 10 7.5l3.5 5 3.5-3" stroke="currentColor" strokeWidth="1.45" strokeLinecap="round" strokeLinejoin="round" opacity="0.75" />
                 </svg>
             );
         case 'sessions:sectionPie':
@@ -126,32 +127,11 @@ export function VisualizationIcon({ type, size = 16, className = '', ...props })
                     <path d="M19.5 12A7.5 7.5 0 1 1 12 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
             );
-        case 'sessions:heatmap':
-            return (
-                <svg {...common}>
-                    <path d="M5 5h4v4H5zM10 5h4v4h-4zM15 5h4v4h-4zM5 10h4v4H5zM10 10h4v4h-4zM15 10h4v4h-4zM5 15h4v4H5zM10 15h4v4h-4zM15 15h4v4h-4z" stroke="currentColor" strokeWidth="1.3" />
-                    <path d="M10 10h4v4h-4zM15 15h4v4h-4z" fill="currentColor" opacity="0.35" />
-                </svg>
-            );
         case 'sessions:streaks':
             return (
                 <svg {...common}>
                     <path d="M5 16.5c1.7-4.7 4.1-4.7 5.8-1.5 1.4 2.6 3.5 2.3 5-.6 1-2 1.7-4.4 2.2-7.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                     <path d="M4.5 19h15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                </svg>
-            );
-        case 'sessions:weeklyChart':
-            return (
-                <svg {...common}>
-                    <path d="M4.5 18.5h15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                    <path d="M6.5 15.5v-5M10 15.5v-8M13.5 15.5v-3M17 15.5v-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                </svg>
-            );
-        case 'sessions:completionRate':
-            return (
-                <svg {...common}>
-                    <path d="M5 12a7 7 0 1 0 2.1-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    <path d="m8.5 11.8 2.3 2.3 4.7-5" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
             );
         case 'sessions:startDistribution':
@@ -169,21 +149,6 @@ export function VisualizationIcon({ type, size = 16, className = '', ...props })
                     <path d="M6 15.5h2.5v3H6zM10.2 10h2.5v8.5h-2.5zM14.4 13h2.5v5.5h-2.5z" stroke="currentColor" strokeWidth="1.5" />
                 </svg>
             );
-        case 'sessions:plannedVsActual':
-            return (
-                <svg {...common}>
-                    <path d="M5 7h14M5 17h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" opacity="0.55" />
-                    <path d="M8 7v10M16 7v10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                    <path d="m9.5 12 2 2 3.5-4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-            );
-        case 'sessions:consistency':
-            return (
-                <svg {...common}>
-                    <path d="M5 8h3M10.5 8h3M16 8h3M5 13h3M10.5 13h3M16 13h3M5 18h3M10.5 18h3M16 18h3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                    <path d="M5 4.5h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                </svg>
-            );
         case 'activities:scatterPlot':
             return (
                 <svg {...common}>
@@ -193,41 +158,32 @@ export function VisualizationIcon({ type, size = 16, className = '', ...props })
                     <circle cx="17" cy="7" r="1.5" fill="currentColor" />
                 </svg>
             );
-        case 'activities:lineGraph':
+        case 'activities:activityTrends':
             return (
                 <svg {...common}>
-                    <path d="M5 18h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                    <path d="M6.5 15.5 10 11.5l3.2 2.2 4.3-6.2" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-                    <circle cx="10" cy="11.5" r="1.2" fill="currentColor" />
+                    <path d="M5 18V6M5 18h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M7 15 10.5 11.5l3.2 2.2 4.1-6" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
             );
         case 'activities:activityFrequency':
             return (
                 <svg {...common}>
-                    <path d="M5 18.5h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                    <path d="M7 15.5h10M7 11.5h7M7 7.5h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M5 18.5V5.5M5 18.5h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M7.5 8h10M7.5 12h7M7.5 16h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
             );
-        case 'activities:timeByActivity':
+        case 'activities:metricTrends':
             return (
                 <svg {...common}>
-                    <path d="M12 7v5l3 1.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M12 20.5a8.5 8.5 0 1 0 0-17 8.5 8.5 0 0 0 0 17Z" stroke="currentColor" strokeWidth="1.8" />
-                    <path d="M4.5 12h2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    <path d="M5 18V6M5 18h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M7 14.5 10 10.5l3 2.4 4-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
             );
-        case 'activities:personalBest':
+        case 'activities:metricProgress':
             return (
                 <svg {...common}>
-                    <path d="M12 4.5 14 9l4.8.4-3.6 3.1 1.1 4.7L12 14.7l-4.3 2.5 1.1-4.7-3.6-3.1L10 9l2-4.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-                </svg>
-            );
-        case 'activities:metricVolume':
-            return (
-                <svg {...common}>
-                    <path d="M4.5 18.5h15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                    <path d="M7 16v-8M12 16V5M17 16v-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    <path d="M6 8h2M11 5h2M16 11h2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                    <path d="M5 12h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+                    <path d="M7 8h2.2v4H7zM10.9 12h2.2v4h-2.2zM14.8 6h2.2v6h-2.2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
                 </svg>
             );
         case 'activities:groupMix':
@@ -287,7 +243,7 @@ export function RestoreHeaderIcon({ size = 16, className = '', ...props }) {
     );
 }
 
-export function AnalyticsGoalIcon({ goal, getGoalColor, getGoalSecondaryColor, getGoalIcon, size = 16, className = '' }) {
+export function AnalyticsGoalIcon({ goal, getGoalSecondaryColor, getGoalIcon, size = 16, className = '' }) {
     return (
         <GoalIcon
             size={size}
