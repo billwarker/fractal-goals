@@ -59,6 +59,11 @@ class TestFractalEndpoints:
         data = json.loads(response.data)
         assert len(data) >= 1
         assert any(f['id'] == sample_ultimate_goal.id for f in data)
+        sample_payload = next(f for f in data if f['id'] == sample_ultimate_goal.id)
+        assert sample_payload['display_level']['name'] == 'Ultimate Goal'
+        assert 'color' in sample_payload['display_level']
+        assert 'secondary_color' in sample_payload['display_level']
+        assert 'icon' in sample_payload['display_level']
     
     def test_delete_fractal(
         self,

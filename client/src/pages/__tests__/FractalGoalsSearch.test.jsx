@@ -75,6 +75,10 @@ vi.mock('../../contexts/DebugContext', () => ({
     useDebug: () => ({ debugMode: false }),
 }));
 
+vi.mock('../../contexts/AuthContext', () => ({
+    useAuth: () => ({ user: { id: 'user-1', username: 'will' } }),
+}));
+
 vi.mock('../../contexts/GoalLevelsContext', () => ({
     useGoalLevels: () => ({
         getGoalColor: () => '#38bdf8',

@@ -459,8 +459,39 @@ class GoalService:
             current_max = self._find_max_updated(child, current_max)
         return current_max
 
+    def _get_effective_level_maps_for_roots(self, current_user_id, root_ids):
+        if not root_ids:
+            return {}
+
+        system_levels = self.db_session.query(GoalLevel).filter(
+            GoalLevel.owner_id == None,
+            GoalLevel.deleted_at == None,
+        ).all()
+        user_global_levels = self.db_session.query(GoalLevel).filter(
+            GoalLevel.owner_id == current_user_id,
+            GoalLevel.root_id == None,
+            GoalLevel.deleted_at == None,
+        ).all()
+        root_levels = self.db_session.query(GoalLevel).filter(
+            GoalLevel.owner_id == current_user_id,
+            GoalLevel.root_id.in_(root_ids),
+            GoalLevel.deleted_at == None,
+        ).all()
+
+        base_levels = {}
+        for level in system_levels:
+            base_levels[level.name] = level
+        for level in user_global_levels:
+            base_levels[level.name] = level
+
+        levels_by_root = {root_id: dict(base_levels) for root_id in root_ids}
+        for level in root_levels:
+            levels_by_root.setdefault(level.root_id, dict(base_levels))[level.name] = level
+        return levels_by_root
+
     def list_fractals(self, current_user_id) -> ServiceResult[JsonList]:
         roots = self.db_session.query(Goal).options(
+            selectinload(Goal.level),
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups),
             selectinload(Goal.children),
@@ -470,10 +501,16 @@ class GoalService:
             Goal.deleted_at.is_(None),
         ).all()
 
+        level_maps_by_root = self._get_effective_level_maps_for_roots(
+            current_user_id,
+            [root.id for root in roots],
+        )
         fractals = []
         for root in roots:
             last_activity = self._find_max_updated(root, root.updated_at)
-            fractals.append(serialize_fractal_summary(root, last_activity))
+            level_name = root.level.name if getattr(root, 'level', None) else "Ultimate Goal"
+            display_level = level_maps_by_root.get(root.id, {}).get(level_name)
+            fractals.append(serialize_fractal_summary(root, last_activity, display_level=display_level))
         return fractals, None, 200
 
     def list_global_goals(self, current_user_id, limit=None, offset=0) -> ServiceResult[JsonList]:

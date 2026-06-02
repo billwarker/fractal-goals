@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { globalApi } from '../utils/api';
 import { getTypeDisplayName } from '../utils/goalHelpers';
@@ -21,10 +21,10 @@ import notify from '../utils/notify';
  * Displays all root goals as cards and allows navigation to specific fractal views
  */
 function Selection() {
-    const RECENT_ROOT_STORAGE_KEY = 'fractal_recent_root_id';
+    const RECENT_ROOT_STORAGE_PREFIX = 'fractal_recent_root_id';
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-    const [recentRootId, setRecentRootId] = useState(() => localStorage.getItem(RECENT_ROOT_STORAGE_KEY));
+    const [recentRootId, setRecentRootId] = useState(null);
 
     // Modal States
     const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -34,14 +34,24 @@ function Selection() {
     const { user, logout, isAuthenticated, loading: authLoading } = useAuth();
     const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const isMobile = useIsMobile();
+    const userId = user?.id || null;
+    const recentRootStorageKey = useMemo(
+        () => userId ? `${RECENT_ROOT_STORAGE_PREFIX}:${userId}` : null,
+        [userId]
+    );
+
+    useEffect(() => {
+        localStorage.removeItem(RECENT_ROOT_STORAGE_PREFIX);
+        setRecentRootId(recentRootStorageKey ? localStorage.getItem(recentRootStorageKey) : null);
+    }, [recentRootStorageKey]);
 
     const fractalsQuery = useQuery({
-        queryKey: queryKeys.fractals(),
+        queryKey: queryKeys.fractals(userId),
         queryFn: async () => {
             const res = await globalApi.getAllFractals();
             return res.data || [];
         },
-        enabled: isAuthenticated,
+        enabled: isAuthenticated && !!userId,
     });
 
     const fractals = useMemo(
@@ -49,44 +59,13 @@ function Selection() {
         [fractalsQuery.data, isAuthenticated]
     );
 
-    const recentGoalLevelsQuery = useQuery({
-        queryKey: queryKeys.goalLevels(recentRootId),
-        queryFn: async () => {
-            const res = await globalApi.getGoalLevels(recentRootId);
-            return Array.isArray(res.data) ? res.data : [];
-        },
-        enabled: isAuthenticated && !!recentRootId,
-    });
-
-    const fractalGoalLevelQueries = useQueries({
-        queries: isAuthenticated
-            ? fractals.map((fractal) => ({
-                queryKey: queryKeys.goalLevels(fractal.id),
-                queryFn: async () => {
-                    const res = await globalApi.getGoalLevels(fractal.id);
-                    return Array.isArray(res.data) ? res.data : [];
-                },
-                enabled: !!fractal.id,
-            }))
-            : [],
-    });
-
-    const goalLevelsByRootId = useMemo(
-        () => Object.fromEntries(
-            fractals.map((fractal, index) => [fractal.id, fractalGoalLevelQueries[index]?.data || []])
-        ),
-        [fractals, fractalGoalLevelQueries]
-    );
-
-    const recentGoalLevels = recentGoalLevelsQuery.data || [];
-
     const createFractalMutation = useMutation({
         mutationFn: async (data) => {
             const res = await globalApi.createFractal(data);
             return res.data;
         },
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: queryKeys.fractals() });
+            await queryClient.invalidateQueries({ queryKey: queryKeys.fractals(userId) });
             setCreateModalOpen(false);
             notify.success('Fractal created');
         },
@@ -101,13 +80,15 @@ function Selection() {
             return res.data;
         },
         onSuccess: (_, deletedRootId) => {
-            queryClient.setQueryData(queryKeys.fractals(), (current = []) => (
+            queryClient.setQueryData(queryKeys.fractals(userId), (current = []) => (
                 current.filter((fractal) => fractal.id !== deletedRootId)
             ));
-            queryClient.removeQueries({ queryKey: queryKeys.goalLevels(deletedRootId) });
+            queryClient.removeQueries({ queryKey: queryKeys.goalLevels(deletedRootId, userId) });
 
             if (recentRootId === deletedRootId) {
-                localStorage.removeItem(RECENT_ROOT_STORAGE_KEY);
+                if (recentRootStorageKey) {
+                    localStorage.removeItem(recentRootStorageKey);
+                }
                 setRecentRootId(null);
             }
 
@@ -120,7 +101,9 @@ function Selection() {
     });
 
     const handleSelectRoot = (rootId) => {
-        localStorage.setItem(RECENT_ROOT_STORAGE_KEY, rootId);
+        if (recentRootStorageKey) {
+            localStorage.setItem(recentRootStorageKey, rootId);
+        }
         setRecentRootId(rootId);
         navigate(`/${rootId}/goals`);
     };
@@ -161,13 +144,7 @@ function Selection() {
     };
 
     const getFractalLevelConfig = (fractal) => {
-        const levels = goalLevelsByRootId[fractal.id];
-        if (!Array.isArray(levels)) return null;
-
-        const normalizedTypeName = fractal.type.replace(/([A-Z])/g, ' $1').trim();
-        return levels.find((candidate) => (
-            candidate?.name === normalizedTypeName || candidate?.name === fractal.type
-        )) || null;
+        return fractal?.display_level || null;
     };
 
     const getFractalTypeColor = (fractal) => {
@@ -211,10 +188,7 @@ function Selection() {
     const topRoot = getHighestPriorityRoot();
     const headerType = topRoot ? topRoot.type : 'UltimateGoal';
     const isHeaderSmart = topRoot ? topRoot.is_smart : false;
-    const normalizedHeaderName = headerType.replace(/([A-Z])/g, ' $1').trim();
-    const recentLevel = recentGoalLevels.find((level) => (
-        level?.name === normalizedHeaderName || level?.name === headerType
-    ));
+    const recentLevel = topRoot?.display_level || null;
 
     const headerColor = recentLevel?.color || getGoalColor(headerType);
 

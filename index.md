@@ -74,6 +74,9 @@ Important frontend design choices:
 
 - TanStack Query is the canonical remote-data layer.
 - Query keys are centralized in `client/src/hooks/queryKeys.js`.
+- Broad invalidation should use centralized query-key prefix helpers, not ad hoc raw arrays.
+- Account-owned homepage data must be scoped by the authenticated user id or cleared on auth transitions; auth changes clear the query cache to prevent cross-account data bleed.
+- The selection page consumes `/api/fractals` summaries directly, including effective `display_level` metadata, rather than issuing per-fractal goal-level fetches.
 - Older hand-managed fetch state has largely been removed.
 - Large multi-mode components were decomposed into coordinators plus focused subcomponents/hooks.
 - Modal behavior and state reset patterns are more standardized than before.
@@ -93,6 +96,7 @@ Current SaaS/account pieces:
 - per-user app-data storage limits and usage reporting
 - quota usage reporting in account settings
 - admin user management, invite-key generation, and support access into user fractals
+- user-scoped selection-page cache and recent-fractal localStorage keys
 - production security checks for JWT secrets, CORS, and cookie settings
 - rate limiting on sensitive auth and selected write endpoints
 

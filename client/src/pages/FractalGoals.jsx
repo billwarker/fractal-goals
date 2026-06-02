@@ -8,6 +8,7 @@ import AlertModal from '../components/modals/AlertModal';
 import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
 import { useGoals } from '../contexts/GoalsContext';
 import { useDebug } from '../contexts/DebugContext';
+import { useAuth } from '../contexts/AuthContext';
 import { buildTreeMaps, getLineagePath } from '../components/flowTree/flowTreeTreeUtils';
 import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
@@ -47,6 +48,7 @@ function FractalGoals() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const { user } = useAuth();
     const {
         createGoal,
         updateGoal,
@@ -159,10 +161,13 @@ function FractalGoals() {
             return;
         }
         setActiveRootId(rootId);
-        localStorage.setItem('fractal_recent_root_id', rootId);
+        localStorage.removeItem('fractal_recent_root_id');
+        if (user?.id) {
+            localStorage.setItem(`fractal_recent_root_id:${user.id}`, rootId);
+        }
 
         return () => setActiveRootId(null);
-    }, [rootId, navigate, setActiveRootId]);
+    }, [rootId, navigate, setActiveRootId, user?.id]);
 
     useEffect(() => {
         if (!rootId) return;

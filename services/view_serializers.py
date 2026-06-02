@@ -8,13 +8,20 @@ from services.serializers import (
 )
 
 
-def serialize_fractal_summary(root, last_activity):
+def serialize_fractal_summary(root, last_activity, display_level=None):
     level_name = root.level.name if getattr(root, 'level', None) else "Ultimate Goal"
+    effective_level = display_level or getattr(root, 'level', None)
     return {
         "id": root.id,
         "name": root.name,
         "description": root.description,
         "type": level_name.replace(" ", ""),
+        "display_level": {
+            "name": level_name,
+            "color": getattr(effective_level, "color", None),
+            "secondary_color": getattr(effective_level, "secondary_color", None),
+            "icon": getattr(effective_level, "icon", None),
+        },
         "created_at": format_utc(root.created_at),
         "updated_at": format_utc(last_activity),
         "is_smart": all(calculate_smart_status(root).values()),

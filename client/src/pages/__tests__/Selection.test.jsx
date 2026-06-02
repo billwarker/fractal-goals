@@ -14,6 +14,7 @@ const {
     createFractal,
     deleteFractal,
     notify,
+    mockAuthState,
 } = vi.hoisted(() => ({
     mockNavigate: vi.fn(),
     mockLogout: vi.fn(),
@@ -21,6 +22,9 @@ const {
     getGoalLevels: vi.fn(),
     createFractal: vi.fn(),
     deleteFractal: vi.fn(),
+    mockAuthState: {
+        user: { id: 'user-1', username: 'will' },
+    },
     notify: {
         success: vi.fn(),
         error: vi.fn(),
@@ -46,7 +50,7 @@ vi.mock('../../utils/api', () => ({
 
 vi.mock('../../contexts/AuthContext', () => ({
     useAuth: () => ({
-        user: { username: 'will' },
+        user: mockAuthState.user,
         logout: mockLogout,
         isAuthenticated: true,
         loading: false,
@@ -149,23 +153,33 @@ describe('Selection', () => {
             configurable: true,
         });
         localStorageMock.clear();
+        mockAuthState.user = { id: 'user-1', username: 'will' };
     });
 
-    it('stores fractals and per-root goal levels under shared query keys', async () => {
+    it('stores fractals under user-scoped query keys without per-root level fetches', async () => {
         const queryClient = createQueryClient();
-        localStorage.setItem('fractal_recent_root_id', 'root-1');
+        localStorage.setItem('fractal_recent_root_id:user-1', 'root-1');
 
         getAllFractals.mockResolvedValueOnce({
             data: [
-                { id: 'root-1', name: 'Root 1', type: 'UltimateGoal', is_smart: false, created_at: '2026-03-01T00:00:00Z' },
-                { id: 'root-2', name: 'Root 2', type: 'LongTermGoal', is_smart: true, created_at: '2026-03-02T00:00:00Z' },
+                {
+                    id: 'root-1',
+                    name: 'Root 1',
+                    type: 'UltimateGoal',
+                    is_smart: false,
+                    created_at: '2026-03-01T00:00:00Z',
+                    display_level: { name: 'Ultimate Goal', color: '#111111', secondary_color: '#222222', icon: 'circle' },
+                },
+                {
+                    id: 'root-2',
+                    name: 'Root 2',
+                    type: 'LongTermGoal',
+                    is_smart: true,
+                    created_at: '2026-03-02T00:00:00Z',
+                    display_level: { name: 'Long Term Goal', color: '#333333', secondary_color: '#444444', icon: 'square' },
+                },
             ],
         });
-        getGoalLevels.mockImplementation(async (rootId) => ({
-            data: rootId === 'root-1'
-                ? [{ name: 'Ultimate Goal', color: '#111111', secondary_color: '#222222', icon: 'circle' }]
-                : [{ name: 'Long Term Goal', color: '#333333', secondary_color: '#444444', icon: 'square' }],
-        }));
 
         renderSelection(queryClient);
 
@@ -175,27 +189,81 @@ describe('Selection', () => {
         });
 
         await waitFor(() => {
-            expect(queryClient.getQueryData(queryKeys.fractals())).toHaveLength(2);
-            expect(queryClient.getQueryData(queryKeys.goalLevels('root-1'))).toEqual([
-                { name: 'Ultimate Goal', color: '#111111', secondary_color: '#222222', icon: 'circle' },
-            ]);
-            expect(queryClient.getQueryData(queryKeys.goalLevels('root-2'))).toEqual([
-                { name: 'Long Term Goal', color: '#333333', secondary_color: '#444444', icon: 'square' },
-            ]);
+            expect(queryClient.getQueryData(queryKeys.fractals('user-1'))).toHaveLength(2);
         });
+        expect(getGoalLevels).not.toHaveBeenCalled();
     });
 
-    it('removes deleted fractals from the shared cache and clears the recent root', async () => {
+    it('does not show cached fractals from a previous account after switching users', async () => {
         const queryClient = createQueryClient();
-        localStorage.setItem('fractal_recent_root_id', 'root-1');
 
         getAllFractals.mockResolvedValueOnce({
             data: [
-                { id: 'root-1', name: 'Root 1', type: 'UltimateGoal', is_smart: false, created_at: '2026-03-01T00:00:00Z' },
+                {
+                    id: 'root-a',
+                    name: 'User A Root',
+                    type: 'UltimateGoal',
+                    is_smart: false,
+                    created_at: '2026-03-01T00:00:00Z',
+                    display_level: { name: 'Ultimate Goal', color: '#111111', secondary_color: '#222222', icon: 'circle' },
+                },
             ],
         });
-        getGoalLevels.mockResolvedValueOnce({
-            data: [{ name: 'Ultimate Goal', color: '#111111', secondary_color: '#222222', icon: 'circle' }],
+
+        const view = renderSelection(queryClient);
+
+        await waitFor(() => {
+            expect(screen.getByText('User A Root')).toBeInTheDocument();
+        });
+
+        mockAuthState.user = { id: 'user-2', username: 'testuser' };
+        getAllFractals.mockResolvedValueOnce({
+            data: [
+                {
+                    id: 'root-b',
+                    name: 'User B Root',
+                    type: 'LongTermGoal',
+                    is_smart: false,
+                    created_at: '2026-03-02T00:00:00Z',
+                    display_level: { name: 'Long Term Goal', color: '#333333', secondary_color: '#444444', icon: 'square' },
+                },
+            ],
+        });
+
+        view.rerender(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter>
+                    <Selection />
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        expect(screen.queryByText('User A Root')).not.toBeInTheDocument();
+
+        await waitFor(() => {
+            expect(screen.getByText('User B Root')).toBeInTheDocument();
+        });
+
+        expect(queryClient.getQueryData(queryKeys.fractals('user-1'))).toHaveLength(1);
+        expect(queryClient.getQueryData(queryKeys.fractals('user-2'))).toHaveLength(1);
+        expect(getGoalLevels).not.toHaveBeenCalled();
+    });
+
+    it('removes deleted fractals from the user-scoped cache and clears the user recent root', async () => {
+        const queryClient = createQueryClient();
+        localStorage.setItem('fractal_recent_root_id:user-1', 'root-1');
+
+        getAllFractals.mockResolvedValueOnce({
+            data: [
+                {
+                    id: 'root-1',
+                    name: 'Root 1',
+                    type: 'UltimateGoal',
+                    is_smart: false,
+                    created_at: '2026-03-01T00:00:00Z',
+                    display_level: { name: 'Ultimate Goal', color: '#111111', secondary_color: '#222222', icon: 'circle' },
+                },
+            ],
         });
         deleteFractal.mockResolvedValueOnce({ data: { ok: true } });
 
@@ -209,11 +277,11 @@ describe('Selection', () => {
         fireEvent.click(screen.getByText('Confirm delete'));
 
         await waitFor(() => {
-            expect(queryClient.getQueryData(queryKeys.fractals())).toEqual([]);
+            expect(queryClient.getQueryData(queryKeys.fractals('user-1'))).toEqual([]);
             expect(screen.queryByText('Root 1')).not.toBeInTheDocument();
         });
 
-        expect(localStorage.getItem('fractal_recent_root_id')).toBeNull();
+        expect(localStorage.getItem('fractal_recent_root_id:user-1')).toBeNull();
     });
 
     it('uses notify instead of alert when fractal creation fails', async () => {
@@ -246,11 +314,15 @@ describe('Selection', () => {
 
         getAllFractals.mockResolvedValueOnce({
             data: [
-                { id: 'root-1', name: 'Root 1', type: 'UltimateGoal', is_smart: false, created_at: '2026-03-01T00:00:00Z' },
+                {
+                    id: 'root-1',
+                    name: 'Root 1',
+                    type: 'UltimateGoal',
+                    is_smart: false,
+                    created_at: '2026-03-01T00:00:00Z',
+                    display_level: { name: 'Ultimate Goal', color: '#111111', secondary_color: '#222222', icon: 'circle' },
+                },
             ],
-        });
-        getGoalLevels.mockResolvedValueOnce({
-            data: [{ name: 'Ultimate Goal', color: '#111111', secondary_color: '#222222', icon: 'circle' }],
         });
         deleteFractal.mockRejectedValueOnce(new Error('Delete failed'));
 

@@ -260,9 +260,9 @@ function Sessions() {
             setSessionToDelete(null);
 
             queryClient.removeQueries({ queryKey: queryKeys.session(rootId, sessionToDelete.id) });
-            queryClient.invalidateQueries({ queryKey: ['sessions', rootId] });
-            queryClient.invalidateQueries({ queryKey: ['activity-history', rootId] });
-            queryClient.invalidateQueries({ queryKey: ['progress'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.activityHistoryRoot(rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.progressRoot() });
 
             notify.success('Session deleted');
         } catch (err) {

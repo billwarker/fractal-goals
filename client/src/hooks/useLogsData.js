@@ -27,7 +27,7 @@ export function useLogsData(rootId, { page, pageSize, eventType, startDate, endD
         mutationFn: async () => fractalApi.clearLogs(rootId),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.logs(rootId) });
-            queryClient.removeQueries({ queryKey: ['logs', rootId, 'infinite'] });
+            queryClient.removeQueries({ queryKey: queryKeys.logsInfiniteRoot(rootId) });
         }
     });
 

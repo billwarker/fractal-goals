@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { authApi, clearAccessToken, setAccessToken } from '../utils/api';
 
 const AuthContext = createContext();
@@ -6,6 +7,16 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+
+    const replaceUser = (nextUser) => {
+        const previousUserId = user?.id || null;
+        const nextUserId = nextUser?.id || null;
+        if (previousUserId !== nextUserId) {
+            queryClient.clear();
+        }
+        setUser(nextUser || null);
+    };
 
     useEffect(() => {
         fetchCurrentUser();
@@ -15,7 +26,7 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         const handleUnauthorized = () => {
             clearAccessToken();
-            setUser(null);
+            replaceUser(null);
             setLoading(false);
         };
         const handleTokenRefresh = (e) => {
@@ -23,7 +34,7 @@ export function AuthProvider({ children }) {
                 setAccessToken(e.detail.token);
             }
             if (e.detail?.user) {
-                setUser(e.detail.user);
+                replaceUser(e.detail.user);
             }
         };
         window.addEventListener('auth:unauthorized', handleUnauthorized);
@@ -32,7 +43,7 @@ export function AuthProvider({ children }) {
             window.removeEventListener('auth:unauthorized', handleUnauthorized);
             window.removeEventListener('auth:token_refreshed', handleTokenRefresh);
         };
-    }, []);
+    }, [queryClient, user?.id]);
 
     const fetchCurrentUser = async () => {
         try {
@@ -44,22 +55,23 @@ export function AuthProvider({ children }) {
                     setAccessToken(refreshResponse.data.token);
                 }
                 if (refreshResponse.data?.user) {
-                    setUser(refreshResponse.data.user);
+                    replaceUser(refreshResponse.data.user);
                     return;
                 }
             }
 
             const res = await authApi.getMe();
-            setUser(res.data);
+            replaceUser(res.data);
         } catch (err) {
-            console.error("Failed to fetch current user:", err);
             const status = err?.response?.status;
             const isNetworkError = !err?.response;
 
             // Keep token for transient network failures so interceptor retries can recover.
             if (!isNetworkError && (status === 401 || status === 403)) {
                 clearAccessToken();
-                setUser(null);
+                replaceUser(null);
+            } else {
+                console.error("Failed to fetch current user:", err);
             }
         } finally {
             setLoading(false);
@@ -74,7 +86,7 @@ export function AuthProvider({ children }) {
             });
             const { token, user: userData } = res.data;
             setAccessToken(token);
-            setUser(userData);
+            replaceUser(userData);
             return res.data;
         } catch (err) {
             console.error("Login failed:", err);
@@ -102,7 +114,7 @@ export function AuthProvider({ children }) {
             await authApi.logout();
         } finally {
             clearAccessToken();
-            setUser(null);
+            replaceUser(null);
         }
     };
 
@@ -113,7 +125,7 @@ export function AuthProvider({ children }) {
         login,
         signup,
         logout,
-        setUser,
+        setUser: replaceUser,
         isAuthenticated: !!user
     };
 

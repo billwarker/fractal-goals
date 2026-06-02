@@ -129,8 +129,8 @@ export function useSessionDetailMutations({
             invalidateSessionListQueries();
             queryClient.removeQueries({ queryKey: sessionKey });
             queryClient.removeQueries({ queryKey: sessionActivitiesKey });
-            queryClient.invalidateQueries({ queryKey: ['activity-history', rootId] });
-            queryClient.invalidateQueries({ queryKey: ['progress'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.activityHistoryRoot(rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.progressRoot() });
             notify.success('Session deleted successfully');
         },
         onError: () => {
@@ -314,7 +314,7 @@ export function useSessionDetailMutations({
             if (updates?.metrics !== undefined || updates?.sets !== undefined) {
                 queryClient.invalidateQueries({ queryKey: queryKeys.progressComparison(instanceId) });
                 if (activityDefinitionId) {
-                    queryClient.invalidateQueries({ queryKey: ['progress', 'history', activityDefinitionId] });
+                    queryClient.invalidateQueries({ queryKey: queryKeys.progressHistoryRoot(activityDefinitionId) });
                 }
                 queryClient.invalidateQueries({ queryKey: queryKeys.sessionProgressSummary(sessionId) });
             }

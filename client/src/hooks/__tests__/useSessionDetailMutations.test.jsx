@@ -254,7 +254,7 @@ describe('useSessionDetailMutations', () => {
         });
 
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.progressComparison('inst-1') });
-        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['progress', 'history', 'act-1'] });
+        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.progressHistoryRoot('act-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessionProgressSummary('session-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessions('root-1') });
     });

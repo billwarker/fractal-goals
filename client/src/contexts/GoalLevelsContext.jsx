@@ -25,6 +25,7 @@ export function adjustBrightness(hex, percent) {
 export function GoalLevelsProvider({ children }) {
     const { isAuthenticated, user } = useAuth();
     const queryClient = useQueryClient();
+    const userId = user?.id || null;
 
     // Extract rootId from URL path (pattern: /:rootId/...)
     // UUID pattern: 8-4-4-4-12 hex characters
@@ -48,12 +49,12 @@ export function GoalLevelsProvider({ children }) {
         isLoading,
         error
     } = useQuery({
-        queryKey: queryKeys.goalLevels(currentRootId),
+        queryKey: queryKeys.goalLevels(currentRootId, userId),
         queryFn: async () => {
             const res = await globalApi.getGoalLevels(currentRootId);
             return res.data;
         },
-        enabled: isAuthenticated
+        enabled: isAuthenticated && !!userId
     });
 
     const updateGoalLevelMutation = useMutation({
@@ -63,8 +64,8 @@ export function GoalLevelsProvider({ children }) {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.goalLevels(currentRootId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.fractals() });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalLevels(currentRootId, userId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.fractals(userId) });
         }
     });
 
@@ -74,8 +75,8 @@ export function GoalLevelsProvider({ children }) {
             return res.data;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.goalLevels(currentRootId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.fractals() });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalLevels(currentRootId, userId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.fractals(userId) });
         }
     });
 

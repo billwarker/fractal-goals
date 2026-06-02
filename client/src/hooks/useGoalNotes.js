@@ -24,7 +24,7 @@ export function useGoalNotes(rootId, goalId, { includeDescendants = false } = {}
 
     const invalidate = () => {
         queryClient.invalidateQueries({ queryKey: noteKey });
-        queryClient.invalidateQueries({ queryKey: ['all-notes', rootId] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.allNotesRoot(rootId) });
     };
 
     const createNoteMutation = useMutation({

@@ -70,8 +70,8 @@ export function useNotesPageQuery(rootId, filters = {}) {
     const hasMore = Boolean(hasNextPage);
 
     const invalidate = () => {
-        queryClient.invalidateQueries({ queryKey: ['all-notes', rootId] });
-        queryClient.invalidateQueries({ queryKey: ['goal-notes', rootId] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.allNotesRoot(rootId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.goalNotesRoot(rootId) });
     };
 
     const createNoteMutation = useMutation({

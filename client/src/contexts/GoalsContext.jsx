@@ -90,10 +90,10 @@ export function GoalsProvider({ children }) {
         },
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
-            queryClient.invalidateQueries({ queryKey: ['session', variables.rootId] });
-            queryClient.invalidateQueries({ queryKey: ['session-activities', variables.rootId] });
-            queryClient.invalidateQueries({ queryKey: ['session-notes', variables.rootId] });
-            queryClient.invalidateQueries({ queryKey: ['session-goals-view', variables.rootId] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionRoot(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivitiesRoot(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionNotesRoot(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionGoalsViewRoot(variables.rootId) });
             notify.success('Goal deleted');
         },
         onError: (error) => {
