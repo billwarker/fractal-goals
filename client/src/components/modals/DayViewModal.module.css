@@ -95,15 +95,12 @@
     border-radius: 8px;
     padding: 16px;
     border: 1px solid var(--color-border);
-    border-left-width: 4px;
-    border-left-style: solid;
     position: relative;
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .programDayCardCompleted {
     background: var(--color-bg-surface);
-    border-left-color: var(--color-brand-success);
 }
 
 .programDayHeader {
@@ -130,6 +127,9 @@
     color: var(--color-text-muted);
     font-size: 12px;
     margin-top: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
 }
 
 .removeButton {
@@ -170,6 +170,13 @@
 
 .templateHeaderPending {
     color: var(--color-text-muted);
+}
+
+.templateStatusIcon,
+.inlineStatusIcon,
+.goalCardIcon,
+.actionIcon {
+    flex: 0 0 auto;
 }
 
 .sessionCountBadge {
@@ -275,7 +282,7 @@
 }
 
 .emptyStateIcon {
-    font-size: 24px;
+    color: var(--color-text-muted);
     margin-bottom: 10px;
 }
 
@@ -295,12 +302,10 @@
     background: var(--color-bg-secondary);
     border-radius: 6px;
     border: 1px solid var(--color-border);
-    border-left: 3px solid;
 }
 
 .goalCardCompleted {
     background: var(--color-bg-surface);
-    border-left-color: var(--color-brand-success);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -309,6 +314,19 @@
 .goalMeta {
     font-size: 11px;
     margin-top: 4px;
+}
+
+.goalCardName,
+.iconTextRow {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.goalCardName {
+    min-width: 0;
+    color: var(--color-text-primary);
+    font-size: 14px;
 }
 
 /* Action Controls */
@@ -332,6 +350,13 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+.actionToggleLabel {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
 }
 
 .actionToggle:hover {
@@ -422,8 +447,8 @@
 
 .createButton {
     padding: 10px;
-    background-image: linear-gradient(to right, rgba(58, 134, 255, 0.07), rgba(58, 134, 255, 0.2));
-    border: 1px dashed var(--color-brand-primary);
+    background: color-mix(in srgb, var(--color-brand-primary) 8%, var(--color-bg-input));
+    border: 1px dashed color-mix(in srgb, var(--color-brand-primary) 72%, var(--color-border));
     border-radius: 6px;
     color: var(--color-brand-primary);
     text-align: center;
@@ -431,10 +456,23 @@
     font-size: 13px;
     font-weight: 600;
     width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .createButton:hover {
-    background-image: linear-gradient(to right, rgba(58, 134, 255, 0.15), rgba(58, 134, 255, 0.3));
+    background: color-mix(in srgb, var(--color-brand-primary) 14%, var(--color-bg-input));
+    border-color: var(--color-brand-primary);
+    color: color-mix(in srgb, var(--color-brand-primary) 84%, white);
+}
+
+.createButton:focus-visible {
+    outline: none;
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-primary) 22%, transparent);
 }
 
 /* Footer */
@@ -506,11 +544,6 @@
 .goalCardFlex {
     display: flex;
     flex-direction: column;
-}
-
-.goalCardName {
-    color: var(--color-text-primary);
-    font-size: 14px;
 }
 
 .goalCardMetaCompleted {

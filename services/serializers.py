@@ -632,8 +632,10 @@ def serialize_session(session):
                 result["program_info"] = {
                     "program_id": program.id,
                     "program_name": program.name,
+                    "program_color": getattr(program, 'color', None),
                     "block_id": block.id,
                     "block_name": block.name,
+                    "block_color": getattr(block, 'color', None),
                     "day_id": day.id,
                     "day_name": day.name
                 }
@@ -816,19 +818,20 @@ def serialize_program_block(block):
 
 def serialize_program_day(day):
     """Serialize a ProgramDay object."""
-    # note_condition_satisfied: True if any note was written during a completed session on this day
-    note_condition = bool(getattr(day, 'note_condition', False))
-    note_condition_satisfied = False
-    if note_condition:
-        session_ids = {s.id for s in (day.completed_sessions or []) if not s.deleted_at}
-        if session_ids:
-            note_condition_satisfied = any(
-                hasattr(s, 'notes_list') and len([
-                    n for n in (s.notes_list or []) if not n.deleted_at
-                ]) > 0
-                for s in (day.completed_sessions or [])
-                if not s.deleted_at
-            )
+    template_rules = {
+        link.session_template_id: {
+            "is_required": bool(link.is_required),
+            "order": link.order or 0,
+        }
+        for link in (getattr(day, 'template_links', None) or [])
+    }
+    serialized_templates = []
+    for index, template in enumerate(day.templates or []):
+        template_payload = serialize_session_template(template)
+        template_rule = template_rules.get(template.id, {})
+        template_payload["is_required"] = template_rule.get("is_required", True)
+        template_payload["order"] = template_rule.get("order", index)
+        serialized_templates.append(template_payload)
 
     return {
         "id": day.id,
@@ -838,11 +841,10 @@ def serialize_program_day(day):
         "notes": day.notes,
         "date": format_utc(day.date),
         "day_of_week": day.day_of_week or [],
-        "templates": [serialize_session_template(t) for t in day.templates],
+        "templates": serialized_templates,
         "goal_ids": [g.id for g in (day.goals or [])],
         "is_completed": day.is_completed,
-        "note_condition": note_condition,
-        "note_condition_satisfied": note_condition_satisfied,
+        "completion_min_templates": getattr(day, 'completion_min_templates', None),
         "sessions": [serialize_program_day_session_light(s) for s in day.completed_sessions if not s.deleted_at],
         "day_sessions": [{
             "id": ds.id,

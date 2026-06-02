@@ -8,15 +8,18 @@ function SessionTemplateNameBadge({
     name,
     color,
     size = 'md',
+    wrap = false,
     className = '',
 }) {
     const resolvedColor = color || getTemplateColor(entity);
     const resolvedName = name || entity?.name || 'Template';
     const sizeClass = styles[`size${size.charAt(0).toUpperCase()}${size.slice(1)}`] || styles.sizeMd;
+    const wrapClass = wrap ? styles.wrap : '';
 
     return (
         <span
-            className={`${styles.badge} ${sizeClass} ${className}`.trim()}
+            className={`${styles.badge} ${sizeClass} ${wrapClass} ${className}`.trim()}
+            title={resolvedName}
             style={{
                 borderColor: resolvedColor,
                 color: resolvedColor,

@@ -1,5 +1,4 @@
 import React from 'react';
-import GoalIcon from '../atoms/GoalIcon';
 import CheckIcon from '../atoms/CheckIcon';
 import EditIcon from '../atoms/EditIcon';
 import LinkIcon from '../atoms/LinkIcon';
@@ -8,6 +7,7 @@ import TrashIcon from '../atoms/TrashIcon';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { isBlockActive, ActiveBlockBadge } from '../../utils/programUtils';
 import Card from '../atoms/Card';
+import GoalNameBadge from '../common/GoalNameBadge';
 import styles from './ProgramBlockView.module.css';
 import { useState } from 'react';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
@@ -23,6 +23,11 @@ import {
     getISOYMDInTimezone,
     getWeekdayName,
 } from '../../utils/dateUtils';
+import {
+    getProgramDayScheduledDates,
+    getScheduledProgramDayCompletion,
+} from '../../utils/programViewModel';
+import { ProgramCheckIcon } from './ProgramSvgIcons';
 
 function ProgramBlockView({
     blocks, // sortedBlocks
@@ -90,7 +95,6 @@ function ProgramBlockView({
                     <Card
                         key={block.id}
                         className={styles.blockCard}
-                        style={{ borderLeftColor: blockColor }}
                     >
                         {/* ── Block Header ─────────────────────────────── */}
                         <div className={styles.blockHeader} style={{ background: headerBg }}>
@@ -162,25 +166,22 @@ function ProgramBlockView({
                                         : getGoalSecondaryColor(goalType);
 
                                     return (
-                                        <button
+                                        <GoalNameBadge
                                             key={goal.id}
-                                            type="button"
-                                            className={`${styles.goalListItem} ${isCompleted ? styles.goalListItemCompleted : ''}`}
+                                            as="button"
+                                            goal={goal}
+                                            label={goal.name || goal.attributes?.name}
+                                            color={goalColor}
+                                            secondaryColor={goalSecondaryColor}
+                                            shape={getGoalIcon(goalType)}
+                                            isSmart={goal.is_smart || goal.attributes?.is_smart}
+                                            isCompleted={isCompleted}
+                                            className={styles.goalBadge}
                                             onClick={(event) => {
                                                 event.stopPropagation();
                                                 onGoalClick(goal);
                                             }}
-                                            title={goal.name}
-                                        >
-                                            <GoalIcon
-                                                shape={getGoalIcon(goalType)}
-                                                color={goalColor}
-                                                secondaryColor={goalSecondaryColor}
-                                                isSmart={goal.is_smart}
-                                                size={14}
-                                            />
-                                            <span className={styles.goalListItemName}>{goal.name}</span>
-                                        </button>
+                                        />
                                     );
                                 })}
                             </div>
@@ -215,7 +216,6 @@ function ProgramBlockView({
                                                 key={day.id}
                                                 onClick={() => onEditDay(block.id, day)}
                                                 className={styles.dayCard}
-                                                style={{ borderLeftColor: blockColor }}
                                             >
                                                 <div className={styles.dayHeader}>
                                                     <div>
@@ -236,20 +236,24 @@ function ProgramBlockView({
                                                         })()}
                                                     </div>
                                                     {(() => {
-                                                        const daySessions = sessions.filter(s => {
-                                                            if (s.program_day_id !== day.id || !s.completed) return false;
-                                                            const sessionDate = getISOYMDInTimezone(s.session_start || s.created_at, timezone);
-                                                            return sessionDate >= blockStartDate && sessionDate <= blockEndDate;
-                                                        });
+                                                        const completedProgramDayCount = getProgramDayScheduledDates(day, block).filter((date) => (
+                                                            getScheduledProgramDayCompletion({
+                                                                date,
+                                                                dayId: day.id,
+                                                                day,
+                                                                templates: day.templates || [],
+                                                            }, sessions, timezone).isCompleted
+                                                        )).length;
 
-                                                        const completedTemplateIds = new Set(daySessions.filter(s => s.template_id).map(s => s.template_id));
-                                                        const templates = day.templates || [];
-                                                        const isFullComplete = templates.length > 0 && templates.every(t => completedTemplateIds.has(t.id));
-
-                                                        if (daySessions.length > 0) {
+                                                        if (completedProgramDayCount > 0) {
                                                             return (
-                                                                <div className={styles.sessionCount}>
-                                                                    {daySessions.length}{isFullComplete ? ' ✓' : ''}
+                                                                <div
+                                                                    className={styles.sessionCount}
+                                                                    aria-label={`${completedProgramDayCount} completed program days`}
+                                                                    title={`${completedProgramDayCount} completed program days`}
+                                                                >
+                                                                    <span>{completedProgramDayCount}</span>
+                                                                    <ProgramCheckIcon size={13} />
                                                                 </div>
                                                             );
                                                         }
@@ -270,17 +274,21 @@ function ProgramBlockView({
                                                                 const tSessions = daySessions.filter(s => s.template_id === template.id);
                                                                 const sCount = tSessions.length;
                                                                 const isDone = sCount > 0;
+                                                                const isRequired = template.is_required !== false;
 
                                                                 return (
                                                                     <div
                                                                         key={template.id}
-                                                                        className={`${styles.templateItem} ${isDone ? styles.templateItemDone : styles.templateItemPending}`}
+                                                                        className={`${styles.templateItem} ${isDone ? styles.templateItemDone : styles.templateItemPending} ${!isRequired ? styles.templateItemOptional : ''}`}
                                                                     >
                                                                         <div className={styles.templateBadgeWrap}>
                                                                             {isDone && <CheckIcon className={styles.templateDoneMark} size={12} />}
-                                                                            <SessionTemplateNameBadge entity={template} size="sm" />
+                                                                            <SessionTemplateNameBadge entity={template} size="sm" wrap className={styles.templateBadge} />
                                                                         </div>
-                                                                        {sCount > 1 && <span className={styles.templateCount}>×{sCount}</span>}
+                                                                        <span className={styles.templateMeta}>
+                                                                            {!isRequired ? <span className={styles.optionalMark}>Optional</span> : null}
+                                                                            {sCount > 1 && <span className={styles.templateCount}>×{sCount}</span>}
+                                                                        </span>
                                                                     </div>
                                                                 );
                                                             });
@@ -289,11 +297,6 @@ function ProgramBlockView({
                                                     })()}
                                                 </div>
 
-                                                {day.note_condition && (
-                                                    <div className={day.note_condition_satisfied ? styles.noteConditionMet : styles.noteConditionUnmet}>
-                                                        {day.note_condition_satisfied ? '✎ Note written' : '✎ Note required'}
-                                                    </div>
-                                                )}
                                             </div>
                                         ))}
 

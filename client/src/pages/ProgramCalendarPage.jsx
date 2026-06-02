@@ -86,6 +86,36 @@ function getStatusLabel(status) {
     return 'Inactive';
 }
 
+function ProgramSidePaneSection({
+    title,
+    collapsed,
+    onToggle,
+    children,
+    className = '',
+    contentClassName = '',
+}) {
+    return (
+        <section className={`${styles.sidePaneSectionGroup} ${collapsed ? styles.sidePaneSectionGroupCollapsed : ''} ${className}`.trim()}>
+            <div className={styles.sidePaneSectionTitleRow}>
+                <div className={styles.sidePaneSectionTitle}>{title}</div>
+                <button
+                    type="button"
+                    className={styles.sidePaneSectionToggle}
+                    onClick={onToggle}
+                    aria-expanded={!collapsed}
+                >
+                    {collapsed ? 'Show' : 'Hide'}
+                </button>
+            </div>
+            {!collapsed ? (
+                <div className={`${styles.sidePaneSectionContent} ${contentClassName}`.trim()}>
+                    {children}
+                </div>
+            ) : null}
+        </section>
+    );
+}
+
 function getDayOffset(startDate, nextStartDate) {
     const source = new Date(`${getDatePart(startDate)}T00:00:00`);
     const target = new Date(`${getDatePart(nextStartDate)}T00:00:00`);
@@ -123,6 +153,18 @@ function ProgramSidePane({
         goals,
     }), [goals, program]);
     const getGoalDetails = (goalId) => goals.find((goal) => goal.id === goalId) || null;
+    const [collapsedSections, setCollapsedSections] = useState({
+        details: false,
+        metrics: false,
+        notes: false,
+        goals: false,
+    });
+    const toggleSection = (key) => {
+        setCollapsedSections((current) => ({
+            ...current,
+            [key]: !current[key],
+        }));
+    };
     const sidePaneData = {
         programMetrics: programMetrics || fallbackSidePaneData.programMetrics,
         activeBlock: activeBlock || fallbackSidePaneData.activeBlock,
@@ -157,52 +199,89 @@ function ProgramSidePane({
 
             {program && view === 'details' ? (
                 <div className={styles.detailsPane}>
-                    {program.description ? <p className={styles.description}>{program.description}</p> : null}
+                    <ProgramSidePaneSection
+                        title="Details"
+                        collapsed={collapsedSections.details}
+                        onToggle={() => toggleSection('details')}
+                    >
+                        {program.description ? (
+                            <p className={styles.sectionDescription}>{program.description}</p>
+                        ) : (
+                            <p className={styles.emptySectionText}>No details yet.</p>
+                        )}
+                    </ProgramSidePaneSection>
 
-                    <ProgramSidebar
-                        program={program}
-                        programMetrics={sidePaneData.programMetrics}
-                        activeBlock={sidePaneData.activeBlock}
-                        blockMetrics={sidePaneData.blockMetrics}
-                        programGoalSeeds={sidePaneData.programGoalSeeds}
-                        onGoalClick={onGoalClick || (() => {})}
-                        getGoalDetails={getGoalDetails}
-                        compact
-                        hideGoals
-                        className={styles.embeddedSidebarMetrics}
-                    />
+                    <ProgramSidePaneSection
+                        title="Metrics"
+                        collapsed={collapsedSections.metrics}
+                        onToggle={() => toggleSection('metrics')}
+                        contentClassName={styles.metricsSectionContent}
+                    >
+                        <ProgramSidebar
+                            program={program}
+                            programMetrics={sidePaneData.programMetrics}
+                            activeBlock={sidePaneData.activeBlock}
+                            blockMetrics={sidePaneData.blockMetrics}
+                            programGoalSeeds={sidePaneData.programGoalSeeds}
+                            onGoalClick={onGoalClick || (() => {})}
+                            getGoalDetails={getGoalDetails}
+                            compact
+                            hideGoals
+                            hideMetricsHeader
+                            flushMetricsPadding
+                            className={styles.embeddedSidebarMetrics}
+                        />
+                    </ProgramSidePaneSection>
 
-                    <SidePaneNotePanel
-                        notes={notes}
-                        isLoading={notesQuery.isLoading}
-                        error={notesQuery.error}
-                        onSubmit={onCreateNote}
-                        onEdit={notesQuery.updateNote}
-                        onDelete={notesQuery.deleteNote}
-                        onPin={notesQuery.pinNote}
-                        onUnpin={notesQuery.unpinNote}
-                        hasMore={notesQuery.hasMore}
-                        onLoadMore={notesQuery.loadNextPage}
-                        placeholder="Add a program note..."
-                        label="Program Notes"
-                    />
+                    <ProgramSidePaneSection
+                        title={notes.length > 0 ? `Program Notes (${notes.length})` : 'Program Notes'}
+                        collapsed={collapsedSections.notes}
+                        onToggle={() => toggleSection('notes')}
+                        className={styles.notesSidePaneSection}
+                        contentClassName={styles.notesSectionContent}
+                    >
+                        <SidePaneNotePanel
+                            notes={notes}
+                            isLoading={notesQuery.isLoading}
+                            error={notesQuery.error}
+                            onSubmit={onCreateNote}
+                            onEdit={notesQuery.updateNote}
+                            onDelete={notesQuery.deleteNote}
+                            onPin={notesQuery.pinNote}
+                            onUnpin={notesQuery.unpinNote}
+                            hasMore={notesQuery.hasMore}
+                            onLoadMore={notesQuery.loadNextPage}
+                            placeholder="Add a program note..."
+                            label="Program Notes"
+                            hideHeader
+                        />
+                    </ProgramSidePaneSection>
                 </div>
             ) : null}
 
             {program && view === 'goals' ? (
                 <div className={styles.goalsPane}>
-                    <ProgramSidebar
-                        program={program}
-                        programMetrics={sidePaneData.programMetrics}
-                        activeBlock={sidePaneData.activeBlock}
-                        blockMetrics={sidePaneData.blockMetrics}
-                        programGoalSeeds={sidePaneData.programGoalSeeds}
-                        onGoalClick={onGoalClick || (() => {})}
-                        getGoalDetails={getGoalDetails}
-                        compact
-                        hideMetrics
-                        className={styles.embeddedSidebar}
-                    />
+                    <ProgramSidePaneSection
+                        title="Program Goals"
+                        collapsed={collapsedSections.goals}
+                        onToggle={() => toggleSection('goals')}
+                        className={styles.goalsSidePaneSection}
+                        contentClassName={styles.goalsSectionContent}
+                    >
+                        <ProgramSidebar
+                            program={program}
+                            programMetrics={sidePaneData.programMetrics}
+                            activeBlock={sidePaneData.activeBlock}
+                            blockMetrics={sidePaneData.blockMetrics}
+                            programGoalSeeds={sidePaneData.programGoalSeeds}
+                            onGoalClick={onGoalClick || (() => {})}
+                            getGoalDetails={getGoalDetails}
+                            compact
+                            hideMetrics
+                            hideGoalsHeader
+                            className={styles.embeddedSidebar}
+                        />
+                    </ProgramSidePaneSection>
                 </div>
             ) : null}
 
@@ -469,7 +548,25 @@ function ProgramCalendarPage() {
         </span>
     );
     const pageSubtitle = displayProgram
-        ? `${formatLiteralDate(displayProgram.start_date)} - ${formatLiteralDate(displayProgram.end_date)}${selectedRangeText ? ` • Selected ${selectedRangeText}` : ''}`
+        ? (
+            <span className={styles.headerMetaRow}>
+                <span>{formatLiteralDate(displayProgram.start_date)} - {formatLiteralDate(displayProgram.end_date)}</span>
+                {displayProgramStatus ? (
+                    <span className={`${styles.statusBadge} ${styles[getStatusBadgeClass(displayProgramStatus)]}`}>
+                        {getStatusLabel(displayProgramStatus)}
+                    </span>
+                ) : null}
+                {blockMetrics ? (
+                    <span
+                        className={styles.blockBadge}
+                        style={{ borderColor: blockMetrics.color, color: blockMetrics.color, background: `color-mix(in srgb, ${blockMetrics.color} 14%, transparent)` }}
+                    >
+                        {blockMetrics.name}
+                    </span>
+                ) : null}
+                {selectedRangeText ? <span>Selected {selectedRangeText}</span> : null}
+            </span>
+        )
         : (selectedRangeText ? 'No program scheduled for these days.' : 'No program scheduled for this day.');
     const duplicateInitialData = useMemo(() => {
         if (builderState.mode !== 'duplicate' || !builderState.duplicateSource) return null;
@@ -708,7 +805,12 @@ function ProgramCalendarPage() {
                             day_number: sourceDay.day_number,
                             day_of_week: sourceDay.day_of_week || [],
                             template_ids: (sourceDay.templates || []).map((template) => template.id).filter(Boolean),
-                            note_condition: Boolean(sourceDay.note_condition),
+                            template_configs: (sourceDay.templates || []).map((template, index) => ({
+                                template_id: template.id,
+                                is_required: template.is_required !== false,
+                                order: template.order ?? index,
+                            })).filter((config) => Boolean(config.template_id)),
+                            completion_min_templates: sourceDay.completion_min_templates || null,
                         });
                     }
                 }
@@ -856,34 +958,16 @@ function ProgramCalendarPage() {
     return (
         <div className={styles.container}>
             <div className={`${styles.workspace} ${!isSidePaneVisible ? styles.workspaceNoSidePane : ''}`}>
-                <div className={styles.mainColumn}>
+                <div className={`${styles.mainColumn} ${viewMode === 'blocks' ? styles.mainColumnBlocksMode : ''}`}>
                     <PageHeader
                         title={pageTitle}
                         subtitle={pageSubtitle}
-                        style={displayProgramColor ? {
-                            '--page-header-accent-color': displayProgramColor,
-                        } : undefined}
                         hideTitleOnMobile={false}
                         compactMobileContext
-                        titleAccessory={displayProgramStatus ? (
-                            <>
-                                <span className={`${styles.statusBadge} ${styles[getStatusBadgeClass(displayProgramStatus)]}`}>
-                                    {getStatusLabel(displayProgramStatus)}
-                                </span>
-                                {blockMetrics ? (
-                                    <span
-                                        className={styles.blockBadge}
-                                        style={{ borderColor: blockMetrics.color, color: blockMetrics.color, background: `color-mix(in srgb, ${blockMetrics.color} 14%, transparent)` }}
-                                    >
-                                        {blockMetrics.name}
-                                    </span>
-                                ) : null}
-                            </>
-                        ) : null}
                         actions={viewActions}
                     />
 
-                    <div className={styles.calendarPanel}>
+                    <div className={`${styles.calendarPanel} ${viewMode === 'blocks' ? styles.blocksModePanel : ''}`}>
                         {loading || (viewMode === 'blocks' && detailLoading) ? (
                             <div className={styles.loading}>Loading programs...</div>
                         ) : viewMode === 'calendar' ? (

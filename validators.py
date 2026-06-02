@@ -1292,6 +1292,15 @@ class ProgramBlockUpdateSchema(BaseModel):
 
 
 
+class ProgramDayTemplateConfigSchema(BaseModel):
+    """Completion metadata for a session template attached to a program day."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    template_id: str
+    is_required: Optional[bool] = True
+    order: Optional[int] = 0
+
+
 class ProgramDayCreateSchema(BaseModel):
     """Schema for adding a day to a program block."""
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -1301,7 +1310,8 @@ class ProgramDayCreateSchema(BaseModel):
     day_of_week: Optional[List[str]] = None
     template_id: Optional[str] = None
     template_ids: Optional[List[str]] = None
-    note_condition: Optional[bool] = False
+    template_configs: Optional[List[ProgramDayTemplateConfigSchema]] = None
+    completion_min_templates: Optional[int] = Field(None, ge=1)
     cascade: Optional[bool] = False
 
     @field_validator('day_of_week')
@@ -1323,7 +1333,8 @@ class ProgramDayUpdateSchema(BaseModel):
     date: Optional[str] = None
     day_of_week: Optional[List[str]] = None
     template_ids: Optional[List[str]] = None
-    note_condition: Optional[bool] = None
+    template_configs: Optional[List[ProgramDayTemplateConfigSchema]] = None
+    completion_min_templates: Optional[int] = Field(None, ge=1)
     cascade: Optional[bool] = False
 
     @field_validator('day_of_week')

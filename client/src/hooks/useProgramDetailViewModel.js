@@ -55,7 +55,8 @@ export function useProgramDetailViewModel({
         programDaysMap,
         attachedGoalIds,
         getGoalDetails,
-    }), [attachedGoalIds, getGoalDetails, program, programDaysMap, sessions]);
+        timezone,
+    }), [attachedGoalIds, getGoalDetails, program, programDaysMap, sessions, timezone]);
 
     const activeBlock = useMemo(() => {
         return program?.blocks?.find((block) => isBlockActive(block)) || null;
@@ -75,9 +76,11 @@ export function useProgramDetailViewModel({
     const blockMetrics = useMemo(() => buildBlockMetrics({
         activeBlock,
         sessions,
+        program,
         programDaysMap,
         blockGoalsByBlockId,
-    }), [activeBlock, blockGoalsByBlockId, programDaysMap, sessions]);
+        timezone,
+    }), [activeBlock, blockGoalsByBlockId, program, programDaysMap, sessions, timezone]);
 
     const attachBlock = useMemo(() => {
         return sortedBlocks.find((block) => block.id === attachBlockId) || null;

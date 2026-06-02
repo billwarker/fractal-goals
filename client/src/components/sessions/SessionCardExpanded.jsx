@@ -13,7 +13,7 @@ import { getAchievedTargetsForSession } from '../../utils/targetUtils';
 import { isSMART } from '../../utils/smartHelpers';
 import CardCornerActionButton from '../common/CardCornerActionButton';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
-import GoalAccomplishmentChip from '../common/GoalAccomplishmentChip';
+import GoalNameBadge from '../common/GoalNameBadge';
 import MetaField from '../common/MetaField';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
@@ -104,14 +104,16 @@ const AccomplishmentsSection = memo(function AccomplishmentsSection({
                     const goalSecondaryColor = getGoalSecondaryColor(goal);
 
                     return (
-                        <GoalAccomplishmentChip
+                        <GoalNameBadge
                             key={getGoalId(goal) || `${goalType}-${getGoalName(goal)}`}
-                            className={styles.accomplishmentChip}
+                            className={styles.accomplishmentBadge}
+                            goal={goal}
                             label={getGoalName(goal)}
                             color={goalColor}
                             secondaryColor={goalSecondaryColor}
                             shape={getGoalIcon(goal)}
                             isSmart={isSMART(goal)}
+                            iconSize={16}
                         />
                     );
                 })}
@@ -151,6 +153,9 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     }
     const sessionStart = sessionData?.session_start || session?.session_start || session?.attributes?.session_start;
     const sessionEnd = sessionData?.session_end || session?.session_end || session?.attributes?.session_end;
+    const programInfo = session.program_info || null;
+    const programColor = programInfo?.program_color || 'var(--color-brand-primary)';
+    const blockColor = programInfo?.block_color || programColor;
     const shortTermGoals = session.short_term_goals || [];
     const immediateGoals = session.immediate_goals || [];
 
@@ -346,16 +351,27 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 {/* Program */}
                 <div className={styles.metaItem}>
                     <div className={styles.fieldLabel}>Program</div>
-                    {session.program_info ? (
+                    {programInfo ? (
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <Link
-                                to={`/${rootId}/programs/${session.program_info.program_id}`}
+                                to={`/${rootId}/programs/${programInfo.program_id}`}
                                 className={styles.programLink}
+                                style={{
+                                    color: programColor,
+                                    '--program-link-color': programColor,
+                                }}
                             >
-                                {session.program_info.program_name}
+                                {programInfo.program_name}
                             </Link>
                             <span className={styles.programSubtext}>
-                                {session.program_info.block_name} • {session.program_info.day_name}
+                                <span
+                                    className={styles.programBlockName}
+                                    style={{ color: blockColor }}
+                                >
+                                    {programInfo.block_name}
+                                </span>
+                                <span className={styles.programSeparator}> • </span>
+                                <span>{programInfo.day_name}</span>
                             </span>
                         </div>
                     ) : (

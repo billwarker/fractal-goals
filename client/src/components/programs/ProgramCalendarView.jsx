@@ -19,7 +19,7 @@ function renderEventContent(eventInfo) {
         return (
             <div
                 className={`${styles.eventPill} ${styles.eventPillGoal}`}
-                style={{ background: bg, color: fg, borderLeftColor: bg }}
+                style={{ background: bg, color: fg }}
             >
                 <span className={styles.eventPillText}>{title}</span>
             </div>
@@ -27,14 +27,13 @@ function renderEventContent(eventInfo) {
     }
 
     if (type === 'program_day') {
-        const accentColor = isCompleted ? 'var(--color-brand-success)' : (blockColor || 'var(--color-brand-primary)');
         const bg = isCompleted
             ? 'color-mix(in srgb, var(--color-brand-success) 13%, var(--color-bg-card))'
             : `color-mix(in srgb, ${blockColor || 'var(--color-brand-primary)'} 13%, var(--color-bg-card))`;
         return (
             <div
                 className={`${styles.eventPill} ${styles.eventPillProgramDay}`}
-                style={{ borderLeftColor: accentColor, background: bg }}
+                style={{ background: bg }}
             >
                 <span className={styles.eventPillText}>{title}</span>
             </div>

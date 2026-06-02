@@ -5,10 +5,21 @@
     max-width: 100%;
     border-radius: 999px;
     border: 1px solid;
+    overflow: hidden;
     overflow-wrap: anywhere;
+    text-overflow: ellipsis;
     line-height: 1;
     font-weight: 700;
     white-space: nowrap;
+}
+
+.wrap {
+    width: auto;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    line-height: 1.2;
 }
 
 .sizeSm {

@@ -4,7 +4,7 @@ from datetime import datetime, date, timezone, timedelta
 from unittest.mock import patch
 
 import models
-from models import Program, ProgramBlock, ProgramDay, Goal, Session, SessionTemplate, ProgramDaySession, get_session
+from models import Program, ProgramBlock, ProgramDay, Goal, Session, SessionTemplate, ProgramDayTemplate, ProgramDaySession, get_session
 from services.programs import ProgramService
 from services.events import event_bus, Events, Event
 
@@ -165,51 +165,45 @@ def test_create_block_starts_empty_and_can_add_day(db_session, sample_program, s
     assert day_res_count['days'][0]['name'] == 'Bonus Day'
 
 
-def test_add_block_day_persists_note_condition(db_session, sample_program, sample_goal_hierarchy):
+def test_get_active_program_days_filters_to_days_scheduled_today(db_session, sample_program, sample_session_template, sample_goal_hierarchy):
     root_id = sample_goal_hierarchy['ultimate'].id
-
-    block_res = ProgramService.create_block(db_session, root_id, sample_program.id, {
-        'name': 'Condition Block',
-        'start_date': date.today().isoformat(),
-        'end_date': (date.today() + timedelta(days=3)).isoformat(),
-    })
-
-    day_res = ProgramService.add_block_day(db_session, root_id, sample_program.id, block_res['id'], {
-        'name': 'Reflect',
-        'day_of_week': ['Tuesday'],
-        'note_condition': True,
-    })
-
-    assert day_res['days'][0]['note_condition'] is True
-
-    persisted = db_session.query(ProgramDay).get(day_res['days'][0]['id'])
-    assert persisted.note_condition is True
-
-
-def test_update_block_day_persists_note_condition(db_session, sample_program, sample_goal_hierarchy):
-    root_id = sample_goal_hierarchy['ultimate'].id
-
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
     block = ProgramBlock(
         program_id=sample_program.id,
-        name='Condition Update Block',
-        start_date=date.today(),
-        end_date=date.today() + timedelta(days=5),
+        name='Active Block',
+        start_date=today - timedelta(days=1),
+        end_date=today + timedelta(days=2),
     )
     db_session.add(block)
     db_session.flush()
 
-    day = ProgramDay(block_id=block.id, name='Reflect', day_number=1, note_condition=False)
-    db_session.add(day)
+    today_day = ProgramDay(
+        block_id=block.id,
+        name='Today Practice',
+        day_number=1,
+        day_of_week=[today.strftime('%A')],
+    )
+    today_day.templates.append(sample_session_template)
+    future_day = ProgramDay(
+        block_id=block.id,
+        name='Future Practice',
+        day_number=2,
+        day_of_week=[tomorrow.strftime('%A')],
+    )
+    future_day.templates.append(sample_session_template)
+    unscheduled_day = ProgramDay(
+        block_id=block.id,
+        name='Unscheduled Practice',
+        day_number=3,
+    )
+    unscheduled_day.templates.append(sample_session_template)
+    db_session.add_all([today_day, future_day, unscheduled_day])
     db_session.commit()
 
-    result = ProgramService.update_block_day(db_session, root_id, sample_program.id, block.id, day.id, {
-        'note_condition': True,
-    })
+    result = ProgramService.get_active_program_days(db_session, root_id)
 
-    assert result['note_condition'] is True
-
-    db_session.refresh(day)
-    assert day.note_condition is True
+    assert [day['day_name'] for day in result] == ['Today Practice']
 
 
 def test_create_block_accepts_camel_case_dates(db_session, sample_program, sample_goal_hierarchy):
@@ -483,6 +477,120 @@ def test_check_program_day_completion(db_session, sample_program, sample_session
     
     db_session.refresh(day)
     assert day.is_completed is True
+
+
+def test_check_program_day_completion_allows_optional_template_missing(db_session, sample_program, sample_session_template, sample_goal_hierarchy):
+    root_id = sample_goal_hierarchy['ultimate'].id
+    optional_template = SessionTemplate(
+        id=str(uuid.uuid4()),
+        name="Optional Review",
+        root_id=root_id,
+        template_data={},
+    )
+    db_session.add(optional_template)
+    db_session.flush()
+
+    block = ProgramBlock(program_id=sample_program.id, name="Optional Block")
+    db_session.add(block)
+    db_session.flush()
+
+    day = ProgramDay(block_id=block.id, name="Optional Day", day_number=1)
+    db_session.add(day)
+    db_session.flush()
+    db_session.add_all([
+        ProgramDayTemplate(
+            program_day_id=day.id,
+            session_template_id=sample_session_template.id,
+            is_required=True,
+            order=0,
+        ),
+        ProgramDayTemplate(
+            program_day_id=day.id,
+            session_template_id=optional_template.id,
+            is_required=False,
+            order=1,
+        ),
+    ])
+    db_session.commit()
+
+    completed_sess = Session(
+        id=str(uuid.uuid4()),
+        root_id=root_id,
+        name="Required Session",
+        completed=True,
+        program_day_id=day.id,
+        template_id=sample_session_template.id,
+    )
+    db_session.add(completed_sess)
+    db_session.commit()
+
+    assert ProgramService.check_program_day_completion(db_session, completed_sess.id) is True
+
+
+def test_check_program_day_completion_requires_minimum_template_count(db_session, sample_program, sample_session_template, sample_goal_hierarchy):
+    root_id = sample_goal_hierarchy['ultimate'].id
+    second_template = SessionTemplate(
+        id=str(uuid.uuid4()),
+        name="Second Required",
+        root_id=root_id,
+        template_data={},
+    )
+    db_session.add(second_template)
+    db_session.flush()
+
+    block = ProgramBlock(program_id=sample_program.id, name="Threshold Block")
+    db_session.add(block)
+    db_session.flush()
+
+    day = ProgramDay(
+        block_id=block.id,
+        name="Threshold Day",
+        day_number=1,
+        completion_min_templates=2,
+    )
+    db_session.add(day)
+    db_session.flush()
+    db_session.add_all([
+        ProgramDayTemplate(
+            program_day_id=day.id,
+            session_template_id=sample_session_template.id,
+            is_required=False,
+            order=0,
+        ),
+        ProgramDayTemplate(
+            program_day_id=day.id,
+            session_template_id=second_template.id,
+            is_required=False,
+            order=1,
+        ),
+    ])
+    db_session.commit()
+
+    first_session = Session(
+        id=str(uuid.uuid4()),
+        root_id=root_id,
+        name="First Session",
+        completed=True,
+        program_day_id=day.id,
+        template_id=sample_session_template.id,
+    )
+    db_session.add(first_session)
+    db_session.commit()
+
+    assert ProgramService.check_program_day_completion(db_session, first_session.id) is False
+
+    second_session = Session(
+        id=str(uuid.uuid4()),
+        root_id=root_id,
+        name="Second Session",
+        completed=True,
+        program_day_id=day.id,
+        template_id=second_template.id,
+    )
+    db_session.add(second_session)
+    db_session.commit()
+
+    assert ProgramService.check_program_day_completion(db_session, second_session.id) is True
 
 
 def test_check_program_day_completion_queues_events_until_commit(

@@ -17,6 +17,8 @@ function ProgramSidebar({
     hideMetricsHeader = false,
     hideMetrics = false,
     hideGoals = false,
+    hideGoalsHeader = false,
+    flushMetricsPadding = false,
     className = ''
 }) {
     const {
@@ -33,7 +35,7 @@ function ProgramSidebar({
     });
 
     return (
-        <div className={`${styles.sidebar} ${compact ? styles.compactSidebar : ''} ${className}`}>
+        <div className={`${styles.sidebar} ${compact ? styles.compactSidebar : ''} ${flushMetricsPadding ? styles.flushMetricsPadding : ''} ${className}`}>
             {/* Fixed Top Section */}
             {!hideMetrics && (
                 <div className={`${styles.topSection} ${compact ? styles.compactTopSection : ''}`}>
@@ -46,7 +48,7 @@ function ProgramSidebar({
                                     <div className={styles.metricValuePrimary}>
                                         {programMetrics.primaryMetricValue ?? programMetrics.daysRemaining} {programMetrics.primaryMetricLabel || 'Days Remaining'}
                                     </div>
-                                    <div><span className={styles.metricLabel}>Sessions:</span> {programMetrics.completedSessions} / {programMetrics.scheduledSessions}</div>
+                                    <div><span className={styles.metricLabel}>Program Days:</span> {programMetrics.completedProgramDays ?? programMetrics.completedSessions} / {programMetrics.scheduledProgramDays ?? programMetrics.scheduledSessions}</div>
                                     <div><span className={styles.metricLabel}>Duration:</span> {formatDurationSeconds ? formatDurationSeconds(programMetrics.totalDuration) : Math.round(programMetrics.totalDuration / 60) + ' min'}</div>
                                     <div><span className={styles.metricLabel}>Goals:</span> {programMetrics.goalsMet} / {programMetrics.totalGoals}</div>
                                 </div>
@@ -61,7 +63,7 @@ function ProgramSidebar({
                                     <div className={styles.metricValuePrimary} style={{ color: blockMetrics.color }}>
                                         {blockMetrics.daysRemaining} Days Remaining
                                     </div>
-                                    <div><span className={styles.metricLabel}>Sessions:</span> {blockMetrics.completedSessions} / {blockMetrics.scheduledSessions}</div>
+                                    <div><span className={styles.metricLabel}>Program Days:</span> {blockMetrics.completedProgramDays ?? blockMetrics.completedSessions} / {blockMetrics.scheduledProgramDays ?? blockMetrics.scheduledSessions}</div>
                                     <div><span className={styles.metricLabel}>Duration:</span> {formatDurationSeconds ? formatDurationSeconds(blockMetrics.totalDuration) : Math.round(blockMetrics.totalDuration / 60) + ' min'}</div>
                                     <div><span className={styles.metricLabel}>Goals:</span> {blockMetrics.goalsMet} / {blockMetrics.totalGoals}</div>
                                 </div>
@@ -74,7 +76,7 @@ function ProgramSidebar({
             {/* Scrollable Bottom Section */}
             {!hideGoals && (
                 <div className={styles.bottomSection}>
-                    <h3 className={styles.sectionHeader}>Program Goals</h3>
+                    {hideGoalsHeader ? null : <h3 className={styles.sectionHeader}>Program Goals</h3>}
                     <div className={styles.goalsScroll}>
                         <GoalHierarchyList
                             variant="session"

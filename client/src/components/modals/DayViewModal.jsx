@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import {
@@ -13,8 +13,18 @@ import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import CloseIcon from '../atoms/CloseIcon';
-import GoalAssociationPicker from '../goals/GoalAssociationPicker';
+import GoalHierarchySelector from '../goals/GoalHierarchySelector';
 import { useProgramDayViewModel } from '../../hooks/useProgramDayViewModel';
+import { getProgramDayTemplateRules } from '../../utils/programViewModel';
+import { buildProgramGoalScope } from '../../utils/programGoalWindow';
+import {
+    ProgramCalendarIcon,
+    ProgramCheckIcon,
+    ProgramMinusIcon,
+    ProgramPendingIcon,
+    ProgramPlusIcon,
+    ProgramTargetIcon,
+} from '../programs/ProgramSvgIcons';
 import styles from './DayViewModal.module.css';
 
 function getGoalStartDate(goal) {
@@ -26,6 +36,28 @@ function getGoalStartDate(goal) {
         || goal?.target?.start_date
         || goal?.target?.startDate
     );
+}
+
+function flattenGoalTree(goals = [], parentId = null, seenIds = new Set()) {
+    return goals.flatMap((goal) => {
+        const goalId = goal?.id || goal?.attributes?.id;
+        if (!goalId || seenIds.has(goalId)) {
+            return [];
+        }
+
+        seenIds.add(goalId);
+        const children = Array.isArray(goal.children) ? goal.children : [];
+        const normalizedGoal = {
+            ...goal,
+            parent_id: goal.parent_id || goal.parentId || goal.attributes?.parent_id || goal.attributes?.parentId || parentId,
+            childrenIds: children.map((child) => child?.id || child?.attributes?.id).filter(Boolean),
+        };
+
+        return [
+            normalizedGoal,
+            ...flattenGoalTree(children, goalId, seenIds),
+        ];
+    });
 }
 
 /**
@@ -76,6 +108,25 @@ const DayViewModal = ({
         timezone,
         selectedBlockId,
     });
+    const goalsById = useMemo(
+        () => new Map((goals || []).map((goal) => [goal.id || goal.attributes?.id, goal]).filter(([goalId]) => Boolean(goalId))),
+        [goals]
+    );
+    const programScopedGoalOptions = useMemo(() => {
+        if (!program) {
+            return [];
+        }
+
+        const eligibleGoalIds = new Set((eligibleGoalsForDate || []).map((goal) => goal.id || goal.attributes?.id).filter(Boolean));
+        const goalScope = buildProgramGoalScope({
+            program,
+            goals,
+            getGoalDetails: (goalId) => goalsById.get(goalId) || null,
+        });
+
+        return flattenGoalTree(goalScope.hierarchyGoalSeeds)
+            .filter((goal) => eligibleGoalIds.has(goal.id || goal.attributes?.id));
+    }, [eligibleGoalsForDate, goals, goalsById, program]);
     const resetLocalState = () => {
         setSelectedBlockId('');
         setShowAddDaySection(false);
@@ -92,7 +143,7 @@ const DayViewModal = ({
     if (!isOpen || !date) return null;
 
     const formatSessionCount = (count, label) => `${count} ${label}${count === 1 ? '' : 's'}`;
-    const selectedGoal = goals.find((goal) => goal.id === selectedGoalId);
+    const selectedGoal = goals.find((goal) => (goal.id || goal.attributes?.id) === selectedGoalId);
     const goalDayOptions = scheduledProgramDayData.map((day) => ({
         id: day.id,
         blockId: day.blockId,
@@ -204,15 +255,25 @@ const DayViewModal = ({
                                     }
                                 });
 
-                                const isPDCompleted = templates.length > 0 &&
-                                    templates.every(t => sessionsByTemplate[t.id]?.some(s => s.completed || s.attributes?.completed));
+                                const templateRules = getProgramDayTemplateRules(day);
+                                const completedTemplateIds = new Set(templates
+                                    .filter(t => sessionsByTemplate[t.id]?.some(s => s.completed || s.attributes?.completed))
+                                    .map(t => t.id));
+                                const requiredTemplateIds = templateRules
+                                    .filter(rule => rule.isRequired)
+                                    .map(rule => rule.templateKey);
+                                const minTemplates = day.completion_min_templates || null;
+                                const hasRule = requiredTemplateIds.length > 0 || minTemplates;
+                                const isPDCompleted = templateRules.length > 0
+                                    && requiredTemplateIds.every(templateId => completedTemplateIds.has(templateId))
+                                    && (!minTemplates || completedTemplateIds.size >= minTemplates)
+                                    && (hasRule || completedTemplateIds.size > 0);
                                 const completedTemplateCount = templates.filter(t =>
                                     sessionsByTemplate[t.id]?.some(s => s.completed || s.attributes?.completed)
                                 ).length;
 
                                 return (
-                                    <div key={idx} className={`${styles.programDayCard} ${isPDCompleted ? styles.programDayCardCompleted : ''}`}
-                                        style={{ borderLeftColor: isPDCompleted ? '#4caf50' : (day.blockColor || '#3A86FF') }}>
+                                    <div key={idx} className={`${styles.programDayCard} ${isPDCompleted ? styles.programDayCardCompleted : ''}`}>
                                         <div className={styles.programDayHeader}>
                                             <div>
                                                 <div className={styles.programDayBlockName} style={{ color: isPDCompleted ? '#4caf50' : (day.blockColor || '#3A86FF') }}>
@@ -220,7 +281,12 @@ const DayViewModal = ({
                                                 </div>
                                                 <div className={styles.programDayTitle}>{day.name}</div>
                                                 <div className={styles.programDayStatus}>
-                                                    {isPDCompleted ? '✓ Program day completed' : `${completedTemplateCount}/${templates.length || 0} program sessions completed`}
+                                                    {isPDCompleted ? (
+                                                        <>
+                                                            <ProgramCheckIcon className={styles.inlineStatusIcon} size={13} />
+                                                            <span>Program day completed</span>
+                                                        </>
+                                                    ) : `${completedTemplateCount}/${templates.length || 0} program sessions completed`}
                                                 </div>
                                             </div>
                                             <button
@@ -245,7 +311,11 @@ const DayViewModal = ({
                                                         <div key={t.id}>
                                                             <div className={`${styles.templateHeader} ${isDone ? styles.templateHeaderDone : styles.templateHeaderPending}`}
                                                                 style={{ marginBottom: tSessions.length > 0 ? '6px' : '0' }}>
-                                                                <span>{isDone ? '✓' : '○'}</span>
+                                                                {isDone ? (
+                                                                    <ProgramCheckIcon className={styles.templateStatusIcon} size={14} />
+                                                                ) : (
+                                                                    <ProgramPendingIcon className={styles.templateStatusIcon} size={14} />
+                                                                )}
                                                                 <span style={{ fontWeight: 500 }}>{t.name}</span>
                                                                 {completedTSessions.length > 1 && <span className={styles.sessionCountBadge}>{completedTSessions.length}</span>}
                                                             </div>
@@ -283,8 +353,9 @@ const DayViewModal = ({
                                         {unlinkedDaySessions.length > 0 && (
                                             <div className={styles.unlinkedSessions}>
                                                 {unlinkedDaySessions.map(s => (
-                                                    <div key={s.id} className={styles.dayOptionNotes}>
-                                                        ✓ {s.name} ({s.total_duration_seconds ? formatDurationHuman(s.total_duration_seconds) : 'Unknown'})
+                                                    <div key={s.id} className={`${styles.dayOptionNotes} ${styles.iconTextRow}`}>
+                                                        <ProgramCheckIcon className={styles.inlineStatusIcon} size={13} />
+                                                        <span>{s.name} ({s.total_duration_seconds ? formatDurationHuman(s.total_duration_seconds) : 'Unknown'})</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -341,7 +412,7 @@ const DayViewModal = ({
 
                     {scheduledProgramDayData.length === 0 && looseScheduledSessions.length === 0 && (
                         <div className={styles.emptyState}>
-                            <div className={styles.emptyStateIcon}>📅</div>
+                            <ProgramCalendarIcon className={styles.emptyStateIcon} size={30} />
                             <div className={styles.emptyStateTitle}>
                                 {program ? 'No program days or sessions scheduled for this date' : 'No program scheduled for this date'}
                             </div>
@@ -383,7 +454,10 @@ const DayViewModal = ({
                                 {goalsCompletedOnDate.map(goal => (
                                     <div key={`comp-${goal.id}`} className={styles.goalCardCompleted}>
                                         <div className={styles.goalCardFlex}>
-                                            <div className={styles.goalCardName}>✅ {goal.name}</div>
+                                            <div className={styles.goalCardName}>
+                                                <ProgramCheckIcon className={styles.goalCardIcon} size={16} />
+                                                <span>{goal.name}</span>
+                                            </div>
                                             <div className={`${styles.goalMeta} ${styles.goalCardMetaCompleted}`}>
                                                 {goal.type || 'Goal'} • Met on this date
                                             </div>
@@ -400,10 +474,14 @@ const DayViewModal = ({
                                         <div key={`due-${goal.id}`} className={styles.goalCard}
                                             style={{
                                                 background: isCompleted ? 'var(--color-bg-success-subtle, rgba(16, 185, 129, 0.1))' : 'var(--color-bg-card-hover)',
-                                                borderLeftColor: isCompleted ? 'var(--color-brand-success)' : getGoalColor(goal.type)
                                             }}>
                                             <div className={styles.goalCardName}>
-                                                {isCompleted ? '✅' : '🎯'} {goal.name}
+                                                {isCompleted ? (
+                                                    <ProgramCheckIcon className={styles.goalCardIcon} size={16} />
+                                                ) : (
+                                                    <ProgramTargetIcon className={styles.goalCardIcon} size={16} />
+                                                )}
+                                                <span>{goal.name}</span>
                                             </div>
                                             <div className={styles.goalMeta} style={{ color: isCompleted ? 'var(--color-brand-success)' : getGoalColor(goal.type) }}>
                                                 {goal.type || 'Goal'} • {isCompleted ? `Completed ${completionDate ? 'on ' + getLocalDateString(completionDate) : ''}` : 'Due today'}
@@ -425,8 +503,11 @@ const DayViewModal = ({
                                 disabled={isPastDate}
                                 className={`${styles.actionToggle} ${isPastDate ? styles.actionToggleDisabled : ''}`}
                             >
-                                <span>🎯 Set Goal Deadline for This Date</span>
-                                <span>{showGoalSection ? '−' : '+'}</span>
+                                <span className={styles.actionToggleLabel}>
+                                    <ProgramTargetIcon className={styles.actionIcon} size={16} />
+                                    <span>Set Goal Deadline for This Date</span>
+                                </span>
+                                {showGoalSection ? <ProgramMinusIcon size={16} /> : <ProgramPlusIcon size={16} />}
                             </button>
                             {isPastDate && (
                                 <div className={styles.actionHint}>Not available for past dates.</div>
@@ -438,18 +519,15 @@ const DayViewModal = ({
                                         <label className={styles.label}>
                                             Select Goal
                                         </label>
-                                        <GoalAssociationPicker
-                                            goals={eligibleGoalsForDate}
-                                            selectedGoalId={selectedGoalId}
-                                            onSelectGoal={(goal) => setSelectedGoalId(goal.id)}
-                                            associatedGoalIds={goalsDueOnDate.map((goal) => goal.id)}
-                                            associationLabel="Due Today"
-                                            getAssociationMeta={(goal) => {
-                                                const deadline = getDatePart(goal.deadline);
-                                                return deadline ? `Current deadline: ${formatLiteralDate(deadline, { month: 'short', day: 'numeric', year: 'numeric' })}` : null;
-                                            }}
-                                            emptyState="No goals can take this deadline. Check start dates and parent deadlines first."
-                                            inputName="day-deadline-goal"
+                                        <GoalHierarchySelector
+                                            goals={programScopedGoalOptions}
+                                            selectedGoalIds={selectedGoalId ? [selectedGoalId] : []}
+                                            onSelectionChange={(goalIds) => setSelectedGoalId(goalIds[0] || '')}
+                                            selectionMode="single"
+                                            searchPlaceholder="Search program goals..."
+                                            emptyState="No program goals can take this deadline. Check program goal attachments, start dates, and parent deadlines first."
+                                            highlightSelectionAncestors
+                                            showGoalHighlightHalo
                                         />
                                     </div>
                                     {shouldAttachGoalToDay && goalDayOptions.length > 1 && (
@@ -500,8 +578,11 @@ const DayViewModal = ({
                                     disabled={isPastDate}
                                     className={`${styles.actionToggle} ${isPastDate ? styles.actionToggleDisabled : ''}`}
                                 >
-                                    <span>📅 Schedule Day for This Date</span>
-                                    <span>{showAddDaySection ? '−' : '+'}</span>
+                                    <span className={styles.actionToggleLabel}>
+                                        <ProgramCalendarIcon className={styles.actionIcon} size={16} />
+                                        <span>Schedule Day for This Date</span>
+                                    </span>
+                                    {showAddDaySection ? <ProgramMinusIcon size={16} /> : <ProgramPlusIcon size={16} />}
                                 </button>
                                 {isPastDate && (
                                     <div className={styles.actionHint}>Not available for past dates.</div>
@@ -592,7 +673,8 @@ const DayViewModal = ({
                                                     }}
                                                     className={styles.createButton}
                                                 >
-                                                    + Create New Day From Scratch
+                                                    <ProgramPlusIcon className={styles.actionIcon} size={15} />
+                                                    <span>Create New Day From Scratch</span>
                                                 </button>
                                             </div>
                                         )}

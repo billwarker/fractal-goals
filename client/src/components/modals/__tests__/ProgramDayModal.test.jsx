@@ -73,10 +73,15 @@ describe('ProgramDayModal', () => {
         ]);
     });
 
-    it('includes note_condition in the save payload', async () => {
+    it('saves per-template required flags and minimum completion threshold', async () => {
         const queryClient = createQueryClient();
         const onSave = vi.fn();
-        getSessionTemplates.mockResolvedValueOnce({ data: [] });
+        getSessionTemplates.mockResolvedValueOnce({
+            data: [
+                { id: 'template-1', name: 'Warmup' },
+                { id: 'template-2', name: 'Repertoire' },
+            ],
+        });
         getActivities.mockResolvedValueOnce({ data: [] });
         getActivityGroups.mockResolvedValueOnce({ data: [] });
 
@@ -87,19 +92,32 @@ describe('ProgramDayModal', () => {
                     onClose={vi.fn()}
                     onSave={onSave}
                     rootId="root-1"
+                    initialData={{
+                        id: 'day-1',
+                        name: 'Daily Practice',
+                        templates: [
+                            { id: 'template-1', name: 'Warmup', is_required: true, order: 0 },
+                            { id: 'template-2', name: 'Repertoire', is_required: false, order: 1 },
+                        ],
+                    }}
                 />
             </QueryClientProvider>
         );
 
         await waitFor(() => {
-            expect(screen.getByText('+ Add Session Template')).toBeInTheDocument();
+            expect(screen.getAllByText('Warmup').length).toBeGreaterThan(0);
         });
 
-        fireEvent.click(screen.getByLabelText('Require a note for this day'));
-        fireEvent.click(screen.getByRole('button', { name: 'Add Day' }));
+        fireEvent.click(screen.getByLabelText('At least'));
+        fireEvent.change(screen.getByLabelText('Minimum completed sessions'), { target: { value: '2' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 
         expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-            note_condition: true,
+            template_configs: [
+                { template_id: 'template-1', is_required: true, order: 0 },
+                { template_id: 'template-2', is_required: false, order: 1 },
+            ],
+            completion_min_templates: 2,
         }));
     });
 });

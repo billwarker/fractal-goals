@@ -70,6 +70,139 @@ export function isCompletedSession(session) {
     return Boolean(session?.completed || session?.attributes?.completed);
 }
 
+const DAY_NAME_TO_INDEX = {
+    Sunday: 0,
+    Monday: 1,
+    Tuesday: 2,
+    Wednesday: 3,
+    Thursday: 4,
+    Friday: 5,
+    Saturday: 6,
+};
+
+function getProgramDayTemplateKey(template) {
+    return template?.id || template?.name || null;
+}
+
+function getSessionTemplateKey(session) {
+    return session?.template_id || session?.name || null;
+}
+
+function getProgramDayWeekdayIndexes(day) {
+    const dayOfWeek = Array.isArray(day?.day_of_week)
+        ? day.day_of_week
+        : (day?.day_of_week ? [day.day_of_week] : []);
+
+    return [...new Set(dayOfWeek
+        .map((dayName) => DAY_NAME_TO_INDEX[dayName])
+        .filter((value) => value !== undefined))];
+}
+
+export function getProgramDayTemplateRules(dayOrOccurrence) {
+    const templates = dayOrOccurrence?.templates || dayOrOccurrence?.day?.templates || [];
+    return templates
+        .map((template, index) => ({
+            template,
+            templateKey: getProgramDayTemplateKey(template),
+            isRequired: template?.is_required !== false,
+            order: template?.order ?? index,
+        }))
+        .filter((rule) => Boolean(rule.templateKey))
+        .sort((left, right) => left.order - right.order);
+}
+
+export function getProgramDayScheduledDates(day, block) {
+    const blockStart = getDatePart(block?.start_date);
+    const blockEnd = getDatePart(block?.end_date);
+    const explicitDate = getDatePart(day?.date);
+
+    if (explicitDate) {
+        if (blockStart && blockEnd && (explicitDate < blockStart || explicitDate > blockEnd)) {
+            return [];
+        }
+        return [explicitDate];
+    }
+
+    const activeDays = getProgramDayWeekdayIndexes(day);
+    if (!blockStart || !blockEnd || activeDays.length === 0) {
+        return [];
+    }
+
+    return getRecurringDatesWithinRange(blockStart, blockEnd, activeDays);
+}
+
+export function buildProgramDayOccurrences({
+    program,
+    blockFilter = () => true,
+    programIndex = 0,
+} = {}) {
+    if (!program) {
+        return [];
+    }
+
+    const programColor = getProgramColor(program, programIndex);
+
+    return sortProgramBlocks(program.blocks || []).flatMap((block) => {
+        if (!blockFilter(block)) {
+            return [];
+        }
+
+        const blockColor = block.color || programColor;
+        return (block.days || []).flatMap((day) => (
+            getProgramDayScheduledDates(day, block).map((dateStr) => ({
+                id: `${block.id}-${day.id}-${dateStr}`,
+                date: dateStr,
+                program,
+                programId: program.id,
+                block,
+                blockId: block.id,
+                blockName: block.name,
+                blockColor,
+                day,
+                dayId: day.id,
+                dayName: day.name || 'Program Day',
+                templates: day.templates || [],
+            }))
+        ));
+    });
+}
+
+export function getScheduledProgramDayCompletion(occurrence, sessions = [], timezone) {
+    const occurrenceSessions = sessions.filter((session) => (
+        getSessionProgramDayId(session) === occurrence.dayId
+        && getISOYMDInTimezone(session.session_start || session.created_at, timezone) === occurrence.date
+    ));
+    const completedSessions = occurrenceSessions.filter(isCompletedSession);
+    const templateRules = getProgramDayTemplateRules(occurrence);
+
+    if (templateRules.length === 0) {
+        return {
+            isCompleted: false,
+            sessions: occurrenceSessions,
+            completedSessions,
+        };
+    }
+
+    const completedTemplateKeys = new Set(
+        completedSessions.map(getSessionTemplateKey).filter(Boolean)
+    );
+    const requiredTemplateKeys = templateRules
+        .filter((rule) => rule.isRequired)
+        .map((rule) => rule.templateKey);
+    const completionMinTemplates = occurrence.day?.completion_min_templates ?? occurrence.completion_min_templates ?? null;
+    const hasAnyCompletionRequirement = requiredTemplateKeys.length > 0 || completionMinTemplates;
+    const requiredPassed = requiredTemplateKeys.every((templateKey) => completedTemplateKeys.has(templateKey));
+    const minPassed = completionMinTemplates
+        ? completedTemplateKeys.size >= completionMinTemplates
+        : true;
+
+    return {
+        isCompleted: requiredPassed && minPassed && (hasAnyCompletionRequirement || completedTemplateKeys.size > 0),
+        sessions: occurrenceSessions,
+        completedSessions,
+    };
+}
+
 export function flattenProgramSessions(program) {
     const sessionsById = new Map();
 
@@ -214,6 +347,8 @@ export function buildProgramCalendarEvents({
         });
     };
 
+    const occurrences = buildProgramDayOccurrences({ program, programIndex });
+
     sortedBlocks.forEach((block) => {
         const blockStart = getDatePart(block.start_date);
         const blockEnd = getDatePart(block.end_date);
@@ -242,23 +377,10 @@ export function buildProgramCalendarEvents({
                 },
             });
         }
+    });
 
-        (block.days || []).forEach((day) => {
-            if (day.date) {
-                addDayToDateGroup(getDatePart(day.date), day, block);
-            }
-
-            if (day.day_of_week?.length && blockStart && blockEnd) {
-                const dayMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
-                const activeDays = [...new Set((Array.isArray(day.day_of_week) ? day.day_of_week : [day.day_of_week])
-                    .map((dayName) => dayMap[dayName])
-                    .filter((value) => value !== undefined))];
-
-                getRecurringDatesWithinRange(blockStart, blockEnd, activeDays).forEach((dateStr) => {
-                    addDayToDateGroup(dateStr, day, block);
-                });
-            }
-        });
+    occurrences.forEach((occurrence) => {
+        addDayToDateGroup(occurrence.date, occurrence.day, occurrence.block);
     });
 
     sessions.forEach((session) => {
@@ -335,12 +457,16 @@ export function buildProgramCalendarEvents({
             });
 
             const templatePairs = Object.values(group.templatesByName);
-            const isProgramDayCompleted = templatePairs.length > 0
-                && templatePairs.every((pair) => pair.sessions.some(isCompletedSession));
+            const isProgramDayCompleted = getScheduledProgramDayCompletion({
+                date: dateStr,
+                dayId: group.pDay?.id,
+                day: group.pDay,
+                templates: group.pDay?.templates || [],
+            }, group.sessions, timezone).isCompleted;
 
             events.push({
                 id: `pday-${includeProgramId ? `${program.id}-` : ''}${dateStr}-${group.pDay?.id || group.name}`,
-                title: `${isProgramDayCompleted ? '✓ ' : ''}${group.name}`,
+                title: group.name,
                 start: dateStr,
                 allDay: true,
                 backgroundColor: 'transparent',
@@ -366,7 +492,7 @@ export function buildProgramCalendarEvents({
                 let title = templateName;
 
                 if (isTemplateCompleted) {
-                    title = `✓ ${templateName}`;
+                    title = templateName;
                     if (completedCount > 1) {
                         title += ` (${completedCount})`;
                     }
@@ -398,7 +524,7 @@ export function buildProgramCalendarEvents({
             const completed = isCompletedSession(session);
             events.push({
                 id: `session-${includeProgramId ? `${program.id}-` : ''}${session.id}`,
-                title: `${completed ? '✓ ' : ''}${session.name}`,
+                title: session.name,
                 start: dateStr,
                 allDay: true,
                 backgroundColor: 'transparent',
@@ -429,7 +555,7 @@ export function buildProgramCalendarEvents({
         const color = getGoalColor(goalType);
         events.push({
             id: `${includeProgramId ? `program-goal-${program.id}` : 'goal'}-${goal.id}`,
-            title: `${completed ? '✓ ' : ''}${goal.name}`,
+            title: goal.name,
             start: !includeProgramId && completed && completionDate
                 ? getISOYMDInTimezone(completionDate, timezone)
                 : getDatePart(deadline),
@@ -438,11 +564,13 @@ export function buildProgramCalendarEvents({
             borderColor: color,
             textColor: getGoalTextColor(goalType),
             extendedProps: {
+                ...goal,
                 type: 'goal',
+                id: goal.id,
+                goalId: goal.id,
                 programId: program.id,
                 program,
                 sortOrder: 3,
-                ...goal,
             },
             classNames: completed ? ['completed-goal-event', 'clickable-goal-event'] : ['clickable-goal-event'],
         });
@@ -464,7 +592,7 @@ function buildGoalDeadlineEvent(goal, getGoalColor, getGoalTextColor, timezone, 
 
     return {
         id: `${idPrefix}-${goal.id}`,
-        title: `${completed ? '✓ ' : ''}${goal.name}`,
+        title: goal.name,
         start: completed && completionDate
             ? getISOYMDInTimezone(completionDate, timezone)
             : getDatePart(deadline),
@@ -473,11 +601,11 @@ function buildGoalDeadlineEvent(goal, getGoalColor, getGoalTextColor, timezone, 
         borderColor: color,
         textColor: getGoalTextColor(goalType),
         extendedProps: {
+            ...goal,
             type: 'goal',
             id: goal.id,
             goalId: goal.id,
             sortOrder: 3,
-            ...goal,
         },
         classNames: completed ? ['completed-goal-event', 'clickable-goal-event'] : ['clickable-goal-event'],
     };
@@ -524,6 +652,9 @@ export function buildProgramsCalendarEvents(programs = [], goals = [], getGoalCo
 
         programEvents.forEach((event) => {
             if (event.extendedProps?.type === 'goal' && event.extendedProps?.id) {
+                if (goalEventIds.has(event.extendedProps.id)) {
+                    return;
+                }
                 goalEventIds.add(event.extendedProps.id);
             }
             events.push(event);
@@ -553,12 +684,16 @@ function getDaysBetween(dateValue, targetValue) {
     return Math.ceil((target.getTime() - start.getTime()) / 86400000);
 }
 
-export function buildProgramMetrics({ program, sessions = [], programDaysMap, attachedGoalIds, getGoalDetails }) {
+export function buildProgramMetrics({ program, sessions = [], programDaysMap, attachedGoalIds, getGoalDetails, timezone }) {
     if (!program) {
         return null;
     }
 
     const scopedProgramDaysMap = programDaysMap || buildProgramDaysMap(program.blocks || []);
+    const scheduledProgramDays = buildProgramDayOccurrences({ program });
+    const completedProgramDays = scheduledProgramDays.filter((occurrence) => (
+        getScheduledProgramDayCompletion(occurrence, sessions, timezone).isCompleted
+    ));
     const programSessions = sessions.filter((session) => {
         const programDayId = getSessionProgramDayId(session);
         return programDayId && scopedProgramDaysMap.has(programDayId);
@@ -570,8 +705,10 @@ export function buildProgramMetrics({ program, sessions = [], programDaysMap, at
         : null;
 
     return {
-        completedSessions: programSessions.filter(isCompletedSession).length,
-        scheduledSessions: Array.from(scopedProgramDaysMap.values()).reduce((sum, day) => sum + (day.templates?.length || 0), 0),
+        completedSessions: completedProgramDays.length,
+        scheduledSessions: scheduledProgramDays.length,
+        completedProgramDays: completedProgramDays.length,
+        scheduledProgramDays: scheduledProgramDays.length,
         totalDuration: programSessions.reduce((sum, session) => sum + (session.total_duration_seconds || 0), 0),
         goalsMet: Array.from(attachedGoalIds || []).filter((goalId) => {
             const goal = getGoalDetails(goalId);
@@ -619,11 +756,18 @@ export function buildBlockGoalsByBlockId({ sortedBlocks = [], associatedGoals = 
     return new Map(entries);
 }
 
-export function buildBlockMetrics({ activeBlock, sessions = [], programDaysMap, blockGoalsByBlockId }) {
+export function buildBlockMetrics({ activeBlock, sessions = [], program, programDaysMap, blockGoalsByBlockId, timezone }) {
     if (!activeBlock) {
         return null;
     }
 
+    const scheduledProgramDays = buildProgramDayOccurrences({
+        program,
+        blockFilter: (block) => block.id === activeBlock.id,
+    });
+    const completedProgramDays = scheduledProgramDays.filter((occurrence) => (
+        getScheduledProgramDayCompletion(occurrence, sessions, timezone).isCompleted
+    ));
     const blockSessions = sessions.filter((session) => {
         const programDayId = getSessionProgramDayId(session);
         if (!programDayId) {
@@ -638,8 +782,10 @@ export function buildBlockMetrics({ activeBlock, sessions = [], programDaysMap, 
     return {
         name: activeBlock.name,
         color: activeBlock.color || '#3A86FF',
-        completedSessions: blockSessions.filter(isCompletedSession).length,
-        scheduledSessions: blockSessions.length,
+        completedSessions: completedProgramDays.length,
+        scheduledSessions: scheduledProgramDays.length,
+        completedProgramDays: completedProgramDays.length,
+        scheduledProgramDays: scheduledProgramDays.length,
         goalsMet: blockGoals.filter((goal) => goal && (goal.completed || goal.attributes?.completed)).length,
         totalGoals: blockGoals.length,
         totalDuration: blockSessions.reduce((sum, session) => sum + (session.total_duration_seconds || 0), 0),
@@ -687,6 +833,7 @@ export function buildProgramSidePaneData({ program, goals = [], attachedGoalIds,
         blockMetrics: buildBlockMetrics({
             activeBlock,
             sessions,
+            program,
             programDaysMap,
             blockGoalsByBlockId,
         }),

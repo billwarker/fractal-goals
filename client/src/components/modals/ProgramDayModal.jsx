@@ -46,14 +46,22 @@ function getInitialSelectedDaysOfWeek(initialData) {
 
 function buildInitialProgramDayState(initialData) {
     const selectedTemplates = initialData?.templates
-        ? initialData.templates.map((template) => template.id)
-        : (initialData?.sessions || []).map((session) => session.session_template_id).filter(Boolean);
+        ? initialData.templates.map((template, index) => ({
+            templateId: template.id,
+            isRequired: template.is_required !== false,
+            order: template.order ?? index,
+        }))
+        : (initialData?.sessions || []).map((session, index) => ({
+            templateId: session.session_template_id,
+            isRequired: true,
+            order: index,
+        })).filter((entry) => Boolean(entry.templateId));
 
     return {
         name: initialData?.name || '',
         selectedTemplates,
         selectedDaysOfWeek: getInitialSelectedDaysOfWeek(initialData),
-        noteCondition: initialData?.note_condition || false,
+        completionMinTemplates: initialData?.completion_min_templates || '',
         copyStatus: '',
         copyMode: 'all',
     };
@@ -66,7 +74,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
     const [selectedTemplates, setSelectedTemplates] = useState(initialState.selectedTemplates);
     const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState(initialState.selectedDaysOfWeek);
 
-    const [noteCondition, setNoteCondition] = useState(initialState.noteCondition);
+    const [completionMinTemplates, setCompletionMinTemplates] = useState(initialState.completionMinTemplates);
     const [copyStatus, setCopyStatus] = useState(initialState.copyStatus);
     const [copyMode] = useState(initialState.copyMode);
 
@@ -96,18 +104,31 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
         onSuccess: async (savedTemplate) => {
             await queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
             if (savedTemplate?.id) {
-                setSelectedTemplates((current) => [...current, savedTemplate.id]);
+                setSelectedTemplates((current) => [
+                    ...current,
+                    { templateId: savedTemplate.id, isRequired: true, order: current.length },
+                ]);
             }
             setShowTemplateBuilder(false);
         },
     });
 
     const handleSave = () => {
+        const templateConfigs = selectedTemplates.map((entry, index) => ({
+            template_id: entry.templateId,
+            is_required: entry.isRequired !== false,
+            order: index,
+        }));
+        const parsedMinTemplates = completionMinTemplates === ''
+            ? null
+            : Math.max(1, Math.min(Number(completionMinTemplates) || 1, templateConfigs.length || 1));
+
         onSave({
             name,
-            template_ids: selectedTemplates,
+            template_ids: templateConfigs.map((entry) => entry.template_id),
+            template_configs: templateConfigs,
             day_of_week: fixedDate ? [] : selectedDaysOfWeek,
-            note_condition: noteCondition,
+            completion_min_templates: parsedMinTemplates,
             ...(fixedDate ? { date: fixedDate } : {}),
         });
     };
@@ -140,10 +161,43 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
 
     const handleAddTemplate = (e) => {
         const val = e.target.value;
-        if (val) {
-            setSelectedTemplates([...selectedTemplates, val]);
+        if (val && !selectedTemplates.some((entry) => entry.templateId === val)) {
+            setSelectedTemplates([
+                ...selectedTemplates,
+                { templateId: val, isRequired: true, order: selectedTemplates.length },
+            ]);
         }
     };
+
+    const handleRemoveTemplate = (indexToRemove) => {
+        setSelectedTemplates((current) => {
+            const nextTemplates = current.filter((_, index) => index !== indexToRemove);
+            if (completionMinTemplates !== '' && Number(completionMinTemplates) > nextTemplates.length) {
+                setCompletionMinTemplates(nextTemplates.length > 0 ? String(nextTemplates.length) : '');
+            }
+            return nextTemplates;
+        });
+    };
+
+    const handleToggleRequired = (indexToToggle) => {
+        setSelectedTemplates((current) => current.map((entry, index) => (
+            index === indexToToggle
+                ? { ...entry, isRequired: entry.isRequired === false }
+                : entry
+        )));
+    };
+
+    const requiredTemplateCount = selectedTemplates.filter((entry) => entry.isRequired !== false).length;
+    const completionSummaryParts = [];
+    if (requiredTemplateCount > 0) {
+        completionSummaryParts.push(`Requires ${requiredTemplateCount} required session${requiredTemplateCount === 1 ? '' : 's'}`);
+    }
+    if (completionMinTemplates !== '') {
+        completionSummaryParts.push(`at least ${completionMinTemplates} total`);
+    }
+    const completionSummary = completionSummaryParts.length > 0
+        ? completionSummaryParts.join(' and ')
+        : 'Completes after any selected session is completed';
 
     const handleTemplateBuilderSave = async (payload, templateId) => {
         try {
@@ -184,20 +238,26 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                         <div className={styles.field}>
                             <label className={styles.label}>Sessions</label>
                             <div className={styles.sessionList}>
-                                {selectedTemplates.map((tid, idx) => {
-                                    const t = sessionTemplates.find(st => st.id === tid);
+                                {selectedTemplates.map((entry, idx) => {
+                                    const t = sessionTemplates.find(st => st.id === entry.templateId);
                                     return (
-                                        <div key={idx} className={styles.sessionItem}>
+                                        <div key={entry.templateId} className={styles.sessionItem}>
                                             <span className={styles.sessionName}>{t ? t.name : 'Unknown Template'}</span>
+                                            <label className={styles.requiredCheckboxLabel}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={entry.isRequired !== false}
+                                                    onChange={() => handleToggleRequired(idx)}
+                                                    className={styles.checkbox}
+                                                    aria-label={`Mark ${t ? t.name : 'template'} required`}
+                                                />
+                                                <span>Required</span>
+                                            </label>
                                             <Button
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() => {
-                                                    const newTids = [...selectedTemplates];
-                                                    newTids.splice(idx, 1);
-                                                    setSelectedTemplates(newTids);
-                                                }}
+                                                onClick={() => handleRemoveTemplate(idx)}
                                                 className={styles.removeSessionBtn}
                                                 aria-label="Remove Template"
                                             >
@@ -228,6 +288,40 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                                     + New
                                 </Button>
                             </div>
+                            {selectedTemplates.length > 0 && (
+                                <div className={styles.completionRuleRow}>
+                                    <label className={styles.checkboxLabel}>
+                                        <input
+                                            type="checkbox"
+                                            checked={completionMinTemplates !== ''}
+                                            onChange={(event) => setCompletionMinTemplates(event.target.checked ? String(Math.min(1, selectedTemplates.length)) : '')}
+                                            className={styles.checkbox}
+                                        />
+                                        <span>At least</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max={selectedTemplates.length}
+                                        disabled={completionMinTemplates === ''}
+                                        value={completionMinTemplates}
+                                        onChange={(event) => {
+                                            const value = event.target.value;
+                                            if (value === '') {
+                                                setCompletionMinTemplates('');
+                                                return;
+                                            }
+                                            setCompletionMinTemplates(String(Math.max(1, Math.min(Number(value) || 1, selectedTemplates.length))));
+                                        }}
+                                        className={styles.minTemplatesInput}
+                                        aria-label="Minimum completed sessions"
+                                    />
+                                    <span className={styles.completionRuleText}>completed</span>
+                                </div>
+                            )}
+                            {selectedTemplates.length > 0 && (
+                                <div className={styles.hint}>{completionSummary}.</div>
+                            )}
                         </div>
 
                         {!fixedDate && (
@@ -262,23 +356,6 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                                 )}
                             </div>
                         )}
-
-                        <div className={styles.field}>
-                            <label className={styles.checkboxLabel}>
-                                <input
-                                    type="checkbox"
-                                    checked={noteCondition}
-                                    onChange={e => setNoteCondition(e.target.checked)}
-                                    className={styles.checkbox}
-                                />
-                                <span>Require a note for this day</span>
-                            </label>
-                            {noteCondition && initialData?.note_condition_satisfied !== undefined && (
-                                <div className={noteCondition && initialData.note_condition_satisfied ? styles.conditionMet : styles.conditionUnmet}>
-                                    {initialData.note_condition_satisfied ? '✓ Note written' : '○ No note yet'}
-                                </div>
-                            )}
-                        </div>
 
                         {isEdit && (
                             <div className={styles.copyArea}>

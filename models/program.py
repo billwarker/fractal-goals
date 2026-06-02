@@ -8,7 +8,8 @@ program_day_templates = Table(
     'program_day_templates', Base.metadata,
     Column('program_day_id', String, ForeignKey('program_days.id', ondelete='CASCADE'), primary_key=True),
     Column('session_template_id', String, ForeignKey('session_templates.id', ondelete='CASCADE'), primary_key=True),
-    Column('order', Integer, default=0)
+    Column('order', Integer, default=0),
+    Column('is_required', Boolean, nullable=False, default=True)
 )
 
 # Junction table for linking Programs to Goals
@@ -91,10 +92,22 @@ class ProgramDay(Base):
     is_completed = Column(Boolean, default=False)
     
     day_of_week = Column(JSON_TYPE)
-    note_condition = Column(Boolean, default=False, nullable=False)
+    completion_min_templates = Column(Integer, nullable=True)
 
     block = relationship("ProgramBlock", back_populates="days")
-    templates = relationship("SessionTemplate", secondary=program_day_templates, order_by="program_day_templates.c.order")
+    template_links = relationship(
+        "ProgramDayTemplate",
+        back_populates="program_day",
+        cascade="all, delete-orphan",
+        order_by=program_day_templates.c.order,
+        overlaps="templates"
+    )
+    templates = relationship(
+        "SessionTemplate",
+        secondary=program_day_templates,
+        order_by="program_day_templates.c.order",
+        overlaps="program_day,template,template_links"
+    )
     completed_sessions = relationship("Session", back_populates="program_day")
     
     goals = relationship(
@@ -105,12 +118,21 @@ class ProgramDay(Base):
     )
 
     def check_completion(self):
-        """Check if all templates have been completed"""
-        if not self.templates:
-            return False
-        completed_template_ids = {s.template_id for s in self.completed_sessions if s.template_id and not s.deleted_at}
-        required_template_ids = {t.id for t in self.templates if not t.deleted_at}
-        return required_template_ids.issubset(completed_template_ids)
+        """Check if this program day's configured completion rules are satisfied."""
+        return evaluate_program_day_completion(self, self.completed_sessions)
+
+class ProgramDayTemplate(Base):
+    __table__ = program_day_templates
+
+    program_day = relationship(
+        "ProgramDay",
+        back_populates="template_links",
+        overlaps="templates"
+    )
+    template = relationship(
+        "SessionTemplate",
+        overlaps="program_day,templates,template_links"
+    )
 
 class ProgramDaySession(Base):
     """
@@ -130,3 +152,56 @@ class ProgramDaySession(Base):
     program_day = relationship("ProgramDay", backref="day_sessions")
     template = relationship("SessionTemplate")
     session = relationship("Session")
+
+
+def get_program_day_template_rules(day):
+    links = list(getattr(day, 'template_links', None) or [])
+    if links:
+        links.sort(key=lambda link: link.order or 0)
+        return [
+            {
+                'template': link.template,
+                'template_id': link.session_template_id,
+                'is_required': bool(link.is_required),
+                'order': link.order or 0,
+            }
+            for link in links
+            if link.template is not None and not getattr(link.template, 'deleted_at', None)
+        ]
+
+    return [
+        {
+            'template': template,
+            'template_id': template.id,
+            'is_required': True,
+            'order': index,
+        }
+        for index, template in enumerate(getattr(day, 'templates', None) or [])
+        if template is not None and not getattr(template, 'deleted_at', None)
+    ]
+
+
+def evaluate_program_day_completion(day, completed_sessions):
+    rules = get_program_day_template_rules(day)
+    if not rules:
+        return False
+
+    completed_template_ids = {
+        session.template_id
+        for session in (completed_sessions or [])
+        if session.template_id and getattr(session, 'completed', False) and not getattr(session, 'deleted_at', None)
+    }
+    required_template_ids = {
+        rule['template_id']
+        for rule in rules
+        if rule['is_required']
+    }
+    min_templates = getattr(day, 'completion_min_templates', None)
+
+    required_passed = required_template_ids.issubset(completed_template_ids)
+    min_passed = True if not min_templates else len(completed_template_ids) >= min_templates
+    has_any_completion_requirement = bool(required_template_ids or min_templates)
+    if not has_any_completion_requirement and not completed_template_ids:
+        return False
+
+    return required_passed and min_passed

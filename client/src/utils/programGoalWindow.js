@@ -164,6 +164,16 @@ export function buildProgramGoalChildrenMap(goals = []) {
         childrenById.set(goalId, getGoalChildren(goal).map(getGoalId).filter(Boolean));
     });
 
+    goals.forEach((goal) => {
+        const goalId = getGoalId(goal);
+        const parentId = goal?.parent_id || goal?.parentId || goal?.attributes?.parent_id || goal?.attributes?.parentId || null;
+        if (!goalId || !parentId) {
+            return;
+        }
+        const childIds = childrenById.get(parentId) || [];
+        childrenById.set(parentId, Array.from(new Set([...childIds, goalId])));
+    });
+
     return childrenById;
 }
 
@@ -252,8 +262,32 @@ export function buildProgramGoalScope({
         expandAssociatedGoalIds(programGoalIds),
         childrenById,
     );
+    const buildScopedGoalTree = (goalId, seenIds = new Set()) => {
+        if (!goalId || seenIds.has(goalId)) {
+            return [];
+        }
+
+        seenIds.add(goalId);
+        const goal = resolveGoal(goalId);
+        if (!goal) {
+            return [];
+        }
+
+        const childTrees = (childrenById.get(goalId) || []).flatMap((childId) => (
+            buildScopedGoalTree(childId, new Set(seenIds))
+        ));
+
+        if (!isGoalInProgramWindow(goal, startDate, endDate)) {
+            return childTrees;
+        }
+
+        return [{
+            ...goal,
+            children: childTrees,
+        }];
+    };
     const hierarchyGoalSeeds = programScopeGoalIds
-        .flatMap((goalId) => pruneProgramGoalTreeForWindow(resolveGoal(goalId), startDate, endDate))
+        .flatMap((goalId) => buildScopedGoalTree(goalId))
         .filter(Boolean);
 
     return {

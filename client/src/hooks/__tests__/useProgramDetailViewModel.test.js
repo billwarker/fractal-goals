@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
 
-import { addDaysToDateString, getTodayLocalDate, subtractDaysToDateString } from '../../utils/dateUtils';
+import { addDaysToDateString, getTodayLocalDate, getWeekdayName, subtractDaysToDateString } from '../../utils/dateUtils';
 import { useProgramDetailViewModel } from '../useProgramDetailViewModel';
 
 describe('useProgramDetailViewModel', () => {
@@ -34,6 +34,7 @@ describe('useProgramDetailViewModel', () => {
                         {
                             id: 'day-1',
                             name: 'Day 1',
+                            day_of_week: [getWeekdayName(today)],
                             templates: [{ id: 'template-1', name: 'Warmup' }],
                         },
                     ],

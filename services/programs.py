@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from services.serializers import format_utc
 from models import (
-    Program, ProgramBlock, ProgramDay, ProgramDaySession, Goal, SessionTemplate, Session,
+    Program, ProgramBlock, ProgramDay, ProgramDayTemplate, ProgramDaySession, Goal, SessionTemplate, Session,
     validate_root_goal, _safe_load_json, program_goals, program_block_goals
 )
 from services import event_bus, Event, Events
@@ -145,6 +145,91 @@ class ProgramService:
         return value.date() if isinstance(value, datetime) else value
 
     @staticmethod
+    def _program_day_scheduled_on(day: ProgramDay, block: ProgramBlock, target_date: date) -> bool:
+        if day.date:
+            return day.date == target_date
+
+        if not block.start_date or not block.end_date:
+            return False
+
+        if target_date < block.start_date or target_date > block.end_date:
+            return False
+
+        day_names = day.day_of_week if isinstance(day.day_of_week, list) else ([day.day_of_week] if day.day_of_week else [])
+        return bool(day_names and target_date.strftime('%A') in day_names)
+
+    @staticmethod
+    def _normalize_template_configs(data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        raw_configs = data.get('template_configs')
+        configs: List[Dict[str, Any]] = []
+
+        if raw_configs is not None:
+            seen_template_ids = set()
+            for index, raw_config in enumerate(raw_configs or []):
+                template_id = raw_config.get('template_id') if isinstance(raw_config, dict) else None
+                if not template_id or template_id in seen_template_ids:
+                    continue
+                seen_template_ids.add(template_id)
+                configs.append({
+                    'template_id': template_id,
+                    'is_required': bool(raw_config.get('is_required', True)),
+                    'order': raw_config.get('order', index) if raw_config.get('order', index) is not None else index,
+                })
+        else:
+            template_ids = list(data.get('template_ids') or [])
+            if data.get('template_id') and data['template_id'] not in template_ids:
+                template_ids.append(data['template_id'])
+            seen_template_ids = set()
+            for index, template_id in enumerate(template_ids):
+                if not template_id or template_id in seen_template_ids:
+                    continue
+                seen_template_ids.add(template_id)
+                configs.append({
+                    'template_id': template_id,
+                    'is_required': True,
+                    'order': index,
+                })
+
+        min_templates = data.get('completion_min_templates')
+        if min_templates is not None and min_templates > len(configs):
+            raise ValueError("completion_min_templates cannot exceed the number of selected templates")
+
+        return configs
+
+    @staticmethod
+    def _apply_program_day_template_configs(session, day: ProgramDay, template_configs: List[Dict[str, Any]]):
+        session.query(ProgramDayTemplate).filter(
+            ProgramDayTemplate.program_day_id == day.id
+        ).delete(synchronize_session=False)
+        session.flush()
+
+        if not template_configs:
+            day.templates = []
+            return
+
+        template_ids = [config['template_id'] for config in template_configs]
+        templates = session.query(SessionTemplate).filter(SessionTemplate.id.in_(template_ids)).all()
+        templates_by_id = {template.id: template for template in templates}
+        missing_ids = [template_id for template_id in template_ids if template_id not in templates_by_id]
+        if missing_ids:
+            raise ValueError(f"Session templates not found: {', '.join(missing_ids)}")
+
+        for index, config in enumerate(template_configs):
+            session.add(ProgramDayTemplate(
+                program_day_id=day.id,
+                session_template_id=config['template_id'],
+                order=config.get('order', index),
+                is_required=bool(config.get('is_required', True)),
+            ))
+        session.expire(day, ['templates', 'template_links'])
+
+    @staticmethod
+    def _validate_program_day_completion_min(day: ProgramDay):
+        min_templates = getattr(day, 'completion_min_templates', None)
+        if min_templates is not None and min_templates > len(day.templates or []):
+            raise ValueError("completion_min_templates cannot exceed the number of selected templates")
+
+    @staticmethod
     def _collect_goal_descendant_ids(session, root_id: str, seed_goal_ids: List[str]) -> set[str]:
         normalized_seed_ids = list(dict.fromkeys(seed_goal_ids or []))
         if not normalized_seed_ids:
@@ -274,6 +359,10 @@ class ProgramService:
                 .selectinload(ProgramDay.templates),
             selectinload(Program.blocks)
                 .selectinload(ProgramBlock.days)
+                .selectinload(ProgramDay.template_links)
+                .selectinload(ProgramDayTemplate.template),
+            selectinload(Program.blocks)
+                .selectinload(ProgramBlock.days)
                 .selectinload(ProgramDay.completed_sessions)
         ).filter_by(root_id=root_id).all()
         return [serialize_program(program) for program in programs]
@@ -287,6 +376,10 @@ class ProgramService:
             selectinload(Program.blocks)
                 .selectinload(ProgramBlock.days)
                 .selectinload(ProgramDay.templates),
+            selectinload(Program.blocks)
+                .selectinload(ProgramBlock.days)
+                .selectinload(ProgramDay.template_links)
+                .selectinload(ProgramDayTemplate.template),
             selectinload(Program.blocks)
                 .selectinload(ProgramBlock.days)
                 .selectinload(ProgramDay.completed_sessions)
@@ -510,11 +603,7 @@ class ProgramService:
             raise ValueError("Block not found")
         
         name = data.get('name')
-        template_ids = data.get('template_ids', [])
-        note_condition = bool(data.get('note_condition', False))
-        if 'template_id' in data and data['template_id']:
-            if data['template_id'] not in template_ids:
-                template_ids.append(data['template_id'])
+        template_configs = ProgramService._normalize_template_configs(data)
         
         day_of_week_raw = data.get('day_of_week')
         day_of_week_list = day_of_week_raw if isinstance(day_of_week_raw, list) else ([day_of_week_raw] if day_of_week_raw else [])
@@ -555,18 +644,19 @@ class ProgramService:
                     day_number=count + 1,
                     name=name,
                     day_of_week=day_of_week_list,
-                    note_condition=note_condition,
+                    completion_min_templates=data.get('completion_min_templates'),
                 )
                 session.add(day)
+                session.flush()
             else:
                 if name: day.name = name
                 day.day_of_week = day_of_week_list
-                if 'note_condition' in data:
-                    day.note_condition = note_condition
+                if 'completion_min_templates' in data:
+                    day.completion_min_templates = data.get('completion_min_templates')
             
-            if template_ids:
-                templates = session.query(SessionTemplate).filter(SessionTemplate.id.in_(template_ids)).all()
-                day.templates = templates
+            if 'template_configs' in data or 'template_ids' in data or 'template_id' in data:
+                ProgramService._apply_program_day_template_configs(session, day, template_configs)
+            ProgramService._validate_program_day_completion_min(day)
             
             created_count += 1
             touched_days.append(day)
@@ -595,7 +685,8 @@ class ProgramService:
         
         if 'name' in data: day.name = data['name']
         if 'day_number' in data: day.day_number = data['day_number']
-        if 'note_condition' in data: day.note_condition = bool(data['note_condition'])
+        if 'completion_min_templates' in data:
+            day.completion_min_templates = data.get('completion_min_templates')
         
         if 'date' in data:
             if data['date']:
@@ -617,19 +708,13 @@ class ProgramService:
         cascade = data.get('cascade', False)
         
         update_sessions = False
-        template_ids = data.get('template_ids', [])
-        if 'template_ids' in data: update_sessions = True
-        
-        if 'template_id' in data:
+        if 'template_configs' in data or 'template_ids' in data or 'template_id' in data:
             update_sessions = True
-            if data['template_id'] and data['template_id'] not in template_ids:
-                 template_ids.append(data['template_id'])
+            template_configs = ProgramService._normalize_template_configs(data)
 
-        new_templates = []
         if update_sessions:
-            if template_ids:
-                new_templates = session.query(SessionTemplate).filter(SessionTemplate.id.in_(template_ids)).all()
-            day.templates = new_templates
+            ProgramService._apply_program_day_template_configs(session, day, template_configs)
+        ProgramService._validate_program_day_completion_min(day)
         
         if cascade:
             all_blocks = session.query(ProgramBlock).filter_by(program_id=program_id).all()
@@ -642,8 +727,11 @@ class ProgramService:
                     t_day = session.query(ProgramDay).filter_by(block_id=target.id, day_number=day.day_number).first()
                     if t_day:
                         if 'name' in data: t_day.name = data['name']
+                        if 'completion_min_templates' in data:
+                            t_day.completion_min_templates = data.get('completion_min_templates')
                         if update_sessions:
-                             t_day.templates = new_templates
+                            ProgramService._apply_program_day_template_configs(session, t_day, template_configs)
+                        ProgramService._validate_program_day_completion_min(t_day)
             except StopIteration: pass
 
         ProgramService._commit(session, day)
@@ -704,16 +792,29 @@ class ProgramService:
                       block_id=target.id,
                       day_number=source_day.day_number,
                       name=source_day.name,
-                      date=None 
+                      date=None,
+                      day_of_week=source_day.day_of_week,
+                      completion_min_templates=source_day.completion_min_templates,
                   )
                   session.add(target_day)
+                  session.flush()
              else:
                   target_day.name = source_day.name
+                  target_day.day_of_week = source_day.day_of_week
+                  target_day.completion_min_templates = source_day.completion_min_templates
              
-             if source_day.templates:
-                  target_day.templates = list(source_day.templates)
-             else:
-                  target_day.templates = []
+             source_configs = [
+                 {
+                     'template_id': link.session_template_id,
+                     'is_required': bool(link.is_required),
+                     'order': link.order or index,
+                 }
+                 for index, link in enumerate(source_day.template_links or [])
+             ] or [
+                 {'template_id': template.id, 'is_required': True, 'order': index}
+                 for index, template in enumerate(source_day.templates or [])
+             ]
+             ProgramService._apply_program_day_template_configs(session, target_day, source_configs)
              
              copied_count += 1
              copied_days.append(target_day)
@@ -928,7 +1029,11 @@ class ProgramService:
         active_programs = session.query(Program).options(
             selectinload(Program.blocks)
                 .selectinload(ProgramBlock.days)
-                .selectinload(ProgramDay.templates)
+                .selectinload(ProgramDay.templates),
+            selectinload(Program.blocks)
+                .selectinload(ProgramBlock.days)
+                .selectinload(ProgramDay.template_links)
+                .selectinload(ProgramDayTemplate.template)
         ).filter(
             Program.root_id == root_id,
             Program.start_date <= today,
@@ -942,14 +1047,24 @@ class ProgramService:
                 if block.start_date and block.end_date:
                     if block.start_date <= today <= block.end_date:
                         for day in block.days:
-                            if day.templates:
+                            if day.templates and ProgramService._program_day_scheduled_on(day, block, today):
                                 session_details = []
-                                for template in day.templates:
+                                template_rules = {
+                                    link.session_template_id: {
+                                        "is_required": bool(link.is_required),
+                                        "order": link.order or 0,
+                                    }
+                                    for link in (day.template_links or [])
+                                }
+                                for index, template in enumerate(day.templates):
+                                    template_rule = template_rules.get(template.id, {})
                                     session_details.append({
                                         "template_id": template.id,
                                         "template_name": template.name,
                                         "template_description": template.description,
-                                        "template_data": _safe_load_json(template.template_data, {})
+                                        "template_data": _safe_load_json(template.template_data, {}),
+                                        "is_required": template_rule.get("is_required", True),
+                                        "order": template_rule.get("order", index),
                                     })
                                 
                                 result.append({
@@ -965,6 +1080,7 @@ class ProgramService:
                                     "day_number": day.day_number,
                                     "day_date": format_utc(day.date),
                                     "is_completed": day.is_completed,
+                                    "completion_min_templates": day.completion_min_templates,
                                     "sessions": session_details,
                                     "completed_session_count": len([s for s in day.completed_sessions if not s.deleted_at])
                                 })

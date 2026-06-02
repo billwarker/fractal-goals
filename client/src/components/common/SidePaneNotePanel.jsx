@@ -17,6 +17,7 @@ function SidePaneNotePanel({
     placeholder = 'Add a note...',
     label = 'Notes',
     composerOnly = false,
+    hideHeader = false,
     className = '',
 }) {
     const [content, setContent] = useState('');
@@ -91,12 +92,14 @@ function SidePaneNotePanel({
 
     return (
         <div className={styles.panel}>
-            <div className={styles.timelineHeader}>
-                <span className={styles.timelineLabel}>
-                    {label}
-                    {notes.length > 0 ? ` (${notes.length})` : ''}
-                </span>
-            </div>
+            {!hideHeader ? (
+                <div className={styles.timelineHeader}>
+                    <span className={styles.timelineLabel}>
+                        {label}
+                        {notes.length > 0 ? ` (${notes.length})` : ''}
+                    </span>
+                </div>
+            ) : null}
 
             <div className={styles.notesList}>
                 {isLoading ? (

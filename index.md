@@ -326,6 +326,8 @@ Important program-domain rules now enforced in the backend service layer:
 - block goal attachments must stay within that scope and within the block date range
 - scheduling and unscheduling program-day occurrences run through `ProgramService`
 - calendar-day goal deadline changes on the programs page go through the programs API instead of generic client-side goal mutation assembly
+- program-day completion is driven by per-template required flags plus an optional day-level minimum completed-template threshold; legacy template links default to required
+- program days no longer support a note-required completion condition; notes remain available as ordinary session/program context
 
 Templates model reusable session structures.
 

@@ -2,10 +2,10 @@ import { useMemo } from 'react';
 import {
     formatLiteralDate,
     getDatePart,
-    getDayOfWeekIndex,
     getISOYMDInTimezone,
     isDateBeforeToday,
 } from '../utils/dateUtils';
+import { buildProgramDayOccurrences } from '../utils/programViewModel';
 
 
 function getLocalDateString(dateTimeStr, timezone) {
@@ -51,42 +51,16 @@ export function useProgramDayViewModel({
     const effectiveBlockId = selectedBlockId || (blocksContainingDate.length === 1 ? blocksContainingDate[0].id : '');
 
     const scheduledProgramDays = useMemo(() => {
-        const result = [];
-        (program?.blocks || []).forEach((block) => {
-            (block.days || []).forEach((day) => {
-                let isScheduledForDate = false;
-
-                if (day.date && getDatePart(day.date) === date) {
-                    isScheduledForDate = true;
-                } else if (day.day_of_week && block.start_date && block.end_date) {
-                    const start = getDatePart(block.start_date);
-                    const end = getDatePart(block.end_date);
-                    if (date >= start && date <= end) {
-                        const dows = Array.isArray(day.day_of_week) ? day.day_of_week : [day.day_of_week];
-                        if (dows.length > 0) {
-                            const dayMap = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
-                            const activeDays = dows.map((dayName) => dayMap[dayName]).filter((value) => value !== undefined);
-                            const targetDayOfWeek = getDayOfWeekIndex(date);
-                            if (activeDays.includes(targetDayOfWeek)) {
-                                isScheduledForDate = true;
-                            }
-                        }
-                    }
-                }
-
-                if (isScheduledForDate) {
-                    result.push({
-                        ...day,
-                        blockName: block.name,
-                        blockId: block.id,
-                        blockColor: block.color,
-                        isRecurringTemplate: !day.date && !!day.day_of_week && day.day_of_week.length > 0,
-                        type: 'program_day',
-                    });
-                }
-            });
-        });
-        return result;
+        return buildProgramDayOccurrences({ program })
+            .filter((occurrence) => occurrence.date === date)
+            .map((occurrence) => ({
+                ...occurrence.day,
+                blockName: occurrence.blockName,
+                blockId: occurrence.blockId,
+                blockColor: occurrence.blockColor,
+                isRecurringTemplate: !occurrence.day.date && !!occurrence.day.day_of_week && occurrence.day.day_of_week.length > 0,
+                type: 'program_day',
+            }));
     }, [date, program?.blocks]);
 
     const scheduledSessions = useMemo(() => {

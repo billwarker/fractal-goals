@@ -453,6 +453,8 @@ class TestProgramStructure:
         scheduled_session = schedule_response.get_json()
         assert scheduled_session['program_day_id'] == day_id
         assert scheduled_session['program_info']['program_id'] == program_id
+        assert scheduled_session['program_info']['program_color'] == sample_program['color']
+        assert scheduled_session['program_info']['block_color'] == block['color']
         assert any(goal['id'] == short_term_goal.id for goal in scheduled_session['short_term_goals'])
 
     def test_unschedule_block_day_occurrence_soft_deletes_matching_session(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):

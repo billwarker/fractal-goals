@@ -32,6 +32,11 @@
     overflow: hidden;
 }
 
+.mainColumnBlocksMode {
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
 
 .statusBadge {
     display: inline-flex;
@@ -62,6 +67,13 @@
 .headerTitleSeparator {
     color: var(--color-text-muted);
     font-weight: 600;
+}
+
+.headerMetaRow {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
 }
 
 .blockBadge {
@@ -113,11 +125,25 @@
     background: var(--color-bg-app);
 }
 
+.blocksModePanel {
+    border: none;
+    background: transparent;
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+}
+
 .blocksPanel {
     height: 100%;
     min-height: 680px;
     padding: 24px;
     overflow: auto;
+}
+
+.mainColumnBlocksMode .blocksPanel {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
 }
 
 .emptyBlocksPanel {
@@ -165,15 +191,9 @@
     overflow: hidden;
 }
 
-.description,
 .muted {
     margin: 0;
     color: var(--color-text-secondary);
-}
-
-.description {
-    margin: 14px 18px 0;
-    line-height: 1.5;
 }
 
 .viewToggle {
@@ -467,7 +487,7 @@
 .embeddedSidebarMetrics {
     width: 100%;
     border-right: none;
-    background: var(--color-bg-sidebar);
+    background: transparent;
     flex-shrink: 0;
 }
 
@@ -476,7 +496,8 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto;
+    padding: 0 16px 0;
 }
 
 .detailsPaneScroll {
@@ -488,7 +509,113 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto;
+    padding: 0 16px 16px;
+}
+
+.sidePaneSectionGroup {
+    padding: 14px 0 4px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.sidePaneSectionGroup:last-child {
+    border-bottom: none;
+}
+
+.sidePaneSectionGroupCollapsed {
+    padding-bottom: 14px;
+}
+
+.sidePaneSectionTitleRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.sidePaneSectionTitle {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.sidePaneSectionToggle {
+    padding: 2px 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.sidePaneSectionToggle:hover {
+    color: var(--color-text-primary);
+}
+
+.sidePaneSectionContent {
+    padding: 8px 0 12px;
+}
+
+.sectionDescription {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 16px;
+    line-height: 1.45;
+}
+
+.emptySectionText {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    font-style: italic;
+}
+
+.metricsSectionContent {
+    padding-top: 4px;
+}
+
+.notesSidePaneSection {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.notesSidePaneSection:not(.sidePaneSectionGroupCollapsed) {
+    flex: 1;
+    padding-bottom: 0;
+}
+
+.notesSectionContent {
+    min-height: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0;
+}
+
+.goalsSidePaneSection {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border-bottom: none;
+}
+
+.goalsSidePaneSection:not(.sidePaneSectionGroupCollapsed) {
+    flex: 1;
+    padding-bottom: 0;
+}
+
+.goalsSectionContent {
+    min-height: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 0;
 }
 
 .emptySidePane {

@@ -21,7 +21,7 @@ from .session import (
     get_sessions_for_root, get_immediate_goals_for_session, delete_session
 )
 from .program import (
-    Program, ProgramBlock, ProgramDay, ProgramDaySession,
+    Program, ProgramBlock, ProgramDay, ProgramDayTemplate, ProgramDaySession,
     program_day_templates, program_goals, program_block_goals
 )
 from .common import AnalyticsDashboard, Note, EventLog
