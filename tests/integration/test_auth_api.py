@@ -289,6 +289,8 @@ class TestMeEndpoint:
 
     def test_logout_clears_cookie(self, client, test_user):
         """Logout should clear cookie-backed authentication."""
+        from config import config
+
         client.post(
             '/api/auth/login',
             data=json.dumps({
@@ -297,8 +299,12 @@ class TestMeEndpoint:
             }),
             content_type='application/json'
         )
+        csrf_cookie = client.get_cookie(config.CSRF_COOKIE_NAME)
 
-        logout_response = client.post('/api/auth/logout')
+        logout_response = client.post(
+            '/api/auth/logout',
+            headers={config.CSRF_HEADER_NAME: csrf_cookie.value},
+        )
         assert logout_response.status_code == 200
         assert client.get('/api/auth/me').status_code == 401
 
@@ -325,6 +331,48 @@ class TestPreferencesEndpoint:
         # Response should contain the user object with preferences key
         assert 'id' in data  # User object returned
         assert 'preferences' in data  # Preferences field exists
+
+    def test_cookie_authenticated_write_requires_csrf(self, client, test_user):
+        response = client.post(
+            '/api/auth/login',
+            data=json.dumps({
+                'username_or_email': 'testuser',
+                'password': 'Password123',
+            }),
+            content_type='application/json',
+        )
+        assert response.status_code == 200
+
+        write_response = client.patch(
+            '/api/auth/preferences',
+            data=json.dumps({'preferences': {'theme': 'dark'}}),
+            content_type='application/json',
+        )
+        assert write_response.status_code == 403
+        assert 'csrf' in json.loads(write_response.data)['error'].lower()
+
+    def test_cookie_authenticated_write_accepts_matching_csrf(self, client, test_user):
+        from config import config
+
+        login_response = client.post(
+            '/api/auth/login',
+            data=json.dumps({
+                'username_or_email': 'testuser',
+                'password': 'Password123',
+            }),
+            content_type='application/json',
+        )
+        assert login_response.status_code == 200
+        csrf_cookie = client.get_cookie(config.CSRF_COOKIE_NAME)
+        assert csrf_cookie is not None
+
+        write_response = client.patch(
+            '/api/auth/preferences',
+            data=json.dumps({'preferences': {'theme': 'dark'}}),
+            content_type='application/json',
+            headers={config.CSRF_HEADER_NAME: csrf_cookie.value},
+        )
+        assert write_response.status_code == 200
 
 
 @pytest.mark.integration
@@ -513,6 +561,40 @@ class TestTokenRefreshEndpoint:
         data = json.loads(response.data)
         assert 'token' in data
         assert 'user' in data
+
+    def test_cookie_refresh_requires_csrf(self, client, test_user):
+        response = client.post(
+            '/api/auth/login',
+            data=json.dumps({
+                'username_or_email': 'testuser',
+                'password': 'Password123',
+            }),
+            content_type='application/json',
+        )
+        assert response.status_code == 200
+
+        refresh_response = client.post('/api/auth/refresh')
+        assert refresh_response.status_code == 403
+
+    def test_cookie_refresh_accepts_matching_csrf(self, client, test_user):
+        from config import config
+
+        response = client.post(
+            '/api/auth/login',
+            data=json.dumps({
+                'username_or_email': 'testuser',
+                'password': 'Password123',
+            }),
+            content_type='application/json',
+        )
+        assert response.status_code == 200
+        csrf_cookie = client.get_cookie(config.CSRF_COOKIE_NAME)
+
+        refresh_response = client.post(
+            '/api/auth/refresh',
+            headers={config.CSRF_HEADER_NAME: csrf_cookie.value},
+        )
+        assert refresh_response.status_code == 200
 
     def test_refresh_token_past_window(self, client, test_user):
         import jwt

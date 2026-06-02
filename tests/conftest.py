@@ -59,13 +59,14 @@ def app():
     
     # Load configuration to get DATABASE_URL
     from config import config
+    test_app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
     
     # Enable CORS
     CORS(test_app, resources={
         r"/api/*": {
             "origins": "*",
             "methods": ["GET", "POST", "PUT", "PATCH", "DELETE"],
-            "allow_headers": ["Content-Type"]
+            "allow_headers": ["Content-Type", config.CSRF_HEADER_NAME]
         }
     })
     

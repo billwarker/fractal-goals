@@ -232,7 +232,6 @@ export const buildGraphPresentation = ({
     selectedNodeId,
     completedGoalColor,
     viewSettings,
-    sessions,
     evidenceGoalIds,
     metricsSummary,
     activities,

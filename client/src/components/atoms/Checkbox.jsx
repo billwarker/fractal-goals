@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import styles from './Checkbox.module.css';
 
 /**
@@ -13,7 +13,8 @@ const Checkbox = ({
     id,
     ...props
 }) => {
-    const inputId = id || Math.random().toString(36).substr(2, 9);
+    const generatedId = useId();
+    const inputId = id || generatedId;
 
     return (
         <label

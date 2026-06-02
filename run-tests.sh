@@ -49,6 +49,7 @@ usage() {
     echo "  db-down       Stop local Postgres containers"
     echo "  db-reset      Recreate local Postgres containers and volumes"
     echo "  lint          Run frontend lint and maintainability checks"
+    echo "  audit         Run Python and frontend production dependency audits"
     echo "  fix           Run frontend auto-fixes and maintainability checks"
     echo "  maintain      Run frontend maintainability and responsive audits"
     echo "  watch         Run tests in watch mode"
@@ -190,6 +191,18 @@ run_frontend_tests() {
     print_message "$GREEN" "Running frontend tests..."
     ensure_frontend_tools
     frontend_vitest
+}
+
+run_dependency_audit() {
+    print_message "$GREEN" "Running dependency audits..."
+    ensure_backend_tools
+    "$VENV_PYTHON" -m pip_audit \
+        -r "$ROOT_DIR/requirements.txt" \
+        --no-deps \
+        --disable-pip \
+        --cache-dir "${PIP_AUDIT_CACHE_DIR:-${TMPDIR:-/tmp}/fractal-goals-pip-audit-cache}" \
+        --progress-spinner off
+    (cd "$CLIENT_DIR" && "$NPM_BIN" audit --omit=dev)
 }
 
 run_doctor() {
@@ -417,6 +430,9 @@ main() {
             ;;
         lint)
             run_lint
+            ;;
+        audit)
+            run_dependency_audit
             ;;
         fix)
             run_fix

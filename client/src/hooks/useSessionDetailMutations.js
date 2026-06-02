@@ -5,6 +5,7 @@ import { createAutoSaveQueue } from '../utils/autoSaveQueue';
 import { formatError } from '../utils/mutationNotify';
 import { applyOptimisticQueryUpdate } from '../utils/optimisticQuery';
 import { fractalApi } from '../utils/api';
+import { invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
 import { mergeUniqueIds } from '../utils/sessionGoalScope';
 import { queryKeys } from './queryKeys';
 import {
@@ -25,9 +26,6 @@ export function useSessionDetailMutations({
     sessionActivitiesKey,
     sessionGoalsViewKey,
     sessionNotesKey,
-    sessionsKey,
-    sessionsAllKey,
-    sessionsPaginatedKey,
     fractalTreeKey,
     activitiesKey,
     updateSession,
@@ -42,24 +40,26 @@ export function useSessionDetailMutations({
     const goalsForSelectionKey = queryKeys.goalsForSelection(rootId);
 
     const invalidateSessionListQueries = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: sessionsKey });
-        queryClient.invalidateQueries({ queryKey: sessionsAllKey });
-        queryClient.invalidateQueries({ queryKey: sessionsPaginatedKey });
-    }, [queryClient, sessionsAllKey, sessionsKey, sessionsPaginatedKey]);
+        invalidateSessionLists(queryClient, rootId, queryKeys);
+    }, [queryClient, rootId]);
 
     const invalidateFlowTreeActivityEvidence = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.sessionsEvidenceGoalsRoot(rootId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.sessionsFlowtreeMetricsRoot(rootId) });
+        invalidateQueryKeys(queryClient, [
+            queryKeys.sessionsEvidenceGoalsRoot(rootId),
+            queryKeys.sessionsFlowtreeMetricsRoot(rootId),
+        ]);
     }, [queryClient, rootId]);
 
     const invalidateGoalQueries = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: goalsKey });
-        queryClient.invalidateQueries({ queryKey: goalsForSelectionKey });
-        queryClient.invalidateQueries({ queryKey: fractalTreeKey });
-        queryClient.invalidateQueries({ queryKey: queryKeys.rootGoal(rootId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.sessionGoalsViewRoot(rootId) });
-        queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
-        queryClient.invalidateQueries({ queryKey: queryKeys.goalAnalytics(rootId) });
+        invalidateQueryKeys(queryClient, [
+            goalsKey,
+            goalsForSelectionKey,
+            fractalTreeKey,
+            queryKeys.rootGoal(rootId),
+            queryKeys.sessionGoalsViewRoot(rootId),
+            sessionGoalsViewKey,
+            queryKeys.goalAnalytics(rootId),
+        ]);
     }, [fractalTreeKey, goalsForSelectionKey, goalsKey, queryClient, rootId, sessionGoalsViewKey]);
 
     const addActivityMutation = useMutation({

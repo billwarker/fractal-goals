@@ -48,11 +48,11 @@ def get_engine(db_url=None):
         db_url,
         echo=False,
         poolclass=QueuePool,
-        pool_size=10,
-        max_overflow=20,
+        pool_size=config.DB_POOL_SIZE,
+        max_overflow=config.DB_MAX_OVERFLOW,
         pool_pre_ping=True,
-        pool_recycle=3600,
-        pool_timeout=30,
+        pool_recycle=config.DB_POOL_RECYCLE_SECONDS,
+        pool_timeout=config.DB_POOL_TIMEOUT,
     )
     
     if db_url == config.get_database_url():

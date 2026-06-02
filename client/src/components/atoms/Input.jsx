@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useId } from 'react';
 import styles from './Input.module.css';
 
 /**
@@ -13,7 +13,8 @@ const Input = forwardRef(({
     type = 'text',
     ...props
 }, ref) => {
-    const inputId = id || props.name || Math.random().toString(36).substr(2, 9);
+    const generatedId = useId();
+    const inputId = id || props.name || generatedId;
     const errorId = error ? `${inputId}-error` : undefined;
 
     return (

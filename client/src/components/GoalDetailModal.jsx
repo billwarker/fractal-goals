@@ -57,7 +57,6 @@ function GoalDetailModal({
     goal,
     onUpdate,
     activityDefinitions: activityDefinitionsRaw = [],
-    sessions: sessionsRaw = [],
     evidenceGoalIds: evidenceGoalIdsRaw = null,
     onToggleCompletion,
     onDelete,
@@ -89,10 +88,6 @@ function GoalDetailModal({
     const activityDefinitions = useMemo(
         () => (Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : []),
         [activityDefinitionsRaw]
-    );
-    const sessions = useMemo(
-        () => (Array.isArray(sessionsRaw) ? sessionsRaw : []),
-        [sessionsRaw]
     );
     const evidenceGoalIds = useMemo(() => {
         if (evidenceGoalIdsRaw instanceof Set) {

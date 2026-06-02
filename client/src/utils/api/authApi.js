@@ -9,6 +9,7 @@ export const authApi = {
         {},
         token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
     ),
+    getCsrf: () => axios.get(`${API_BASE}/auth/csrf`),
     getMe: () => axios.get(`${API_BASE}/auth/me`),
     getAccountUsage: (params = {}) => axios.get(`${API_BASE}/auth/account/usage`, { params }),
     updatePreferences: (data) => axios.patch(`${API_BASE}/auth/preferences`, data),

@@ -40,6 +40,8 @@ class Config:
     # Flask Server
     HOST = os.getenv('FLASK_HOST', '0.0.0.0')
     PORT = int(os.getenv('FLASK_PORT', '8001'))
+    MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', str(2 * 1024 * 1024)))
+    SLOW_REQUEST_THRESHOLD_MS = int(os.getenv('SLOW_REQUEST_THRESHOLD_MS', '750'))
     
     # Database Configuration
     # Use DATABASE_URL for local/test environments.
@@ -47,6 +49,10 @@ class Config:
     # can switch providers without overloading the generic local variable.
     DATABASE_URL = os.getenv('DATABASE_URL', None)
     SUPABASE_DATABASE_URL = os.getenv('SUPABASE_DATABASE_URL', None)
+    DB_POOL_SIZE = int(os.getenv('DB_POOL_SIZE', '5'))
+    DB_MAX_OVERFLOW = int(os.getenv('DB_MAX_OVERFLOW', '10'))
+    DB_POOL_TIMEOUT = int(os.getenv('DB_POOL_TIMEOUT', '30'))
+    DB_POOL_RECYCLE_SECONDS = int(os.getenv('DB_POOL_RECYCLE_SECONDS', '3600'))
     
     # CORS
     # Support comma or semicolon or space as delimiters for flexibility
@@ -74,6 +80,8 @@ class Config:
     JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '72'))
     JWT_REFRESH_WINDOW_DAYS = int(os.getenv('JWT_REFRESH_WINDOW_DAYS', '7'))
     AUTH_COOKIE_NAME = os.getenv('AUTH_COOKIE_NAME', 'fractal_auth_token')
+    CSRF_COOKIE_NAME = os.getenv('CSRF_COOKIE_NAME', 'fractal_csrf_token')
+    CSRF_HEADER_NAME = os.getenv('CSRF_HEADER_NAME', 'X-CSRF-Token')
     AUTH_COOKIE_SECURE = os.getenv(
         'AUTH_COOKIE_SECURE',
         'true' if ENV not in ('development', 'testing', 'local') else 'false'
@@ -111,15 +119,24 @@ class Config:
         if cls.ENV not in ('development', 'testing', 'local'):
             if cls.JWT_SECRET_KEY == 'default-jwt-secret-keep-it-safe':
                 raise ValueError(f"CRITICAL: JWT_SECRET_KEY must be set in {cls.ENV} environment!")
+
+            if cls.DEBUG:
+                raise ValueError(f"CRITICAL: DEBUG must be false in {cls.ENV} environment!")
             
             if '*' in cls.CORS_ORIGINS:
                 raise ValueError(f"CRITICAL: Wildcard CORS origin (*) is NOT allowed in {cls.ENV} environment!")
+
+            if not cls.AUTH_COOKIE_SECURE:
+                raise ValueError(f"CRITICAL: AUTH_COOKIE_SECURE must be true in {cls.ENV} environment!")
 
             if cls.AUTH_COOKIE_SAMESITE not in ('Lax', 'Strict', 'None'):
                 raise ValueError("CRITICAL: AUTH_COOKIE_SAMESITE must be Lax, Strict, or None")
 
             if cls.AUTH_COOKIE_SAMESITE == 'None' and not cls.AUTH_COOKIE_SECURE:
                 raise ValueError("CRITICAL: AUTH_COOKIE_SECURE must be true when AUTH_COOKIE_SAMESITE=None")
+
+            if cls.RATELIMIT_STORAGE_URI == 'memory://':
+                raise ValueError(f"CRITICAL: RATELIMIT_STORAGE_URI must use durable shared storage in {cls.ENV} environment!")
 
     @classmethod
     def get_database_url(cls):

@@ -463,4 +463,72 @@ describe('useSessionGoalsViewModel', () => {
         expect(names).toContain('Active Goal');
     });
 
+    it('stays within a large-session view model render budget', () => {
+        const childrenFor = (prefix, depth, maxDepth) => {
+            if (depth >= maxDepth) return [];
+            return Array.from({ length: 5 }, (_, index) => {
+                const id = `${prefix}-${depth}-${index}`;
+                return {
+                    id,
+                    type: depth >= maxDepth - 1 ? 'ImmediateGoal' : 'ShortTermGoal',
+                    name: `Goal ${id}`,
+                    children: childrenFor(id, depth + 1, maxDepth),
+                    targets: [
+                        {
+                            id: `target-${id}`,
+                            name: `Target ${id}`,
+                            activity_id: `activity-${index % 12}`,
+                        }
+                    ]
+                };
+            });
+        };
+        const collectLeafIds = (node, result = []) => {
+            if (!node.children?.length) {
+                result.push(node.id);
+                return result;
+            }
+            node.children.forEach((child) => collectLeafIds(child, result));
+            return result;
+        };
+        const goalTree = {
+            id: 'root',
+            type: 'UltimateGoal',
+            name: 'Root',
+            children: childrenFor('root', 0, 4),
+        };
+        const leafIds = collectLeafIds(goalTree);
+        const activityGoalIdsByActivity = Object.fromEntries(
+            Array.from({ length: 12 }, (_, activityIndex) => [
+                `activity-${activityIndex}`,
+                leafIds.filter((_, index) => index % 12 === activityIndex).slice(0, 25),
+            ])
+        );
+        const activityInstances = Array.from({ length: 72 }, (_, index) => ({
+            id: `instance-${index}`,
+            activity_definition_id: `activity-${index % 12}`,
+        }));
+        const sessionGoalsView = {
+            goal_tree: goalTree,
+            session_goal_ids: leafIds.slice(0, 180),
+            activity_goal_ids_by_activity: activityGoalIdsByActivity,
+            session_activity_ids: Array.from({ length: 12 }, (_, index) => `activity-${index}`),
+        };
+
+        const startedAt = performance.now();
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            sessionGoalsView,
+            selectedActivity: activityInstances[0],
+            activityInstances,
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+        }));
+        const elapsedMs = performance.now() - startedAt;
+
+        expect(result.current.sessionHierarchy.length).toBeGreaterThan(100);
+        expect(result.current.activityHierarchy.length).toBeGreaterThan(10);
+        expect(result.current.targetCards.length).toBeGreaterThan(0);
+        expect(elapsedMs).toBeLessThan(250);
+    });
+
 });

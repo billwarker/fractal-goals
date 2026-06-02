@@ -1,6 +1,8 @@
 from functools import wraps
 from flask import request, jsonify, Blueprint, g
 from sqlalchemy.exc import SQLAlchemyError
+import secrets
+import hmac
 from validators import (
     validate_request, UserSignupSchema, UserLoginSchema, UserPreferencesUpdateSchema,
     UserPasswordUpdateSchema, UserEmailUpdateSchema, UserDeleteSchema, UserUsernameUpdateSchema
@@ -19,6 +21,37 @@ logger = logging.getLogger(__name__)
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 
+def _issue_csrf_token():
+    return secrets.token_urlsafe(32)
+
+
+def _set_csrf_cookie(response, token=None):
+    token = token or _issue_csrf_token()
+    response.set_cookie(
+        config.CSRF_COOKIE_NAME,
+        token,
+        max_age=(
+            config.JWT_EXPIRATION_HOURS * 60 * 60
+            + config.JWT_REFRESH_WINDOW_DAYS * 24 * 60 * 60
+        ),
+        httponly=False,
+        secure=config.AUTH_COOKIE_SECURE,
+        samesite=config.AUTH_COOKIE_SAMESITE,
+        path='/',
+    )
+    return token
+
+
+def _clear_csrf_cookie(response):
+    response.delete_cookie(
+        config.CSRF_COOKIE_NAME,
+        path='/',
+        secure=config.AUTH_COOKIE_SECURE,
+        samesite=config.AUTH_COOKIE_SAMESITE,
+    )
+    return response
+
+
 def _set_auth_cookie(response, token):
     max_age_seconds = (
         config.JWT_EXPIRATION_HOURS * 60 * 60
@@ -33,6 +66,7 @@ def _set_auth_cookie(response, token):
         samesite=config.AUTH_COOKIE_SAMESITE,
         path='/',
     )
+    _set_csrf_cookie(response)
     return response
 
 
@@ -43,14 +77,30 @@ def _clear_auth_cookie(response):
         secure=config.AUTH_COOKIE_SECURE,
         samesite=config.AUTH_COOKIE_SAMESITE,
     )
+    _clear_csrf_cookie(response)
     return response
 
 
 def _get_request_token():
     auth_header = request.headers.get('Authorization')
     if auth_header and auth_header.startswith('Bearer '):
-        return auth_header.split(" ", 1)[1]
-    return request.cookies.get(config.AUTH_COOKIE_NAME)
+        return auth_header.split(" ", 1)[1], 'bearer'
+    cookie_token = request.cookies.get(config.AUTH_COOKIE_NAME)
+    if cookie_token:
+        return cookie_token, 'cookie'
+    return None, None
+
+
+def _is_mutating_request():
+    return request.method in ('POST', 'PUT', 'PATCH', 'DELETE')
+
+
+def _validate_csrf_for_cookie_auth():
+    cookie_token = request.cookies.get(config.CSRF_COOKIE_NAME)
+    header_token = request.headers.get(config.CSRF_HEADER_NAME)
+    if not cookie_token or not header_token:
+        return False
+    return hmac.compare_digest(cookie_token, header_token)
 
 def token_required(f):
     """Decorator to protect routes with JWT authentication."""
@@ -61,10 +111,13 @@ def token_required(f):
         if request.method == 'OPTIONS':
             return ('', 204)
 
-        token = _get_request_token()
+        token, token_source = _get_request_token()
         
         if not token:
             return jsonify({'error': 'Token is missing'}), 401
+
+        if token_source == 'cookie' and _is_mutating_request() and not _validate_csrf_for_cookie_auth():
+            return jsonify({'error': 'CSRF token missing or invalid'}), 403
 
         db_session = get_db_session()
         try:
@@ -119,10 +172,13 @@ def signup(validated_data):
 @auth_bp.route('/refresh', methods=['POST'])
 def refresh_token():
     """Silent token refresh endpoint."""
-    token = _get_request_token()
+    token, token_source = _get_request_token()
             
     if not token:
         return jsonify({'error': 'Token is missing'}), 401
+
+    if token_source == 'cookie' and not _validate_csrf_for_cookie_auth():
+        return jsonify({'error': 'CSRF token missing or invalid'}), 403
     
     db_session = get_db_session()
     try:
@@ -171,6 +227,19 @@ def get_me(current_user):
     return jsonify(serialize_user(current_user))
 
 
+@auth_bp.route('/csrf', methods=['GET'])
+@token_required
+def get_csrf_token(current_user):
+    """Issue a readable CSRF cookie for browser clients using HttpOnly auth cookies."""
+    response = jsonify({
+        'csrf_cookie_name': config.CSRF_COOKIE_NAME,
+        'csrf_header_name': config.CSRF_HEADER_NAME,
+    })
+    token = _set_csrf_cookie(response)
+    response.headers[config.CSRF_HEADER_NAME] = token
+    return response, 200
+
+
 @auth_bp.route('/account/usage', methods=['GET'])
 @token_required
 def get_account_usage(current_user):
@@ -199,6 +268,9 @@ def get_account_usage(current_user):
 @auth_bp.route('/logout', methods=['POST'])
 def logout():
     """Clear the browser auth cookie."""
+    token, token_source = _get_request_token()
+    if token and token_source == 'cookie' and not _validate_csrf_for_cookie_auth():
+        return jsonify({'error': 'CSRF token missing or invalid'}), 403
     response = jsonify({"message": "Logged out successfully"})
     _clear_auth_cookie(response)
     return response, 200

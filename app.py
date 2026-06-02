@@ -8,6 +8,7 @@ from flask_cors import CORS
 from flask_compress import Compress
 from flask_talisman import Talisman
 import logging
+import time
 
 from extensions import limiter
 import sentry_sdk
@@ -59,6 +60,7 @@ except ValueError as e:
 app = Flask(__name__)
 app.config['ENV'] = config.ENV
 app.config['DEBUG'] = config.DEBUG
+app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
 app.config['COMPRESS_LEVEL'] = 6
 app.config['COMPRESS_MIN_SIZE'] = 512
 app.config['COMPRESS_MIMETYPES'] = [
@@ -70,11 +72,6 @@ app.config['COMPRESS_MIMETYPES'] = [
     'image/svg+xml',
 ]
 Compress(app)
-
-@app.teardown_appcontext
-def shutdown_session(exception=None):
-    from models import remove_session
-    remove_session()
 
 # Initialize Rate Limiter
 app.config['RATELIMIT_STORAGE_URI'] = config.RATELIMIT_STORAGE_URI
@@ -146,6 +143,27 @@ CORS(app, resources={
     }
 })
 
+for write_limited_blueprint in (
+    goals_bp,
+    sessions_bp,
+    activities_bp,
+    templates_bp,
+    timers_bp,
+    programs_bp,
+    notes_bp,
+    dashboards_bp,
+    logs_api,
+):
+    limiter.limit(
+        "180 per minute",
+        methods=["POST", "PUT", "PATCH", "DELETE"],
+    )(write_limited_blueprint)
+
+limiter.limit(
+    "60 per minute",
+    methods=["POST", "PUT", "PATCH", "DELETE"],
+)(admin_bp)
+
 # Register blueprints
 # app.register_blueprint(api_bp)
 app.register_blueprint(activities_bp)
@@ -177,6 +195,7 @@ logger.info("Database engine initialized with connection pooling")
 @app.before_request
 def reset_request_scoped_contexts():
     """Prevent request-local thread state from leaking across requests."""
+    request._fractal_started_at = time.perf_counter()
     clear_achievement_context()
     clear_live_progress()
 
@@ -195,6 +214,18 @@ def clear_request_scoped_contexts(exception=None):
 
 @app.after_request
 def add_cache_headers(response):
+    started_at = getattr(request, '_fractal_started_at', None)
+    if started_at is not None:
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        response.headers['X-Response-Time-Ms'] = f"{elapsed_ms:.1f}"
+        if elapsed_ms >= config.SLOW_REQUEST_THRESHOLD_MS:
+            logger.warning(
+                "Slow request method=%s path=%s status=%s elapsed_ms=%.1f",
+                request.method,
+                request.path,
+                response.status_code,
+                elapsed_ms,
+            )
     # Favor correctness for authenticated API data over intermediary/browser caching.
     if request.path.startswith('/api/'):
         response.headers['Cache-Control'] = 'no-store'

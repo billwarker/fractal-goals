@@ -62,6 +62,7 @@ export function AuthProvider({ children }) {
 
             const res = await authApi.getMe();
             replaceUser(res.data);
+            await authApi.getCsrf();
         } catch (err) {
             const status = err?.response?.status;
             const isNetworkError = !err?.response;

@@ -68,7 +68,6 @@ function isPausedGoal(goal) {
 }
 
 export function useSessionGoalsViewModel({
-    session,
     sessionGoalsView,
     activityInstances,
     localSessionData,
@@ -178,7 +177,7 @@ export function useSessionGoalsViewModel({
                 status: getGoalStatus(node, targetAchievements, achievedTargetIds)
             }));
 
-    }, [activeActivityDefId, activeActivityInstanceId, activityGoalIdsByActivity, selectedActivityInSession, normalizedTree, parentMap, targetAchievements, achievedTargetIds]);
+    }, [activeActivityDefId, activityGoalIdsByActivity, selectedActivityInSession, normalizedTree, parentMap, targetAchievements, achievedTargetIds]);
 
     // 4. Build Target Cards
     const targetCards = useMemo(() => {

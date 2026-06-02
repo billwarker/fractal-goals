@@ -15,6 +15,7 @@ import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import CloseIcon from '../atoms/CloseIcon';
 import CreateNoteIcon from '../atoms/CreateNoteIcon';
 import GoalTreePicker from '../common/GoalTreePicker';
+import { markdownComponents } from './markdownComponents';
 import styles from './NoteComposer.module.css';
 
 function NoteComposer({
@@ -158,7 +159,7 @@ function NoteComposer({
                         <div className={styles.previewPane}>
                             {content.trim() ? (
                                 <div className={styles.markdownPreview}>
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{content}</ReactMarkdown>
                                 </div>
                             ) : (
                                 <span className={styles.previewEmpty}>Nothing to preview.</span>

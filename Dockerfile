@@ -8,7 +8,10 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     APP_HOME=/app \
-    PORT=8080
+    PORT=8080 \
+    WEB_CONCURRENCY=2 \
+    GUNICORN_THREADS=4 \
+    GUNICORN_TIMEOUT=120
 
 # Set work directory
 WORKDIR $APP_HOME
@@ -40,4 +43,4 @@ EXPOSE $PORT
 # -b: Bind address
 # --access-logfile -: Log to stdout
 # --error-logfile -: Log to stderr
-CMD exec gunicorn --bind :$PORT --workers 4 --threads 8 --timeout 0 app:app
+CMD exec gunicorn --bind :$PORT --workers $WEB_CONCURRENCY --threads $GUNICORN_THREADS --timeout $GUNICORN_TIMEOUT --access-logfile - --error-logfile - app:app

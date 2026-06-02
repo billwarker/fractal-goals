@@ -6,7 +6,6 @@ import styles from './GoalNameBadge.module.css';
 function GoalNameBadge({
     goal = null,
     label,
-    type,
     color,
     secondaryColor,
     shape,

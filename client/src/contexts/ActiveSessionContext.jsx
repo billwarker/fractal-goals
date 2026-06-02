@@ -7,6 +7,7 @@ import useSessionDraftAutosave from '../hooks/useSessionDraftAutosave';
 import useSessionDetailMutations from '../hooks/useSessionDetailMutations';
 import { queryKeys } from '../hooks/queryKeys';
 import { fractalApi } from '../utils/api';
+import { invalidateSessionLists } from '../utils/queryInvalidation';
 import { useGoals } from './GoalsContext';
 
 const SessionDataContext = createContext(null);
@@ -169,9 +170,6 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     const sessionActivitiesKey = queryKeys.sessionActivities(rootId, sessionId);
     const sessionGoalsViewKey = queryKeys.sessionGoalsView(rootId, sessionId);
     const sessionNotesKey = queryKeys.sessionNotes(rootId, sessionId);
-    const sessionsKey = queryKeys.sessions(rootId);
-    const sessionsAllKey = queryKeys.sessionsAll(rootId);
-    const sessionsPaginatedKey = queryKeys.sessionsPaginated(rootId);
     const fractalTreeKey = queryKeys.fractalTree(rootId);
     const activitiesKey = queryKeys.activities(rootId);
 
@@ -194,10 +192,8 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     }, []);
 
     const invalidateSessionListQueries = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: sessionsKey });
-        queryClient.invalidateQueries({ queryKey: sessionsAllKey });
-        queryClient.invalidateQueries({ queryKey: sessionsPaginatedKey });
-    }, [queryClient, sessionsAllKey, sessionsKey, sessionsPaginatedKey]);
+        invalidateSessionLists(queryClient, rootId, queryKeys);
+    }, [queryClient, rootId]);
 
     const {
         session,
@@ -288,9 +284,6 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         sessionActivitiesKey,
         sessionGoalsViewKey,
         sessionNotesKey,
-        sessionsKey,
-        sessionsAllKey,
-        sessionsPaginatedKey,
         fractalTreeKey,
         activitiesKey,
         updateSession: updateSessionMutation.mutateAsync,

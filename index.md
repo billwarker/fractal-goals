@@ -75,6 +75,7 @@ Important frontend design choices:
 - TanStack Query is the canonical remote-data layer.
 - Query keys are centralized in `client/src/hooks/queryKeys.js`.
 - Broad invalidation should use centralized query-key prefix helpers, not ad hoc raw arrays.
+- Repeated invalidation clusters should use shared helpers in `client/src/utils/queryInvalidation.js` so query churn remains visible and easy to tune.
 - Account-owned homepage data must be scoped by the authenticated user id or cleared on auth transitions; auth changes clear the query cache to prevent cross-account data bleed.
 - The selection page consumes `/api/fractals` summaries directly, including effective `display_level` metadata, rather than issuing per-fractal goal-level fetches.
 - Older hand-managed fetch state has largely been removed.
@@ -89,6 +90,7 @@ The app has a real account boundary rather than a purely local/single-user model
 Current SaaS/account pieces:
 
 - JWT auth with HttpOnly cookie support
+- CSRF double-submit protection for cookie-authenticated mutating requests
 - role-backed admin accounts
 - invite-key gated tester signup
 - user profile, password, email, username, and preferences endpoints
@@ -98,7 +100,9 @@ Current SaaS/account pieces:
 - admin user management, invite-key generation, and support access into user fractals
 - user-scoped selection-page cache and recent-fractal localStorage keys
 - production security checks for JWT secrets, CORS, and cookie settings
+- production security checks for debug mode, shared rate-limit storage, and secure auth cookies
 - rate limiting on sensitive auth and selected write endpoints
+- frontend production serving uses security headers and immutable caching for built assets
 
 Key backend pieces:
 
@@ -116,6 +120,15 @@ Key frontend pieces:
 - `client/src/pages/Admin.jsx`
 - `client/src/components/modals/AuthModal.jsx`
 - `client/src/components/modals/SettingsModal.jsx`
+
+Performance and production-hardening notes:
+
+- Backend responses include `X-Response-Time-Ms`; slow requests are logged using `SLOW_REQUEST_THRESHOLD_MS`.
+- API request bodies are capped by `MAX_CONTENT_LENGTH`.
+- SQLAlchemy pool sizing is environment-driven via `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`, and `DB_POOL_RECYCLE_SECONDS`.
+- Backend performance tests include query-count, response-size, and latency budget checks for core endpoints.
+- Large-account budget tests cover goal-tree, sessions search, notes pagination, and admin user-list paths.
+- Frontend performance coverage includes a large session-goals view-model budget test.
 
 Remaining SaaS build-out to know:
 
