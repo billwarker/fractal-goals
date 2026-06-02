@@ -81,7 +81,8 @@ class TemplateService:
         if error:
             return None, *error
 
-        _, quota_error, quota_status = QuotaService(self.db_session).check_available(current_user_id, "session_templates")
+        quota_service = QuotaService(self.db_session)
+        _, quota_error, quota_status = quota_service.check_available(current_user_id, "session_templates")
         if quota_error:
             return None, quota_error, quota_status
 
@@ -89,6 +90,12 @@ class TemplateService:
             template_data = validate_session_template_data(data.get('template_data') or {})
         except ValueError as exc:
             return None, str(exc), 400
+        _, storage_error, storage_status = quota_service.check_storage_available(
+            current_user_id,
+            QuotaService._payload_size(data.get('name'), data.get('description'), template_data),
+        )
+        if storage_error:
+            return None, storage_error, storage_status
 
         new_template = SessionTemplate(
             id=str(uuid.uuid4()),

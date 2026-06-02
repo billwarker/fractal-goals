@@ -8,6 +8,7 @@ from validators import (
 from services.serializers import serialize_user
 from services.auth_service import AuthService
 from services.user_service import UserService
+from models import validate_root_goal
 from blueprints.api_utils import get_db_session, internal_error
 from extensions import limiter
 from config import config
@@ -71,6 +72,23 @@ def token_required(f):
             current_user, error, status = service.get_current_user_for_token(token)
             if error:
                 return jsonify({'error': error}), status
+            root_id = kwargs.get('root_id')
+            admin_user_id = request.args.get('admin_user_id')
+            admin_mode = request.args.get('admin_mode')
+            if root_id and admin_user_id and admin_mode:
+                if not getattr(current_user, 'is_admin', False):
+                    return jsonify({'error': 'Admin access required'}), 403
+                if admin_mode not in ('read_only', 'read_write'):
+                    return jsonify({'error': 'Invalid admin_mode'}), 400
+                if admin_mode == 'read_only' and request.method not in ('GET', 'HEAD', 'OPTIONS'):
+                    return jsonify({'error': 'Admin read-only mode does not permit writes'}), 403
+                root = validate_root_goal(db_session, root_id, owner_id=admin_user_id)
+                if not root:
+                    return jsonify({'error': 'Fractal not found'}), 404
+                g.admin_actor_user_id = current_user.id
+                g.admin_target_user_id = admin_user_id
+                g.admin_mode = admin_mode
+                current_user.id = admin_user_id
             g.current_user = current_user
             return f(current_user, *args, **kwargs)
         except SQLAlchemyError:

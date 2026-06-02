@@ -240,6 +240,15 @@ function Selection() {
 
     return (
         <div className={styles.container}>
+            {isAuthenticated && user?.is_admin && (
+                <button
+                    onClick={() => navigate('/admin')}
+                    className={styles.adminTopButton}
+                >
+                    ADMIN
+                </button>
+            )}
+
             {/* Top Center Display */}
             <div className={styles.headerContainer}>
                 <div className={styles.headerLogoWrapper}>

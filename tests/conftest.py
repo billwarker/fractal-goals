@@ -44,6 +44,7 @@ from blueprints.notes_api import notes_bp
 from blueprints.dashboards_api import dashboards_bp
 from blueprints.logs_api import logs_api
 from blueprints.auth_api import auth_bp
+from blueprints.admin_api import admin_bp
 from blueprints.goal_levels_api import goal_levels_bp
 from services.completion_handlers import clear_achievement_context, clear_live_progress
 
@@ -79,6 +80,7 @@ def app():
     test_app.register_blueprint(dashboards_bp)
     test_app.register_blueprint(logs_api)
     test_app.register_blueprint(auth_bp)
+    test_app.register_blueprint(admin_bp)
     test_app.register_blueprint(goal_levels_bp)
     
     # Initialize Limiter

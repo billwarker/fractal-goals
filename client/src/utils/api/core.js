@@ -32,6 +32,25 @@ axios.interceptors.request.use((config) => {
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${accessToken}`;
     }
+    if (typeof window !== 'undefined') {
+        const pageParams = new URLSearchParams(window.location.search || '');
+        const adminUserId = pageParams.get('admin_user_id');
+        const adminMode = pageParams.get('admin_mode');
+        const url = String(config.url || '');
+        if (
+            adminUserId
+            && adminMode
+            && url.includes('/api/')
+            && !url.includes('/api/admin/')
+            && !url.includes('/api/auth/')
+        ) {
+            config.params = {
+                ...(config.params || {}),
+                admin_user_id: adminUserId,
+                admin_mode: adminMode,
+            };
+        }
+    }
     return config;
 });
 

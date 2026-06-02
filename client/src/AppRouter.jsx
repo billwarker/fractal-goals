@@ -23,6 +23,7 @@ const ManageActivities = lazyWithRetry(() => import('./pages/ManageActivities'),
 const Analytics = lazyWithRetry(() => import('./pages/Analytics'), 'pages/Analytics');
 const Logs = lazyWithRetry(() => import('./pages/Logs'), 'pages/Logs');
 const Notes = lazyWithRetry(() => import('./pages/Notes'), 'pages/Notes');
+const Admin = lazyWithRetry(() => import('./pages/Admin'), 'pages/Admin');
 const SettingsModal = lazyWithRetry(() => import('./components/modals/SettingsModal'), 'components/modals/SettingsModal');
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 
@@ -44,7 +45,7 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
 
     const isFractalRoute = Boolean(
         rootId &&
-        !['', 'assets', 'vite.svg', 'session', 'manage-activities', 'manage-session-templates', 'create-session', 'analytics', 'logs'].includes(rootId)
+        !['', 'admin', 'assets', 'vite.svg', 'session', 'manage-activities', 'manage-session-templates', 'create-session', 'analytics', 'logs'].includes(rootId)
     );
 
     const { data: rootGoal } = useRootGoal(rootId, { enabled: isFractalRoute });
@@ -232,10 +233,14 @@ function App() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
     const [navHeight, setNavHeight] = useState(() => (location.pathname === '/' ? 0 : (isMobile ? 56 : 60)));
+    const adminParams = new URLSearchParams(location.search);
+    const adminMode = adminParams.get('admin_mode');
+    const adminUserId = adminParams.get('admin_user_id');
 
     // Determine page title based on path
     const getPageTitle = (pathname) => {
         if (pathname === '/') return 'Selection';
+        if (pathname === '/admin') return 'Admin';
         if (pathname.includes('/goals')) return 'Goals';
         if (pathname.includes('/programs')) return 'Programs';
         if (pathname.includes('/sessions')) return 'Sessions';
@@ -324,7 +329,7 @@ function App() {
     return (
         <HeaderProvider>
             <div className="app-container">
-                {location.pathname !== '/' && (
+                {location.pathname !== '/' && location.pathname !== '/admin' && (
                     <NavigationHeader
                         onOpenSettings={() => setIsSettingsOpen(true)}
                         onHeightChange={setNavHeight}
@@ -332,8 +337,19 @@ function App() {
                 )}
 
                 <div className="content-container">
+                    {adminUserId && adminMode && (
+                        <div className={styles.adminModeBanner}>
+                            Admin {adminMode === 'read_only' ? 'read-only' : 'read-write'} access
+                        </div>
+                    )}
                     {location.pathname === '/' ? (
                         <Selection />
+                    ) : location.pathname === '/admin' ? (
+                        <ComponentErrorBoundary>
+                            <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                <Admin />
+                            </Suspense>
+                        </ComponentErrorBoundary>
                     ) : (
                         <Routes key={location.pathname}>
                             <Route

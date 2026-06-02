@@ -15,18 +15,29 @@ Tests cover:
 
 import pytest
 import json
+from services.admin_service import hash_invite_key
+
+
+def create_invite_key(db_session, raw_key='fg_invite_test'):
+    from models import SignupInviteKey
+    invite = SignupInviteKey(key_hash=hash_invite_key(raw_key), label='Test invite')
+    db_session.add(invite)
+    db_session.commit()
+    return raw_key
 
 
 @pytest.mark.integration
 class TestSignupEndpoint:
     """Test user registration endpoint."""
     
-    def test_signup_success(self, client):
+    def test_signup_success(self, client, db_session):
         """Test successful user registration."""
+        invite_key = create_invite_key(db_session)
         payload = {
             'username': 'newuser',
             'email': 'newuser@example.com',
-            'password': 'Securepassword123'
+            'password': 'Securepassword123',
+            'invite_key': invite_key,
         }
         response = client.post(
             '/api/auth/signup',
@@ -42,12 +53,14 @@ class TestSignupEndpoint:
         assert 'password' not in data
         assert 'password_hash' not in data
     
-    def test_signup_duplicate_username(self, client, test_user):
+    def test_signup_duplicate_username(self, client, test_user, db_session):
         """Test signup with existing username fails."""
+        invite_key = create_invite_key(db_session, 'fg_invite_dup_user')
         payload = {
             'username': 'testuser',  # Same as test_user
             'email': 'different@example.com',
-            'password': 'Securepassword123'
+            'password': 'Securepassword123',
+            'invite_key': invite_key,
         }
         response = client.post(
             '/api/auth/signup',
@@ -58,12 +71,14 @@ class TestSignupEndpoint:
         data = json.loads(response.data)
         assert 'error' in data
     
-    def test_signup_duplicate_email(self, client, test_user):
+    def test_signup_duplicate_email(self, client, test_user, db_session):
         """Test signup with existing email fails."""
+        invite_key = create_invite_key(db_session, 'fg_invite_dup_email')
         payload = {
             'username': 'differentuser',
             'email': 'test@example.com',  # Same as test_user
-            'password': 'Securepassword123'
+            'password': 'Securepassword123',
+            'invite_key': invite_key,
         }
         response = client.post(
             '/api/auth/signup',
@@ -79,7 +94,8 @@ class TestSignupEndpoint:
         payload = {
             'username': 'newuser',
             'email': 'not-an-email',
-            'password': 'Securepassword123'
+            'password': 'Securepassword123',
+            'invite_key': 'fg_invite_invalid_email',
         }
         response = client.post(
             '/api/auth/signup',
@@ -94,7 +110,8 @@ class TestSignupEndpoint:
         payload = {
             'username': 'newuser',
             'email': 'newuser@example.com',
-            'password': 'short'  # Less than 8 characters
+            'password': 'short',  # Less than 8 characters
+            'invite_key': 'fg_invite_short_password',
         }
         response = client.post(
             '/api/auth/signup',

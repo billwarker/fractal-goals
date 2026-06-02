@@ -82,12 +82,13 @@ export function AuthProvider({ children }) {
         }
     };
 
-    const signup = async (username, email, password) => {
+    const signup = async (username, email, password, inviteKey) => {
         try {
             const res = await authApi.signup({
                 username,
                 email,
-                password
+                password,
+                invite_key: inviteKey
             });
             return res.data;
         } catch (err) {

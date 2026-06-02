@@ -428,6 +428,14 @@ class ActivityService:
         _, quota_error, quota_status = quota_service.check_available(current_user_id, "activities")
         if quota_error:
             return None, quota_error, quota_status
+        _, storage_error, storage_status = quota_service.check_storage_available(
+            current_user_id,
+            QuotaService._payload_size(
+                validated_data.get('name'), validated_data.get('description'), validated_data.get('metrics'),
+            ),
+        )
+        if storage_error:
+            return None, storage_error, storage_status
 
         metric_increment = sum(
             1

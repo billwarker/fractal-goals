@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import json
 from typing import Optional, Sequence
 
 from sqlalchemy import func, or_, select
@@ -8,14 +9,20 @@ from sqlalchemy import func, or_, select
 import models
 from models import (
     ActivityDefinition,
+    ActivityGroup,
     ActivityInstance,
+    AnalyticsDashboard,
+    EventLog,
     FractalMetricDefinition,
     Goal,
     MetricDefinition,
     Note,
     Program,
+    ProgramBlock,
+    ProgramDay,
     Session,
     SessionTemplate,
+    Target,
     User,
 )
 from services.service_types import JsonDict, ServiceResult
@@ -69,6 +76,8 @@ RESOURCE_ORDER = [
     "programs",
 ]
 
+DEFAULT_STORAGE_LIMIT_BYTES = 104857600
+
 
 class QuotaService:
     def __init__(self, db_session):
@@ -94,6 +103,89 @@ class QuotaService:
                 if resource in limits and isinstance(value, int) and value >= 0:
                     limits[resource] = value
         return limits
+
+    @staticmethod
+    def _payload_size(*values) -> int:
+        total = 0
+        for value in values:
+            if value is None:
+                continue
+            if isinstance(value, (dict, list)):
+                rendered = json.dumps(value, sort_keys=True, default=str, separators=(",", ":"))
+            else:
+                rendered = str(value)
+            total += len(rendered.encode("utf-8"))
+        return total
+
+    def get_storage_usage_bytes(self, user_id: str, root_ids: Optional[Sequence[str]] = None) -> int:
+        scoped_root_ids = list(dict.fromkeys(root_ids or []))
+        if scoped_root_ids:
+            roots = select(Goal.id).where(
+                Goal.id.in_(scoped_root_ids),
+                Goal.owner_id == user_id,
+                Goal.parent_id.is_(None),
+                Goal.deleted_at.is_(None),
+            )
+            goal_filter = or_(Goal.id.in_(scoped_root_ids), Goal.root_id.in_(scoped_root_ids))
+        else:
+            roots = select(Goal.id).where(
+                Goal.owner_id == user_id,
+                Goal.parent_id.is_(None),
+                Goal.deleted_at.is_(None),
+            )
+            goal_filter = Goal.owner_id == user_id
+
+        total = 0
+
+        for goal in self.db_session.query(Goal).filter(goal_filter, Goal.deleted_at.is_(None)).all():
+            total += self._payload_size(
+                goal.name, goal.description, goal.relevance_statement, goal.targets,
+                goal.progress_settings, goal.completion_reason,
+            )
+
+        for row in self.db_session.query(Session).filter(Session.root_id.in_(roots), Session.deleted_at.is_(None)).all():
+            total += self._payload_size(row.name, row.description, row.attributes)
+
+        for row in self.db_session.query(ActivityGroup).filter(ActivityGroup.root_id.in_(roots), ActivityGroup.deleted_at.is_(None)).all():
+            total += self._payload_size(row.name, row.description)
+
+        for row in self.db_session.query(ActivityDefinition).filter(ActivityDefinition.root_id.in_(roots), ActivityDefinition.deleted_at.is_(None)).all():
+            total += self._payload_size(row.name, row.description)
+
+        for row in self.db_session.query(ActivityInstance).filter(ActivityInstance.root_id.in_(roots), ActivityInstance.deleted_at.is_(None)).all():
+            total += self._payload_size(row.notes, row.data)
+
+        for row in self.db_session.query(FractalMetricDefinition).filter(FractalMetricDefinition.root_id.in_(roots), FractalMetricDefinition.deleted_at.is_(None)).all():
+            total += self._payload_size(row.name, row.unit, row.description, row.predefined_values)
+
+        for row in self.db_session.query(MetricDefinition).filter(MetricDefinition.root_id.in_(roots), MetricDefinition.deleted_at.is_(None)).all():
+            total += self._payload_size(row.name, row.unit, row.progress_aggregation)
+
+        for row in self.db_session.query(SessionTemplate).filter(SessionTemplate.root_id.in_(roots), SessionTemplate.deleted_at.is_(None)).all():
+            total += self._payload_size(row.name, row.description, row.template_data)
+
+        for row in self.db_session.query(Note).filter(Note.root_id.in_(roots), Note.deleted_at.is_(None)).all():
+            total += self._payload_size(row.content)
+
+        for row in self.db_session.query(Program).filter(Program.root_id.in_(roots)).all():
+            total += self._payload_size(row.name, row.description, row.weekly_schedule, row.color)
+
+        for row in self.db_session.query(ProgramBlock).join(Program).filter(Program.root_id.in_(roots)).all():
+            total += self._payload_size(row.name, row.color)
+
+        for row in self.db_session.query(ProgramDay).join(ProgramBlock).join(Program).filter(Program.root_id.in_(roots)).all():
+            total += self._payload_size(row.name, row.notes, row.day_of_week)
+
+        for row in self.db_session.query(AnalyticsDashboard).filter(AnalyticsDashboard.root_id.in_(roots), AnalyticsDashboard.deleted_at.is_(None)).all():
+            total += self._payload_size(row.name, row.layout)
+
+        for row in self.db_session.query(EventLog).filter(EventLog.root_id.in_(roots)).all():
+            total += self._payload_size(row.event_type, row.entity_type, row.description, row.payload, row.source)
+
+        for row in self.db_session.query(Target).filter(Target.root_id.in_(roots), Target.deleted_at.is_(None)).all():
+            total += self._payload_size(row.name, row.type, row.time_scope)
+
+        return int(total)
 
     def get_usage(self, user_id: str, root_ids: Optional[Sequence[str]] = None) -> JsonDict:
         scoped_root_ids = list(dict.fromkeys(root_ids or []))
@@ -215,6 +307,8 @@ class QuotaService:
 
         limits = self.get_effective_limits(user)
         usage = self.get_usage(user_id, selected_root_ids or None)
+        storage_bytes = self.get_storage_usage_bytes(user_id, selected_root_ids or None)
+        storage_limit_bytes = getattr(user, "storage_limit_bytes", None)
         return {
             "tier": self.normalize_tier(getattr(user, "membership_tier", "free")),
             "subscription_status": getattr(user, "subscription_status", "none") or "none",
@@ -222,11 +316,45 @@ class QuotaService:
             "unlimited": limits is None,
             "limits": limits,
             "usage": usage,
+            "storage": {
+                "used_bytes": storage_bytes,
+                "limit_bytes": storage_limit_bytes,
+                "unlimited": storage_limit_bytes is None,
+            },
             "scope": "fractals" if selected_root_ids else "account",
             "root_ids": selected_root_ids,
             "resources": RESOURCE_ORDER,
             "labels": RESOURCE_LABELS,
         }, None, 200
+
+    def check_storage_available(self, user_id: str, estimated_bytes: int = 0) -> ServiceResult[JsonDict]:
+        if estimated_bytes <= 0:
+            return {"allowed": True}, None, 200
+
+        user = self.get_user(user_id)
+        if not user:
+            return None, "User not found", 404
+
+        limit = getattr(user, "storage_limit_bytes", DEFAULT_STORAGE_LIMIT_BYTES)
+        if limit is None:
+            return {"allowed": True, "unlimited": True}, None, 200
+
+        current = self.get_storage_usage_bytes(user_id)
+        if current + estimated_bytes <= int(limit):
+            return {
+                "allowed": True,
+                "current": current,
+                "limit": int(limit),
+                "requested": estimated_bytes,
+            }, None, 200
+
+        return None, {
+            "error": "Storage quota reached",
+            "resource": "storage",
+            "current": current,
+            "limit": int(limit),
+            "requested": estimated_bytes,
+        }, 403
 
     def check_available(self, user_id: str, resource: str, increment: int = 1) -> ServiceResult[JsonDict]:
         if increment <= 0:

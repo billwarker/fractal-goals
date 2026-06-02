@@ -672,10 +672,14 @@ def serialize_user(user):
         "username": user.username,
         "email": user.email,
         "is_active": user.is_active,
+        "role": getattr(user, "role", "user") or "user",
+        "is_admin": bool(getattr(user, "is_admin", False)),
         "preferences": _safe_load_json(user.preferences, {}),
         "membership_tier": getattr(user, "membership_tier", "free") or "free",
         "subscription_status": getattr(user, "subscription_status", "none") or "none",
         "paid_amount_cad_cents": getattr(user, "paid_amount_cad_cents", None),
+        "storage_limit_bytes": getattr(user, "storage_limit_bytes", None),
+        "last_login_at": format_utc(getattr(user, "last_login_at", None)),
         "created_at": format_utc(user.created_at)
     }
 

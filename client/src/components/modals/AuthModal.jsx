@@ -30,6 +30,7 @@ function AuthModalInner({ onClose }) {
         } else {
             if (!values.username) errors.username = "Required";
             if (!values.email) errors.email = "Required";
+            if (!values.inviteKey) errors.inviteKey = "Required";
             if (!values.password) errors.password = "Required";
             else if (values.password.length < 8) errors.password = "Must be at least 8 characters";
         }
@@ -51,6 +52,7 @@ function AuthModalInner({ onClose }) {
         username: '',
         email: '',
         password: '',
+        inviteKey: '',
         usernameOrEmail: ''
     }, validate);
 
@@ -67,7 +69,7 @@ function AuthModalInner({ onClose }) {
                 await login(formValues.usernameOrEmail, formValues.password);
                 onClose();
             } else {
-                await signup(formValues.username, formValues.email, formValues.password);
+                await signup(formValues.username, formValues.email, formValues.password, formValues.inviteKey);
                 setIsLogin(true);
                 setGeneralError(null);
                 notify.success("Account created! Please log in.");
@@ -163,6 +165,19 @@ function AuthModalInner({ onClose }) {
                                     error={touched.email && errors.email}
                                     required
                                     placeholder="void@nebula.io"
+                                    fullWidth
+                                />
+                            </div>
+                            <div className={styles.formGroup}>
+                                <Input
+                                    label="Invite Key"
+                                    name="inviteKey"
+                                    value={values.inviteKey}
+                                    onChange={handleChange}
+                                    onBlur={handleBlur}
+                                    error={touched.inviteKey && errors.inviteKey}
+                                    required
+                                    placeholder="fg_invite_..."
                                     fullWidth
                                 />
                             </div>

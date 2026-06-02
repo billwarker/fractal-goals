@@ -236,6 +236,7 @@ class UserSignupSchema(BaseModel):
     username: str = Field(..., min_length=3, max_length=80)
     email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
     password: str = Field(..., min_length=8)
+    invite_key: str = Field(..., min_length=8, max_length=128)
     
     @field_validator('username')
     @classmethod
@@ -254,6 +255,51 @@ class UserLoginSchema(BaseModel):
     
     username_or_email: str = Field(..., min_length=3)
     password: str = Field(..., min_length=1)
+
+
+class AdminUserCreateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    username: str = Field(..., min_length=3, max_length=80)
+    email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    password: Optional[str] = Field(None, min_length=8)
+    role: Optional[str] = Field('user', pattern=r'^(user|admin)$')
+    membership_tier: Optional[str] = Field('free', pattern=r'^(free|paid|legacy)$')
+    storage_limit_bytes: Optional[int] = Field(104857600, ge=0)
+
+    @field_validator('username')
+    @classmethod
+    def sanitize_username(cls, v: str) -> str:
+        return sanitize_string(v)
+
+    @field_validator('password')
+    @classmethod
+    def validate_password_strength(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return validate_strong_password(v)
+
+
+class AdminUserUpdateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    role: Optional[str] = Field(None, pattern=r'^(user|admin)$')
+    is_active: Optional[bool] = None
+    membership_tier: Optional[str] = Field(None, pattern=r'^(free|paid|legacy)$')
+    quota_overrides: Optional[Dict[str, int]] = None
+    storage_limit_bytes: Optional[int] = Field(None, ge=0)
+
+
+class AdminInviteKeyCreateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    label: Optional[str] = Field(None, max_length=255)
+    expires_at: Optional[str] = None
+
+    @field_validator('label')
+    @classmethod
+    def sanitize_label(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_string(v) if v else v
 
 
 class UserPreferencesUpdateSchema(BaseModel):

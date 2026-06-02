@@ -62,6 +62,20 @@
     background: var(--color-border);
 }
 
+.adminModeBanner {
+    position: sticky;
+    top: var(--app-nav-height, 0px);
+    z-index: 90;
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--color-border);
+    background: rgba(79, 156, 255, 0.16);
+    color: var(--color-text-primary);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
 .mobileNav {
     display: none;
 }

@@ -6,6 +6,7 @@ import jwt
 from config import config
 from models import User
 from services.serializers import serialize_user
+from services.admin_service import AdminService
 from services.service_types import JsonDict, ServiceResult
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,10 @@ class AuthService:
         return current_user, None, 200
 
     def signup(self, data) -> ServiceResult[JsonDict]:
+        invite, invite_error, invite_status = AdminService(self.db_session).validate_invite_key(data.get('invite_key', ''))
+        if invite_error:
+            return None, invite_error, invite_status
+
         existing_user = self.db_session.query(User).filter(
             (User.username == data['username']) |
             (User.email == data['email'])
@@ -56,10 +61,13 @@ class AuthService:
         new_user = User(
             username=data['username'],
             email=data['email'],
+            storage_limit_bytes=104857600,
         )
         new_user.set_password(data['password'])
 
         self.db_session.add(new_user)
+        self.db_session.flush()
+        AdminService(self.db_session).consume_invite_key(invite, new_user.id)
         self.db_session.commit()
         self.db_session.refresh(new_user)
         logger.info("Signed up user_id=%s", new_user.id)

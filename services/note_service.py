@@ -527,10 +527,17 @@ class NoteService:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
-        _, quota_error, quota_status = QuotaService(self.db_session).check_available(current_user_id, "notes")
+        quota_service = QuotaService(self.db_session)
+        _, quota_error, quota_status = quota_service.check_available(current_user_id, "notes")
         if quota_error:
             return None, quota_error, quota_status
         content = data.get('content', '')
+        _, storage_error, storage_status = quota_service.check_storage_available(
+            current_user_id,
+            QuotaService._payload_size(content),
+        )
+        if storage_error:
+            return None, storage_error, storage_status
 
         session_id = data.get('session_id')
         activity_instance_id = data.get('activity_instance_id')
@@ -619,6 +626,13 @@ class NoteService:
         if 'content' in data:
             if not data['content']:
                 return None, "content is required", 400
+            size_delta = QuotaService._payload_size(data['content']) - QuotaService._payload_size(note.content)
+            _, storage_error, storage_status = QuotaService(self.db_session).check_storage_available(
+                current_user_id,
+                max(0, size_delta),
+            )
+            if storage_error:
+                return None, storage_error, storage_status
             note.content = data['content']
 
         if 'pin' in data:

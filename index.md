@@ -11,7 +11,7 @@ Fractal Goals is a full-stack goal and practice-tracking application built aroun
 - Sessions capture real execution work
 - Activities, templates, and programs structure recurring practice
 - Analytics, dashboards, annotations, and logs explain what happened over time
-- Auth, quotas, and tier limits provide the current SaaS account boundary
+- Auth, admin tooling, quotas, storage limits, and tier limits provide the current SaaS account boundary
 
 The codebase is now organized around two main ideas:
 
@@ -86,23 +86,30 @@ The app has a real account boundary rather than a purely local/single-user model
 Current SaaS/account pieces:
 
 - JWT auth with HttpOnly cookie support
+- role-backed admin accounts
+- invite-key gated tester signup
 - user profile, password, email, username, and preferences endpoints
 - membership tiers and quota limits for free/paid/legacy users
+- per-user app-data storage limits and usage reporting
 - quota usage reporting in account settings
+- admin user management, invite-key generation, and support access into user fractals
 - production security checks for JWT secrets, CORS, and cookie settings
 - rate limiting on sensitive auth and selected write endpoints
 
 Key backend pieces:
 
 - `services/auth_service.py`
+- `services/admin_service.py`
 - `services/user_service.py`
 - `services/quota_service.py`
 - `blueprints/auth_api.py`
+- `blueprints/admin_api.py`
 - `models/user.py`
 
 Key frontend pieces:
 
 - `client/src/contexts/AuthContext.jsx`
+- `client/src/pages/Admin.jsx`
 - `client/src/components/modals/AuthModal.jsx`
 - `client/src/components/modals/SettingsModal.jsx`
 
@@ -110,7 +117,7 @@ Remaining SaaS build-out to know:
 
 - Stripe/customer-portal/webhook integration is not yet wired as a full billing system.
 - Email workflows such as password reset, verification, billing notices, and quota warnings are not yet present.
-- Admin/support tooling is not yet a first-class product surface.
+- Admin support access is explicit and scoped by `admin_user_id` plus `admin_mode=read_only|read_write`; it is not full impersonation.
 
 ## Core Domain Areas
 

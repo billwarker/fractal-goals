@@ -133,7 +133,8 @@ class ActivityMetricService:
         if error:
             return None, *error
 
-        _, quota_error, quota_status = QuotaService(self.db_session).check_available(current_user_id, "metrics")
+        quota_service = QuotaService(self.db_session)
+        _, quota_error, quota_status = quota_service.check_available(current_user_id, "metrics")
         if quota_error:
             return None, quota_error, quota_status
 
@@ -178,6 +179,18 @@ class ActivityMetricService:
         )
         if constraint_error:
             return None, *constraint_error
+        _, storage_error, storage_status = quota_service.check_storage_available(
+            current_user_id,
+            QuotaService._payload_size(
+                name,
+                unit,
+                data.get('description'),
+                data.get('predefined_values'),
+                data.get('default_progress_aggregation'),
+            ),
+        )
+        if storage_error:
+            return None, storage_error, storage_status
 
         metric = FractalMetricDefinition(
             root_id=root_id,
@@ -216,6 +229,13 @@ class ActivityMetricService:
         metric = self._get_active_fractal_metric(root_id, metric_id)
         if not metric:
             return None, "Metric not found", 404
+        old_storage_size = QuotaService._payload_size(
+            metric.name,
+            metric.unit,
+            metric.description,
+            metric.predefined_values,
+            metric.default_progress_aggregation,
+        )
 
         if 'name' in data or 'unit' in data:
             name = (data.get('name') or metric.name).strip()
@@ -249,6 +269,19 @@ class ActivityMetricService:
         )
         if constraint_error:
             return None, *constraint_error
+        next_storage_size = QuotaService._payload_size(
+            data.get('name', metric.name),
+            data.get('unit', metric.unit),
+            data.get('description', metric.description),
+            data.get('predefined_values', metric.predefined_values),
+            data.get('default_progress_aggregation', metric.default_progress_aggregation),
+        )
+        _, storage_error, storage_status = QuotaService(self.db_session).check_storage_available(
+            current_user_id,
+            max(0, next_storage_size - old_storage_size),
+        )
+        if storage_error:
+            return None, storage_error, storage_status
 
         if 'is_multiplicative' in data:
             metric.is_multiplicative = data['is_multiplicative']

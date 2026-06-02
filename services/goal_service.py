@@ -495,6 +495,12 @@ class GoalService:
             _, quota_error, quota_status = quota_service.check_available(current_user_id, resource)
             if quota_error:
                 return None, quota_error, quota_status
+        _, storage_error, storage_status = quota_service.check_storage_available(
+            current_user_id,
+            QuotaService._payload_size(data.get('name'), data.get('description'), data.get('relevance_statement')),
+        )
+        if storage_error:
+            return None, storage_error, storage_status
 
         level = self.db_session.query(GoalLevel).filter_by(name="Ultimate Goal").first()
         if not level:
@@ -579,6 +585,15 @@ class GoalService:
         _, quota_error, quota_status = quota_service.check_available(current_user_id, "goals")
         if quota_error:
             return None, quota_error, quota_status
+        _, storage_error, storage_status = quota_service.check_storage_available(
+            current_user_id,
+            QuotaService._payload_size(
+                data.get('name'), data.get('description'), data.get('relevance_statement'),
+                data.get('targets'), data.get('progress_settings'),
+            ),
+        )
+        if storage_error:
+            return None, storage_error, storage_status
         if not data.get('parent_id'):
             _, quota_error, quota_status = quota_service.check_available(current_user_id, "fractals")
             if quota_error:
@@ -720,9 +735,19 @@ class GoalService:
         if error:
             return None, *error
 
-        _, quota_error, quota_status = QuotaService(self.db_session).check_available(current_user_id, "goals")
+        quota_service = QuotaService(self.db_session)
+        _, quota_error, quota_status = quota_service.check_available(current_user_id, "goals")
         if quota_error:
             return None, quota_error, quota_status
+        _, storage_error, storage_status = quota_service.check_storage_available(
+            current_user_id,
+            QuotaService._payload_size(
+                data.get('name'), data.get('description'), data.get('relevance_statement'),
+                data.get('targets'), data.get('progress_settings'),
+            ),
+        )
+        if storage_error:
+            return None, storage_error, storage_status
 
         activity_definition_id = data.get('activity_definition_id')
         activity = None

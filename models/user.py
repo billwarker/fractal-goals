@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Integer
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 import uuid
@@ -16,8 +16,10 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
     preferences = Column(JSON_TYPE, default={})  # Store UI preferences like goal colors
+    role = Column(String(32), default='user', nullable=False, index=True)
     membership_tier = Column(String(32), default='free', nullable=False)
     quota_overrides = Column(JSON_TYPE, nullable=True)
+    storage_limit_bytes = Column(BigInteger, default=104857600, nullable=True)
     stripe_customer_id = Column(String(255), nullable=True)
     stripe_subscription_id = Column(String(255), nullable=True)
     subscription_status = Column(String(32), default='none', nullable=False)
@@ -40,3 +42,28 @@ class User(Base):
         
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    @property
+    def is_admin(self):
+        return (self.role or 'user').lower() == 'admin'
+
+
+class SignupInviteKey(Base):
+    """
+    Hashed one-time invite keys for tester onboarding.
+    Raw keys are never stored.
+    """
+    __tablename__ = 'signup_invite_keys'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    key_hash = Column(String(64), unique=True, nullable=False, index=True)
+    label = Column(String(255), nullable=True)
+    created_by_user_id = Column(String, ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    used_by_user_id = Column(String, ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    created_at = Column(DateTime, default=utc_now)
+    expires_at = Column(DateTime, nullable=True)
+    used_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+
+    creator = relationship("User", foreign_keys=[created_by_user_id])
+    used_by = relationship("User", foreign_keys=[used_by_user_id])

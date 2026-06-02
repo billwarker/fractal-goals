@@ -175,12 +175,19 @@ class TimerService:
                 "created": False,
             }, None, 200
 
-        _, quota_error, quota_status = QuotaService(self.db_session).check_available(
+        quota_service = QuotaService(self.db_session)
+        _, quota_error, quota_status = quota_service.check_available(
             current_user_id,
             "activity_instances",
         )
         if quota_error:
             return None, quota_error, quota_status
+        _, storage_error, storage_status = quota_service.check_storage_available(
+            current_user_id,
+            QuotaService._payload_size(instance_id, activity_definition_id) or 64,
+        )
+        if storage_error:
+            return None, storage_error, storage_status
 
         instance = self._build_instance(
             root_id=root_id,
@@ -259,6 +266,12 @@ class TimerService:
             activity_definition = get_owned_activity_definition(self.db_session, root_id, activity_definition_id)
             if not activity_definition:
                 return None, "Activity definition not found in this fractal", 404
+            _, storage_error, storage_status = QuotaService(self.db_session).check_storage_available(
+                current_user_id,
+                QuotaService._payload_size(instance_id, activity_definition_id) or 64,
+            )
+            if storage_error:
+                return None, storage_error, storage_status
 
             instance = self._build_instance(
                 root_id=root_id,
@@ -410,6 +423,12 @@ class TimerService:
             activity_definition = get_owned_activity_definition(self.db_session, root_id, activity_definition_id)
             if not activity_definition:
                 return None, "Activity definition not found in this fractal", 404
+            _, storage_error, storage_status = QuotaService(self.db_session).check_storage_available(
+                current_user_id,
+                QuotaService._payload_size(instance_id, activity_definition_id) or 64,
+            )
+            if storage_error:
+                return None, storage_error, storage_status
 
             instance = self._build_instance(
                 root_id=root_id,

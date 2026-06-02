@@ -472,9 +472,21 @@ class ProgramService:
     def create_program(session, root_id: str, validated_data: Dict, current_user_id: str | None = None) -> Dict:
         ProgramService._require_root_access(session, root_id, current_user_id)
         if current_user_id:
-            _, quota_error, quota_status = QuotaService(session).check_available(current_user_id, "programs")
+            quota_service = QuotaService(session)
+            _, quota_error, quota_status = quota_service.check_available(current_user_id, "programs")
             if quota_error:
                 raise ProgramServiceValidationError(quota_error, quota_status)
+            _, storage_error, storage_status = quota_service.check_storage_available(
+                current_user_id,
+                QuotaService._payload_size(
+                    validated_data.get('name'),
+                    validated_data.get('description'),
+                    validated_data.get('weeklySchedule'),
+                    validated_data.get('selectedGoals'),
+                ),
+            )
+            if storage_error:
+                raise ProgramServiceValidationError(storage_error, storage_status)
         
         # Parse dates
         start_date = ProgramService._parse_program_datetime(validated_data['start_date'], 'start_date')
