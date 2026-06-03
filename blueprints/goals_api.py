@@ -441,11 +441,17 @@ def get_fractal_goal(current_user, root_id, goal_id):
     """Get a specific goal by ID within a fractal."""
     db_session = get_db_session()
     try:
+        include_children = request.args.get('include_children', 'true').lower() not in ('false', '0', 'no')
         service = GoalService(db_session, sync_targets=_sync_targets)
-        goal, error, status = service.get_fractal_goal(root_id, goal_id, current_user.id)
+        goal, error, status = service.get_fractal_goal(
+            root_id,
+            goal_id,
+            current_user.id,
+            include_children=include_children,
+        )
         if error:
             return jsonify({"error": error}), status
-        return jsonify(serialize_goal(goal)), status
+        return jsonify(serialize_goal(goal, include_children=include_children)), status
         
     finally:
         db_session.close()

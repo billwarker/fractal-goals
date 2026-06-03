@@ -25,6 +25,8 @@ function SessionsQuerySidebar({
     goalOptions = [],
     heatmap,
     isHeatmapLoading = false,
+    isActivityFilterLoading = false,
+    isGoalFilterLoading = false,
     hasActiveFilters = false,
     onUpdateFilters,
     onResetFilters,
@@ -235,7 +237,7 @@ function SessionsQuerySidebar({
                         type="button"
                         className="sessions-query-picker-button"
                         onClick={() => setIsActivityModalOpen(true)}
-                        disabled={activities.length === 0}
+                        disabled={isActivityFilterLoading || activities.length === 0}
                     >
                         {filters.activityIds.length > 0
                             ? `Choose Activities (${filters.activityIds.length})`
@@ -257,7 +259,7 @@ function SessionsQuerySidebar({
                         type="button"
                         className="sessions-query-picker-button"
                         onClick={() => setIsGoalModalOpen(true)}
-                        disabled={goalOptions.length === 0}
+                        disabled={isGoalFilterLoading || goalOptions.length === 0}
                     >
                         {filters.goalIds.length > 0
                             ? `Choose Goals (${filters.goalIds.length})`

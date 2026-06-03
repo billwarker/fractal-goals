@@ -3,7 +3,9 @@ import { API_BASE, axios } from './core';
 export const fractalGoalsApi = {
     getGoals: (rootId) => axios.get(`${API_BASE}/${rootId}/goals`),
     getGoalsForSelection: (rootId) => axios.get(`${API_BASE}/${rootId}/goals/selection`),
-    getGoal: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}`),
+    getGoal: (rootId, goalId, options = {}) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}`, {
+        params: options.includeChildren === false ? { include_children: 'false' } : undefined,
+    }),
     createGoal: (rootId, data) => axios.post(`${API_BASE}/${rootId}/goals`, data),
     updateGoal: (rootId, goalId, data) => axios.put(`${API_BASE}/${rootId}/goals/${goalId}`, data),
     deleteGoal: (rootId, goalId) => axios.delete(`${API_BASE}/${rootId}/goals/${goalId}`),

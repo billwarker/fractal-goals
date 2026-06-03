@@ -49,6 +49,18 @@ class TestFractalGoalEndpoints:
         data = json.loads(response.data)
         assert data['id'] == goal_id
 
+    def test_get_fractal_goal_can_skip_children(self, authed_client, sample_goal_hierarchy):
+        """Header/root lookups can avoid fetching the whole tree."""
+        root_id = sample_goal_hierarchy['ultimate'].id
+
+        response = authed_client.get(f'/api/{root_id}/goals/{root_id}?include_children=false')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert data['id'] == root_id
+        assert data['name'] == sample_goal_hierarchy['ultimate'].name
+        assert data['children'] == []
+
     def test_update_fractal_goal(self, authed_client, sample_goal_hierarchy):
         """Test updating a goal via scoped endpoint."""
         root_id = sample_goal_hierarchy['ultimate'].id
@@ -81,6 +93,5 @@ class TestFractalGoalEndpoints:
         """Test validation of root_id."""
         response = authed_client.get('/api/nonexistent-root/goals')
         assert response.status_code == 404
-
 
 

@@ -223,6 +223,30 @@ def test_get_goal_tree_query_budget(authed_client, query_counter, sample_goal_hi
 
 
 @pytest.mark.integration
+def test_get_root_goal_header_query_budget(authed_client, query_counter, sample_goal_hierarchy):
+    """Header root-goal lookup should not serialize the whole tree."""
+    root_id = sample_goal_hierarchy["ultimate"].id
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/goals/{root_id}?include_children=false")
+
+    assert_response_budget(response, max_bytes=30_000, max_ms=400, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 10
+
+
+@pytest.mark.integration
+def test_get_activities_query_budget(authed_client, query_counter, sample_activity_definition):
+    """Activity definition serialization should batch metrics, splits, and goal associations."""
+    root_id = sample_activity_definition.root_id
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/activities")
+
+    assert_response_budget(response, max_bytes=120_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 8
+
+
+@pytest.mark.integration
 def test_get_session_goals_view_query_budget(
     authed_client,
     query_counter,

@@ -271,14 +271,6 @@ function Sessions() {
         }
     }, [queryClient, rootId, sessionToDelete]);
 
-    if (activitiesLoading || activityGroupsLoading || goalsLoading || !goalTree) {
-        return (
-            <div className="page-container">
-                <LoadingState label="Loading sessions..." />
-            </div>
-        );
-    }
-
     return (
         <div className={styles.pageContainer}>
             <div className={styles.leftPanel}>
@@ -380,6 +372,8 @@ function Sessions() {
                         goalOptions={goalOptions}
                         heatmap={heatmap}
                         isHeatmapLoading={heatmapLoading && !heatmap}
+                        isActivityFilterLoading={activitiesLoading || activityGroupsLoading}
+                        isGoalFilterLoading={goalsLoading && !goalTree}
                         hasActiveFilters={hasActiveFilters}
                         onUpdateFilters={updateFilters}
                         onResetFilters={resetFilters}

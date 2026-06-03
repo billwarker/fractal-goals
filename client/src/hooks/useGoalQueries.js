@@ -10,7 +10,7 @@ export function useRootGoal(rootId, options = {}) {
     return useQuery({
         queryKey: queryKeys.rootGoal(rootId),
         queryFn: async () => {
-            const res = await fractalApi.getGoal(rootId, rootId);
+            const res = await fractalApi.getGoal(rootId, rootId, { includeChildren: false });
             return res.data || null;
         },
         enabled: isReady && enabled,

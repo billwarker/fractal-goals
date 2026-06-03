@@ -11,6 +11,7 @@ const mockIsMobile = vi.hoisted(() => ({ value: false }));
 vi.mock('../../utils/api', () => ({
     authApi: {
         getMe: vi.fn().mockResolvedValue({ data: null }),
+        getCsrf: vi.fn().mockResolvedValue({ data: {} }),
         refresh: vi.fn().mockResolvedValue({ data: {} }),
         login: vi.fn(),
         signup: vi.fn(),
@@ -116,6 +117,35 @@ describe('Sessions page data loading', () => {
         });
 
         expect(getSessionActivities).not.toHaveBeenCalled();
+    });
+
+    it('renders session cards while activity reference data is still loading', async () => {
+        getSessions.mockResolvedValue({
+            data: {
+                sessions: [
+                    {
+                        id: 's1',
+                        name: 'Session 1',
+                        attributes: { completed: false, session_data: { sections: [] } },
+                        activity_instances: [{ id: 'i1' }],
+                        notes: []
+                    }
+                ],
+                pagination: { limit: 10, offset: 0, total: 1, has_more: false }
+            }
+        });
+        getActivities.mockReturnValue(new Promise(() => {}));
+
+        renderWithProviders(<Sessions />, {
+            route: '/root-1/sessions',
+            path: '/:rootId/sessions',
+            withTimezone: false,
+            withTheme: false
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText('expanded:s1:instances:1')).toBeInTheDocument();
+        });
     });
 
     it('renders expanded cards for every visible session', async () => {

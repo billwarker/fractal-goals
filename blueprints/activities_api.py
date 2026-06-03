@@ -2,10 +2,12 @@ from flask import Blueprint, request, jsonify
 import logging
 import models
 from pydantic import ValidationError
+from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import SQLAlchemyError
 from models import (
     get_session,
     ActivityDefinition,
+    MetricDefinition,
 )
 from validators import (
     validate_request,
@@ -300,7 +302,11 @@ def get_activities(current_user, root_id):
         if not root:
              return jsonify({"error": "Fractal not found or access denied"}), 404
         
-        activities_q = session.query(ActivityDefinition).filter_by(root_id=root_id).filter(
+        activities_q = session.query(ActivityDefinition).options(
+            selectinload(ActivityDefinition.metric_definitions).selectinload(MetricDefinition.fractal_metric),
+            selectinload(ActivityDefinition.split_definitions),
+            selectinload(ActivityDefinition.associated_goals),
+        ).filter_by(root_id=root_id).filter(
             ActivityDefinition.deleted_at.is_(None)
         ).order_by(ActivityDefinition.name)
         limit, offset = parse_optional_pagination(request, max_limit=500)

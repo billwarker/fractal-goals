@@ -3,7 +3,8 @@ import logging
 import uuid
 
 from sqlalchemy import inspect, or_, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
+from sqlalchemy.orm.attributes import set_committed_value
 
 from models import (
     ActivityInstance,
@@ -108,6 +109,18 @@ def session_goal_insert_values(db_session, session_id, goal_id, goal_type, assoc
     return values
 
 
+def goal_serializer_load_options():
+    """Eager-load relationships touched by serialize_goal."""
+    return [
+        with_loader_criteria(Goal, Goal.deleted_at.is_(None), include_aliases=True),
+        selectinload(Goal.level),
+        selectinload(Goal.targets_rel).selectinload(Target.metric_conditions),
+        selectinload(Goal.associated_activities),
+        selectinload(Goal.associated_activity_groups),
+        selectinload(Goal.sessions),
+    ]
+
+
 def authorize_goal_access(db_session, current_user_id, goal, root_id_hint=None) -> str | None:
     if not goal:
         return None
@@ -125,6 +138,28 @@ class GoalService:
     def __init__(self, db_session, *, sync_targets):
         self.db_session = db_session
         self.sync_targets = sync_targets
+
+    def _load_fractal_goals_for_serialization(self, root_id):
+        goals = self.db_session.query(Goal).options(
+            *goal_serializer_load_options()
+        ).filter(
+            or_(Goal.root_id == root_id, Goal.id == root_id),
+            Goal.deleted_at.is_(None),
+        ).order_by(
+            Goal.parent_id.asc().nullsfirst(),
+            Goal.sort_order.asc(),
+            Goal.created_at.asc(),
+            Goal.id.asc(),
+        ).all()
+
+        children_by_parent = {}
+        for goal in goals:
+            children_by_parent.setdefault(goal.parent_id, []).append(goal)
+
+        for goal in goals:
+            set_committed_value(goal, "children", children_by_parent.get(goal.id, []))
+
+        return {goal.id: goal for goal in goals}
 
     def _validate_owned_root(self, root_id, current_user_id) -> tuple[Goal | None, tuple[str, int] | None]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
@@ -570,21 +605,14 @@ class GoalService:
         return {"status": "success", "message": "Fractal deleted"}, None, 200
 
     def get_fractal_tree(self, root_id, current_user_id) -> ServiceResult[Goal]:
-        root = self.db_session.query(Goal).options(
-            selectinload(Goal.children),
-            selectinload(Goal.associated_activities),
-            selectinload(Goal.associated_activity_groups),
-        ).filter(
-            Goal.id == root_id,
-            Goal.parent_id.is_(None),
-            Goal.owner_id == current_user_id,
-            Goal.deleted_at.is_(None),
-        ).first()
+        root, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
 
+        goals_by_id = self._load_fractal_goals_for_serialization(root_id)
+        root = goals_by_id.get(root_id)
         if not root:
-            root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
-            if not root:
-                return None, "Fractal not found or access denied", 404
+            return None, "Fractal not found or access denied", 404
 
         return root, None, 200
 
@@ -885,12 +913,23 @@ class GoalService:
 
         return new_goal, None, 201
 
-    def get_fractal_goal(self, root_id, goal_id, current_user_id) -> ServiceResult[Goal]:
+    def get_fractal_goal(self, root_id, goal_id, current_user_id, *, include_children=True) -> ServiceResult[Goal]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
 
-        goal = get_goal_by_id(self.db_session, goal_id)
+        if include_children:
+            goal = self._load_fractal_goals_for_serialization(root_id).get(goal_id)
+            if not goal:
+                return None, "Goal not found", 404
+            return goal, None, 200
+
+        goal = self.db_session.query(Goal).options(
+            *goal_serializer_load_options()
+        ).filter(
+            Goal.id == goal_id,
+            Goal.deleted_at.is_(None),
+        ).first()
         if not goal or goal.root_id != root_id:
             return None, "Goal not found", 404
         return goal, None, 200
