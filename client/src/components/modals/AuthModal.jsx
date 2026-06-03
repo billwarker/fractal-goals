@@ -81,7 +81,9 @@ function AuthModalInner({ onClose }) {
             let errorMessage = "An error occurred";
 
             // Check for network errors (no response from server)
-            if (!err.response) {
+            if (err.code === 'ECONNABORTED') {
+                errorMessage = "The server took too long to respond. Please try again in a moment.";
+            } else if (!err.response) {
                 errorMessage = "Network Error: Unable to reach the server. Please check your connection.";
             }
             // Check for server-side structure errors (500s)

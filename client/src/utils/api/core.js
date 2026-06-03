@@ -3,6 +3,7 @@ import axios from 'axios';
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
 axios.defaults.withCredentials = true;
+axios.defaults.timeout = Number(import.meta.env.VITE_API_TIMEOUT_MS || 20000);
 
 let accessToken = null;
 let isRefreshing = false;

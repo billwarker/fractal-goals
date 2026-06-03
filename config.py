@@ -91,8 +91,10 @@ class Config:
         'Lax' if ENV in ('development', 'testing', 'local') else 'Strict'
     )
 
-    # Rate Limiting Storage URL (Redis)
+    # Rate Limiting Storage URL (Redis-compatible, or memory:// for explicit private-beta mode)
     RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'memory://')
+    ALLOW_IN_MEMORY_RATELIMIT = os.getenv('ALLOW_IN_MEMORY_RATELIMIT', 'false').lower() in ('true', '1', 'yes')
+    WEB_CONCURRENCY = int(os.getenv('WEB_CONCURRENCY', '1'))
 
     # Observability
     SENTRY_TRACES_SAMPLE_RATE = float(os.getenv(
@@ -136,7 +138,16 @@ class Config:
                 raise ValueError("CRITICAL: AUTH_COOKIE_SECURE must be true when AUTH_COOKIE_SAMESITE=None")
 
             if cls.RATELIMIT_STORAGE_URI == 'memory://':
-                raise ValueError(f"CRITICAL: RATELIMIT_STORAGE_URI must use durable shared storage in {cls.ENV} environment!")
+                if not cls.ALLOW_IN_MEMORY_RATELIMIT:
+                    raise ValueError(
+                        f"CRITICAL: RATELIMIT_STORAGE_URI must use durable shared storage in {cls.ENV} environment, "
+                        "or ALLOW_IN_MEMORY_RATELIMIT=true must explicitly opt into private-beta mode."
+                    )
+                if cls.WEB_CONCURRENCY != 1:
+                    raise ValueError(
+                        "CRITICAL: Private-beta in-memory rate limiting requires WEB_CONCURRENCY=1 "
+                        "so rate-limit counters are not split across worker processes."
+                    )
 
     @classmethod
     def get_database_url(cls):

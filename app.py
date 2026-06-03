@@ -138,7 +138,7 @@ CORS(app, resources={
     r"/api/.*": {
         "origins": config.CORS_ORIGINS,
         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
+        "allow_headers": ["Content-Type", "Authorization", config.CSRF_HEADER_NAME],
         "supports_credentials": True
     }
 })
@@ -236,20 +236,20 @@ def add_cache_headers(response):
 @app.route('/health')
 def health_check():
     """Health check endpoint."""
-    db_url = config.get_database_url()
-    # Mask password
-    if '@' in db_url:
-        parts = db_url.split('@')
-        db_display = f"{parts[0].rsplit(':', 1)[0]}:***@{parts[1]}"
-    else:
-        db_display = db_url
-        
     return {
         "status": "healthy",
         "message": "Fractal Goals Flask Server",
         "environment": config.ENV,
         "database_type": config.get_database_provider(),
-        "database_url": db_display
+    }
+
+
+@app.route('/api/healthz')
+def api_healthz():
+    """Lightweight API health check that does not touch auth or the database."""
+    return {
+        "status": "ok",
+        "environment": config.ENV,
     }
 
 

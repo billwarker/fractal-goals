@@ -79,7 +79,8 @@ steps:
       '--platform', 'managed',
       '--allow-unauthenticated', # Remove if auth required
       '--set-secrets', 'SUPABASE_DATABASE_URL=SUPABASE_DATABASE_URL:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest',
-      '--set-env-vars', 'FLASK_ENV=production,CORS_ORIGINS=https://my.fractalgoals.com;https://fractal-frontend-195572181270.us-east1.run.app,AUTH_COOKIE_SAMESITE=None,AUTH_COOKIE_SECURE=True,CSP_CONNECT_SRC=https://fractal-backend-195572181270.us-east1.run.app',
+      '--set-env-vars', 'FLASK_ENV=production,FLASK_DEBUG=false,CORS_ORIGINS=https://my.fractalgoals.com;https://fractal-frontend-195572181270.us-east1.run.app,AUTH_COOKIE_SAMESITE=None,AUTH_COOKIE_SECURE=True,CSP_CONNECT_SRC=https://fractal-backend-195572181270.us-east1.run.app,RATELIMIT_STORAGE_URI=memory://,ALLOW_IN_MEMORY_RATELIMIT=true,WEB_CONCURRENCY=1,GUNICORN_THREADS=4',
+      '--max-instances', '1',
       '--service-account', 'fractal-runtime@fractal-goals.iam.gserviceaccount.com'
     ]
 

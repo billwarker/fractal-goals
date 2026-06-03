@@ -549,7 +549,9 @@ Useful modes:
 
 - split CI for frontend, backend unit, backend integration, and coverage
 - repo-tracked git hooks for pre-commit and pre-push verification
-- Cloud Build deploys backend/frontend Cloud Run services and runs migration jobs with Secret Manager-backed database/JWT settings
+- Cloud Build deploys backend/frontend Cloud Run services and runs migration jobs with Secret Manager-backed database/JWT settings.
+- Current production deploy is a budget private-beta profile: `RATELIMIT_STORAGE_URI=memory://`, `ALLOW_IN_MEMORY_RATELIMIT=true`, `WEB_CONCURRENCY=1`, and Cloud Run `--max-instances=1`.
+- Full production should switch `RATELIMIT_STORAGE_URI` to shared Redis-compatible storage and remove the single-instance private-beta constraint.
 
 ## Architectural Improvements Already Landed
 
