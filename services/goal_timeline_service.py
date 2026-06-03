@@ -6,12 +6,14 @@ from models import (
     ActivityGroup,
     ActivityInstance,
     Goal,
+    MetricDefinition,
     MetricValue,
     Target,
     activity_goal_associations,
     goal_activity_group_associations,
     validate_root_goal,
 )
+from services.goal_loading import load_fractal_goals_for_serialization
 from services.goal_type_utils import get_canonical_goal_type
 from services.serializers import (
     calculate_smart_status,
@@ -66,7 +68,8 @@ class GoalTimelineService:
         if error:
             return None, *error
 
-        goal = self.db_session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
+        goals_by_id = load_fractal_goals_for_serialization(self.db_session, root_id)
+        goal = goals_by_id.get(goal_id)
         if not goal:
             return None, "Goal not found", 404
 
@@ -80,7 +83,6 @@ class GoalTimelineService:
         timeline_goals = all_subtree_goals if include_children else [goal]
         timeline_goal_ids = {item.id for item in timeline_goals}
         all_subtree_ids = {item.id for item in all_subtree_goals}
-        goals_by_id = {item.id: item for item in all_subtree_goals}
         entries = []
 
         def source_relationship(source_goal_id):
@@ -164,11 +166,7 @@ class GoalTimelineService:
         effective_goal_ids = set(timeline_goal_ids)
         parent_goal = None
         if goal.inherit_parent_activities and goal.parent_id:
-            parent_goal = self.db_session.query(Goal).filter(
-                Goal.id == goal.parent_id,
-                Goal.root_id == root_id,
-                Goal.deleted_at.is_(None),
-            ).first()
+            parent_goal = goals_by_id.get(goal.parent_id)
             if parent_goal:
                 effective_goal_ids.add(parent_goal.id)
 
@@ -201,7 +199,10 @@ class GoalTimelineService:
         group_ids = {row.activity_group_id for row in group_rows}
         activities_by_group = {}
         if group_ids:
-            group_activities = self.db_session.query(ActivityDefinition).filter(
+            group_activities = self.db_session.query(ActivityDefinition).options(
+                selectinload(ActivityDefinition.metric_definitions).selectinload(MetricDefinition.fractal_metric),
+                selectinload(ActivityDefinition.split_definitions),
+            ).filter(
                 ActivityDefinition.root_id == root_id,
                 ActivityDefinition.group_id.in_(group_ids),
                 ActivityDefinition.deleted_at.is_(None),
@@ -218,7 +219,7 @@ class GoalTimelineService:
         if 'activity' in requested_types and activity_contexts:
             instances = self.db_session.query(ActivityInstance).options(
                 selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
-                selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.metric_definitions),
+                selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.metric_definitions).selectinload(MetricDefinition.fractal_metric),
                 selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.split_definitions),
                 selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
                 selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
@@ -264,7 +265,10 @@ class GoalTimelineService:
             activity_ids = {row.activity_id for row in direct_activity_rows}
             activities_by_id = {}
             if activity_ids:
-                activities = self.db_session.query(ActivityDefinition).filter(
+                activities = self.db_session.query(ActivityDefinition).options(
+                    selectinload(ActivityDefinition.metric_definitions).selectinload(MetricDefinition.fractal_metric),
+                    selectinload(ActivityDefinition.split_definitions),
+                ).filter(
                     ActivityDefinition.id.in_(activity_ids),
                     ActivityDefinition.root_id == root_id,
                     ActivityDefinition.deleted_at.is_(None),

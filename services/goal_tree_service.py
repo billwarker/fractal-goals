@@ -3,6 +3,7 @@ from sqlalchemy.orm import selectinload, with_loader_criteria
 from sqlalchemy import select
 
 from models import Goal, Session, ActivityInstance, session_goals
+from services.goal_loading import load_fractal_goals_for_serialization
 from services.serializers import serialize_goal
 from services.goal_type_utils import get_canonical_goal_type
 from services.view_serializers import serialize_session_goals_view_payload
@@ -73,21 +74,9 @@ class GoalTreeService:
         from services.session_service import SessionService
         from blueprints.api_utils import require_owned_root
         
-        root = self.db_session.query(Goal).options(
-            selectinload(Goal.children),
-            selectinload(Goal.associated_activities),
-            selectinload(Goal.associated_activity_groups)
-        ).filter(
-            Goal.id == root_id,
-            Goal.parent_id == None,
-            Goal.owner_id == current_user.id,
-            Goal.deleted_at == None
-        ).first()
-        
+        root = require_owned_root(self.db_session, root_id, current_user.id)
         if not root:
-            root = require_owned_root(self.db_session, root_id, current_user.id)
-            if not root:
-                return None, {"error": "Fractal not found or access denied"}, 404
+            return None, {"error": "Fractal not found or access denied"}, 404
 
         session_obj = self.db_session.query(Session).options(
             selectinload(Session.goals),
@@ -102,15 +91,9 @@ class GoalTreeService:
         if not session_obj:
             return None, {"error": "Session not found in this fractal"}, 404
 
+        goals_by_id = load_fractal_goals_for_serialization(self.db_session, root_id)
+        root = goals_by_id.get(root_id, root)
         root_tree = serialize_goal(root)
-
-        goals_by_id = {
-            goal.id: goal
-            for goal in self.db_session.query(Goal).filter(
-                Goal.root_id == root_id,
-                Goal.deleted_at == None
-            ).all()
-        }
 
         session_service = SessionService(self.db_session)
         session_goal_select = select(session_goals.c.goal_id)

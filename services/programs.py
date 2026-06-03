@@ -5,10 +5,12 @@ from datetime import datetime, timedelta, date, timezone
 from typing import List, Dict, Any, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from sqlalchemy.orm import selectinload
+
 from services.serializers import format_utc
 from models import (
     Program, ProgramBlock, ProgramDay, ProgramDayTemplate, ProgramDaySession, Goal, SessionTemplate, Session,
-    validate_root_goal, _safe_load_json, program_goals, program_block_goals
+    Target, validate_root_goal, _safe_load_json, program_goals, program_block_goals
 )
 from services import event_bus, Event, Events
 from services.owned_entity_queries import get_owned_program
@@ -34,6 +36,24 @@ class ProgramService:
     """
     Service for managing training programs, blocks, and days.
     """
+
+    @staticmethod
+    def _program_serializer_load_options():
+        day_load = selectinload(Program.blocks).selectinload(ProgramBlock.days)
+        template_goal_load = day_load.selectinload(ProgramDay.templates).selectinload(SessionTemplate.goals)
+        return [
+            selectinload(Program.goals),
+            selectinload(Program.blocks).selectinload(ProgramBlock.goals),
+            day_load.selectinload(ProgramDay.goals),
+            day_load.selectinload(ProgramDay.template_links).selectinload(ProgramDayTemplate.template),
+            template_goal_load.selectinload(Goal.level),
+            template_goal_load.selectinload(Goal.targets_rel).selectinload(Target.metric_conditions),
+            template_goal_load.selectinload(Goal.associated_activities),
+            template_goal_load.selectinload(Goal.associated_activity_groups),
+            template_goal_load.selectinload(Goal.sessions),
+            day_load.selectinload(ProgramDay.completed_sessions),
+            day_load.selectinload(ProgramDay.day_sessions),
+        ]
 
     @staticmethod
     def _require_root_access(session, root_id: str, current_user_id: str | None = None):
@@ -348,22 +368,11 @@ class ProgramService:
         return goals
 
     @staticmethod
-    @staticmethod
     def get_programs(session, root_id: str, current_user_id: str | None = None) -> List[Dict]:
         ProgramService._require_root_access(session, root_id, current_user_id)
 
-        from sqlalchemy.orm import selectinload
         programs = session.query(Program).options(
-            selectinload(Program.blocks)
-                .selectinload(ProgramBlock.days)
-                .selectinload(ProgramDay.templates),
-            selectinload(Program.blocks)
-                .selectinload(ProgramBlock.days)
-                .selectinload(ProgramDay.template_links)
-                .selectinload(ProgramDayTemplate.template),
-            selectinload(Program.blocks)
-                .selectinload(ProgramBlock.days)
-                .selectinload(ProgramDay.completed_sessions)
+            *ProgramService._program_serializer_load_options()
         ).filter_by(root_id=root_id).all()
         return [serialize_program(program) for program in programs]
 
@@ -371,18 +380,8 @@ class ProgramService:
     def get_program(session, root_id: str, program_id: str, current_user_id: str | None = None) -> Optional[Dict]:
         ProgramService._require_root_access(session, root_id, current_user_id)
 
-        from sqlalchemy.orm import selectinload
         program = session.query(Program).options(
-            selectinload(Program.blocks)
-                .selectinload(ProgramBlock.days)
-                .selectinload(ProgramDay.templates),
-            selectinload(Program.blocks)
-                .selectinload(ProgramBlock.days)
-                .selectinload(ProgramDay.template_links)
-                .selectinload(ProgramDayTemplate.template),
-            selectinload(Program.blocks)
-                .selectinload(ProgramBlock.days)
-                .selectinload(ProgramDay.completed_sessions)
+            *ProgramService._program_serializer_load_options()
         ).filter(Program.id == program_id, Program.root_id == root_id).first()
         if not program:
             return None

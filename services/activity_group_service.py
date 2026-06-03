@@ -1,4 +1,5 @@
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 
 from models import (
     ActivityDefinition,
@@ -159,6 +160,8 @@ class ActivityGroupService:
         groups = self.db_session.query(ActivityGroup).filter(
             ActivityGroup.root_id == root_id,
             ActivityGroup.deleted_at.is_(None),
+        ).options(
+            selectinload(ActivityGroup.associated_goals),
         ).order_by(
             ActivityGroup.sort_order,
             ActivityGroup.created_at,

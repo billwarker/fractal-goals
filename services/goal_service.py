@@ -2,9 +2,8 @@ from datetime import datetime, timezone
 import logging
 import uuid
 
-from sqlalchemy import inspect, or_, select
-from sqlalchemy.orm import selectinload, with_loader_criteria
-from sqlalchemy.orm.attributes import set_committed_value
+from sqlalchemy import func, inspect, select
+from sqlalchemy.orm import selectinload
 
 from models import (
     ActivityInstance,
@@ -33,6 +32,7 @@ from services.goal_domain_rules import (
     resolve_completed_via_children,
     should_inherit_parent_activities,
 )
+from services.goal_loading import goal_serializer_load_options, load_fractal_goals_for_serialization
 from services.metrics import GoalMetricsService
 from services.payload_normalizers import normalize_goal_payload
 from services.quota_service import QuotaService
@@ -109,18 +109,6 @@ def session_goal_insert_values(db_session, session_id, goal_id, goal_type, assoc
     return values
 
 
-def goal_serializer_load_options():
-    """Eager-load relationships touched by serialize_goal."""
-    return [
-        with_loader_criteria(Goal, Goal.deleted_at.is_(None), include_aliases=True),
-        selectinload(Goal.level),
-        selectinload(Goal.targets_rel).selectinload(Target.metric_conditions),
-        selectinload(Goal.associated_activities),
-        selectinload(Goal.associated_activity_groups),
-        selectinload(Goal.sessions),
-    ]
-
-
 def authorize_goal_access(db_session, current_user_id, goal, root_id_hint=None) -> str | None:
     if not goal:
         return None
@@ -140,26 +128,7 @@ class GoalService:
         self.sync_targets = sync_targets
 
     def _load_fractal_goals_for_serialization(self, root_id):
-        goals = self.db_session.query(Goal).options(
-            *goal_serializer_load_options()
-        ).filter(
-            or_(Goal.root_id == root_id, Goal.id == root_id),
-            Goal.deleted_at.is_(None),
-        ).order_by(
-            Goal.parent_id.asc().nullsfirst(),
-            Goal.sort_order.asc(),
-            Goal.created_at.asc(),
-            Goal.id.asc(),
-        ).all()
-
-        children_by_parent = {}
-        for goal in goals:
-            children_by_parent.setdefault(goal.parent_id, []).append(goal)
-
-        for goal in goals:
-            set_committed_value(goal, "children", children_by_parent.get(goal.id, []))
-
-        return {goal.id: goal for goal in goals}
+        return load_fractal_goals_for_serialization(self.db_session, root_id)
 
     def _validate_owned_root(self, root_id, current_user_id) -> tuple[Goal | None, tuple[str, int] | None]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
@@ -527,22 +496,34 @@ class GoalService:
     def list_fractals(self, current_user_id) -> ServiceResult[JsonList]:
         roots = self.db_session.query(Goal).options(
             selectinload(Goal.level),
+            selectinload(Goal.targets_rel),
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups),
-            selectinload(Goal.children),
         ).filter(
             Goal.parent_id.is_(None),
             Goal.owner_id == current_user_id,
             Goal.deleted_at.is_(None),
         ).all()
 
+        root_ids = [root.id for root in roots]
+        last_activity_by_root = {}
+        if root_ids:
+            rows = self.db_session.query(
+                Goal.root_id,
+                func.max(Goal.updated_at),
+            ).filter(
+                Goal.root_id.in_(root_ids),
+                Goal.deleted_at.is_(None),
+            ).group_by(Goal.root_id).all()
+            last_activity_by_root = {root_id: last_activity for root_id, last_activity in rows}
+
         level_maps_by_root = self._get_effective_level_maps_for_roots(
             current_user_id,
-            [root.id for root in roots],
+            root_ids,
         )
         fractals = []
         for root in roots:
-            last_activity = self._find_max_updated(root, root.updated_at)
+            last_activity = last_activity_by_root.get(root.id) or root.updated_at
             level_name = root.level.name if getattr(root, 'level', None) else "Ultimate Goal"
             display_level = level_maps_by_root.get(root.id, {}).get(level_name)
             fractals.append(serialize_fractal_summary(root, last_activity, display_level=display_level))

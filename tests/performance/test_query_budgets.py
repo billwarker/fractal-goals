@@ -16,7 +16,11 @@ from models import (
     GoalLevel,
     Note,
     PracticeSession,
+    Program,
+    ProgramBlock,
+    ProgramDay,
     User,
+    activity_goal_associations,
 )
 
 
@@ -31,6 +35,46 @@ def timed_get(client, url):
     response = client.get(url)
     elapsed_ms = (time.perf_counter() - started_at) * 1000
     return response, elapsed_ms
+
+
+@pytest.fixture
+def sample_program_tree(db_session, sample_ultimate_goal, sample_session_template):
+    program = Program(
+        id=str(uuid.uuid4()),
+        root_id=sample_ultimate_goal.id,
+        name="Performance Program",
+        description="Program performance fixture",
+        start_date=datetime.now(timezone.utc),
+        end_date=datetime.now(timezone.utc) + timedelta(days=14),
+        weekly_schedule=[],
+    )
+    db_session.add(program)
+    db_session.flush()
+
+    block = ProgramBlock(
+        id=str(uuid.uuid4()),
+        program_id=program.id,
+        name="Block 1",
+        start_date=datetime.now(timezone.utc).date(),
+        end_date=(datetime.now(timezone.utc) + timedelta(days=6)).date(),
+    )
+    db_session.add(block)
+    db_session.flush()
+
+    for index in range(5):
+        day = ProgramDay(
+            id=str(uuid.uuid4()),
+            block_id=block.id,
+            day_number=index + 1,
+            name=f"Day {index + 1}",
+            date=(datetime.now(timezone.utc) + timedelta(days=index)).date(),
+            day_of_week=[],
+        )
+        day.templates.append(sample_session_template)
+        db_session.add(day)
+
+    db_session.commit()
+    return program
 
 
 @pytest.fixture
@@ -247,6 +291,37 @@ def test_get_activities_query_budget(authed_client, query_counter, sample_activi
 
 
 @pytest.mark.integration
+def test_get_activity_groups_query_budget(authed_client, query_counter, sample_activity_group):
+    root_id = sample_activity_group.root_id
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/activity-groups")
+
+    assert_response_budget(response, max_bytes=80_000, max_ms=400, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 6
+
+
+@pytest.mark.integration
+def test_get_programs_query_budget(authed_client, query_counter, sample_program_tree):
+    root_id = sample_program_tree.root_id
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/programs")
+
+    assert_response_budget(response, max_bytes=200_000, max_ms=700, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 22
+
+
+@pytest.mark.integration
+def test_get_fractals_query_budget(authed_client, query_counter, sample_goal_hierarchy):
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(authed_client, "/api/fractals")
+
+    assert_response_budget(response, max_bytes=80_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 12
+
+
+@pytest.mark.integration
 def test_get_session_goals_view_query_budget(
     authed_client,
     query_counter,
@@ -262,6 +337,64 @@ def test_get_session_goals_view_query_budget(
 
     assert_response_budget(response, max_bytes=220_000, max_ms=900, elapsed_ms=elapsed_ms)
     assert query_counter["total"] <= 36
+
+
+@pytest.mark.integration
+def test_get_session_detail_goal_activities_query_budget(
+    authed_client,
+    db_session,
+    query_counter,
+    sample_goal_hierarchy,
+    sample_activity_definition,
+):
+    """Goal activity references should stay bounded across child inheritance."""
+    root_id = sample_goal_hierarchy["ultimate"].id
+    parent_goal = sample_goal_hierarchy["mid_term"]
+    child_goal = sample_goal_hierarchy["short_term"]
+    db_session.execute(
+        activity_goal_associations.insert().values(
+            activity_id=sample_activity_definition.id,
+            goal_id=child_goal.id,
+        )
+    )
+    db_session.commit()
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/goals/{parent_goal.id}/activities")
+
+    assert_response_budget(response, max_bytes=80_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 16
+
+
+@pytest.mark.integration
+def test_get_goal_timeline_query_budget(
+    authed_client,
+    db_session,
+    query_counter,
+    sample_goal_hierarchy,
+    sample_activity_definition,
+    sample_activity_instance,
+):
+    """Goal timeline should remain lazy in the UI and bounded once requested."""
+    root_id = sample_goal_hierarchy["ultimate"].id
+    parent_goal = sample_goal_hierarchy["mid_term"]
+    child_goal = sample_goal_hierarchy["short_term"]
+    db_session.execute(
+        activity_goal_associations.insert().values(
+            activity_id=sample_activity_definition.id,
+            goal_id=child_goal.id,
+        )
+    )
+    db_session.commit()
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{root_id}/goals/{parent_goal.id}/timeline?types=activity,target,child_goal",
+    )
+
+    assert_response_budget(response, max_bytes=160_000, max_ms=800, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 28
 
 
 @pytest.mark.integration

@@ -9,6 +9,7 @@ from models import (
     validate_root_goal,
 )
 from services.events import Event, Events, event_bus
+from services.goal_loading import load_fractal_goals_for_serialization
 from services.payload_normalizers import normalize_id_list
 from services.service_types import JsonDict, JsonList, ServiceResult
 
@@ -112,7 +113,12 @@ class ActivityAssociationService:
         if error:
             return None, *error
 
-        goal = self.db_session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
+        goals_by_id = load_fractal_goals_for_serialization(
+            self.db_session,
+            root_id,
+            include_group_activities=True,
+        )
+        goal = goals_by_id.get(goal_id)
         if not goal:
             return None, "Goal not found", 404
 
@@ -262,7 +268,7 @@ class ActivityAssociationService:
                 stack.append(child)
 
         if goal.inherit_parent_activities and goal.parent_id:
-            parent = self.db_session.query(Goal).filter_by(id=goal.parent_id, root_id=root_id).first()
+            parent = goals_by_id.get(goal.parent_id)
             if parent and not parent.deleted_at:
                 process_goal(parent, activities, is_inherited=True, source_name=parent.name, direction="parent")
 
