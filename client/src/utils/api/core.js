@@ -45,7 +45,7 @@ const needsCsrfHeader = (config) => {
     const url = String(config.url || '');
     if (!MUTATING_METHODS.has(method)) return false;
     if (config.headers?.Authorization || accessToken) return false;
-    if (url.includes('/auth/login') || url.includes('/auth/signup')) return false;
+    if (url.includes('/auth/login') || url.includes('/auth/signup') || url.includes('/auth/refresh')) return false;
     return true;
 };
 
@@ -67,6 +67,13 @@ axios.interceptors.request.use(async (config) => {
     if (accessToken && !config.headers?.Authorization) {
         config.headers = config.headers || {};
         config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+    if (String(config.url || '').includes('/auth/refresh') && !config.headers?.[CSRF_HEADER_NAME]) {
+        const csrfToken = readCookie(CSRF_COOKIE_NAME);
+        if (csrfToken) {
+            config.headers = config.headers || {};
+            config.headers[CSRF_HEADER_NAME] = decodeURIComponent(csrfToken);
+        }
     }
     if (needsCsrfHeader(config)) {
         const csrfToken = await ensureCsrfToken(config);
@@ -106,7 +113,8 @@ axios.interceptors.response.use(
             if (
                 originalRequest?.url?.includes('/auth/refresh') ||
                 originalRequest?.url?.includes('/auth/login') ||
-                originalRequest?.url?.includes('/auth/me')
+                originalRequest?.url?.includes('/auth/me') ||
+                originalRequest?.url?.includes('/auth/csrf')
             ) {
                 return Promise.reject(error);
             }
@@ -127,13 +135,21 @@ axios.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                const response = await axios.post(`${API_BASE}/auth/refresh`, {});
+                const response = await axios.post(`${API_BASE}/auth/refresh`, {}, { _skipCsrfFetch: true });
 
                 const { token, user } = response.data;
                 setAccessToken(token);
                 window.dispatchEvent(new CustomEvent('auth:token_refreshed', { detail: { token, user } }));
 
                 processQueue(null, token);
+
+                if (!originalRequest.headers?.[CSRF_HEADER_NAME] && needsCsrfHeader(originalRequest)) {
+                    const csrfToken = await ensureCsrfToken(originalRequest);
+                    if (csrfToken) {
+                        originalRequest.headers = originalRequest.headers || {};
+                        originalRequest.headers[CSRF_HEADER_NAME] = decodeURIComponent(csrfToken);
+                    }
+                }
 
                 return axios(originalRequest);
             } catch (refreshError) {

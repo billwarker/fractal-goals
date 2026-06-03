@@ -483,6 +483,7 @@ Shared frontend infrastructure to know:
 
 - `client/src/hooks/queryKeys.js`
 - `client/src/utils/optimisticQuery.js`
+- `client/src/utils/api/core.js`
 - `client/src/utils/goalNodeModel.js`
 - `client/src/utils/programViewModel.js`
 - `client/src/utils/sessionRuntime.js`

@@ -14,6 +14,7 @@ const {
         login: vi.fn(),
         logout: vi.fn(),
         refresh: vi.fn(),
+        getCsrf: vi.fn(),
         signup: vi.fn(),
     },
     setAccessToken: vi.fn(),
@@ -73,6 +74,7 @@ describe('AuthContext cache boundary', () => {
             configurable: true,
         });
         authApi.getMe.mockRejectedValue({ response: { status: 401 } });
+        authApi.getCsrf.mockResolvedValue({});
         authApi.logout.mockResolvedValue({});
     });
 
