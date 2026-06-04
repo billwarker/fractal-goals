@@ -13,6 +13,21 @@ const CSRF_COOKIE_NAME = 'fractal_csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
+const getHeader = (headers, name) => {
+    if (!headers) return undefined;
+    if (typeof headers.get === 'function') return headers.get(name);
+    return headers[name] || headers[name.toLowerCase()];
+};
+
+const setHeader = (config, name, value) => {
+    config.headers = config.headers || {};
+    if (typeof config.headers.set === 'function') {
+        config.headers.set(name, value);
+    } else {
+        config.headers[name] = value;
+    }
+};
+
 export const setAccessToken = (token) => {
     accessToken = token || null;
 };
@@ -45,7 +60,7 @@ const needsCsrfHeader = (config) => {
     const method = String(config.method || 'get').toLowerCase();
     const url = String(config.url || '');
     if (!MUTATING_METHODS.has(method)) return false;
-    if (config.headers?.Authorization || accessToken) return false;
+    if (getHeader(config.headers, 'Authorization') || accessToken) return false;
     if (url.includes('/auth/login') || url.includes('/auth/signup') || url.includes('/auth/refresh')) return false;
     return true;
 };
@@ -74,22 +89,19 @@ const isCsrfAuthFailure = (error) => (
 );
 
 axios.interceptors.request.use(async (config) => {
-    if (accessToken && !config.headers?.Authorization) {
-        config.headers = config.headers || {};
-        config.headers.Authorization = `Bearer ${accessToken}`;
+    if (accessToken && !getHeader(config.headers, 'Authorization')) {
+        setHeader(config, 'Authorization', `Bearer ${accessToken}`);
     }
-    if (String(config.url || '').includes('/auth/refresh') && !config.headers?.[CSRF_HEADER_NAME]) {
+    if (String(config.url || '').includes('/auth/refresh') && !getHeader(config.headers, CSRF_HEADER_NAME)) {
         const csrfToken = readCookie(CSRF_COOKIE_NAME);
         if (csrfToken) {
-            config.headers = config.headers || {};
-            config.headers[CSRF_HEADER_NAME] = decodeURIComponent(csrfToken);
+            setHeader(config, CSRF_HEADER_NAME, decodeURIComponent(csrfToken));
         }
     }
     if (needsCsrfHeader(config)) {
         const csrfToken = await ensureCsrfToken(config);
         if (csrfToken) {
-            config.headers = config.headers || {};
-            config.headers[CSRF_HEADER_NAME] = decodeURIComponent(csrfToken);
+            setHeader(config, CSRF_HEADER_NAME, decodeURIComponent(csrfToken));
         }
     }
     if (typeof window !== 'undefined') {
@@ -123,8 +135,7 @@ axios.interceptors.response.use(
             originalRequest._csrfRetry = true;
             const csrfToken = await ensureCsrfToken(originalRequest, { force: true });
             if (csrfToken) {
-                originalRequest.headers = originalRequest.headers || {};
-                originalRequest.headers[CSRF_HEADER_NAME] = decodeURIComponent(csrfToken);
+                setHeader(originalRequest, CSRF_HEADER_NAME, decodeURIComponent(csrfToken));
                 return axios(originalRequest);
             }
         }
@@ -144,8 +155,7 @@ axios.interceptors.response.use(
                     failedQueue.push({ resolve, reject });
                 }).then((token) => {
                     if (token) {
-                        originalRequest.headers = originalRequest.headers || {};
-                        originalRequest.headers.Authorization = `Bearer ${token}`;
+                        setHeader(originalRequest, 'Authorization', `Bearer ${token}`);
                     }
                     return axios(originalRequest);
                 });
@@ -163,11 +173,10 @@ axios.interceptors.response.use(
 
                 processQueue(null, token);
 
-                if (!originalRequest.headers?.[CSRF_HEADER_NAME] && needsCsrfHeader(originalRequest)) {
+                if (!getHeader(originalRequest.headers, CSRF_HEADER_NAME) && needsCsrfHeader(originalRequest)) {
                     const csrfToken = await ensureCsrfToken(originalRequest);
                     if (csrfToken) {
-                        originalRequest.headers = originalRequest.headers || {};
-                        originalRequest.headers[CSRF_HEADER_NAME] = decodeURIComponent(csrfToken);
+                        setHeader(originalRequest, CSRF_HEADER_NAME, decodeURIComponent(csrfToken));
                     }
                 }
 
