@@ -305,9 +305,10 @@ class TimerService:
             instance.is_paused = False
             instance.last_paused_at = None
 
-        self.db_session.commit()
-        self._recompute_stats_for_instance(instance)
+        self.db_session.flush()
         activity_name = instance.definition.name if instance.definition else "Unknown"
+        serialized = serialize_activity_instance(instance)
+        self.db_session.commit()
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_UPDATED,
             self._activity_event_payload(
@@ -321,7 +322,7 @@ class TimerService:
         ))
         return {
             "instance": instance,
-            "serialized": serialize_activity_instance(instance),
+            "serialized": serialized,
             "activity_name": activity_name,
         }, None, 200
 
@@ -473,8 +474,10 @@ class TimerService:
         elif not instance.time_start or not instance.time_stop:
             instance.duration_seconds = None
 
-        self.db_session.commit()
+        self.db_session.flush()
         activity_name = instance.definition.name if instance.definition else "Unknown"
+        serialized = serialize_activity_instance(instance)
+        self.db_session.commit()
         updated_fields = list(data.keys())
         non_metric_fields = [field for field in updated_fields if field != 'sets']
         if 'sets' in data:
@@ -503,7 +506,7 @@ class TimerService:
             ))
         return {
             "instance": instance,
-            "serialized": serialize_activity_instance(instance),
+            "serialized": serialized,
             "activity_name": activity_name,
         }, None, 200
 

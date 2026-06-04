@@ -127,8 +127,10 @@ Performance and production-hardening notes:
 - API request bodies are capped by `MAX_CONTENT_LENGTH`.
 - SQLAlchemy pool sizing is environment-driven via `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`, and `DB_POOL_RECYCLE_SECONDS`.
 - Goal tree/detail, activity-definition, activity-group, program, fractal-summary, session `goals-view`, goal-activity association, and goal-timeline endpoints intentionally batch the relationships or aggregates consumed by their serializers to avoid N+1 round trips against remote Postgres.
+- Session detail add/remove activity and timer start/reset mutations keep response serialization on the already-loaded instance path and have query/latency budget coverage.
 - Fractal-route header root-goal lookups request `include_children=false`; full goal-tree consumers should use the dedicated tree query instead of duplicating root detail fetches.
 - Goal detail timeline data remains lazy-loaded by the frontend; the backend timeline endpoint uses the shared eager goal-tree loader once the user opens the Timeline tab.
+- Browser CSRF handling shares a single in-flight `/auth/csrf` fetch across concurrent writes and retries once on stale-token CSRF 403s.
 - Backend performance tests include query-count, response-size, and latency budget checks for core endpoints.
 - Large-account budget tests cover goal-tree, sessions search, notes pagination, and admin user-list paths.
 - Frontend performance coverage includes a large session-goals view-model budget test.

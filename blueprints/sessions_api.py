@@ -391,7 +391,7 @@ def add_activity_to_session(current_user, root_id, session_id, validated_data):
         payload, error, status = service.add_activity_to_session(root_id, session_id, current_user.id, validated_data)
         if error:
             return jsonify({"error": error}), status
-        return jsonify(serialize_activity_instance(payload["instance"])), 201
+        return jsonify(payload.get("serialized") or serialize_activity_instance(payload["instance"])), 201
         
     except SQLAlchemyError:
         db_session.rollback()

@@ -2,7 +2,7 @@ import copy
 import uuid
 
 from sqlalchemy import inspect, text
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
 import models
@@ -171,7 +171,15 @@ class SessionActivityService:
         if not activity_definition_id:
             return None, "activity_definition_id required", 400
 
-        activity_def = get_owned_activity_definition(self.db_session, root_id, activity_definition_id)
+        activity_def = get_owned_activity_definition(
+            self.db_session,
+            root_id,
+            activity_definition_id,
+            query_options=(
+                joinedload(ActivityDefinition.group),
+                selectinload(ActivityDefinition.associated_goals).selectinload(Goal.level),
+            ),
+        )
         if not activity_def:
             return None, "Activity definition not found in this fractal", 404
 
@@ -195,6 +203,7 @@ class SessionActivityService:
             activity_definition_id=activity_definition_id,
             root_id=root_id,
         )
+        instance.definition = activity_def
         self.db_session.add(instance)
         self.db_session.flush()
 
@@ -222,30 +231,34 @@ class SessionActivityService:
             ).scalars().all()
             program_goal_ids = set(raw_program_goals)
 
-        for goal in associated_goals:
-            if goal.root_id != root_id:
-                continue
-            if program_goal_ids and goal.id not in program_goal_ids:
-                continue
-            existing = self.db_session.execute(
-                text("SELECT 1 FROM session_goals WHERE session_id = :session_id AND goal_id = :goal_id LIMIT 1"),
-                {"session_id": session_id, "goal_id": goal.id},
-            ).first()
-            if existing:
-                continue
-            self.db_session.execute(
-                session_goals.insert().values(
-                    **self._session_goal_insert_values(
-                        session_id,
-                        goal.id,
-                        get_canonical_goal_type(goal),
-                        'activity',
-                    )
+        eligible_goals = [
+            goal
+            for goal in associated_goals
+            if goal.root_id == root_id and (not program_goal_ids or goal.id in program_goal_ids)
+        ]
+        if eligible_goals:
+            existing_goal_ids = {
+                goal_id
+                for (goal_id,) in self.db_session.query(session_goals.c.goal_id).filter(
+                    session_goals.c.session_id == session_id,
+                    session_goals.c.goal_id.in_([goal.id for goal in eligible_goals]),
+                ).all()
+            }
+            insert_values = [
+                self._session_goal_insert_values(
+                    session_id,
+                    goal.id,
+                    get_canonical_goal_type(goal),
+                    'activity',
                 )
-            )
+                for goal in eligible_goals
+                if goal.id not in existing_goal_ids
+            ]
+            if insert_values:
+                self.db_session.execute(session_goals.insert(), insert_values)
 
+        serialized = serialize_activity_instance(instance)
         self.db_session.commit()
-        self.db_session.refresh(instance)
         activity_name = activity_def.name if activity_def else 'Unknown'
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_CREATED,
@@ -260,6 +273,7 @@ class SessionActivityService:
         ))
         return {
             "instance": instance,
+            "serialized": serialized,
             "activity_name": activity_name,
         }, None, 201
 
@@ -356,7 +370,6 @@ class SessionActivityService:
         instance.deleted_at = models.utc_now()
         self._remove_instance_from_session_sections(session, instance_id)
         self.db_session.commit()
-        self._recompute_and_attach_stats(session)
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_DELETED,
             {

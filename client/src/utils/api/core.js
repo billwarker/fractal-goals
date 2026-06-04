@@ -7,7 +7,7 @@ axios.defaults.timeout = Number(import.meta.env.VITE_API_TIMEOUT_MS || 20000);
 
 let accessToken = null;
 let isRefreshing = false;
-let isFetchingCsrf = false;
+let csrfFetchPromise = null;
 let failedQueue = [];
 const CSRF_COOKIE_NAME = 'fractal_csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
@@ -50,19 +50,28 @@ const needsCsrfHeader = (config) => {
     return true;
 };
 
-const ensureCsrfToken = async (config) => {
+const ensureCsrfToken = async (config, { force = false } = {}) => {
     let token = readCookie(CSRF_COOKIE_NAME);
-    if (token || config._skipCsrfFetch || isFetchingCsrf) return token;
+    if ((token && !force) || config._skipCsrfFetch) return token;
 
-    isFetchingCsrf = true;
-    try {
-        const response = await axios.get(`${API_BASE}/auth/csrf`, { _skipCsrfFetch: true });
-        token = readCookie(CSRF_COOKIE_NAME) || response.headers?.[CSRF_HEADER_NAME.toLowerCase()] || null;
-    } finally {
-        isFetchingCsrf = false;
+    if (!csrfFetchPromise) {
+        csrfFetchPromise = axios.get(`${API_BASE}/auth/csrf`, { _skipCsrfFetch: true })
+            .then((response) => (
+                readCookie(CSRF_COOKIE_NAME)
+                || response.headers?.[CSRF_HEADER_NAME.toLowerCase()]
+                || null
+            ))
+            .finally(() => {
+                csrfFetchPromise = null;
+            });
     }
-    return token;
+    return csrfFetchPromise;
 };
+
+const isCsrfAuthFailure = (error) => (
+    error?.response?.status === 403
+    && /csrf/i.test(String(error.response?.data?.error || ''))
+);
 
 axios.interceptors.request.use(async (config) => {
     if (accessToken && !config.headers?.Authorization) {
@@ -109,6 +118,16 @@ axios.interceptors.response.use(
     (response) => response,
     async (error) => {
         const originalRequest = error.config;
+
+        if (isCsrfAuthFailure(error) && originalRequest && !originalRequest._csrfRetry && needsCsrfHeader(originalRequest)) {
+            originalRequest._csrfRetry = true;
+            const csrfToken = await ensureCsrfToken(originalRequest, { force: true });
+            if (csrfToken) {
+                originalRequest.headers = originalRequest.headers || {};
+                originalRequest.headers[CSRF_HEADER_NAME] = decodeURIComponent(csrfToken);
+                return axios(originalRequest);
+            }
+        }
 
         if (error.response?.status === 401 && !originalRequest?._retry) {
             if (

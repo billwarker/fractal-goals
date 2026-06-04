@@ -30,9 +30,22 @@ def assert_response_budget(response, *, max_bytes: int, max_ms: float, elapsed_m
     assert elapsed_ms <= max_ms
 
 
+def assert_mutation_budget(response, *, status_code: int, max_bytes: int, max_ms: float, elapsed_ms: float):
+    assert response.status_code == status_code
+    assert len(response.data) <= max_bytes
+    assert elapsed_ms <= max_ms
+
+
 def timed_get(client, url):
     started_at = time.perf_counter()
     response = client.get(url)
+    elapsed_ms = (time.perf_counter() - started_at) * 1000
+    return response, elapsed_ms
+
+
+def timed_request(client, method, url, **kwargs):
+    started_at = time.perf_counter()
+    response = getattr(client, method)(url, **kwargs)
     elapsed_ms = (time.perf_counter() - started_at) * 1000
     return response, elapsed_ms
 
@@ -239,6 +252,127 @@ def test_get_session_activities_query_budget(authed_client, query_counter, sampl
 
     assert_response_budget(response, max_bytes=80_000, max_ms=500, elapsed_ms=elapsed_ms)
     assert query_counter["total"] <= 15
+
+
+@pytest.mark.integration
+def test_add_session_activity_mutation_query_budget(
+    authed_client,
+    query_counter,
+    sample_practice_session,
+    sample_activity_definition,
+):
+    root_id = sample_practice_session.root_id
+    session_id = sample_practice_session.id
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_request(
+        authed_client,
+        "post",
+        f"/api/{root_id}/sessions/{session_id}/activities",
+        json={"activity_definition_id": sample_activity_definition.id, "section_index": 0},
+    )
+
+    assert_mutation_budget(response, status_code=201, max_bytes=40_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 16
+
+
+@pytest.mark.integration
+def test_remove_session_activity_mutation_query_budget(
+    authed_client,
+    query_counter,
+    sample_practice_session,
+    sample_activity_instance,
+):
+    root_id = sample_practice_session.root_id
+    session_id = sample_practice_session.id
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_request(
+        authed_client,
+        "delete",
+        f"/api/{root_id}/sessions/{session_id}/activities/{sample_activity_instance.id}",
+    )
+
+    assert_mutation_budget(response, status_code=200, max_bytes=20_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 14
+
+
+@pytest.mark.integration
+def test_start_activity_timer_mutation_query_budget(
+    authed_client,
+    query_counter,
+    sample_practice_session,
+    sample_activity_instance,
+):
+    root_id = sample_practice_session.root_id
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_request(
+        authed_client,
+        "post",
+        f"/api/{root_id}/activity-instances/{sample_activity_instance.id}/start",
+        json={"target_duration_seconds": 90},
+    )
+
+    assert_mutation_budget(response, status_code=200, max_bytes=40_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 12
+
+
+@pytest.mark.integration
+def test_reset_activity_timer_mutation_query_budget(
+    authed_client,
+    db_session,
+    query_counter,
+    sample_practice_session,
+    sample_activity_instance,
+):
+    root_id = sample_practice_session.root_id
+    sample_activity_instance.time_start = datetime.now(timezone.utc) - timedelta(minutes=5)
+    sample_activity_instance.time_stop = datetime.now(timezone.utc)
+    sample_activity_instance.duration_seconds = 300
+    sample_activity_instance.completed = True
+    db_session.commit()
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_request(
+        authed_client,
+        "put",
+        f"/api/{root_id}/activity-instances/{sample_activity_instance.id}",
+        json={
+            "session_id": sample_practice_session.id,
+            "activity_definition_id": sample_activity_instance.activity_definition_id,
+            "time_start": None,
+            "time_stop": None,
+            "target_duration_seconds": None,
+            "completed": False,
+        },
+    )
+
+    assert_mutation_budget(response, status_code=200, max_bytes=40_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 14
+
+
+@pytest.mark.integration
+def test_complete_activity_timer_mutation_query_budget(
+    authed_client,
+    db_session,
+    query_counter,
+    sample_practice_session,
+    sample_activity_instance,
+):
+    root_id = sample_practice_session.root_id
+    sample_activity_instance.time_start = datetime.now(timezone.utc) - timedelta(minutes=5)
+    db_session.commit()
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_request(
+        authed_client,
+        "post",
+        f"/api/{root_id}/activity-instances/{sample_activity_instance.id}/complete",
+    )
+
+    assert_mutation_budget(response, status_code=200, max_bytes=60_000, max_ms=800, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 24
 
 
 @pytest.mark.integration
