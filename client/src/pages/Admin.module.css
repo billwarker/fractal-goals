@@ -252,6 +252,7 @@
 .actionsContentArea input,
 .actionsContentArea select,
 .actionsContentArea textarea,
+.tierQuotaEditor input,
 .tierQuotaEditor select,
 .tierQuotaEditor textarea {
     border: 1px solid var(--color-border);
@@ -271,6 +272,7 @@
 .actionsContentArea input:focus,
 .actionsContentArea select:focus,
 .actionsContentArea textarea:focus,
+.tierQuotaEditor input:focus,
 .tierQuotaEditor select:focus,
 .tierQuotaEditor textarea:focus {
     border-color: var(--color-brand-primary);
@@ -385,12 +387,14 @@
 }
 
 .tierQuotaHeader label,
+.tierQuotaStorageField,
 .tierQuotaJsonField {
     display: grid;
     gap: 8px;
 }
 
 .tierQuotaHeader label span,
+.tierQuotaStorageField span,
 .tierQuotaJsonField span {
     color: var(--color-text-muted);
     font-size: var(--font-size-xs);
@@ -401,6 +405,10 @@
 
 .tierQuotaHeader select {
     min-width: 180px;
+}
+
+.tierQuotaStorageField {
+    max-width: 320px;
 }
 
 .tierQuotaJsonField textarea {

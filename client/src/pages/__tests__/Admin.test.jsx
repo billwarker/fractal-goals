@@ -11,6 +11,7 @@ const {
     getTierQuotas,
     getInviteKeys,
     createInviteKey,
+    createUser,
     updateTierQuotas,
     updateUser,
     softDeleteUser,
@@ -28,6 +29,7 @@ const {
     getTierQuotas: vi.fn(),
     getInviteKeys: vi.fn(),
     createInviteKey: vi.fn(),
+    createUser: vi.fn(),
     updateTierQuotas: vi.fn(),
     updateUser: vi.fn(),
     softDeleteUser: vi.fn(),
@@ -55,6 +57,7 @@ vi.mock('../../utils/api', () => ({
         getTierQuotas: (...args) => getTierQuotas(...args),
         getInviteKeys: (...args) => getInviteKeys(...args),
         createInviteKey: (...args) => createInviteKey(...args),
+        createUser: (...args) => createUser(...args),
         updateTierQuotas: (...args) => updateTierQuotas(...args),
         updateUser: (...args) => updateUser(...args),
         softDeleteUser: (...args) => softDeleteUser(...args),
@@ -204,6 +207,11 @@ describe('Admin', () => {
                     },
                     legacy: null,
                 },
+                tier_storage_limit_bytes: {
+                    free: 104857600,
+                    paid: 104857600,
+                    legacy: null,
+                },
                 editable_tiers: ['free', 'paid'],
                 unlimited_tiers: ['legacy'],
                 resources: ['fractals', 'goals', 'sessions', 'activity_instances', 'activities', 'metrics', 'session_templates', 'notes', 'programs'],
@@ -212,6 +220,7 @@ describe('Admin', () => {
         });
         getInviteKeys.mockResolvedValue({ data: [] });
         createInviteKey.mockResolvedValue({ data: { id: 'key-1', key: 'fg_invite_secret', status: 'available' } });
+        createUser.mockResolvedValue({ data: { temporary_password: 'A1createdPassword' } });
         updateTierQuotas.mockResolvedValue({ data: {} });
         updateUser.mockResolvedValue({ data: {} });
         softDeleteUser.mockResolvedValue({ data: { message: 'User soft deleted' } });
@@ -241,6 +250,15 @@ describe('Admin', () => {
         expect(screen.getByText('activity instances')).toBeInTheDocument();
         expect(screen.getAllByText('Storage').length).toBeGreaterThan(0);
         expect(screen.getByText('Root')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'newbie' } });
+        fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'newbie@example.com' } });
+        expect(screen.getByPlaceholderText('Tier default')).toHaveValue(null);
+        fireEvent.click(screen.getByText('Add User'));
+        await waitFor(() => expect(createUser).toHaveBeenCalledWith({
+            username: 'newbie',
+            email: 'newbie@example.com',
+        }));
 
         fireEvent.click(screen.getByText('invite keys'));
         fireEvent.change(screen.getByPlaceholderText('Label'), { target: { value: 'Wave 1' } });
@@ -348,6 +366,9 @@ describe('Admin', () => {
 
         fireEvent.click(screen.getByText('tier quotas'));
         await waitFor(() => expect(screen.getByDisplayValue(/"goals": 50/)).toBeInTheDocument());
+        const storageInput = screen.getByLabelText('Default Storage MB');
+        expect(storageInput).toHaveValue(100);
+        fireEvent.change(storageInput, { target: { value: '250' } });
 
         fireEvent.click(screen.getByText('Save Tier Quotas'));
         await waitFor(() => expect(updateTierQuotas).toHaveBeenCalledWith({
@@ -363,6 +384,7 @@ describe('Admin', () => {
                 notes: 1000,
                 programs: 5,
             },
+            storage_limit_bytes: 262144000,
             apply_existing_users: false,
         }));
 
@@ -381,6 +403,7 @@ describe('Admin', () => {
                 notes: 1000,
                 programs: 5,
             },
+            storage_limit_bytes: 262144000,
             apply_existing_users: true,
         }));
     });

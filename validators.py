@@ -338,6 +338,7 @@ class AdminTierQuotaUpdateSchema(BaseModel):
 
     tier: str = Field(..., pattern=r'^(free|paid|legacy)$')
     limits: Dict[str, int]
+    storage_limit_bytes: int = Field(..., ge=0)
     apply_existing_users: bool = False
 
     @field_validator('limits')

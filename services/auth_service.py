@@ -7,6 +7,7 @@ from config import config
 from models import User
 from services.serializers import serialize_user
 from services.admin_service import AdminService
+from services.quota_service import DEFAULT_STORAGE_LIMIT_BYTES, QuotaService
 from services.service_types import JsonDict, ServiceResult
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ class AuthService:
         new_user = User(
             username=data['username'],
             email=data['email'],
-            storage_limit_bytes=104857600,
+            storage_limit_bytes=QuotaService(self.db_session).get_tier_storage_limit_bytes("free") or DEFAULT_STORAGE_LIMIT_BYTES,
         )
         new_user.set_password(data['password'])
 

@@ -172,12 +172,16 @@ class AdminService:
             return None, "Username or email already exists", 400
 
         raw_password = data.get("password") or generate_password()
+        membership_tier = data.get("membership_tier") or "free"
         user = User(
             username=data["username"],
             email=data["email"],
             role=data.get("role") or "user",
-            membership_tier=data.get("membership_tier") or "free",
-            storage_limit_bytes=data.get("storage_limit_bytes", DEFAULT_STORAGE_LIMIT_BYTES),
+            membership_tier=membership_tier,
+            storage_limit_bytes=data.get(
+                "storage_limit_bytes",
+                self.quota_service.get_tier_storage_limit_bytes(membership_tier) or DEFAULT_STORAGE_LIMIT_BYTES,
+            ),
         )
         user.set_password(raw_password)
         self.db_session.add(user)
@@ -217,6 +221,7 @@ class AdminService:
     def get_tier_quota_settings(self) -> ServiceResult[JsonDict]:
         return {
             "tier_default_limits": self.quota_service.get_tier_default_limits(),
+            "tier_storage_limit_bytes": self.quota_service.get_tier_storage_limits(),
             "resources": RESOURCE_ORDER,
             "labels": RESOURCE_LABELS,
             "editable_tiers": ["free", "paid"],
@@ -232,9 +237,13 @@ class AdminService:
             normalized_limits = self.quota_service.validate_finite_limits(data.get("limits") or {})
         except ValueError as exc:
             return None, str(exc), 400
+        storage_limit_bytes = data.get("storage_limit_bytes")
+        if not isinstance(storage_limit_bytes, int) or storage_limit_bytes < 0:
+            return None, "Storage limit bytes must be a non-negative integer", 400
 
         apply_existing_users = bool(data.get("apply_existing_users", False))
         current_defaults = self.quota_service.get_tier_default_limits()
+        current_storage_defaults = self.quota_service.get_tier_storage_limits()
         target_users = self.db_session.query(User).filter(User.membership_tier == tier).all()
 
         if not apply_existing_users:
@@ -247,6 +256,9 @@ class AdminService:
         configured_defaults = deepcopy(current_defaults)
         configured_defaults[tier] = normalized_limits
         configured_defaults["legacy"] = None
+        configured_defaults["storage_limit_bytes"] = deepcopy(current_storage_defaults)
+        configured_defaults["storage_limit_bytes"][tier] = storage_limit_bytes
+        configured_defaults["storage_limit_bytes"]["legacy"] = None
 
         if setting is None:
             setting = AppSetting(key=TIER_DEFAULT_LIMITS_SETTING_KEY, value=configured_defaults)
@@ -258,12 +270,14 @@ class AdminService:
         if apply_existing_users:
             for user in target_users:
                 user.quota_overrides = {}
+                user.storage_limit_bytes = storage_limit_bytes
                 flag_modified(user, "quota_overrides")
 
         self.db_session.commit()
         return {
             "tier": tier,
             "tier_default_limits": self.quota_service.get_tier_default_limits(),
+            "tier_storage_limit_bytes": self.quota_service.get_tier_storage_limits(),
             "apply_existing_users": apply_existing_users,
             "affected_user_count": len(target_users),
         }, None, 200
@@ -482,6 +496,7 @@ class AdminService:
             "membership_tier": getattr(user, "membership_tier", "free") or "free",
             "quota_overrides": user.quota_overrides or {},
             "storage_limit_bytes": getattr(user, "storage_limit_bytes", DEFAULT_STORAGE_LIMIT_BYTES),
+            "tier_storage_limit_bytes": self.quota_service.get_tier_storage_limits(),
             "created_at": format_utc(user.created_at),
             "last_login_at": format_utc(user.last_login_at),
             "failed_login_count": getattr(user, "failed_login_count", 0) or 0,

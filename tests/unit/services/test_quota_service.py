@@ -179,6 +179,19 @@ def test_configured_tier_defaults_drive_effective_limits(db_session, test_user):
     assert limits["goals"] == 123
 
 
+def test_configured_tier_storage_defaults_are_available(db_session):
+    db_session.add(AppSetting(
+        key=TIER_DEFAULT_LIMITS_SETTING_KEY,
+        value={"storage_limit_bytes": {"free": 123456789}},
+    ))
+    db_session.commit()
+
+    storage_limits = QuotaService(db_session).get_tier_storage_limits()
+
+    assert storage_limits["free"] == 123456789
+    assert storage_limits["paid"] == 104857600
+
+
 def test_invalid_configured_tier_defaults_fall_back_to_builtins(db_session, test_user):
     invalid_free = dict(FREE_LIMITS)
     invalid_free.pop("goals")

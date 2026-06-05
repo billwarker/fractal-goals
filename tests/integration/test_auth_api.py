@@ -16,6 +16,7 @@ Tests cover:
 import pytest
 import json
 from services.admin_service import hash_invite_key
+from services.quota_service import TIER_DEFAULT_LIMITS_SETTING_KEY
 
 
 def create_invite_key(db_session, raw_key='fg_invite_test'):
@@ -32,6 +33,13 @@ class TestSignupEndpoint:
     
     def test_signup_success(self, client, db_session):
         """Test successful user registration."""
+        from models import AppSetting
+
+        db_session.add(AppSetting(
+            key=TIER_DEFAULT_LIMITS_SETTING_KEY,
+            value={'storage_limit_bytes': {'free': 222222222}},
+        ))
+        db_session.commit()
         invite_key = create_invite_key(db_session)
         payload = {
             'username': 'newuser',
@@ -49,6 +57,7 @@ class TestSignupEndpoint:
         assert data['username'] == 'newuser'
         assert data['email'] == 'newuser@example.com'
         assert 'id' in data
+        assert data['storage_limit_bytes'] == 222222222
         # Password should never be returned
         assert 'password' not in data
         assert 'password_hash' not in data

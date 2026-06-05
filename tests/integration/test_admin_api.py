@@ -285,13 +285,16 @@ def test_admin_can_manage_tier_quotas_with_apply_scope(admin_client, db_session,
     assert settings_response.status_code == 200
     settings_payload = json.loads(settings_response.data)
     assert settings_payload['tier_default_limits']['free']['goals'] == 50
+    assert settings_payload['tier_storage_limit_bytes']['free'] == 104857600
     assert settings_payload['tier_default_limits']['legacy'] is None
 
+    original_storage_limit = test_user.storage_limit_bytes
     new_users_only_response = admin_client.patch(
         '/api/admin/tier-quotas',
         data=json.dumps({
             'tier': 'free',
             'limits': free_limits_with(goals=88),
+            'storage_limit_bytes': 209715200,
             'apply_existing_users': False,
         }),
         content_type='application/json',
@@ -299,12 +302,25 @@ def test_admin_can_manage_tier_quotas_with_apply_scope(admin_client, db_session,
     assert new_users_only_response.status_code == 200
     db_session.refresh(test_user)
     assert test_user.quota_overrides['goals'] == 50
+    assert test_user.storage_limit_bytes == original_storage_limit
+
+    created_user_response = admin_client.post(
+        '/api/admin/users',
+        data=json.dumps({
+            'username': 'tierstorage',
+            'email': 'tierstorage@example.com',
+        }),
+        content_type='application/json',
+    )
+    assert created_user_response.status_code == 201
+    assert json.loads(created_user_response.data)['storage_limit_bytes'] == 209715200
 
     apply_existing_response = admin_client.patch(
         '/api/admin/tier-quotas',
         data=json.dumps({
             'tier': 'free',
             'limits': free_limits_with(goals=99),
+            'storage_limit_bytes': 314572800,
             'apply_existing_users': True,
         }),
         content_type='application/json',
@@ -312,7 +328,9 @@ def test_admin_can_manage_tier_quotas_with_apply_scope(admin_client, db_session,
     assert apply_existing_response.status_code == 200
     db_session.refresh(test_user)
     assert test_user.quota_overrides == {}
+    assert test_user.storage_limit_bytes == 314572800
     assert json.loads(apply_existing_response.data)['tier_default_limits']['free']['goals'] == 99
+    assert json.loads(apply_existing_response.data)['tier_storage_limit_bytes']['free'] == 314572800
 
 
 @pytest.mark.integration
@@ -322,6 +340,7 @@ def test_admin_tier_quota_update_rejects_legacy_and_invalid_resources(admin_clie
         data=json.dumps({
             'tier': 'legacy',
             'limits': free_limits_with(goals=10),
+            'storage_limit_bytes': 104857600,
             'apply_existing_users': True,
         }),
         content_type='application/json',
@@ -333,6 +352,7 @@ def test_admin_tier_quota_update_rejects_legacy_and_invalid_resources(admin_clie
         data=json.dumps({
             'tier': 'free',
             'limits': {'goals': 10},
+            'storage_limit_bytes': 104857600,
             'apply_existing_users': True,
         }),
         content_type='application/json',

@@ -102,6 +102,14 @@ class QuotaService:
         }
 
     @staticmethod
+    def get_builtin_tier_storage_limits() -> JsonDict:
+        return {
+            "free": DEFAULT_STORAGE_LIMIT_BYTES,
+            "paid": DEFAULT_STORAGE_LIMIT_BYTES,
+            "legacy": None,
+        }
+
+    @staticmethod
     def validate_finite_limits(limits: JsonDict) -> JsonDict:
         if not isinstance(limits, dict):
             raise ValueError("Quota limits must be an object")
@@ -137,6 +145,27 @@ class QuotaService:
             except ValueError:
                 continue
         return defaults
+
+    def get_tier_storage_limits(self) -> JsonDict:
+        defaults = self.get_builtin_tier_storage_limits()
+        setting = self.db_session.get(AppSetting, TIER_DEFAULT_LIMITS_SETTING_KEY)
+        configured = models._safe_load_json(getattr(setting, "value", None), {})
+        if not isinstance(configured, dict):
+            return defaults
+
+        configured_storage = configured.get("storage_limit_bytes")
+        if not isinstance(configured_storage, dict):
+            return defaults
+
+        for tier in ("free", "paid"):
+            value = configured_storage.get(tier)
+            if isinstance(value, int) and value >= 0:
+                defaults[tier] = value
+        return defaults
+
+    def get_tier_storage_limit_bytes(self, tier: Optional[str]) -> Optional[int]:
+        normalized_tier = self.normalize_tier(tier)
+        return self.get_tier_storage_limits().get(normalized_tier)
 
     def get_effective_limits(self, user: User) -> Optional[JsonDict]:
         tier = self.normalize_tier(getattr(user, "membership_tier", "free"))

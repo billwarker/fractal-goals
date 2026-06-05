@@ -81,9 +81,11 @@ function TierQuotasPanel({ tierQuotasQuery }) {
     const queryClient = useQueryClient();
     const [selectedTier, setSelectedTier] = useState('free');
     const [quotaDraft, setQuotaDraft] = useState('{}');
+    const [storageDraftMb, setStorageDraftMb] = useState('100');
     const [applyExistingUsers, setApplyExistingUsers] = useState(false);
 
     const tierDefaultLimits = tierQuotasQuery.data?.tier_default_limits || {};
+    const tierStorageLimitBytes = tierQuotasQuery.data?.tier_storage_limit_bytes || {};
     const tierOptions = useMemo(() => Object.keys(tierDefaultLimits), [tierDefaultLimits]);
     const editableTiers = tierQuotasQuery.data?.editable_tiers || ['free', 'paid'];
     const unlimitedTiers = tierQuotasQuery.data?.unlimited_tiers || ['legacy'];
@@ -97,7 +99,9 @@ function TierQuotasPanel({ tierQuotasQuery }) {
         }
         const limits = tierDefaultLimits[selectedTier];
         setQuotaDraft(limits === null || limits === undefined ? 'null' : formatQuotaJson(limits));
-    }, [editableTiers, selectedTier, tierDefaultLimits, tierOptions, tierQuotasQuery.data]);
+        const storageBytes = tierStorageLimitBytes[selectedTier];
+        setStorageDraftMb(storageBytes === null || storageBytes === undefined ? 'unlimited' : String(Math.round(storageBytes / 1048576)));
+    }, [editableTiers, selectedTier, tierDefaultLimits, tierOptions, tierQuotasQuery.data, tierStorageLimitBytes]);
 
     const mutation = useMutation({
         mutationFn: () => {
@@ -105,6 +109,7 @@ function TierQuotasPanel({ tierQuotasQuery }) {
             return adminApi.updateTierQuotas({
                 tier: selectedTier,
                 limits: parsed,
+                storage_limit_bytes: Math.max(0, Number(storageDraftMb || 0)) * 1048576,
                 apply_existing_users: applyExistingUsers,
             });
         },
@@ -129,7 +134,12 @@ function TierQuotasPanel({ tierQuotasQuery }) {
                 return;
             }
         } catch {
-            notify.error('Tier quota JSON must be valid JSON');
+                notify.error('Tier quota JSON must be valid JSON');
+                return;
+            }
+        const storageMb = Number(storageDraftMb);
+        if (!Number.isFinite(storageMb) || storageMb < 0) {
+            notify.error('Storage MB must be a non-negative number');
             return;
         }
         mutation.mutate();
@@ -160,6 +170,17 @@ function TierQuotasPanel({ tierQuotasQuery }) {
                         </select>
                     </label>
                 </div>
+
+                <label className={styles.tierQuotaStorageField}>
+                    <span>Default Storage MB</span>
+                    <input
+                        type="number"
+                        min="0"
+                        value={storageDraftMb}
+                        onChange={(event) => setStorageDraftMb(event.target.value)}
+                        disabled={selectedTierIsUnlimited}
+                    />
+                </label>
 
                 <label className={styles.tierQuotaJsonField}>
                     <span>Default Quotas JSON</span>
@@ -576,7 +597,7 @@ function Admin() {
     const [userDraft, setUserDraft] = useState({
         username: '',
         email: '',
-        storage_limit_mb: '100',
+        storage_limit_mb: '',
     });
     const queryClient = useQueryClient();
 
@@ -622,14 +643,19 @@ function Admin() {
     });
 
     const createUserMutation = useMutation({
-        mutationFn: () => adminApi.createUser({
-            username: userDraft.username,
-            email: userDraft.email,
-            storage_limit_bytes: Math.max(0, Number(userDraft.storage_limit_mb || 0)) * 1048576,
-        }),
+        mutationFn: () => {
+            const payload = {
+                username: userDraft.username,
+                email: userDraft.email,
+            };
+            if (userDraft.storage_limit_mb !== '') {
+                payload.storage_limit_bytes = Math.max(0, Number(userDraft.storage_limit_mb || 0)) * 1048576;
+            }
+            return adminApi.createUser(payload);
+        },
         onSuccess: (res) => {
             setCreatedPassword(res.data.temporary_password);
-            setUserDraft({ username: '', email: '', storage_limit_mb: '100' });
+            setUserDraft({ username: '', email: '', storage_limit_mb: '' });
             queryClient.invalidateQueries({ queryKey: ADMIN_USERS_KEY });
             queryClient.invalidateQueries({ queryKey: ADMIN_SUMMARY_KEY });
             notify.success('User created');
@@ -743,6 +769,7 @@ function Admin() {
                         />
                         <input
                             aria-label="New user storage limit"
+                            placeholder="Tier default"
                             type="number"
                             min="0"
                             value={userDraft.storage_limit_mb}
