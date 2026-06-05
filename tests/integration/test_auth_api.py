@@ -374,6 +374,30 @@ class TestPreferencesEndpoint:
         )
         assert write_response.status_code == 200
 
+    def test_csrf_endpoint_returns_readable_token(self, client, test_user):
+        from config import config
+
+        login_response = client.post(
+            '/api/auth/login',
+            data=json.dumps({
+                'username_or_email': 'testuser',
+                'password': 'Password123',
+            }),
+            content_type='application/json',
+        )
+        assert login_response.status_code == 200
+
+        response = client.get('/api/auth/csrf')
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        csrf_cookie = client.get_cookie(config.CSRF_COOKIE_NAME)
+        assert data['csrf_cookie_name'] == config.CSRF_COOKIE_NAME
+        assert data['csrf_header_name'] == config.CSRF_HEADER_NAME
+        assert data['csrf_token']
+        assert response.headers[config.CSRF_HEADER_NAME] == data['csrf_token']
+        assert csrf_cookie.value == data['csrf_token']
+
 
 @pytest.mark.integration
 class TestPasswordChangeEndpoint:

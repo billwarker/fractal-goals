@@ -74,3 +74,17 @@ def test_production_cors_allows_csrf_header(client):
     assert response.status_code in (200, 204)
     allowed_headers = response.headers.get('Access-Control-Allow-Headers', '').lower()
     assert 'x-csrf-token' in allowed_headers
+
+
+def test_production_cors_exposes_csrf_header(client):
+    response = client.options(
+        '/api/auth/csrf',
+        headers={
+            'Origin': 'http://localhost:5173',
+            'Access-Control-Request-Method': 'GET',
+        },
+    )
+
+    assert response.status_code in (200, 204)
+    exposed_headers = response.headers.get('Access-Control-Expose-Headers', '').lower()
+    assert 'x-csrf-token' in exposed_headers

@@ -51,7 +51,7 @@ export const fractalGoalsApi = {
     pauseGoal: (rootId, goalId, paused) =>
         axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/pause`, { paused }),
     freezeGoal: (rootId, goalId, frozen) =>
-        axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/pause`, { paused: frozen }),
+        axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/freeze`, { frozen }),
     moveGoal: (rootId, goalId, newParentId) =>
         axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/move`, { new_parent_id: newParentId }),
     convertGoalLevel: (rootId, goalId, levelId) =>

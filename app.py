@@ -139,6 +139,7 @@ CORS(app, resources={
         "origins": config.CORS_ORIGINS,
         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", config.CSRF_HEADER_NAME],
+        "expose_headers": [config.CSRF_HEADER_NAME],
         "supports_credentials": True
     }
 })

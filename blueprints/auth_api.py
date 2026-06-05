@@ -231,11 +231,13 @@ def get_me(current_user):
 @token_required
 def get_csrf_token(current_user):
     """Issue a readable CSRF cookie for browser clients using HttpOnly auth cookies."""
+    token = _issue_csrf_token()
     response = jsonify({
         'csrf_cookie_name': config.CSRF_COOKIE_NAME,
         'csrf_header_name': config.CSRF_HEADER_NAME,
+        'csrf_token': token,
     })
-    token = _set_csrf_cookie(response)
+    _set_csrf_cookie(response, token)
     response.headers[config.CSRF_HEADER_NAME] = token
     return response, 200
 

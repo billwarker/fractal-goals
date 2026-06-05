@@ -66,7 +66,8 @@ def app():
         r"/api/*": {
             "origins": "*",
             "methods": ["GET", "POST", "PUT", "PATCH", "DELETE"],
-            "allow_headers": ["Content-Type", config.CSRF_HEADER_NAME]
+            "allow_headers": ["Content-Type", config.CSRF_HEADER_NAME],
+            "expose_headers": [config.CSRF_HEADER_NAME],
         }
     })
     

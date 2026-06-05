@@ -28,6 +28,8 @@ const setHeader = (config, name, value) => {
     }
 };
 
+const getResponseHeader = (headers, name) => getHeader(headers, name);
+
 export const setAccessToken = (token) => {
     accessToken = token || null;
 };
@@ -72,8 +74,9 @@ const ensureCsrfToken = async (config, { force = false } = {}) => {
     if (!csrfFetchPromise) {
         csrfFetchPromise = axios.get(`${API_BASE}/auth/csrf`, { _skipCsrfFetch: true })
             .then((response) => (
-                readCookie(CSRF_COOKIE_NAME)
-                || response.headers?.[CSRF_HEADER_NAME.toLowerCase()]
+                response.data?.csrf_token
+                || getResponseHeader(response.headers, CSRF_HEADER_NAME)
+                || readCookie(CSRF_COOKIE_NAME)
                 || null
             ))
             .finally(() => {
@@ -98,7 +101,7 @@ axios.interceptors.request.use(async (config) => {
             setHeader(config, CSRF_HEADER_NAME, decodeURIComponent(csrfToken));
         }
     }
-    if (needsCsrfHeader(config)) {
+    if (needsCsrfHeader(config) && !getHeader(config.headers, CSRF_HEADER_NAME)) {
         const csrfToken = await ensureCsrfToken(config);
         if (csrfToken) {
             setHeader(config, CSRF_HEADER_NAME, decodeURIComponent(csrfToken));

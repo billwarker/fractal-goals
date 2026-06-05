@@ -130,7 +130,8 @@ Performance and production-hardening notes:
 - Session detail add/remove activity and timer start/reset mutations keep response serialization on the already-loaded instance path and have query/latency budget coverage.
 - Fractal-route header root-goal lookups request `include_children=false`; full goal-tree consumers should use the dedicated tree query instead of duplicating root detail fetches.
 - Goal detail timeline data remains lazy-loaded by the frontend; the backend timeline endpoint uses the shared eager goal-tree loader once the user opens the Timeline tab.
-- Browser CSRF handling shares a single in-flight `/auth/csrf` fetch across concurrent writes and retries once on stale-token CSRF 403s.
+- Browser CSRF handling shares a single in-flight `/auth/csrf` fetch across concurrent writes, reads the token from the response body/header for cross-origin production API calls, and retries once on stale-token CSRF 403s.
+- Frontend API contract tests cover mutating helpers across goals, programs, sessions, notes, and analytics to catch CSRF regressions and endpoint path drift.
 - Backend performance tests include query-count, response-size, and latency budget checks for core endpoints.
 - Large-account budget tests cover goal-tree, sessions search, notes pagination, and admin user-list paths.
 - Frontend performance coverage includes a large session-goals view-model budget test.

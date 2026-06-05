@@ -225,6 +225,64 @@ describe('api core auth refresh behavior', () => {
         expect(calls.filter((call) => String(call.url).includes(`${API_BASE}/root-1/goals`))).toHaveLength(2);
     });
 
+    it('recovers program day saves with CSRF tokens returned in the response body', async () => {
+        document.cookie = 'fractal_csrf_token=stale-day-token; path=/';
+        const { axios, API_BASE } = await import('../core');
+        const { fractalApi } = await import('../fractalApi');
+        const calls = [];
+        const originalAdapter = axios.defaults.adapter;
+
+        axios.defaults.adapter = async (config) => {
+            const token = config.headers?.get?.('X-CSRF-Token') || config.headers?.['X-CSRF-Token'];
+            calls.push({
+                url: config.url,
+                token,
+            });
+            if (String(config.url).includes('/auth/csrf')) {
+                return {
+                    data: { csrf_token: 'fresh-day-token' },
+                    status: 200,
+                    statusText: 'OK',
+                    headers: {},
+                    config,
+                };
+            }
+            if (token === 'stale-day-token') {
+                const error = new Error('Forbidden');
+                error.config = config;
+                error.response = { status: 403, data: { error: 'CSRF token missing or invalid' }, config };
+                throw error;
+            }
+            return {
+                data: { id: 'day-1', name: 'Daily Practice' },
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                config,
+            };
+        };
+
+        try {
+            const response = await fractalApi.updateBlockDay(
+                'root-1',
+                'program-1',
+                'block-1',
+                'day-1',
+                { name: 'Daily Practice' },
+            );
+            expect(response.data).toEqual({ id: 'day-1', name: 'Daily Practice' });
+        } finally {
+            axios.defaults.adapter = originalAdapter;
+        }
+
+        expect(calls.map((call) => call.token)).toEqual([
+            'stale-day-token',
+            undefined,
+            'fresh-day-token',
+        ]);
+        expect(calls.filter((call) => String(call.url).includes(`${API_BASE}/root-1/programs/program-1/blocks/block-1/days/day-1`))).toHaveLength(2);
+    });
+
     it('uses AxiosHeaders accessors when mutating CSRF headers', async () => {
         document.cookie = 'fractal_csrf_token=axios-headers-token; path=/';
         const { axios, API_BASE } = await import('../core');
@@ -388,6 +446,115 @@ describe('api core auth refresh behavior', () => {
 
         expect(calls).toHaveLength(protectedMutations.length);
         expect(calls.filter((call) => call.token !== 'all-mutators-token')).toEqual([]);
+    });
+
+    it('keeps app-surface mutating helpers on the expected protected endpoints', async () => {
+        document.cookie = 'fractal_csrf_token=surface-token; path=/';
+        const { axios, API_BASE } = await import('../core');
+        const { fractalActivitiesApi } = await import('../fractalActivitiesApi');
+        const { fractalGoalsApi } = await import('../fractalGoalsApi');
+        const { fractalMetaApi } = await import('../fractalMetaApi');
+        const { fractalNotesApi } = await import('../fractalNotesApi');
+        const { fractalProgramsApi } = await import('../fractalProgramsApi');
+        const { fractalSessionsApi } = await import('../fractalSessionsApi');
+        const calls = [];
+        const originalAdapter = axios.defaults.adapter;
+
+        const surfaceMutations = [
+            ['goals.createGoal', 'post', '/root-1/goals', () => fractalGoalsApi.createGoal('root-1', { name: 'Goal' })],
+            ['goals.updateGoal', 'put', '/root-1/goals/goal-1', () => fractalGoalsApi.updateGoal('root-1', 'goal-1', { name: 'Goal' })],
+            ['goals.deleteGoal', 'delete', '/root-1/goals/goal-1', () => fractalGoalsApi.deleteGoal('root-1', 'goal-1')],
+            ['goals.toggleGoalCompletion', 'patch', '/root-1/goals/goal-1/complete', () => fractalGoalsApi.toggleGoalCompletion('root-1', 'goal-1', true)],
+            ['goals.evaluateGoalTargets', 'post', '/root-1/goals/goal-1/evaluate-targets', () => fractalGoalsApi.evaluateGoalTargets('root-1', 'goal-1', 'session-1')],
+            ['goals.linkGoalActivityGroup', 'post', '/root-1/goals/goal-1/activity-groups/group-1', () => fractalGoalsApi.linkGoalActivityGroup('root-1', 'goal-1', 'group-1')],
+            ['goals.unlinkGoalActivityGroup', 'delete', '/root-1/goals/goal-1/activity-groups/group-1', () => fractalGoalsApi.unlinkGoalActivityGroup('root-1', 'goal-1', 'group-1')],
+            ['goals.setGoalAssociationsBatch', 'put', '/root-1/goals/goal-1/associations/batch', () => fractalGoalsApi.setGoalAssociationsBatch('root-1', 'goal-1', { activity_ids: [], group_ids: [] })],
+            ['goals.copyGoal', 'post', '/root-1/goals/goal-1/copy', () => fractalGoalsApi.copyGoal('root-1', 'goal-1')],
+            ['goals.pauseGoal', 'patch', '/root-1/goals/goal-1/pause', () => fractalGoalsApi.pauseGoal('root-1', 'goal-1', true)],
+            ['goals.freezeGoal', 'patch', '/root-1/goals/goal-1/freeze', () => fractalGoalsApi.freezeGoal('root-1', 'goal-1', true)],
+            ['goals.moveGoal', 'patch', '/root-1/goals/goal-1/move', () => fractalGoalsApi.moveGoal('root-1', 'goal-1', 'goal-2')],
+            ['goals.convertGoalLevel', 'patch', '/root-1/goals/goal-1/convert-level', () => fractalGoalsApi.convertGoalLevel('root-1', 'goal-1', 'level-1')],
+
+            ['programs.createProgram', 'post', '/root-1/programs', () => fractalProgramsApi.createProgram('root-1', { name: 'Program' })],
+            ['programs.updateProgram', 'put', '/root-1/programs/program-1', () => fractalProgramsApi.updateProgram('root-1', 'program-1', { name: 'Program' })],
+            ['programs.deleteProgram', 'delete', '/root-1/programs/program-1', () => fractalProgramsApi.deleteProgram('root-1', 'program-1')],
+            ['programs.createBlock', 'post', '/root-1/programs/program-1/blocks', () => fractalProgramsApi.createBlock('root-1', 'program-1', { name: 'Block' })],
+            ['programs.updateBlock', 'put', '/root-1/programs/program-1/blocks/block-1', () => fractalProgramsApi.updateBlock('root-1', 'program-1', 'block-1', { name: 'Block' })],
+            ['programs.deleteBlock', 'delete', '/root-1/programs/program-1/blocks/block-1', () => fractalProgramsApi.deleteBlock('root-1', 'program-1', 'block-1')],
+            ['programs.addBlockDay', 'post', '/root-1/programs/program-1/blocks/block-1/days', () => fractalProgramsApi.addBlockDay('root-1', 'program-1', 'block-1', { name: 'Day' })],
+            ['programs.updateBlockDay', 'put', '/root-1/programs/program-1/blocks/block-1/days/day-1', () => fractalProgramsApi.updateBlockDay('root-1', 'program-1', 'block-1', 'day-1', { name: 'Day' })],
+            ['programs.deleteBlockDay', 'delete', '/root-1/programs/program-1/blocks/block-1/days/day-1', () => fractalProgramsApi.deleteBlockDay('root-1', 'program-1', 'block-1', 'day-1')],
+            ['programs.copyBlockDay', 'post', '/root-1/programs/program-1/blocks/block-1/days/day-1/copy', () => fractalProgramsApi.copyBlockDay('root-1', 'program-1', 'block-1', 'day-1', {})],
+            ['programs.scheduleBlockDay', 'post', '/root-1/programs/program-1/blocks/block-1/days/day-1/schedule', () => fractalProgramsApi.scheduleBlockDay('root-1', 'program-1', 'block-1', 'day-1', {})],
+            ['programs.unscheduleBlockDayOccurrence', 'post', '/root-1/programs/program-1/blocks/block-1/days/day-1/unschedule', () => fractalProgramsApi.unscheduleBlockDayOccurrence('root-1', 'program-1', 'block-1', 'day-1', {})],
+            ['programs.attachGoalToBlock', 'post', '/root-1/programs/program-1/blocks/block-1/goals', () => fractalProgramsApi.attachGoalToBlock('root-1', 'program-1', 'block-1', { goal_id: 'goal-1' })],
+            ['programs.attachGoalToDay', 'post', '/root-1/programs/program-1/blocks/block-1/days/day-1/goals', () => fractalProgramsApi.attachGoalToDay('root-1', 'program-1', 'block-1', 'day-1', { goal_id: 'goal-1' })],
+            ['programs.setProgramGoalDeadline', 'post', '/root-1/programs/program-1/goal-deadlines', () => fractalProgramsApi.setProgramGoalDeadline('root-1', 'program-1', { goal_id: 'goal-1' })],
+
+            ['sessions.createSession', 'post', '/root-1/sessions', () => fractalSessionsApi.createSession('root-1', { name: 'Session' })],
+            ['sessions.completeQuickSession', 'post', '/root-1/sessions/quick-complete', () => fractalSessionsApi.completeQuickSession('root-1', { activities: [] })],
+            ['sessions.updateSession', 'put', '/root-1/sessions/session-1', () => fractalSessionsApi.updateSession('root-1', 'session-1', { name: 'Session' })],
+            ['sessions.deleteSession', 'delete', '/root-1/sessions/session-1', () => fractalSessionsApi.deleteSession('root-1', 'session-1')],
+            ['sessions.duplicateSession', 'post', '/root-1/sessions/session-1/duplicate', () => fractalSessionsApi.duplicateSession('root-1', 'session-1')],
+            ['sessions.pauseSession', 'post', '/root-1/timers/session/session-1/pause', () => fractalSessionsApi.pauseSession('root-1', 'session-1')],
+            ['sessions.resumeSession', 'post', '/root-1/timers/session/session-1/resume', () => fractalSessionsApi.resumeSession('root-1', 'session-1')],
+            ['sessions.addSessionGoal', 'post', '/root-1/sessions/session-1/goals', () => fractalSessionsApi.addSessionGoal('root-1', 'session-1', 'goal-1')],
+            ['sessions.addActivityToSession', 'post', '/root-1/sessions/session-1/activities', () => fractalSessionsApi.addActivityToSession('root-1', 'session-1', { activity_definition_id: 'activity-1' })],
+            ['sessions.removeActivityFromSession', 'delete', '/root-1/sessions/session-1/activities/instance-1', () => fractalSessionsApi.removeActivityFromSession('root-1', 'session-1', 'instance-1')],
+            ['sessions.updateActivityMetrics', 'put', '/root-1/sessions/session-1/activities/instance-1/metrics', () => fractalSessionsApi.updateActivityMetrics('root-1', 'session-1', 'instance-1', { metrics: [] })],
+            ['sessions.createSessionTemplate', 'post', '/root-1/session-templates', () => fractalSessionsApi.createSessionTemplate('root-1', { name: 'Template' })],
+            ['sessions.createTemplateFromSession', 'post', '/root-1/sessions/session-1/create-template', () => fractalSessionsApi.createTemplateFromSession('root-1', 'session-1', { name: 'Template' })],
+            ['sessions.updateSessionTemplate', 'put', '/root-1/session-templates/template-1', () => fractalSessionsApi.updateSessionTemplate('root-1', 'template-1', { name: 'Template' })],
+            ['sessions.deleteSessionTemplate', 'delete', '/root-1/session-templates/template-1', () => fractalSessionsApi.deleteSessionTemplate('root-1', 'template-1')],
+            ['sessions.createActivityInstance', 'post', '/root-1/activity-instances', () => fractalActivitiesApi.createActivityInstance('root-1', { session_id: 'session-1', activity_definition_id: 'activity-1' })],
+            ['sessions.startActivityTimer', 'post', '/root-1/activity-instances/instance-1/start', () => fractalActivitiesApi.startActivityTimer('root-1', 'instance-1', {})],
+            ['sessions.completeActivityInstance', 'post', '/root-1/activity-instances/instance-1/complete', () => fractalActivitiesApi.completeActivityInstance('root-1', 'instance-1', {})],
+            ['sessions.updateActivityInstance', 'put', '/root-1/activity-instances/instance-1', () => fractalActivitiesApi.updateActivityInstance('root-1', 'instance-1', { completed: false })],
+
+            ['notes.createNote', 'post', '/root-1/notes', () => fractalNotesApi.createNote('root-1', { content: 'Note' })],
+            ['notes.updateNote', 'put', '/root-1/notes/note-1', () => fractalNotesApi.updateNote('root-1', 'note-1', { content: 'Note' })],
+            ['notes.deleteNote', 'delete', '/root-1/notes/note-1', () => fractalNotesApi.deleteNote('root-1', 'note-1')],
+            ['notes.pinNote', 'put', '/root-1/notes/note-1/pin', () => fractalNotesApi.pinNote('root-1', 'note-1')],
+            ['notes.unpinNote', 'put', '/root-1/notes/note-1/unpin', () => fractalNotesApi.unpinNote('root-1', 'note-1')],
+
+            ['analytics.createAnalyticsView', 'post', '/roots/root-1/dashboards', () => fractalMetaApi.createAnalyticsView('root-1', { name: 'Dashboard' })],
+            ['analytics.updateAnalyticsView', 'put', '/roots/root-1/dashboards/dashboard-1', () => fractalMetaApi.updateAnalyticsView('root-1', 'dashboard-1', { name: 'Dashboard' })],
+            ['analytics.deleteAnalyticsView', 'delete', '/roots/root-1/dashboards/dashboard-1', () => fractalMetaApi.deleteAnalyticsView('root-1', 'dashboard-1')],
+        ];
+
+        axios.defaults.adapter = async (config) => {
+            calls.push({
+                url: config.url,
+                method: String(config.method || '').toLowerCase(),
+                token: config.headers?.get?.('X-CSRF-Token') || config.headers?.['X-CSRF-Token'],
+            });
+            return {
+                data: { ok: true },
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                config,
+            };
+        };
+
+        try {
+            for (const [, , , invoke] of surfaceMutations) {
+                await invoke();
+            }
+        } finally {
+            axios.defaults.adapter = originalAdapter;
+        }
+
+        expect(calls).toHaveLength(surfaceMutations.length);
+        surfaceMutations.forEach(([label, expectedMethod, expectedPath], index) => {
+            const call = calls[index];
+            expect({ label, method: call.method, url: call.url, token: call.token }).toMatchObject({
+                label,
+                method: expectedMethod,
+                url: `${API_BASE}${expectedPath}`,
+                token: 'surface-token',
+            });
+        });
     });
 
     it('keeps app network calls on the shared API core', () => {
