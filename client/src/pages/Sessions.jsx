@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
@@ -23,9 +23,12 @@ import { fractalApi } from '../utils/api';
 import { queryKeys } from '../hooks/queryKeys';
 import notify from '../utils/notify';
 import { isQuickSession } from '../utils/sessionRuntime';
+import { lazyWithRetry } from '../utils/lazyWithRetry';
 import '../App.css';
 import styles from './Sessions.module.css';
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
+
+const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 
 /**
  * Sessions Page - View and query practice sessions
@@ -38,11 +41,17 @@ function Sessions() {
     const [searchParams, setSearchParams] = useSearchParams();
     const queryClient = useQueryClient();
     const { timezone } = useTimezone();
-    const { setActiveRootId } = useGoals();
+    const {
+        setActiveRootId,
+        updateGoal,
+        deleteGoal,
+        toggleGoalCompletion,
+    } = useGoals();
     const isMobile = useIsMobile();
     const quickSessionDialogRef = useRef(null);
 
     const [selectedSessionId, setSelectedSessionId] = useState(null);
+    const [selectedGoal, setSelectedGoal] = useState(null);
     const [sessionToDelete, setSessionToDelete] = useState(null);
     const filtersPaneStorageKey = `sessions-query-pane-open:${rootId || 'default'}`;
     const [isFiltersPaneOpen, setIsFiltersPaneOpen] = useState(() => {
@@ -241,6 +250,35 @@ function Sessions() {
         setSessionToDelete(session);
     }, []);
 
+    const handleOpenGoal = useCallback((goal) => {
+        setSelectedGoal(goal);
+    }, []);
+
+    const handleCloseGoal = useCallback(() => {
+        setSelectedGoal(null);
+    }, []);
+
+    const handleUpdateGoal = useCallback(async (goalId, updates) => {
+        const updatedGoal = await updateGoal(rootId, goalId, updates);
+        if (updatedGoal) setSelectedGoal(updatedGoal);
+        queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) });
+        return updatedGoal;
+    }, [queryClient, rootId, updateGoal]);
+
+    const handleToggleGoalCompletion = useCallback(async (goalId, currentStatus) => {
+        const updatedGoal = await toggleGoalCompletion(rootId, goalId, !currentStatus);
+        if (updatedGoal) setSelectedGoal(updatedGoal);
+        queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) });
+        return updatedGoal;
+    }, [queryClient, rootId, toggleGoalCompletion]);
+
+    const handleDeleteGoal = useCallback(async (goalId) => {
+        const result = await deleteGoal(rootId, goalId);
+        setSelectedGoal(null);
+        queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) });
+        return result;
+    }, [deleteGoal, queryClient, rootId]);
+
     const handleCloseDeleteModal = useCallback(() => {
         setSessionToDelete(null);
     }, []);
@@ -319,6 +357,7 @@ function Sessions() {
                                     isSelected={selectedSessionId === session.id}
                                     onSelect={handleSessionSelect}
                                     onRequestDelete={handleRequestDeleteSession}
+                                    onOpenGoal={handleOpenGoal}
                                     getGoalColor={getGoalColor}
                                     timezone={timezone}
                                     formatDate={formatDate}
@@ -394,6 +433,22 @@ function Sessions() {
                     : 'Are you sure you want to delete this session?'}
                 confirmText="Delete Session"
             />
+
+            {!!selectedGoal && (
+                <Suspense fallback={null}>
+                    <GoalDetailModal
+                        isOpen={Boolean(selectedGoal)}
+                        onClose={handleCloseGoal}
+                        goal={selectedGoal}
+                        onUpdate={handleUpdateGoal}
+                        onToggleCompletion={handleToggleGoalCompletion}
+                        onDelete={handleDeleteGoal}
+                        activityDefinitions={activities}
+                        activityGroups={activityGroups}
+                        rootId={rootId}
+                    />
+                </Suspense>
+            )}
 
             {activeQuickSession && isQuickSession(activeQuickSession) && (
                 <div

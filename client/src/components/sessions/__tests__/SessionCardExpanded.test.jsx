@@ -197,6 +197,9 @@ describe('SessionCardExpanded', () => {
     });
 
     it('shows a goal completed in the session when completed_session_id matches without relying on timestamps', () => {
+        const handleOpenGoal = vi.fn();
+        const handleSelect = vi.fn();
+
         renderWithProviders(
             <SessionCardExpanded
                 session={{
@@ -226,7 +229,8 @@ describe('SessionCardExpanded', () => {
                 rootId="root-1"
                 activities={[]}
                 isSelected={false}
-                onSelect={() => {}}
+                onSelect={handleSelect}
+                onOpenGoal={handleOpenGoal}
                 getGoalColor={(goal) => {
                     const type = typeof goal === 'string' ? goal : goal?.type || goal?.attributes?.type;
                     const colors = { ImmediateGoal: '#009688', Completed: '#44dd88' };
@@ -246,6 +250,10 @@ describe('SessionCardExpanded', () => {
         expect(screen.getByText('Manual completion')).toBeInTheDocument();
         const completionBadge = screen.getByTitle('Manual completion');
         expect(completionBadge.querySelector('svg path[fill="#44dd88"]')).toBeInTheDocument();
+
+        fireEvent.click(completionBadge);
+        expect(handleOpenGoal).toHaveBeenCalledWith(expect.objectContaining({ id: 'goal-1' }));
+        expect(handleSelect).not.toHaveBeenCalled();
     });
 
     it('renders quick-session activities as activity cards instead of pills', () => {

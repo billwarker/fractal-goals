@@ -41,6 +41,12 @@
     cursor: pointer;
 }
 
+.cardHeaderTitle:hover,
+.cardHeaderTitle:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
 .cardHeaderTitleTemplate {
     max-width: 100%;
     padding: 4px 10px;
@@ -140,6 +146,19 @@
     border-color: var(--color-border);
     background: color-mix(in srgb, var(--color-bg-card-alt) 92%, var(--color-text-muted));
     box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-bg-elevated) 56%, transparent);
+}
+
+button.accomplishmentBadge:hover,
+button.accomplishmentBadge:focus-visible {
+    border-color: var(--color-border);
+    background: color-mix(in srgb, var(--color-bg-card-alt) 92%, var(--color-text-muted));
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-bg-elevated) 56%, transparent);
+}
+
+button.accomplishmentBadge:hover span,
+button.accomplishmentBadge:focus-visible span {
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 
 /* Achieved Targets */

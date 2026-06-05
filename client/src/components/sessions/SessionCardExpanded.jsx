@@ -80,7 +80,8 @@ const AccomplishmentsSection = memo(function AccomplishmentsSection({
     getGoalSecondaryColor,
     getGoalIcon,
     completedGoalColor,
-    completedGoalSecondaryColor
+    completedGoalSecondaryColor,
+    onOpenGoal
 }) {
     if (completedGoals.length === 0) {
         return null;
@@ -96,11 +97,20 @@ const AccomplishmentsSection = memo(function AccomplishmentsSection({
                     const goalSecondaryColor = getGoalSecondaryColor(goal);
                     const iconColor = completedGoalColor || goalColor;
                     const iconSecondaryColor = completedGoalSecondaryColor || goalSecondaryColor;
+                    const handleGoalClick = onOpenGoal
+                        ? (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onOpenGoal(goal);
+                        }
+                        : undefined;
 
                     return (
                         <GoalNameBadge
                             key={getGoalId(goal) || `${goalType}-${getGoalName(goal)}`}
                             className={styles.accomplishmentBadge}
+                            as={onOpenGoal ? 'button' : 'span'}
+                            onClick={handleGoalClick}
                             goal={goal}
                             label={getGoalName(goal)}
                             color={iconColor}
@@ -128,6 +138,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     isSelected,
     onSelect,
     onRequestDelete,
+    onOpenGoal,
     getGoalColor,
     formatDate
 }) {
@@ -325,6 +336,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 getGoalIcon={getGoalIcon}
                 completedGoalColor={completedGoalColor}
                 completedGoalSecondaryColor={completedGoalSecondaryColor}
+                onOpenGoal={onOpenGoal}
             />
 
             {/* Bottom Level: Session data with horizontal sections */}
