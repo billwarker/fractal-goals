@@ -9,6 +9,8 @@ import React, { memo, useMemo } from 'react';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import { formatShortDuration } from '../../hooks/useSessionDuration';
 import { resolveEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
+import { getAverageDurationStat } from '../../utils/durationStats';
+import { getGroupBreadcrumb } from '../../utils/manageActivities';
 import {
     computeAutoAggregations,
     filterTrackedMetricDefs,
@@ -348,6 +350,8 @@ function SingleMetrics({ activity, activityDefinition, progressComparison, displ
 const ActivityCard = memo(function ActivityCard({
     activity,
     activityDefinition,
+    activityGroups = [],
+    sessionStats = null,
     deltaDisplayMode = 'percent',
 }) {
     const effectiveDeltaDisplayMode = resolveEffectiveDeltaDisplayMode(
@@ -361,6 +365,7 @@ const ActivityCard = memo(function ActivityCard({
     const activityCompleted = Boolean(activity.completed ?? activity.attributes?.completed ?? activity.time_stop);
     const activityPaused = Boolean(activity.is_paused ?? activity.attributes?.is_paused);
     const activityInProgress = !activityCompleted && !activityPaused && Boolean(activity.time_start);
+    const activityDefinitionId = activityDefinition?.id || activity.activity_definition_id || activity.activity_id || null;
     let activityStatusLabel = 'Incomplete activity';
     if (activityPaused) {
         activityStatusLabel = 'Paused activity';
@@ -388,6 +393,18 @@ const ActivityCard = memo(function ActivityCard({
         }
         return map;
     }, [autoAgg]);
+    const groupLabel = useMemo(() => {
+        const groupId = activityDefinition?.group_id || activity.group_id || null;
+        if (groupId && Array.isArray(activityGroups) && activityGroups.length > 0) {
+            const breadcrumb = getGroupBreadcrumb(groupId, activityGroups);
+            if (breadcrumb) return breadcrumb;
+        }
+        return activity.group_name || null;
+    }, [activity.group_id, activity.group_name, activityDefinition?.group_id, activityGroups]);
+    const averageDuration = useMemo(
+        () => getAverageDurationStat(sessionStats?.activity_durations?.[activityDefinitionId]),
+        [activityDefinitionId, sessionStats?.activity_durations]
+    );
 
     return (
         <div className={`${styles.activityCard} ${isActivity ? styles.activityCardInstance : ''}`}>
@@ -401,6 +418,24 @@ const ActivityCard = memo(function ActivityCard({
                     label={activityStatusLabel}
                 />
                 <div className={styles.content}>
+                    {(groupLabel || averageDuration) && (
+                        <div className={styles.activityMetaLine}>
+                            {groupLabel && (
+                                <span className={styles.activityGroupLabel}>{groupLabel}</span>
+                            )}
+                            {groupLabel && averageDuration && (
+                                <span className={styles.activityMetaSeparator}>•</span>
+                            )}
+                            {averageDuration && (
+                                <span
+                                    className={styles.activityAverage}
+                                    title={`Average based on ${averageDuration.sampleCount} completed activity instances`}
+                                >
+                                    Avg {averageDuration.label}
+                                </span>
+                            )}
+                        </div>
+                    )}
                     <div className={styles.activityTitleRow}>
                         <div className={styles.activityName}>
                             {activity.name}

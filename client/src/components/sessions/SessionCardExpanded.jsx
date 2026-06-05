@@ -123,6 +123,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     session,
     rootId,
     activities,
+    activityGroups = [],
     sessionActivityInstances = [],
     isSelected,
     onSelect,
@@ -339,6 +340,8 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                                         key={activity.instance_id || activity.id || `${activity.name}-${index}`}
                                         activity={activity}
                                         activityDefinition={activityDefinition}
+                                        activityGroups={activityGroups}
+                                        sessionStats={session.stats}
                                         deltaDisplayMode={deltaDisplayMode}
                                     />
                                 );
@@ -354,7 +357,9 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                         <SessionSectionGrid
                             sections={sessionData.sections}
                             activities={activities}
+                            activityGroups={activityGroups}
                             activityInstances={sessionActivityInstances}
+                            sessionStats={session.stats}
                             deltaDisplayMode={deltaDisplayMode}
                         />
 

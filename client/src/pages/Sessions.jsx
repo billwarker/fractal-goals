@@ -315,6 +315,7 @@ function Sessions() {
                                     session={session}
                                     rootId={rootId}
                                     activities={activities}
+                                    activityGroups={activityGroups}
                                     isSelected={selectedSessionId === session.id}
                                     onSelect={handleSessionSelect}
                                     onRequestDelete={handleRequestDeleteSession}

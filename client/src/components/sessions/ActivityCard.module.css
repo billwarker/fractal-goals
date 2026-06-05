@@ -21,6 +21,7 @@
 
 .content {
     flex: 1;
+    min-width: 0;
 }
 
 .completionBadge {
@@ -38,6 +39,29 @@
     font-weight: 500;
     color: var(--color-text-primary);
     text-decoration: none;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.activityMetaLine {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 5px;
+    margin-bottom: 2px;
+    color: var(--color-text-muted);
+    font-size: 11px;
+    line-height: 1.25;
+}
+
+.activityGroupLabel,
+.activityAverage {
+    overflow-wrap: anywhere;
+}
+
+.activityMetaSeparator {
+    color: var(--color-text-muted);
+    opacity: 0.75;
 }
 
 .activityDuration {
