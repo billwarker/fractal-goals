@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { adminApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
-import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import notify from '../utils/notify';
 import { formatError } from '../utils/mutationNotify';
 import styles from './Admin.module.css';
@@ -11,6 +10,7 @@ import styles from './Admin.module.css';
 const ADMIN_USERS_KEY = ['admin', 'users'];
 const ADMIN_SUMMARY_KEY = ['admin', 'summary'];
 const ADMIN_INVITES_KEY = ['admin', 'invite-keys'];
+const QUOTA_PLACEHOLDER = '{"goals": 100, "sessions": 500}';
 
 const formatDate = (value) => value ? new Date(value).toLocaleString() : 'Never';
 const formatBytes = (bytes) => {
@@ -23,6 +23,12 @@ const formatBytes = (bytes) => {
         index += 1;
     }
     return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+};
+const formatQuotaJson = (value) => JSON.stringify(value || {}, null, 2);
+const getTierDefaultQuotas = (user, tier) => {
+    const defaults = user?.tier_default_limits || {};
+    const tierDefaults = defaults[tier] ?? defaults.free ?? {};
+    return tierDefaults || {};
 };
 
 function UsageBar({ label, used, limit }) {
@@ -70,7 +76,263 @@ function StorageEditor({ user }) {
     );
 }
 
-function UserRow({ user, onDelete }) {
+function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generatedPassword }) {
+    const [activeTab, setActiveTab] = useState('account');
+    const [tierDraft, setTierDraft] = useState(user?.membership_tier || 'free');
+    const [roleDraft, setRoleDraft] = useState(user?.role || 'user');
+    const [storageDraftMb, setStorageDraftMb] = useState('0');
+    const [quotaDraft, setQuotaDraft] = useState('{}');
+    const [softConfirm, setSoftConfirm] = useState('');
+    const [hardConfirm, setHardConfirm] = useState('');
+
+    React.useEffect(() => {
+        if (!user) return;
+        setTierDraft(user.membership_tier || 'free');
+        setRoleDraft(user.role || 'user');
+        setStorageDraftMb(String(Math.round((user.storage_limit_bytes ?? 0) / 1048576)));
+        setQuotaDraft(formatQuotaJson(user.limits || user.quota_overrides || {}));
+        setSoftConfirm('');
+        setHardConfirm('');
+        setActiveTab('account');
+    }, [user]);
+
+    React.useEffect(() => {
+        if (!isOpen) return undefined;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        const handleEsc = (event) => {
+            if (event.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', handleEsc);
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            document.removeEventListener('keydown', handleEsc);
+        };
+    }, [isOpen, onClose]);
+
+    if (!user || !isOpen) return null;
+
+    const submitQuota = () => {
+        try {
+            const parsed = quotaDraft.trim() ? JSON.parse(quotaDraft) : {};
+            onAction('quota', {
+                quota_overrides: parsed,
+                storage_limit_bytes: Math.max(0, Number(storageDraftMb || 0)) * 1048576,
+            });
+        } catch {
+            notify.error('Quota overrides must be valid JSON');
+        }
+    };
+
+    const resetQuotaToTierDefaults = () => {
+        setQuotaDraft(formatQuotaJson(getTierDefaultQuotas(user, tierDraft)));
+        onAction('quota', {
+            quota_overrides: {},
+            storage_limit_bytes: Math.max(0, Number(storageDraftMb || 0)) * 1048576,
+        });
+    };
+
+    const tabs = [
+        ['account', 'Account'],
+        ['quota', 'Quota'],
+        ['access', 'Access'],
+        ['password', 'Password'],
+        ['destructive', 'Destructive'],
+    ];
+
+    return (
+        <div className={styles.actionsOverlay} onClick={onClose} aria-modal="true" role="dialog">
+            <div className={styles.actionsShell} onClick={(event) => event.stopPropagation()}>
+                <div className={styles.actionsHeader}>
+                    <h2>Actions for {user.username}</h2>
+                    <button onClick={onClose} className={styles.actionsCloseButton} aria-label="Close user actions">
+                        &times;
+                    </button>
+                </div>
+                <div className={styles.actionsBody}>
+                    <aside className={styles.actionsSidebar}>
+                        <div className={styles.actionsTabMenu}>
+                            {tabs.map(([key, label]) => (
+                                <button
+                                    key={key}
+                                    className={`${styles.actionsTab} ${activeTab === key ? styles.actionsTabActive : ''}`}
+                                    onClick={() => setActiveTab(key)}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className={styles.actionsUserSummary}>
+                            <strong>{user.email}</strong>
+                            <span>{user.is_active ? 'Active' : 'Suspended'} · {user.membership_tier}</span>
+                        </div>
+                    </aside>
+
+                    <div className={styles.actionsContentArea}>
+                        {activeTab === 'account' && (
+                            <section className={styles.actionsTabContent}>
+                                <h3 className={styles.actionsSectionTitle}>Account</h3>
+                                <div className={styles.actionsFormStack}>
+                                    <div className={styles.actionsControlRow}>
+                                        <label>
+                                            <span>Tier</span>
+                                            <select value={tierDraft} onChange={(event) => setTierDraft(event.target.value)}>
+                                                <option value="free">free</option>
+                                                <option value="paid">paid</option>
+                                                <option value="legacy">legacy</option>
+                                            </select>
+                                        </label>
+                                        <button
+                                            onClick={() => onAction('tier', { membership_tier: tierDraft })}
+                                            disabled={isPending}
+                                        >
+                                            Upgrade Tier
+                                        </button>
+                                    </div>
+                                    <div className={styles.actionsControlRow}>
+                                        <label>
+                                            <span>Role</span>
+                                            <select value={roleDraft} onChange={(event) => setRoleDraft(event.target.value)}>
+                                                <option value="user">user</option>
+                                                <option value="admin">admin</option>
+                                            </select>
+                                        </label>
+                                        <button
+                                            onClick={() => onAction('role', { role: roleDraft })}
+                                            disabled={isPending}
+                                        >
+                                            Update Role
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
+                        {activeTab === 'quota' && (
+                            <section className={styles.actionsTabContent}>
+                                <h3 className={styles.actionsSectionTitle}>Quota</h3>
+                                <p className={styles.actionsDescription}>Update storage and resource overrides for this user.</p>
+                                <div className={styles.actionsFormStack}>
+                                    <label className={styles.actionsField}>
+                                        <span>Storage MB</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={storageDraftMb}
+                                            onChange={(event) => setStorageDraftMb(event.target.value)}
+                                        />
+                                    </label>
+                                    <label className={styles.actionsField}>
+                                        <span>Quota overrides JSON</span>
+                                        <textarea
+                                            value={quotaDraft}
+                                            onChange={(event) => setQuotaDraft(event.target.value)}
+                                            placeholder={QUOTA_PLACEHOLDER}
+                                            rows={8}
+                                        />
+                                    </label>
+                                    <button className={styles.actionsPrimaryButton} onClick={submitQuota} disabled={isPending}>
+                                        Upgrade Quotas
+                                    </button>
+                                    <button onClick={resetQuotaToTierDefaults} disabled={isPending}>
+                                        Reset to Tier Defaults
+                                    </button>
+                                </div>
+                            </section>
+                        )}
+
+                        {activeTab === 'access' && (
+                            <section className={styles.actionsTabContent}>
+                                <h3 className={styles.actionsSectionTitle}>Access</h3>
+                                <p className={styles.actionsDescription}>
+                                    Status: {user.is_active ? 'Active' : 'Suspended'} · Failed logins: {user.failed_login_count || 0}
+                                </p>
+                                <div className={styles.actionsButtonStack}>
+                                    <button
+                                        onClick={() => onAction('status', { is_active: !user.is_active })}
+                                        disabled={isPending}
+                                    >
+                                        {user.is_active ? 'Suspend Account' : 'Reactivate Account'}
+                                    </button>
+                                    <button onClick={() => onAction('unlock')} disabled={isPending}>Unlock Account</button>
+                                    <button
+                                        onClick={() => onAction('forcePasswordChange', { force_password_change: !user.force_password_change })}
+                                        disabled={isPending}
+                                    >
+                                        {user.force_password_change ? 'Clear Password Change' : 'Force Password Change'}
+                                    </button>
+                                </div>
+                            </section>
+                        )}
+
+                        {activeTab === 'password' && (
+                            <section className={styles.actionsTabContent}>
+                                <h3 className={styles.actionsSectionTitle}>Password</h3>
+                                <p className={styles.actionsDescription}>Generate a temporary password and mark the account for password-change follow-up.</p>
+                                <div className={styles.actionsButtonStack}>
+                                    <button onClick={() => onAction('temporaryPassword')} disabled={isPending}>
+                                        Generate Temporary Password
+                                    </button>
+                                </div>
+                                {generatedPassword && (
+                                    <div className={styles.generatedKey}>
+                                        <span>Temporary password: {generatedPassword}</span>
+                                        <button onClick={() => navigator.clipboard?.writeText(generatedPassword)}>Copy</button>
+                                    </div>
+                                )}
+                            </section>
+                        )}
+
+                        {activeTab === 'destructive' && (
+                            <section className={`${styles.actionsTabContent} ${styles.actionsDangerContent}`}>
+                                <h3 className={styles.actionsSectionTitle}>Destructive</h3>
+                                <p className={styles.actionsDescription}>Soft delete disables and anonymizes. Hard delete removes the user and owned records.</p>
+                                <div className={styles.actionsFormStack}>
+                                    <div className={styles.actionsControlRow}>
+                                        <label>
+                                            <span>Type soft delete</span>
+                                            <input
+                                                value={softConfirm}
+                                                onChange={(event) => setSoftConfirm(event.target.value)}
+                                                placeholder="soft delete"
+                                            />
+                                        </label>
+                                        <button
+                                            className={styles.dangerButton}
+                                            onClick={() => onAction('softDelete')}
+                                            disabled={isPending || softConfirm !== 'soft delete'}
+                                        >
+                                            Soft Delete User
+                                        </button>
+                                    </div>
+                                    <div className={styles.actionsControlRow}>
+                                        <label>
+                                            <span>Type hard delete {user.username}</span>
+                                            <input
+                                                value={hardConfirm}
+                                                onChange={(event) => setHardConfirm(event.target.value)}
+                                                placeholder={`hard delete ${user.username}`}
+                                            />
+                                        </label>
+                                        <button
+                                            className={styles.dangerButton}
+                                            onClick={() => onAction('hardDelete')}
+                                            disabled={isPending || hardConfirm !== `hard delete ${user.username}`}
+                                        >
+                                            Hard Delete User
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function UserRow({ user, onActions }) {
     const [expanded, setExpanded] = useState(false);
     const navigate = useNavigate();
     const resources = user.resources || Object.keys(user.usage || {});
@@ -103,13 +365,15 @@ function UserRow({ user, onDelete }) {
                 <td>{user.fractals?.length || 0}</td>
                 <td>
                     <div>{formatBytes(storage.used_bytes)} / {formatBytes(storageLimit)}</div>
-                    <button className={styles.dangerButton} onClick={() => onDelete(user)}>Delete User</button>
+                </td>
+                <td>
+                    <button onClick={() => onActions(user)}>Actions</button>
                 </td>
             </tr>
             {expanded && (
                 <tr>
                     <td />
-                    <td colSpan="8">
+                    <td colSpan="9">
                         <div className={styles.expandedPanel}>
                             <div className={styles.quotaGrid}>
                                 {resources.map((resource) => (
@@ -173,7 +437,8 @@ function Admin() {
     const [newKey, setNewKey] = useState(null);
     const [inviteLabel, setInviteLabel] = useState('');
     const [createdPassword, setCreatedPassword] = useState(null);
-    const [userToDelete, setUserToDelete] = useState(null);
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [generatedUserPassword, setGeneratedUserPassword] = useState(null);
     const [userDraft, setUserDraft] = useState({
         username: '',
         email: '',
@@ -233,16 +498,39 @@ function Admin() {
         onError: (error) => notify.error(`Failed to create user: ${formatError(error)}`),
     });
 
-    const deleteUserMutation = useMutation({
-        mutationFn: (targetUserId) => adminApi.deleteUser(targetUserId),
-        onSuccess: () => {
-            setUserToDelete(null);
+    const adminActionMutation = useMutation({
+        mutationFn: ({ action, targetUserId, data }) => {
+            if (action === 'softDelete') return adminApi.softDeleteUser(targetUserId);
+            if (action === 'hardDelete') return adminApi.hardDeleteUser(targetUserId);
+            if (action === 'temporaryPassword') return adminApi.generateTemporaryPassword(targetUserId);
+            if (action === 'tier') return adminApi.updateUserTier(targetUserId, data);
+            if (action === 'quota') return adminApi.updateUserQuota(targetUserId, data);
+            if (action === 'status') return adminApi.updateUserStatus(targetUserId, data);
+            if (action === 'unlock') return adminApi.unlockUser(targetUserId);
+            if (action === 'forcePasswordChange') return adminApi.forcePasswordChange(targetUserId, data);
+            if (action === 'role') return adminApi.updateUserRole(targetUserId, data);
+            throw new Error(`Unknown admin action: ${action}`);
+        },
+        onSuccess: (res, variables) => {
+            if (variables.action === 'temporaryPassword') {
+                setGeneratedUserPassword(res.data.temporary_password);
+            } else {
+                setGeneratedUserPassword(null);
+            }
+            if (variables.action === 'softDelete' || variables.action === 'hardDelete') {
+                setSelectedUser(null);
+            }
             queryClient.invalidateQueries({ queryKey: ADMIN_USERS_KEY });
             queryClient.invalidateQueries({ queryKey: ADMIN_SUMMARY_KEY });
-            notify.success('User deleted');
+            notify.success('User action completed');
         },
-        onError: (error) => notify.error(`Failed to delete user: ${formatError(error)}`),
+        onError: (error) => notify.error(`Failed to update user: ${formatError(error)}`),
     });
+
+    const runUserAction = (action, data) => {
+        if (!selectedUser) return;
+        adminActionMutation.mutate({ action, targetUserId: selectedUser.id, data });
+    };
 
     const summaryCards = useMemo(() => {
         const summary = summaryQuery.data || {};
@@ -347,11 +635,19 @@ function Admin() {
                                 <th>Tier</th>
                                 <th>Fractals</th>
                                 <th>Storage</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {(usersQuery.data?.users || []).map((item) => (
-                                <UserRow key={item.id} user={item} onDelete={setUserToDelete} />
+                                <UserRow
+                                    key={item.id}
+                                    user={item}
+                                    onActions={(targetUser) => {
+                                        setSelectedUser(targetUser);
+                                        setGeneratedUserPassword(null);
+                                    }}
+                                />
                             ))}
                         </tbody>
                     </table>
@@ -405,18 +701,16 @@ function Admin() {
                 </section>
             )}
 
-            <DeleteConfirmModal
-                isOpen={Boolean(userToDelete)}
-                onClose={() => setUserToDelete(null)}
-                onConfirm={() => {
-                    if (userToDelete) {
-                        deleteUserMutation.mutate(userToDelete.id);
-                    }
+            <UserActionsModal
+                user={selectedUser}
+                isOpen={Boolean(selectedUser)}
+                onClose={() => {
+                    setSelectedUser(null);
+                    setGeneratedUserPassword(null);
                 }}
-                title="Delete User?"
-                message={`This will disable and anonymize "${userToDelete?.username}" and prevent future login. Their data remains in the database for referential safety. This action cannot be undone from the admin console.`}
-                requireMatchingText="delete"
-                confirmText={deleteUserMutation.isPending ? 'Deleting...' : 'Delete User'}
+                onAction={runUserAction}
+                isPending={adminActionMutation.isPending}
+                generatedPassword={generatedUserPassword}
             />
         </div>
     );

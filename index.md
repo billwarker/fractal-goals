@@ -97,7 +97,8 @@ Current SaaS/account pieces:
 - membership tiers and quota limits for free/paid/legacy users
 - per-user app-data storage limits and usage reporting
 - quota usage reporting in account settings
-- admin user management, invite-key generation, and support access into user fractals
+- admin user management, invite-key generation, support access into user fractals, and grouped admin user actions for tier/quota updates, temporary passwords, suspend/reactivate, unlock, role changes, soft delete, and hard delete
+- admin quota editing consumes backend-owned tier default metadata so reset-to-default behavior stays aligned with quota enforcement
 - user-scoped selection-page cache and recent-fractal localStorage keys
 - production security checks for JWT secrets, CORS, and cookie settings
 - production security checks for debug mode, shared rate-limit storage, and secure auth cookies
@@ -139,7 +140,8 @@ Performance and production-hardening notes:
 Remaining SaaS build-out to know:
 
 - Stripe/customer-portal/webhook integration is not yet wired as a full billing system.
-- Email workflows such as password reset, verification, billing notices, and quota warnings are not yet present.
+- Email workflows such as user-initiated password reset, verification, billing notices, and quota warnings are not yet present; admins can generate temporary passwords manually.
+- Admin force-password-change is currently an account marker, not an enforced login-time password-change gate.
 - Admin support access is explicit and scoped by `admin_user_id` plus `admin_mode=read_only|read_write`; it is not full impersonation.
 
 ## Core Domain Areas

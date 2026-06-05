@@ -289,6 +289,49 @@ class AdminUserUpdateSchema(BaseModel):
     quota_overrides: Optional[Dict[str, int]] = None
     storage_limit_bytes: Optional[int] = Field(None, ge=0)
 
+    @field_validator('quota_overrides')
+    @classmethod
+    def validate_quota_overrides(cls, v: Optional[Dict[str, int]]) -> Optional[Dict[str, int]]:
+        if v is None:
+            return v
+        if any(value < 0 for value in v.values()):
+            raise ValueError('Quota override values must be non-negative')
+        return v
+
+
+class AdminUserRoleUpdateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    role: str = Field(..., pattern=r'^(user|admin)$')
+
+
+class AdminUserStatusUpdateSchema(BaseModel):
+    is_active: bool
+
+
+class AdminUserTierUpdateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    membership_tier: str = Field(..., pattern=r'^(free|paid|legacy)$')
+
+
+class AdminUserQuotaUpdateSchema(BaseModel):
+    quota_overrides: Optional[Dict[str, int]] = None
+    storage_limit_bytes: Optional[int] = Field(None, ge=0)
+
+    @field_validator('quota_overrides')
+    @classmethod
+    def validate_quota_overrides(cls, v: Optional[Dict[str, int]]) -> Optional[Dict[str, int]]:
+        if v is None:
+            return v
+        if any(value < 0 for value in v.values()):
+            raise ValueError('Quota override values must be non-negative')
+        return v
+
+
+class AdminUserForcePasswordChangeSchema(BaseModel):
+    force_password_change: bool = True
+
 
 class AdminInviteKeyCreateSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)

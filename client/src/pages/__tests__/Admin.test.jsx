@@ -11,14 +11,30 @@ const {
     getInviteKeys,
     createInviteKey,
     updateUser,
-    deleteUser,
+    softDeleteUser,
+    hardDeleteUser,
+    generateTemporaryPassword,
+    updateUserTier,
+    updateUserQuota,
+    updateUserStatus,
+    unlockUser,
+    forcePasswordChange,
+    updateUserRole,
 } = vi.hoisted(() => ({
     getSummary: vi.fn(),
     getUsers: vi.fn(),
     getInviteKeys: vi.fn(),
     createInviteKey: vi.fn(),
     updateUser: vi.fn(),
-    deleteUser: vi.fn(),
+    softDeleteUser: vi.fn(),
+    hardDeleteUser: vi.fn(),
+    generateTemporaryPassword: vi.fn(),
+    updateUserTier: vi.fn(),
+    updateUserQuota: vi.fn(),
+    updateUserStatus: vi.fn(),
+    unlockUser: vi.fn(),
+    forcePasswordChange: vi.fn(),
+    updateUserRole: vi.fn(),
 }));
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -35,7 +51,15 @@ vi.mock('../../utils/api', () => ({
         getInviteKeys: (...args) => getInviteKeys(...args),
         createInviteKey: (...args) => createInviteKey(...args),
         updateUser: (...args) => updateUser(...args),
-        deleteUser: (...args) => deleteUser(...args),
+        softDeleteUser: (...args) => softDeleteUser(...args),
+        hardDeleteUser: (...args) => hardDeleteUser(...args),
+        generateTemporaryPassword: (...args) => generateTemporaryPassword(...args),
+        updateUserTier: (...args) => updateUserTier(...args),
+        updateUserQuota: (...args) => updateUserQuota(...args),
+        updateUserStatus: (...args) => updateUserStatus(...args),
+        unlockUser: (...args) => unlockUser(...args),
+        forcePasswordChange: (...args) => forcePasswordChange(...args),
+        updateUserRole: (...args) => updateUserRole(...args),
         revokeInviteKey: vi.fn(),
     },
 }));
@@ -111,6 +135,35 @@ describe('Admin', () => {
                     },
                     storage: { used_bytes: 1024, limit_bytes: 104857600 },
                     storage_limit_bytes: 104857600,
+                    quota_overrides: {},
+                    tier_default_limits: {
+                        free: {
+                            fractals: 1,
+                            goals: 77,
+                            sessions: 200,
+                            activity_instances: 500,
+                            activities: 50,
+                            metrics: 20,
+                            session_templates: 10,
+                            notes: 1000,
+                            programs: 5,
+                        },
+                        paid: {
+                            fractals: 10,
+                            goals: 1000,
+                            sessions: 5000,
+                            activity_instances: 20000,
+                            activities: 500,
+                            metrics: 250,
+                            session_templates: 250,
+                            notes: 10000,
+                            programs: 50,
+                        },
+                        legacy: null,
+                    },
+                    failed_login_count: 2,
+                    locked_until: null,
+                    force_password_change: false,
                     resources: ['fractals', 'goals', 'sessions', 'activity_instances', 'activities', 'metrics', 'session_templates', 'notes', 'programs'],
                     labels: { activity_instances: 'activity instances', session_templates: 'session templates' },
                     fractals: [{ id: 'root-1', name: 'Root', created_at: '2026-06-01T00:00:00Z', goal_count: 2, session_count: 3, completed: false }],
@@ -121,7 +174,15 @@ describe('Admin', () => {
         getInviteKeys.mockResolvedValue({ data: [] });
         createInviteKey.mockResolvedValue({ data: { id: 'key-1', key: 'fg_invite_secret', status: 'available' } });
         updateUser.mockResolvedValue({ data: {} });
-        deleteUser.mockResolvedValue({ data: { message: 'User deleted' } });
+        softDeleteUser.mockResolvedValue({ data: { message: 'User soft deleted' } });
+        hardDeleteUser.mockResolvedValue({ data: { message: 'User hard deleted' } });
+        generateTemporaryPassword.mockResolvedValue({ data: { temporary_password: 'A1temporaryPassword' } });
+        updateUserTier.mockResolvedValue({ data: {} });
+        updateUserQuota.mockResolvedValue({ data: {} });
+        updateUserStatus.mockResolvedValue({ data: {} });
+        unlockUser.mockResolvedValue({ data: {} });
+        forcePasswordChange.mockResolvedValue({ data: {} });
+        updateUserRole.mockResolvedValue({ data: {} });
     });
 
     it('renders user entity metrics, storage, and invite key creation', async () => {
@@ -148,23 +209,97 @@ describe('Admin', () => {
         await waitFor(() => expect(screen.getByText('fg_invite_secret')).toBeInTheDocument());
     });
 
-    it('requires typing delete before deleting a user', async () => {
+    it('opens user actions and runs core account actions', async () => {
         renderAdmin();
 
         fireEvent.click(screen.getByText('users'));
         await waitFor(() => expect(screen.getByText('tester')).toBeInTheDocument());
 
-        fireEvent.click(screen.getByText('Delete User'));
-        expect(screen.getByText('Delete User?')).toBeInTheDocument();
-        expect(screen.getByText(/Type "delete" to confirm/)).toBeInTheDocument();
+        expect(screen.queryByText('Delete User')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
 
-        const confirmButton = screen.getAllByRole('button', { name: 'Delete User' })
-            .find((button) => button.disabled);
-        expect(confirmButton).toBeDisabled();
+        expect(screen.getByText('Actions for tester')).toBeInTheDocument();
+        expect(screen.getByText('Upgrade Tier')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Quota' }));
+        expect(screen.getByText('Upgrade Quotas')).toBeInTheDocument();
+        expect(screen.getByDisplayValue(/"goals": 50/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Password' }));
+        expect(screen.getByText('Generate Temporary Password')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Access' }));
+        expect(screen.getByText('Suspend Account')).toBeInTheDocument();
+        expect(screen.getByText('Unlock Account')).toBeInTheDocument();
+        expect(screen.getByText('Force Password Change')).toBeInTheDocument();
 
-        fireEvent.change(screen.getByPlaceholderText('Type "delete"'), { target: { value: 'delete' } });
-        fireEvent.click(confirmButton);
+        fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+        fireEvent.click(screen.getByText('Upgrade Tier'));
+        await waitFor(() => expect(updateUserTier).toHaveBeenCalledWith('user-1', { membership_tier: 'free' }));
 
-        await waitFor(() => expect(deleteUser).toHaveBeenCalledWith('user-1'));
+        fireEvent.click(screen.getByRole('button', { name: 'Quota' }));
+        fireEvent.click(screen.getByText('Upgrade Quotas'));
+        await waitFor(() => expect(updateUserQuota).toHaveBeenCalledWith('user-1', {
+            quota_overrides: {
+                fractals: 1,
+                goals: 50,
+                sessions: 200,
+                activity_instances: 500,
+                activities: 50,
+                metrics: 20,
+                session_templates: 10,
+                notes: 1000,
+                programs: 5,
+            },
+            storage_limit_bytes: 104857600,
+        }));
+        fireEvent.click(screen.getByText('Reset to Tier Defaults'));
+        await waitFor(() => expect(updateUserQuota).toHaveBeenCalledWith('user-1', {
+            quota_overrides: {},
+            storage_limit_bytes: 104857600,
+        }));
+        expect(screen.getByDisplayValue(/"goals": 77/)).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Access' }));
+        fireEvent.click(screen.getByText('Suspend Account'));
+        await waitFor(() => expect(updateUserStatus).toHaveBeenCalledWith('user-1', { is_active: false }));
+
+        fireEvent.click(screen.getByText('Unlock Account'));
+        await waitFor(() => expect(unlockUser).toHaveBeenCalledWith('user-1'));
+
+        fireEvent.click(screen.getByText('Force Password Change'));
+        await waitFor(() => expect(forcePasswordChange).toHaveBeenCalledWith('user-1', { force_password_change: true }));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+        fireEvent.click(screen.getByText('Update Role'));
+        await waitFor(() => expect(updateUserRole).toHaveBeenCalledWith('user-1', { role: 'user' }));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Password' }));
+        fireEvent.click(screen.getByText('Generate Temporary Password'));
+        await waitFor(() => expect(generateTemporaryPassword).toHaveBeenCalledWith('user-1'));
+        expect(screen.getByText(/A1temporaryPassword/)).toBeInTheDocument();
+    });
+
+    it('requires typed confirmations for soft and hard delete actions', async () => {
+        renderAdmin();
+
+        fireEvent.click(screen.getByText('users'));
+        await waitFor(() => expect(screen.getByText('tester')).toBeInTheDocument());
+
+        fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Destructive' }));
+
+        const softButton = screen.getByRole('button', { name: 'Soft Delete User' });
+        const hardButton = screen.getByRole('button', { name: 'Hard Delete User' });
+        expect(softButton).toBeDisabled();
+        expect(hardButton).toBeDisabled();
+
+        fireEvent.change(screen.getByPlaceholderText('soft delete'), { target: { value: 'soft delete' } });
+        fireEvent.click(softButton);
+        await waitFor(() => expect(softDeleteUser).toHaveBeenCalledWith('user-1'));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Destructive' }));
+        fireEvent.change(screen.getByPlaceholderText('hard delete tester'), { target: { value: 'hard delete tester' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Hard Delete User' }));
+
+        await waitFor(() => expect(hardDeleteUser).toHaveBeenCalledWith('user-1'));
     });
 });

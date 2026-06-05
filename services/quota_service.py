@@ -91,6 +91,14 @@ class QuotaService:
         tier = (tier or "free").strip().lower()
         return tier if tier in {"free", "paid", "legacy"} else "free"
 
+    @staticmethod
+    def get_tier_default_limits() -> JsonDict:
+        return {
+            "free": deepcopy(FREE_LIMITS),
+            "paid": deepcopy(PAID_LIMITS),
+            "legacy": None,
+        }
+
     def get_effective_limits(self, user: User) -> Optional[JsonDict]:
         tier = self.normalize_tier(getattr(user, "membership_tier", "free"))
         if tier == "legacy":

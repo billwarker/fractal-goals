@@ -1,14 +1,56 @@
 import datetime
 import hashlib
+import logging
 import secrets
 import string
 
-from sqlalchemy import func, or_
+from sqlalchemy import delete, func, or_
+from sqlalchemy.orm.attributes import flag_modified
 
-from models import Goal, Session, SignupInviteKey, User, utc_now
+from models import (
+    ActivityDefinition,
+    ActivityDurationStats,
+    ActivityGroup,
+    ActivityInstance,
+    AnalyticsDashboard,
+    EventLog,
+    FractalMetricDefinition,
+    Goal,
+    GoalLevel,
+    MetricDefinition,
+    MetricValue,
+    Note,
+    Program,
+    ProgramBlock,
+    ProgramDay,
+    ProgramDaySession,
+    ProgressRecord,
+    Session,
+    SessionTemplate,
+    SessionTemplateStats,
+    SignupInviteKey,
+    SplitDefinition,
+    Target,
+    TargetContributionLedger,
+    TargetMetricCondition,
+    TemplateSectionStats,
+    User,
+    activity_goal_associations,
+    goal_activity_group_associations,
+    program_block_goals,
+    program_day_goals,
+    program_day_templates,
+    program_goals,
+    session_goals,
+    session_template_goals,
+    utc_now,
+)
 from services.quota_service import DEFAULT_STORAGE_LIMIT_BYTES, QuotaService
 from services.serializers import format_utc
 from services.service_types import JsonDict, ServiceResult
+
+logger = logging.getLogger(__name__)
+FORCE_PASSWORD_CHANGE_PREFERENCE = "admin_force_password_change"
 
 
 def hash_invite_key(raw_key: str) -> str:
@@ -148,7 +190,66 @@ class AdminService:
         self.db_session.refresh(user)
         return self.serialize_admin_user(user), None, 200
 
-    def delete_user(self, user_id: str, current_user: User) -> ServiceResult[JsonDict]:
+    def update_role(self, user_id: str, current_user: User, role: str) -> ServiceResult[JsonDict]:
+        if user_id == current_user.id and role != "admin":
+            return None, "Admins cannot remove their own admin role from the admin console", 400
+        return self.update_user(user_id, {"role": role})
+
+    def update_tier(self, user_id: str, membership_tier: str) -> ServiceResult[JsonDict]:
+        return self.update_user(user_id, {"membership_tier": membership_tier})
+
+    def update_quota(self, user_id: str, data: JsonDict) -> ServiceResult[JsonDict]:
+        updates = {}
+        if "quota_overrides" in data:
+            updates["quota_overrides"] = data["quota_overrides"] or {}
+        if "storage_limit_bytes" in data:
+            updates["storage_limit_bytes"] = data["storage_limit_bytes"]
+        return self.update_user(user_id, updates)
+
+    def update_status(self, user_id: str, is_active: bool) -> ServiceResult[JsonDict]:
+        return self.update_user(user_id, {"is_active": is_active})
+
+    def unlock_user(self, user_id: str) -> ServiceResult[JsonDict]:
+        user = self.db_session.get(User, user_id)
+        if not user:
+            return None, "User not found", 404
+        user.failed_login_count = 0
+        user.locked_until = None
+        self.db_session.commit()
+        self.db_session.refresh(user)
+        return self.serialize_admin_user(user), None, 200
+
+    def set_force_password_change(self, user_id: str, enabled: bool = True) -> ServiceResult[JsonDict]:
+        user = self.db_session.get(User, user_id)
+        if not user:
+            return None, "User not found", 404
+        preferences = dict(user.preferences or {})
+        preferences[FORCE_PASSWORD_CHANGE_PREFERENCE] = bool(enabled)
+        user.preferences = preferences
+        flag_modified(user, "preferences")
+        self.db_session.commit()
+        self.db_session.refresh(user)
+        return self.serialize_admin_user(user), None, 200
+
+    def generate_temporary_password(self, user_id: str) -> ServiceResult[JsonDict]:
+        user = self.db_session.get(User, user_id)
+        if not user:
+            return None, "User not found", 404
+        raw_password = generate_password()
+        user.set_password(raw_password)
+        user.failed_login_count = 0
+        user.locked_until = None
+        preferences = dict(user.preferences or {})
+        preferences[FORCE_PASSWORD_CHANGE_PREFERENCE] = True
+        user.preferences = preferences
+        flag_modified(user, "preferences")
+        self.db_session.commit()
+        self.db_session.refresh(user)
+        payload = self.serialize_admin_user(user)
+        payload["temporary_password"] = raw_password
+        return payload, None, 200
+
+    def soft_delete_user(self, user_id: str, current_user: User) -> ServiceResult[JsonDict]:
         if user_id == current_user.id:
             return None, "Admins cannot delete their own account from the admin console", 400
 
@@ -161,8 +262,127 @@ class AdminService:
         user.is_active = False
         user.role = "user"
         user.set_password(generate_secret("disabled"))
+        user.failed_login_count = 0
+        user.locked_until = None
         self.db_session.commit()
-        return {"message": "User deleted", "user_id": user_id}, None, 200
+        return {"message": "User soft deleted", "user_id": user_id}, None, 200
+
+    def delete_user(self, user_id: str, current_user: User) -> ServiceResult[JsonDict]:
+        return self.soft_delete_user(user_id, current_user)
+
+    def hard_delete_user(self, user_id: str, current_user: User) -> ServiceResult[JsonDict]:
+        if user_id == current_user.id:
+            return None, "Admins cannot hard delete their own account from the admin console", 400
+
+        user = self.db_session.get(User, user_id)
+        if not user:
+            return None, "User not found", 404
+
+        root_ids = [
+            row[0] for row in self.db_session.query(Goal.id).filter(
+                Goal.owner_id == user_id,
+                Goal.parent_id.is_(None),
+            ).all()
+        ]
+
+        if root_ids:
+            self._hard_delete_roots(root_ids)
+
+        self.db_session.execute(delete(GoalLevel).where(GoalLevel.owner_id == user_id))
+        self.db_session.delete(user)
+        self.db_session.commit()
+        return {"message": "User hard deleted", "user_id": user_id, "deleted_root_count": len(root_ids)}, None, 200
+
+    def _delete_for_roots(self, model, root_ids: list[str]):
+        self.db_session.execute(delete(model).where(model.root_id.in_(root_ids)))
+
+    def _hard_delete_roots(self, root_ids: list[str]):
+        goal_ids = [
+            row[0] for row in self.db_session.query(Goal.id).filter(
+                or_(Goal.id.in_(root_ids), Goal.root_id.in_(root_ids))
+            ).all()
+        ]
+
+        if goal_ids:
+            for table, column_name in (
+                (session_goals, "goal_id"),
+                (activity_goal_associations, "goal_id"),
+                (goal_activity_group_associations, "goal_id"),
+                (session_template_goals, "goal_id"),
+                (program_day_goals, "goal_id"),
+                (program_goals, "goal_id"),
+                (program_block_goals, "goal_id"),
+            ):
+                self.db_session.execute(delete(table).where(getattr(table.c, column_name).in_(goal_ids)))
+
+        self._delete_for_roots(Note, root_ids)
+        self._delete_for_roots(EventLog, root_ids)
+        self._delete_for_roots(AnalyticsDashboard, root_ids)
+
+        target_ids = [
+            row[0] for row in self.db_session.query(Target.id).filter(Target.root_id.in_(root_ids)).all()
+        ]
+        if target_ids:
+            self.db_session.execute(delete(TargetContributionLedger).where(TargetContributionLedger.target_id.in_(target_ids)))
+            self.db_session.execute(delete(TargetMetricCondition).where(TargetMetricCondition.target_id.in_(target_ids)))
+        self._delete_for_roots(Target, root_ids)
+
+        self._delete_for_roots(ProgressRecord, root_ids)
+        metric_ids = [
+            row[0] for row in self.db_session.query(MetricDefinition.id).filter(
+                MetricDefinition.root_id.in_(root_ids)
+            ).all()
+        ]
+        if metric_ids:
+            self.db_session.execute(delete(MetricValue).where(MetricValue.metric_definition_id.in_(metric_ids)))
+        self._delete_for_roots(ActivityInstance, root_ids)
+
+        self._delete_for_roots(SessionTemplateStats, root_ids)
+        self._delete_for_roots(TemplateSectionStats, root_ids)
+        self._delete_for_roots(ActivityDurationStats, root_ids)
+        self._delete_for_roots(Session, root_ids)
+
+        template_ids = [
+            row[0] for row in self.db_session.query(SessionTemplate.id).filter(
+                SessionTemplate.root_id.in_(root_ids)
+            ).all()
+        ]
+        if template_ids:
+            self.db_session.execute(delete(program_day_templates).where(
+                program_day_templates.c.session_template_id.in_(template_ids)
+            ))
+        self._delete_for_roots(SessionTemplate, root_ids)
+
+        program_ids = [
+            row[0] for row in self.db_session.query(Program.id).filter(Program.root_id.in_(root_ids)).all()
+        ]
+        if program_ids:
+            block_ids = [
+                row[0] for row in self.db_session.query(ProgramBlock.id).filter(
+                    ProgramBlock.program_id.in_(program_ids)
+                ).all()
+            ]
+            if block_ids:
+                day_ids = [
+                    row[0] for row in self.db_session.query(ProgramDay.id).filter(
+                        ProgramDay.block_id.in_(block_ids)
+                    ).all()
+                ]
+                if day_ids:
+                    self.db_session.execute(delete(ProgramDaySession).where(ProgramDaySession.program_day_id.in_(day_ids)))
+                    self.db_session.execute(delete(program_day_templates).where(program_day_templates.c.program_day_id.in_(day_ids)))
+                    self.db_session.execute(delete(ProgramDay).where(ProgramDay.id.in_(day_ids)))
+                self.db_session.execute(delete(ProgramBlock).where(ProgramBlock.id.in_(block_ids)))
+            self.db_session.execute(delete(Program).where(Program.id.in_(program_ids)))
+
+        self._delete_for_roots(MetricDefinition, root_ids)
+        self._delete_for_roots(SplitDefinition, root_ids)
+        self._delete_for_roots(FractalMetricDefinition, root_ids)
+        self._delete_for_roots(ActivityDefinition, root_ids)
+        self._delete_for_roots(ActivityGroup, root_ids)
+
+        if goal_ids:
+            self.db_session.execute(delete(Goal).where(Goal.id.in_(goal_ids)))
 
     def serialize_fractal_summary(self, root: Goal) -> JsonDict:
         session_count = int(self.db_session.query(func.count(Session.id)).filter(
@@ -202,8 +422,12 @@ class AdminService:
             "storage_limit_bytes": getattr(user, "storage_limit_bytes", DEFAULT_STORAGE_LIMIT_BYTES),
             "created_at": format_utc(user.created_at),
             "last_login_at": format_utc(user.last_login_at),
+            "failed_login_count": getattr(user, "failed_login_count", 0) or 0,
+            "locked_until": format_utc(user.locked_until),
+            "force_password_change": bool((user.preferences or {}).get(FORCE_PASSWORD_CHANGE_PREFERENCE)),
             "usage": usage_payload["usage"],
             "limits": usage_payload["limits"],
+            "tier_default_limits": self.quota_service.get_tier_default_limits(),
             "storage": usage_payload["storage"],
             "resources": usage_payload["resources"],
             "labels": usage_payload["labels"],
