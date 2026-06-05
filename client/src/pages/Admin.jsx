@@ -10,6 +10,7 @@ import styles from './Admin.module.css';
 const ADMIN_USERS_KEY = ['admin', 'users'];
 const ADMIN_SUMMARY_KEY = ['admin', 'summary'];
 const ADMIN_INVITES_KEY = ['admin', 'invite-keys'];
+const ADMIN_TIER_QUOTAS_KEY = ['admin', 'tier-quotas'];
 const QUOTA_PLACEHOLDER = '{"goals": 100, "sessions": 500}';
 
 const formatDate = (value) => value ? new Date(value).toLocaleString() : 'Never';
@@ -73,6 +74,139 @@ function StorageEditor({ user }) {
             <span>MB</span>
             <button onClick={() => mutation.mutate()} disabled={mutation.isPending}>Save</button>
         </div>
+    );
+}
+
+function TierQuotasPanel({ tierQuotasQuery }) {
+    const queryClient = useQueryClient();
+    const [selectedTier, setSelectedTier] = useState('free');
+    const [quotaDraft, setQuotaDraft] = useState('{}');
+    const [applyExistingUsers, setApplyExistingUsers] = useState(false);
+
+    const tierDefaultLimits = tierQuotasQuery.data?.tier_default_limits || {};
+    const tierOptions = useMemo(() => Object.keys(tierDefaultLimits), [tierDefaultLimits]);
+    const editableTiers = tierQuotasQuery.data?.editable_tiers || ['free', 'paid'];
+    const unlimitedTiers = tierQuotasQuery.data?.unlimited_tiers || ['legacy'];
+    const selectedTierIsUnlimited = unlimitedTiers.includes(selectedTier);
+
+    React.useEffect(() => {
+        if (!tierQuotasQuery.data) return;
+        if (!Object.prototype.hasOwnProperty.call(tierDefaultLimits, selectedTier)) {
+            setSelectedTier(editableTiers[0] || tierOptions[0] || 'free');
+            return;
+        }
+        const limits = tierDefaultLimits[selectedTier];
+        setQuotaDraft(limits === null || limits === undefined ? 'null' : formatQuotaJson(limits));
+    }, [editableTiers, selectedTier, tierDefaultLimits, tierOptions, tierQuotasQuery.data]);
+
+    const mutation = useMutation({
+        mutationFn: () => {
+            const parsed = JSON.parse(quotaDraft);
+            return adminApi.updateTierQuotas({
+                tier: selectedTier,
+                limits: parsed,
+                apply_existing_users: applyExistingUsers,
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ADMIN_TIER_QUOTAS_KEY });
+            queryClient.invalidateQueries({ queryKey: ADMIN_USERS_KEY });
+            queryClient.invalidateQueries({ queryKey: ADMIN_SUMMARY_KEY });
+            notify.success('Tier quotas updated');
+        },
+        onError: (error) => notify.error(`Failed to update tier quotas: ${formatError(error)}`),
+    });
+
+    const saveTierQuotas = () => {
+        if (selectedTierIsUnlimited || !editableTiers.includes(selectedTier)) {
+            notify.error('Legacy tier is unlimited and cannot be assigned finite default quotas');
+            return;
+        }
+        try {
+            const parsed = JSON.parse(quotaDraft);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                notify.error('Tier quota JSON must be an object');
+                return;
+            }
+        } catch {
+            notify.error('Tier quota JSON must be valid JSON');
+            return;
+        }
+        mutation.mutate();
+    };
+
+    if (tierQuotasQuery.isLoading) {
+        return <div className={styles.status}>Loading tier quotas...</div>;
+    }
+
+    if (tierQuotasQuery.isError) {
+        return <div className={styles.status}>Failed to load tier quotas.</div>;
+    }
+
+    return (
+        <section className={styles.section}>
+            <div className={styles.tierQuotaEditor}>
+                <div className={styles.tierQuotaHeader}>
+                    <div>
+                        <h2>Tier Quotas</h2>
+                        <p>Manage default resource quotas for account tiers.</p>
+                    </div>
+                    <label>
+                        <span>Tier</span>
+                        <select value={selectedTier} onChange={(event) => setSelectedTier(event.target.value)}>
+                            {tierOptions.map((tier) => (
+                                <option key={tier} value={tier}>{tier}</option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+
+                <label className={styles.tierQuotaJsonField}>
+                    <span>Default Quotas JSON</span>
+                    <textarea
+                        value={quotaDraft}
+                        onChange={(event) => setQuotaDraft(event.target.value)}
+                        rows={12}
+                        disabled={selectedTierIsUnlimited}
+                    />
+                </label>
+
+                {selectedTierIsUnlimited ? (
+                    <div className={styles.tierQuotaNotice}>
+                        Legacy remains unlimited. Use user-specific quota overrides if an individual legacy account needs finite limits.
+                    </div>
+                ) : (
+                    <div className={styles.tierQuotaApplyPanel}>
+                        <label>
+                            <input
+                                type="radio"
+                                name="tier-quota-apply"
+                                checked={!applyExistingUsers}
+                                onChange={() => setApplyExistingUsers(false)}
+                            />
+                            <span>New users only</span>
+                        </label>
+                        <label>
+                            <input
+                                type="radio"
+                                name="tier-quota-apply"
+                                checked={applyExistingUsers}
+                                onChange={() => setApplyExistingUsers(true)}
+                            />
+                            <span>Apply to existing users in this tier</span>
+                        </label>
+                    </div>
+                )}
+
+                <button
+                    className={styles.tierQuotaSaveButton}
+                    onClick={saveTierQuotas}
+                    disabled={mutation.isPending || selectedTierIsUnlimited}
+                >
+                    {mutation.isPending ? 'Saving...' : 'Save Tier Quotas'}
+                </button>
+            </div>
+        </section>
     );
 }
 
@@ -461,6 +595,11 @@ function Admin() {
         queryFn: async () => (await adminApi.getInviteKeys()).data,
         enabled: Boolean(user?.is_admin),
     });
+    const tierQuotasQuery = useQuery({
+        queryKey: ADMIN_TIER_QUOTAS_KEY,
+        queryFn: async () => (await adminApi.getTierQuotas()).data,
+        enabled: Boolean(user?.is_admin),
+    });
 
     const createInviteMutation = useMutation({
         mutationFn: () => adminApi.createInviteKey({ label: inviteLabel }),
@@ -558,7 +697,7 @@ function Admin() {
             </header>
 
             <div className={styles.tabs}>
-                {['overview', 'users', 'invite keys'].map((item) => (
+                {['overview', 'users', 'tier quotas', 'invite keys'].map((item) => (
                     <button
                         key={item}
                         className={tab === item ? styles.activeTab : ''}
@@ -652,6 +791,10 @@ function Admin() {
                         </tbody>
                     </table>
                 </section>
+            )}
+
+            {tab === 'tier quotas' && (
+                <TierQuotasPanel tierQuotasQuery={tierQuotasQuery} />
             )}
 
             {tab === 'invite keys' && (

@@ -333,6 +333,21 @@ class AdminUserForcePasswordChangeSchema(BaseModel):
     force_password_change: bool = True
 
 
+class AdminTierQuotaUpdateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    tier: str = Field(..., pattern=r'^(free|paid|legacy)$')
+    limits: Dict[str, int]
+    apply_existing_users: bool = False
+
+    @field_validator('limits')
+    @classmethod
+    def validate_limits(cls, v: Dict[str, int]) -> Dict[str, int]:
+        if any(value < 0 for value in v.values()):
+            raise ValueError('Quota limit values must be non-negative')
+        return v
+
+
 class AdminInviteKeyCreateSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 

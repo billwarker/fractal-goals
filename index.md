@@ -99,6 +99,7 @@ Current SaaS/account pieces:
 - quota usage reporting in account settings
 - admin user management, invite-key generation, support access into user fractals, and grouped admin user actions for tier/quota updates, temporary passwords, suspend/reactivate, unlock, role changes, soft delete, and hard delete
 - admin quota editing consumes backend-owned tier default metadata so reset-to-default behavior stays aligned with quota enforcement
+- admin tier quota management persists default free/paid quotas in `app_settings`; changes can apply to existing tier users or preserve existing users for new-user-only rollout
 - user-scoped selection-page cache and recent-fractal localStorage keys
 - production security checks for JWT secrets, CORS, and cookie settings
 - production security checks for debug mode, shared rate-limit storage, and secure auth cookies

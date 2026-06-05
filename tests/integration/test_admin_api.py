@@ -20,6 +20,22 @@ def auth_headers_for(user):
     return {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
 
 
+def free_limits_with(**overrides):
+    limits = {
+        'fractals': 1,
+        'goals': 50,
+        'sessions': 200,
+        'activity_instances': 500,
+        'activities': 50,
+        'metrics': 20,
+        'session_templates': 10,
+        'notes': 1000,
+        'programs': 5,
+    }
+    limits.update(overrides)
+    return limits
+
+
 @pytest.fixture
 def admin_user(db_session):
     user = User(
@@ -261,6 +277,67 @@ def test_admin_named_user_actions(admin_client, db_session, test_user):
     )
     assert role_response.status_code == 200
     assert json.loads(role_response.data)['role'] == 'admin'
+
+
+@pytest.mark.integration
+def test_admin_can_manage_tier_quotas_with_apply_scope(admin_client, db_session, test_user):
+    settings_response = admin_client.get('/api/admin/tier-quotas')
+    assert settings_response.status_code == 200
+    settings_payload = json.loads(settings_response.data)
+    assert settings_payload['tier_default_limits']['free']['goals'] == 50
+    assert settings_payload['tier_default_limits']['legacy'] is None
+
+    new_users_only_response = admin_client.patch(
+        '/api/admin/tier-quotas',
+        data=json.dumps({
+            'tier': 'free',
+            'limits': free_limits_with(goals=88),
+            'apply_existing_users': False,
+        }),
+        content_type='application/json',
+    )
+    assert new_users_only_response.status_code == 200
+    db_session.refresh(test_user)
+    assert test_user.quota_overrides['goals'] == 50
+
+    apply_existing_response = admin_client.patch(
+        '/api/admin/tier-quotas',
+        data=json.dumps({
+            'tier': 'free',
+            'limits': free_limits_with(goals=99),
+            'apply_existing_users': True,
+        }),
+        content_type='application/json',
+    )
+    assert apply_existing_response.status_code == 200
+    db_session.refresh(test_user)
+    assert test_user.quota_overrides == {}
+    assert json.loads(apply_existing_response.data)['tier_default_limits']['free']['goals'] == 99
+
+
+@pytest.mark.integration
+def test_admin_tier_quota_update_rejects_legacy_and_invalid_resources(admin_client):
+    legacy_response = admin_client.patch(
+        '/api/admin/tier-quotas',
+        data=json.dumps({
+            'tier': 'legacy',
+            'limits': free_limits_with(goals=10),
+            'apply_existing_users': True,
+        }),
+        content_type='application/json',
+    )
+    assert legacy_response.status_code == 400
+
+    invalid_response = admin_client.patch(
+        '/api/admin/tier-quotas',
+        data=json.dumps({
+            'tier': 'free',
+            'limits': {'goals': 10},
+            'apply_existing_users': True,
+        }),
+        content_type='application/json',
+    )
+    assert invalid_response.status_code == 400
 
 
 @pytest.mark.integration

@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime, timezone
 
-from models import ActivityDefinition, ActivityInstance, FractalMetricDefinition, Goal, Note, Session, SessionTemplate
-from services.quota_service import FREE_LIMITS, QuotaService
+from models import ActivityDefinition, ActivityInstance, AppSetting, FractalMetricDefinition, Goal, Note, Session, SessionTemplate
+from services.quota_service import FREE_LIMITS, TIER_DEFAULT_LIMITS_SETTING_KEY, QuotaService
 
 
 def test_free_quota_usage_counts_owned_root_entities(db_session, test_user, sample_ultimate_goal):
@@ -163,3 +163,31 @@ def test_free_limits_include_new_quota_resources():
     assert FREE_LIMITS["metrics"] == 20
     assert FREE_LIMITS["session_templates"] == 10
     assert FREE_LIMITS["activity_instances"] == 500
+
+
+def test_configured_tier_defaults_drive_effective_limits(db_session, test_user):
+    configured_free = dict(FREE_LIMITS)
+    configured_free["goals"] = 123
+    db_session.add(AppSetting(
+        key=TIER_DEFAULT_LIMITS_SETTING_KEY,
+        value={"free": configured_free},
+    ))
+    db_session.commit()
+
+    limits = QuotaService(db_session).get_effective_limits(test_user)
+
+    assert limits["goals"] == 123
+
+
+def test_invalid_configured_tier_defaults_fall_back_to_builtins(db_session, test_user):
+    invalid_free = dict(FREE_LIMITS)
+    invalid_free.pop("goals")
+    db_session.add(AppSetting(
+        key=TIER_DEFAULT_LIMITS_SETTING_KEY,
+        value={"free": invalid_free},
+    ))
+    db_session.commit()
+
+    limits = QuotaService(db_session).get_effective_limits(test_user)
+
+    assert limits["goals"] == FREE_LIMITS["goals"]

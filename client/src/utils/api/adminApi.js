@@ -3,10 +3,11 @@ import { API_BASE, axios } from './core';
 export const adminApi = {
     getSummary: () => axios.get(`${API_BASE}/admin/summary`),
     getUsers: (params = {}) => axios.get(`${API_BASE}/admin/users`, { params }),
+    getTierQuotas: () => axios.get(`${API_BASE}/admin/tier-quotas`),
+    updateTierQuotas: (data) => axios.patch(`${API_BASE}/admin/tier-quotas`, data),
     createUser: (data) => axios.post(`${API_BASE}/admin/users`, data),
     updateUser: (userId, data) => axios.patch(`${API_BASE}/admin/users/${userId}`, data),
     softDeleteUser: (userId) => axios.delete(`${API_BASE}/admin/users/${userId}/soft-delete`),
-    deleteUser: (userId) => axios.delete(`${API_BASE}/admin/users/${userId}/soft-delete`),
     hardDeleteUser: (userId) => axios.delete(`${API_BASE}/admin/users/${userId}/hard-delete`),
     generateTemporaryPassword: (userId) => axios.post(`${API_BASE}/admin/users/${userId}/temporary-password`),
     updateUserTier: (userId, data) => axios.patch(`${API_BASE}/admin/users/${userId}/tier`, data),

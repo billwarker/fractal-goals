@@ -8,8 +8,10 @@ import Admin from '../Admin';
 const {
     getSummary,
     getUsers,
+    getTierQuotas,
     getInviteKeys,
     createInviteKey,
+    updateTierQuotas,
     updateUser,
     softDeleteUser,
     hardDeleteUser,
@@ -23,8 +25,10 @@ const {
 } = vi.hoisted(() => ({
     getSummary: vi.fn(),
     getUsers: vi.fn(),
+    getTierQuotas: vi.fn(),
     getInviteKeys: vi.fn(),
     createInviteKey: vi.fn(),
+    updateTierQuotas: vi.fn(),
     updateUser: vi.fn(),
     softDeleteUser: vi.fn(),
     hardDeleteUser: vi.fn(),
@@ -48,8 +52,10 @@ vi.mock('../../utils/api', () => ({
     adminApi: {
         getSummary: (...args) => getSummary(...args),
         getUsers: (...args) => getUsers(...args),
+        getTierQuotas: (...args) => getTierQuotas(...args),
         getInviteKeys: (...args) => getInviteKeys(...args),
         createInviteKey: (...args) => createInviteKey(...args),
+        updateTierQuotas: (...args) => updateTierQuotas(...args),
         updateUser: (...args) => updateUser(...args),
         softDeleteUser: (...args) => softDeleteUser(...args),
         hardDeleteUser: (...args) => hardDeleteUser(...args),
@@ -171,8 +177,42 @@ describe('Admin', () => {
                 total: 1,
             },
         });
+        getTierQuotas.mockResolvedValue({
+            data: {
+                tier_default_limits: {
+                    free: {
+                        fractals: 1,
+                        goals: 50,
+                        sessions: 200,
+                        activity_instances: 500,
+                        activities: 50,
+                        metrics: 20,
+                        session_templates: 10,
+                        notes: 1000,
+                        programs: 5,
+                    },
+                    paid: {
+                        fractals: 10,
+                        goals: 1000,
+                        sessions: 5000,
+                        activity_instances: 20000,
+                        activities: 500,
+                        metrics: 250,
+                        session_templates: 250,
+                        notes: 10000,
+                        programs: 50,
+                    },
+                    legacy: null,
+                },
+                editable_tiers: ['free', 'paid'],
+                unlimited_tiers: ['legacy'],
+                resources: ['fractals', 'goals', 'sessions', 'activity_instances', 'activities', 'metrics', 'session_templates', 'notes', 'programs'],
+                labels: {},
+            },
+        });
         getInviteKeys.mockResolvedValue({ data: [] });
         createInviteKey.mockResolvedValue({ data: { id: 'key-1', key: 'fg_invite_secret', status: 'available' } });
+        updateTierQuotas.mockResolvedValue({ data: {} });
         updateUser.mockResolvedValue({ data: {} });
         softDeleteUser.mockResolvedValue({ data: { message: 'User soft deleted' } });
         hardDeleteUser.mockResolvedValue({ data: { message: 'User hard deleted' } });
@@ -301,5 +341,47 @@ describe('Admin', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Hard Delete User' }));
 
         await waitFor(() => expect(hardDeleteUser).toHaveBeenCalledWith('user-1'));
+    });
+
+    it('manages tier quota defaults with new-user or existing-user scope', async () => {
+        renderAdmin();
+
+        fireEvent.click(screen.getByText('tier quotas'));
+        await waitFor(() => expect(screen.getByDisplayValue(/"goals": 50/)).toBeInTheDocument());
+
+        fireEvent.click(screen.getByText('Save Tier Quotas'));
+        await waitFor(() => expect(updateTierQuotas).toHaveBeenCalledWith({
+            tier: 'free',
+            limits: {
+                fractals: 1,
+                goals: 50,
+                sessions: 200,
+                activity_instances: 500,
+                activities: 50,
+                metrics: 20,
+                session_templates: 10,
+                notes: 1000,
+                programs: 5,
+            },
+            apply_existing_users: false,
+        }));
+
+        fireEvent.click(screen.getByLabelText('Apply to existing users in this tier'));
+        fireEvent.click(screen.getByText('Save Tier Quotas'));
+        await waitFor(() => expect(updateTierQuotas).toHaveBeenLastCalledWith({
+            tier: 'free',
+            limits: {
+                fractals: 1,
+                goals: 50,
+                sessions: 200,
+                activity_instances: 500,
+                activities: 50,
+                metrics: 20,
+                session_templates: 10,
+                notes: 1000,
+                programs: 5,
+            },
+            apply_existing_users: true,
+        }));
     });
 });

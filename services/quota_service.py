@@ -12,6 +12,7 @@ from models import (
     ActivityGroup,
     ActivityInstance,
     AnalyticsDashboard,
+    AppSetting,
     EventLog,
     FractalMetricDefinition,
     Goal,
@@ -77,6 +78,7 @@ RESOURCE_ORDER = [
 ]
 
 DEFAULT_STORAGE_LIMIT_BYTES = 104857600
+TIER_DEFAULT_LIMITS_SETTING_KEY = "tier_default_limits"
 
 
 class QuotaService:
@@ -92,19 +94,57 @@ class QuotaService:
         return tier if tier in {"free", "paid", "legacy"} else "free"
 
     @staticmethod
-    def get_tier_default_limits() -> JsonDict:
+    def get_builtin_tier_default_limits() -> JsonDict:
         return {
             "free": deepcopy(FREE_LIMITS),
             "paid": deepcopy(PAID_LIMITS),
             "legacy": None,
         }
 
+    @staticmethod
+    def validate_finite_limits(limits: JsonDict) -> JsonDict:
+        if not isinstance(limits, dict):
+            raise ValueError("Quota limits must be an object")
+        expected = set(RESOURCE_ORDER)
+        supplied = set(limits.keys())
+        missing = expected - supplied
+        unknown = supplied - expected
+        if missing:
+            raise ValueError(f"Missing quota resources: {', '.join(sorted(missing))}")
+        if unknown:
+            raise ValueError(f"Unknown quota resources: {', '.join(sorted(unknown))}")
+        normalized = {}
+        for resource in RESOURCE_ORDER:
+            value = limits[resource]
+            if not isinstance(value, int) or value < 0:
+                raise ValueError(f"{resource} quota must be a non-negative integer")
+            normalized[resource] = value
+        return normalized
+
+    def get_tier_default_limits(self) -> JsonDict:
+        defaults = self.get_builtin_tier_default_limits()
+        setting = self.db_session.get(AppSetting, TIER_DEFAULT_LIMITS_SETTING_KEY)
+        configured = models._safe_load_json(getattr(setting, "value", None), {})
+        if not isinstance(configured, dict):
+            return defaults
+
+        for tier in ("free", "paid"):
+            tier_limits = configured.get(tier)
+            if tier_limits is None:
+                continue
+            try:
+                defaults[tier] = self.validate_finite_limits(tier_limits)
+            except ValueError:
+                continue
+        return defaults
+
     def get_effective_limits(self, user: User) -> Optional[JsonDict]:
         tier = self.normalize_tier(getattr(user, "membership_tier", "free"))
-        if tier == "legacy":
+        default_limits = self.get_tier_default_limits().get(tier)
+        if default_limits is None:
             return None
 
-        limits = deepcopy(PAID_LIMITS if tier == "paid" else FREE_LIMITS)
+        limits = deepcopy(default_limits)
         overrides = models._safe_load_json(getattr(user, "quota_overrides", None), {})
         if isinstance(overrides, dict):
             for resource, value in overrides.items():

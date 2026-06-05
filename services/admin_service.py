@@ -3,6 +3,7 @@ import hashlib
 import logging
 import secrets
 import string
+from copy import deepcopy
 
 from sqlalchemy import delete, func, or_
 from sqlalchemy.orm.attributes import flag_modified
@@ -13,6 +14,7 @@ from models import (
     ActivityGroup,
     ActivityInstance,
     AnalyticsDashboard,
+    AppSetting,
     EventLog,
     FractalMetricDefinition,
     Goal,
@@ -45,7 +47,13 @@ from models import (
     session_template_goals,
     utc_now,
 )
-from services.quota_service import DEFAULT_STORAGE_LIMIT_BYTES, QuotaService
+from services.quota_service import (
+    DEFAULT_STORAGE_LIMIT_BYTES,
+    RESOURCE_LABELS,
+    RESOURCE_ORDER,
+    TIER_DEFAULT_LIMITS_SETTING_KEY,
+    QuotaService,
+)
 from services.serializers import format_utc
 from services.service_types import JsonDict, ServiceResult
 
@@ -205,6 +213,60 @@ class AdminService:
         if "storage_limit_bytes" in data:
             updates["storage_limit_bytes"] = data["storage_limit_bytes"]
         return self.update_user(user_id, updates)
+
+    def get_tier_quota_settings(self) -> ServiceResult[JsonDict]:
+        return {
+            "tier_default_limits": self.quota_service.get_tier_default_limits(),
+            "resources": RESOURCE_ORDER,
+            "labels": RESOURCE_LABELS,
+            "editable_tiers": ["free", "paid"],
+            "unlimited_tiers": ["legacy"],
+        }, None, 200
+
+    def update_tier_quota_settings(self, data: JsonDict) -> ServiceResult[JsonDict]:
+        tier = self.quota_service.normalize_tier(data.get("tier"))
+        if tier == "legacy":
+            return None, "Legacy tier remains unlimited and cannot be assigned finite default quotas", 400
+
+        try:
+            normalized_limits = self.quota_service.validate_finite_limits(data.get("limits") or {})
+        except ValueError as exc:
+            return None, str(exc), 400
+
+        apply_existing_users = bool(data.get("apply_existing_users", False))
+        current_defaults = self.quota_service.get_tier_default_limits()
+        target_users = self.db_session.query(User).filter(User.membership_tier == tier).all()
+
+        if not apply_existing_users:
+            for user in target_users:
+                current_limits = self.quota_service.get_effective_limits(user)
+                user.quota_overrides = deepcopy(current_limits or {})
+                flag_modified(user, "quota_overrides")
+
+        setting = self.db_session.get(AppSetting, TIER_DEFAULT_LIMITS_SETTING_KEY)
+        configured_defaults = deepcopy(current_defaults)
+        configured_defaults[tier] = normalized_limits
+        configured_defaults["legacy"] = None
+
+        if setting is None:
+            setting = AppSetting(key=TIER_DEFAULT_LIMITS_SETTING_KEY, value=configured_defaults)
+            self.db_session.add(setting)
+        else:
+            setting.value = configured_defaults
+            flag_modified(setting, "value")
+
+        if apply_existing_users:
+            for user in target_users:
+                user.quota_overrides = {}
+                flag_modified(user, "quota_overrides")
+
+        self.db_session.commit()
+        return {
+            "tier": tier,
+            "tier_default_limits": self.quota_service.get_tier_default_limits(),
+            "apply_existing_users": apply_existing_users,
+            "affected_user_count": len(target_users),
+        }, None, 200
 
     def update_status(self, user_id: str, is_active: bool) -> ServiceResult[JsonDict]:
         return self.update_user(user_id, {"is_active": is_active})

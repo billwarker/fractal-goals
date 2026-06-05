@@ -72,3 +72,12 @@ class EventLog(Base):
     
     source = Column(String, nullable=True)
     timestamp = Column(DateTime, default=utc_now)
+
+
+class AppSetting(Base):
+    __tablename__ = 'app_settings'
+
+    key = Column(String, primary_key=True)
+    value = Column(JSON_TYPE, nullable=False)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

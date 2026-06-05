@@ -251,7 +251,9 @@
 .storageEditor input,
 .actionsContentArea input,
 .actionsContentArea select,
-.actionsContentArea textarea {
+.actionsContentArea textarea,
+.tierQuotaEditor select,
+.tierQuotaEditor textarea {
     border: 1px solid var(--color-border);
     background: rgba(16, 24, 32, 0.74);
     color: var(--color-text-primary);
@@ -268,7 +270,9 @@
 .storageEditor input:focus,
 .actionsContentArea input:focus,
 .actionsContentArea select:focus,
-.actionsContentArea textarea:focus {
+.actionsContentArea textarea:focus,
+.tierQuotaEditor select:focus,
+.tierQuotaEditor textarea:focus {
     border-color: var(--color-brand-primary);
     box-shadow: 0 0 0 3px var(--color-focus-ring);
     outline: none;
@@ -347,6 +351,120 @@
 .generatedKey span {
     font-family: monospace;
     overflow-wrap: anywhere;
+}
+
+.tierQuotaEditor {
+    display: grid;
+    gap: 18px;
+    max-width: 900px;
+    padding: 18px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-lg);
+    background: var(--color-bg-card);
+    box-shadow: var(--shadow-sm);
+}
+
+.tierQuotaHeader {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.tierQuotaHeader h2 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-xl);
+}
+
+.tierQuotaHeader p {
+    margin: 6px 0 0;
+    color: var(--color-text-secondary);
+}
+
+.tierQuotaHeader label,
+.tierQuotaJsonField {
+    display: grid;
+    gap: 8px;
+}
+
+.tierQuotaHeader label span,
+.tierQuotaJsonField span {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.tierQuotaHeader select {
+    min-width: 180px;
+}
+
+.tierQuotaJsonField textarea {
+    min-height: 300px;
+    resize: vertical;
+    font-family: monospace;
+}
+
+.tierQuotaApplyPanel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.tierQuotaApplyPanel label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-primary);
+    cursor: pointer;
+}
+
+.tierQuotaApplyPanel input {
+    margin: 0;
+}
+
+.tierQuotaNotice {
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-secondary);
+}
+
+.tierQuotaSaveButton {
+    justify-self: start;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-primary);
+    min-height: 38px;
+    padding: 8px 14px;
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+}
+
+.tierQuotaSaveButton:hover:not(:disabled) {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
+    transform: translateY(-1px);
+}
+
+.tierQuotaSaveButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    transform: none;
 }
 
 .actionsOverlay {
@@ -663,6 +781,15 @@
 
     .actionsControlRow {
         grid-template-columns: 1fr;
+    }
+
+    .tierQuotaHeader {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .tierQuotaSaveButton {
+        width: 100%;
     }
 
     .table,

@@ -7,6 +7,7 @@ from blueprints.auth_api import token_required
 from services.admin_service import AdminService
 from validators import (
     AdminInviteKeyCreateSchema,
+    AdminTierQuotaUpdateSchema,
     AdminUserCreateSchema,
     AdminUserForcePasswordChangeSchema,
     AdminUserQuotaUpdateSchema,
@@ -22,8 +23,7 @@ logger = logging.getLogger(__name__)
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
 
-def _admin_service_or_response(current_user):
-    db_session = get_db_session()
+def _admin_service_or_response(current_user, db_session):
     service = AdminService(db_session)
     error, status = service.require_admin(current_user)
     if error:
@@ -36,7 +36,7 @@ def _admin_service_or_response(current_user):
 def get_admin_summary(current_user):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.summary()
@@ -55,7 +55,7 @@ def get_admin_summary(current_user):
 def list_admin_users(current_user):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         limit, offset = parse_optional_pagination(request, max_limit=100)
@@ -74,13 +74,60 @@ def list_admin_users(current_user):
         db_session.close()
 
 
+@admin_bp.route('/tier-quotas', methods=['GET'])
+@token_required
+def get_tier_quotas(current_user):
+    db_session = get_db_session()
+    try:
+        service, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+        payload, error, status = service.get_tier_quota_settings()
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        logger.exception("Error fetching tier quota settings")
+        return internal_error(logger, "Error fetching tier quota settings")
+    finally:
+        db_session.close()
+
+
+@admin_bp.route('/tier-quotas', methods=['PATCH'])
+@token_required
+@validate_request(AdminTierQuotaUpdateSchema)
+def update_tier_quotas(current_user, validated_data):
+    db_session = get_db_session()
+    try:
+        service, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+        payload, error, status = service.update_tier_quota_settings(validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        logger.info(
+            "Admin user_id=%s updated_tier_quotas tier=%s apply_existing=%s affected_users=%s",
+            current_user.id,
+            payload.get("tier"),
+            payload.get("apply_existing_users"),
+            payload.get("affected_user_count"),
+        )
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error updating tier quota settings")
+        return internal_error(logger, "Error updating tier quota settings")
+    finally:
+        db_session.close()
+
+
 @admin_bp.route('/users', methods=['POST'])
 @token_required
 @validate_request(AdminUserCreateSchema)
 def create_admin_user(current_user, validated_data):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.create_user(validated_data)
@@ -102,7 +149,7 @@ def create_admin_user(current_user, validated_data):
 def update_admin_user(current_user, user_id, validated_data):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.update_user(user_id, validated_data)
@@ -123,7 +170,7 @@ def update_admin_user(current_user, user_id, validated_data):
 def delete_admin_user(current_user, user_id):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.soft_delete_user(user_id, current_user)
@@ -144,7 +191,7 @@ def delete_admin_user(current_user, user_id):
 def soft_delete_admin_user(current_user, user_id):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.soft_delete_user(user_id, current_user)
@@ -165,7 +212,7 @@ def soft_delete_admin_user(current_user, user_id):
 def hard_delete_admin_user(current_user, user_id):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.hard_delete_user(user_id, current_user)
@@ -186,7 +233,7 @@ def hard_delete_admin_user(current_user, user_id):
 def generate_admin_user_temporary_password(current_user, user_id):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.generate_temporary_password(user_id)
@@ -208,7 +255,7 @@ def generate_admin_user_temporary_password(current_user, user_id):
 def update_admin_user_tier(current_user, user_id, validated_data):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.update_tier(user_id, validated_data["membership_tier"])
@@ -230,7 +277,7 @@ def update_admin_user_tier(current_user, user_id, validated_data):
 def update_admin_user_quota(current_user, user_id, validated_data):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.update_quota(user_id, validated_data)
@@ -252,7 +299,7 @@ def update_admin_user_quota(current_user, user_id, validated_data):
 def update_admin_user_status(current_user, user_id, validated_data):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.update_status(user_id, validated_data["is_active"])
@@ -273,7 +320,7 @@ def update_admin_user_status(current_user, user_id, validated_data):
 def unlock_admin_user(current_user, user_id):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.unlock_user(user_id)
@@ -295,7 +342,7 @@ def unlock_admin_user(current_user, user_id):
 def force_admin_user_password_change(current_user, user_id, validated_data):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         enabled = validated_data.get("force_password_change", True)
@@ -318,7 +365,7 @@ def force_admin_user_password_change(current_user, user_id, validated_data):
 def update_admin_user_role(current_user, user_id, validated_data):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.update_role(user_id, current_user, validated_data["role"])
@@ -339,7 +386,7 @@ def update_admin_user_role(current_user, user_id, validated_data):
 def list_invite_keys(current_user):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.list_invite_keys()
@@ -359,7 +406,7 @@ def list_invite_keys(current_user):
 def create_invite_key(current_user, validated_data):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.create_invite_key(current_user, validated_data)
@@ -380,7 +427,7 @@ def create_invite_key(current_user, validated_data):
 def revoke_invite_key(current_user, invite_id):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user)
+        service, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         payload, error, status = service.revoke_invite_key(invite_id)
