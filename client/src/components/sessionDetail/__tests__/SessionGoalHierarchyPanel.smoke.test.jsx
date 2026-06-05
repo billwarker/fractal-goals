@@ -6,7 +6,7 @@ import SessionGoalHierarchyPanel from '../SessionGoalHierarchyPanel';
 let activeSessionMock = {
     rootId: 'root-1',
     sessionId: 'session-1',
-    session: { immediate_goals: [] },
+    session: { session_goals: [] },
     activities: [],
     activityGroups: [],
     targetAchievements: new Map(),
@@ -76,7 +76,7 @@ describe('SessionGoalHierarchyPanel smoke', () => {
         activeSessionMock = {
             rootId: 'root-1',
             sessionId: 'session-1',
-            session: { immediate_goals: [{ id: 'ig-1' }] },
+            session: { session_goals: [{ id: 'ig-1' }] },
             localSessionData: { sections: [{ activity_ids: ['instance-1'] }] },
             activityInstances: [{ id: 'instance-1', activity_definition_id: 'activity-1' }],
             activities: [{ id: 'activity-1', name: 'Pull Up', associated_goal_ids: ['ig-1'] }],

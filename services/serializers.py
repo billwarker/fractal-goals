@@ -607,20 +607,35 @@ def serialize_session(session):
                     exercises.append(ex)
             section["exercises"] = exercises
     
-    # Hydrate goals based on type
+    # Hydrate canonical session goals across every goal level.
     goals_source = getattr(session, '_derived_goals', None)
     if goals_source is None:
         goals_source = session.goals if hasattr(session, 'goals') else []
 
-    if goals_source:
-        def get_type(g):
-            return get_canonical_goal_type(g)
-            
-        result["short_term_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if get_type(g) == 'ShortTermGoal']
-        result["immediate_goals"] = [serialize_goal(g, include_children=False) for g in goals_source if get_type(g) == 'ImmediateGoal']
-    else:
-        result["short_term_goals"] = []
-        result["immediate_goals"] = []
+    seen_goal_ids = set()
+    session_goals_payload = []
+    for goal in goals_source or []:
+        if not goal or getattr(goal, 'deleted_at', None):
+            continue
+        goal_id = getattr(goal, 'id', None)
+        if goal_id in seen_goal_ids:
+            continue
+        seen_goal_ids.add(goal_id)
+        session_goals_payload.append(serialize_goal(goal, include_children=False))
+    result["session_goals"] = session_goals_payload
+
+    completed_goals_source = getattr(session, '_completed_goals', None) or []
+    seen_completed_goal_ids = set()
+    completed_goals_payload = []
+    for goal in completed_goals_source:
+        if not goal or getattr(goal, 'deleted_at', None):
+            continue
+        goal_id = getattr(goal, 'id', None)
+        if goal_id in seen_completed_goal_ids:
+            continue
+        seen_completed_goal_ids.add(goal_id)
+        completed_goals_payload.append(serialize_goal(goal, include_children=False))
+    result["completed_goals"] = completed_goals_payload
 
     # Add Program Info if associated
     if hasattr(session, 'program_day') and session.program_day:

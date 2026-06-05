@@ -80,8 +80,7 @@ describe('useSessionDetailData', () => {
                         ],
                     },
                 },
-                short_term_goals: [{ id: 'session-stale-goal' }],
-                immediate_goals: [{ id: 'session-stale-immediate-goal' }],
+                session_goals: [{ id: 'session-goal' }],
             },
         });
         getSessionActivities.mockResolvedValueOnce({
@@ -166,8 +165,7 @@ describe('useSessionDetailData', () => {
                         sections: [],
                     },
                 },
-                short_term_goals: [],
-                immediate_goals: [],
+                session_goals: [],
             },
         });
         getSessionActivities.mockResolvedValueOnce({ data: [] });

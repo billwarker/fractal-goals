@@ -12,7 +12,6 @@ import './SessionsList.css';
 function SessionsList({
     sessions = [],
     rootId,
-    parentGoals = {},
     selectedSessionId,
     onSelectSession,
     onNavigateToSession,
@@ -79,7 +78,6 @@ function SessionsList({
                             key={session.id}
                             session={session}
                             rootId={rootId}
-                            parentGoals={parentGoals}
                             isSelected={selectedSessionId === session.id}
                             onSelect={onSelectSession}
                             onNavigate={onNavigateToSession}

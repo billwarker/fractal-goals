@@ -59,8 +59,8 @@ describe('SessionCardExpanded', () => {
                     id: 'session-active-1',
                     name: 'Active Practice',
                     is_paused: false,
-                    short_term_goals: [],
-                    immediate_goals: [],
+                    session_goals: [],
+                    completed_goals: [],
                     attributes: {
                         completed: false,
                         updated_at: '2026-03-12T15:43:00Z',
@@ -97,8 +97,8 @@ describe('SessionCardExpanded', () => {
                     id: 'session-paused-1',
                     name: 'Paused Practice',
                     is_paused: true,
-                    short_term_goals: [],
-                    immediate_goals: [],
+                    session_goals: [],
+                    completed_goals: [],
                     attributes: {
                         completed: false,
                         updated_at: '2026-03-12T15:43:00Z',
@@ -136,7 +136,8 @@ describe('SessionCardExpanded', () => {
                 session={{
                     id: 'session-1',
                     name: 'Standard Practice Session',
-                    short_term_goals: [
+                    session_goals: [],
+                    completed_goals: [
                         {
                             id: 'ultimate-1',
                             type: 'UltimateGoal',
@@ -153,16 +154,7 @@ describe('SessionCardExpanded', () => {
                             completed_at: '2026-03-12T15:15:00Z',
                             children: [],
                         },
-                        {
-                            id: 'old-goal',
-                            type: 'ImmediateGoal',
-                            name: 'Completed outside session',
-                            completed: true,
-                            completed_at: '2026-03-11T15:22:00Z',
-                            children: [],
-                        },
                     ],
-                    immediate_goals: [],
                     attributes: {
                         updated_at: '2026-03-12T15:43:00Z',
                         session_data: {
@@ -210,8 +202,8 @@ describe('SessionCardExpanded', () => {
                 session={{
                     id: 'session-2',
                     name: 'Open Session',
-                    short_term_goals: [],
-                    immediate_goals: [
+                    session_goals: [],
+                    completed_goals: [
                         {
                             id: 'goal-1',
                             type: 'ImmediateGoal',
@@ -237,7 +229,7 @@ describe('SessionCardExpanded', () => {
                 onSelect={() => {}}
                 getGoalColor={(goal) => {
                     const type = typeof goal === 'string' ? goal : goal?.type || goal?.attributes?.type;
-                    const colors = { ImmediateGoal: '#009688' };
+                    const colors = { ImmediateGoal: '#009688', Completed: '#44dd88' };
                     return colors[type] || '#607d8b';
                 }}
                 formatDate={(value) => value}
@@ -252,6 +244,8 @@ describe('SessionCardExpanded', () => {
         );
 
         expect(screen.getByText('Manual completion')).toBeInTheDocument();
+        const completionBadge = screen.getByTitle('Manual completion');
+        expect(completionBadge.querySelector('svg path[fill="#44dd88"]')).toBeInTheDocument();
     });
 
     it('renders quick-session activities as activity cards instead of pills', () => {
@@ -260,8 +254,8 @@ describe('SessionCardExpanded', () => {
                 session={{
                     id: 'session-quick-1',
                     name: 'Weigh Myself',
-                    short_term_goals: [],
-                    immediate_goals: [],
+                    session_goals: [],
+                    completed_goals: [],
                     attributes: {
                         completed: true,
                         updated_at: '2026-03-14T20:03:00Z',
@@ -318,8 +312,8 @@ describe('SessionCardExpanded', () => {
                 session={{
                     id: 'session-quick-link',
                     name: 'Weigh Myself',
-                    short_term_goals: [],
-                    immediate_goals: [],
+                    session_goals: [],
+                    completed_goals: [],
                     attributes: {
                         updated_at: '2026-03-14T20:03:00Z',
                         session_data: {
@@ -361,8 +355,8 @@ describe('SessionCardExpanded', () => {
                 session={{
                     id: 'session-delete-1',
                     name: 'Delete Me',
-                    short_term_goals: [],
-                    immediate_goals: [],
+                    session_goals: [],
+                    completed_goals: [],
                     attributes: {
                         updated_at: '2026-03-14T20:03:00Z',
                         session_data: {

@@ -30,9 +30,7 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
                 has_splits: false
             }
         ],
-        parentGoals: [],
-        immediateGoals: [{ id: 'ig-1', name: 'Immediate' }],
-        session: { immediate_goals: [{ id: 'ig-1' }] },
+        session: { session_goals: [{ id: 'ig-1' }] },
     }),
     useActiveSessionActions: () => ({
         updateInstance,

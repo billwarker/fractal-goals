@@ -219,11 +219,8 @@ export const deriveGraphMetrics = (
         const instances = Array.isArray(session.activity_instances) ? session.activity_instances : [];
         if (instances.some((inst) => instanceMapsToVisible(inst))) return true;
 
-        const stGoals = Array.isArray(session.short_term_goals) ? session.short_term_goals : [];
-        const immGoals = Array.isArray(session.immediate_goals) ? session.immediate_goals : [];
-
-        if (stGoals.some((g) => visibleNodeIds.has(toId(g.id)))) return true;
-        if (immGoals.some((g) => visibleNodeIds.has(toId(g.id)))) return true;
+        const sessionGoals = Array.isArray(session.session_goals) ? session.session_goals : [];
+        if (sessionGoals.some((g) => visibleNodeIds.has(toId(g.id)))) return true;
 
         return false;
     };

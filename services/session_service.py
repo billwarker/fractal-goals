@@ -4,7 +4,7 @@ from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import selectinload, with_loader_criteria
 from models import (
     ActivityDefinition, ActivityGroup, ActivityInstance,
-    Goal,
+    Goal, Target,
     MetricValue, ProgramBlock, ProgramDay, Session,
     validate_root_goal
 )
@@ -82,7 +82,8 @@ class SessionService:
     @staticmethod
     def _session_read_options():
         return (
-            selectinload(Session.goals),
+            selectinload(Session.goals).selectinload(Goal.level),
+            selectinload(Session.goals).selectinload(Goal.targets_rel).selectinload(Target.metric_conditions),
             selectinload(Session.template),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
@@ -188,6 +189,62 @@ class SessionService:
         return list(derived.values())
 
     @staticmethod
+    def _timestamp_within_session(timestamp, session_obj) -> bool:
+        if not timestamp or not session_obj.session_start or not session_obj.session_end:
+            return False
+        return session_obj.session_start <= timestamp <= session_obj.session_end
+
+    def _attach_completed_goals(self, sessions: list[Session]) -> None:
+        """Attach canonical completed-in-session goals for session serialization."""
+        session_ids = [session.id for session in sessions if session]
+        if not session_ids:
+            return
+
+        completed_goals_by_session_id: dict[str, dict[str, Goal]] = {
+            session_id: {}
+            for session_id in session_ids
+        }
+
+        direct_completed_goals = self.db_session.query(Goal).options(
+            selectinload(Goal.level),
+            selectinload(Goal.targets_rel).selectinload(Target.metric_conditions),
+        ).filter(
+            Goal.completed_session_id.in_(session_ids),
+            Goal.deleted_at == None,
+        ).all()
+        for goal in direct_completed_goals:
+            session_id = goal.completed_session_id
+            if session_id in completed_goals_by_session_id:
+                completed_goals_by_session_id[session_id][goal.id] = goal
+
+        target_completed_rows = self.db_session.query(
+            Target.completed_session_id,
+            Goal,
+        ).join(
+            Goal,
+            Goal.id == Target.goal_id,
+        ).options(
+            selectinload(Goal.level),
+            selectinload(Goal.targets_rel).selectinload(Target.metric_conditions),
+        ).filter(
+            Target.completed_session_id.in_(session_ids),
+            Target.deleted_at == None,
+            Goal.deleted_at == None,
+        ).all()
+        for session_id, goal in target_completed_rows:
+            if session_id in completed_goals_by_session_id:
+                completed_goals_by_session_id[session_id][goal.id] = goal
+
+        for session_obj in sessions:
+            goals_by_id = completed_goals_by_session_id.get(session_obj.id, {})
+            for goal in (session_obj.goals or []):
+                if goal.deleted_at or not goal.completed:
+                    continue
+                if self._timestamp_within_session(goal.completed_at, session_obj):
+                    goals_by_id[goal.id] = goal
+            session_obj._completed_goals = list(goals_by_id.values())
+
+    @staticmethod
     def _effective_session_timestamp():
         return func.coalesce(Session.session_start, Session.created_at)
 
@@ -212,6 +269,7 @@ class SessionService:
             *self._session_read_options(),
         ).order_by(*self._session_filters.build_ordering(normalized_filters)).offset(offset).limit(limit).all()
 
+        self._attach_completed_goals(sessions)
         result = [serialize_session(s) for s in sessions]
 
         return {
@@ -262,6 +320,7 @@ class SessionService:
             sessions_q = sessions_q.offset(offset).limit(limit)
 
         sessions = sessions_q.all()
+        self._attach_completed_goals(sessions)
         return [serialize_session(s) for s in sessions], None, 200
 
     def get_session_details(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:
@@ -276,6 +335,8 @@ class SessionService:
         
         if not session:
             return None, "Session not found", 404
+
+        self._attach_completed_goals([session])
 
         # Backward-compatible fallback for sessions created without persisted links.
         if not session.goals:

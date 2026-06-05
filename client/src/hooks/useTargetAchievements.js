@@ -14,11 +14,11 @@ function formatGoalTypeLabel(type) {
  * Actual persistence happens when the session is completed.
  * 
  * @param {Array} activityInstances - Current activity instances with their metrics
- * @param {Array} parentGoals - Goals associated with the session (with targets)
+ * @param {Array} goals - Goals associated with the session (with targets)
  * @param {string|null} sessionId - Current session id
  * @returns {Object} Achievement status for real-time UI feedback
  */
-export function useTargetAchievements(activityInstances, parentGoals, sessionId = null) {
+export function useTargetAchievements(activityInstances, goals, sessionId = null) {
     // Build achievement status
     const achievementStatus = useMemo(() => {
         // Map of target_id -> achievement status
@@ -31,7 +31,7 @@ export function useTargetAchievements(activityInstances, parentGoals, sessionId 
         let totalTargets = 0;
         let totalAchieved = 0;
 
-        if (!activityInstances || !parentGoals) {
+        if (!activityInstances || !goals) {
             return {
                 targetAchievements,
                 goalAchievements,
@@ -53,7 +53,7 @@ export function useTargetAchievements(activityInstances, parentGoals, sessionId 
         }
 
         // Check each goal's targets
-        for (const goal of parentGoals) {
+        for (const goal of goals) {
             const targets = parseGoalTargets(goal);
             const achievedForGoal = [];
 
@@ -130,7 +130,7 @@ export function useTargetAchievements(activityInstances, parentGoals, sessionId 
             totalAchieved,
             allTargetsAchieved: totalTargets > 0 && totalAchieved === totalTargets
         };
-    }, [activityInstances, parentGoals, sessionId]);
+    }, [activityInstances, goals, sessionId]);
 
     return achievementStatus;
 }

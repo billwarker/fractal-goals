@@ -243,7 +243,10 @@ Key frontend pieces:
 
 Session detail goal hierarchy contract:
 
-- `session_goals` / `session_goal_ids` represent direct manual session links.
+- Session list/detail payloads expose `session_goals` as the canonical flat list of goals attached to a session across all levels.
+- Session list/detail payloads expose `completed_goals` as the canonical list of goals completed by, target-completed by, or backward-compatibly completed during that session.
+- `short_term_goals` and `immediate_goals` are retired and should not be reintroduced as competing session payload buckets.
+- In the dedicated goals-view payload, `session_goal_ids` represent direct manual session links.
 - Activity and activity-group associations define activity-derived scope.
 - `GoalTreeService.get_session_goals_view_payload` returns the canonical session detail goal payload, including `activity_goal_ids_by_activity`, `session_activity_ids`, and a pruned goal tree containing the complete lineage for in-scope goals.
 - The frontend should render from that canonical payload rather than rebuilding association scope from activity definition caches.

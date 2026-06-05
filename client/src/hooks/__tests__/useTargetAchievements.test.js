@@ -12,7 +12,7 @@ describe('useTargetAchievements', () => {
                 metrics: []
             }
         ];
-        const parentGoals = [
+        const sessionGoals = [
             {
                 id: 'micro-1',
                 completed: false,
@@ -30,7 +30,7 @@ describe('useTargetAchievements', () => {
             }
         ];
 
-        const { result } = renderHook(() => useTargetAchievements(activityInstances, parentGoals));
+        const { result } = renderHook(() => useTargetAchievements(activityInstances, sessionGoals));
         expect(result.current.achievedTargetIds.has('target-1')).toBe(true);
         expect(result.current.targetAchievements.get('target-1')?.achieved).toBe(true);
     });
@@ -44,7 +44,7 @@ describe('useTargetAchievements', () => {
                 metrics: [{ metric_id: 'm-1', value: 10 }]
             }
         ];
-        const parentGoals = [
+        const sessionGoals = [
             {
                 id: 'micro-2',
                 completed: false,
@@ -67,7 +67,7 @@ describe('useTargetAchievements', () => {
             }
         ];
 
-        const { result } = renderHook(() => useTargetAchievements(activityInstances, parentGoals));
+        const { result } = renderHook(() => useTargetAchievements(activityInstances, sessionGoals));
         expect(result.current.targetAchievements.get('target-gt')?.achieved).toBe(true);
         expect(result.current.targetAchievements.get('target-lt')?.achieved).toBe(false);
     });
@@ -81,7 +81,7 @@ describe('useTargetAchievements', () => {
                 metrics: [{ metric_id: 'm-1', value: 10 }]
             }
         ];
-        const parentGoals = [
+        const sessionGoals = [
             {
                 id: 'micro-3',
                 completed: false,
@@ -101,7 +101,7 @@ describe('useTargetAchievements', () => {
             }
         ];
 
-        const { result } = renderHook(() => useTargetAchievements(activityInstances, parentGoals, 'session-1'));
+        const { result } = renderHook(() => useTargetAchievements(activityInstances, sessionGoals, 'session-1'));
         expect(result.current.achievedTargetIds.has('target-3')).toBe(false);
         expect(result.current.targetAchievements.get('target-3')?.achieved).toBe(false);
     });
@@ -115,7 +115,7 @@ describe('useTargetAchievements', () => {
                 metrics: [{ metric_id: 'm-1', value: 5 }]
             }
         ];
-        const parentGoals = [
+        const sessionGoals = [
             {
                 id: 'micro-4',
                 completed: true,
@@ -135,7 +135,7 @@ describe('useTargetAchievements', () => {
             }
         ];
 
-        const { result } = renderHook(() => useTargetAchievements(activityInstances, parentGoals, 'session-current'));
+        const { result } = renderHook(() => useTargetAchievements(activityInstances, sessionGoals, 'session-current'));
         expect(result.current.achievedTargetIds.has('target-4')).toBe(true);
         expect(result.current.targetAchievements.get('target-4')?.achieved).toBe(true);
         expect(result.current.targetAchievements.get('target-4')?.wasAlreadyCompleted).toBe(true);
@@ -150,7 +150,7 @@ describe('useTargetAchievements', () => {
                 metrics: [{ metric_id: 'm-1', value: 5 }]
             }
         ];
-        const parentGoals = [
+        const sessionGoals = [
             {
                 id: 'micro-6',
                 completed: true,
@@ -170,7 +170,7 @@ describe('useTargetAchievements', () => {
             }
         ];
 
-        const { result } = renderHook(() => useTargetAchievements(activityInstances, parentGoals, 'session-current'));
+        const { result } = renderHook(() => useTargetAchievements(activityInstances, sessionGoals, 'session-current'));
         expect(result.current.achievedTargetIds.has('target-6')).toBe(true);
         expect(result.current.targetAchievements.get('target-6')?.achieved).toBe(true);
         expect(result.current.targetAchievements.get('target-6')?.wasAlreadyCompleted).toBe(true);
@@ -185,7 +185,7 @@ describe('useTargetAchievements', () => {
                 metrics: []
             }
         ];
-        const parentGoals = [
+        const sessionGoals = [
             {
                 id: 'micro-5',
                 completed: true,
@@ -205,7 +205,7 @@ describe('useTargetAchievements', () => {
             }
         ];
 
-        const { result } = renderHook(() => useTargetAchievements(activityInstances, parentGoals, 'session-current'));
+        const { result } = renderHook(() => useTargetAchievements(activityInstances, sessionGoals, 'session-current'));
         expect(result.current.achievedTargetIds.has('target-5')).toBe(true);
         expect(result.current.targetAchievements.get('target-5')?.achieved).toBe(true);
         expect(result.current.targetAchievements.get('target-5')?.wasAlreadyCompleted).toBe(true);

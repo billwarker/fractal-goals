@@ -18,7 +18,10 @@ import json
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from models import ActivityDefinition, ActivityInstance, Goal, Session, SessionTemplate, activity_goal_associations
+from models import (
+    ActivityDefinition, ActivityInstance, Goal, Session, SessionTemplate, Target,
+    activity_goal_associations, session_goals,
+)
 
 
 @pytest.mark.integration
@@ -42,6 +45,110 @@ class TestSessionListEndpoints:
         data = json.loads(response.data)
         assert len(data['sessions']) >= 1
         assert any(s['id'] == sample_practice_session.id for s in data['sessions'])
+
+    def test_list_sessions_returns_canonical_session_goals_across_levels(
+        self, authed_client, db_session, sample_practice_session, sample_goal_hierarchy
+    ):
+        """Session rows should expose one canonical all-level session_goals list."""
+        root_id = sample_practice_session.root_id
+        mid_term_goal = sample_goal_hierarchy['mid_term']
+        db_session.execute(
+            session_goals.insert().values(
+                session_id=sample_practice_session.id,
+                goal_id=mid_term_goal.id,
+                goal_type='MidTermGoal',
+                association_source='manual',
+            )
+        )
+        db_session.commit()
+
+        response = authed_client.get(f'/api/{root_id}/sessions')
+        assert response.status_code == 200
+
+        data = json.loads(response.data)
+        matching_session = next(
+            session for session in data['sessions']
+            if session['id'] == sample_practice_session.id
+        )
+
+        assert any(goal['id'] == mid_term_goal.id for goal in matching_session['session_goals'])
+        assert 'short_term_goals' not in matching_session
+        assert 'immediate_goals' not in matching_session
+
+    def test_list_sessions_returns_completed_goals_for_matching_completion_session(
+        self, authed_client, db_session, sample_practice_session, sample_goal_hierarchy
+    ):
+        """A goal completed by this session should appear in completed_goals."""
+        root_id = sample_practice_session.root_id
+        completed_goal = sample_goal_hierarchy['short_term']
+        completed_goal.completed = True
+        completed_goal.completed_at = sample_practice_session.session_end or datetime.now(timezone.utc)
+        completed_goal.completed_session_id = sample_practice_session.id
+        db_session.commit()
+
+        response = authed_client.get(f'/api/{root_id}/sessions')
+        assert response.status_code == 200
+
+        data = json.loads(response.data)
+        matching_session = next(
+            session for session in data['sessions']
+            if session['id'] == sample_practice_session.id
+        )
+
+        assert [goal['id'] for goal in matching_session['completed_goals']] == [completed_goal.id]
+
+    def test_list_sessions_completed_goals_include_target_session_and_exclude_other_sessions(
+        self, authed_client, db_session, sample_practice_session, sample_goal_hierarchy
+    ):
+        """Target completion provenance should drive completed_goals without leaking across sessions."""
+        root_id = sample_practice_session.root_id
+        target_goal = sample_goal_hierarchy['short_term']
+        other_goal = sample_goal_hierarchy['long_term']
+        other_session = Session(
+            id=str(uuid4()),
+            name='Other Completion Session',
+            root_id=root_id,
+            session_start=datetime(2026, 2, 1, 9, 0, tzinfo=timezone.utc),
+            created_at=datetime(2026, 2, 1, 9, 0, tzinfo=timezone.utc),
+            attributes=json.dumps({}),
+        )
+        db_session.add(other_session)
+        db_session.flush()
+
+        db_session.add_all([
+            Target(
+                id=str(uuid4()),
+                goal_id=target_goal.id,
+                root_id=root_id,
+                name='Complete in current session',
+                completed=True,
+                completed_at=datetime.now(timezone.utc),
+                completed_session_id=sample_practice_session.id,
+            ),
+            Target(
+                id=str(uuid4()),
+                goal_id=other_goal.id,
+                root_id=root_id,
+                name='Complete elsewhere',
+                completed=True,
+                completed_at=datetime.now(timezone.utc),
+                completed_session_id=other_session.id,
+            ),
+        ])
+        db_session.commit()
+
+        response = authed_client.get(f'/api/{root_id}/sessions')
+        assert response.status_code == 200
+
+        data = json.loads(response.data)
+        matching_session = next(
+            session for session in data['sessions']
+            if session['id'] == sample_practice_session.id
+        )
+
+        completed_goal_ids = {goal['id'] for goal in matching_session['completed_goals']}
+        assert target_goal.id in completed_goal_ids
+        assert other_goal.id not in completed_goal_ids
 
     def test_list_sessions_backfills_legacy_sets_into_row_payload(
         self, authed_client, db_session, sample_practice_session, sample_activity_definition
@@ -470,7 +577,7 @@ class TestSessionCRUDEndpoints:
         assert data['session_type'] == 'quick'
         assert data['template_color'] == '#123456'
         assert data['attributes']['session_data']['activity_ids']
-        assert data['immediate_goals'] == []
+        assert data['session_goals'] == []
 
     def test_complete_quick_session_sets_end_and_duration(
         self,

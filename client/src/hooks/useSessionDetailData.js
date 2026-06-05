@@ -178,8 +178,6 @@ export function useSessionDetailData({ rootId, sessionId, isDeletingSession }) {
         }, {});
     }, [activities]);
 
-    const parentGoals = useMemo(() => session?.short_term_goals || [], [session]);
-    const immediateGoals = useMemo(() => session?.immediate_goals || [], [session]);
     const allGoalsForTargets = useMemo(
         () => flattenSessionGoalsViewGoals(sessionGoalsView),
         [sessionGoalsView]
@@ -207,8 +205,6 @@ export function useSessionDetailData({ rootId, sessionId, isDeletingSession }) {
         normalizedSessionData,
         groupMap,
         groupedActivities,
-        parentGoals,
-        immediateGoals,
         targetAchievements,
         achievedTargetIds,
         goalAchievements,

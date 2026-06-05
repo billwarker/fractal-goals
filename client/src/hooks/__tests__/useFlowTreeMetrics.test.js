@@ -42,8 +42,7 @@ describe('useFlowTreeMetrics activity evidence helpers', () => {
             [
                 {
                     completed: true,
-                    short_term_goals: [{ id: 'goal-session' }],
-                    immediate_goals: [{ id: 'goal-immediate' }],
+                    session_goals: [{ id: 'goal-session' }, { id: 'goal-immediate' }],
                     activity_instances: [],
                 },
             ],

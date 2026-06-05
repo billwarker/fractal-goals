@@ -9,7 +9,6 @@
 import React, { memo, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDuration, calculateSessionDuration } from '../../hooks/useSessionDuration';
-import { getAchievedTargetsForSession } from '../../utils/targetUtils';
 import { isSMART } from '../../utils/smartHelpers';
 import CardCornerActionButton from '../common/CardCornerActionButton';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
@@ -46,12 +45,14 @@ function getGoalName(goal) {
     return goal?.name ?? goal?.attributes?.name ?? '';
 }
 
-function getGoalCompletedAt(goal) {
-    return goal?.completed_at ?? goal?.attributes?.completed_at ?? null;
-}
-
 function getGoalChildren(goal) {
     return Array.isArray(goal?.children) ? goal.children : [];
+}
+
+function getGoalLevelRank(goal) {
+    const explicitRank = goal?.level_rank ?? goal?.attributes?.level_rank;
+    if (Number.isFinite(explicitRank)) return explicitRank;
+    return GOAL_LEVEL_ORDER[getGoalType(goal)] ?? Number.MAX_SAFE_INTEGER;
 }
 
 function collectUniqueGoals(goals) {
@@ -73,22 +74,13 @@ function collectUniqueGoals(goals) {
     return collected;
 }
 
-function isTimestampWithinSession(timestamp, sessionStart, sessionEnd) {
-    if (!timestamp || !sessionStart || !sessionEnd) return false;
-
-    const targetTime = new Date(timestamp).getTime();
-    const startTime = new Date(sessionStart).getTime();
-    const endTime = new Date(sessionEnd).getTime();
-
-    if ([targetTime, startTime, endTime].some(Number.isNaN)) return false;
-    return targetTime >= startTime && targetTime <= endTime;
-}
-
 const AccomplishmentsSection = memo(function AccomplishmentsSection({
     completedGoals,
     getGoalColor,
     getGoalSecondaryColor,
-    getGoalIcon
+    getGoalIcon,
+    completedGoalColor,
+    completedGoalSecondaryColor
 }) {
     if (completedGoals.length === 0) {
         return null;
@@ -102,6 +94,8 @@ const AccomplishmentsSection = memo(function AccomplishmentsSection({
                     const goalType = getGoalType(goal);
                     const goalColor = getGoalColor(goal);
                     const goalSecondaryColor = getGoalSecondaryColor(goal);
+                    const iconColor = completedGoalColor || goalColor;
+                    const iconSecondaryColor = completedGoalSecondaryColor || goalSecondaryColor;
 
                     return (
                         <GoalNameBadge
@@ -109,8 +103,8 @@ const AccomplishmentsSection = memo(function AccomplishmentsSection({
                             className={styles.accomplishmentBadge}
                             goal={goal}
                             label={getGoalName(goal)}
-                            color={goalColor}
-                            secondaryColor={goalSecondaryColor}
+                            color={iconColor}
+                            secondaryColor={iconSecondaryColor}
                             shape={getGoalIcon(goal)}
                             isSmart={isSMART(goal)}
                             iconSize={16}
@@ -156,108 +150,19 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     const programInfo = session.program_info || null;
     const programColor = programInfo?.program_color || 'var(--color-brand-primary)';
     const blockColor = programInfo?.block_color || programColor;
-    const shortTermGoals = session.short_term_goals || [];
-    const immediateGoals = session.immediate_goals || [];
-
-    // Calculate all associated goals (including from activities)
-    const allGoals = useMemo(() => {
-        const seenIds = new Set();
-        const goals = [];
-
-        // Helper to add goal if not already added
-        const addGoal = (goal) => {
-            if (goal && !seenIds.has(goal.id)) {
-                seenIds.add(goal.id);
-                goals.push(goal);
-            }
-        };
-
-        // 1. Direct session goals (short-term and immediate)
-        shortTermGoals.forEach(addGoal);
-        immediateGoals.forEach(addGoal);
-
-        // 2. Goals from activity definitions currently used in this session
-        const activityDefIds = new Set(
-            sessionActivityInstances
-                .map((instance) => instance.activity_definition_id)
-                .filter(Boolean)
-        );
-
-        // Find matching definitions and their associated goals
-        // Note: activities prop contains activity definitions
-        activityDefIds.forEach(defId => {
-            const def = activities?.find(d => d.id === defId);
-            if (def && def.associated_goal_ids) {
-                def.associated_goal_ids.forEach(goalId => {
-                    // Try to find the goal object
-                    let goalObj = shortTermGoals.find(g => g.id === goalId);
-                    if (!goalObj) goalObj = immediateGoals.find(g => g.id === goalId);
-                    if (goalObj) {
-                        addGoal(goalObj);
-                    }
-                });
-            }
-        });
-
-        return collectUniqueGoals(goals);
-    }, [shortTermGoals, immediateGoals, sessionActivityInstances, activities]);
-
-    const achievedTargets = useMemo(() => {
-        const allAchievables = [...shortTermGoals, ...immediateGoals];
-        const allAchieved = getAchievedTargetsForSession(session, allAchievables);
-        // Filter specifically for targets achieved in THIS session (relational check)
-        return allAchieved.filter(achieved => {
-            // Check if it's explicitly linked to this session
-            if (achieved.target.completed_session_id === session.id) return true;
-
-            // Or if it was calculated as achieved in this session by front-end logic
-            // and is currently marked as completed.
-            return achieved.target.completed;
-        });
-    }, [session, shortTermGoals, immediateGoals]);
+    const completedGoalColor = getGoalColor('Completed');
+    const completedGoalSecondaryColor = getGoalSecondaryColor('Completed');
+    const completedSessionGoals = Array.isArray(session.completed_goals) ? session.completed_goals : [];
 
     const completedGoals = useMemo(() => {
-        const sessionTargetGoalIds = new Set(achievedTargets.map((target) => String(target.goalId)));
-
-        const directlyCompletedGoalIds = new Set(
-            allGoals
-                .filter((goal) => {
-                    const goalId = getGoalId(goal);
-                    const isCompleted = goal.completed || goal.attributes?.completed;
-                    if (!goalId || !isCompleted) return false;
-
-                    const completedSessionId = goal.completed_session_id || goal.attributes?.completed_session_id;
-                    const isExplicitlyLinked = completedSessionId != null && String(completedSessionId) === String(session.id);
-
-                    return isExplicitlyLinked
-                        || sessionTargetGoalIds.has(String(goalId))
-                        || isTimestampWithinSession(getGoalCompletedAt(goal), sessionStart, sessionEnd);
-                })
-                .map((goal) => String(getGoalId(goal)))
-        );
-
-        const hasCompletedDescendant = (goal) => (
-            getGoalChildren(goal).some((child) => {
-                const childId = getGoalId(child);
-                return (childId && directlyCompletedGoalIds.has(String(childId))) || hasCompletedDescendant(child);
-            })
-        );
-
-        return allGoals
-            .filter((goal) => {
-                const goalId = getGoalId(goal);
-                const isCompleted = goal.completed || goal.attributes?.completed;
-                if (!goalId || !isCompleted) return false;
-
-                return directlyCompletedGoalIds.has(String(goalId)) || hasCompletedDescendant(goal);
-            })
+        return collectUniqueGoals(completedSessionGoals)
             .sort((goalA, goalB) => {
-                const levelA = GOAL_LEVEL_ORDER[getGoalType(goalA)] ?? Number.MAX_SAFE_INTEGER;
-                const levelB = GOAL_LEVEL_ORDER[getGoalType(goalB)] ?? Number.MAX_SAFE_INTEGER;
+                const levelA = getGoalLevelRank(goalA);
+                const levelB = getGoalLevelRank(goalB);
                 if (levelA !== levelB) return levelA - levelB;
                 return getGoalName(goalA).localeCompare(getGoalName(goalB));
             });
-    }, [achievedTargets, allGoals, session.id, sessionEnd, sessionStart]);
+    }, [completedSessionGoals]);
 
     // Memoize duration calculation
     const duration = useMemo(() => {
@@ -417,6 +322,8 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 getGoalColor={getGoalColor}
                 getGoalSecondaryColor={getGoalSecondaryColor}
                 getGoalIcon={getGoalIcon}
+                completedGoalColor={completedGoalColor}
+                completedGoalSecondaryColor={completedGoalSecondaryColor}
             />
 
             {/* Bottom Level: Session data with horizontal sections */}

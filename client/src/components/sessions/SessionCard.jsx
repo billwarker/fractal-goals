@@ -27,10 +27,7 @@ function SessionCard({
 
     const sessionData = session.attributes?.session_data || session.session_data || {};
     const templateColor = getTemplateColor(session);
-    const sessionGoals = [
-        ...(Array.isArray(session.short_term_goals) ? session.short_term_goals : []),
-        ...(Array.isArray(session.immediate_goals) ? session.immediate_goals : []),
-    ];
+    const sessionGoals = Array.isArray(session.session_goals) ? session.session_goals : [];
     const notesCount = Array.isArray(session.notes) ? session.notes.length : (session.notes_count || 0);
     const sessionCompleted = Boolean(session.completed || session.attributes?.completed);
     const sessionPaused = Boolean(session.is_paused ?? session.attributes?.is_paused);
