@@ -197,6 +197,7 @@ export function useSessionDetailMutations({
             invalidateGoalQueries();
             queryClient.invalidateQueries({ queryKey: sessionKey });
             queryClient.invalidateQueries({ queryKey: sessionNotesKey });
+            invalidateSessionListQueries();
 
             if (goalResponse) {
                 const goalType = formatGoalTypeLabel(goalResponse.attributes?.type || goalResponse.type);
