@@ -21,7 +21,7 @@ vi.mock('../../FlowTree', () => ({
     default: ({ treeData, layoutMode }) => (
         <div data-testid="flow-tree-demo" data-layout-mode={layoutMode}>
             <span>{treeData.name}</span>
-            <span>{treeData.children[0].children[1].children[0].name}</span>
+            <span>{treeData.children[0].children[0].children[0].name}</span>
         </div>
     ),
 }));
@@ -36,12 +36,22 @@ describe('Landing', () => {
 
         render(<Landing />);
 
-        expect(screen.getByRole('heading', { name: /define the work/i })).toBeInTheDocument();
-        expect(screen.getByText('Composable goal trees')).toBeInTheDocument();
-        expect(screen.getByLabelText('Example goal hierarchy tree')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /want to achieve your goals/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /fully-composable goal achievement platform/i })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Become a skilled guitar player' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
         expect(await screen.findByTestId('flow-tree-demo')).toHaveAttribute('data-layout-mode', 'tree');
-        expect(screen.getByText('Build a resilient practice system')).toBeInTheDocument();
-        expect(screen.getByText('Tempo drills')).toBeInTheDocument();
+        expect(screen.getAllByText('Become a skilled guitar player').length).toBeGreaterThan(0);
+        expect(screen.getByText('Practice CAGED triads')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Become fluent in Chinese' }));
+        expect(screen.getByRole('tab', { name: 'Become fluent in Chinese' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByText('Connect fluency to daily study actions')).toBeInTheDocument();
+        expect(screen.getAllByText('Shadow 10 minutes').length).toBeGreaterThan(0);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Next feature' }));
+        expect(screen.getByText('Build balanced study programs')).toBeInTheDocument();
+        expect(screen.getByText('Tutor prep')).toBeInTheDocument();
 
         fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'Will Tester' } });
         fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'will@example.com' } });
