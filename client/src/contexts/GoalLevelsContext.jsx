@@ -7,6 +7,53 @@ import { useAuth } from './AuthContext';
 
 const GoalLevelsContext = createContext();
 
+const FALLBACK_LEVELS = [
+    {
+        name: 'Ultimate Goal',
+        color: '#4f9cf9',
+        secondary_color: '#102235',
+        icon: 'twelvePointStar',
+    },
+    {
+        name: 'Long Term Goal',
+        color: '#3bc57c',
+        secondary_color: '#0f271c',
+        icon: 'hexagon',
+    },
+    {
+        name: 'Mid Term Goal',
+        color: '#f59f4d',
+        secondary_color: '#2c1d0f',
+        icon: 'diamond',
+    },
+    {
+        name: 'Short Term Goal',
+        color: '#8b6fff',
+        secondary_color: '#181329',
+        icon: 'triangle',
+    },
+    {
+        name: 'Immediate Goal',
+        color: '#ef6a6a',
+        secondary_color: '#301515',
+        icon: 'circle',
+    },
+    {
+        name: 'Completed',
+        color: '#3bc57c',
+        secondary_color: '#102417',
+        icon: 'check',
+    },
+];
+
+const normalizeLevelName = (name) => String(name || '').replace(/([A-Z])/g, ' $1').replace(/\s+/g, ' ').trim();
+
+const getFallbackLevelByName = (name) => {
+    if (!name) return null;
+    const normalized = normalizeLevelName(name);
+    return FALLBACK_LEVELS.find((level) => level.name === normalized || level.name === name) || null;
+};
+
 
 export function adjustBrightness(hex, percent) {
     hex = hex.replace('#', '');
@@ -90,7 +137,7 @@ export function GoalLevelsProvider({ children }) {
     };
 
     const getLevelByName = (name) => {
-        return goalLevels.find(l => l.name === name) || null;
+        return goalLevels.find(l => l.name === name) || getFallbackLevelByName(name);
     };
 
     const getGoalColor = (goal) => {

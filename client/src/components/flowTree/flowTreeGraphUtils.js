@@ -186,7 +186,7 @@ export const convertTreeToFlow = (
         }
 
         const validChildren = getValidChildTypes(nodeType);
-        const hasAddChild = validChildren.length > 0;
+        const hasAddChild = Boolean(onAddChild) && validChildren.length > 0;
         const childTypeName = hasAddChild
             ? (validChildren.length === 1 ? validChildren[0].replace(/([A-Z])/g, ' $1').trim() : 'Child Goal')
             : null;

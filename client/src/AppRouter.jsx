@@ -11,6 +11,7 @@ import GoalIcon from './components/atoms/GoalIcon';
 
 // Import page components
 import Selection from './pages/Selection';
+import Landing from './pages/Landing';
 
 // Lazy load non-critical pages
 const FractalGoals = lazyWithRetry(() => import('./pages/FractalGoals'), 'pages/FractalGoals');
@@ -30,6 +31,17 @@ import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 import { usePageTitle } from './hooks/usePageTitle';
 import { dismissGoalDetailsForNavigation } from './utils/navigationEvents';
 import { useGoalLevels } from './contexts/GoalLevelsContext';
+
+export const isPublicMarketingHost = (hostname = (typeof window === 'undefined' ? '' : window.location.hostname)) => {
+    const normalized = String(hostname || '').toLowerCase();
+    if (!normalized || normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '0.0.0.0') {
+        return false;
+    }
+    if (normalized.startsWith('my.')) {
+        return false;
+    }
+    return normalized === 'fractalgoals.com' || normalized === 'www.fractalgoals.com';
+};
 
 // Navigation header component defined outside of App to avoid re-declaration
 const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
@@ -236,9 +248,12 @@ function App() {
     const adminParams = new URLSearchParams(location.search);
     const adminMode = adminParams.get('admin_mode');
     const adminUserId = adminParams.get('admin_user_id');
+    const showLandingPage = location.pathname === '/landing' || (location.pathname === '/' && isPublicMarketingHost());
+    const showSelectionPage = location.pathname === '/' && !showLandingPage;
 
     // Determine page title based on path
     const getPageTitle = (pathname) => {
+        if (pathname === '/landing' || (pathname === '/' && showLandingPage)) return 'Private Beta';
         if (pathname === '/') return 'Selection';
         if (pathname === '/admin') return 'Admin';
         if (pathname.includes('/goals')) return 'Goals';
@@ -329,7 +344,7 @@ function App() {
     return (
         <HeaderProvider>
             <div className="app-container">
-                {location.pathname !== '/' && location.pathname !== '/admin' && (
+                {!showSelectionPage && !showLandingPage && location.pathname !== '/admin' && (
                     <NavigationHeader
                         onOpenSettings={() => setIsSettingsOpen(true)}
                         onHeightChange={setNavHeight}
@@ -342,7 +357,9 @@ function App() {
                             Admin {adminMode === 'read_only' ? 'read-only' : 'read-write'} access
                         </div>
                     )}
-                    {location.pathname === '/' ? (
+                    {showLandingPage ? (
+                        <Landing />
+                    ) : showSelectionPage ? (
                         <Selection />
                     ) : location.pathname === '/admin' ? (
                         <ComponentErrorBoundary>

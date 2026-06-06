@@ -67,3 +67,22 @@ class SignupInviteKey(Base):
 
     creator = relationship("User", foreign_keys=[created_by_user_id])
     used_by = relationship("User", foreign_keys=[used_by_user_id])
+
+
+class BetaSignupRequest(Base):
+    """
+    Public private-beta request queue.
+    This is intentionally separate from invite keys: admins still decide who receives
+    an account invite, while public visitors can ask to be considered.
+    """
+    __tablename__ = 'beta_signup_requests'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(120), nullable=False)
+    email = Column(String(120), unique=True, nullable=False, index=True)
+    use_case = Column(String(80), nullable=False)
+    note = Column(String(1000), nullable=True)
+    status = Column(String(32), default='new', nullable=False, index=True)
+    source = Column(String(80), default='landing_page', nullable=False)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

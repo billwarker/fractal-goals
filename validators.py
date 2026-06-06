@@ -257,6 +257,34 @@ class UserLoginSchema(BaseModel):
     password: str = Field(..., min_length=1)
 
 
+class BetaSignupRequestSchema(BaseModel):
+    """Schema for public private-beta access requests."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(..., min_length=2, max_length=120)
+    email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    use_case: str = Field(..., min_length=2, max_length=80)
+    note: Optional[str] = Field(None, max_length=1000)
+
+    @field_validator('name', 'use_case')
+    @classmethod
+    def sanitize_required_text(cls, v: str) -> str:
+        return sanitize_string(v)
+
+    @field_validator('email')
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return sanitize_string(v).lower()
+
+    @field_validator('note')
+    @classmethod
+    def sanitize_optional_note(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        cleaned = sanitize_note_content(v)
+        return cleaned or None
+
+
 class AdminUserCreateSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 

@@ -41,6 +41,7 @@ from blueprints.dashboards_api import dashboards_bp
 from blueprints.logs_api import logs_api
 from blueprints.auth_api import auth_bp
 from blueprints.admin_api import admin_bp
+from blueprints.public_api import public_bp
 from blueprints.pages import pages_bp
 from services.completion_handlers import clear_achievement_context, clear_live_progress
 from services import init_services
@@ -179,6 +180,7 @@ app.register_blueprint(dashboards_bp)
 app.register_blueprint(logs_api)
 app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(public_bp)
 app.register_blueprint(pages_bp)
 
 # Initialize services (event bus, completion handlers, etc.)

@@ -2,7 +2,7 @@ from .base import (
     Base, JSON_TYPE, utc_now, format_utc, _safe_load_json,
     get_engine, reset_engine, init_db, get_scoped_session, remove_session, get_session
 )
-from .user import User, SignupInviteKey
+from .user import User, SignupInviteKey, BetaSignupRequest
 from .goal import (
     GoalLevel, Goal, TargetTemplate, Target, TargetMetricCondition, TargetContributionLedger,
     session_goals, activity_goal_associations, goal_activity_group_associations,

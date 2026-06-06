@@ -73,6 +73,7 @@ The intended frontend flow is:
 Important frontend design choices:
 
 - TanStack Query is the canonical remote-data layer.
+- The public landing page lives at `client/src/pages/Landing.jsx`; `/landing` is always available, and the root route serves it on `fractalgoals.com` / `www.fractalgoals.com` while `my.fractalgoals.com` and local dev keep the authenticated fractal-selection root.
 - Query keys are centralized in `client/src/hooks/queryKeys.js`.
 - Broad invalidation should use centralized query-key prefix helpers, not ad hoc raw arrays.
 - Repeated invalidation clusters should use shared helpers in `client/src/utils/queryInvalidation.js` so query churn remains visible and easy to tune.
@@ -93,6 +94,7 @@ Current SaaS/account pieces:
 - CSRF double-submit protection for cookie-authenticated mutating requests
 - role-backed admin accounts
 - invite-key gated tester signup
+- public private-beta request collection through `/api/public/beta-signups`, stored separately from invite keys in `beta_signup_requests`
 - user profile, password, email, username, and preferences endpoints
 - membership tiers and quota limits for free/paid/legacy users
 - per-user app-data storage limits and usage reporting
@@ -110,10 +112,12 @@ Key backend pieces:
 
 - `services/auth_service.py`
 - `services/admin_service.py`
+- `services/public_service.py`
 - `services/user_service.py`
 - `services/quota_service.py`
 - `blueprints/auth_api.py`
 - `blueprints/admin_api.py`
+- `blueprints/public_api.py`
 - `models/user.py`
 
 Key frontend pieces:

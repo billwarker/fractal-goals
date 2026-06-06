@@ -46,6 +46,7 @@ from blueprints.logs_api import logs_api
 from blueprints.auth_api import auth_bp
 from blueprints.admin_api import admin_bp
 from blueprints.goal_levels_api import goal_levels_bp
+from blueprints.public_api import public_bp
 from services.completion_handlers import clear_achievement_context, clear_live_progress
 
 
@@ -84,6 +85,7 @@ def app():
     test_app.register_blueprint(auth_bp)
     test_app.register_blueprint(admin_bp)
     test_app.register_blueprint(goal_levels_bp)
+    test_app.register_blueprint(public_bp)
     
     # Initialize Limiter
     from extensions import limiter
