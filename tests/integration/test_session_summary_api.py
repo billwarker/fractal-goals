@@ -201,7 +201,7 @@ class TestSessionSummaryApi:
         payload = json.loads(response.data)
         assert paused_goal.id not in payload['goal_ids']
 
-    def test_evidence_goals_ignore_completed_child_association(
+    def test_evidence_goals_counts_completed_goal_activity_association(
         self,
         authed_client,
         db_session,
@@ -227,8 +227,7 @@ class TestSessionSummaryApi:
         response = authed_client.get(f'/api/{root_id}/sessions/evidence-goals?days=7')
         assert response.status_code == 200
         payload = json.loads(response.data)
-        assert sample_goal_hierarchy['short_term'].id not in payload['goal_ids']
-        assert sample_goal_hierarchy['mid_term'].id not in payload['goal_ids']
+        assert sample_goal_hierarchy['short_term'].id in payload['goal_ids']
 
     def test_flowtree_metrics_ignore_completed_child_association(
         self,

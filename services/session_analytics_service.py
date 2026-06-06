@@ -14,7 +14,7 @@ from services.serializers import (
 from services.service_types import JsonDict, ServiceResult
 from services.session_filters import normalize_id_list, session_duration_seconds_from_row
 from services.session_template_stats_service import SessionTemplateStatsService
-from services.goal_contribution import as_utc_datetime, resolve_contribution_goal
+from services.goal_contribution import as_utc_datetime, goal_suppresses_contribution, resolve_contribution_goal
 
 
 MAX_FLOWTREE_WINDOW_DAYS = 90
@@ -370,20 +370,11 @@ class SessionAnalyticsService:
         })
 
         effective_goals_by_activity = self._get_effective_activity_goals(root_id, recent_activity_ids)
-        goals_by_id = {
-            goal.id: goal
-            for goal in self.db_session.query(Goal).filter(
-                Goal.root_id == root_id,
-                Goal.deleted_at == None,
-            ).all()
-        }
         goal_ids = set()
-        for activity_id, time_stop, updated_at, created_at in recent_instance_rows:
-            completed_timestamp = time_stop or updated_at or created_at
+        for activity_id, *_ in recent_instance_rows:
             for goal in effective_goals_by_activity.get(activity_id, []):
-                contribution_goal = resolve_contribution_goal(goal, completed_timestamp, goals_by_id)
-                if contribution_goal:
-                    goal_ids.add(str(contribution_goal.id))
+                if goal and not goal_suppresses_contribution(goal):
+                    goal_ids.add(str(goal.id))
 
         return {
             "goal_ids": sorted(goal_ids),
