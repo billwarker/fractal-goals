@@ -283,6 +283,39 @@ describe('api core auth refresh behavior', () => {
         expect(calls.filter((call) => String(call.url).includes(`${API_BASE}/root-1/programs/program-1/blocks/block-1/days/day-1`))).toHaveLength(2);
     });
 
+    it('dispatches a session-expired event when stale CSRF recovery cannot authenticate', async () => {
+        document.cookie = 'fractal_csrf_token=stale-token; path=/';
+        const { axios, API_BASE } = await import('../core');
+        const events = [];
+        const originalAdapter = axios.defaults.adapter;
+        const handleExpired = (event) => events.push(event.detail);
+
+        window.addEventListener('auth:session_expired', handleExpired);
+        axios.defaults.adapter = async (config) => {
+            if (String(config.url).includes('/auth/csrf')) {
+                const error = new Error('Unauthorized');
+                error.config = config;
+                error.response = { status: 401, data: { error: 'Token has expired' }, config };
+                throw error;
+            }
+            const error = new Error('Forbidden');
+            error.config = config;
+            error.response = { status: 403, data: { error: 'CSRF token missing or invalid' }, config };
+            throw error;
+        };
+
+        try {
+            await expect(axios.post(`${API_BASE}/root/sessions/session/activities`, {})).rejects.toMatchObject({
+                response: { status: 401 },
+            });
+        } finally {
+            axios.defaults.adapter = originalAdapter;
+            window.removeEventListener('auth:session_expired', handleExpired);
+        }
+
+        expect(events).toEqual([{ reason: 'csrf_expired' }]);
+    });
+
     it('uses AxiosHeaders accessors when mutating CSRF headers', async () => {
         document.cookie = 'fractal_csrf_token=axios-headers-token; path=/';
         const { axios, API_BASE } = await import('../core');

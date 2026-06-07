@@ -196,10 +196,36 @@ class TestLoginEndpoint:
         cookie_header = response.headers.get('Set-Cookie', '')
         assert config.AUTH_COOKIE_NAME in cookie_header
         assert 'HttpOnly' in cookie_header
+        assert 'Max-Age' not in cookie_header
 
         me_response = client.get('/api/auth/me')
         assert me_response.status_code == 200
         assert json.loads(me_response.data)['username'] == 'testuser'
+
+    def test_login_remember_me_sets_persistent_cookie(self, client, test_user):
+        """Remember-me login should persist auth and CSRF cookies on this device."""
+        from config import config
+
+        response = client.post(
+            '/api/auth/login',
+            data=json.dumps({
+                'username_or_email': 'testuser',
+                'password': 'Password123',
+                'remember_me': True,
+            }),
+            content_type='application/json'
+        )
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['remember_me'] is True
+
+        cookie_headers = response.headers.getlist('Set-Cookie')
+        auth_cookie = next(header for header in cookie_headers if config.AUTH_COOKIE_NAME in header)
+        csrf_cookie = next(header for header in cookie_headers if config.CSRF_COOKIE_NAME in header)
+        assert 'HttpOnly' in auth_cookie
+        assert 'Max-Age=' in auth_cookie
+        assert 'Max-Age=' in csrf_cookie
     
     def test_login_wrong_password(self, client, test_user):
         """Test login with wrong password fails."""

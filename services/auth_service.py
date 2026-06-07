@@ -18,9 +18,10 @@ class AuthService:
         self.db_session = db_session
 
     @staticmethod
-    def issue_token(user_id: str) -> str:
+    def issue_token(user_id: str, *, remember_me: bool = False) -> str:
         return jwt.encode({
             'user_id': user_id,
+            'remember_me': bool(remember_me),
             'exp': datetime.datetime.now(datetime.timezone.utc)
             + datetime.timedelta(hours=config.JWT_EXPIRATION_HOURS),
         }, config.JWT_SECRET_KEY, algorithm="HS256")
@@ -99,7 +100,8 @@ class AuthService:
 
         logger.info("Refreshed auth token for user_id=%s", user.id)
         return {
-            'token': self.issue_token(user.id),
+            'token': self.issue_token(user.id, remember_me=bool(data.get('remember_me'))),
+            'remember_me': bool(data.get('remember_me')),
             'user': serialize_user(user),
         }, None, 200
 
@@ -143,6 +145,7 @@ class AuthService:
         logger.info("Logged in user_id=%s", user.id)
 
         return {
-            'token': self.issue_token(user.id),
+            'token': self.issue_token(user.id, remember_me=bool(data.get('remember_me'))),
+            'remember_me': bool(data.get('remember_me')),
             'user': serialize_user(user),
         }, None, 200

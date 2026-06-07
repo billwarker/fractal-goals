@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { globalApi } from '../utils/api';
 import { getTypeDisplayName } from '../utils/goalHelpers';
 import GoalModal from '../components/modals/GoalModal';
@@ -23,6 +23,7 @@ import notify from '../utils/notify';
 function Selection() {
     const RECENT_ROOT_STORAGE_PREFIX = 'fractal_recent_root_id';
     const navigate = useNavigate();
+    const location = useLocation();
     const queryClient = useQueryClient();
     const [recentRootId, setRecentRootId] = useState(null);
 
@@ -35,6 +36,7 @@ function Selection() {
     const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const isMobile = useIsMobile();
     const userId = user?.id || null;
+    const authModalRequested = Boolean(location.state?.openAuthModal);
     const recentRootStorageKey = useMemo(
         () => userId ? `${RECENT_ROOT_STORAGE_PREFIX}:${userId}` : null,
         [userId]
@@ -131,6 +133,13 @@ function Selection() {
             await deleteFractalMutation.mutateAsync(fractalToDelete.id);
         } catch (err) {
             console.error('Failed to delete fractal:', err);
+        }
+    };
+
+    const handleCloseAuthModal = () => {
+        setAuthModalOpen(false);
+        if (authModalRequested) {
+            navigate(location.pathname, { replace: true, state: null });
         }
     };
 
@@ -350,8 +359,8 @@ function Selection() {
                 requireMatchingText="delete"
             />
             <AuthModal
-                isOpen={isAuthModalOpen}
-                onClose={() => setAuthModalOpen(false)}
+                isOpen={isAuthModalOpen || authModalRequested}
+                onClose={handleCloseAuthModal}
             />
         </div>
     );

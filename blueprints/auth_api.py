@@ -25,15 +25,21 @@ def _issue_csrf_token():
     return secrets.token_urlsafe(32)
 
 
-def _set_csrf_cookie(response, token=None):
+def _auth_cookie_max_age(remember_me=False):
+    if not remember_me:
+        return None
+    return (
+        config.JWT_EXPIRATION_HOURS * 60 * 60
+        + config.JWT_REFRESH_WINDOW_DAYS * 24 * 60 * 60
+    )
+
+
+def _set_csrf_cookie(response, token=None, *, remember_me=False):
     token = token or _issue_csrf_token()
     response.set_cookie(
         config.CSRF_COOKIE_NAME,
         token,
-        max_age=(
-            config.JWT_EXPIRATION_HOURS * 60 * 60
-            + config.JWT_REFRESH_WINDOW_DAYS * 24 * 60 * 60
-        ),
+        max_age=_auth_cookie_max_age(remember_me),
         httponly=False,
         secure=config.AUTH_COOKIE_SECURE,
         samesite=config.AUTH_COOKIE_SAMESITE,
@@ -52,21 +58,17 @@ def _clear_csrf_cookie(response):
     return response
 
 
-def _set_auth_cookie(response, token):
-    max_age_seconds = (
-        config.JWT_EXPIRATION_HOURS * 60 * 60
-        + config.JWT_REFRESH_WINDOW_DAYS * 24 * 60 * 60
-    )
+def _set_auth_cookie(response, token, *, remember_me=False):
     response.set_cookie(
         config.AUTH_COOKIE_NAME,
         token,
-        max_age=max_age_seconds,
+        max_age=_auth_cookie_max_age(remember_me),
         httponly=True,
         secure=config.AUTH_COOKIE_SECURE,
         samesite=config.AUTH_COOKIE_SAMESITE,
         path='/',
     )
-    _set_csrf_cookie(response)
+    _set_csrf_cookie(response, remember_me=remember_me)
     return response
 
 
@@ -187,7 +189,7 @@ def refresh_token():
         if error:
             return jsonify({'error': error}), status
         response = jsonify(payload)
-        _set_auth_cookie(response, payload['token'])
+        _set_auth_cookie(response, payload['token'], remember_me=bool(payload.get('remember_me')))
         return response, status
     except SQLAlchemyError:
         logger.exception("Error in refresh_token")
@@ -211,7 +213,7 @@ def login(validated_data):
         if error:
             return jsonify({"error": error}), status
         response = jsonify(payload)
-        _set_auth_cookie(response, payload['token'])
+        _set_auth_cookie(response, payload['token'], remember_me=bool(payload.get('remember_me')))
         return response, status
     except SQLAlchemyError:
         db_session.rollback()

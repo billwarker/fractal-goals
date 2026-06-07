@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { authApi, clearAccessToken, setAccessToken } from '../utils/api';
+import notify from '../utils/notify';
 
 const AuthContext = createContext();
 
@@ -8,6 +10,7 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
 
     const replaceUser = (nextUser) => {
         const previousUserId = user?.id || null;
@@ -24,10 +27,15 @@ export function AuthProvider({ children }) {
 
     // Handle events from axios interceptors
     useEffect(() => {
-        const handleUnauthorized = () => {
+        const handleSessionExpired = () => {
             clearAccessToken();
             replaceUser(null);
             setLoading(false);
+            notify.error('Your session expired. Please log in again.');
+            navigate('/', {
+                replace: true,
+                state: { openAuthModal: true, authReason: 'session-expired' },
+            });
         };
         const handleTokenRefresh = (e) => {
             if (e.detail?.token) {
@@ -37,13 +45,13 @@ export function AuthProvider({ children }) {
                 replaceUser(e.detail.user);
             }
         };
-        window.addEventListener('auth:unauthorized', handleUnauthorized);
+        window.addEventListener('auth:session_expired', handleSessionExpired);
         window.addEventListener('auth:token_refreshed', handleTokenRefresh);
         return () => {
-            window.removeEventListener('auth:unauthorized', handleUnauthorized);
+            window.removeEventListener('auth:session_expired', handleSessionExpired);
             window.removeEventListener('auth:token_refreshed', handleTokenRefresh);
         };
-    }, [queryClient, user?.id]);
+    }, [navigate, queryClient, user?.id]);
 
     const fetchCurrentUser = async () => {
         try {
@@ -79,11 +87,12 @@ export function AuthProvider({ children }) {
         }
     };
 
-    const login = async (usernameOrEmail, password) => {
+    const login = async (usernameOrEmail, password, options = {}) => {
         try {
             const res = await authApi.login({
                 username_or_email: usernameOrEmail,
-                password: password
+                password: password,
+                remember_me: Boolean(options.rememberMe)
             });
             const { token, user: userData } = res.data;
             setAccessToken(token);

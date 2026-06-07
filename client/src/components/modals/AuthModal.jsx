@@ -5,6 +5,7 @@ import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Input from '../atoms/Input';
 import Button from '../atoms/Button';
+import Checkbox from '../atoms/Checkbox';
 import { Heading, Text } from '../atoms/Typography';
 import { useForm } from '../../hooks/useForm';
 import styles from './AuthModal.module.css';
@@ -53,7 +54,8 @@ function AuthModalInner({ onClose }) {
         email: '',
         password: '',
         inviteKey: '',
-        usernameOrEmail: ''
+        usernameOrEmail: '',
+        rememberMe: false
     }, validate);
 
     useEffect(() => {
@@ -66,7 +68,7 @@ function AuthModalInner({ onClose }) {
         setGeneralError(null);
         try {
             if (isLogin) {
-                await login(formValues.usernameOrEmail, formValues.password);
+                await login(formValues.usernameOrEmail, formValues.password, { rememberMe: formValues.rememberMe });
                 onClose();
             } else {
                 await signup(formValues.username, formValues.email, formValues.password, formValues.inviteKey);
@@ -205,6 +207,16 @@ function AuthModalInner({ onClose }) {
                             </Text>
                         )}
                     </div>
+
+                    {isLogin && (
+                        <Checkbox
+                            label="Remember me on this device"
+                            name="rememberMe"
+                            checked={Boolean(values.rememberMe)}
+                            onChange={handleChange}
+                            className={styles.rememberMe}
+                        />
+                    )}
 
                     {generalError && (
                         <div className={styles.errorMessage}>

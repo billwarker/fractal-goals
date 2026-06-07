@@ -90,7 +90,7 @@ The app has a real account boundary rather than a purely local/single-user model
 
 Current SaaS/account pieces:
 
-- JWT auth with HttpOnly cookie support
+- JWT auth with HttpOnly cookie support, including explicit session-cookie vs remembered-device login behavior
 - CSRF double-submit protection for cookie-authenticated mutating requests
 - role-backed admin accounts
 - invite-key gated tester signup
@@ -136,7 +136,7 @@ Performance and production-hardening notes:
 - Session detail add/remove activity and timer start/reset mutations keep response serialization on the already-loaded instance path and have query/latency budget coverage.
 - Fractal-route header root-goal lookups request `include_children=false`; full goal-tree consumers should use the dedicated tree query instead of duplicating root detail fetches.
 - Goal detail timeline data remains lazy-loaded by the frontend; the backend timeline endpoint uses the shared eager goal-tree loader once the user opens the Timeline tab.
-- Browser CSRF handling shares a single in-flight `/auth/csrf` fetch across concurrent writes, reads the token from the response body/header for cross-origin production API calls, and retries once on stale-token CSRF 403s.
+- Browser CSRF handling shares a single in-flight `/auth/csrf` fetch across concurrent writes, reads the token from the response body/header for cross-origin production API calls, retries once on stale-token CSRF 403s, and emits a session-expired auth event when token recovery fails so the app can notify the user and return them to login.
 - Frontend API contract tests cover mutating helpers across goals, programs, sessions, notes, and analytics to catch CSRF regressions and endpoint path drift.
 - Backend performance tests include query-count, response-size, and latency budget checks for core endpoints.
 - Large-account budget tests cover goal-tree, sessions search, notes pagination, and admin user-list paths.

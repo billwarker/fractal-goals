@@ -9,6 +9,7 @@ let accessToken = null;
 let isRefreshing = false;
 let csrfFetchPromise = null;
 let failedQueue = [];
+let hasDispatchedSessionExpired = false;
 const CSRF_COOKIE_NAME = 'fractal_csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
@@ -91,6 +92,12 @@ const isCsrfAuthFailure = (error) => (
     && /csrf/i.test(String(error.response?.data?.error || ''))
 );
 
+const dispatchSessionExpired = (detail = {}) => {
+    if (typeof window === 'undefined' || hasDispatchedSessionExpired) return;
+    hasDispatchedSessionExpired = true;
+    window.dispatchEvent(new CustomEvent('auth:session_expired', { detail }));
+};
+
 axios.interceptors.request.use(async (config) => {
     if (accessToken && !getHeader(config.headers, 'Authorization')) {
         setHeader(config, 'Authorization', `Bearer ${accessToken}`);
@@ -136,11 +143,19 @@ axios.interceptors.response.use(
 
         if (isCsrfAuthFailure(error) && originalRequest && !originalRequest._csrfRetry && needsCsrfHeader(originalRequest)) {
             originalRequest._csrfRetry = true;
-            const csrfToken = await ensureCsrfToken(originalRequest, { force: true });
-            if (csrfToken) {
-                setHeader(originalRequest, CSRF_HEADER_NAME, decodeURIComponent(csrfToken));
-                return axios(originalRequest);
+            try {
+                const csrfToken = await ensureCsrfToken(originalRequest, { force: true });
+                if (csrfToken) {
+                    setHeader(originalRequest, CSRF_HEADER_NAME, decodeURIComponent(csrfToken));
+                    return axios(originalRequest);
+                }
+            } catch (csrfRefreshError) {
+                clearAccessToken();
+                dispatchSessionExpired({ reason: 'csrf_expired' });
+                return Promise.reject(csrfRefreshError);
             }
+            clearAccessToken();
+            dispatchSessionExpired({ reason: 'csrf_expired' });
         }
 
         if (error.response?.status === 401 && !originalRequest?._retry) {
@@ -171,6 +186,7 @@ axios.interceptors.response.use(
                 const response = await axios.post(`${API_BASE}/auth/refresh`, {}, { _skipCsrfFetch: true });
 
                 const { token, user } = response.data;
+                hasDispatchedSessionExpired = false;
                 setAccessToken(token);
                 window.dispatchEvent(new CustomEvent('auth:token_refreshed', { detail: { token, user } }));
 
@@ -187,7 +203,7 @@ axios.interceptors.response.use(
             } catch (refreshError) {
                 clearAccessToken();
                 processQueue(refreshError, null);
-                window.dispatchEvent(new Event('auth:unauthorized'));
+                dispatchSessionExpired({ reason: 'refresh_failed' });
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;

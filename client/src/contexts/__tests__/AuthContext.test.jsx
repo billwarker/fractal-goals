@@ -1,6 +1,7 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter } from 'react-router-dom';
 
 import { AuthProvider, useAuth } from '../AuthContext';
 
@@ -8,6 +9,7 @@ const {
     authApi,
     setAccessToken,
     clearAccessToken,
+    notify,
 } = vi.hoisted(() => ({
     authApi: {
         getMe: vi.fn(),
@@ -19,12 +21,19 @@ const {
     },
     setAccessToken: vi.fn(),
     clearAccessToken: vi.fn(),
+    notify: {
+        error: vi.fn(),
+    },
 }));
 
 vi.mock('../../utils/api', () => ({
     authApi,
     setAccessToken,
     clearAccessToken,
+}));
+
+vi.mock('../../utils/notify', () => ({
+    default: notify,
 }));
 
 function createQueryClient() {
@@ -53,9 +62,11 @@ function AuthHarness() {
 function renderAuthHarness(queryClient = createQueryClient()) {
     const view = render(
         <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-                <AuthHarness />
-            </AuthProvider>
+            <MemoryRouter>
+                <AuthProvider>
+                    <AuthHarness />
+                </AuthProvider>
+            </MemoryRouter>
         </QueryClientProvider>
     );
 
@@ -144,5 +155,31 @@ describe('AuthContext cache boundary', () => {
 
         expect(queryClient.getQueryData(['fractals', 'user-a'])).toBeUndefined();
         expect(clearAccessToken).toHaveBeenCalled();
+    });
+
+    it('clears auth, cache, and notifies when the API reports a stale session', async () => {
+        const { queryClient } = renderAuthHarness();
+
+        authApi.login.mockResolvedValueOnce({
+            data: { token: 'token-a', user: { id: 'user-a', username: 'alpha' } },
+        });
+        fireEvent.click(screen.getByText('Login A'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('user-id')).toHaveTextContent('user-a');
+        });
+
+        queryClient.setQueryData(['fractals', 'user-a'], [{ id: 'root-a' }]);
+        act(() => {
+            window.dispatchEvent(new CustomEvent('auth:session_expired', { detail: { reason: 'csrf_expired' } }));
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+        });
+
+        expect(queryClient.getQueryData(['fractals', 'user-a'])).toBeUndefined();
+        expect(clearAccessToken).toHaveBeenCalled();
+        expect(notify.error).toHaveBeenCalledWith('Your session expired. Please log in again.');
     });
 });

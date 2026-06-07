@@ -93,6 +93,11 @@
     margin-top: 5px;
 }
 
+.rememberMe {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
 .actions {
     display: flex;
     flex-direction: column;
