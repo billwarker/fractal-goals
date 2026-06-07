@@ -85,8 +85,25 @@ describe('AuthContext cache boundary', () => {
             configurable: true,
         });
         authApi.getMe.mockRejectedValue({ response: { status: 401 } });
+        authApi.refresh.mockRejectedValue({ response: { status: 401 } });
         authApi.getCsrf.mockResolvedValue({});
         authApi.logout.mockResolvedValue({});
+    });
+
+    it('refreshes a remembered browser session when the boot-time me request is stale', async () => {
+        authApi.refresh.mockResolvedValueOnce({
+            data: { token: 'fresh-token', user: { id: 'user-a', username: 'alpha' } },
+        });
+
+        renderAuthHarness();
+
+        await waitFor(() => {
+            expect(screen.getByTestId('user-id')).toHaveTextContent('user-a');
+        });
+
+        expect(authApi.refresh).toHaveBeenCalledWith();
+        expect(setAccessToken).toHaveBeenCalledWith('fresh-token');
+        expect(authApi.getCsrf).toHaveBeenCalled();
     });
 
     it('clears cached query data when logging into a different user', async () => {

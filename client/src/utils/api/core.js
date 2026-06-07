@@ -33,6 +33,9 @@ const getResponseHeader = (headers, name) => getHeader(headers, name);
 
 export const setAccessToken = (token) => {
     accessToken = token || null;
+    if (token) {
+        hasDispatchedSessionExpired = false;
+    }
 };
 
 export const clearAccessToken = () => {

@@ -655,6 +655,35 @@ class TestTokenRefreshEndpoint:
         )
         assert refresh_response.status_code == 200
 
+    def test_remembered_cookie_refresh_preserves_persistent_cookie(self, client, test_user):
+        from config import config
+
+        response = client.post(
+            '/api/auth/login',
+            data=json.dumps({
+                'username_or_email': 'testuser',
+                'password': 'Password123',
+                'remember_me': True,
+            }),
+            content_type='application/json',
+        )
+        assert response.status_code == 200
+        csrf_cookie = client.get_cookie(config.CSRF_COOKIE_NAME)
+
+        refresh_response = client.post(
+            '/api/auth/refresh',
+            headers={config.CSRF_HEADER_NAME: csrf_cookie.value},
+        )
+
+        assert refresh_response.status_code == 200
+        data = json.loads(refresh_response.data)
+        assert data['remember_me'] is True
+        cookie_headers = refresh_response.headers.getlist('Set-Cookie')
+        auth_cookie = next(header for header in cookie_headers if config.AUTH_COOKIE_NAME in header)
+        csrf_cookie_header = next(header for header in cookie_headers if config.CSRF_COOKIE_NAME in header)
+        assert 'Max-Age=' in auth_cookie
+        assert 'Max-Age=' in csrf_cookie_header
+
     def test_refresh_token_past_window(self, client, test_user):
         import jwt
         from datetime import datetime, timedelta, timezone

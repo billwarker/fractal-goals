@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { authApi, clearAccessToken, setAccessToken } from '../utils/api';
@@ -11,6 +11,7 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+    const authVersionRef = useRef(0);
 
     const replaceUser = (nextUser) => {
         const previousUserId = user?.id || null;
@@ -28,6 +29,7 @@ export function AuthProvider({ children }) {
     // Handle events from axios interceptors
     useEffect(() => {
         const handleSessionExpired = () => {
+            authVersionRef.current += 1;
             clearAccessToken();
             replaceUser(null);
             setLoading(false);
@@ -42,6 +44,7 @@ export function AuthProvider({ children }) {
                 setAccessToken(e.detail.token);
             }
             if (e.detail?.user) {
+                authVersionRef.current += 1;
                 replaceUser(e.detail.user);
             }
         };
@@ -54,11 +57,15 @@ export function AuthProvider({ children }) {
     }, [navigate, queryClient, user?.id]);
 
     const fetchCurrentUser = async () => {
+        const authVersion = authVersionRef.current;
+        const isStaleAuthCheck = () => authVersionRef.current !== authVersion;
+
         try {
             const legacyToken = localStorage.getItem('token');
             if (legacyToken) {
                 const refreshResponse = await authApi.refresh(legacyToken);
                 localStorage.removeItem('token');
+                if (isStaleAuthCheck()) return;
                 if (refreshResponse.data?.token) {
                     setAccessToken(refreshResponse.data.token);
                 }
@@ -69,16 +76,33 @@ export function AuthProvider({ children }) {
             }
 
             const res = await authApi.getMe();
+            if (isStaleAuthCheck()) return;
             replaceUser(res.data);
             await authApi.getCsrf();
         } catch (err) {
+            if (isStaleAuthCheck()) return;
+
             const status = err?.response?.status;
             const isNetworkError = !err?.response;
 
             // Keep token for transient network failures so interceptor retries can recover.
             if (!isNetworkError && (status === 401 || status === 403)) {
-                clearAccessToken();
-                replaceUser(null);
+                try {
+                    const refreshResponse = await authApi.refresh();
+                    if (isStaleAuthCheck()) return;
+                    if (refreshResponse.data?.token) {
+                        setAccessToken(refreshResponse.data.token);
+                    }
+                    if (refreshResponse.data?.user) {
+                        replaceUser(refreshResponse.data.user);
+                        await authApi.getCsrf();
+                        return;
+                    }
+                } catch {
+                    if (isStaleAuthCheck()) return;
+                    clearAccessToken();
+                    replaceUser(null);
+                }
             } else {
                 console.error("Failed to fetch current user:", err);
             }
@@ -95,6 +119,7 @@ export function AuthProvider({ children }) {
                 remember_me: Boolean(options.rememberMe)
             });
             const { token, user: userData } = res.data;
+            authVersionRef.current += 1;
             setAccessToken(token);
             replaceUser(userData);
             return res.data;
@@ -123,6 +148,7 @@ export function AuthProvider({ children }) {
         try {
             await authApi.logout();
         } finally {
+            authVersionRef.current += 1;
             clearAccessToken();
             replaceUser(null);
         }
