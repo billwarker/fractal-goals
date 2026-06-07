@@ -151,6 +151,75 @@ class TestProgressService:
         assert yield_comparison['previous_value'] == 500.0
         assert result['derived_summary']['auto_aggregations']['total_yield'] == 525.0
 
+    def test_auto_does_not_add_yield_when_any_tracked_metric_is_not_multiplicative(self, db_session, sample_ultimate_goal):
+        activity, metrics = _build_activity_with_metrics(
+            db_session,
+            sample_ultimate_goal.id,
+            metric_specs=[
+                {'name': 'Hands Distance from Feet', 'unit': 'Inches', 'is_multiplicative': False},
+                {'name': 'Reps', 'unit': 'Count', 'is_multiplicative': True},
+            ],
+        )
+        prev_session = _build_session(
+            db_session,
+            sample_ultimate_goal.id,
+            'Previous Session',
+            datetime(2026, 6, 1, tzinfo=timezone.utc),
+        )
+        current_session = _build_session(
+            db_session,
+            sample_ultimate_goal.id,
+            'Current Session',
+            datetime(2026, 6, 2, tzinfo=timezone.utc),
+        )
+        _build_instance(
+            db_session,
+            root_id=sample_ultimate_goal.id,
+            session_id=prev_session.id,
+            activity_id=activity.id,
+            created_at=datetime(2026, 6, 1, 10, 0, tzinfo=timezone.utc),
+            values={},
+            data={
+                'sets': [
+                    {
+                        'metrics': [
+                            {'metric_id': metrics[0].id, 'value': 20},
+                            {'metric_id': metrics[1].id, 'value': 5},
+                        ],
+                    },
+                ],
+            },
+        )
+        current_instance = _build_instance(
+            db_session,
+            root_id=sample_ultimate_goal.id,
+            session_id=current_session.id,
+            activity_id=activity.id,
+            created_at=datetime(2026, 6, 2, 10, 0, tzinfo=timezone.utc),
+            values={},
+            data={
+                'sets': [
+                    {
+                        'metrics': [
+                            {'metric_id': metrics[0].id, 'value': 24},
+                            {'metric_id': metrics[1].id, 'value': 5},
+                        ],
+                    },
+                ],
+            },
+        )
+        db_session.commit()
+
+        result = ProgressService(db_session).compute_live_comparison(current_instance.id)
+        auto_aggregations = result['derived_summary']['auto_aggregations']
+
+        assert result['comparison_type'] == 'set_metrics'
+        assert all(item.get('type') != 'yield' for item in result['metric_comparisons'])
+        assert auto_aggregations['yield_per_set'] == []
+        assert auto_aggregations['total_yield'] is None
+        assert auto_aggregations['best_set_yield'] is None
+        assert auto_aggregations['additive_totals'][metrics[0].id] == 24
+
     def test_auto_uses_sum_for_additive_set_metrics(self, db_session, sample_ultimate_goal):
         activity, metrics = _build_activity_with_metrics(
             db_session,

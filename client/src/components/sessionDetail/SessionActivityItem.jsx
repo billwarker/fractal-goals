@@ -20,6 +20,7 @@ import { useProgressComparison } from '../../hooks/useProgressComparison';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
 import { useEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
 import {
+    canComputeYield,
     computeAutoAggregations,
     filterTrackedMetricDefs,
     formatAggValue,
@@ -249,8 +250,8 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, disp
 
     if (!autoAgg) return null;
 
-    const multDefs = trackedMetricDefs.filter((md) => md.is_multiplicative);
-    const hasYield = multDefs.length >= 2 && autoAgg.total_yield != null;
+    const yieldEligible = canComputeYield(trackedMetricDefs);
+    const hasYield = yieldEligible && autoAgg.total_yield != null;
     const hasAdditive = Object.keys(autoAgg.additive_totals).length > 0;
     const hasBestSet = autoAgg.best_set_index != null;
 
@@ -671,6 +672,7 @@ function SessionActivityItem({
     }, [
         def.metric_definitions,
         def.split_definitions,
+        exercise.id,
         exercise.metrics,
         exercise.sets,
         hasMetrics,
@@ -766,16 +768,19 @@ function SessionActivityItem({
         return computeAutoAggregations(exercise.sets, trackedMetricDefs);
     }, [hasSets, exercise.sets, trackedMetricDefs]);
     const bestSetIndex = liveAutoAgg?.best_set_index ?? null;
+    const yieldEligible = canComputeYield(trackedMetricDefs);
     const yieldBySetIndex = useMemo(() => {
+        if (!yieldEligible) return null;
         if (!liveAutoAgg?.yield_per_set?.length) return null;
         const map = {};
         for (const { set_index, yield: y } of liveAutoAgg.yield_per_set) {
             map[set_index] = y;
         }
         return map;
-    }, [liveAutoAgg]);
+    }, [liveAutoAgg, yieldEligible]);
 
     const prevYieldBySetIndex = useMemo(() => {
+        if (!yieldEligible) return null;
         const prevAgg = activeProgress?.derived_summary?.prev_auto_aggregations;
         if (!prevAgg?.yield_per_set?.length) return null;
         const map = {};
@@ -783,7 +788,7 @@ function SessionActivityItem({
             map[set_index] = y;
         }
         return map;
-    }, [activeProgress]);
+    }, [activeProgress, yieldEligible]);
 
     const renderMetricProgress = useCallback((metricId, options = {}) => {
         if (!metricId || !activeProgress || activeProgress.is_first_instance) {

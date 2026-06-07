@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import MarkdownNoteContent from '../notes/MarkdownNoteContent';
 import {
+    canComputeYield,
     computeAutoAggregations,
     filterTrackedMetricDefs,
     formatAggValue,
@@ -121,26 +122,28 @@ export function ActivityTimelineCard({
     }, [progressRecord, sets, trackedMetricDefs]);
 
     const prevAutoAgg = progressRecord?.derived_summary?.prev_auto_aggregations ?? null;
-    const multDefs = trackedMetricDefs.filter((md) => md.is_multiplicative);
-    const hasYield = multDefs.length >= 2 && autoAgg?.total_yield != null;
+    const yieldEligible = canComputeYield(trackedMetricDefs);
+    const hasYield = yieldEligible && autoAgg?.total_yield != null;
 
     const yieldBySetIndex = useMemo(() => {
+        if (!yieldEligible) return null;
         if (!autoAgg?.yield_per_set?.length) return null;
         const map = {};
         for (const { set_index, yield: y } of autoAgg.yield_per_set) {
             map[set_index] = y;
         }
         return map;
-    }, [autoAgg]);
+    }, [autoAgg, yieldEligible]);
 
     const prevYieldBySetIndex = useMemo(() => {
+        if (!yieldEligible) return null;
         if (!prevAutoAgg?.yield_per_set?.length) return null;
         const map = {};
         for (const { set_index, yield: y } of prevAutoAgg.yield_per_set) {
             map[set_index] = y;
         }
         return map;
-    }, [prevAutoAgg]);
+    }, [prevAutoAgg, yieldEligible]);
 
     const duration = (() => {
         if (instance.time_start && instance.time_stop) {

@@ -16,6 +16,12 @@ export function filterTrackedMetricDefs(metricDefs) {
     return (metricDefs || []).filter((md) => md?.track_progress !== false);
 }
 
+export function canComputeYield(metricDefs) {
+    return Array.isArray(metricDefs)
+        && metricDefs.length >= 2
+        && metricDefs.every((md) => md?.is_multiplicative === true);
+}
+
 export function resolveAutoAggregationMode(metricDef, metricDefs, { hasSets = false } = {}) {
     if (!metricDef || !hasSets) return 'last';
     const hasBestSetAnchor = (metricDefs || []).some((md) => md?.is_best_set_metric);
@@ -28,7 +34,7 @@ export function resolveAutoAggregationMode(metricDef, metricDefs, { hasSets = fa
 /**
  * Given an array of sets and metric definitions, compute:
  *   - additive_totals: { [metricId]: sum } for additive metrics
- *   - yield_per_set: [{ set_index, yield }] for multiplicative metrics (requires 2+)
+ *   - yield_per_set: [{ set_index, yield }] when all tracked metrics are multiplicative (requires 2+)
  *   - total_yield: sum of per-set yields (null if not applicable)
  *   - best_set_index: index of best set (null if no sets)
  *   - best_set_yield: yield of best set (null if not multiplicative)
@@ -51,8 +57,8 @@ export function computeAutoAggregations(sets, metricDefs) {
     if (!Array.isArray(metricDefs) || metricDefs.length === 0) return result;
     if (!Array.isArray(sets) || sets.length === 0) return result;
 
-    const multDefs = metricDefs.filter((md) => md.is_multiplicative);
-    const hasMultiplicative = multDefs.length >= 2;
+    const hasYield = canComputeYield(metricDefs);
+    const multDefs = hasYield ? metricDefs : [];
 
     // --- Additive totals ---
     for (const md of metricDefs) {
@@ -73,7 +79,7 @@ export function computeAutoAggregations(sets, metricDefs) {
     }
 
     // --- Yield per set and total yield ---
-    if (hasMultiplicative) {
+    if (hasYield) {
         let totalYield = 0;
         let hasAny = false;
         for (let si = 0; si < sets.length; si++) {
@@ -126,7 +132,7 @@ export function computeAutoAggregations(sets, metricDefs) {
             }
         }
         result.best_set_index = bestIndex;
-    } else if (hasMultiplicative && result.yield_per_set.length > 0) {
+    } else if (hasYield && result.yield_per_set.length > 0) {
         // Best set = highest yield set
         const best = result.yield_per_set.reduce((a, b) => b.yield > a.yield ? b : a);
         result.best_set_index = best.set_index;
@@ -167,7 +173,7 @@ export function computeAutoAggregations(sets, metricDefs) {
             if (mid && v !== null) result.best_set_values[mid] = v;
         }
         // Compute yield for best set if multiplicative and not already set
-        if (hasMultiplicative && result.best_set_yield === null) {
+        if (hasYield && result.best_set_yield === null) {
             const setMetrics = {};
             for (const m of (bestSet.metrics || [])) {
                 const mid = m.metric_id || m.metric_definition_id;

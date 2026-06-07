@@ -79,4 +79,62 @@ describe('ActivityTimelineCard', () => {
         expect(screen.getByText('Tempo:')).toBeInTheDocument();
         expect(screen.getByText('sec')).toBeInTheDocument();
     });
+
+    it('does not render yield for mixed multiplicative and non-multiplicative set metrics', () => {
+        renderWithProviders(
+            <ActivityTimelineCard
+                instance={{
+                    id: 'instance-1',
+                    session_name: 'Simple Empty Template',
+                    session_date: '2026-06-02T12:00:00.000Z',
+                    metric_values: [],
+                    sets: [
+                        {
+                            metrics: [
+                                { metric_id: 'distance', value: 24 },
+                                { metric_id: 'reps', value: 5 },
+                            ],
+                        },
+                    ],
+                    notes: [],
+                }}
+                activityDef={{
+                    metric_definitions: [
+                        { id: 'distance', name: 'Hands Distance from Feet', unit: 'Inches', is_multiplicative: false, is_additive: true },
+                        { id: 'reps', name: 'Reps', unit: 'Count', is_multiplicative: true },
+                    ],
+                }}
+                progressRecord={{
+                    is_first_instance: false,
+                    derived_summary: {
+                        auto_aggregations: {
+                            additive_totals: { distance: 24 },
+                            yield_per_set: [{ set_index: 0, yield: 120 }],
+                            total_yield: 120,
+                            best_set_index: 0,
+                            best_set_yield: 120,
+                            best_set_values: { distance: 24, reps: 5 },
+                        },
+                        prev_auto_aggregations: {
+                            yield_per_set: [{ set_index: 0, yield: 100 }],
+                            total_yield: 100,
+                        },
+                    },
+                }}
+                timezone="UTC"
+            />,
+            {
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+                withTimezone: false,
+            }
+        );
+
+        expect(screen.getByText('Hands Distance from Feet:')).toBeInTheDocument();
+        expect(screen.getByText('Reps:')).toBeInTheDocument();
+        expect(screen.queryByText(/Yield:/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Total yield:/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/Set 1/)).toBeInTheDocument();
+    });
 });

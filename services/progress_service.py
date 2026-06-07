@@ -203,6 +203,10 @@ class ProgressService:
             return metric_def.fractal_metric.is_additive
         return True
 
+    def _can_compute_yield(self, metric_defs: list) -> bool:
+        """Yield is valid only when every tracked metric participates multiplicatively."""
+        return bool(metric_defs) and len(metric_defs) >= 2 and all(md.is_multiplicative for md in metric_defs)
+
     def _find_best_set_index(
         self,
         instance: ActivityInstance,
@@ -444,8 +448,8 @@ class ProgressService:
 
         Returns a dict with:
           - additive_totals: {metric_id: total} for additive metrics
-          - yield_per_set: [{set_index, yield}] for multiplicative metrics (if 2+)
-          - total_yield: float sum of per-set yields (if multiplicative)
+          - yield_per_set: [{set_index, yield}] when all tracked metrics are multiplicative (if 2+)
+          - total_yield: float sum of per-set yields (if yield-eligible)
           - best_set_index: index of the best set (None if no sets)
           - best_set_yield: yield value of the best set (None if not multiplicative)
           - best_set_values: {metric_id: value} for all metrics in the best set
@@ -465,8 +469,8 @@ class ProgressService:
         if not metric_defs:
             return result
 
-        mult_defs = [md for md in metric_defs if md.is_multiplicative]
-        has_multiplicative = len(mult_defs) >= 2
+        has_yield = self._can_compute_yield(metric_defs)
+        mult_defs = metric_defs if has_yield else []
 
         # --- Additive totals ---
         for md in metric_defs:
@@ -492,7 +496,7 @@ class ProgressService:
                     result['additive_totals'][md.id] = v
 
         # --- Yield per set and total yield ---
-        if has_multiplicative and sets:
+        if has_yield and sets:
             yield_per_set = []
             total_yield = 0.0
             has_any_yield = False
@@ -516,7 +520,7 @@ class ProgressService:
             if has_any_yield:
                 result['yield_per_set'] = yield_per_set
                 result['total_yield'] = total_yield
-        elif has_multiplicative:
+        elif has_yield:
             product = 1.0
             has_all_values = True
             for md in mult_defs:
@@ -557,7 +561,7 @@ class ProgressService:
                                 best_val = v
                                 best_index = set_index
                 result['best_set_index'] = best_index
-            elif has_multiplicative and result['yield_per_set']:
+            elif has_yield and result['yield_per_set']:
                 # Best set = highest yield set
                 best = max(result['yield_per_set'], key=lambda x: x['yield'])
                 best_index = best['set_index']
@@ -594,7 +598,7 @@ class ProgressService:
                     if mid and v is not None:
                         result['best_set_values'][mid] = v
                 # Also attach yield for best set if multiplicative
-                if has_multiplicative and result['best_set_yield'] is None:
+                if has_yield and result['best_set_yield'] is None:
                     set_metrics = {
                         (m.get('metric_id') or m.get('metric_definition_id')): self._coerce_numeric(m.get('value'))
                         for m in best_s.get('metrics', [])
@@ -624,10 +628,10 @@ class ProgressService:
         Returns (float total, list of metric_def_ids used)
         or (None, []) if fewer than 2 multiplicative metrics have data.
         """
-        mult_defs = [md for md in metric_defs if md.is_multiplicative]
-        if len(mult_defs) < 2:
+        if not self._can_compute_yield(metric_defs):
             return None, []
 
+        mult_defs = metric_defs
         used_ids = [md.id for md in mult_defs]
 
         raw_data = models._safe_load_json(instance.data, {})
@@ -727,9 +731,8 @@ class ProgressService:
         curr_sets = curr_data.get('sets', []) if isinstance(curr_data, dict) else []
         has_sets = bool(curr_sets)
 
-        # Yield is derived automatically when at least two tracked multiplicative metrics exist.
-        mult_tracked_defs = [md for md in tracked_defs if md.is_multiplicative]
-        yield_requested = len(mult_tracked_defs) >= 2
+        # Yield is derived only when every tracked metric is multiplicative.
+        yield_requested = self._can_compute_yield(tracked_defs)
         curr_yield = None
         prev_yield = None
         yield_ids = []

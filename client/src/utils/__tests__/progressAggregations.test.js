@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    canComputeYield,
     computeAutoAggregations,
     filterTrackedMetricDefs,
     resolveAutoAggregationMode,
@@ -32,32 +33,29 @@ describe('progressAggregations', () => {
         expect(resolveAutoAggregationMode(metricDefs[0], metricDefs, { hasSets: false })).toBe('last');
     });
 
-    it('computes aggregations from tracked metric definitions', () => {
+    it('computes yield when all tracked metric definitions are multiplicative', () => {
         const sets = [
             {
                 metrics: [
                     { metric_id: 'weight', value: 100 },
                     { metric_id: 'reps', value: 5 },
-                    { metric_id: 'distance', value: 400 },
                 ],
             },
             {
                 metrics: [
                     { metric_id: 'weight', value: 105 },
                     { metric_id: 'reps', value: 4 },
-                    { metric_id: 'distance', value: 500 },
                 ],
             },
         ];
         const metricDefs = filterTrackedMetricDefs([
             { id: 'weight', is_multiplicative: true },
             { id: 'reps', is_multiplicative: true },
-            { id: 'distance', is_multiplicative: false, is_additive: true },
             { id: 'internal', is_multiplicative: true, track_progress: false },
         ]);
 
         expect(computeAutoAggregations(sets, metricDefs)).toEqual({
-            additive_totals: { distance: 900 },
+            additive_totals: {},
             yield_per_set: [
                 { set_index: 0, yield: 500 },
                 { set_index: 1, yield: 420 },
@@ -68,8 +66,31 @@ describe('progressAggregations', () => {
             best_set_values: {
                 weight: 100,
                 reps: 5,
-                distance: 400,
             },
         });
+    });
+
+    it('does not compute yield when any tracked metric is non-multiplicative', () => {
+        const sets = [
+            {
+                metrics: [
+                    { metric_id: 'distance', value: 24 },
+                    { metric_id: 'reps', value: 5 },
+                ],
+            },
+        ];
+        const metricDefs = filterTrackedMetricDefs([
+            { id: 'distance', is_multiplicative: false, is_additive: true },
+            { id: 'reps', is_multiplicative: true },
+        ]);
+
+        const result = computeAutoAggregations(sets, metricDefs);
+
+        expect(canComputeYield(metricDefs)).toBe(false);
+        expect(result.yield_per_set).toEqual([]);
+        expect(result.total_yield).toBeNull();
+        expect(result.best_set_yield).toBeNull();
+        expect(result.additive_totals).toEqual({ distance: 24 });
+        expect(result.best_set_values).toEqual({ distance: 24, reps: 5 });
     });
 });

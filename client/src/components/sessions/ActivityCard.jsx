@@ -12,6 +12,7 @@ import { resolveEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaD
 import { getAverageDurationStat } from '../../utils/durationStats';
 import { getGroupBreadcrumb } from '../../utils/manageActivities';
 import {
+    canComputeYield,
     computeAutoAggregations,
     filterTrackedMetricDefs,
     formatAggValue,
@@ -119,8 +120,8 @@ function ActivityProgressSummary({ sets, activityDefinition, progressComparison,
 
     if (!autoAgg) return null;
 
-    const multDefs = trackedMetricDefs.filter((md) => md.is_multiplicative);
-    const hasYield = multDefs.length >= 2 && autoAgg.total_yield != null;
+    const yieldEligible = canComputeYield(trackedMetricDefs);
+    const hasYield = yieldEligible && autoAgg.total_yield != null;
     const hasAdditive = Object.keys(autoAgg.additive_totals).length > 0;
     const hasBestSet = autoAgg.best_set_index != null;
 
@@ -386,13 +387,14 @@ const ActivityCard = memo(function ActivityCard({
     }, [hasSets, activity.sets, progressComparison, trackedMetricDefs]);
 
     const yieldBySetIndex = useMemo(() => {
+        if (!canComputeYield(trackedMetricDefs)) return null;
         if (!autoAgg?.yield_per_set?.length) return null;
         const map = {};
         for (const { set_index, yield: y } of autoAgg.yield_per_set) {
             map[set_index] = y;
         }
         return map;
-    }, [autoAgg]);
+    }, [autoAgg, trackedMetricDefs]);
     const groupLabel = useMemo(() => {
         const groupId = activityDefinition?.group_id || activity.group_id || null;
         if (groupId && Array.isArray(activityGroups) && activityGroups.length > 0) {

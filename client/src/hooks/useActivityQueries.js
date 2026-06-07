@@ -72,12 +72,25 @@ export function useFractalMetrics(rootId) {
     return { fractalMetrics, isLoading, error };
 }
 
+function upsertFractalMetric(metrics = [], metric) {
+    if (!metric?.id) return metrics;
+    const existingIndex = metrics.findIndex((item) => item.id === metric.id);
+    if (existingIndex === -1) {
+        return [...metrics, metric];
+    }
+    return metrics.map((item) => (item.id === metric.id ? metric : item));
+}
+
 export function useCreateFractalMetric(rootId) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (payload) => fractalApi.createFractalMetric(rootId, payload),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.fractalMetrics(rootId) });
+        onSuccess: (response) => {
+            queryClient.setQueryData(
+                queryKeys.fractalMetrics(rootId),
+                (current = []) => upsertFractalMetric(current, response?.data)
+            );
+            queryClient.invalidateQueries({ queryKey: queryKeys.fractalMetrics(rootId), refetchType: 'inactive' });
         },
     });
 }
@@ -86,8 +99,12 @@ export function useUpdateFractalMetric(rootId) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({ metricId, ...payload }) => fractalApi.updateFractalMetric(rootId, metricId, payload),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.fractalMetrics(rootId) });
+        onSuccess: (response) => {
+            queryClient.setQueryData(
+                queryKeys.fractalMetrics(rootId),
+                (current = []) => upsertFractalMetric(current, response?.data)
+            );
+            queryClient.invalidateQueries({ queryKey: queryKeys.fractalMetrics(rootId), refetchType: 'inactive' });
         },
     });
 }
@@ -96,8 +113,12 @@ export function useDeleteFractalMetric(rootId) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (metricId) => fractalApi.deleteFractalMetric(rootId, metricId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.fractalMetrics(rootId) });
+        onSuccess: (_response, metricId) => {
+            queryClient.setQueryData(
+                queryKeys.fractalMetrics(rootId),
+                (current = []) => current.filter((metric) => metric.id !== metricId)
+            );
+            queryClient.invalidateQueries({ queryKey: queryKeys.fractalMetrics(rootId), refetchType: 'inactive' });
             queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) });
         },
     });

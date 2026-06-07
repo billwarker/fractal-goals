@@ -241,7 +241,7 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
             }
             setCopyingFrom(null);
             setValidationMessage('');
-            handleCancelEdit();
+            handleClose();
         } catch (error) {
             const message = `Failed to save metric: ${formatError(error)}`;
             setValidationMessage(message);
