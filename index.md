@@ -78,7 +78,7 @@ Important frontend design choices:
 - Broad invalidation should use centralized query-key prefix helpers, not ad hoc raw arrays.
 - Repeated invalidation clusters should use shared helpers in `client/src/utils/queryInvalidation.js` so query churn remains visible and easy to tune.
 - Account-owned homepage data must be scoped by the authenticated user id or cleared on auth transitions; auth changes clear the query cache to prevent cross-account data bleed.
-- Auth bootstrap attempts a cookie refresh when `/auth/me` is stale. Production frontend builds should call same-origin `/api`, with Nginx proxying to the backend, so remembered-device cookies remain first-party on mobile browsers.
+- Auth bootstrap attempts a cookie refresh when `/auth/me` is stale. Production frontend builds must call same-origin `/api`, with Cloud Build passing `VITE_API_URL=/api` and Nginx proxying to the backend through runtime `BACKEND_URL`, so remembered-device cookies remain first-party on mobile browsers.
 - The selection page consumes `/api/fractals` summaries directly, including effective `display_level` metadata, rather than issuing per-fractal goal-level fetches.
 - Older hand-managed fetch state has largely been removed.
 - Large multi-mode components were decomposed into coordinators plus focused subcomponents/hooks.
