@@ -28,9 +28,9 @@ FROM nginx:alpine-slim
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy custom Nginx configuration (optional, using default for now but robust apps need it)
-# We will create a simple nginx.conf to support client-side routing
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# The official nginx entrypoint renders templates in /etc/nginx/templates.
+ENV BACKEND_URL=https://fractal-backend-195572181270.us-east1.run.app
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 # Expose port
 EXPOSE 8080

@@ -52,6 +52,7 @@ function AuthHarness() {
             <div data-testid="loading">{String(loading)}</div>
             <div data-testid="user-id">{user?.id || 'none'}</div>
             <button onClick={() => login('user-a', 'password')}>Login A</button>
+            <button onClick={() => login('user-a', 'password', { rememberMe: true })}>Remember Login A</button>
             <button onClick={() => login('user-b', 'password')}>Login B</button>
             <button onClick={() => logout()}>Logout</button>
             <button onClick={() => setUser({ id: user?.id, username: 'renamed' })}>Update Same User</button>
@@ -104,6 +105,31 @@ describe('AuthContext cache boundary', () => {
         expect(authApi.refresh).toHaveBeenCalledWith();
         expect(setAccessToken).toHaveBeenCalledWith('fresh-token');
         expect(authApi.getCsrf).toHaveBeenCalled();
+    });
+
+    it('does not store remember-me auth tokens in localStorage', async () => {
+        renderAuthHarness();
+
+        await waitFor(() => {
+            expect(screen.getByTestId('loading')).toHaveTextContent('false');
+        });
+
+        authApi.login.mockResolvedValueOnce({
+            data: { token: 'token-a', user: { id: 'user-a', username: 'alpha' } },
+        });
+
+        fireEvent.click(screen.getByText('Remember Login A'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('user-id')).toHaveTextContent('user-a');
+        });
+
+        expect(localStorage.setItem).not.toHaveBeenCalled();
+        expect(authApi.login).toHaveBeenCalledWith({
+            username_or_email: 'user-a',
+            password: 'password',
+            remember_me: true,
+        });
     });
 
     it('clears cached query data when logging into a different user', async () => {

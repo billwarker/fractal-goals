@@ -61,20 +61,6 @@ export function AuthProvider({ children }) {
         const isStaleAuthCheck = () => authVersionRef.current !== authVersion;
 
         try {
-            const legacyToken = localStorage.getItem('token');
-            if (legacyToken) {
-                const refreshResponse = await authApi.refresh(legacyToken);
-                localStorage.removeItem('token');
-                if (isStaleAuthCheck()) return;
-                if (refreshResponse.data?.token) {
-                    setAccessToken(refreshResponse.data.token);
-                }
-                if (refreshResponse.data?.user) {
-                    replaceUser(refreshResponse.data.user);
-                    return;
-                }
-            }
-
             const res = await authApi.getMe();
             if (isStaleAuthCheck()) return;
             replaceUser(res.data);
