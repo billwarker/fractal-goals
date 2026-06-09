@@ -97,6 +97,34 @@ describe('NoteCard', () => {
         expect(screen.getByText('Standard Practice Session')).toBeInTheDocument();
     });
 
+    it('removes the redundant trailing note word in metadata note type labels', () => {
+        renderWithProviders(
+            <NoteCard
+                note={{
+                    id: 'note-5',
+                    content: 'Activity definition note',
+                    created_at: '2026-04-04T13:37:00Z',
+                    updated_at: '2026-04-04T13:37:00Z',
+                    context_type: 'activity_definition',
+                    context_id: 'activity-1',
+                    activity_definition_id: 'activity-1',
+                    activity_definition_name: 'Bench Press',
+                    note_type: 'activity_definition_note',
+                    note_type_label: 'Activity Definition Note',
+                    set_index: null,
+                    goal_id: null,
+                    pinned_at: null,
+                    is_pinned: false,
+                }}
+                noteTypeVariant="metadata"
+            />,
+        );
+
+        expect(screen.getByText('Activity Definition')).toBeInTheDocument();
+        expect(screen.getByText('Bench Press')).toBeInTheDocument();
+        expect(screen.queryByText('Activity Definition Note')).not.toBeInTheDocument();
+    });
+
     it('renders links in plain goal note content', () => {
         renderWithProviders(
             <NoteCard

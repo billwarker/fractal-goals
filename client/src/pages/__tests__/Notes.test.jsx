@@ -6,10 +6,12 @@ import Notes from '../Notes';
 const {
     createNote,
     navigate,
+    noteTimelineMock,
     useNotesPageQueryMock,
 } = vi.hoisted(() => ({
     createNote: vi.fn(),
     navigate: vi.fn(),
+    noteTimelineMock: vi.fn(),
     useNotesPageQueryMock: vi.fn(),
 }));
 
@@ -32,7 +34,10 @@ vi.mock('../../hooks/useActivityQueries', () => ({
 }));
 
 vi.mock('../../components/notes', () => ({
-    NoteTimeline: () => <div>Timeline</div>,
+    NoteTimeline: (props) => {
+        noteTimelineMock(props);
+        return <div>Timeline</div>;
+    },
     NoteComposer: ({ onSubmit }) => (
         <button onClick={() => onSubmit('Root note', null, null)} type="button">
             Submit mocked note
@@ -149,5 +154,14 @@ describe('Notes page', () => {
         expect(latestCall[1]).toMatchObject({
             note_types: ['program_note'],
         });
+    });
+
+    it('renders note type labels as metadata text on the timeline', () => {
+        render(<Notes />);
+
+        expect(noteTimelineMock).toHaveBeenCalledWith(expect.objectContaining({
+            noteTypeVariant: 'metadata',
+            showContext: true,
+        }));
     });
 });

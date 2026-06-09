@@ -65,6 +65,7 @@ function NoteTimeline({
     minimal = false,
     variant = 'card', // 'card' (filled) or 'flat' (transparent, for session detail)
     showTypePill = true,
+    noteTypeVariant = 'pill',
     selectedNoteId,
     onNoteSelect,
     hasMore = false,
@@ -95,6 +96,7 @@ function NoteTimeline({
             minimal={minimal}
             variant={variant}
             showTypePill={showTypePill}
+            noteTypeVariant={noteTypeVariant}
             isSelected={selectedNoteId === note.id}
             onSelect={() => onNoteSelect && onNoteSelect(note)}
         />

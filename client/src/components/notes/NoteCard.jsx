@@ -58,6 +58,10 @@ function deriveNoteTypeLabel(note) {
     return labels[deriveNoteType(note)] || 'Note';
 }
 
+function formatMetadataNoteTypeLabel(label) {
+    return label.replace(/\s+Note$/i, '');
+}
+
 function NoteCard({
     note,
     onEdit,
@@ -70,6 +74,7 @@ function NoteCard({
     minimal = false,
     variant = 'card',
     showTypePill = true,
+    noteTypeVariant = 'pill',
     isSelected = false,
     onSelect,
 }) {
@@ -84,6 +89,9 @@ function NoteCard({
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const resolvedNoteType = deriveNoteType(note);
     const resolvedNoteTypeLabel = deriveNoteTypeLabel(note);
+    const displayNoteTypeLabel = noteTypeVariant === 'metadata'
+        ? formatMetadataNoteTypeLabel(resolvedNoteTypeLabel)
+        : resolvedNoteTypeLabel;
     const supportsMarkdown = resolvedNoteType === 'fractal_note';
 
     const adjustHeight = (el) => {
@@ -197,6 +205,14 @@ function NoteCard({
     );
     const shouldShowRichContent = !shouldDeferRichContent || shouldRenderRichContent;
     const previewContent = supportsMarkdown ? buildPlainTextPreview(note.content) : note.content;
+    const timestamp = (
+        <span className={styles.timestamp}>
+            {formatDate(note.created_at)}
+            {note.isPast && note.session_name && resolvedNoteType !== 'session_note' && (
+                <span className={styles.pastSessionName}> ({note.session_name})</span>
+            )}
+        </span>
+    );
 
     useEffect(() => {
         if (!shouldDeferRichContent) {
@@ -317,13 +333,28 @@ function NoteCard({
                     )}
 
                     <div className={styles.headerActions}>
-                        {!minimal && showTypePill && <span className={styles.noteTypePill}>{resolvedNoteTypeLabel}</span>}
-                        <span className={styles.timestamp}>
-                            {formatDate(note.created_at)}
-                            {note.isPast && note.session_name && resolvedNoteType !== 'session_note' && (
-                                <span className={styles.pastSessionName}> ({note.session_name})</span>
-                            )}
-                        </span>
+                        {!minimal && noteTypeVariant === 'metadata' && (
+                            <>
+                                {showTypePill && (
+                                    <>
+                                        <span className={styles.noteTypeText}>{displayNoteTypeLabel}</span>
+                                        <span className={styles.metaSep} aria-hidden="true">·</span>
+                                    </>
+                                )}
+                                {timestamp}
+                            </>
+                        )}
+                        {!minimal && noteTypeVariant !== 'metadata' && (
+                            <>
+                                {showTypePill && (
+                                    <span className={styles.noteTypePill}>
+                                        {displayNoteTypeLabel}
+                                    </span>
+                                )}
+                                {timestamp}
+                            </>
+                        )}
+                        {minimal && timestamp}
 
                         {hasMenu && (
                             <div className={styles.optionsWrapper} ref={menuRef}>
@@ -358,7 +389,6 @@ function NoteCard({
                         )}
                     </div>
                 </div>
-
                 {/* Content */}
                 {isEditing ? (
                     <div className={styles.editArea}>
