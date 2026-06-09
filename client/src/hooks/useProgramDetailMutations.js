@@ -188,12 +188,13 @@ export function useProgramDetailMutations({
 
     const updateGoal = useCallback(async (goalId, payload) => {
         try {
-            await fractalApi.updateGoal(rootId, goalId, payload);
+            const response = await fractalApi.updateGoal(rootId, goalId, payload);
             await resolvedRefreshers.programGoals();
-            notify.success('Goal updated');
+            return response?.data || null;
         } catch (error) {
             console.error('Failed to update goal:', error);
             notify.error(`Failed to update goal: ${formatError(error)}`);
+            throw error;
         }
     }, [resolvedRefreshers, rootId]);
 

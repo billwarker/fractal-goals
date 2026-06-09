@@ -716,6 +716,7 @@ function ProgramCalendarPage() {
 
     const handleCalendarGoalDeadline = async (goalId, deadline) => {
         await updateGoal(goalId, { deadline });
+        notify.success('Deadline updated');
     };
 
     const resetCalendarContextToToday = () => {

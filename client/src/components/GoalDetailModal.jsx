@@ -308,11 +308,12 @@ function GoalDetailModal({
                 notify.error('Failed to create goal: ' + (err.response?.data?.error || err.message));
             }
         } else {
-            onUpdate(goalId, payload);
+            await onUpdate?.(goalId, payload);
 
             // Persist activity and group associations
             await persistAssociations();
 
+            notify.success('Goal updated');
             setIsEditing(false);
         }
     };

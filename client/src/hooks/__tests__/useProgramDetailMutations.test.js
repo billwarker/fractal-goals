@@ -114,6 +114,23 @@ describe('useProgramDetailMutations', () => {
         expect(notify.success).toHaveBeenCalledWith('Day saved');
     });
 
+    it('returns updated goals and leaves edit-save success toast ownership to the caller', async () => {
+        updateGoal.mockResolvedValueOnce({
+            data: { id: 'goal-1', name: 'Updated goal' },
+        });
+        const { result } = renderMutations();
+
+        let updatedGoal;
+        await act(async () => {
+            updatedGoal = await result.current.updateGoal('goal-1', { description: 'New description' });
+        });
+
+        expect(updatedGoal).toEqual({ id: 'goal-1', name: 'Updated goal' });
+        expect(updateGoal).toHaveBeenCalledWith('root-1', 'goal-1', { description: 'New description' });
+        expect(refreshers.programGoals).toHaveBeenCalledTimes(1);
+        expect(notify.success).not.toHaveBeenCalled();
+    });
+
     it('delegates recurring unschedule to the program service path and always clears the confirmation state', async () => {
         const { result } = renderMutations({
             itemToUnschedule: {

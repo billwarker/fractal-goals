@@ -572,6 +572,47 @@ describe('GoalDetailModal smoke coverage', () => {
         }, { timeout: 5000 });
     });
 
+    it('awaits update saves before returning to view mode and shows a success toast', async () => {
+        const onUpdate = vi.fn().mockResolvedValue({
+            id: 'goal-1',
+            name: 'Deep Work',
+            attributes: {
+                id: 'goal-1',
+                type: 'ShortTermGoal',
+                description: 'Focus on leverage work',
+            },
+        });
+
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    attributes: { id: 'goal-1', type: 'ShortTermGoal' },
+                }}
+                onUpdate={onUpdate}
+                onToggleCompletion={vi.fn()}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                mode="edit"
+                treeData={[]}
+            />
+        );
+
+        fireEvent.click(screen.getByText('save goal'));
+
+        await waitFor(() => {
+            expect(onUpdate).toHaveBeenCalledWith('goal-1', expect.objectContaining({
+                name: 'Deep Work',
+                description: 'Focus on leverage work',
+            }));
+            expect(mockNotify.success).toHaveBeenCalledWith('Goal updated');
+            expect(screen.getByText('view:Deep Work')).toBeInTheDocument();
+        }, { timeout: 5000 });
+    });
+
     it('closes when app navigation begins', () => {
         const onClose = vi.fn();
 

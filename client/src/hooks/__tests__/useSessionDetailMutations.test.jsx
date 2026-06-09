@@ -8,6 +8,7 @@ import { useSessionDetailMutations } from '../useSessionDetailMutations';
 
 const {
     createGoal,
+    updateGoal,
     addActivityToSession,
     startActivityTimer,
     updateActivityInstance,
@@ -15,6 +16,7 @@ const {
     notify,
 } = vi.hoisted(() => ({
     createGoal: vi.fn(),
+    updateGoal: vi.fn(),
     addActivityToSession: vi.fn(),
     startActivityTimer: vi.fn(),
     updateActivityInstance: vi.fn(),
@@ -28,6 +30,7 @@ const {
 vi.mock('../../utils/api', () => ({
     fractalApi: {
         createGoal: (...args) => createGoal(...args),
+        updateGoal: (...args) => updateGoal(...args),
         addActivityToSession: (...args) => addActivityToSession(...args),
         startActivityTimer: (...args) => startActivityTimer(...args),
         updateActivityInstance: (...args) => updateActivityInstance(...args),
@@ -167,6 +170,64 @@ describe('useSessionDetailMutations', () => {
         ]);
         expect(draftState.sections[0].activity_ids).toEqual(['inst-1', 'inst-2']);
         expect(selectorState[0]).toBe(false);
+    });
+
+    it('updates goal caches immediately after editing a goal from session detail', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        const originalGoal = {
+            id: 'goal-1',
+            name: 'Goal 1',
+            description: '',
+            attributes: { id: 'goal-1', type: 'ImmediateGoal', description: '' },
+            children: [],
+        };
+        const updatedGoal = {
+            ...originalGoal,
+            description: 'New description',
+            attributes: {
+                ...originalGoal.attributes,
+                description: 'New description',
+                updated_at: '2026-06-09T16:00:00Z',
+            },
+        };
+        queryClient.setQueryData(queryKeys.fractalTree('root-1'), {
+            id: 'root-1',
+            children: [originalGoal],
+        });
+        queryClient.setQueryData(queryKeys.sessionGoalsView('root-1', 'session-1'), {
+            goal_tree: {
+                id: 'root-1',
+                children: [originalGoal],
+            },
+        });
+        queryClient.setQueryData(queryKeys.goals('root-1'), [originalGoal]);
+        queryClient.setQueryData(queryKeys.goalsForSelection('root-1'), [originalGoal]);
+        updateGoal.mockResolvedValueOnce({ data: updatedGoal });
+
+        const { result } = renderHook(
+            () => useSessionDetailMutations(createBaseOptions(queryClient)),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        let response;
+        await act(async () => {
+            response = await result.current.updateGoal({
+                goalId: 'goal-1',
+                updates: { description: 'New description' },
+            });
+        });
+
+        expect(response.data).toEqual(updatedGoal);
+        expect(updateGoal).toHaveBeenCalledWith('root-1', 'goal-1', { description: 'New description' });
+        expect(queryClient.getQueryData(queryKeys.goals('root-1'))[0].description).toBe('New description');
+        expect(queryClient.getQueryData(queryKeys.goalsForSelection('root-1'))[0].description).toBe('New description');
+        expect(queryClient.getQueryData(queryKeys.fractalTree('root-1')).children[0].description).toBe('New description');
+        expect(queryClient.getQueryData(queryKeys.sessionGoalsView('root-1', 'session-1')).goal_tree.children[0].description).toBe('New description');
     });
 
     it('updates the session goals view cache when adding an associated activity', async () => {

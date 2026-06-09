@@ -162,7 +162,11 @@ function SessionDetailContent() {
                     onActivityCreated={handleActivityCreated}
                     selectedGoal={selectedGoal}
                     onCloseGoal={() => setSelectedGoal(null)}
-                    onUpdateGoal={(goalId, updates) => updateGoal({ goalId, updates })}
+                    onUpdateGoal={async (goalId, updates) => {
+                        const response = await updateGoal({ goalId, updates });
+                        if (response?.data) setSelectedGoal(response.data);
+                        return response?.data || response;
+                    }}
                     onToggleGoalCompletion={async (goalId, currentStatus) => {
                         const response = await toggleGoalCompletion({ goalId, completed: !currentStatus });
                         if (response?.data) setSelectedGoal(response.data);
@@ -255,7 +259,11 @@ function SessionDetailContent() {
                 onActivityCreated={handleActivityCreated}
                 selectedGoal={selectedGoal}
                 onCloseGoal={() => setSelectedGoal(null)}
-                onUpdateGoal={(goalId, updates) => updateGoal({ goalId, updates })}
+                onUpdateGoal={async (goalId, updates) => {
+                    const response = await updateGoal({ goalId, updates });
+                    if (response?.data) setSelectedGoal(response.data);
+                    return response?.data || response;
+                }}
                 onToggleGoalCompletion={async (goalId, currentStatus) => {
                     const response = await toggleGoalCompletion({ goalId, completed: !currentStatus });
                     if (response?.data) setSelectedGoal(response.data);

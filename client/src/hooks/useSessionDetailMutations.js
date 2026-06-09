@@ -166,7 +166,18 @@ export function useSessionDetailMutations({
 
     const updateGoalMutation = useMutation({
         mutationFn: ({ goalId, updates }) => fractalApi.updateGoal(rootId, goalId, updates),
-        onSuccess: () => {
+        onSuccess: (response) => {
+            const goalResponse = response?.data;
+            if (goalResponse) {
+                queryClient.setQueryData(fractalTreeKey, (previous) => replaceGoalInTree(previous, goalResponse));
+                queryClient.setQueryData(sessionGoalsViewKey, (previous) => (
+                    previous?.goal_tree
+                        ? { ...previous, goal_tree: replaceGoalInTree(previous.goal_tree, goalResponse) }
+                        : previous
+                ));
+                queryClient.setQueryData(goalsKey, (previous) => replaceGoalInList(previous, goalResponse));
+                queryClient.setQueryData(goalsForSelectionKey, (previous) => replaceGoalInList(previous, goalResponse));
+            }
             invalidateGoalQueries();
             queryClient.invalidateQueries({ queryKey: sessionKey });
         },
