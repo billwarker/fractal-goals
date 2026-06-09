@@ -5,6 +5,7 @@ import { DISABLED_CHART_ANIMATION, useChartOptions } from './ChartJSWrapper'; //
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import CloseIcon from '../atoms/CloseIcon';
 import GoalIcon from '../atoms/GoalIcon';
+import ModalBackdrop from '../atoms/ModalBackdrop';
 import styles from './GenericGraphModal.module.css';
 
 /**
@@ -180,9 +181,9 @@ const GenericGraphModal = ({
     } : null;
 
     return ReactDOM.createPortal(
-        <div
+        <ModalBackdrop
             className={styles.overlay}
-            onClick={onClose}
+            onClose={onClose}
         >
             <div
                 className={styles.container}
@@ -270,7 +271,7 @@ const GenericGraphModal = ({
                     )}
                 </div>
             </div>
-        </div>,
+        </ModalBackdrop>,
         document.body
     );
 };

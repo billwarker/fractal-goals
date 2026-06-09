@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import styles from './Modal.module.css';
 import Card from './Card';
 import { Heading } from './Typography';
-import Button from './Button';
+import ModalBackdrop from './ModalBackdrop';
 
 /**
  * Standardized Modal Component
@@ -16,7 +16,8 @@ const Modal = ({
     size = 'md', // sm, md, lg, xl
     className = '',
     showCloseButton = true,
-    closeOnEsc = true
+    closeOnEsc = true,
+    closeOnBackdrop = true
 }) => {
     useEffect(() => {
         const handleEsc = (e) => {
@@ -42,7 +43,13 @@ const Modal = ({
     if (!isOpen) return null;
 
     const modalContent = (
-        <div className={styles.overlay} onClick={onClose} aria-modal="true" role="dialog">
+        <ModalBackdrop
+            className={styles.overlay}
+            closeOnBackdrop={closeOnBackdrop}
+            onClose={onClose}
+            aria-modal="true"
+            role="dialog"
+        >
             <div
                 className={`${styles.container} ${styles[size]} ${className}`}
                 onClick={e => e.stopPropagation()}
@@ -66,7 +73,7 @@ const Modal = ({
                     </div>
                 </Card>
             </div>
-        </div>
+        </ModalBackdrop>
     );
 
     // Use portal if document.body exists, else render inline (SSR safety)

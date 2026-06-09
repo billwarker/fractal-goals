@@ -25,6 +25,7 @@ import { useDebug } from '../contexts/DebugContext';
 import '../App.css';
 import notify from '../utils/notify';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
+import ModalBackdrop from '../components/atoms/ModalBackdrop';
 import styles from './Analytics.module.css';
 
 const AnalyticsViewNameModal = lazy(() => import('../components/analytics/AnalyticsViewNameModal'));
@@ -448,9 +449,9 @@ function Analytics() {
             </div>
 
             {isFiltersPaneOpen && isMobile && (
-                <div
+                <ModalBackdrop
                     className={styles.sheetBackdrop}
-                    onClick={() => setIsFiltersPaneOpen(false)}
+                    onClose={() => setIsFiltersPaneOpen(false)}
                     aria-hidden="true"
                 />
             )}

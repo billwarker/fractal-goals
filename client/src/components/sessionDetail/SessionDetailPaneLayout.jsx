@@ -1,6 +1,7 @@
 import React from 'react';
 
 import CloseIcon from '../atoms/CloseIcon';
+import ModalBackdrop from '../atoms/ModalBackdrop';
 import SessionSidePane from './SessionSidePane';
 import styles from '../../pages/SessionDetail.module.css';
 
@@ -20,9 +21,9 @@ function SessionDetailPaneLayout({
             </div>
 
             {isMobile && isMobilePaneOpen && (
-                <div
+                <ModalBackdrop
                     className={styles.mobilePaneOverlay}
-                    onClick={onCloseMobilePane}
+                    onClose={onCloseMobilePane}
                     role="presentation"
                 >
                     <div
@@ -42,7 +43,7 @@ function SessionDetailPaneLayout({
                         </div>
                         <SessionSidePane model={sidePaneModel} showModeTabs={false} embedded />
                     </div>
-                </div>
+                </ModalBackdrop>
             )}
         </>
     );

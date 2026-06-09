@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { adminApi } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
+import ModalBackdrop from '../components/atoms/ModalBackdrop';
 import notify from '../utils/notify';
 import { formatError } from '../utils/mutationNotify';
 import styles from './Admin.module.css';
@@ -296,7 +297,7 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
     ];
 
     return (
-        <div className={styles.actionsOverlay} onClick={onClose} aria-modal="true" role="dialog">
+        <ModalBackdrop className={styles.actionsOverlay} onClose={onClose} aria-modal="true" role="dialog">
             <div className={styles.actionsShell} onClick={(event) => event.stopPropagation()}>
                 <div className={styles.actionsHeader}>
                     <h2>Actions for {user.username}</h2>
@@ -483,7 +484,7 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
                     </div>
                 </div>
             </div>
-        </div>
+        </ModalBackdrop>
     );
 }
 

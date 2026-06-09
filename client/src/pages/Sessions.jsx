@@ -12,6 +12,7 @@ import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { SessionCardExpanded, SessionsQuerySidebar } from '../components/sessions';
 import { QuickSessionWorkspace } from '../components/sessionDetail';
 import CardCornerActionButton from '../components/common/CardCornerActionButton';
+import ModalBackdrop from '../components/atoms/ModalBackdrop';
 import EmptyState from '../components/common/EmptyState';
 import LoadingState from '../components/common/LoadingState';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
@@ -395,9 +396,9 @@ function Sessions() {
             </div>
 
             {isFiltersPaneOpen && isMobile && (
-                <div
+                <ModalBackdrop
                     className={styles.sheetBackdrop}
-                    onClick={() => setIsFiltersPaneOpen(false)}
+                    onClose={() => setIsFiltersPaneOpen(false)}
                     aria-hidden="true"
                 />
             )}
@@ -451,9 +452,9 @@ function Sessions() {
             )}
 
             {activeQuickSession && isQuickSession(activeQuickSession) && (
-                <div
+                <ModalBackdrop
                     className={styles.quickSessionModalOverlay}
-                    onClick={handleCloseQuickSessionModal}
+                    onClose={handleCloseQuickSessionModal}
                     role="presentation"
                 >
                     <div
@@ -475,7 +476,7 @@ function Sessions() {
                             <QuickSessionWorkspace />
                         </ActiveSessionProvider>
                     </div>
-                </div>
+                </ModalBackdrop>
             )}
         </div>
     );

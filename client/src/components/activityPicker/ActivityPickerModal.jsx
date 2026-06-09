@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
+import ModalBackdrop from '../atoms/ModalBackdrop';
 import ActivityPicker from './ActivityPicker';
 import styles from './ActivityPickerModal.module.css';
 
@@ -29,7 +30,7 @@ function ActivityPickerModal({
     if (!isOpen) return null;
 
     const modalContent = (
-        <div className={styles.overlay} onClick={onClose}>
+        <ModalBackdrop className={styles.overlay} onClose={onClose}>
             <div className={styles.sheet} onClick={(event) => event.stopPropagation()}>
                 <ActivityPicker
                     {...pickerProps}
@@ -38,7 +39,7 @@ function ActivityPickerModal({
                     onClose={onClose}
                 />
             </div>
-        </div>
+        </ModalBackdrop>
     );
 
     if (typeof document !== 'undefined') {

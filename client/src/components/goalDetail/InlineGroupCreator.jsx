@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 
+import ModalBackdrop from '../atoms/ModalBackdrop';
 import styles from './ActivityAssociator.module.css';
 
 const InlineGroupCreator = ({
@@ -15,7 +16,7 @@ const InlineGroupCreator = ({
     onParentChange,
 }) => {
     const modalContent = (
-        <div className={styles.groupCreatorModalOverlay} onClick={onCancel}>
+        <ModalBackdrop className={styles.groupCreatorModalOverlay} onClose={onCancel}>
             <div className={styles.groupCreatorModalContent} onClick={(event) => event.stopPropagation()}>
                 <h5 className={styles.groupCreatorTitle}>New Activity Group</h5>
                 <div className={styles.groupCreatorFields}>
@@ -57,7 +58,7 @@ const InlineGroupCreator = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </ModalBackdrop>
     );
 
     return createPortal(modalContent, document.body);

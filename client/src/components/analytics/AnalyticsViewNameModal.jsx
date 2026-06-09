@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 
 import CloseIcon from '../atoms/CloseIcon';
+import ModalBackdrop from '../atoms/ModalBackdrop';
 import styles from './AnalyticsViewsModal.module.css';
 
 function AnalyticsViewNameModal({
@@ -11,7 +12,7 @@ function AnalyticsViewNameModal({
     const [name, setName] = useState(initialName);
 
     return (
-        <div className={styles.overlay} onClick={onClose}>
+        <ModalBackdrop className={styles.overlay} onClose={onClose}>
             <div className={styles.namingSheet} onClick={(event) => event.stopPropagation()}>
                 <div className={styles.header}>
                     <h3 className={styles.title}>Save Analytics View</h3>
@@ -47,7 +48,7 @@ function AnalyticsViewNameModal({
                     </div>
                 </form>
             </div>
-        </div>
+        </ModalBackdrop>
     );
 }
 

@@ -17,6 +17,7 @@ import { useNotesPageQuery } from '../hooks/useNotesPageQuery';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import CloseIcon from '../components/atoms/CloseIcon';
+import ModalBackdrop from '../components/atoms/ModalBackdrop';
 import ActivityFilterModal from '../components/common/ActivityFilterModal';
 import GoalTreePicker from '../components/common/GoalTreePicker';
 import SidePaneHeader from '../components/common/SidePaneHeader';
@@ -43,7 +44,7 @@ function GoalPickerModal({ rootId, selectedGoalId, onSelect, onClose }) {
     const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
 
     return (
-        <div className={styles.modalOverlay} onClick={onClose}>
+        <ModalBackdrop className={styles.modalOverlay} onClose={onClose}>
             <div className={styles.modalSheet} onClick={e => e.stopPropagation()}>
                 <div className={styles.modalHeader}>
                     <span className={styles.modalTitle}>Filter by Goal</span>
@@ -72,7 +73,7 @@ function GoalPickerModal({ rootId, selectedGoalId, onSelect, onClose }) {
                     />
                 </div>
             </div>
-        </div>
+        </ModalBackdrop>
     );
 }
 
@@ -442,7 +443,7 @@ function Notes() {
             )}
 
             {isMobile && mobilePanelOpen && (
-                <div className={styles.bottomSheet} onClick={() => setMobilePanelOpen(false)}>
+                <ModalBackdrop className={styles.bottomSheet} onClose={() => setMobilePanelOpen(false)}>
                     <div className={styles.bottomSheetCard} onClick={e => e.stopPropagation()}>
                         <div className={styles.bottomSheetHandle} />
                         <div className={styles.bottomSheetHeader}>
@@ -476,7 +477,7 @@ function Notes() {
                             {composing ? composeLinkPanelBody : filterPanelBody}
                         </div>
                     </div>
-                </div>
+                </ModalBackdrop>
             )}
         </div>
     );

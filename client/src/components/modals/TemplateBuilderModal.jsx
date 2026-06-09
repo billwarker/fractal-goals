@@ -23,6 +23,7 @@ import {
     getSessionRuntimeType,
     getTemplateColor,
 } from '../../utils/sessionRuntime';
+import ModalBackdrop from '../atoms/ModalBackdrop';
 
 const EMPTY_TEMPLATE = {
     name: '',
@@ -111,6 +112,8 @@ function TemplateBuilderModalContent({
         setShowActivityModal(false);
         setSelectedSectionIndex(null);
     };
+
+    const closeAlertModal = () => setAlertModal((previous) => ({ ...previous, show: false }));
 
     const handleAddSection = () => {
         if (!newSection.name.trim()) {
@@ -702,9 +705,9 @@ function TemplateBuilderModalContent({
             </Modal>
 
             {showSectionModal && (
-                <div
+                <ModalBackdrop
                     className={styles.secondaryModalOverlay}
-                    onClick={resetSectionEditor}
+                    onClose={resetSectionEditor}
                 >
                     <div
                         className={styles.secondaryModalContent}
@@ -747,14 +750,14 @@ function TemplateBuilderModalContent({
                             </Button>
                         </div>
                     </div>
-                </div>
+                </ModalBackdrop>
             )}
 
             {alertModal.show && (
-                <div
+                <ModalBackdrop
                     className={styles.secondaryModalOverlay}
                     style={{ zIndex: 3400 }}
-                    onClick={() => setAlertModal((previous) => ({ ...previous, show: false }))}
+                    onClose={closeAlertModal}
                 >
                     <div
                         className={styles.secondaryModalContent}
@@ -775,7 +778,7 @@ function TemplateBuilderModalContent({
                             OK
                         </button>
                     </div>
-                </div>
+                </ModalBackdrop>
             )}
         </>
     );

@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { useActivities } from '../../contexts/ActivitiesContext';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useFractalTree } from '../../hooks/useGoalQueries';
+import ModalBackdrop from '../atoms/ModalBackdrop';
 import ActivityBuilderForm from '../activityBuilder/ActivityBuilderForm';
 import { flattenGoals } from '../activityBuilder/activityBuilderUtils';
 import styles from '../GoalDetailModal.module.css';
@@ -16,7 +17,7 @@ function InlineActivityBuilderModal({ rootId, activityGroups = [], activityTempl
     const allGoals = useMemo(() => flattenGoals(currentFractal, null), [currentFractal]);
 
     const modalContent = (
-        <div className={styles.topLayerModalOverlay} onClick={onCancel}>
+        <ModalBackdrop className={styles.topLayerModalOverlay} onClose={onCancel}>
             <div className={styles.topLayerModalContent} onClick={(event) => event.stopPropagation()}>
                 <div className={styles.activityBuilderHeader}>
                     <button onClick={onCancel} className={styles.backButton}>←</button>
@@ -38,7 +39,7 @@ function InlineActivityBuilderModal({ rootId, activityGroups = [], activityTempl
                     getGoalIcon={getGoalIcon}
                 />
             </div>
-        </div>
+        </ModalBackdrop>
     );
 
     return createPortal(modalContent, document.body);

@@ -25,6 +25,7 @@ import GoalViewMode from './goals/GoalViewMode';
 import GoalEditForm from './goals/GoalEditForm';
 import CloseIcon from './atoms/CloseIcon';
 import GoalIcon from './atoms/GoalIcon';
+import ModalBackdrop from './atoms/ModalBackdrop';
 import SidePaneNotePanel from './common/SidePaneNotePanel';
 import ViewToggleTabs from './common/ViewToggleTabs';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
@@ -1261,9 +1262,9 @@ function GoalDetailModal({
 
     // Modal mode
     const modalMarkup = (
-        <div
+        <ModalBackdrop
             className={styles.modalOverlay}
-            onClick={handleClose}
+            onClose={handleClose}
         >
             <div
                 onClick={(e) => e.stopPropagation()}
@@ -1282,7 +1283,7 @@ function GoalDetailModal({
                 )}
             </div>
             {activityBuilderModal}
-        </div>
+        </ModalBackdrop>
     );
 
     return createPortal(modalMarkup, document.body);

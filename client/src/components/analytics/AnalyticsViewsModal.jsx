@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 
 import CloseIcon from '../atoms/CloseIcon';
+import ModalBackdrop from '../atoms/ModalBackdrop';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 import styles from './AnalyticsViewsModal.module.css';
 
@@ -33,7 +34,7 @@ function AnalyticsViewsModal({
     }, [normalizedSearch, views]);
 
     return (
-        <div className={styles.overlay} onClick={onClose}>
+        <ModalBackdrop className={styles.overlay} onClose={onClose}>
             <div className={styles.sheet} onClick={(event) => event.stopPropagation()}>
                 <div className={styles.header}>
                     <h3 className={styles.title}>Analytics Views</h3>
@@ -119,7 +120,7 @@ function AnalyticsViewsModal({
                 title="Delete Analytics View"
                 message={`Are you sure you want to delete "${viewToDelete?.name}"?`}
             />
-        </div>
+        </ModalBackdrop>
     );
 }
 

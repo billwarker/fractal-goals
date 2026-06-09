@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import useIsMobile from '../../hooks/useIsMobile';
 import CloseIcon from '../atoms/CloseIcon';
+import ModalBackdrop from '../atoms/ModalBackdrop';
 import styles from './AnnotationModal.module.css';
 
 /**
@@ -72,9 +73,9 @@ function AnnotationModal({
     };
 
     return (
-        <div
+        <ModalBackdrop
             className={`${styles.overlay} ${isMobile ? styles.overlayMobile : ''}`}
-            onClick={handleClose}
+            onClose={handleClose}
         >
             <div
                 className={`${styles.container} ${isMobile ? styles.containerMobile : ''}`}
@@ -116,7 +117,7 @@ function AnnotationModal({
                     </button>
                 </div>
             </div>
-        </div>
+        </ModalBackdrop>
     );
 }
 

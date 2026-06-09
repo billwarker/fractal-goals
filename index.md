@@ -83,6 +83,7 @@ Important frontend design choices:
 - Older hand-managed fetch state has largely been removed.
 - Large multi-mode components were decomposed into coordinators plus focused subcomponents/hooks.
 - Modal behavior and state reset patterns are more standardized than before.
+- Backdrop dismissal for modals and mobile sheets is centralized through `client/src/components/atoms/ModalBackdrop.jsx` and guarded while text inputs, textareas, or contenteditable fields are focused so accidental outside clicks do not discard in-progress typing.
 - The app shell exposes `--app-viewport-height`, using dynamic viewport units when available, so mobile browser chrome does not hide headers or bottom content.
 
 ## SaaS And Account Layer

@@ -6,6 +6,7 @@ import MetaField from '../common/MetaField';
 import SectionHeader from '../common/SectionHeader';
 import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../../contexts/ActiveSessionContext';
 import useIsMobile from '../../hooks/useIsMobile';
+import ModalBackdrop from '../atoms/ModalBackdrop';
 import ActivitySelectorPanel from '../common/ActivitySelectorPanel';
 
 import { prepareActivityDefinitionCopy } from '../../utils/activityBuilder';
@@ -255,15 +256,15 @@ const SessionSection = ({
                 {!isCompleted && (
                     isSelectorOpen ? (
                         isMobile ? (
-                            <div
+                            <ModalBackdrop
                                 className={styles.mobileSelectorOverlay}
-                                onClick={closeSelector}
+                                onClose={closeSelector}
                                 role="presentation"
                             >
                                 <div className={styles.mobileSelectorSheet} onClick={(event) => event.stopPropagation()}>
                                     {selectorContent}
                                 </div>
-                            </div>
+                            </ModalBackdrop>
                         ) : (
                             selectorContent
                         )
