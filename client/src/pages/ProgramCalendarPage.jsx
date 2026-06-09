@@ -227,7 +227,6 @@ function ProgramSidePane({
                             getGoalDetails={getGoalDetails}
                             compact
                             hideGoals
-                            hideMetricsHeader
                             flushMetricsPadding
                             className={styles.embeddedSidebarMetrics}
                         />
