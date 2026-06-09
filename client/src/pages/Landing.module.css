@@ -6,8 +6,10 @@
 
 .header,
 .hero,
+.audienceSection,
 .treeSection,
 .featuresSection,
+.faqSection,
 .betaSection {
     max-width: 1240px;
     margin-left: auto;
@@ -140,8 +142,10 @@
     background: var(--color-brand-primary-hover);
 }
 
+.audienceSection,
 .treeSection,
 .featuresSection,
+.faqSection,
 .betaSection {
     margin-top: 72px;
 }
@@ -156,6 +160,51 @@
     font-size: clamp(2rem, 4vw, 3.4rem);
     line-height: var(--line-height-tight);
     letter-spacing: 0;
+}
+
+.sectionHeader p {
+    max-width: 820px;
+    margin: 16px 0 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-lg);
+    line-height: var(--line-height-relaxed);
+}
+
+.audienceGrid,
+.faqGrid {
+    margin-top: 24px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.audienceCard,
+.faqItem {
+    background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-md);
+    padding: 18px;
+}
+
+.audienceCard h3,
+.faqItem h3 {
+    margin: 0;
+    font-size: var(--font-size-xl);
+    line-height: var(--line-height-snug);
+    letter-spacing: 0;
+}
+
+.audienceCard p,
+.faqItem p {
+    margin: 12px 0 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-md);
+    line-height: var(--line-height-base);
+}
+
+.faqGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .exampleToggle {
@@ -455,6 +504,10 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .audienceGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .carousel,
     .betaSection {
         grid-template-columns: 1fr;
@@ -482,6 +535,8 @@
     }
 
     .exampleToggle,
+    .audienceGrid,
+    .faqGrid,
     .analyticsStrip {
         grid-template-columns: 1fr;
     }

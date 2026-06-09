@@ -36,22 +36,24 @@ describe('Landing', () => {
 
         render(<Landing />);
 
-        expect(screen.getByRole('heading', { name: /want to achieve your goals/i })).toBeInTheDocument();
-        expect(screen.getByRole('heading', { name: /fully-composable goal achievement platform/i })).toBeInTheDocument();
-        expect(screen.getByRole('tab', { name: 'Become a skilled guitar player' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('heading', { name: /track every goal, program, and training session/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /want to achieve big goals/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /if you're training for more than one thing/i })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Guitar practice tracker' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
         expect(await screen.findByTestId('flow-tree-demo')).toHaveAttribute('data-layout-mode', 'tree');
         expect(screen.getAllByText('Become a skilled guitar player').length).toBeGreaterThan(0);
         expect(screen.getByText('Practice CAGED triads')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('tab', { name: 'Become fluent in Chinese' }));
-        expect(screen.getByRole('tab', { name: 'Become fluent in Chinese' })).toHaveAttribute('aria-selected', 'true');
-        expect(screen.getByText('Connect fluency to daily study actions')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'Chinese language tracker' }));
+        expect(screen.getByRole('tab', { name: 'Chinese language tracker' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByText('Goal Trees - Break big goals into trackable pieces')).toBeInTheDocument();
         expect(screen.getAllByText('Shadow 10 minutes').length).toBeGreaterThan(0);
 
         fireEvent.click(screen.getByRole('button', { name: 'Next feature' }));
-        expect(screen.getByText('Build balanced study programs')).toBeInTheDocument();
+        expect(screen.getByText('Programs - Turn goals into a repeatable weekly plan')).toBeInTheDocument();
         expect(screen.getByText('Tutor prep')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Common questions' })).toBeInTheDocument();
 
         fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'Will Tester' } });
         fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'will@example.com' } });
@@ -68,6 +70,6 @@ describe('Landing', () => {
                 note: 'I want to track practice.',
             });
         });
-        expect(await screen.findByText('You are on the private beta request list.')).toBeInTheDocument();
+        expect(await screen.findByText("You're on the private beta request list.")).toBeInTheDocument();
     });
 });
