@@ -54,7 +54,10 @@
 .inviteCreator button,
 .generatedKey button,
 .storageEditor button,
-.userCreator button {
+.userCreator button,
+.landingExamplesFooter button,
+.landingExampleActions button,
+.landingFractalOption button {
     border: 1px solid var(--color-border);
     background: var(--color-bg-card-alt);
     color: var(--color-text-primary);
@@ -96,7 +99,10 @@
 
 .inviteCreator button:disabled,
 .storageEditor button:disabled,
-.userCreator button:disabled {
+.userCreator button:disabled,
+.landingExamplesFooter button:disabled,
+.landingExampleActions button:disabled,
+.landingFractalOption button:disabled {
     cursor: not-allowed;
     opacity: 0.45;
     transform: none;
@@ -252,6 +258,7 @@
 .actionsContentArea input,
 .actionsContentArea select,
 .actionsContentArea textarea,
+.landingExampleItem input,
 .tierQuotaEditor input,
 .tierQuotaEditor select,
 .tierQuotaEditor textarea {
@@ -309,6 +316,121 @@
     min-width: 0;
 }
 
+.landingExamplesHeader {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: flex-start;
+    margin-bottom: 18px;
+}
+
+.landingExamplesHeader h2,
+.landingExamplesPanel h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+    letter-spacing: 0;
+}
+
+.landingExamplesHeader p {
+    margin: 8px 0 0;
+    color: var(--color-text-secondary);
+}
+
+.landingExamplesPublishMeta {
+    display: grid;
+    gap: 4px;
+    min-width: 220px;
+    padding: 14px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.landingExamplesPublishMeta span,
+.landingExamplesPanelHeader span,
+.landingExampleItem label span,
+.landingExampleItem > div span,
+.landingFractalOption span {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0;
+}
+
+.landingExamplesPublishMeta strong {
+    color: var(--color-text-primary);
+    font-size: var(--font-size-base);
+}
+
+.landingExamplesGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+    gap: 16px;
+}
+
+.landingExamplesPanel {
+    display: grid;
+    gap: 14px;
+    align-content: start;
+    padding: 16px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.landingExamplesPanelHeader {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+}
+
+.landingExampleList {
+    display: grid;
+    gap: 10px;
+}
+
+.landingExampleItem,
+.landingFractalOption {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+}
+
+.landingFractalOption {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+}
+
+.landingExampleItem > div,
+.landingFractalOption > div {
+    display: grid;
+    gap: 4px;
+}
+
+.landingExampleItem label {
+    display: grid;
+    gap: 6px;
+}
+
+.landingExampleActions,
+.landingExamplesFooter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.landingExamplesFooter {
+    justify-content: flex-end;
+    padding-top: 4px;
+}
+
 .storageEditor span {
     flex: 0 0 auto;
     display: inline-flex;
@@ -329,6 +451,10 @@
 }
 
 @media (max-width: 960px) {
+    .landingExamplesGrid {
+        grid-template-columns: 1fr;
+    }
+
     .storageEditor button {
         width: 100%;
     }

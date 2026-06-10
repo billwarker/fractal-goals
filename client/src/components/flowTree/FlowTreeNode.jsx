@@ -119,17 +119,18 @@ export default function FlowTreeNode({ data }) {
     const isCompleted = data.completed || false;
     const isSmartGoal = data.isSmart || false;
     const isHierarchyLayout = data.layoutMode === 'hierarchy';
+    const goalForDisplay = data.goal || data.type;
     const completionChar = getLevelByName('Completed') || { icon: 'check' };
-    const levelChar = { icon: getGoalIcon(data.type) };
+    const levelChar = { icon: getGoalIcon(goalForDisplay) };
     const config = isCompleted ? { ...completionChar, icon: levelChar.icon } : levelChar;
-    const fillColor = isCompleted ? getCompletionColor() : getGoalColor(data.type);
+    const fillColor = isCompleted ? getCompletionColor() : getGoalColor(goalForDisplay);
     const isUltimate = data.type === 'UltimateGoal';
     const age = getAgeLabel(data.created_at);
     const dueTime = getDueTimeLabel(data.deadline);
     const timingLabel = age ? `Age: ${age}` : null;
     const smartRingFillColor = isCompleted
         ? getGoalSecondaryColor('Completed')
-        : getGoalSecondaryColor(data.type);
+        : getGoalSecondaryColor(goalForDisplay);
     const glowColor = isCompleted ? hexToRgba(fillColor, 0.6) : null;
     const IconComponent = animatedIcons ? AnimatedGoalIcon : GoalIcon;
     const iconSize = isHierarchyLayout ? 22 : 30;

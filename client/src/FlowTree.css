@@ -1,4 +1,10 @@
 /* ReactFlow Edge Overrides */
+.react-flow,
+.react-flow__renderer,
+.react-flow__pane {
+    background: transparent !important;
+}
+
 .react-flow__edges {
     z-index: 0 !important;
 }

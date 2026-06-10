@@ -23,6 +23,9 @@ const {
     unlockUser,
     forcePasswordChange,
     updateUserRole,
+    getLandingExamples,
+    updateLandingExamples,
+    publishLandingExamples,
 } = vi.hoisted(() => ({
     getSummary: vi.fn(),
     getUsers: vi.fn(),
@@ -41,6 +44,9 @@ const {
     unlockUser: vi.fn(),
     forcePasswordChange: vi.fn(),
     updateUserRole: vi.fn(),
+    getLandingExamples: vi.fn(),
+    updateLandingExamples: vi.fn(),
+    publishLandingExamples: vi.fn(),
 }));
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -69,6 +75,9 @@ vi.mock('../../utils/api', () => ({
         unlockUser: (...args) => unlockUser(...args),
         forcePasswordChange: (...args) => forcePasswordChange(...args),
         updateUserRole: (...args) => updateUserRole(...args),
+        getLandingExamples: (...args) => getLandingExamples(...args),
+        updateLandingExamples: (...args) => updateLandingExamples(...args),
+        publishLandingExamples: (...args) => publishLandingExamples(...args),
         revokeInviteKey: vi.fn(),
     },
 }));
@@ -232,6 +241,46 @@ describe('Admin', () => {
         unlockUser.mockResolvedValue({ data: {} });
         forcePasswordChange.mockResolvedValue({ data: {} });
         updateUserRole.mockResolvedValue({ data: {} });
+        getLandingExamples.mockResolvedValue({
+            data: {
+                eligible_fractals: [
+                    {
+                        root_id: 'root-1',
+                        name: 'Guitar practice tracker',
+                        updated_at: '2026-06-09T12:00:00Z',
+                        goal_count: 8,
+                    },
+                    {
+                        root_id: 'root-2',
+                        name: 'Chinese language tracker',
+                        updated_at: '2026-06-08T12:00:00Z',
+                        goal_count: 12,
+                    },
+                ],
+                examples: [
+                    { root_id: 'root-1', label: 'Guitar practice', sort_order: 0 },
+                ],
+                published_at: '2026-06-09T12:00:00Z',
+                published_example_count: 1,
+            },
+        });
+        updateLandingExamples.mockResolvedValue({
+            data: {
+                eligible_fractals: [],
+                examples: [
+                    { root_id: 'root-1', label: 'Guitar practice refined', sort_order: 0 },
+                    { root_id: 'root-2', label: 'Chinese language tracker', sort_order: 1 },
+                ],
+                published_at: '2026-06-09T12:00:00Z',
+                published_example_count: 1,
+            },
+        });
+        publishLandingExamples.mockResolvedValue({
+            data: {
+                published_at: '2026-06-09T13:00:00Z',
+                published_example_count: 2,
+            },
+        });
     });
 
     it('renders user entity metrics, storage, and invite key creation', async () => {
@@ -405,6 +454,38 @@ describe('Admin', () => {
             },
             storage_limit_bytes: 262144000,
             apply_existing_users: true,
+        }));
+    });
+
+    it('manages landing example draft selection and publish', async () => {
+        renderAdmin();
+
+        fireEvent.click(screen.getByText('landing'));
+        await waitFor(() => expect(screen.getByText('Landing Examples')).toBeInTheDocument());
+
+        expect(screen.getAllByText('Guitar practice tracker').length).toBeGreaterThan(0);
+        expect(screen.getByDisplayValue('Guitar practice')).toBeInTheDocument();
+        expect(screen.getByText('Chinese language tracker')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+        fireEvent.change(screen.getByDisplayValue('Guitar practice'), {
+            target: { value: 'Guitar practice refined' },
+        });
+        fireEvent.click(screen.getByText('Save Draft'));
+
+        await waitFor(() => expect(updateLandingExamples).toHaveBeenCalledWith({
+            examples: [
+                { root_id: 'root-1', label: 'Guitar practice refined', sort_order: 0 },
+                { root_id: 'root-2', label: 'Chinese language tracker', sort_order: 1 },
+            ],
+        }));
+
+        fireEvent.click(screen.getByText('Publish'));
+        await waitFor(() => expect(publishLandingExamples).toHaveBeenCalledWith({
+            examples: [
+                { root_id: 'root-1', label: 'Guitar practice refined', sort_order: 0 },
+                { root_id: 'root-2', label: 'Chinese language tracker', sort_order: 1 },
+            ],
         }));
     });
 });

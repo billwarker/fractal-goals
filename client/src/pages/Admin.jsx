@@ -12,6 +12,7 @@ const ADMIN_USERS_KEY = ['admin', 'users'];
 const ADMIN_SUMMARY_KEY = ['admin', 'summary'];
 const ADMIN_INVITES_KEY = ['admin', 'invite-keys'];
 const ADMIN_TIER_QUOTAS_KEY = ['admin', 'tier-quotas'];
+const ADMIN_LANDING_EXAMPLES_KEY = ['admin', 'landing-examples'];
 const QUOTA_PLACEHOLDER = '{"goals": 100, "sessions": 500}';
 
 const formatDate = (value) => value ? new Date(value).toLocaleString() : 'Never';
@@ -227,6 +228,205 @@ function TierQuotasPanel({ tierQuotasQuery }) {
                 >
                     {mutation.isPending ? 'Saving...' : 'Save Tier Quotas'}
                 </button>
+            </div>
+        </section>
+    );
+}
+
+function LandingExamplesPanel() {
+    const queryClient = useQueryClient();
+    const [draftExamples, setDraftExamples] = useState([]);
+
+    const landingExamplesQuery = useQuery({
+        queryKey: ADMIN_LANDING_EXAMPLES_KEY,
+        queryFn: async () => (await adminApi.getLandingExamples()).data,
+    });
+
+    React.useEffect(() => {
+        if (!landingExamplesQuery.data) return;
+        setDraftExamples((landingExamplesQuery.data.examples || []).map((example, index) => ({
+            root_id: example.root_id,
+            label: example.label,
+            sort_order: example.sort_order ?? index,
+        })));
+    }, [landingExamplesQuery.data]);
+
+    const eligibleFractals = landingExamplesQuery.data?.eligible_fractals || [];
+    const selectedRootIds = new Set(draftExamples.map((example) => example.root_id));
+    const sortedDraftExamples = [...draftExamples].sort((left, right) => (
+        (left.sort_order ?? 0) - (right.sort_order ?? 0)
+    ));
+
+    const normalizeDraft = (examples) => examples.map((example, index) => ({
+        root_id: example.root_id,
+        label: example.label,
+        sort_order: index,
+    }));
+
+    const updateMutation = useMutation({
+        mutationFn: (examples) => adminApi.updateLandingExamples({ examples: normalizeDraft(examples) }),
+        onSuccess: (res) => {
+            queryClient.setQueryData(ADMIN_LANDING_EXAMPLES_KEY, res.data);
+            notify.success('Landing examples saved');
+        },
+        onError: (error) => notify.error(`Failed to save landing examples: ${formatError(error)}`),
+    });
+
+    const publishMutation = useMutation({
+        mutationFn: () => adminApi.publishLandingExamples({ examples: normalizeDraft(sortedDraftExamples) }),
+        onSuccess: (res) => {
+            queryClient.setQueryData(ADMIN_LANDING_EXAMPLES_KEY, (current) => ({
+                ...(current || {}),
+                examples: normalizeDraft(sortedDraftExamples),
+                published_at: res.data.published_at,
+                published_example_count: res.data.published_example_count,
+            }));
+            notify.success('Landing examples published');
+        },
+        onError: (error) => notify.error(`Failed to publish landing examples: ${formatError(error)}`),
+    });
+
+    const addExample = (fractal) => {
+        setDraftExamples((current) => normalizeDraft([
+            ...current,
+            {
+                root_id: fractal.root_id,
+                label: fractal.name,
+                sort_order: current.length,
+            },
+        ]));
+    };
+
+    const removeExample = (rootId) => {
+        setDraftExamples((current) => normalizeDraft(current.filter((example) => example.root_id !== rootId)));
+    };
+
+    const moveExample = (rootId, direction) => {
+        setDraftExamples((current) => {
+            const next = normalizeDraft([...current]);
+            const index = next.findIndex((example) => example.root_id === rootId);
+            const targetIndex = index + direction;
+            if (index < 0 || targetIndex < 0 || targetIndex >= next.length) return current;
+            [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+            return normalizeDraft(next);
+        });
+    };
+
+    const updateLabel = (rootId, label) => {
+        setDraftExamples((current) => current.map((example) => (
+            example.root_id === rootId ? { ...example, label } : example
+        )));
+    };
+
+    const canSave = sortedDraftExamples.every((example) => example.label.trim().length > 0);
+
+    if (landingExamplesQuery.isLoading) {
+        return <div className={styles.status}>Loading landing examples...</div>;
+    }
+
+    if (landingExamplesQuery.isError) {
+        return <div className={styles.status}>Failed to load landing examples.</div>;
+    }
+
+    return (
+        <section className={styles.section}>
+            <div className={styles.landingExamplesHeader}>
+                <div>
+                    <h2>Landing Examples</h2>
+                    <p>Choose admin-owned fractals to publish as read-only examples on the public landing page.</p>
+                </div>
+                <div className={styles.landingExamplesPublishMeta}>
+                    <span>Published</span>
+                    <strong>{formatDate(landingExamplesQuery.data?.published_at)}</strong>
+                    <span>{landingExamplesQuery.data?.published_example_count || 0} examples live</span>
+                </div>
+            </div>
+
+            <div className={styles.landingExamplesGrid}>
+                <div className={styles.landingExamplesPanel}>
+                    <div className={styles.landingExamplesPanelHeader}>
+                        <h3>Selected examples</h3>
+                        <span>{sortedDraftExamples.length} selected</span>
+                    </div>
+                    {sortedDraftExamples.length === 0 ? (
+                        <div className={styles.status}>No landing examples selected.</div>
+                    ) : (
+                        <div className={styles.landingExampleList}>
+                            {sortedDraftExamples.map((example, index) => {
+                                const fractal = eligibleFractals.find((item) => item.root_id === example.root_id);
+                                return (
+                                    <div className={styles.landingExampleItem} key={example.root_id}>
+                                        <div>
+                                            <strong>{fractal?.name || 'Missing fractal'}</strong>
+                                            <span>{example.root_id}</span>
+                                        </div>
+                                        <label>
+                                            <span>Public label</span>
+                                            <input
+                                                value={example.label}
+                                                onChange={(event) => updateLabel(example.root_id, event.target.value)}
+                                            />
+                                        </label>
+                                        <div className={styles.landingExampleActions}>
+                                            <button
+                                                onClick={() => moveExample(example.root_id, -1)}
+                                                disabled={index === 0}
+                                                aria-label={`Move ${example.label} up`}
+                                            >
+                                                Up
+                                            </button>
+                                            <button
+                                                onClick={() => moveExample(example.root_id, 1)}
+                                                disabled={index === sortedDraftExamples.length - 1}
+                                                aria-label={`Move ${example.label} down`}
+                                            >
+                                                Down
+                                            </button>
+                                            <button onClick={() => removeExample(example.root_id)}>Remove</button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                    <div className={styles.landingExamplesFooter}>
+                        <button
+                            onClick={() => updateMutation.mutate(sortedDraftExamples)}
+                            disabled={updateMutation.isPending || !canSave}
+                        >
+                            {updateMutation.isPending ? 'Saving...' : 'Save Draft'}
+                        </button>
+                        <button
+                            onClick={() => publishMutation.mutate()}
+                            disabled={publishMutation.isPending || !canSave}
+                        >
+                            {publishMutation.isPending ? 'Publishing...' : 'Publish'}
+                        </button>
+                    </div>
+                </div>
+
+                <div className={styles.landingExamplesPanel}>
+                    <div className={styles.landingExamplesPanelHeader}>
+                        <h3>Eligible admin fractals</h3>
+                        <span>{eligibleFractals.length} available</span>
+                    </div>
+                    <div className={styles.landingExampleList}>
+                        {eligibleFractals.map((fractal) => (
+                            <div className={styles.landingFractalOption} key={fractal.root_id}>
+                                <div>
+                                    <strong>{fractal.name}</strong>
+                                    <span>Updated {formatDate(fractal.updated_at)}</span>
+                                </div>
+                                <button
+                                    onClick={() => addExample(fractal)}
+                                    disabled={selectedRootIds.has(fractal.root_id)}
+                                >
+                                    {selectedRootIds.has(fractal.root_id) ? 'Selected' : 'Add'}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         </section>
     );
@@ -724,7 +924,7 @@ function Admin() {
             </header>
 
             <div className={styles.tabs}>
-                {['overview', 'users', 'tier quotas', 'invite keys'].map((item) => (
+                {['overview', 'users', 'tier quotas', 'landing', 'invite keys'].map((item) => (
                     <button
                         key={item}
                         className={tab === item ? styles.activeTab : ''}
@@ -823,6 +1023,10 @@ function Admin() {
 
             {tab === 'tier quotas' && (
                 <TierQuotasPanel tierQuotasQuery={tierQuotasQuery} />
+            )}
+
+            {tab === 'landing' && (
+                <LandingExamplesPanel />
             )}
 
             {tab === 'invite keys' && (

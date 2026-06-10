@@ -32,6 +32,7 @@ function GoalViewMode({
     onClose,
     onUpdate,
     setTargets,
+    readOnly = false,
 }) {
     const navigate = useNavigate();
 
@@ -95,7 +96,7 @@ function GoalViewMode({
                         rootId={rootId}
                         isEditing={false}
                         viewMode="list"
-                        onSave={(newTargets) => {
+                        onSave={readOnly ? undefined : (newTargets) => {
                             if (onUpdate && goalId) {
                                 onUpdate(goalId, {
                                     name,

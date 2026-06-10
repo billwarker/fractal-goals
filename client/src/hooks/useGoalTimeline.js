@@ -14,8 +14,9 @@ export function useGoalTimeline(rootId, goalId, options = {}) {
         types = DEFAULT_GOAL_TIMELINE_TYPES,
         includeChildren = true,
         limit = 50,
+        enabled: enabledOption = true,
     } = options;
-    const enabled = Boolean(rootId && goalId);
+    const enabled = Boolean(rootId && goalId) && enabledOption;
 
     const query = useQuery({
         queryKey: queryKeys.goalTimeline(rootId, goalId, types, includeChildren, limit),

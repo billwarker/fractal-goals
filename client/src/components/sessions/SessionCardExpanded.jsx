@@ -140,11 +140,18 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     onRequestDelete,
     onOpenGoal,
     getGoalColor,
-    formatDate
+    formatDate,
+    readOnly = false,
+    progressSettingsOverride = undefined,
 }) {
     const { getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
-    const { progressSettings } = useRootProgressSettings(rootId);
-    const deltaDisplayMode = useEffectiveDeltaDisplayMode(null, progressSettings);
+    const { progressSettings } = useRootProgressSettings(rootId, {
+        enabled: progressSettingsOverride === undefined,
+    });
+    const deltaDisplayMode = useEffectiveDeltaDisplayMode(
+        null,
+        progressSettingsOverride === undefined ? progressSettings : progressSettingsOverride,
+    );
     const sessionData = session.attributes?.session_data;
     const quickSession = isQuickSession(session);
     const templateColor = getTemplateColor(session);
@@ -186,12 +193,14 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     }, [quickSession, session, sessionEnd]);
 
     const handleClick = () => {
+        if (readOnly) return;
         onSelect?.(session.id);
     };
 
     const handleDeleteClick = (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (readOnly) return;
         onRequestDelete?.(session);
     };
 
@@ -226,31 +235,46 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
             onClick={handleClick}
             className={`${styles.sessionCard} ${isSelected ? styles.sessionCardSelected : ''}`}
         >
-            <CardCornerActionButton
-                className={styles.deleteBtn}
-                onClick={handleDeleteClick}
-                label={`Delete session ${session.name}`}
-                title="Delete Session"
-            />
+            {!readOnly ? (
+                <CardCornerActionButton
+                    className={styles.deleteBtn}
+                    onClick={handleDeleteClick}
+                    label={`Delete session ${session.name}`}
+                    title="Delete Session"
+                />
+            ) : null}
 
             {/* Top Level: High-level session info */}
             <div className={styles.cardTopLevel}>
                 {/* Session Name (Link) */}
                 <div className={styles.topTitleBlock}>
                     <div className={styles.topTitleRow}>
-                        <Link
-                            to={quickSession
-                                ? `/${rootId}/sessions?quickSessionId=${session.id}`
-                                : `/${rootId}/session/${session.id}`}
-                            className={`${styles.cardHeaderTitle} ${sessionData?.template_name ? styles.cardHeaderTitleTemplate : ''}`}
-                            style={sessionData?.template_name ? {
-                                borderColor: templateColor,
-                                color: templateColor,
-                                background: `color-mix(in srgb, ${templateColor} 14%, transparent)`,
-                            } : undefined}
-                        >
-                            {session.name}
-                        </Link>
+                        {readOnly ? (
+                            <span
+                                className={`${styles.cardHeaderTitle} ${sessionData?.template_name ? styles.cardHeaderTitleTemplate : ''}`}
+                                style={sessionData?.template_name ? {
+                                    borderColor: templateColor,
+                                    color: templateColor,
+                                    background: `color-mix(in srgb, ${templateColor} 14%, transparent)`,
+                                } : undefined}
+                            >
+                                {session.name}
+                            </span>
+                        ) : (
+                            <Link
+                                to={quickSession
+                                    ? `/${rootId}/sessions?quickSessionId=${session.id}`
+                                    : `/${rootId}/session/${session.id}`}
+                                className={`${styles.cardHeaderTitle} ${sessionData?.template_name ? styles.cardHeaderTitleTemplate : ''}`}
+                                style={sessionData?.template_name ? {
+                                    borderColor: templateColor,
+                                    color: templateColor,
+                                    background: `color-mix(in srgb, ${templateColor} 14%, transparent)`,
+                                } : undefined}
+                            >
+                                {session.name}
+                            </Link>
+                        )}
                         <CompletionCheckBadge
                             checked={sessionCompleted}
                             inProgress={sessionInProgress}
@@ -270,16 +294,28 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                     <div className={styles.fieldLabel}>Program</div>
                     {programInfo ? (
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <Link
-                                to={`/${rootId}/programs/${programInfo.program_id}`}
-                                className={styles.programLink}
-                                style={{
-                                    color: programColor,
-                                    '--program-link-color': programColor,
-                                }}
-                            >
-                                {programInfo.program_name}
-                            </Link>
+                            {readOnly ? (
+                                <span
+                                    className={styles.programLink}
+                                    style={{
+                                        color: programColor,
+                                        '--program-link-color': programColor,
+                                    }}
+                                >
+                                    {programInfo.program_name}
+                                </span>
+                            ) : (
+                                <Link
+                                    to={`/${rootId}/programs/${programInfo.program_id}`}
+                                    className={styles.programLink}
+                                    style={{
+                                        color: programColor,
+                                        '--program-link-color': programColor,
+                                    }}
+                                >
+                                    {programInfo.program_name}
+                                </Link>
+                            )}
                             <span className={styles.programSubtext}>
                                 <span
                                     className={styles.programBlockName}

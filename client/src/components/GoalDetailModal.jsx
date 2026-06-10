@@ -39,6 +39,7 @@ const GenericGraphModal = lazyWithRetry(() => import('./analytics/GenericGraphMo
 const GoalOptionsView = lazyWithRetry(() => import('./goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./goalDetail/GoalNotesView'), 'components/goalDetail/GoalNotesView');
 const GoalTimelineView = lazyWithRetry(() => import('./goalDetail/GoalTimelineView'), 'components/goalDetail/GoalTimelineView');
+const ReadOnlyActivitiesView = lazyWithRetry(() => import('./goalDetail/ReadOnlyActivitiesView'), 'components/goalDetail/ReadOnlyActivitiesView');
 
 /**
  * GoalDetailModal Component
@@ -74,6 +75,7 @@ function GoalDetailModal({
     onGoalSelect, // Handler for selecting a goal (e.g. child)
     onAssociationsChanged, // Callback when activity associations change
     onMobileCollapse,
+    readOnly = false,
     initialActivities = [], // Initial associated activities for create mode
     initialActivityGroups = [] // Initial associated groups for create mode
 }) {
@@ -157,12 +159,33 @@ function GoalDetailModal({
         ? (selectedChildType || defaultChildType)
         : (goal?.attributes?.type || goal?.type);
     const goalId = mode === 'create' ? null : (goal?.attributes?.id || goal?.id);
-    const { createNote: createGoalNote } = useGoalNotes(rootId, goalId);
+    const queryRootId = readOnly ? null : rootId;
+    const queryGoalId = readOnly ? null : goalId;
+    const { createNote: createGoalNote } = useGoalNotes(queryRootId, queryGoalId);
     const goalColor = getGoalColor(goalType);
     const goalSecondaryColor = getGoalSecondaryColor(goalType);
     const goalIcon = getGoalIcon(goalType);
     const goalIsSmart = isSMART(goal);
     const depGoalId = goal?.attributes?.id || goal?.id;
+
+    // In read-only mode (e.g. the public landing page) the Activities, Timeline,
+    // and Notes tabs cannot hit authenticated endpoints, so their data is embedded
+    // in the goal snapshot itself. Read it off the goal attributes here.
+    const readOnlyAssociatedActivities = useMemo(() => (
+        readOnly && Array.isArray(goal?.attributes?.associated_activities)
+            ? goal.attributes.associated_activities
+            : null
+    ), [readOnly, goal?.attributes?.associated_activities]);
+    const readOnlyTimelineEntries = useMemo(() => (
+        readOnly && Array.isArray(goal?.attributes?.timeline_events)
+            ? goal.attributes.timeline_events
+            : null
+    ), [readOnly, goal?.attributes?.timeline_events]);
+    const readOnlyNotes = useMemo(() => (
+        readOnly && Array.isArray(goal?.attributes?.notes)
+            ? goal.attributes.notes
+            : null
+    ), [readOnly, goal?.attributes?.notes]);
 
     const {
         isEditing,
@@ -223,11 +246,11 @@ function GoalDetailModal({
     const {
         activities: fetchedActivities,
         groups: fetchedGroups,
-    } = useGoalAssociations(rootId, mode === 'create' ? null : depGoalId);
+    } = useGoalAssociations(queryRootId, mode === 'create' ? null : queryGoalId);
 
     const {
         metrics: fetchedMetrics,
-    } = useGoalMetrics(mode === 'create' ? null : depGoalId);
+    } = useGoalMetrics(mode === 'create' ? null : queryGoalId);
     const {
         activityGroups,
         setActivityGroups,
@@ -463,13 +486,14 @@ function GoalDetailModal({
     ]);
 
     const handleCompletionFooterClick = () => {
-        if (!completionFooterState.canToggleCompletion || isPaused) {
+        if (readOnly || !completionFooterState.canToggleCompletion || isPaused) {
             return;
         }
         setViewState(isCompleted ? 'uncomplete-confirm' : 'complete-confirm');
     };
 
     const handleEditDetails = () => {
+        if (readOnly) return;
         setViewState('goal');
         setIsEditing(true);
     };
@@ -571,7 +595,7 @@ function GoalDetailModal({
         setViewState(nextViewState);
     };
 
-    const canAddChildGoal = Boolean(onAddChild && childType && goalType !== 'ImmediateGoal' && !isCompleted);
+    const canAddChildGoal = !readOnly && Boolean(onAddChild && childType && goalType !== 'ImmediateGoal' && !isCompleted);
 
     const handleAddChildGoal = () => {
         if (!canAddChildGoal) {
@@ -743,8 +767,8 @@ function GoalDetailModal({
                         displayMode={displayMode}
                         programs={programs}
                         targets={targets}
-                        associatedActivities={associatedActivities}
-                        activityDefinitions={activityDefinitions}
+                        associatedActivities={readOnly ? (readOnlyAssociatedActivities || []) : associatedActivities}
+                        activityDefinitions={readOnly ? (readOnlyAssociatedActivities || []) : activityDefinitions}
                         treeData={treeData}
                         name={name}
                         description={description}
@@ -755,6 +779,7 @@ function GoalDetailModal({
                         onGoalSelect={onGoalSelect}
                         onUpdate={onUpdate}
                         setTargets={setTargets}
+                        readOnly={readOnly}
                     />
                 )
                 }
@@ -763,8 +788,15 @@ function GoalDetailModal({
     };
 
     // ============ DETERMINE WHICH CONTENT TO RENDER ============
+    // Read-only supports the same navigation tabs as the editable modal
+    // (Details / Timeline / Activities / Notes), all fed from the goal snapshot.
+    // Any other viewState is an editing flow that has no read-only surface, so
+    // fall back to the Details content.
+    const READ_ONLY_VIEW_STATES = ['goal', 'goal-timeline', 'goal-activities', 'goal-notes'];
     let content;
-    if (viewState === 'complete-confirm') {
+    if (readOnly && !READ_ONLY_VIEW_STATES.includes(viewState)) {
+        content = renderGoalContent();
+    } else if (viewState === 'complete-confirm') {
         content = (
             <GoalCompletionModal
                 goal={goal}
@@ -867,6 +899,12 @@ function GoalDetailModal({
                 />
             </Suspense>
         );
+    } else if (viewState === 'goal-activities' && readOnly) {
+        content = (
+            <Suspense fallback={null}>
+                <ReadOnlyActivitiesView activities={readOnlyAssociatedActivities || []} />
+            </Suspense>
+        );
     } else if (viewState === 'goal-activities') {
         content = (
             <Suspense fallback={null}>
@@ -953,6 +991,7 @@ function GoalDetailModal({
                     rootId={rootId}
                     goalId={goalId}
                     hideComposer
+                    readOnlyNotes={readOnlyNotes}
                 />
             </Suspense>
         );
@@ -963,7 +1002,8 @@ function GoalDetailModal({
                     rootId={rootId}
                     goalId={goalId}
                     metrics={fetchedMetrics}
-                    onTimeSpentClick={openDurationModal}
+                    onTimeSpentClick={readOnly ? undefined : openDurationModal}
+                    readOnlyEntries={readOnlyTimelineEntries}
                 />
             </Suspense>
         );
@@ -1024,7 +1064,8 @@ function GoalDetailModal({
     }
 
     // ============ RENDER ============
-    const showGoalNoteComposer = viewState === 'goal-notes'
+    const showGoalNoteComposer = !readOnly
+        && viewState === 'goal-notes'
         && mode !== 'create'
         && Boolean(rootId && goalId)
         && !['complete-confirm', 'uncomplete-confirm'].includes(viewState);
@@ -1034,12 +1075,15 @@ function GoalDetailModal({
         && !(needsLevelPicker && selectedChildType === null);
     const showEditFooter = viewState === 'goal'
         && mode !== 'create'
+        && !readOnly
         && isEditing;
     const showDetailFooter = viewState === 'goal'
         && mode !== 'create'
+        && !readOnly
         && !isEditing;
     const showActivitiesFooter = viewState === 'goal-activities'
         && mode !== 'create'
+        && !readOnly
         && embeddedTargetBuilderTarget === undefined
         && Boolean(activitiesAssociateAction);
     const isTargetFlowActive = isTargetSelectionMode;
@@ -1246,7 +1290,7 @@ function GoalDetailModal({
     if (displayMode === 'panel') {
         return (
             <>
-                <div className={styles.panelContainer}>
+                <div className={`${styles.panelContainer} ${readOnly ? styles.readOnlySurface : ''}`}>
                     <div className={styles.panelContent} ref={contentScrollRef}>
                         {content}
                     </div>
@@ -1269,7 +1313,7 @@ function GoalDetailModal({
         >
             <div
                 onClick={(e) => e.stopPropagation()}
-                className={styles.modalContent}
+                className={`${styles.modalContent} ${readOnly ? styles.readOnlySurface : ''}`}
                 style={{
                     borderTop: `4px solid ${displayGoalColor}`,
                 }}

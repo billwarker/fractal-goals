@@ -14,18 +14,21 @@ function ConnectedGoalDetailModal({
     rootId,
     activityDefinitions,
     activityGroups,
+    readOnly = false,
     ...props
 }) {
     const modalData = useGoalDetailModalData({
         rootId,
         activityDefinitions,
         activityGroups,
+        enabled: !readOnly,
     });
 
     return (
         <GoalDetailModal
             {...props}
             rootId={rootId}
+            readOnly={readOnly}
             activityDefinitions={modalData.activityDefinitions}
             activityGroups={modalData.activityGroups}
         />

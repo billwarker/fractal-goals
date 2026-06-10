@@ -196,6 +196,7 @@ export const convertTreeToFlow = (
             type: 'custom',
             position: { x: 0, y: 0 },
             data: {
+                goal: normalizedNode,
                 label: getGoalNodeName(normalizedNode),
                 type: nodeType,
                 completed: normalizedNode.completed,

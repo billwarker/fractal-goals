@@ -378,6 +378,34 @@ class AdminTierQuotaUpdateSchema(BaseModel):
         return v
 
 
+class LandingExampleSelectionSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    root_id: str = Field(..., min_length=1, max_length=120)
+    label: str = Field(..., min_length=1, max_length=120)
+    sort_order: int = Field(..., ge=0, le=1000)
+
+    @field_validator('root_id', 'label')
+    @classmethod
+    def sanitize_landing_example_text(cls, v: str) -> str:
+        return sanitize_string(v)
+
+
+class AdminLandingExamplesUpdateSchema(BaseModel):
+    examples: List[LandingExampleSelectionSchema] = Field(default_factory=list, max_length=12)
+
+    @field_validator('examples')
+    @classmethod
+    def validate_unique_landing_example_roots(
+        cls,
+        v: List[LandingExampleSelectionSchema],
+    ) -> List[LandingExampleSelectionSchema]:
+        root_ids = [item.root_id for item in v]
+        if len(root_ids) != len(set(root_ids)):
+            raise ValueError('Landing example root ids must be unique')
+        return v
+
+
 class AdminInviteKeyCreateSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 

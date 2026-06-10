@@ -1,6 +1,14 @@
 from models import BetaSignupRequest
 
 
+def test_public_landing_examples_empty_when_unpublished(client):
+    response = client.get('/api/public/landing-examples')
+
+    assert response.status_code == 200
+    assert 'no-store' in response.headers['Cache-Control']
+    assert response.get_json() == {'published_at': None, 'examples': []}
+
+
 def test_create_beta_signup_request(client, db_session):
     response = client.post('/api/public/beta-signups', json={
         'name': 'Will Tester',

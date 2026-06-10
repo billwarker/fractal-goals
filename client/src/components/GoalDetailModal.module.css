@@ -34,6 +34,19 @@
     overflow-y: auto;
 }
 
+/*
+ * Read-only surface (e.g. public landing page).
+ * Tabs and the close control live in the header (outside .afterHeaderContent),
+ * so they stay fully navigable, and client-side timeline filters keep working
+ * (they're marked data-readonly-allow). Any other normally-editing control
+ * inside the content body becomes inert with a stop-sign cursor, signalling
+ * that editing requires signing in.
+ */
+.readOnlySurface .afterHeaderContent button:not([data-readonly-allow]),
+.readOnlySurface .afterHeaderContent [role="button"]:not([data-readonly-allow]) {
+    cursor: not-allowed;
+}
+
 .panelNoteComposer {
     flex-shrink: 0;
 }

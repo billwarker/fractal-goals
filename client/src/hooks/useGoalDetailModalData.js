@@ -6,9 +6,10 @@ export function useGoalDetailModalData({
     rootId,
     activityDefinitions,
     activityGroups,
+    enabled = true,
 }) {
-    const shouldFetchActivities = activityDefinitions === undefined;
-    const shouldFetchActivityGroups = activityGroups === undefined;
+    const shouldFetchActivities = enabled && activityDefinitions === undefined;
+    const shouldFetchActivityGroups = enabled && activityGroups === undefined;
 
     const { activities: fetchedActivities = [] } = useActivities(rootId, {
         enabled: shouldFetchActivities,

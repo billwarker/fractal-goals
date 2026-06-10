@@ -1,16 +1,71 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import AnimatedGoalIcon from '../components/atoms/AnimatedGoalIcon';
 import GoalIcon from '../components/atoms/GoalIcon';
+import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
+import LandingShowcaseFrame from '../components/landing/LandingShowcaseFrame';
+import { GoalLevelsProvider } from '../contexts/GoalLevelsContext';
+import landingContent from '../content/landingContent';
+import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
+import { findGoalNodeById, getGoalNodeId } from '../utils/goalNodeModel';
 import { publicApi } from '../utils/api';
 import styles from './Landing.module.css';
+// Reuse the real goals-page styles for the view-options widget and the docked
+// side-in detail panel (.flowtree-options-pane, .details-window.sidebar.docked).
+import './FractalGoals.css';
 
 const FlowTree = lazy(() => import('../FlowTree'));
+const GoalDetailModal = lazy(() => import('../components/ConnectedGoalDetailModal'));
+
+const DEFAULT_VIEW_SETTINGS = {
+    fadeInactiveBranches: false,
+    hideInactiveGoals: false,
+    hideCompletedGoals: false,
+    showMetricsOverlay: false,
+};
+const FLOWTREE_SCOPE_TRANSITION_MS = 160;
 
 const goalLevels = [
-    { label: 'Ultimate', shape: 'twelvePointStar', color: '#4f9cf9', secondaryColor: '#102235' },
-    { label: 'Long Term', shape: 'hexagon', color: '#3bc57c', secondaryColor: '#0f271c' },
-    { label: 'Mid Term', shape: 'diamond', color: '#f59f4d', secondaryColor: '#2c1d0f' },
-    { label: 'Short Term', shape: 'triangle', color: '#8b6fff', secondaryColor: '#181329' },
-    { label: 'Immediate', shape: 'circle', color: '#ef6a6a', secondaryColor: '#301515' },
+    {
+        label: 'Ultimate',
+        type: 'UltimateGoal',
+        shape: 'twelvePointStar',
+        color: '#4f9cf9',
+        secondaryColor: '#102235',
+        description: 'The identity-level ambition everything else serves.',
+    },
+    {
+        label: 'Long Term',
+        type: 'LongTermGoal',
+        shape: 'hexagon',
+        color: '#3bc57c',
+        secondaryColor: '#0f271c',
+        description: 'Major directions that make the big ambition real.',
+    },
+    {
+        label: 'Mid Term',
+        type: 'MidTermGoal',
+        shape: 'diamond',
+        color: '#f59f4d',
+        secondaryColor: '#2c1d0f',
+        description: 'Trackable milestones with a clear outcome.',
+    },
+    {
+        label: 'Short Term',
+        type: 'ShortTermGoal',
+        shape: 'triangle',
+        color: '#8b6fff',
+        secondaryColor: '#181329',
+        description: 'Focused projects that turn plans into near-term work.',
+    },
+    {
+        label: 'Immediate',
+        type: 'ImmediateGoal',
+        shape: 'circle',
+        color: '#ef6a6a',
+        secondaryColor: '#301515',
+        description: 'The next concrete action you can log and measure.',
+    },
 ];
 
 const levelByType = {
@@ -21,330 +76,324 @@ const levelByType = {
     ImmediateGoal: goalLevels[4],
 };
 
-const seoMeta = {
-    title: 'Fractal Goals - One App for Goals, Programs & Training',
-    description: 'Break big goals into trackable trees, build your own programs, and log every session in one composable platform. Built for people training across many disciplines.',
-    ogTitle: 'Track every goal, program, and training session in one place',
-};
-
-const makeGoal = (id, name, type, children = [], isSmart = false) => ({
-    id,
-    name,
-    type,
-    children,
-    is_smart: isSmart,
-    created_at: '2026-01-01T00:00:00Z',
-});
-
-const examples = [
-    {
-        id: 'guitar',
-        label: 'Guitar practice tracker',
-        root: 'Become a skilled guitar player',
-        tree: makeGoal('guitar-root', 'Become a skilled guitar player', 'UltimateGoal', [
-            makeGoal('guitar-musicianship', 'Build complete musicianship', 'LongTermGoal', [
-                makeGoal('guitar-fretboard', 'Map the fretboard', 'MidTermGoal', [
-                    makeGoal('guitar-caged', 'Practice CAGED triads', 'ShortTermGoal', [
-                        makeGoal('guitar-caged-session', '20 minute triad session', 'ImmediateGoal'),
-                    ]),
-                    makeGoal('guitar-notes', 'Name notes up to 12th fret', 'ImmediateGoal'),
-                ]),
-                makeGoal('guitar-rhythm', 'Develop reliable rhythm', 'MidTermGoal', [
-                    makeGoal('guitar-metronome', 'Metronome strumming ladder', 'ShortTermGoal', [
-                        makeGoal('guitar-eighths', 'Eighth-note groove drill', 'ImmediateGoal'),
-                    ]),
-                ]),
-            ], true),
-            makeGoal('guitar-repertoire', 'Perform songs confidently', 'LongTermGoal', [
-                makeGoal('guitar-songbook', 'Build a 10 song setlist', 'MidTermGoal', [
-                    makeGoal('guitar-song-one', 'Polish first full song', 'ShortTermGoal', [
-                        makeGoal('guitar-record-take', 'Record one clean take', 'ImmediateGoal'),
-                    ]),
-                ]),
-            ]),
-        ], true),
-        metrics: ['42 practice hours', '18 sessions', '7 songs in progress'],
-        features: [
-            {
-                title: 'Goal Trees - Break big goals into trackable pieces',
-                body: 'Start with the identity-level goal, then branch it into themes, sub-goals, and concrete sessions. Nothing floats free; every task connects to the ambition it serves.',
-                visual: {
-                    type: 'hierarchy',
-                    rows: ['Skilled guitar player', 'Complete musicianship', 'Map the fretboard', '20 minute triad session'],
-                },
-            },
-            {
-                title: 'Programs - Turn goals into a repeatable weekly plan',
-                body: 'Build your own program from your own goals - alternate the work across the week so progress does not depend on motivation or memory.',
-                visual: {
-                    type: 'program',
-                    rows: ['Mon: CAGED triads', 'Wed: metronome ladder', 'Fri: song polish', 'Sun: record + review'],
-                },
-            },
-            {
-                title: 'Sessions - Log what you actually did',
-                body: 'Capture duration, reps, holds, attempts, and notes, with every activity tied to the goal it supports. This is your training log, structured.',
-                visual: {
-                    type: 'session',
-                    rows: ['Triads: 20m', 'Metronome: 12m', 'Clean take attempts: 4', 'Notes: B string weak spot'],
-                },
-            },
-            {
-                title: 'Analytics - Watch progress roll up the tree',
-                body: 'See time, volume, streaks, and outcome metrics connect back to the larger goal, so improvement is visible instead of assumed.',
-                visual: {
-                    type: 'metrics',
-                    rows: ['Practice time +18%', 'Tempo target 92 BPM', 'Song confidence 7/10', 'Weekly streak 4'],
-                },
-            },
-        ],
-    },
-    {
-        id: 'calisthenics',
-        label: 'Calisthenics training log',
-        root: 'Become an elite calisthenics athlete',
-        tree: makeGoal('cal-root', 'Become an elite calisthenics athlete', 'UltimateGoal', [
-            makeGoal('cal-strength', 'Build elite relative strength', 'LongTermGoal', [
-                makeGoal('cal-pull', 'Master pulling strength', 'MidTermGoal', [
-                    makeGoal('cal-muscle-up', 'Strict muscle-up progression', 'ShortTermGoal', [
-                        makeGoal('cal-false-grip', 'False grip pulls 5x3', 'ImmediateGoal'),
-                    ]),
-                    makeGoal('cal-front-lever', 'Front lever tuck holds', 'ImmediateGoal'),
-                ]),
-                makeGoal('cal-push', 'Develop pressing power', 'MidTermGoal', [
-                    makeGoal('cal-hspu', 'Wall handstand push-up block', 'ShortTermGoal', [
-                        makeGoal('cal-negatives', 'Controlled negatives', 'ImmediateGoal'),
-                    ]),
-                ]),
-            ], true),
-            makeGoal('cal-mobility', 'Stay mobile and resilient', 'LongTermGoal', [
-                makeGoal('cal-shoulders', 'Bulletproof shoulders', 'MidTermGoal', [
-                    makeGoal('cal-scapula', 'Scapular control circuit', 'ImmediateGoal'),
-                ]),
-            ]),
-        ], true),
-        metrics: ['31 training hours', '24 workouts', '5 skill targets'],
-        features: [
-            {
-                title: 'Goal Trees - Break big goals into trackable pieces',
-                body: 'Start with the identity-level goal, then branch it into themes, sub-goals, and concrete sessions. Nothing floats free; every task connects to the ambition it serves.',
-                visual: { type: 'hierarchy', rows: ['Elite calisthenics athlete', 'Relative strength', 'Strict muscle-up', 'False grip pulls 5x3'] },
-            },
-            {
-                title: 'Programs - Turn goals into a repeatable weekly plan',
-                body: 'Build your own program from your own goals - alternate the work across the week so progress does not depend on motivation or memory.',
-                visual: { type: 'program', rows: ['Pull strength', 'Mobility reset', 'Push power', 'Skill density'] },
-            },
-            {
-                title: 'Sessions - Log what you actually did',
-                body: 'Capture duration, reps, holds, attempts, and notes, with every activity tied to the goal it supports. This is your training log, structured.',
-                visual: { type: 'session', rows: ['False grip pulls 5x3', 'Tuck hold 4x12s', 'Wall HSPU negatives', 'RPE 8'] },
-            },
-            {
-                title: 'Analytics - Watch progress roll up the tree',
-                body: 'See time, volume, streaks, and outcome metrics connect back to the larger goal, so improvement is visible instead of assumed.',
-                visual: { type: 'metrics', rows: ['Pull volume +12%', 'Hold time 48s', 'Recovery score 8/10', 'Skill attempts 36'] },
-            },
-        ],
-    },
-    {
-        id: 'speaking',
-        label: 'Public speaking practice',
-        root: 'Become a confident public speaker',
-        tree: makeGoal('speak-root', 'Become a confident public speaker', 'UltimateGoal', [
-            makeGoal('speak-presence', 'Build stage presence', 'LongTermGoal', [
-                makeGoal('speak-voice', 'Strengthen vocal control', 'MidTermGoal', [
-                    makeGoal('speak-breath', 'Breath and pause practice', 'ShortTermGoal', [
-                        makeGoal('speak-read', 'Record 3 minute read', 'ImmediateGoal'),
-                    ]),
-                ]),
-                makeGoal('speak-body', 'Use body language intentionally', 'MidTermGoal', [
-                    makeGoal('speak-gesture', 'Gesture rehearsal loop', 'ImmediateGoal'),
-                ]),
-            ], true),
-            makeGoal('speak-content', 'Deliver clear persuasive talks', 'LongTermGoal', [
-                makeGoal('speak-structure', 'Master talk structure', 'MidTermGoal', [
-                    makeGoal('speak-outline', 'Outline 5 minute talk', 'ShortTermGoal', [
-                        makeGoal('speak-hook', 'Write opening hook', 'ImmediateGoal'),
-                    ]),
-                ]),
-            ]),
-        ], true),
-        metrics: ['12 talks recorded', '9 feedback notes', '6 delivery drills'],
-        features: [
-            {
-                title: 'Goal Trees - Break big goals into trackable pieces',
-                body: 'Start with the identity-level goal, then branch it into themes, sub-goals, and concrete sessions. Nothing floats free; every task connects to the ambition it serves.',
-                visual: { type: 'hierarchy', rows: ['Confident public speaker', 'Stage presence', 'Vocal control', 'Record 3 minute read'] },
-            },
-            {
-                title: 'Programs - Turn goals into a repeatable weekly plan',
-                body: 'Build your own program from your own goals - alternate the work across the week so progress does not depend on motivation or memory.',
-                visual: { type: 'program', rows: ['Voice drill', 'Gesture loop', 'Outline sprint', 'Full rehearsal'] },
-            },
-            {
-                title: 'Sessions - Log what you actually did',
-                body: 'Capture duration, reps, holds, attempts, and notes, with every activity tied to the goal it supports. This is your training log, structured.',
-                visual: { type: 'session', rows: ['Read: 3m', 'Pauses: 14', 'Filler words: 8', 'Feedback: slower open'] },
-            },
-            {
-                title: 'Analytics - Watch progress roll up the tree',
-                body: 'See time, volume, streaks, and outcome metrics connect back to the larger goal, so improvement is visible instead of assumed.',
-                visual: { type: 'metrics', rows: ['Filler words -34%', 'Runs completed 12', 'Confidence 8/10', 'Feedback items closed 6'] },
-            },
-        ],
-    },
-    {
-        id: 'chinese',
-        label: 'Chinese language tracker',
-        root: 'Become fluent in Chinese',
-        tree: makeGoal('zh-root', 'Become fluent in Chinese', 'UltimateGoal', [
-            makeGoal('zh-comprehension', 'Understand native content', 'LongTermGoal', [
-                makeGoal('zh-listening', 'Build listening comprehension', 'MidTermGoal', [
-                    makeGoal('zh-podcast', 'Podcast shadowing block', 'ShortTermGoal', [
-                        makeGoal('zh-shadow', 'Shadow 10 minutes', 'ImmediateGoal'),
-                    ]),
-                    makeGoal('zh-dialogue', 'Review dialogue transcript', 'ImmediateGoal'),
-                ]),
-                makeGoal('zh-reading', 'Read everyday Chinese', 'MidTermGoal', [
-                    makeGoal('zh-graded', 'Finish graded reader chapter', 'ImmediateGoal'),
-                ]),
-            ], true),
-            makeGoal('zh-output', 'Speak and write comfortably', 'LongTermGoal', [
-                makeGoal('zh-speaking', 'Hold fluid conversations', 'MidTermGoal', [
-                    makeGoal('zh-tutor', 'Prepare tutor conversation', 'ShortTermGoal', [
-                        makeGoal('zh-story', 'Tell one short story', 'ImmediateGoal'),
-                    ]),
-                ]),
-                makeGoal('zh-characters', 'Build character recall', 'MidTermGoal', [
-                    makeGoal('zh-anki', 'Review 40 due cards', 'ImmediateGoal'),
-                ]),
-            ]),
-        ], true),
-        metrics: ['56 study hours', '1,240 cards reviewed', '14 speaking sessions'],
-        features: [
-            {
-                title: 'Goal Trees - Break big goals into trackable pieces',
-                body: 'Start with the identity-level goal, then branch it into themes, sub-goals, and concrete sessions. Nothing floats free; every task connects to the ambition it serves.',
-                visual: { type: 'hierarchy', rows: ['Fluent in Chinese', 'Understand native content', 'Listening comprehension', 'Shadow 10 minutes'] },
-            },
-            {
-                title: 'Programs - Turn goals into a repeatable weekly plan',
-                body: 'Build your own program from your own goals - alternate the work across the week so progress does not depend on motivation or memory.',
-                visual: { type: 'program', rows: ['Listening shadow', 'Reader chapter', 'Tutor prep', 'Anki review'] },
-            },
-            {
-                title: 'Sessions - Log what you actually did',
-                body: 'Capture duration, reps, holds, attempts, and notes, with every activity tied to the goal it supports. This is your training log, structured.',
-                visual: { type: 'session', rows: ['Shadowing: 10m', 'Cards reviewed: 40', 'Tutor topic: travel', 'New phrases: 12'] },
-            },
-            {
-                title: 'Analytics - Watch progress roll up the tree',
-                body: 'See time, volume, streaks, and outcome metrics connect back to the larger goal, so improvement is visible instead of assumed.',
-                visual: { type: 'metrics', rows: ['Listening +22%', 'Cards mature 68%', 'Speaking sessions 14', 'Study streak 11'] },
-            },
-        ],
-    },
-];
-
-const featureNames = ['Goal Trees', 'Programs', 'Sessions', 'Analytics'];
-
-const audienceCards = [
-    {
-        title: 'You train across multiple disciplines',
-        body: 'Guitar, calisthenics, a language, a speaking habit - track them as one connected system instead of juggling a separate app for each.',
-    },
-    {
-        title: "You've outgrown the notes app",
-        body: "If your training log currently lives in your phone's notes, a spreadsheet, or three different trackers, this is the upgrade: structured, searchable, and tied to real goals.",
-    },
-    {
-        title: 'You already know your programming',
-        body: "Fractal Goals isn't a coach and won't tell you what to do. You bring the plan; it gives you the structure to organize, run, and measure it.",
-    },
-    {
-        title: "You're driven by outcomes",
-        body: 'Every session you log rolls up to the goal it serves, so you can always see whether the daily work is moving the big target.',
-    },
-];
-
-const faqItems = [
-    {
-        question: 'What is Fractal Goals?',
-        answer: 'Fractal Goals is a composable goal-tracking platform. You set a big goal, break it into a tree of smaller goals, build programs toward them, and log sessions, activities, and metrics - all connected in one place.',
-    },
-    {
-        question: 'Can I track multiple goals or hobbies in one app?',
-        answer: 'Yes. Fractal Goals is built for people working toward several things at once. You can run guitar practice, a calisthenics program, language study, and more side by side, each as its own goal tree, in a single system.',
-    },
-    {
-        question: 'Do I have to follow a preset program?',
-        answer: "No. Fractal Goals does not prescribe a plan. You bring your own programming and use the platform to structure, schedule, and measure it.",
-    },
-    {
-        question: 'How is it different from a habit tracker?',
-        answer: 'Habit trackers count streaks. Fractal Goals models the whole structure beneath a goal - sub-goals, programs, sessions, and metrics that roll up - so you can see not just that you showed up, but whether the work is moving the outcome.',
-    },
-    {
-        question: 'Can I use it as a training log?',
-        answer: 'Yes. Logging sessions - reps, holds, durations, attempts, and notes - is core to how it works, and every entry stays tied to the goal it supports.',
-    },
-    {
-        question: 'How do I get access?',
-        answer: 'Fractal Goals is in invite-based private beta while the product is being shaped. Request access below and the team follows up with testers who match the current build.',
-    },
-];
-
 const initialFormState = {
     name: '',
     email: '',
-    use_case: 'personal goals',
+    use_case: landingContent.betaForm.useCaseOptions[0]?.value || 'personal goals',
     note: '',
 };
 
-function FeatureVisual({ feature }) {
-    const iconSet = {
-        hierarchy: ['UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ImmediateGoal'],
-        program: ['LongTermGoal', 'MidTermGoal', 'ShortTermGoal', 'ImmediateGoal'],
-        session: ['ImmediateGoal', 'ShortTermGoal', 'ImmediateGoal', 'MidTermGoal'],
-        metrics: ['MidTermGoal', 'ImmediateGoal', 'LongTermGoal', 'ShortTermGoal'],
-    };
-    const icons = iconSet[feature.visual.type] || iconSet.hierarchy;
+const fallbackLandingExamples = [{
+    root_id: 'demo-guitar-root',
+    label: 'Guitar practice tracker',
+    root_name: 'Become a skilled guitar player',
+    sort_order: 0,
+    evidence_goal_ids: ['demo-guitar-musicianship', 'demo-guitar-caged'],
+    metrics_summary: {
+        'demo-guitar-root': { total_duration_seconds: 12600, session_count: 6 },
+        'demo-guitar-caged': { total_duration_seconds: 3600, session_count: 3 },
+    },
+    programs: [{
+        id: 'demo-program-1',
+        name: 'Weekly musicianship block',
+        color: '#3A86FF',
+        start_date: '2026-01-05',
+        end_date: '2026-02-01',
+        goal_ids: ['demo-guitar-musicianship', 'demo-guitar-caged'],
+        blocks: [{
+            id: 'demo-block-1',
+            name: 'Fretboard map',
+            color: '#3A86FF',
+            start_date: '2026-01-05',
+            end_date: '2026-01-18',
+            goal_ids: ['demo-guitar-caged'],
+            days: [{
+                id: 'demo-day-1',
+                name: 'Triad practice',
+                day_of_week: ['Monday', 'Wednesday', 'Friday'],
+                templates: [{ id: 'demo-template-1', name: 'Triad Session', is_required: true }],
+            }],
+        }],
+    }],
+    sessions: [{
+        id: 'demo-session-1',
+        name: 'Triad Session',
+        root_id: 'demo-guitar-root',
+        session_start: '2026-01-12T18:00:00Z',
+        session_end: '2026-01-12T18:45:00Z',
+        duration_minutes: 45,
+        total_duration_seconds: 2700,
+        completed: true,
+        attributes: {
+            updated_at: '2026-01-12T18:45:00Z',
+            completed: true,
+            session_data: {
+                session_start: '2026-01-12T18:00:00Z',
+                session_end: '2026-01-12T18:45:00Z',
+                sections: [{
+                    name: 'Main',
+                    duration_minutes: 45,
+                    activity_ids: ['demo-instance-1'],
+                }],
+                notes: 'CAGED shapes are getting faster; B-string transitions still need attention.',
+            },
+        },
+        activity_instances: [{
+            id: 'demo-instance-1',
+            activity_definition_id: 'demo-activity-1',
+            name: 'CAGED Triads',
+            duration_seconds: 2700,
+            completed: true,
+            sets: [],
+            metrics: [{ metric_id: 'demo-metric-1', value: 36 }],
+        }],
+        completed_goals: [],
+        stats: {},
+    }],
+    activity_definitions: [{
+        id: 'demo-activity-1',
+        name: 'CAGED Triads',
+        description: 'Move triad shapes through the neck with clean naming.',
+        has_metrics: true,
+        has_sets: false,
+        metric_definitions: [{ id: 'demo-metric-1', name: 'Reps', unit: 'clean changes' }],
+        split_definitions: [],
+    }],
+    activity_groups: [],
+    analytics_charts: [{
+        id: 'demo-session-duration',
+        title: 'Session Duration Trend',
+        type: 'bar',
+        data: {
+            labels: ['Mon', 'Wed', 'Fri', 'Mon'],
+            datasets: [{
+                label: 'Minutes',
+                data: [30, 35, 42, 45],
+                backgroundColor: '#3A86FF',
+                borderColor: '#3A86FF',
+            }],
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } },
+        },
+    }],
+    session_templates: [{
+        id: 'demo-template-1',
+        name: 'Triad Session',
+        description: 'A reusable practice shape for fretboard work.',
+        session_type: 'standard',
+        template_data: {
+            sections: [{
+                name: 'Main',
+                activities: [{ activity_id: 'demo-activity-1', name: 'CAGED Triads' }],
+            }],
+        },
+    }],
+    tree: {
+        id: 'demo-guitar-root',
+        name: 'Become a skilled guitar player',
+        type: 'UltimateGoal',
+        level: { id: 'demo-level-ultimate', name: 'Ultimate Goal', icon: 'twelvePointStar', color: '#4f9cf9', secondary_color: '#102235' },
+        attributes: { id: 'demo-guitar-root', type: 'UltimateGoal', created_at: '2026-01-01T00:00:00Z', is_smart: true },
+        children: [{
+            id: 'demo-guitar-musicianship',
+            name: 'Build complete musicianship',
+            type: 'LongTermGoal',
+            level: { id: 'demo-level-long', name: 'Long Term Goal', icon: 'hexagon', color: '#3bc57c', secondary_color: '#0f271c' },
+            attributes: { id: 'demo-guitar-musicianship', type: 'LongTermGoal', created_at: '2026-01-01T00:00:00Z', is_smart: true },
+            children: [{
+                id: 'demo-guitar-fretboard',
+                name: 'Map the fretboard',
+                type: 'MidTermGoal',
+                level: { id: 'demo-level-mid', name: 'Mid Term Goal', icon: 'diamond', color: '#f59f4d', secondary_color: '#2c1d0f' },
+                attributes: { id: 'demo-guitar-fretboard', type: 'MidTermGoal', created_at: '2026-01-01T00:00:00Z' },
+                children: [{
+                    id: 'demo-guitar-caged',
+                    name: 'Practice CAGED triads',
+                    type: 'ShortTermGoal',
+                    level: { id: 'demo-level-short', name: 'Short Term Goal', icon: 'triangle', color: '#8b6fff', secondary_color: '#181329' },
+                    attributes: {
+                        id: 'demo-guitar-caged',
+                        type: 'ShortTermGoal',
+                        created_at: '2026-01-01T00:00:00Z',
+                        associated_activities: [{
+                            id: 'demo-activity-1',
+                            name: 'CAGED Triads',
+                            metric_definitions: [{ id: 'demo-metric-1', name: 'Reps', unit: 'clean changes' }],
+                        }],
+                    },
+                    children: [{
+                        id: 'demo-guitar-session-goal',
+                        name: 'Complete one clean triad session',
+                        type: 'ImmediateGoal',
+                        level: { id: 'demo-level-immediate', name: 'Immediate Goal', icon: 'circle', color: '#ef6a6a', secondary_color: '#301515' },
+                        attributes: { id: 'demo-guitar-session-goal', type: 'ImmediateGoal', created_at: '2026-01-01T00:00:00Z' },
+                        children: [],
+                    }],
+                }],
+            }],
+        }],
+    },
+}];
 
-    return (
-        <div className={styles.featureVisual} aria-label={`${feature.title} visual`}>
-            {feature.visual.rows.map((row, index) => {
-                const level = levelByType[icons[index] || 'ImmediateGoal'];
-                return (
-                    <div className={styles.visualRow} key={row}>
-                        <GoalIcon
-                            shape={level.shape}
-                            color={level.color}
-                            secondaryColor={level.secondaryColor}
-                            isSmart={index === 0}
-                            size={24}
-                        />
-                        <span>{row}</span>
-                    </div>
-                );
-            })}
-        </div>
-    );
+// Collect the distinct goal levels embedded in a snapshot tree so the landing page
+// can seed GoalLevelsContext, making colors/icons/SMART resolve from the published
+// snapshot's real (admin-customized) levels rather than the generic fallback palette.
+function collectSnapshotLevels(rootNode) {
+    if (!rootNode) return [];
+    const levelsByKey = new Map();
+    const stack = [rootNode];
+    while (stack.length > 0) {
+        const node = stack.pop();
+        if (!node) continue;
+        const level = node.level || node.attributes?.level;
+        const key = level?.id || level?.name;
+        if (level && key && !levelsByKey.has(key)) {
+            levelsByKey.set(key, {
+                id: level.id,
+                name: level.name,
+                color: level.color,
+                secondary_color: level.secondary_color,
+                icon: level.icon,
+                ...(node.level_characteristics || {}),
+            });
+        }
+        const children = node.children || [];
+        for (let index = children.length - 1; index >= 0; index -= 1) {
+            stack.push(children[index]);
+        }
+    }
+    return Array.from(levelsByKey.values());
+}
+
+function getGoalIconProps(goal) {
+    const goalType = goal?.attributes?.type || goal?.type || 'UltimateGoal';
+    const serializedLevel = goal?.level || goal?.attributes?.level || null;
+    if (serializedLevel?.icon) {
+        return {
+            shape: serializedLevel.icon,
+            color: serializedLevel.color || levelByType[goalType]?.color || levelByType.UltimateGoal.color,
+            secondaryColor: serializedLevel.secondary_color || levelByType[goalType]?.secondaryColor || levelByType.UltimateGoal.secondaryColor,
+            isSmart: Boolean(goal?.attributes?.is_smart ?? goal?.is_smart),
+        };
+    }
+
+    const fallbackLevel = levelByType[goalType] || levelByType.UltimateGoal;
+
+    return {
+        shape: fallbackLevel.shape,
+        color: fallbackLevel.color,
+        secondaryColor: fallbackLevel.secondaryColor,
+        isSmart: Boolean(goal?.attributes?.is_smart ?? goal?.is_smart),
+    };
+}
+
+function findFirstGoalByType(rootNode, goalType) {
+    if (!rootNode) return null;
+    const stack = [rootNode];
+    while (stack.length > 0) {
+        const node = stack.shift();
+        const nodeType = node?.attributes?.type || node?.type;
+        if (nodeType === goalType) return node;
+        stack.unshift(...(node?.children || []));
+    }
+    return null;
+}
+
+function buildHeroGoalLevels(example) {
+    return goalLevels.map((level) => {
+        const exampleGoal = findFirstGoalByType(example?.tree, level.type);
+        const iconProps = exampleGoal
+            ? getGoalIconProps(exampleGoal)
+            : {
+                shape: level.shape,
+                color: level.color,
+                secondaryColor: level.secondaryColor,
+                isSmart: level.type === 'UltimateGoal',
+            };
+        return {
+            ...level,
+            iconProps,
+        };
+    });
 }
 
 function Landing() {
-    const [selectedExampleId, setSelectedExampleId] = useState(examples[0].id);
-    const [activeFeatureIndex, setActiveFeatureIndex] = useState(0);
+    const isMobile = useIsMobile();
+    const [selectedExampleId, setSelectedExampleId] = useState(null);
+    const [selectedGoalId, setSelectedGoalId] = useState(null);
+    const [flowTreeScopeKey, setFlowTreeScopeKey] = useState(0);
+    const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
+    const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
+    const [isOptionsPaneMinimized, setIsOptionsPaneMinimized] = useState(false);
     const [formState, setFormState] = useState(initialFormState);
     const [status, setStatus] = useState('idle');
     const [message, setMessage] = useState('');
+    const flowTreeRef = useRef(null);
+    const flowTreeScopeTransitionTimerRef = useRef(null);
+
+    const landingExamplesQuery = useQuery({
+        queryKey: ['public', 'landing-examples'],
+        queryFn: async () => (await publicApi.getLandingExamples()).data,
+        staleTime: 5 * 60 * 1000,
+    });
+    const publishedExamples = useMemo(() => {
+        const apiExamples = landingExamplesQuery.data?.examples || [];
+        const sourceExamples = apiExamples.length > 0 ? apiExamples : fallbackLandingExamples;
+        return sourceExamples
+            .slice()
+            .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0))
+            .map((example) => ({
+                id: example.root_id,
+                label: example.label,
+                root: example.root_name || example.tree?.name || example.label,
+                tree: example.tree,
+                rootIcon: getGoalIconProps(example.tree),
+                // Root-scoped data that drives the FlowTree view-options widget,
+                // mirroring what the authenticated goals page fetches live.
+                evidenceGoalIds: Array.isArray(example.evidence_goal_ids)
+                    ? new Set(example.evidence_goal_ids.map((goalId) => String(goalId)))
+                    : null,
+                metricsSummary: example.metrics_summary || null,
+                programs: Array.isArray(example.programs) ? example.programs : [],
+                sessions: Array.isArray(example.sessions) ? example.sessions : [],
+                activityDefinitions: Array.isArray(example.activity_definitions) ? example.activity_definitions : [],
+                activityGroups: Array.isArray(example.activity_groups) ? example.activity_groups : [],
+                analyticsCharts: Array.isArray(example.analytics_charts) ? example.analytics_charts : [],
+                sessionTemplates: Array.isArray(example.session_templates) ? example.session_templates : [],
+            }))
+            .filter((example) => example.id && example.tree);
+    }, [landingExamplesQuery.data]);
+
+    useEffect(() => {
+        if (publishedExamples.length === 0) {
+            setSelectedExampleId(null);
+            setSelectedGoalId(null);
+            return;
+        }
+        if (!publishedExamples.some((example) => example.id === selectedExampleId)) {
+            setSelectedExampleId(publishedExamples[0].id);
+            setSelectedGoalId(null);
+        }
+    }, [publishedExamples, selectedExampleId]);
 
     const selectedExample = useMemo(
-        () => examples.find((example) => example.id === selectedExampleId) || examples[0],
-        [selectedExampleId]
+        () => publishedExamples.find((example) => example.id === selectedExampleId) || publishedExamples[0] || null,
+        [publishedExamples, selectedExampleId]
     );
-    const activeFeature = selectedExample.features[activeFeatureIndex] || selectedExample.features[0];
-
+    const selectedGoal = useMemo(
+        () => findGoalNodeById(selectedExample?.tree, selectedGoalId),
+        [selectedExample, selectedGoalId]
+    );
+    const snapshotLevels = useMemo(
+        () => collectSnapshotLevels(selectedExample?.tree),
+        [selectedExample]
+    );
+    const heroGoalLevels = useMemo(
+        () => buildHeroGoalLevels(selectedExample),
+        [selectedExample]
+    );
     useEffect(() => {
         const previousTitle = document.title;
         const upsertMeta = (selector, attributes) => {
@@ -364,38 +413,22 @@ function Landing() {
             return { element, existed, previousAttributes, attributes };
         };
 
-        document.title = seoMeta.title;
+        document.title = landingContent.seo.title;
         const descriptionMeta = upsertMeta('meta[name="description"]', {
             name: 'description',
-            content: seoMeta.description,
+            content: landingContent.seo.description,
         });
         const ogTitleMeta = upsertMeta('meta[property="og:title"]', {
             property: 'og:title',
-            content: seoMeta.ogTitle,
+            content: landingContent.seo.ogTitle,
         });
         const ogDescriptionMeta = upsertMeta('meta[property="og:description"]', {
             property: 'og:description',
-            content: seoMeta.description,
+            content: landingContent.seo.description,
         });
-        const faqScript = document.createElement('script');
-        faqScript.type = 'application/ld+json';
-        faqScript.textContent = JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'FAQPage',
-            mainEntity: faqItems.map((item) => ({
-                '@type': 'Question',
-                name: item.question,
-                acceptedAnswer: {
-                    '@type': 'Answer',
-                    text: item.answer,
-                },
-            })),
-        });
-        document.head.appendChild(faqScript);
 
         return () => {
             document.title = previousTitle;
-            faqScript.remove();
             [descriptionMeta, ogTitleMeta, ogDescriptionMeta].forEach((element) => {
                 if (!element?.element?.parentNode) return;
                 if (!element.existed) {
@@ -430,26 +463,56 @@ function Landing() {
 
     const handleExampleSelect = (exampleId) => {
         setSelectedExampleId(exampleId);
-        setActiveFeatureIndex(0);
+        setSelectedGoalId(null);
+        setFlowTreeScopeKey((current) => current + 1);
     };
 
-    const showPreviousFeature = () => {
-        setActiveFeatureIndex((current) => (
-            current === 0 ? selectedExample.features.length - 1 : current - 1
-        ));
+    const handleGoalSelect = (goal) => {
+        const goalId = getGoalNodeId(goal);
+        setSelectedGoalId(goalId);
+        // Bump the scope transition key so FlowTree re-filters to this goal's
+        // lineage and re-centers smoothly, matching the authenticated goals page.
+        setFlowTreeScopeKey((current) => current + 1);
     };
 
-    const showNextFeature = () => {
-        setActiveFeatureIndex((current) => (
-            current === selectedExample.features.length - 1 ? 0 : current + 1
-        ));
+    const clearSelectedGoal = () => {
+        setSelectedGoalId(null);
+        setFlowTreeScopeKey((current) => current + 1);
     };
+
+    // Mirror the goals page: scope-changing toggles fade the tree out, apply after a
+    // short delay, and bump the scope key so FlowTree re-centers; others apply instantly.
+    const handleToggleViewSetting = useCallback((settingKey) => (event) => {
+        const nextChecked = event.target.checked;
+        const shouldTransitionScope = settingKey === 'hideInactiveGoals' || settingKey === 'hideCompletedGoals';
+
+        if (!shouldTransitionScope) {
+            setViewSettings((prev) => ({ ...prev, [settingKey]: nextChecked }));
+            return;
+        }
+
+        flowTreeRef.current?.startFadeOut?.();
+        if (flowTreeScopeTransitionTimerRef.current) {
+            clearTimeout(flowTreeScopeTransitionTimerRef.current);
+        }
+        flowTreeScopeTransitionTimerRef.current = setTimeout(() => {
+            setViewSettings((prev) => ({ ...prev, [settingKey]: nextChecked }));
+            setFlowTreeScopeKey((prev) => prev + 1);
+            flowTreeScopeTransitionTimerRef.current = null;
+        }, FLOWTREE_SCOPE_TRANSITION_MS);
+    }, []);
+
+    useEffect(() => () => {
+        if (flowTreeScopeTransitionTimerRef.current) {
+            clearTimeout(flowTreeScopeTransitionTimerRef.current);
+        }
+    }, []);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
         if (!canSubmit) {
             setStatus('error');
-            setMessage('Add your name, a valid email, and what you want to test.');
+            setMessage(landingContent.betaForm.validationMessage);
             return;
         }
 
@@ -467,12 +530,12 @@ function Landing() {
             const response = await publicApi.createBetaSignup(payload);
             setStatus('success');
             setMessage(response.data?.created
-                ? "You're on the private beta request list."
-                : 'Your private beta request has been updated.');
+                ? landingContent.betaForm.successCreatedMessage
+                : landingContent.betaForm.successUpdatedMessage);
             setFormState(initialFormState);
         } catch (error) {
             setStatus('error');
-            setMessage(error.response?.data?.error || 'Could not send the request. Please try again.');
+            setMessage(error.response?.data?.error || landingContent.betaForm.errorMessage);
         }
     };
 
@@ -489,39 +552,167 @@ function Landing() {
                             size={34}
                         />
                     </span>
-                    <span>Fractal Goals</span>
+                    <span>{landingContent.header.brand}</span>
                 </a>
                 <nav className={styles.nav} aria-label="Primary">
-                    <a href="#examples">Examples</a>
-                    <a href="#features">Features</a>
-                    <a href="#faq">FAQ</a>
-                    <a href="#beta">Private beta</a>
-                    <a href="https://my.fractalgoals.com">Open app</a>
+                    {landingContent.header.nav.map((item) => (
+                        <a href={item.href} key={`${item.href}-${item.label}`}>{item.label}</a>
+                    ))}
                 </nav>
             </header>
 
             <section className={styles.hero} aria-labelledby="landing-title">
-                <div className={styles.kicker}>Composable goal tracking</div>
-                <h1 id="landing-title">Track every goal, program, and training session in one place</h1>
-                <h2>
-                    Want to achieve big goals? Start by making them smaller. Fractal Goals breaks any
-                    ambition into a tree of smaller goals, lets you build your own programs toward them,
-                    and logs every session, activity, and metric - so all your training, across every
-                    discipline, lives in one connected system instead of five scattered apps.
-                </h2>
-                <div className={styles.heroActions}>
-                    <a className={styles.primaryAction} href="#beta">Request beta access</a>
-                    <a className={styles.secondaryAction} href="https://my.fractalgoals.com">Go to app</a>
+                <div className={styles.heroCopy}>
+                    <h1 id="landing-title">{landingContent.hero.title}</h1>
+                    <h2>{landingContent.hero.body}</h2>
+                    <div className={styles.heroActions}>
+                        {landingContent.hero.actions.map((action, index) => (
+                            <a
+                                className={index === 0 ? styles.primaryAction : styles.secondaryAction}
+                                href={action.href}
+                                key={`${action.href}-${action.label}`}
+                            >
+                                {action.label}
+                            </a>
+                        ))}
+                    </div>
                 </div>
+                <aside className={styles.heroLevelStack} aria-label="Goal levels from ultimate to immediate">
+                    {heroGoalLevels.map((level) => (
+                        (() => {
+                            const HeroIcon = level.iconProps.isSmart ? AnimatedGoalIcon : GoalIcon;
+                            return (
+                                <button
+                                    type="button"
+                                    className={styles.heroLevelItem}
+                                    aria-label={`${level.label}: ${level.description}`}
+                                    key={level.label}
+                                >
+                                    <span className={styles.heroLevelIcon} aria-hidden="true">
+                                        <HeroIcon
+                                            {...level.iconProps}
+                                            size={96}
+                                            reduced
+                                        />
+                                    </span>
+                                    <span className={styles.heroLevelTooltip} role="tooltip">
+                                        <strong>{level.label}</strong>
+                                        <span>{level.description}</span>
+                                    </span>
+                                </button>
+                            );
+                        })()
+                    ))}
+                </aside>
             </section>
+
+            {selectedExample && (
+                <section className={styles.treeSection} id="examples" aria-labelledby="examples-title">
+                    <div className={styles.sectionHeader}>
+                        <h2 id="examples-title">{landingContent.examples.title}</h2>
+                        <p>{landingContent.examples.body}</p>
+                    </div>
+                    <div className={styles.exampleToggle} role="tablist" aria-label="Example goal trees">
+                        {publishedExamples.map((example) => (
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={example.id === selectedExample.id}
+                                className={example.id === selectedExample.id ? styles.toggleActive : ''}
+                                onClick={() => handleExampleSelect(example.id)}
+                                key={example.id}
+                            >
+                                <span aria-hidden="true" className={styles.exampleToggleIcon}>
+                                    <GoalIcon
+                                        {...example.rootIcon}
+                                        size={24}
+                                    />
+                                </span>
+                                <span>{example.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <div className={styles.goalExplorer}>
+                        <div className={styles.goalTreeCanvas} aria-label={`${selectedExample.root} goal tree`}>
+                            <div className={styles.flowTreeViewport}>
+                                <FlowTreeOptionsPane
+                                    isMobile={isMobile}
+                                    isMinimized={isOptionsPaneMinimized}
+                                    onToggleMinimized={() => setIsOptionsPaneMinimized((prev) => !prev)}
+                                    goalsViewMode={goalsViewMode}
+                                    onGoalsViewModeChange={setGoalsViewMode}
+                                    viewSettings={viewSettings}
+                                    onToggleViewSetting={handleToggleViewSetting}
+                                    inactiveBranchTooltip="Dims branches with no recent completed activity evidence."
+                                    hideInactiveTooltip="Hides goals with no completed activity evidence in the active window."
+                                    hideCompletedTooltip="Hides completed goals from the fractal tree."
+                                />
+                                <Suspense fallback={<div className={styles.flowTreeLoading}>Loading preview...</div>}>
+                                    <FlowTree
+                                        ref={flowTreeRef}
+                                        key={`${selectedExample.id}-${goalsViewMode}`}
+                                        treeData={selectedExample.tree}
+                                        onNodeClick={handleGoalSelect}
+                                        onAddChild={null}
+                                        viewSettings={viewSettings}
+                                        evidenceGoalIds={selectedExample.evidenceGoalIds}
+                                        metricsSummary={selectedExample.metricsSummary}
+                                        programs={selectedExample.programs}
+                                        layoutMode={goalsViewMode}
+                                        selectedNodeId={selectedGoalId}
+                                        zoomTargetNodeId={selectedGoalId}
+                                        scopeTransitionKey={flowTreeScopeKey}
+                                        sidebarOpen={Boolean(selectedGoal)}
+                                    />
+                                </Suspense>
+                            </div>
+                            {selectedGoal && !isMobile && (
+                                <div className="details-window sidebar docked landing-goal-dock">
+                                    <div className="window-content landing-goal-dock-content">
+                                        <Suspense fallback={<div className={styles.flowTreeLoading}>Loading details...</div>}>
+                                            <GoalLevelsProvider seedLevels={snapshotLevels}>
+                                                <GoalDetailModal
+                                                    isOpen
+                                                    onClose={clearSelectedGoal}
+                                                    goal={selectedGoal}
+                                                    rootId={selectedExample.id}
+                                                    treeData={selectedExample.tree}
+                                                    displayMode="panel"
+                                                    readOnly
+                                                    onGoalSelect={handleGoalSelect}
+                                                />
+                                            </GoalLevelsProvider>
+                                        </Suspense>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    {selectedGoal && isMobile && (
+                        <Suspense fallback={<div className={styles.flowTreeLoading}>Loading details...</div>}>
+                            <GoalLevelsProvider seedLevels={snapshotLevels}>
+                                <GoalDetailModal
+                                    isOpen
+                                    onClose={() => setSelectedGoalId(null)}
+                                    goal={selectedGoal}
+                                    rootId={selectedExample.id}
+                                    treeData={selectedExample.tree}
+                                    displayMode="modal"
+                                    readOnly
+                                    onGoalSelect={handleGoalSelect}
+                                />
+                            </GoalLevelsProvider>
+                        </Suspense>
+                    )}
+                </section>
+            )}
 
             <section className={styles.audienceSection} aria-labelledby="audience-title">
                 <div className={styles.sectionHeader}>
-                    <span>Built for serious, self-directed practitioners</span>
-                    <h2 id="audience-title">If you're training for more than one thing, this is your home base.</h2>
+                    <h2 id="audience-title">{landingContent.audience.title}</h2>
                 </div>
                 <div className={styles.audienceGrid}>
-                    {audienceCards.map((card) => (
+                    {landingContent.audience.cards.map((card) => (
                         <article className={styles.audienceCard} key={card.title}>
                             <h3>{card.title}</h3>
                             <p>{card.body}</p>
@@ -530,121 +721,21 @@ function Landing() {
                 </div>
             </section>
 
-            <section className={styles.treeSection} id="examples" aria-labelledby="examples-title">
-                <div className={styles.sectionHeader}>
-                    <span>Example fractals</span>
-                    <h2 id="examples-title">See how real goals break down - from ambition to today's session.</h2>
-                    <p>
-                        Every Fractal Goals plan starts as a single big goal and branches into smaller,
-                        trackable goals, programs, and sessions. Here are four complete examples across
-                        different disciplines.
-                    </p>
-                </div>
-                <div className={styles.exampleToggle} role="tablist" aria-label="Example goal trees">
-                    {examples.map((example) => (
-                        <button
-                            type="button"
-                            role="tab"
-                            aria-selected={example.id === selectedExample.id}
-                            className={example.id === selectedExample.id ? styles.toggleActive : ''}
-                            onClick={() => handleExampleSelect(example.id)}
-                            key={example.id}
-                        >
-                            {example.label}
-                        </button>
-                    ))}
-                </div>
-                <div className={styles.flowTreeFrame} aria-label={`${selectedExample.root} goal tree`}>
-                    <Suspense fallback={<div className={styles.flowTreeLoading}>Loading preview...</div>}>
-                        <FlowTree
-                            key={selectedExample.id}
-                            treeData={selectedExample.tree}
-                            onNodeClick={() => {}}
-                            onAddChild={null}
-                            viewSettings={{
-                                fadeInactiveBranches: false,
-                                hideInactiveGoals: false,
-                                hideCompletedGoals: false,
-                            }}
-                            layoutMode="tree"
-                        />
-                    </Suspense>
-                </div>
-                <div className={styles.analyticsStrip}>
-                    {selectedExample.metrics.map((metric) => {
-                        const [value, ...labelParts] = metric.split(' ');
-                        return (
-                            <div key={metric}>
-                                <strong>{value}</strong>
-                                <span>{labelParts.join(' ')}</span>
-                            </div>
-                        );
-                    })}
-                </div>
-            </section>
-
-            <section className={styles.featuresSection} id="features" aria-labelledby="features-title">
-                <div className={styles.sectionHeader}>
-                    <span>How it works</span>
-                    <h2 id="features-title">One system, four views: goals, programs, sessions, and progress.</h2>
-                    <p>
-                        The same plan shows up four ways, so you can zoom from your top-level goal all
-                        the way down to today's reps - and back up to the metrics that prove it's working.
-                    </p>
-                </div>
-                <div className={styles.carousel}>
-                    <div className={styles.carouselText}>
-                        <span>{featureNames[activeFeatureIndex]}</span>
-                        <h3>{activeFeature.title}</h3>
-                        <p>{activeFeature.body}</p>
-                    </div>
-                    <FeatureVisual feature={activeFeature} />
-                    <div className={styles.carouselControls}>
-                        <button type="button" onClick={showPreviousFeature} aria-label="Previous feature">{'<'}</button>
-                        <div className={styles.carouselDots} aria-label="Feature slides">
-                            {selectedExample.features.map((feature, index) => (
-                                <button
-                                    type="button"
-                                    aria-label={`Show ${feature.title}`}
-                                    aria-current={index === activeFeatureIndex ? 'true' : undefined}
-                                    onClick={() => setActiveFeatureIndex(index)}
-                                    key={feature.title}
-                                />
-                            ))}
-                        </div>
-                        <button type="button" onClick={showNextFeature} aria-label="Next feature">{'>'}</button>
-                    </div>
-                </div>
-            </section>
-
-            <section className={styles.faqSection} id="faq" aria-labelledby="faq-title">
-                <div className={styles.sectionHeader}>
-                    <span>FAQ</span>
-                    <h2 id="faq-title">Common questions</h2>
-                </div>
-                <div className={styles.faqGrid}>
-                    {faqItems.map((item) => (
-                        <article className={styles.faqItem} key={item.question}>
-                            <h3>{item.question}</h3>
-                            <p>{item.answer}</p>
-                        </article>
-                    ))}
-                </div>
-            </section>
+            {selectedExample && (
+                <LandingShowcaseFrame
+                    example={selectedExample}
+                    seedLevels={snapshotLevels}
+                />
+            )}
 
             <section className={styles.betaSection} id="beta" aria-labelledby="beta-title">
                 <div className={styles.betaCopy}>
-                    <span>Private beta</span>
-                    <h2 id="beta-title">Help test the next version of goal-tracking software.</h2>
-                    <p>
-                        Beta access is invite-based while the product is being shaped. Tell us what you
-                        want to organize - your training, a creative practice, a language, a startup -
-                        and we'll follow up with testers who match the current build.
-                    </p>
+                    <h2 id="beta-title">{landingContent.beta.title}</h2>
+                    <p>{landingContent.beta.body}</p>
                 </div>
                 <form className={styles.betaForm} onSubmit={handleSubmit}>
                     <label>
-                        Name
+                        {landingContent.betaForm.nameLabel}
                         <input
                             type="text"
                             value={formState.name}
@@ -654,7 +745,7 @@ function Landing() {
                         />
                     </label>
                     <label>
-                        Email
+                        {landingContent.betaForm.emailLabel}
                         <input
                             type="email"
                             value={formState.email}
@@ -664,17 +755,15 @@ function Landing() {
                         />
                     </label>
                     <label>
-                        Testing focus
+                        {landingContent.betaForm.useCaseLabel}
                         <select value={formState.use_case} onChange={updateField('use_case')} required>
-                            <option value="personal goals">Personal goals</option>
-                            <option value="creative practice">Creative practice</option>
-                            <option value="fitness training">Fitness training</option>
-                            <option value="startup or work">Startup or work</option>
-                            <option value="research or learning">Research or learning</option>
+                            {landingContent.betaForm.useCaseOptions.map((option) => (
+                                <option value={option.value} key={option.value}>{option.label}</option>
+                            ))}
                         </select>
                     </label>
                     <label>
-                        Note
+                        {landingContent.betaForm.noteLabel}
                         <textarea
                             value={formState.note}
                             onChange={updateField('note')}
@@ -682,8 +771,10 @@ function Landing() {
                             maxLength={1000}
                         />
                     </label>
-            <button type="submit" disabled={!canSubmit}>
-                        {status === 'submitting' ? 'Sending...' : 'Request invite'}
+                    <button type="submit" disabled={!canSubmit}>
+                        {status === 'submitting'
+                            ? landingContent.betaForm.submittingLabel
+                            : landingContent.betaForm.submitLabel}
                     </button>
                     {message && (
                         <p className={status === 'success' ? styles.successMessage : styles.errorMessage} role="status">

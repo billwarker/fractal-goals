@@ -1,4 +1,5 @@
-from models import BetaSignupRequest, format_utc
+from models import AppSetting, BetaSignupRequest, format_utc
+from services.admin_service import LANDING_EXAMPLE_CACHE_KEY
 
 
 class PublicService:
@@ -40,3 +41,14 @@ class PublicService:
             "request": self.serialize_beta_signup(request),
             "created": created,
         }, None, 201 if created else 200
+
+    def get_landing_examples(self):
+        setting = self.db_session.get(AppSetting, LANDING_EXAMPLE_CACHE_KEY)
+        if setting is None or not isinstance(setting.value, dict):
+            return {"published_at": None, "schema_version": None, "examples": []}, None, 200
+
+        return {
+            "published_at": setting.value.get("published_at"),
+            "schema_version": setting.value.get("schema_version"),
+            "examples": setting.value.get("examples") or [],
+        }, None, 200

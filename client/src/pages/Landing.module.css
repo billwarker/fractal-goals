@@ -1,17 +1,19 @@
 .page {
+    --landing-page-x-padding: clamp(16px, 4vw, 56px);
+    --landing-section-max-width: 1560px;
+    --landing-readable-max-width: 1120px;
+
     min-height: 100%;
     color: var(--color-text-primary);
-    padding: 20px clamp(16px, 4vw, 56px) 56px;
+    padding: 20px var(--landing-page-x-padding) 56px;
 }
 
 .header,
 .hero,
 .audienceSection,
 .treeSection,
-.featuresSection,
-.faqSection,
 .betaSection {
-    max-width: 1240px;
+    max-width: var(--landing-section-max-width);
     margin-left: auto;
     margin-right: auto;
 }
@@ -77,28 +79,20 @@
 
 .hero {
     min-height: min(520px, calc(var(--app-viewport-height) - 88px));
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(128px, 180px);
+    align-items: center;
+    gap: clamp(28px, 5vw, 72px);
     padding: 68px 0 40px;
 }
 
-.kicker,
-.sectionHeader span,
-.carouselText span,
-.betaCopy span {
-    display: inline-flex;
-    color: var(--color-brand-success);
-    font-size: var(--font-size-xs);
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0;
-    margin-bottom: 12px;
+.heroCopy {
+    min-width: 0;
 }
 
 .hero h1 {
     margin: 0;
-    max-width: 1120px;
+    max-width: var(--landing-readable-max-width);
     font-size: clamp(3.1rem, 8vw, 7.8rem);
     line-height: 0.94;
     letter-spacing: 0;
@@ -106,7 +100,7 @@
 
 .hero h2 {
     margin: 24px 0 0;
-    max-width: 980px;
+    max-width: var(--landing-readable-max-width);
     color: var(--color-text-secondary);
     font-size: clamp(1.2rem, 2.5vw, 2rem);
     line-height: var(--line-height-snug);
@@ -119,6 +113,94 @@
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
+}
+
+.heroLevelStack {
+    align-self: center;
+    display: grid;
+    gap: 24px;
+    justify-self: start;
+    width: min(180px, 100%);
+}
+
+.heroLevelItem {
+    position: relative;
+    width: 118px;
+    height: 118px;
+    display: grid;
+    place-items: center;
+    justify-self: end;
+    padding: 0;
+    color: var(--color-text-primary);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius-sm);
+    cursor: help;
+}
+
+.heroLevelItem:hover,
+.heroLevelItem:focus-visible {
+    background: color-mix(in srgb, var(--color-bg-card) 48%, transparent);
+    border-color: color-mix(in srgb, var(--color-border) 78%, transparent);
+}
+
+.heroLevelItem:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 4px;
+}
+
+.heroLevelIcon {
+    display: grid;
+    place-items: center;
+    transform: scale(1);
+    transition: transform 160ms ease;
+}
+
+.heroLevelItem:hover .heroLevelIcon,
+.heroLevelItem:focus-visible .heroLevelIcon {
+    transform: scale(1.08);
+}
+
+.heroLevelTooltip {
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 18px);
+    z-index: 4;
+    width: min(280px, calc(100vw - 48px));
+    padding: 12px 14px;
+    color: var(--color-text-primary);
+    background: color-mix(in srgb, var(--color-bg-card) 96%, black);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    pointer-events: none;
+    text-align: left;
+    transform: translate(10px, -50%);
+    transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.heroLevelTooltip strong,
+.heroLevelTooltip span {
+    display: block;
+}
+
+.heroLevelTooltip strong {
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-snug);
+}
+
+.heroLevelTooltip span {
+    margin-top: 4px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-base);
+}
+
+.heroLevelItem:hover .heroLevelTooltip,
+.heroLevelItem:focus-visible .heroLevelTooltip {
+    opacity: 1;
+    transform: translate(0, -50%);
 }
 
 .primaryAction,
@@ -143,11 +225,13 @@
 }
 
 .audienceSection,
-.treeSection,
-.featuresSection,
-.faqSection,
 .betaSection {
     margin-top: 72px;
+}
+
+.treeSection {
+    margin-top: 28px;
+    max-width: var(--landing-section-max-width);
 }
 
 .sectionHeader {
@@ -170,16 +254,14 @@
     line-height: var(--line-height-relaxed);
 }
 
-.audienceGrid,
-.faqGrid {
+.audienceGrid {
     margin-top: 24px;
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 14px;
 }
 
-.audienceCard,
-.faqItem {
+.audienceCard {
     background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius-md);
@@ -187,72 +269,102 @@
     padding: 18px;
 }
 
-.audienceCard h3,
-.faqItem h3 {
+.audienceCard h3 {
     margin: 0;
     font-size: var(--font-size-xl);
     line-height: var(--line-height-snug);
     letter-spacing: 0;
 }
 
-.audienceCard p,
-.faqItem p {
+.audienceCard p {
     margin: 12px 0 0;
     color: var(--color-text-secondary);
     font-size: var(--font-size-md);
     line-height: var(--line-height-base);
 }
 
-.faqGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .exampleToggle {
     margin-top: 22px;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 18px 28px;
+    align-items: center;
 }
 
-.exampleToggle button,
-.carouselControls button,
-.carouselDots button {
+.exampleToggle button {
     font: inherit;
 }
 
 .exampleToggle button {
+    width: max-content;
+    max-width: min(420px, 100%);
     min-height: 48px;
-    padding: 10px 12px;
+    padding: 4px 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
     color: var(--color-text-secondary);
-    background: color-mix(in srgb, var(--color-bg-card) 88%, transparent);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm);
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
     cursor: pointer;
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-lg);
     font-weight: 800;
     text-align: left;
+}
+
+.exampleToggle button span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.exampleToggleIcon {
+    display: inline-flex;
+    flex: 0 0 auto;
 }
 
 .exampleToggle button:hover,
 .exampleToggle .toggleActive {
     color: var(--color-text-primary);
-    background: var(--color-bg-card-hover);
-    border-color: var(--color-brand-primary);
+    background: transparent;
+    border-bottom-color: var(--color-brand-primary);
 }
 
-.flowTreeFrame {
+.goalExplorer {
+    margin-top: 16px;
+    min-height: min(70vh, 720px);
+}
+
+.goalTreeCanvas {
+    position: relative;
+    display: flex;
+    width: 100%;
     height: min(72vh, 720px);
     min-height: 520px;
-    margin-top: 16px;
     overflow: hidden;
-    background-color: var(--color-bg-app);
-    background-image:
-        linear-gradient(var(--color-grid) 1px, transparent 1px),
-        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
-    background-size: 20px 20px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-md);
-    box-shadow: var(--shadow-lg);
+    border: 1px dashed transparent;
+    border-radius: var(--border-radius-sm);
+    transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+/*
+ * The FlowTree viewport is a flex sibling of the docked detail panel, so opening
+ * the panel physically compresses this box. The FlowTree then re-fits/re-centers
+ * into the smaller width on its container-resize effect — exactly like the
+ * authenticated goals page (where the side pane is also an in-flow flex sibling).
+ */
+.flowTreeViewport {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+}
+
+.goalTreeCanvas:hover {
+    border-color: color-mix(in srgb, var(--color-brand-primary) 58%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 22%, transparent);
 }
 
 .flowTreeLoading {
@@ -264,152 +376,38 @@
     font-weight: 700;
 }
 
-.analyticsStrip {
-    margin-top: 12px;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-}
-
-.analyticsStrip div {
-    background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm);
-    padding: 14px;
-}
-
-.analyticsStrip strong,
-.analyticsStrip span {
-    display: block;
-}
-
-.analyticsStrip strong {
-    font-family: var(--font-family-mono);
-    font-size: var(--font-size-2xl);
-}
-
-.analyticsStrip span {
-    color: var(--color-text-muted);
-    font-size: var(--font-size-sm);
-    margin-top: 2px;
-}
-
-.carousel {
-    margin-top: 24px;
-    display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1.1fr);
-    gap: 18px;
-    align-items: stretch;
-    background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-md);
-    box-shadow: var(--shadow-lg);
-    padding: 18px;
-}
-
-.carouselText {
-    min-height: 300px;
+/*
+ * The docked detail panel is an in-flow flex sibling of the FlowTree viewport
+ * (NOT absolutely positioned), so its width compresses the tree viewport and the
+ * FlowTree re-centers into the remaining space — matching the goals page. The
+ * base surface + slideInRight animation come from the shared
+ * .details-window.sidebar.docked styles in App.css.
+ */
+:global(.landing-goal-dock.details-window.sidebar.docked) {
+    position: relative;
+    flex: 0 0 auto;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    margin: 16px 16px 16px 8px;
+    z-index: 10;
+    width: min(420px, 38%);
+    min-width: 320px;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    padding: 12px;
+    /* Keep the panel fully solid (the shared .details-window base is 0.95). */
+    opacity: 1;
+    background: var(--color-bg-sidebar);
 }
 
-.carouselText h3 {
-    margin: 0;
-    font-size: clamp(1.6rem, 3vw, 2.6rem);
-    line-height: var(--line-height-tight);
-    letter-spacing: 0;
-}
-
-.carouselText p {
-    margin: 18px 0 0;
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-lg);
-    line-height: var(--line-height-relaxed);
-}
-
-.featureVisual {
-    min-height: 300px;
-    display: grid;
-    align-content: center;
-    gap: 10px;
-    padding: 18px;
-    background-color: var(--color-bg-app);
-    background-image:
-        linear-gradient(var(--color-grid) 1px, transparent 1px),
-        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
-    background-size: 20px 20px;
-    border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
-    border-radius: var(--border-radius-sm);
-}
-
-.visualRow {
-    display: grid;
-    grid-template-columns: 34px minmax(0, 1fr);
-    align-items: center;
-    gap: 12px;
-    min-height: 54px;
-    padding: 10px 12px;
-    color: var(--color-text-primary);
-    background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm);
-    font-size: var(--font-size-base);
-    font-weight: 700;
-}
-
-.visualRow span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.carouselControls {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
-    align-items: center;
-    gap: 12px;
-}
-
-.carouselControls > button {
-    width: 44px;
-    height: 38px;
-    color: var(--color-text-primary);
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    font-size: 24px;
-    line-height: 1;
-}
-
-.carouselControls > button:hover {
-    background: var(--color-bg-card-hover);
-    border-color: var(--color-border-hover);
-}
-
-.carouselDots {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.carouselDots button {
-    width: 42px;
-    height: 8px;
+:global(.landing-goal-dock .landing-goal-dock-content) {
+    flex: 1;
+    min-height: 0;
     padding: 0;
-    background: var(--color-border);
-    border: 0;
-    border-radius: 999px;
-    cursor: pointer;
-}
-
-.carouselDots button[aria-current="true"] {
-    background: var(--color-brand-primary);
+    display: flex;
+    flex-direction: column;
 }
 
 .betaSection {
@@ -500,15 +498,43 @@
         flex-wrap: wrap;
     }
 
+    .hero {
+        grid-template-columns: 1fr;
+    }
+
+    .heroLevelStack {
+        justify-self: start;
+        width: 100%;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .heroLevelItem {
+        width: 90px;
+        height: 90px;
+        justify-self: center;
+    }
+
+    .heroLevelTooltip {
+        top: calc(100% + 10px);
+        right: auto;
+        left: 50%;
+        transform: translate(-50%, -8px);
+    }
+
+    .heroLevelItem:hover .heroLevelTooltip,
+    .heroLevelItem:focus-visible .heroLevelTooltip {
+        transform: translate(-50%, 0);
+    }
+
     .exampleToggle {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        justify-content: flex-start;
     }
 
     .audienceGrid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .carousel,
     .betaSection {
         grid-template-columns: 1fr;
     }
@@ -516,6 +542,8 @@
 
 @media (max-width: 620px) {
     .page {
+        --landing-page-x-padding: 14px;
+
         padding: 16px 14px 42px;
     }
 
@@ -529,29 +557,49 @@
     }
 
     .hero h2,
-    .betaCopy p,
-    .carouselText p {
+    .betaCopy p {
         font-size: var(--font-size-base);
     }
 
-    .exampleToggle,
-    .audienceGrid,
-    .faqGrid,
-    .analyticsStrip {
+    .heroLevelStack {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .heroLevelItem {
+        width: 60px;
+        height: 60px;
+    }
+
+    .heroLevelIcon {
+        transform: scale(0.64);
+    }
+
+    .heroLevelItem:hover .heroLevelIcon,
+    .heroLevelItem:focus-visible .heroLevelIcon {
+        transform: scale(0.7);
+    }
+
+    .heroLevelTooltip {
+        width: min(260px, calc(100vw - 28px));
+    }
+
+    .audienceGrid {
         grid-template-columns: 1fr;
     }
 
-    .flowTreeFrame {
+    .exampleToggle {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .exampleToggle button {
+        width: 100%;
+    }
+
+    .goalTreeCanvas {
         height: 520px;
         min-height: 520px;
     }
 
-    .carousel {
-        padding: 12px;
-    }
-
-    .carouselText,
-    .featureVisual {
-        min-height: 240px;
-    }
 }

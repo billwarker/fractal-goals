@@ -10,9 +10,9 @@ import { getActiveGoalWindowDaysFromSettings } from './useFlowTreeMetrics';
  * progressSettings shape: { enabled: bool }
  * null means "use defaults" (enabled=true).
  */
-export function useRootProgressSettings(rootId) {
+export function useRootProgressSettings(rootId, { enabled = true } = {}) {
     const queryClient = useQueryClient();
-    const { data: tree } = useFractalTree(rootId, { enabled: Boolean(rootId) });
+    const { data: tree } = useFractalTree(rootId, { enabled: enabled && Boolean(rootId) });
 
     // The fractal tree root is the top-level goal object
     const progressSettings = tree?.attributes?.progress_settings ?? null;

@@ -11,6 +11,7 @@ const ActivityMiniCard = ({
     renderMetricIndicators,
     isSelectable = false,
     onSelect,
+    readOnly = false,
 }) => {
     const hasDirectAssociation = activity.has_direct_association !== false;
     const isInheritedOnly = Boolean(activity.is_inherited) && !hasDirectAssociation;
@@ -71,7 +72,7 @@ const ActivityMiniCard = ({
                     )}
                     {activity.name}
                 </h4>
-                {hasDirectAssociation && !isProtectedByGroup && !isSelectable && (
+                {hasDirectAssociation && !isProtectedByGroup && !isSelectable && !readOnly && (
                     <button
                         className={styles.removeBtn}
                         onClick={(event) => {

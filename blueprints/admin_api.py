@@ -7,6 +7,7 @@ from blueprints.auth_api import token_required
 from services.admin_service import AdminService
 from validators import (
     AdminInviteKeyCreateSchema,
+    AdminLandingExamplesUpdateSchema,
     AdminTierQuotaUpdateSchema,
     AdminUserCreateSchema,
     AdminUserForcePasswordChangeSchema,
@@ -117,6 +118,77 @@ def update_tier_quotas(current_user, validated_data):
         db_session.rollback()
         logger.exception("Error updating tier quota settings")
         return internal_error(logger, "Error updating tier quota settings")
+    finally:
+        db_session.close()
+
+
+@admin_bp.route('/landing-examples', methods=['GET'])
+@token_required
+def get_landing_examples_settings(current_user):
+    db_session = get_db_session()
+    try:
+        service, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+        payload, error, status = service.get_landing_example_settings()
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        logger.exception("Error fetching landing example settings")
+        return internal_error(logger, "Error fetching landing example settings")
+    finally:
+        db_session.close()
+
+
+@admin_bp.route('/landing-examples', methods=['PATCH'])
+@token_required
+@validate_request(AdminLandingExamplesUpdateSchema)
+def update_landing_examples_settings(current_user, validated_data):
+    db_session = get_db_session()
+    try:
+        service, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+        payload, error, status = service.update_landing_example_settings(validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        logger.info("Admin user_id=%s updated landing examples", current_user.id)
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error updating landing example settings")
+        return internal_error(logger, "Error updating landing example settings")
+    finally:
+        db_session.close()
+
+
+@admin_bp.route('/landing-examples/publish', methods=['POST'])
+@token_required
+@validate_request(AdminLandingExamplesUpdateSchema, allow_empty_json=True)
+def publish_landing_examples(current_user, validated_data):
+    db_session = get_db_session()
+    try:
+        service, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+        if "examples" in validated_data:
+            _, error, status = service.update_landing_example_settings(validated_data)
+            if error:
+                return jsonify({"error": error}), status
+        payload, error, status = service.publish_landing_examples()
+        if error:
+            return jsonify({"error": error}), status
+        logger.info(
+            "Admin user_id=%s published landing examples count=%s",
+            current_user.id,
+            payload.get("published_example_count"),
+        )
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error publishing landing examples")
+        return internal_error(logger, "Error publishing landing examples")
     finally:
         db_session.close()
 

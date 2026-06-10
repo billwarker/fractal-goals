@@ -149,15 +149,22 @@ function normalizeTimelineEntry(item, goalLevelHelpers) {
     };
 }
 
-function GoalTimelineView({ rootId, goalId, metrics, onTimeSpentClick }) {
+function GoalTimelineView({ rootId, goalId, metrics, onTimeSpentClick, readOnlyEntries = null }) {
     const { timezone } = useTimezone();
     const [selectedTypes, setSelectedTypes] = useState(DEFAULT_GOAL_TIMELINE_TYPES);
     const [includeChildren, setIncludeChildren] = useState(true);
-    const { entries, isLoading, error } = useGoalTimeline(rootId, goalId, {
+    const isReadOnly = Array.isArray(readOnlyEntries);
+    const fetched = useGoalTimeline(rootId, goalId, {
         types: selectedTypes,
         includeChildren,
         limit: 75,
+        // When entries are supplied from a snapshot (e.g. public landing page),
+        // skip the authenticated fetch entirely.
+        enabled: !isReadOnly,
     });
+    const entries = isReadOnly ? readOnlyEntries : fetched.entries;
+    const isLoading = isReadOnly ? false : fetched.isLoading;
+    const error = isReadOnly ? null : fetched.error;
 
     const selectedSet = useMemo(() => new Set(selectedTypes), [selectedTypes]);
     const toggleType = (type) => {

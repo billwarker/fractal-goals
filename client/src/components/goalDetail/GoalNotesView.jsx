@@ -11,19 +11,23 @@ import Button from '../atoms/Button';
 import { useGoalNotes } from '../../hooks/useGoalNotes';
 import styles from './GoalNotesView.module.css';
 
-function GoalNotesView({ rootId, goalId, hideComposer = false }) {
+function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = null }) {
     const [includeDescendants, setIncludeDescendants] = useState(false);
     const [composing, setComposing] = useState(false);
+    const isReadOnly = Array.isArray(readOnlyNotes);
 
     const {
-        notes,
-        isLoading,
+        notes: fetchedNotes,
+        isLoading: fetchedLoading,
         createNote,
         updateNote,
         deleteNote,
         pinNote,
         unpinNote,
     } = useGoalNotes(rootId, goalId, { includeDescendants });
+
+    const notes = isReadOnly ? readOnlyNotes : fetchedNotes;
+    const isLoading = isReadOnly ? false : fetchedLoading;
 
     const handleCompose = async (content, linkedGoalId, activityDefinitionId) => {
         // Pre-linked to this goal; any linked goal from picker overrides
@@ -40,7 +44,8 @@ function GoalNotesView({ rootId, goalId, hideComposer = false }) {
 
     return (
         <div className={styles.container}>
-            {/* Options row */}
+            {/* Options row — hidden in read-only since descendants/composer can't fetch */}
+            {!isReadOnly && (
             <div className={styles.optionsRow}>
                 <label className={styles.checkboxLabel}>
                     <input
@@ -64,9 +69,10 @@ function GoalNotesView({ rootId, goalId, hideComposer = false }) {
                     </Button>
                 )}
             </div>
+            )}
 
             {/* Compose area */}
-            {!hideComposer && composing && (
+            {!isReadOnly && !hideComposer && composing && (
                 <div className={styles.composeArea}>
                     <NoteComposer
                         rootId={rootId}
@@ -85,10 +91,10 @@ function GoalNotesView({ rootId, goalId, hideComposer = false }) {
                 ) : (
                     <NoteTimeline
                         notes={notes}
-                        onEdit={updateNote}
-                        onDelete={deleteNote}
-                        onPin={pinNote}
-                        onUnpin={unpinNote}
+                        onEdit={isReadOnly ? undefined : updateNote}
+                        onDelete={isReadOnly ? undefined : deleteNote}
+                        onPin={isReadOnly ? undefined : pinNote}
+                        onUnpin={isReadOnly ? undefined : unpinNote}
                         groupByDate={true}
                         showContext={includeDescendants}
                         showTypePill={false}

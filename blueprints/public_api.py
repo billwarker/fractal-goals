@@ -14,6 +14,25 @@ logger = logging.getLogger(__name__)
 public_bp = Blueprint('public', __name__, url_prefix='/api/public')
 
 
+@public_bp.route('/landing-examples', methods=['GET'])
+@limiter.limit("120 per minute")
+def get_landing_examples():
+    db_session = get_db_session()
+    service = PublicService(db_session)
+
+    try:
+        payload, error, status = service.get_landing_examples()
+        if error:
+            return jsonify({"error": error}), status
+        response = jsonify(payload)
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        return response, status
+    except SQLAlchemyError:
+        return internal_error(logger, "Error fetching landing examples")
+    finally:
+        db_session.close()
+
+
 @public_bp.route('/beta-signups', methods=['POST'])
 @limiter.limit("12 per hour")
 @validate_request(BetaSignupRequestSchema)

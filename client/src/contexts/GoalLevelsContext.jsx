@@ -69,10 +69,14 @@ export function adjustBrightness(hex, percent) {
     return `#${rr}${gg}${bb}`;
 }
 
-export function GoalLevelsProvider({ children }) {
+export function GoalLevelsProvider({ children, seedLevels = null }) {
     const { isAuthenticated, user } = useAuth();
     const queryClient = useQueryClient();
     const userId = user?.id || null;
+    // When seeded (e.g. the public landing page), use the provided levels directly
+    // and skip the authenticated query, so all level-driven styling (colors, icons,
+    // SMART) resolves from the published snapshot exactly like the authenticated app.
+    const hasSeed = Array.isArray(seedLevels) && seedLevels.length > 0;
 
     // Extract rootId from URL path (pattern: /:rootId/...)
     // UUID pattern: 8-4-4-4-12 hex characters
@@ -92,8 +96,8 @@ export function GoalLevelsProvider({ children }) {
     }, [location.pathname]);
 
     const {
-        data: goalLevels = [],
-        isLoading,
+        data: fetchedGoalLevels = [],
+        isLoading: queryLoading,
         error
     } = useQuery({
         queryKey: queryKeys.goalLevels(currentRootId, userId),
@@ -101,8 +105,11 @@ export function GoalLevelsProvider({ children }) {
             const res = await globalApi.getGoalLevels(currentRootId);
             return res.data;
         },
-        enabled: isAuthenticated && !!userId
+        enabled: isAuthenticated && !!userId && !hasSeed
     });
+
+    const goalLevels = hasSeed ? seedLevels : fetchedGoalLevels;
+    const isLoading = hasSeed ? false : queryLoading;
 
     const updateGoalLevelMutation = useMutation({
         mutationFn: async ({ id, updates }) => {

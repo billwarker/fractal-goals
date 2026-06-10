@@ -640,6 +640,52 @@ describe('GoalDetailModal smoke coverage', () => {
         expect(onClose).toHaveBeenCalled();
     });
 
+    it('in read-only mode shows all tabs, renders snapshot activities, and hides edit affordances', async () => {
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                readOnly
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    attributes: {
+                        id: 'goal-1',
+                        type: 'ShortTermGoal',
+                        associated_activities: [
+                            {
+                                id: 'activity-snap-1',
+                                name: 'Sight reading drill',
+                                metric_definitions: [{ id: 'm1', name: 'Bars', unit: 'count' }],
+                            },
+                        ],
+                        timeline_events: [],
+                        notes: [],
+                    },
+                }}
+                rootId="root-1"
+                treeData={[]}
+            />
+        );
+
+        // All four navigation tabs remain available in read-only.
+        expect(screen.getByRole('tab', { name: 'Details' })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Timeline' })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Activities' })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Notes' })).toBeInTheDocument();
+
+        // No edit / options / completion footer affordances.
+        expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Options' })).not.toBeInTheDocument();
+
+        // The Activities tab renders the snapshot activities read-only (no remove control).
+        fireEvent.click(screen.getByRole('tab', { name: 'Activities' }));
+        await waitFor(() => {
+            expect(screen.getByText('Sight reading drill')).toBeInTheDocument();
+            expect(screen.queryByText('+ Associate Activities')).not.toBeInTheDocument();
+        }, { timeout: 5000 });
+    });
+
     it('renders create mode and submits through onCreate', async () => {
         const onCreate = vi.fn().mockResolvedValue({ id: 'goal-2', name: 'Deep Work' });
 
