@@ -340,7 +340,11 @@ function Landing() {
     });
     const publishedExamples = useMemo(() => {
         const apiExamples = landingExamplesQuery.data?.examples || [];
-        const sourceExamples = apiExamples.length > 0 ? apiExamples : fallbackLandingExamples;
+        const shouldUseFallback = landingExamplesQuery.isError
+            || (landingExamplesQuery.isSuccess && apiExamples.length === 0);
+        const sourceExamples = apiExamples.length > 0
+            ? apiExamples
+            : (shouldUseFallback ? fallbackLandingExamples : []);
         return sourceExamples
             .slice()
             .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0))
@@ -364,7 +368,7 @@ function Landing() {
                 sessionTemplates: Array.isArray(example.session_templates) ? example.session_templates : [],
             }))
             .filter((example) => example.id && example.tree);
-    }, [landingExamplesQuery.data]);
+    }, [landingExamplesQuery.data, landingExamplesQuery.isError, landingExamplesQuery.isSuccess]);
 
     useEffect(() => {
         if (publishedExamples.length === 0) {

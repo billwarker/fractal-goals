@@ -399,6 +399,23 @@ describe('Landing', () => {
         expect(container.querySelector('.details-window.sidebar.docked.landing-goal-dock')).toBeInTheDocument();
     });
 
+    it('does not flash the built-in demo while published examples are loading', async () => {
+        let resolveExamples;
+        getLandingExamples.mockReturnValue(new Promise((resolve) => {
+            resolveExamples = resolve;
+        }));
+
+        renderLanding();
+
+        expect(screen.queryByRole('tablist', { name: 'Example goal trees' })).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Become a skilled guitar player goal tree')).not.toBeInTheDocument();
+
+        resolveExamples({ data: publishedExamples });
+
+        expect(await screen.findByRole('tab', { name: 'Guitar practice tracker' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
+    });
+
     it('keeps the sample explorer and showcase visible when no examples are published', async () => {
         getLandingExamples.mockResolvedValue({ data: { published_at: null, examples: [] } });
 
@@ -407,8 +424,8 @@ describe('Landing', () => {
         await waitFor(() => {
             expect(getLandingExamples).toHaveBeenCalled();
         });
-        expect(screen.getByRole('tablist', { name: 'Example goal trees' })).toBeInTheDocument();
-        expect(screen.getByRole('tab', { name: 'Guitar practice tracker' })).toHaveAttribute('aria-selected', 'true');
+        expect(await screen.findByRole('tablist', { name: 'Example goal trees' })).toBeInTheDocument();
+        expect(await screen.findByRole('tab', { name: 'Guitar practice tracker' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
         expect(screen.getByTestId('showcase-session')).toHaveTextContent('Triad Session');
         expect(screen.getByRole('heading', { name: landingContent.hero.title })).toBeInTheDocument();
