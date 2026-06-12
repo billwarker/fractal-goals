@@ -80,7 +80,7 @@ export function QueuedQuickSessionProvider({
         activityInstances: draftSession?.activityInstances || [],
         activities: activityDefinitions,
         activityGroups,
-        sessionGoalsView: null,
+        sessionGoalsView: draftSession?.sessionGoalsView || null,
         loading: false,
         instancesLoading: false,
         activitiesLoading: false,
@@ -89,9 +89,11 @@ export function QueuedQuickSessionProvider({
         localSessionData: draftSession?.localSessionData || null,
         groupMap,
         groupedActivities,
-        targetAchievements: [],
-        achievedTargetIds: [],
-        goalAchievements: [],
+        // Match the shapes produced by useTargetAchievements: consumers call
+        // achievedTargetIds.has() and read goalAchievements as a Map.
+        targetAchievements: new Map(),
+        achievedTargetIds: new Set(),
+        goalAchievements: new Map(),
         calculateTotalDuration,
     }), [
         activityDefinitions,
@@ -100,6 +102,7 @@ export function QueuedQuickSessionProvider({
         draftSession?.activityInstances,
         draftSession?.localSessionData,
         draftSession?.session,
+        draftSession?.sessionGoalsView,
         groupMap,
         groupedActivities,
         rootId,

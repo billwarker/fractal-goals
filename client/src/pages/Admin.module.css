@@ -393,6 +393,101 @@
     gap: 10px;
 }
 
+.landingShowcaseEditor {
+    display: grid;
+    gap: 10px;
+    border-top: 1px solid var(--color-border);
+    padding-top: 10px;
+}
+
+.landingShowcaseToggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: transparent;
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+    cursor: pointer;
+    text-align: left;
+}
+
+.landingShowcaseToggle span {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    text-transform: none;
+}
+
+.landingShowcaseFields {
+    display: grid;
+    gap: 14px;
+}
+
+.landingShowcaseFields label {
+    display: grid;
+    gap: 6px;
+}
+
+.landingShowcaseFields select,
+.landingShowcaseFields input[type='date'] {
+    border: 1px solid var(--color-border);
+    background: rgba(16, 24, 32, 0.74);
+    color: var(--color-text-primary);
+    border-radius: var(--border-radius-md);
+    min-height: 38px;
+    padding: 8px 12px;
+    font: inherit;
+}
+
+.landingShowcaseFields fieldset {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+}
+
+.landingShowcaseFields legend {
+    padding: 0 6px;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.landingShowcaseCheck {
+    display: flex !important;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+}
+
+.landingShowcaseCheck span {
+    color: var(--color-text-primary) !important;
+    font-size: var(--font-size-sm) !important;
+    font-weight: 600 !important;
+    text-transform: none !important;
+}
+
+.landingShowcaseCheck em {
+    color: var(--color-brand-warning, #f59f4d);
+    font-style: normal;
+    font-size: var(--font-size-xs);
+}
+
+.landingShowcaseDates {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
 .landingExampleItem,
 .landingFractalOption {
     display: grid;

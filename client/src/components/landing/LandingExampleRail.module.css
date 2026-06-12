@@ -1,0 +1,101 @@
+.rail {
+    display: none;
+}
+
+@media (min-width: 981px) {
+    .rail {
+        position: fixed;
+        /* Just left of the section dot rail (28px-wide dots + gap). */
+        right: calc(clamp(10px, 1.6vw, 22px) + 42px);
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 30;
+        display: block;
+        animation: railFadeIn 180ms ease;
+    }
+}
+
+@keyframes railFadeIn {
+    from {
+        opacity: 0;
+        transform: translate(8px, -50%);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(0, -50%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rail {
+        animation: none;
+    }
+}
+
+.iconList {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.iconButton {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    background: color-mix(in srgb, var(--color-bg-card) 72%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.iconButton:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border);
+}
+
+.iconButton:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 2px;
+}
+
+.iconActive {
+    background: var(--color-bg-card);
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 0 0 1px var(--color-brand-primary);
+}
+
+.icon {
+    display: grid;
+    place-items: center;
+}
+
+.iconLabel {
+    position: absolute;
+    right: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 4px 10px;
+    color: var(--color-text-primary);
+    background: color-mix(in srgb, var(--color-bg-card) 96%, black);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    box-shadow: var(--shadow-md);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+}
+
+.iconButton:hover .iconLabel,
+.iconButton:focus-visible .iconLabel {
+    opacity: 1;
+}

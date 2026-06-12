@@ -29,6 +29,7 @@ import { DebugProvider } from './contexts/DebugContext.jsx'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useDebug } from './contexts/DebugContext.jsx'
+import { maybePrefetchLandingExamples } from './utils/landingPrefetch.js'
 const ReactQueryDevtools = lazy(() =>
   import('@tanstack/react-query-devtools').then((module) => ({
     default: module.ReactQueryDevtools,
@@ -45,6 +46,10 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+// Start fetching public landing examples before React mounts so the landing
+// page renders real data as early as possible.
+maybePrefetchLandingExamples(queryClient)
 
 // Helper to conditionally render devtools based on debug mode
 const QueryDevtools = () => {

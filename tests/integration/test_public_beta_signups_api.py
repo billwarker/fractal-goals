@@ -5,16 +5,13 @@ def test_public_landing_examples_empty_when_unpublished(client):
     response = client.get('/api/public/landing-examples')
 
     assert response.status_code == 200
-    assert 'no-store' in response.headers['Cache-Control']
-    assert response.get_json() == {'published_at': None, 'examples': []}
+    assert response.headers['Cache-Control'] == 'public, max-age=300, stale-while-revalidate=86400'
+    assert response.get_json() == {'published_at': None, 'schema_version': None, 'examples': []}
 
 
 def test_create_beta_signup_request(client, db_session):
     response = client.post('/api/public/beta-signups', json={
-        'name': 'Will Tester',
         'email': 'Will@Test.Example',
-        'use_case': 'creative practice',
-        'note': 'I want to track music sessions.',
     })
 
     assert response.status_code == 201
@@ -23,8 +20,8 @@ def test_create_beta_signup_request(client, db_session):
     assert payload['request']['email'] == 'will@test.example'
 
     stored = db_session.query(BetaSignupRequest).filter_by(email='will@test.example').one()
-    assert stored.name == 'Will Tester'
-    assert stored.use_case == 'creative practice'
+    assert stored.name == 'Beta access request'
+    assert stored.use_case == 'interested beta user'
 
 
 def test_duplicate_beta_signup_updates_existing_request(client, db_session):
@@ -51,12 +48,19 @@ def test_duplicate_beta_signup_updates_existing_request(client, db_session):
     assert len(requests) == 1
     assert requests[0].use_case == 'startup or work'
 
+    third = client.post('/api/public/beta-signups', json={
+        'email': 'will@test.example',
+    })
+
+    assert third.status_code == 200
+    db_session.refresh(requests[0])
+    assert requests[0].name == 'Will Updated'
+    assert requests[0].use_case == 'startup or work'
+
 
 def test_beta_signup_validates_required_fields(client):
     response = client.post('/api/public/beta-signups', json={
-        'name': 'W',
         'email': 'not-an-email',
-        'use_case': '',
     })
 
     assert response.status_code == 400

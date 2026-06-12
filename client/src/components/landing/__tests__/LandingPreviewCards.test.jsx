@@ -2,7 +2,6 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 
 import ActivityPreviewCard from '../ActivityPreviewCard';
-import TemplatePreviewCard from '../TemplatePreviewCard';
 
 describe('landing preview cards', () => {
     it('renders activity metric chips from a published snapshot activity', () => {
@@ -20,24 +19,9 @@ describe('landing preview cards', () => {
         expect(screen.getByText('Reps count')).toBeInTheDocument();
     });
 
-    it('renders template sections with resolved activity names', () => {
-        render(
-            <TemplatePreviewCard
-                template={{
-                    name: 'Practice Template',
-                    template_data: {
-                        sections: [{
-                            name: 'Warmup',
-                            activities: [{ activity_id: 'activity-1' }],
-                        }],
-                    },
-                }}
-                activityDefinitions={[{ id: 'activity-1', name: 'CAGED Triads' }]}
-            />
-        );
+    it('renders an empty-state card when no activity is published', () => {
+        render(<ActivityPreviewCard activity={null} />);
 
-        expect(screen.getByRole('heading', { name: 'Practice Template' })).toBeInTheDocument();
-        expect(screen.getByText('Warmup')).toBeInTheDocument();
-        expect(screen.getByText('CAGED Triads')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'No activity snapshot' })).toBeInTheDocument();
     });
 });

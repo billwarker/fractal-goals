@@ -49,6 +49,7 @@ export const queryKeys = {
         startDate,
         endDate,
     ],
+    landingExamples: () => ['public', 'landing-examples'],
     logsInfinite: (rootId, pageSize = 50) => ['logs', rootId, 'infinite', pageSize],
     logsInfiniteRoot: (rootId) => ['logs', rootId, 'infinite'],
     program: (rootId, programId) => ['program', rootId, programId],

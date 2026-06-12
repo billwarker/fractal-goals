@@ -10,13 +10,14 @@ const fallbackContent = {
         brand: 'Fractal Goals',
         nav: [
             { label: 'Examples', href: '#examples' },
-            { label: 'App showcase', href: '#showcase' },
+            { label: 'Features', href: '#features' },
             { label: 'Private beta', href: '#beta' },
             { label: 'Open app', href: 'https://my.fractalgoals.com' },
         ],
     },
     hero: {
         kicker: 'Composable goal tracking',
+        navLabel: 'Top',
         title: 'Track every goal, program, and training session in one place',
         body: 'Want to achieve big goals? Start by making them smaller. Fractal Goals breaks any ambition into a tree of smaller goals, lets you build your own programs toward them, and logs every session, activity, and metric - so all your training, across every discipline, lives in one connected system instead of five scattered apps.',
         actions: [
@@ -26,37 +27,81 @@ const fallbackContent = {
     },
     audience: {
         eyebrow: 'Built for serious, self-directed practitioners',
+        navLabel: "Who it's for",
         title: "If you're training for more than one thing, this is your home base.",
         cards: [],
     },
     examples: {
         eyebrow: 'Example fractals',
+        navLabel: 'Goals',
         title: "See how real goals break down - from ambition to today's session.",
         body: 'Every Fractal Goals plan starts as a single big goal and branches into smaller, trackable goals, programs, and sessions. Here are four complete examples across different disciplines.',
     },
+    features: {
+        eyebrow: 'The full toolkit',
+        navLabel: 'Features',
+        title: 'Plan it, run it, measure it - one connected system.',
+        body: 'Pick a feature to see it running on real data from the example fractal above.',
+        items: {
+            session: {
+                label: 'Sessions',
+                heading: 'Log the work, not just the plan.',
+                body: 'A session is one real block of work: its activities, metrics, timers, and notes in a single record. Run it live with a timer or log it after the fact - either way it rolls up to the goals it serves, so the log always tells you what the work was for.',
+            },
+            activity: {
+                label: 'Activities',
+                heading: 'Every activity knows which goals it serves.',
+                body: "Activities are reusable building blocks with their own metrics. Link an activity to a goal once and every session that includes it feeds that goal automatically - the credit flows up the tree, from today's reps all the way to the ultimate ambition.",
+            },
+            programs: {
+                label: 'Programs',
+                heading: 'Structure weeks of work on a real calendar.',
+                body: 'Programs organize goals and session templates into blocks and days. Plan a training block, schedule its days on the calendar, and watch completion fill in as the sessions get logged.',
+            },
+            analytics: {
+                label: 'Analytics',
+                heading: 'See whether the work is working.',
+                body: 'Sessions feed your charts automatically: duration trends, time per activity, and metric progress over time. No spreadsheets and no manual exports - the training log is the dataset.',
+            },
+            more: {
+                label: 'And more',
+                heading: 'The details that make it livable.',
+                body: 'Fractal Goals is built for daily use, not just planning. Notes, automatic progress comparisons, theming, and per-level customization keep the everyday loop fast and pleasant.',
+            },
+        },
+        extras: [
+            {
+                title: 'Notes',
+                body: 'Attach notes - including images - to any goal, session, or activity, and browse everything on one searchable timeline.',
+            },
+            {
+                title: 'Progress tracking',
+                body: "Completed activities are compared against your own history automatically, so every session shows whether you're trending up.",
+            },
+            {
+                title: 'Light & dark mode',
+                body: 'A full theme system that is easy on the eyes at 6am or midnight. Try the toggle.',
+            },
+            {
+                title: 'Custom goal icons',
+                body: 'Every goal level has a configurable shape and color, so your tree reads at a glance.',
+            },
+        ],
+    },
     beta: {
         eyebrow: 'Private beta',
+        navLabel: 'Beta',
         title: 'Help test the next version of goal-tracking software.',
-        body: "Beta access is invite-based while the product is being shaped. Tell us what you want to organize - your training, a creative practice, a language, a startup - and we'll follow up with testers who match the current build.",
+        body: "Beta access is invite-based while the product is being shaped. Drop your email and we'll follow up as new tester slots open.",
     },
     betaForm: {
-        nameLabel: 'Name',
         emailLabel: 'Email',
-        useCaseLabel: 'Testing focus',
-        noteLabel: 'Note',
-        submitLabel: 'Request invite',
+        submitLabel: 'Request beta access',
         submittingLabel: 'Sending...',
-        validationMessage: 'Add your name, a valid email, and what you want to test.',
+        validationMessage: 'Add a valid email to request beta access.',
         successCreatedMessage: "You're on the private beta request list.",
         successUpdatedMessage: 'Your private beta request has been updated.',
         errorMessage: 'Could not send the request. Please try again.',
-        useCaseOptions: [
-            { label: 'Personal goals', value: 'personal goals' },
-            { label: 'Creative practice', value: 'creative practice' },
-            { label: 'Fitness training', value: 'fitness training' },
-            { label: 'Startup or work', value: 'startup or work' },
-            { label: 'Research or learning', value: 'research or learning' },
-        ],
     },
 };
 
@@ -66,17 +111,16 @@ const metaKeyMap = {
     'email label': 'emailLabel',
     'error message': 'errorMessage',
     eyebrow: 'eyebrow',
+    heading: 'heading',
     kicker: 'kicker',
     label: 'label',
-    'name label': 'nameLabel',
-    'note label': 'noteLabel',
+    'nav label': 'navLabel',
     'open graph title': 'ogTitle',
     'submit label': 'submitLabel',
     'submitting label': 'submittingLabel',
     'success created message': 'successCreatedMessage',
     'success updated message': 'successUpdatedMessage',
     title: 'title',
-    'use case label': 'useCaseLabel',
     'validation message': 'validationMessage',
 };
 
@@ -188,13 +232,14 @@ function getNestedSection(section, title) {
     return sectionLines.join('\n').trim();
 }
 
-function readPipeOptions(section) {
-    return section
-        .split(/\r?\n/)
-        .filter((line) => line.trim().startsWith('- '))
-        .map((line) => line.replace(/^-\s+/, '').split('|').map((part) => part.trim()))
-        .filter(([label, value]) => label && value)
-        .map(([label, value]) => ({ label, value }));
+function getSectionIntro(section) {
+    const lines = section.split(/\r?\n/);
+    const introLines = [];
+    for (const line of lines) {
+        if (line.match(nestedHeadingPattern)) break;
+        introLines.push(line);
+    }
+    return introLines.join('\n').trim();
 }
 
 function readStandardSection(markdown, sectionName, fallback) {
@@ -241,16 +286,48 @@ export function parseLandingContent(markdown) {
 
     content.examples = readStandardSection(markdown, 'Examples', content.examples);
 
+    const featuresSection = getTopLevelSection(markdown, 'Features');
+    if (featuresSection) {
+        const featuresIntro = getSectionIntro(featuresSection);
+        const featuresMeta = readMetadata(featuresIntro);
+        const items = {};
+        // Per-feature parsing degrades per key: a missing/partial markdown
+        // sub-block falls back to the hardcoded copy for that feature only.
+        Object.entries({
+            session: 'Session',
+            activity: 'Activity',
+            programs: 'Programs',
+            analytics: 'Analytics',
+            more: 'More',
+        }).forEach(([key, headingTitle]) => {
+            const itemSection = getNestedSection(featuresSection, headingTitle);
+            const itemMeta = itemSection ? readMetadata(itemSection) : {};
+            items[key] = {
+                ...content.features.items[key],
+                ...itemMeta,
+                body: (itemSection && readBody(itemSection)) || content.features.items[key].body,
+            };
+        });
+        content.features = {
+            ...content.features,
+            ...featuresMeta,
+            title: readFirstHeading(featuresIntro) || featuresMeta.title || content.features.title,
+            body: readBody(featuresIntro) || content.features.body,
+            items,
+        };
+    }
+
+    const extrasSection = getTopLevelSection(markdown, 'Feature Extras');
+    const extras = extrasSection ? readCards(extrasSection) : [];
+    content.features.extras = extras.length ? extras : content.features.extras;
+
     content.beta = readStandardSection(markdown, 'Beta', content.beta);
 
     const betaFormSection = getTopLevelSection(markdown, 'Beta Form');
     const formMetadata = readMetadata(betaFormSection);
-    const optionSection = getNestedSection(betaFormSection, 'Use Case Options');
-    const useCaseOptions = readPipeOptions(optionSection);
     content.betaForm = {
         ...content.betaForm,
         ...formMetadata,
-        useCaseOptions: useCaseOptions.length ? useCaseOptions : content.betaForm.useCaseOptions,
     };
 
     return content;

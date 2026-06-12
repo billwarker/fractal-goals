@@ -163,6 +163,28 @@ def update_landing_examples_settings(current_user, validated_data):
         db_session.close()
 
 
+@admin_bp.route('/landing-examples/options', methods=['GET'])
+@token_required
+def get_landing_example_options(current_user):
+    db_session = get_db_session()
+    try:
+        service, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+        root_id = (request.args.get('root_id') or '').strip()
+        if not root_id:
+            return jsonify({"error": "root_id is required"}), 400
+        payload, error, status = service.get_landing_example_options(root_id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        logger.exception("Error fetching landing example options")
+        return internal_error(logger, "Error fetching landing example options")
+    finally:
+        db_session.close()
+
+
 @admin_bp.route('/landing-examples/publish', methods=['POST'])
 @token_required
 @validate_request(AdminLandingExamplesUpdateSchema, allow_empty_json=True)

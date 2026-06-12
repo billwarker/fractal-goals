@@ -69,6 +69,12 @@ class Config:
         if source.strip()
     ]
     
+    # Public URL of the landing-examples endpoint as served by the frontend
+    # edge (e.g. https://www.fractalgoals.com/api/public/landing-examples).
+    # When set, publishing landing examples warms the frontend Nginx cache.
+    # Empty disables warming (development/tests).
+    LANDING_CACHE_WARM_URL = os.getenv('LANDING_CACHE_WARM_URL', '')
+
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     LOG_FILE = os.getenv('LOG_FILE', 'server.log')

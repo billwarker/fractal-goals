@@ -1,6 +1,6 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import landingContent from '../../content/landingContent';
 import Landing from '../Landing';
@@ -11,6 +11,7 @@ const { createBetaSignup, getLandingExamples } = vi.hoisted(() => ({
 }));
 
 vi.mock('../../utils/api', () => ({
+    API_BASE: '/api',
     publicApi: {
         createBetaSignup: (...args) => createBetaSignup(...args),
         getLandingExamples: (...args) => getLandingExamples(...args),
@@ -60,6 +61,28 @@ vi.mock('../../FlowTree', () => ({
     },
 }));
 
+vi.mock('../../contexts/ThemeContext', () => {
+    let theme = 'dark';
+    return {
+        ThemeProvider: ({ children }) => <>{children}</>,
+        useTheme: () => ({
+            theme,
+            toggleTheme: () => {
+                theme = theme === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', theme);
+            },
+        }),
+    };
+});
+
+vi.mock('../../contexts/TimezoneContext', () => ({
+    useTimezone: () => ({ timezone: 'America/Toronto' }),
+}));
+
+vi.mock('../../contexts/GoalsContext', () => ({
+    useGoals: () => ({ setActiveRootId: vi.fn() }),
+}));
+
 vi.mock('../../contexts/GoalLevelsContext', () => ({
     GoalLevelsProvider: ({ children }) => <>{children}</>,
     useGoalLevels: () => ({
@@ -68,14 +91,6 @@ vi.mock('../../contexts/GoalLevelsContext', () => ({
         getGoalIcon: () => 'circle',
         getGoalSecondaryColor: () => '#102235',
     }),
-}));
-
-vi.mock('../../components/sessions/SessionCardExpanded', () => ({
-    default: ({ session, readOnly }) => (
-        <article data-testid="showcase-session" data-read-only={readOnly ? 'yes' : 'no'}>
-            {session.name}
-        </article>
-    ),
 }));
 
 vi.mock('../../components/programs/ProgramCalendarView', () => ({
@@ -193,6 +208,21 @@ const publishedExamples = {
             label: 'Chinese language tracker',
             root_name: 'Become fluent in Chinese',
             sort_order: 1,
+            sessions: [{
+                id: 'zh-session-1',
+                name: 'Listening Review',
+                attributes: {
+                    session_data: {
+                        notes: [{
+                            id: 'note-1',
+                            content: 'Shadowing felt smoother after the second pass.',
+                            context_type: 'session',
+                        }],
+                        sections: [],
+                    },
+                },
+                activity_instances: [],
+            }],
             tree: {
                 id: 'chinese-root',
                 name: 'Become fluent in Chinese',
@@ -220,6 +250,26 @@ const publishedExamples = {
     ],
 };
 
+// jsdom implements neither scrollIntoView nor IntersectionObserver; the stubs
+// record calls/instances so tests can assert section jumps and drive the
+// active-section observer manually.
+const scrollIntoViewCalls = [];
+const intersectionObservers = [];
+
+class IntersectionObserverStub {
+    constructor(callback, options) {
+        this.callback = callback;
+        this.options = options;
+        intersectionObservers.push(this);
+    }
+
+    observe() {}
+
+    unobserve() {}
+
+    disconnect() {}
+}
+
 function renderLanding() {
     const queryClient = new QueryClient({
         defaultOptions: {
@@ -238,6 +288,17 @@ describe('Landing', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getLandingExamples.mockResolvedValue({ data: publishedExamples });
+        scrollIntoViewCalls.length = 0;
+        intersectionObservers.length = 0;
+        Element.prototype.scrollIntoView = function scrollIntoViewStub(options) {
+            scrollIntoViewCalls.push({ element: this, options });
+        };
+        vi.stubGlobal('IntersectionObserver', IntersectionObserverStub);
+    });
+
+    afterEach(() => {
+        delete Element.prototype.scrollIntoView;
+        vi.unstubAllGlobals();
     });
 
     it('renders the beta signup page and submits a request', async () => {
@@ -256,7 +317,7 @@ describe('Landing', () => {
         expect(screen.getByRole('button', { name: /Short Term: Focused projects/ })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Immediate: The next concrete action/ })).toBeInTheDocument();
         expect(screen.getAllByTestId('animated-goal-icon').length).toBeGreaterThan(0);
-        expect(screen.getByRole('link', { name: 'App showcase' })).toHaveAttribute('href', '#showcase');
+        expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '#features');
         expect(await screen.findByRole('tab', { name: 'Guitar practice tracker' })).toHaveAttribute('aria-selected', 'true');
         expect(await screen.findByRole('tab', { name: 'Chinese language tracker' })).toBeInTheDocument();
         expect(screen.getAllByTestId('goal-icon').some((icon) => icon.textContent === 'star')).toBe(true);
@@ -276,22 +337,18 @@ describe('Landing', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Chinese language tracker' }));
         expect(screen.getByRole('tab', { name: 'Chinese language tracker' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getAllByText('Shadow 10 minutes').length).toBeGreaterThan(0);
+        expect(await screen.findByLabelText('Listening Review detail preview')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Session Notes' })).toBeInTheDocument();
         expect(screen.queryByText('One system, four views: goals, programs, sessions, and progress.')).not.toBeInTheDocument();
         expect(screen.queryByRole('heading', { name: 'Common questions' })).not.toBeInTheDocument();
 
-        fireEvent.change(screen.getByLabelText(/name/i), { target: { value: 'Will Tester' } });
         fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'will@example.com' } });
-        fireEvent.change(screen.getByLabelText(/testing focus/i), { target: { value: 'creative practice' } });
-        fireEvent.change(screen.getByLabelText(/note/i), { target: { value: 'I want to track practice.' } });
 
-        fireEvent.click(screen.getByRole('button', { name: /request invite/i }));
+        fireEvent.click(screen.getByRole('button', { name: /request beta access/i }));
 
         await waitFor(() => {
             expect(createBetaSignup).toHaveBeenCalledWith({
-                name: 'Will Tester',
                 email: 'will@example.com',
-                use_case: 'creative practice',
-                note: 'I want to track practice.',
             });
         });
         expect(await screen.findByText(landingContent.betaForm.successCreatedMessage)).toBeInTheDocument();
@@ -321,21 +378,21 @@ describe('Landing', () => {
         });
     });
 
-    it('keeps /landing as a normal top-to-bottom page with audience and showcase before beta', async () => {
+    it('keeps the landing sections in document order: hero, goals, audience, features, beta', async () => {
         const { container } = renderLanding();
 
         const heroHeading = screen.getByRole('heading', { name: landingContent.hero.title });
         const examplesHeading = await screen.findByRole('heading', { name: landingContent.examples.title });
         const audienceHeading = screen.getByRole('heading', { name: landingContent.audience.title });
-        const showcase = container.querySelector('#showcase');
+        const features = container.querySelector('#features');
         const betaHeading = screen.getByRole('heading', { name: landingContent.beta.title });
 
-        expect(showcase).toBeInTheDocument();
+        expect(features).toBeInTheDocument();
         expect(Boolean(heroHeading.compareDocumentPosition(examplesHeading) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
         expect(Boolean(examplesHeading.compareDocumentPosition(audienceHeading) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
-        expect(Boolean(audienceHeading.compareDocumentPosition(showcase) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
-        expect(Boolean(showcase.compareDocumentPosition(betaHeading) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
-        expect(container.querySelector('#features')).not.toBeInTheDocument();
+        expect(Boolean(audienceHeading.compareDocumentPosition(features) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+        expect(Boolean(features.compareDocumentPosition(betaHeading) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+        expect(container.querySelector('#showcase')).not.toBeInTheDocument();
         expect(container.querySelector('#faq')).not.toBeInTheDocument();
     });
 
@@ -366,25 +423,107 @@ describe('Landing', () => {
         });
     });
 
-    it('renders the app showcase frame and switches across read-only snapshot tabs', async () => {
+    it('renders the features section with detached toggles, in-box copy, and read-only surfaces', async () => {
+        const { container } = renderLanding();
+
+        await screen.findByRole('tab', { name: 'Chinese language tracker' });
+        expect(screen.getByRole('heading', { name: landingContent.features.title })).toBeInTheDocument();
+
+        // The feature toggle row is its own tablist, not nested in the stage frame.
+        const featureTabs = screen.getByRole('tablist', { name: 'Product features' });
+        const stage = container.querySelector('#features [class*="featureStage"]');
+        expect(stage).toBeInTheDocument();
+        expect(stage.contains(featureTabs)).toBe(false);
+        expect(container.querySelector('#features [class*="featureInfo"]')).not.toBeInTheDocument();
+
+        // Session feature is the default, with its explanatory copy inside the wide stage.
+        expect(screen.getByRole('tab', { name: landingContent.features.items.session.label })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('heading', { name: landingContent.features.items.session.heading })).toBeInTheDocument();
+        expect(screen.getByText(landingContent.features.items.session.body)).toBeInTheDocument();
+        expect(screen.getByLabelText('Technique Session detail preview')).toBeInTheDocument();
+        expect(screen.getByRole('tablist', { name: 'Session side pane views' })).toBeInTheDocument();
+
+        // Activity feature shows the activity card plus the goal lineage demo.
+        fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
+        expect(screen.getByRole('heading', { name: landingContent.features.items.activity.heading })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'CAGED Triads' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Goals this activity feeds' })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.programs.label }));
+        expect(screen.getByRole('heading', { name: landingContent.features.items.programs.heading })).toBeInTheDocument();
+        expect(screen.getByTestId('showcase-calendar')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.analytics.label }));
+        expect(screen.getByRole('heading', { name: 'Session Duration Trend' })).toBeInTheDocument();
+        expect(screen.getAllByTestId('showcase-chart')[0]).toHaveTextContent('Technique Session');
+
+        // "And more" renders the extras cards, including the live theme toggle.
+        fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.more.label }));
+        landingContent.features.extras.forEach((extra) => {
+            expect(screen.getByRole('heading', { name: extra.title })).toBeInTheDocument();
+        });
+        const themeBefore = document.documentElement.getAttribute('data-theme');
+        fireEvent.click(screen.getByRole('button', { name: /tap for/i }));
+        expect(document.documentElement.getAttribute('data-theme')).not.toBe(themeBefore);
+    });
+
+    it('honors admin showcase picks for featured session, activities, and charts', async () => {
+        const showcaseExamples = JSON.parse(JSON.stringify(publishedExamples));
+        const example = showcaseExamples.examples[0];
+        example.sessions = [
+            ...example.sessions,
+            {
+                id: 'session-2',
+                name: 'Featured Older Session',
+                attributes: { updated_at: '2026-01-02T10:00:00Z', session_data: { sections: [] } },
+                activity_instances: [],
+            },
+        ];
+        example.activity_definitions = [
+            ...example.activity_definitions,
+            { id: 'activity-2', name: 'Featured Scales', metric_definitions: [], associated_goal_ids: ['guitar-caged'] },
+        ];
+        example.analytics_charts = [
+            ...example.analytics_charts,
+            {
+                id: 'chart-2',
+                title: 'Featured Chart',
+                type: 'bar',
+                data: { labels: ['Featured Label'], datasets: [{ data: [1] }] },
+                options: {},
+            },
+        ];
+        example.showcase = {
+            session_id: 'session-2',
+            activity_ids: ['activity-2'],
+            program_id: 'prog-1',
+            program_start_date: '2026-01-01',
+            program_end_date: '2026-01-31',
+            chart_ids: ['chart-2'],
+        };
+        getLandingExamples.mockResolvedValue({ data: showcaseExamples });
+
         renderLanding();
 
         await screen.findByRole('tab', { name: 'Chinese language tracker' });
-        expect(await screen.findByRole('heading', { name: /real app surfaces/i })).toBeInTheDocument();
-        expect(screen.getByRole('tab', { name: 'Sessions' })).toHaveAttribute('aria-selected', 'true');
-        expect(screen.getByTestId('showcase-session')).toHaveTextContent('Technique Session');
-        expect(screen.getByTestId('showcase-session')).toHaveAttribute('data-read-only', 'yes');
+        // Featured session replaces the most-recent default.
+        expect(screen.getByLabelText('Featured Older Session detail preview')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('tab', { name: 'Programs' }));
-        expect(screen.getByTestId('showcase-calendar')).toBeInTheDocument();
+        // Featured activity is the only chip content shown.
+        fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
+        expect(screen.getByRole('heading', { name: 'Featured Scales' })).toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: 'CAGED Triads' })).not.toBeInTheDocument();
+        // The featured activity's linked goal and its ancestors render in the
+        // lineage (the goal name also appears inside the mocked FlowTree).
+        expect(screen.getAllByText('Practice CAGED triads').length).toBeGreaterThan(1);
+        expect(screen.getByText('Map the fretboard')).toBeInTheDocument();
+        expect(screen.getAllByText('Build complete musicianship').length).toBeGreaterThan(0);
 
-        fireEvent.click(screen.getByRole('tab', { name: 'Analytics' }));
-        expect(screen.getByRole('heading', { name: 'Session Duration Trend' })).toBeInTheDocument();
-        expect(screen.getByTestId('showcase-chart')).toHaveTextContent('Technique Session');
-
-        fireEvent.click(screen.getByRole('tab', { name: 'Build' }));
-        expect(screen.getByRole('heading', { name: 'CAGED Triads' })).toBeInTheDocument();
-        expect(screen.getByRole('heading', { name: 'Practice Template' })).toBeInTheDocument();
+        // Chart curation filters to the featured chart only.
+        fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.analytics.label }));
+        expect(screen.getByRole('heading', { name: 'Featured Chart' })).toBeInTheDocument();
+        expect(screen.getAllByTestId('showcase-chart')).toHaveLength(1);
+        expect(screen.getByTestId('showcase-chart')).toHaveTextContent('Featured Label');
     });
 
     it('opens the goal detail in the real docked side-in panel', async () => {
@@ -409,11 +548,137 @@ describe('Landing', () => {
 
         expect(screen.queryByRole('tablist', { name: 'Example goal trees' })).not.toBeInTheDocument();
         expect(screen.queryByLabelText('Become a skilled guitar player goal tree')).not.toBeInTheDocument();
+        // All three surfaces hold their footprint with skeletons instead of unmounting.
+        expect(screen.getByTestId('example-picker-skeleton')).toBeInTheDocument();
+        expect(screen.getByTestId('examples-skeleton')).toBeInTheDocument();
+        expect(screen.getByTestId('features-stage-skeleton')).toBeInTheDocument();
 
         resolveExamples({ data: publishedExamples });
 
         expect(await screen.findByRole('tab', { name: 'Guitar practice tracker' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
+        expect(screen.queryByTestId('example-picker-skeleton')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('examples-skeleton')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('features-stage-skeleton')).not.toBeInTheDocument();
+    });
+
+    it('hosts the example picker in the hero and auto-scrolls to the goals view on pick', async () => {
+        renderLanding();
+
+        const picker = await screen.findByRole('tablist', { name: 'Example goal trees' });
+        const hero = document.getElementById('hero');
+        expect(hero).toBeInTheDocument();
+        expect(hero.contains(picker)).toBe(true);
+
+        // The initial default selection must not auto-scroll the page.
+        expect(scrollIntoViewCalls).toHaveLength(0);
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Chinese language tracker' }));
+        expect(scrollIntoViewCalls).toHaveLength(1);
+        expect(scrollIntoViewCalls[0].element.id).toBe('examples');
+        expect(scrollIntoViewCalls[0].options).toEqual({ behavior: 'smooth', block: 'start' });
+    });
+
+    it('jumps without animation when the user prefers reduced motion', async () => {
+        vi.stubGlobal('matchMedia', (query) => ({
+            matches: query === '(prefers-reduced-motion: reduce)',
+            media: query,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            addListener: () => {},
+            removeListener: () => {},
+        }));
+
+        renderLanding();
+
+        fireEvent.click(await screen.findByRole('tab', { name: 'Chinese language tracker' }));
+        expect(scrollIntoViewCalls).toHaveLength(1);
+        expect(scrollIntoViewCalls[0].options).toEqual({ behavior: 'auto', block: 'start' });
+    });
+
+    it('renders the section dot rail, tracks the active section, and jumps on click', async () => {
+        renderLanding();
+        await screen.findByRole('tab', { name: 'Chinese language tracker' });
+
+        const rail = screen.getByRole('navigation', { name: 'Page sections' });
+        const dots = within(rail).getAllByRole('button');
+        expect(dots.map((dot) => dot.getAttribute('aria-label'))).toEqual([
+            landingContent.hero.navLabel,
+            landingContent.examples.navLabel,
+            landingContent.audience.navLabel,
+            landingContent.features.navLabel,
+            landingContent.beta.navLabel,
+        ]);
+
+        // The hero starts as the single active section.
+        expect(dots[0]).toHaveAttribute('aria-current', 'true');
+        expect(dots.filter((dot) => dot.getAttribute('aria-current') === 'true')).toHaveLength(1);
+
+        fireEvent.click(within(rail).getByRole('button', { name: landingContent.features.navLabel }));
+        expect(scrollIntoViewCalls.at(-1).element.id).toBe('features');
+
+        // A section crossing the scroll container's center activates its dot.
+        const observer = intersectionObservers.at(-1);
+        expect(observer.options.rootMargin).toBe('-50% 0px -50% 0px');
+        act(() => {
+            observer.callback([{ target: document.getElementById('features'), isIntersecting: true }]);
+        });
+        const updatedDots = within(rail).getAllByRole('button');
+        expect(within(rail).getByRole('button', { name: landingContent.features.navLabel })).toHaveAttribute('aria-current', 'true');
+        expect(updatedDots.filter((dot) => dot.getAttribute('aria-current') === 'true')).toHaveLength(1);
+    });
+
+    it('shows the example icon rail past the hero and flips examples in place', async () => {
+        renderLanding();
+        await screen.findByRole('tab', { name: 'Chinese language tracker' });
+
+        // Hidden while the hero is the active section.
+        expect(screen.queryByRole('navigation', { name: 'Example fractals' })).not.toBeInTheDocument();
+
+        const observer = intersectionObservers.at(-1);
+        act(() => {
+            observer.callback([{ target: document.getElementById('features'), isIntersecting: true }]);
+        });
+
+        const rail = screen.getByRole('navigation', { name: 'Example fractals' });
+        const exampleButtons = within(rail).getAllByRole('button');
+        expect(exampleButtons.map((button) => button.getAttribute('aria-label'))).toEqual([
+            'Guitar practice tracker',
+            'Chinese language tracker',
+        ]);
+        expect(exampleButtons[0]).toHaveAttribute('aria-current', 'true');
+
+        scrollIntoViewCalls.length = 0;
+        fireEvent.click(within(rail).getByRole('button', { name: 'Chinese language tracker' }));
+
+        // The active example flips without scrolling the page.
+        expect(scrollIntoViewCalls).toHaveLength(0);
+        expect(screen.getByRole('tab', { name: 'Chinese language tracker' })).toHaveAttribute('aria-selected', 'true');
+        await waitFor(() => {
+            expect(screen.getByLabelText('Become fluent in Chinese goal tree')).toBeInTheDocument();
+        });
+        expect(within(rail).getByRole('button', { name: 'Chinese language tracker' })).toHaveAttribute('aria-current', 'true');
+
+        // Scrolling back to the hero hides the rail again.
+        act(() => {
+            observer.callback([{ target: document.getElementById('hero'), isIntersecting: true }]);
+        });
+        expect(screen.queryByRole('navigation', { name: 'Example fractals' })).not.toBeInTheDocument();
+    });
+
+    it('scrolls back to the goals view when a lineage goal is clicked in the Activity feature', async () => {
+        const linkedExamples = JSON.parse(JSON.stringify(publishedExamples));
+        linkedExamples.examples[0].activity_definitions[0].associated_goal_ids = ['guitar-caged'];
+        getLandingExamples.mockResolvedValue({ data: linkedExamples });
+
+        renderLanding();
+        await screen.findByRole('tab', { name: 'Chinese language tracker' });
+
+        fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
+        scrollIntoViewCalls.length = 0;
+
+        fireEvent.click(screen.getByText('Map the fretboard'));
+        expect(scrollIntoViewCalls.at(-1).element.id).toBe('examples');
     });
 
     it('keeps the sample explorer and showcase visible when no examples are published', async () => {
@@ -427,7 +692,7 @@ describe('Landing', () => {
         expect(await screen.findByRole('tablist', { name: 'Example goal trees' })).toBeInTheDocument();
         expect(await screen.findByRole('tab', { name: 'Guitar practice tracker' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
-        expect(screen.getByTestId('showcase-session')).toHaveTextContent('Triad Session');
+        expect(screen.getByLabelText('Triad Session detail preview')).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: landingContent.hero.title })).toBeInTheDocument();
     });
 });

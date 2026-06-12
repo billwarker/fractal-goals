@@ -229,8 +229,10 @@ def add_cache_headers(response):
                 response.status_code,
                 elapsed_ms,
             )
-    # Favor correctness for authenticated API data over intermediary/browser caching.
-    if request.path.startswith('/api/'):
+    # Favor correctness for authenticated API data over intermediary/browser
+    # caching, while preserving explicit public cache policies such as the
+    # landing examples snapshot.
+    if request.path.startswith('/api/') and 'Cache-Control' not in response.headers:
         response.headers['Cache-Control'] = 'no-store'
     return response
 

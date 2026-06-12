@@ -11,6 +11,25 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" /></noscript>
+  <script>
+    // Start fetching public landing examples while the JS bundle is still
+    // downloading; src/utils/landingPrefetch.js consumes this promise.
+    // Entry-path logic mirrors isLandingEntryPath/isPublicMarketingHost in
+    // src/utils/landingPrefetch.js and src/utils/marketingHost.js — keep in sync.
+    (function () {
+      var host = window.location.hostname;
+      var path = window.location.pathname;
+      var isMarketingHost = host === 'fractalgoals.com' || host === 'www.fractalgoals.com';
+      if (path !== '/landing' && !(path === '/' && isMarketingHost)) return;
+      window.__fgLandingExamplesPreload = fetch('/api/public/landing-examples', { credentials: 'same-origin' })
+        .then(function (response) {
+          if (!response.ok) throw new Error('landing examples preload failed: ' + response.status);
+          return response.json();
+        });
+      // landingPrefetch falls back to its own request on rejection.
+      window.__fgLandingExamplesPreload.catch(function () {});
+    })();
+  </script>
 </head>
 
 <body>

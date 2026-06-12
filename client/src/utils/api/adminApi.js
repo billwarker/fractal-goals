@@ -6,6 +6,7 @@ export const adminApi = {
     getTierQuotas: () => axios.get(`${API_BASE}/admin/tier-quotas`),
     updateTierQuotas: (data) => axios.patch(`${API_BASE}/admin/tier-quotas`, data),
     getLandingExamples: () => axios.get(`${API_BASE}/admin/landing-examples`),
+    getLandingExampleOptions: (rootId) => axios.get(`${API_BASE}/admin/landing-examples/options`, { params: { root_id: rootId } }),
     updateLandingExamples: (data) => axios.patch(`${API_BASE}/admin/landing-examples`, data),
     publishLandingExamples: (data = {}) => axios.post(`${API_BASE}/admin/landing-examples/publish`, data),
     createUser: (data) => axios.post(`${API_BASE}/admin/users`, data),

@@ -6,10 +6,12 @@ import secrets
 import string
 from copy import deepcopy
 
+import requests
 from sqlalchemy import delete, func, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
+from config import config
 from models import (
     ActivityDefinition,
     ActivityDurationStats,
@@ -77,13 +79,25 @@ LANDING_EXAMPLE_SETTINGS_KEY = "landing_example_settings"
 LANDING_EXAMPLE_CACHE_KEY = "landing_example_cache"
 # Bump when the published landing snapshot shape changes so the frontend / future
 # migrations can detect and handle stale caches.
-LANDING_EXAMPLE_SCHEMA_VERSION = 4
+LANDING_EXAMPLE_SCHEMA_VERSION = 5
 # Bound the per-goal timeline/notes we embed so the public cache stays small.
 LANDING_EXAMPLE_TIMELINE_LIMIT = 50
 LANDING_EXAMPLE_NOTES_LIMIT = 30
 LANDING_EXAMPLE_SESSIONS_LIMIT = 4
 LANDING_EXAMPLE_TEMPLATES_LIMIT = 4
 LANDING_EXAMPLE_ANALYTICS_LIMIT = 24
+# Bound the admin showcase picker lists so the options endpoint stays light.
+LANDING_EXAMPLE_OPTIONS_SESSIONS_LIMIT = 50
+LANDING_EXAMPLE_OPTIONS_ACTIVITIES_LIMIT = 200
+LANDING_EXAMPLE_SHOWCASE_ACTIVITY_LIMIT = 4
+LANDING_EXAMPLE_SHOWCASE_KEYS = (
+    "session_id",
+    "activity_ids",
+    "program_id",
+    "program_start_date",
+    "program_end_date",
+    "chart_ids",
+)
 
 
 def hash_invite_key(raw_key: str) -> str:
@@ -350,6 +364,20 @@ class AdminService:
             "updated_at": format_utc(root.updated_at),
         }
 
+    @staticmethod
+    def _normalize_landing_example_showcase(showcase: JsonDict | None) -> JsonDict:
+        """Keep only the known showcase keys with stable null/empty defaults."""
+        source = showcase if isinstance(showcase, dict) else {}
+        normalized: JsonDict = {}
+        for key in LANDING_EXAMPLE_SHOWCASE_KEYS:
+            value = source.get(key)
+            if key in ("activity_ids", "chart_ids"):
+                normalized[key] = [str(item) for item in (value or []) if item]
+            else:
+                normalized[key] = str(value) if value else None
+        normalized["activity_ids"] = normalized["activity_ids"][:LANDING_EXAMPLE_SHOWCASE_ACTIVITY_LIMIT]
+        return normalized
+
     def _normalize_landing_example_settings(self, examples: list[JsonDict]) -> list[JsonDict]:
         normalized = []
         for index, item in enumerate(examples or []):
@@ -357,6 +385,7 @@ class AdminService:
                 "root_id": item["root_id"],
                 "label": item["label"],
                 "sort_order": int(item.get("sort_order", index)),
+                "showcase": self._normalize_landing_example_showcase(item.get("showcase")),
             })
         return sorted(normalized, key=lambda item: (item["sort_order"], item["label"].lower()))
 
@@ -441,6 +470,82 @@ class AdminService:
         self._set_app_setting_value(LANDING_EXAMPLE_SETTINGS_KEY, {"examples": examples})
         self.db_session.commit()
         return self.get_landing_example_settings()
+
+    def get_landing_example_options(self, root_id: str) -> ServiceResult[JsonDict]:
+        """Bounded picker lists (sessions/activities/programs) for the admin
+        landing showcase editor, scoped to one admin-owned root."""
+        roots_by_id, error, status = self._validate_landing_example_roots([{"root_id": root_id}])
+        if error:
+            return None, error, status
+        root = roots_by_id[root_id]
+        owner_id = root.owner_id
+
+        session_service = SessionService(self.db_session)
+        sessions_result, sessions_error, _ = session_service.get_fractal_sessions(
+            root.id,
+            owner_id,
+            limit=LANDING_EXAMPLE_OPTIONS_SESSIONS_LIMIT,
+            offset=0,
+            filters={"sort_by": "session_start", "sort_order": "desc"},
+        )
+        sessions = sessions_result.get("sessions", []) if sessions_result and not sessions_error else []
+
+        activities = self.db_session.query(ActivityDefinition).options(
+            selectinload(ActivityDefinition.associated_goals),
+        ).filter(
+            ActivityDefinition.root_id == root.id,
+            ActivityDefinition.deleted_at.is_(None),
+        ).order_by(ActivityDefinition.name.asc()).limit(LANDING_EXAMPLE_OPTIONS_ACTIVITIES_LIMIT).all()
+
+        try:
+            programs = ProgramService.get_programs(self.db_session, root.id, owner_id)
+        except Exception:
+            programs = []
+
+        return {
+            "root_id": root.id,
+            "sessions": [
+                {
+                    "id": session.get("id"),
+                    "name": session.get("name"),
+                    "session_start": session.get("session_start"),
+                    "total_duration_seconds": session.get("total_duration_seconds"),
+                    "completed": session.get("completed"),
+                }
+                for session in sessions
+            ],
+            "activities": [
+                {
+                    "id": activity.id,
+                    "name": activity.name,
+                    "group_id": activity.group_id,
+                    "associated_goal_count": len([
+                        goal for goal in (activity.associated_goals or [])
+                        if getattr(goal, "deleted_at", None) is None
+                    ]),
+                }
+                for activity in activities
+            ],
+            "programs": [
+                {
+                    "id": program.get("id"),
+                    "name": program.get("name"),
+                    "color": program.get("color"),
+                    "start_date": program.get("start_date"),
+                    "end_date": program.get("end_date"),
+                    "blocks": [
+                        {
+                            "id": block.get("id"),
+                            "name": block.get("name"),
+                            "start_date": block.get("start_date"),
+                            "end_date": block.get("end_date"),
+                        }
+                        for block in (program.get("blocks") or [])
+                    ],
+                }
+                for program in programs
+            ],
+        }, None, 200
 
     def _serialize_public_target(self, target: Target) -> JsonDict:
         metrics = []
@@ -735,8 +840,54 @@ class AdminService:
 
         return charts
 
-    def _build_landing_showcase_data(self, root: Goal) -> dict:
+    def _resolve_landing_showcase(self, root: Goal, showcase: JsonDict | None) -> tuple[JsonDict, list[str]]:
+        """Validate admin-picked showcase references against the root, dropping any
+        stale ids (deleted/moved content) instead of failing publish."""
+        resolved = self._normalize_landing_example_showcase(showcase)
+        warnings: list[str] = []
+
+        if resolved["session_id"]:
+            session_exists = self.db_session.query(Session.id).filter(
+                Session.id == resolved["session_id"],
+                Session.root_id == root.id,
+                Session.deleted_at.is_(None),
+            ).first()
+            if not session_exists:
+                warnings.append("Featured session no longer exists and was skipped")
+                resolved["session_id"] = None
+
+        if resolved["activity_ids"]:
+            existing_ids = {
+                row[0]
+                for row in self.db_session.query(ActivityDefinition.id).filter(
+                    ActivityDefinition.id.in_(resolved["activity_ids"]),
+                    ActivityDefinition.root_id == root.id,
+                    ActivityDefinition.deleted_at.is_(None),
+                ).all()
+            }
+            dropped = [activity_id for activity_id in resolved["activity_ids"] if activity_id not in existing_ids]
+            if dropped:
+                warnings.append(f"{len(dropped)} featured activities no longer exist and were skipped")
+            resolved["activity_ids"] = [
+                activity_id for activity_id in resolved["activity_ids"] if activity_id in existing_ids
+            ]
+
+        if resolved["program_id"]:
+            program_exists = self.db_session.query(Program.id).filter(
+                Program.id == resolved["program_id"],
+                Program.root_id == root.id,
+            ).first()
+            if not program_exists:
+                warnings.append("Featured program no longer exists and was skipped")
+                resolved["program_id"] = None
+                resolved["program_start_date"] = None
+                resolved["program_end_date"] = None
+
+        return resolved, warnings
+
+    def _build_landing_showcase_data(self, root: Goal, showcase: JsonDict | None = None) -> dict:
         owner_id = root.owner_id
+        showcase = self._normalize_landing_example_showcase(showcase)
         session_service = SessionService(self.db_session)
         sessions_result, sessions_error, _ = session_service.get_fractal_sessions(
             root.id,
@@ -746,6 +897,16 @@ class AdminService:
             filters={"sort_by": "session_start", "sort_order": "desc"},
         )
         sessions = sessions_result.get("sessions", []) if sessions_result and not sessions_error else []
+
+        featured_session_id = showcase["session_id"]
+        if featured_session_id and not any(session.get("id") == featured_session_id for session in sessions):
+            featured_result, featured_error, _ = session_service.get_session_details(
+                root.id,
+                featured_session_id,
+                owner_id,
+            )
+            if featured_result and not featured_error:
+                sessions = [featured_result, *sessions]
 
         analytics_result, analytics_error, _ = session_service.get_session_analytics_summary(
             root.id,
@@ -762,6 +923,9 @@ class AdminService:
         }
         if analytics_summary:
             activity_ids.update((analytics_summary.get("activity_instances") or {}).keys())
+        # Explicitly featured activities must always serialize, even when no
+        # recent session or analytics row references them.
+        activity_ids.update(showcase["activity_ids"])
 
         activity_definitions = []
         if activity_ids:
@@ -806,6 +970,7 @@ class AdminService:
             return None, error, status
 
         published_examples = []
+        showcase_warnings: list[str] = []
         for item in examples:
             goals_by_id = load_fractal_goals_for_serialization(self.db_session, item["root_id"])
             root = goals_by_id.get(item["root_id"])
@@ -815,7 +980,9 @@ class AdminService:
             serialized_tree = self._serialize_public_goal_tree(root, effective_levels_by_name)
             self._enrich_landing_tree_with_history(serialized_tree, root)
             flowtree_data = self._build_landing_flowtree_data(root, serialized_tree)
-            showcase_data = self._build_landing_showcase_data(root)
+            resolved_showcase, warnings = self._resolve_landing_showcase(root, item.get("showcase"))
+            showcase_warnings.extend(f"{item['label']}: {warning}" for warning in warnings)
+            showcase_data = self._build_landing_showcase_data(root, resolved_showcase)
             published_examples.append({
                 "root_id": root.id,
                 "label": item["label"],
@@ -826,6 +993,7 @@ class AdminService:
                 "evidence_goal_ids": flowtree_data["evidence_goal_ids"],
                 "metrics_summary": flowtree_data["metrics_summary"],
                 "programs": flowtree_data["programs"],
+                "showcase": resolved_showcase,
                 "sessions": showcase_data["sessions"],
                 "activity_definitions": showcase_data["activity_definitions"],
                 "activity_groups": showcase_data["activity_groups"],
@@ -844,7 +1012,32 @@ class AdminService:
             "published_at": cache["published_at"],
             "published_example_count": len(published_examples),
             "examples": examples,
+            "showcase_warnings": showcase_warnings,
+            "cache_warm": self._warm_landing_cache(),
         }, None, 200
+
+    @staticmethod
+    def _warm_landing_cache() -> str:
+        """Refresh the frontend edge cache with the just-published snapshot.
+
+        Best-effort post-commit side effect: the bypass header makes Nginx
+        fetch fresh from the backend and overwrite its stored entry. Failures
+        never fail the publish — the edge cache self-heals within its TTL.
+        """
+        warm_url = config.LANDING_CACHE_WARM_URL
+        if not warm_url:
+            return "skipped"
+        try:
+            response = requests.get(
+                warm_url,
+                headers={"X-Landing-Cache-Warm": "1"},
+                timeout=5,
+            )
+            response.raise_for_status()
+            return "ok"
+        except requests.RequestException:
+            logger.warning("Landing cache warm request failed for %s", warm_url, exc_info=True)
+            return "failed"
 
     def update_status(self, user_id: str, is_active: bool) -> ServiceResult[JsonDict]:
         return self.update_user(user_id, {"is_active": is_active})

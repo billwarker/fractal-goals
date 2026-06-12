@@ -13,6 +13,7 @@ from models import (
     Goal,
     GoalLevel,
     Note,
+    Program,
     Session,
     SessionTemplate,
     Target,
@@ -458,13 +459,28 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     assert isinstance(public_example['analytics_charts'], list)
 
     # Snapshot carries a schema version for forward-safe shape evolution.
-    assert public_example['schema_version'] == 4
-    assert public_payload['schema_version'] == 4
+    assert public_example['schema_version'] == 5
+    assert public_payload['schema_version'] == 5
+
+    # Without admin curation, the showcase key is still present with stable
+    # null/empty defaults so the frontend never branches on key existence.
+    assert public_example['showcase'] == {
+        'session_id': None,
+        'activity_ids': [],
+        'program_id': None,
+        'program_start_date': None,
+        'program_end_date': None,
+        'chart_ids': [],
+    }
+
+    # Published responses serve with short public caching; the cache only
+    # changes on manual publish.
+    assert public_response.headers['Cache-Control'] == 'public, max-age=300, stale-while-revalidate=86400'
 
     cache = db_session.get(AppSetting, 'landing_example_cache')
     assert cache is not None
     assert cache.value['examples'][0]['root_id'] == admin_landing_fractal.id
-    assert cache.value['schema_version'] == 4
+    assert cache.value['schema_version'] == 5
 
 
 @pytest.mark.integration
@@ -492,6 +508,236 @@ def test_non_admin_cannot_manage_landing_examples(authed_client):
         content_type='application/json',
     )
     assert response.status_code == 403
+
+
+def _landing_example_payload(root_id, showcase=None):
+    example = {'root_id': root_id, 'label': 'Software demo', 'sort_order': 0}
+    if showcase is not None:
+        example['showcase'] = showcase
+    return json.dumps({'examples': [example]})
+
+
+@pytest.mark.integration
+def test_landing_example_showcase_settings_round_trip(admin_client, db_session, admin_landing_fractal):
+    showcase = {
+        'session_id': 'session-1',
+        'activity_ids': ['activity-1', 'activity-2'],
+        'program_id': 'program-1',
+        'program_start_date': '2026-01-05',
+        'program_end_date': '2026-01-20',
+        'chart_ids': ['session-duration-trend'],
+    }
+    response = admin_client.patch(
+        '/api/admin/landing-examples',
+        data=_landing_example_payload(admin_landing_fractal.id, showcase),
+        content_type='application/json',
+    )
+    assert response.status_code == 200
+    saved = response.get_json()['examples'][0]['showcase']
+    assert saved == showcase
+
+    # GET returns the persisted, normalized showcase.
+    settings = admin_client.get('/api/admin/landing-examples').get_json()
+    assert settings['examples'][0]['showcase'] == showcase
+
+    # Saving without a showcase normalizes to stable null/empty defaults.
+    response = admin_client.patch(
+        '/api/admin/landing-examples',
+        data=_landing_example_payload(admin_landing_fractal.id),
+        content_type='application/json',
+    )
+    assert response.status_code == 200
+    assert response.get_json()['examples'][0]['showcase'] == {
+        'session_id': None,
+        'activity_ids': [],
+        'program_id': None,
+        'program_start_date': None,
+        'program_end_date': None,
+        'chart_ids': [],
+    }
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize('showcase', [
+    {'activity_ids': ['a1', 'a2', 'a3', 'a4', 'a5']},
+    {'activity_ids': ['a1', 'a1']},
+    {'program_start_date': 'not-a-date'},
+    {'program_start_date': '2026-02-01', 'program_end_date': '2026-01-01'},
+])
+def test_landing_example_showcase_validation_rejects_bad_payloads(
+    admin_client, admin_landing_fractal, showcase,
+):
+    response = admin_client.patch(
+        '/api/admin/landing-examples',
+        data=_landing_example_payload(admin_landing_fractal.id, showcase),
+        content_type='application/json',
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.integration
+def test_publish_honors_showcase_selections(admin_client, client, db_session, admin_landing_fractal):
+    root = admin_landing_fractal
+    featured_session = db_session.query(Session).filter_by(root_id=root.id).first()
+    # Push the featured session out of the most-recent-4 window.
+    for day in range(11, 15):
+        db_session.add(Session(
+            id=str(uuid.uuid4()),
+            root_id=root.id,
+            name=f'Newer Session {day}',
+            session_start=datetime(2026, 1, day, 9, 0),
+            total_duration_seconds=600,
+        ))
+    # An activity no recent session references: only featuring it should publish it.
+    hidden_activity = ActivityDefinition(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        name='Hidden Featured Activity',
+    )
+    program = Program(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        name='Public Demo Program',
+        start_date=datetime(2026, 1, 1),
+        end_date=datetime(2026, 3, 1),
+        weekly_schedule={},
+    )
+    db_session.add_all([hidden_activity, program])
+    db_session.commit()
+
+    showcase = {
+        'session_id': featured_session.id,
+        'activity_ids': [hidden_activity.id],
+        'program_id': program.id,
+        'program_start_date': '2026-01-05',
+        'program_end_date': '2026-01-20',
+        'chart_ids': ['session-duration-trend'],
+    }
+    publish_response = admin_client.post(
+        '/api/admin/landing-examples/publish',
+        data=_landing_example_payload(root.id, showcase),
+        content_type='application/json',
+    )
+    assert publish_response.status_code == 200
+    assert publish_response.get_json()['showcase_warnings'] == []
+
+    public_example = client.get('/api/public/landing-examples').get_json()['examples'][0]
+    assert public_example['showcase'] == showcase
+    # The featured session is included even though it is not among the recent 4.
+    session_ids = [session['id'] for session in public_example['sessions']]
+    assert featured_session.id in session_ids
+    # The explicitly featured activity serializes despite no recent-session reference.
+    activity_names = [activity['name'] for activity in public_example['activity_definitions']]
+    assert 'Hidden Featured Activity' in activity_names
+    assert any(program_item['id'] == program.id for program_item in public_example['programs'])
+
+
+@pytest.mark.integration
+def test_publish_drops_stale_showcase_refs_with_warnings(admin_client, client, admin_landing_fractal):
+    showcase = {
+        'session_id': str(uuid.uuid4()),
+        'activity_ids': [str(uuid.uuid4())],
+        'program_id': str(uuid.uuid4()),
+        'program_start_date': '2026-01-05',
+        'program_end_date': '2026-01-20',
+    }
+    publish_response = admin_client.post(
+        '/api/admin/landing-examples/publish',
+        data=_landing_example_payload(admin_landing_fractal.id, showcase),
+        content_type='application/json',
+    )
+    assert publish_response.status_code == 200
+    warnings = publish_response.get_json()['showcase_warnings']
+    assert len(warnings) == 3
+
+    public_example = client.get('/api/public/landing-examples').get_json()['examples'][0]
+    assert public_example['showcase'] == {
+        'session_id': None,
+        'activity_ids': [],
+        'program_id': None,
+        'program_start_date': None,
+        'program_end_date': None,
+        'chart_ids': [],
+    }
+
+
+@pytest.mark.integration
+def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, admin_landing_fractal, monkeypatch):
+    import requests as requests_lib
+
+    def publish():
+        response = admin_client.post(
+            '/api/admin/landing-examples/publish',
+            data=_landing_example_payload(admin_landing_fractal.id),
+            content_type='application/json',
+        )
+        assert response.status_code == 200
+        return response.get_json()
+
+    # No warm URL configured (the dev/test default): warming is skipped.
+    assert publish()['cache_warm'] == 'skipped'
+
+    warm_url = 'https://www.example.com/api/public/landing-examples'
+    monkeypatch.setattr(config, 'LANDING_CACHE_WARM_URL', warm_url)
+
+    warm_calls = []
+
+    class _WarmResponse:
+        def raise_for_status(self):
+            return None
+
+    def _fake_get(url, headers=None, timeout=None):
+        warm_calls.append({'url': url, 'headers': headers, 'timeout': timeout})
+        return _WarmResponse()
+
+    monkeypatch.setattr(requests_lib, 'get', _fake_get)
+    assert publish()['cache_warm'] == 'ok'
+    assert warm_calls == [{
+        'url': warm_url,
+        'headers': {'X-Landing-Cache-Warm': '1'},
+        'timeout': 5,
+    }]
+
+    def _failing_get(url, headers=None, timeout=None):
+        raise requests_lib.ConnectionError('warm endpoint unreachable')
+
+    monkeypatch.setattr(requests_lib, 'get', _failing_get)
+    # A warm failure must never fail the publish itself.
+    assert publish()['cache_warm'] == 'failed'
+
+
+@pytest.mark.integration
+def test_landing_example_options_endpoint(admin_client, authed_client, db_session, admin_landing_fractal, sample_ultimate_goal):
+    root = admin_landing_fractal
+    program = Program(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        name='Options Program',
+        start_date=datetime(2026, 1, 1),
+        end_date=datetime(2026, 3, 1),
+        weekly_schedule={},
+    )
+    db_session.add(program)
+    db_session.commit()
+
+    response = admin_client.get(f'/api/admin/landing-examples/options?root_id={root.id}')
+    assert response.status_code == 200
+    options = response.get_json()
+    assert options['root_id'] == root.id
+    assert [session['name'] for session in options['sessions']] == ['Public Demo Session']
+    assert options['sessions'][0]['total_duration_seconds'] == 2700
+    activity = next(item for item in options['activities'] if item['name'] == 'Public Demo Activity')
+    assert activity['associated_goal_count'] == 1
+    assert [item['name'] for item in options['programs']] == ['Options Program']
+
+    assert admin_client.get('/api/admin/landing-examples/options').status_code == 400
+    # Roots not owned by an active admin are rejected.
+    assert admin_client.get(
+        f'/api/admin/landing-examples/options?root_id={sample_ultimate_goal.id}'
+    ).status_code == 400
+    assert authed_client.get(
+        f'/api/admin/landing-examples/options?root_id={root.id}'
+    ).status_code == 403
 
 
 @pytest.mark.integration

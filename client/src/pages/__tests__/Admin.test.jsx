@@ -473,18 +473,26 @@ describe('Admin', () => {
         });
         fireEvent.click(screen.getByText('Save Draft'));
 
+        const emptyShowcase = {
+            session_id: null,
+            activity_ids: [],
+            program_id: null,
+            program_start_date: null,
+            program_end_date: null,
+            chart_ids: [],
+        };
         await waitFor(() => expect(updateLandingExamples).toHaveBeenCalledWith({
             examples: [
-                { root_id: 'root-1', label: 'Guitar practice refined', sort_order: 0 },
-                { root_id: 'root-2', label: 'Chinese language tracker', sort_order: 1 },
+                { root_id: 'root-1', label: 'Guitar practice refined', sort_order: 0, showcase: emptyShowcase },
+                { root_id: 'root-2', label: 'Chinese language tracker', sort_order: 1, showcase: emptyShowcase },
             ],
         }));
 
         fireEvent.click(screen.getByText('Publish'));
         await waitFor(() => expect(publishLandingExamples).toHaveBeenCalledWith({
             examples: [
-                { root_id: 'root-1', label: 'Guitar practice refined', sort_order: 0 },
-                { root_id: 'root-2', label: 'Chinese language tracker', sort_order: 1 },
+                { root_id: 'root-1', label: 'Guitar practice refined', sort_order: 0, showcase: emptyShowcase },
+                { root_id: 'root-2', label: 'Chinese language tracker', sort_order: 1, showcase: emptyShowcase },
             ],
         }));
     });

@@ -1,5 +1,5 @@
 import React from 'react';
-import styles from './LandingShowcaseFrame.module.css';
+import styles from './LandingFeaturesSection.module.css';
 
 function getMetricSummary(activity) {
     const metrics = activity?.metric_definitions || [];

@@ -262,14 +262,16 @@ class BetaSignupRequestSchema(BaseModel):
     """Schema for public private-beta access requests."""
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    name: str = Field(..., min_length=2, max_length=120)
+    name: Optional[str] = Field(None, min_length=2, max_length=120)
     email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-    use_case: str = Field(..., min_length=2, max_length=80)
+    use_case: Optional[str] = Field(None, min_length=2, max_length=80)
     note: Optional[str] = Field(None, max_length=1000)
 
     @field_validator('name', 'use_case')
     @classmethod
-    def sanitize_required_text(cls, v: str) -> str:
+    def sanitize_optional_text(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
         return sanitize_string(v)
 
     @field_validator('email')
@@ -378,12 +380,55 @@ class AdminTierQuotaUpdateSchema(BaseModel):
         return v
 
 
+class LandingExampleShowcaseSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    session_id: Optional[str] = Field(None, min_length=1, max_length=120)
+    activity_ids: List[str] = Field(default_factory=list, max_length=4)
+    program_id: Optional[str] = Field(None, min_length=1, max_length=120)
+    program_start_date: Optional[str] = None
+    program_end_date: Optional[str] = None
+    chart_ids: List[str] = Field(default_factory=list, max_length=4)
+
+    @field_validator('session_id', 'program_id')
+    @classmethod
+    def sanitize_showcase_id(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_string(v) if v else v
+
+    @field_validator('activity_ids', 'chart_ids')
+    @classmethod
+    def sanitize_showcase_id_lists(cls, v: List[str]) -> List[str]:
+        cleaned = [sanitize_string(item) for item in v if item and item.strip()]
+        if len(cleaned) != len(set(cleaned)):
+            raise ValueError('Showcase id lists must not contain duplicates')
+        return cleaned
+
+    @field_validator('program_start_date', 'program_end_date')
+    @classmethod
+    def validate_showcase_date(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or not v.strip():
+            return None
+        try:
+            date.fromisoformat(v)
+        except ValueError as exc:
+            raise ValueError('Showcase dates must be YYYY-MM-DD') from exc
+        return v
+
+    @model_validator(mode='after')
+    def validate_program_date_window(self) -> 'LandingExampleShowcaseSchema':
+        if self.program_start_date and self.program_end_date:
+            if date.fromisoformat(self.program_end_date) < date.fromisoformat(self.program_start_date):
+                raise ValueError('Showcase program end date must not be before the start date')
+        return self
+
+
 class LandingExampleSelectionSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     root_id: str = Field(..., min_length=1, max_length=120)
     label: str = Field(..., min_length=1, max_length=120)
     sort_order: int = Field(..., ge=0, le=1000)
+    showcase: Optional[LandingExampleShowcaseSchema] = None
 
     @field_validator('root_id', 'label')
     @classmethod

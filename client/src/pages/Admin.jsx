@@ -233,6 +233,188 @@ function TierQuotasPanel({ tierQuotasQuery }) {
     );
 }
 
+const EMPTY_LANDING_SHOWCASE = {
+    session_id: null,
+    activity_ids: [],
+    program_id: null,
+    program_start_date: null,
+    program_end_date: null,
+    chart_ids: [],
+};
+const LANDING_SHOWCASE_ACTIVITY_CAP = 4;
+const LANDING_SHOWCASE_CHARTS = [
+    { id: 'session-duration-trend', label: 'Session duration trend' },
+    { id: 'activity-time-totals', label: 'Activity time totals' },
+];
+
+const normalizeShowcase = (showcase) => ({
+    ...EMPTY_LANDING_SHOWCASE,
+    ...(showcase || {}),
+    activity_ids: (showcase?.activity_ids || []).slice(0, LANDING_SHOWCASE_ACTIVITY_CAP),
+    chart_ids: showcase?.chart_ids || [],
+});
+
+function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
+    const [expanded, setExpanded] = useState(false);
+    const showcase = normalizeShowcase(example.showcase);
+
+    const optionsQuery = useQuery({
+        queryKey: ['admin', 'landing-example-options', example.root_id],
+        queryFn: async () => (await adminApi.getLandingExampleOptions(example.root_id)).data,
+        enabled: expanded,
+        staleTime: 60 * 1000,
+    });
+
+    const options = optionsQuery.data;
+    const update = (patch) => onShowcaseChange(example.root_id, { ...showcase, ...patch });
+
+    const toggleActivity = (activityId) => {
+        const next = showcase.activity_ids.includes(activityId)
+            ? showcase.activity_ids.filter((id) => id !== activityId)
+            : [...showcase.activity_ids, activityId].slice(0, LANDING_SHOWCASE_ACTIVITY_CAP);
+        update({ activity_ids: next });
+    };
+
+    const toggleChart = (chartId) => {
+        const next = showcase.chart_ids.includes(chartId)
+            ? showcase.chart_ids.filter((id) => id !== chartId)
+            : [...showcase.chart_ids, chartId];
+        update({ chart_ids: next });
+    };
+
+    const selectedProgram = (options?.programs || []).find((program) => program.id === showcase.program_id) || null;
+    const summaryBits = [
+        showcase.session_id ? 'session' : null,
+        showcase.activity_ids.length ? `${showcase.activity_ids.length} activities` : null,
+        showcase.program_id ? 'program window' : null,
+        showcase.chart_ids.length ? `${showcase.chart_ids.length} charts` : null,
+    ].filter(Boolean);
+
+    return (
+        <div className={styles.landingShowcaseEditor}>
+            <button
+                type="button"
+                className={styles.landingShowcaseToggle}
+                onClick={() => setExpanded((current) => !current)}
+                aria-expanded={expanded}
+            >
+                {expanded ? '▾' : '▸'} Showcase picks
+                <span>{summaryBits.length ? summaryBits.join(', ') : 'auto'}</span>
+            </button>
+            {expanded && (
+                optionsQuery.isLoading ? (
+                    <div className={styles.status}>Loading showcase options...</div>
+                ) : optionsQuery.isError ? (
+                    <div className={styles.status}>Failed to load showcase options.</div>
+                ) : (
+                    <div className={styles.landingShowcaseFields}>
+                        <label>
+                            <span>Featured session</span>
+                            <select
+                                value={showcase.session_id || ''}
+                                onChange={(event) => update({ session_id: event.target.value || null })}
+                            >
+                                <option value="">Auto (most recent)</option>
+                                {(options?.sessions || []).map((session) => (
+                                    <option value={session.id} key={session.id}>
+                                        {session.name} — {session.session_start ? new Date(session.session_start).toLocaleDateString() : 'undated'}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+
+                        <fieldset>
+                            <legend>Featured activities (max {LANDING_SHOWCASE_ACTIVITY_CAP})</legend>
+                            {(options?.activities || []).length === 0 && (
+                                <div className={styles.status}>No activities in this fractal.</div>
+                            )}
+                            {(options?.activities || []).map((activity) => {
+                                const checked = showcase.activity_ids.includes(activity.id);
+                                const capped = !checked && showcase.activity_ids.length >= LANDING_SHOWCASE_ACTIVITY_CAP;
+                                return (
+                                    <label className={styles.landingShowcaseCheck} key={activity.id}>
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            disabled={capped}
+                                            onChange={() => toggleActivity(activity.id)}
+                                        />
+                                        <span>
+                                            {activity.name}
+                                            {activity.associated_goal_count === 0 && (
+                                                <em title="No goal links: the inheritance demo would be empty"> ⚠ no goal links</em>
+                                            )}
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                        </fieldset>
+
+                        <label>
+                            <span>Featured program</span>
+                            <select
+                                value={showcase.program_id || ''}
+                                onChange={(event) => {
+                                    const programId = event.target.value || null;
+                                    const program = (options?.programs || []).find((item) => item.id === programId);
+                                    update({
+                                        program_id: programId,
+                                        program_start_date: program?.start_date?.slice(0, 10) || null,
+                                        program_end_date: program?.end_date?.slice(0, 10) || null,
+                                    });
+                                }}
+                            >
+                                <option value="">Auto (first program)</option>
+                                {(options?.programs || []).map((program) => (
+                                    <option value={program.id} key={program.id}>{program.name}</option>
+                                ))}
+                            </select>
+                        </label>
+                        {showcase.program_id && (
+                            <div className={styles.landingShowcaseDates}>
+                                <label>
+                                    <span>Window start</span>
+                                    <input
+                                        type="date"
+                                        value={showcase.program_start_date || ''}
+                                        min={selectedProgram?.start_date?.slice(0, 10)}
+                                        max={showcase.program_end_date || selectedProgram?.end_date?.slice(0, 10)}
+                                        onChange={(event) => update({ program_start_date: event.target.value || null })}
+                                    />
+                                </label>
+                                <label>
+                                    <span>Window end</span>
+                                    <input
+                                        type="date"
+                                        value={showcase.program_end_date || ''}
+                                        min={showcase.program_start_date || selectedProgram?.start_date?.slice(0, 10)}
+                                        max={selectedProgram?.end_date?.slice(0, 10)}
+                                        onChange={(event) => update({ program_end_date: event.target.value || null })}
+                                    />
+                                </label>
+                            </div>
+                        )}
+
+                        <fieldset>
+                            <legend>Featured charts (none = all)</legend>
+                            {LANDING_SHOWCASE_CHARTS.map((chart) => (
+                                <label className={styles.landingShowcaseCheck} key={chart.id}>
+                                    <input
+                                        type="checkbox"
+                                        checked={showcase.chart_ids.includes(chart.id)}
+                                        onChange={() => toggleChart(chart.id)}
+                                    />
+                                    <span>{chart.label}</span>
+                                </label>
+                            ))}
+                        </fieldset>
+                    </div>
+                )
+            )}
+        </div>
+    );
+}
+
 function LandingExamplesPanel() {
     const queryClient = useQueryClient();
     const [draftExamples, setDraftExamples] = useState([]);
@@ -248,6 +430,7 @@ function LandingExamplesPanel() {
             root_id: example.root_id,
             label: example.label,
             sort_order: example.sort_order ?? index,
+            showcase: normalizeShowcase(example.showcase),
         })));
     }, [landingExamplesQuery.data]);
 
@@ -261,6 +444,7 @@ function LandingExamplesPanel() {
         root_id: example.root_id,
         label: example.label,
         sort_order: index,
+        showcase: normalizeShowcase(example.showcase),
     }));
 
     const updateMutation = useMutation({
@@ -282,9 +466,19 @@ function LandingExamplesPanel() {
                 published_example_count: res.data.published_example_count,
             }));
             notify.success('Landing examples published');
+            (res.data.showcase_warnings || []).forEach((warning) => notify.error(warning));
+            if (res.data.cache_warm === 'failed') {
+                notify.error('Published, but warming the landing edge cache failed; it will refresh on its own within ~5 minutes.');
+            }
         },
         onError: (error) => notify.error(`Failed to publish landing examples: ${formatError(error)}`),
     });
+
+    const updateShowcase = (rootId, showcase) => {
+        setDraftExamples((current) => current.map((example) => (
+            example.root_id === rootId ? { ...example, showcase: normalizeShowcase(showcase) } : example
+        )));
+    };
 
     const addExample = (fractal) => {
         setDraftExamples((current) => normalizeDraft([
@@ -384,6 +578,10 @@ function LandingExamplesPanel() {
                                             </button>
                                             <button onClick={() => removeExample(example.root_id)}>Remove</button>
                                         </div>
+                                        <LandingExampleShowcaseEditor
+                                            example={example}
+                                            onShowcaseChange={updateShowcase}
+                                        />
                                     </div>
                                 );
                             })}

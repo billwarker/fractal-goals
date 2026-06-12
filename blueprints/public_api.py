@@ -25,7 +25,9 @@ def get_landing_examples():
         if error:
             return jsonify({"error": error}), status
         response = jsonify(payload)
-        response.headers["Cache-Control"] = "no-store, max-age=0"
+        # The cache only changes on manual admin publish, so short shared/browser
+        # caching is safe and lets repeat landing visits render instantly.
+        response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=86400"
         return response, status
     except SQLAlchemyError:
         return internal_error(logger, "Error fetching landing examples")

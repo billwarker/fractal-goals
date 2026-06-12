@@ -3,12 +3,18 @@ import { useQuery } from '@tanstack/react-query';
 import AnimatedGoalIcon from '../components/atoms/AnimatedGoalIcon';
 import GoalIcon from '../components/atoms/GoalIcon';
 import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
-import LandingShowcaseFrame from '../components/landing/LandingShowcaseFrame';
+import LandingExampleRail from '../components/landing/LandingExampleRail';
+import LandingFeaturesSection from '../components/landing/LandingFeaturesSection';
+import LandingSectionNav from '../components/landing/LandingSectionNav';
+import LandingSkeleton from '../components/landing/LandingSkeleton';
 import { GoalLevelsProvider } from '../contexts/GoalLevelsContext';
 import landingContent from '../content/landingContent';
+import useActiveLandingSection from '../hooks/useActiveLandingSection';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
+import { queryKeys } from '../hooks/queryKeys';
 import { findGoalNodeById, getGoalNodeId } from '../utils/goalNodeModel';
 import { publicApi } from '../utils/api';
+import { fetchLandingExamples, LANDING_EXAMPLES_STALE_TIME } from '../utils/landingPrefetch';
 import styles from './Landing.module.css';
 // Reuse the real goals-page styles for the view-options widget and the docked
 // side-in detail panel (.flowtree-options-pane, .details-window.sidebar.docked).
@@ -77,17 +83,46 @@ const levelByType = {
 };
 
 const initialFormState = {
-    name: '',
     email: '',
-    use_case: landingContent.betaForm.useCaseOptions[0]?.value || 'personal goals',
-    note: '',
 };
+
+// One dot per full-viewport snap section, in document order. Labels come from
+// the markdown content pipeline (Nav Label metadata) with built-in fallbacks.
+const sectionNavItems = [
+    { id: 'hero', label: landingContent.hero.navLabel },
+    { id: 'examples', label: landingContent.examples.navLabel },
+    { id: 'audience', label: landingContent.audience.navLabel },
+    { id: 'features', label: landingContent.features.navLabel },
+    { id: 'beta', label: landingContent.beta.navLabel },
+];
+const SECTION_IDS = sectionNavItems.map((section) => section.id);
+
+function prefersReducedMotion() {
+    return typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function scrollToSection(sectionId) {
+    document.getElementById(sectionId)?.scrollIntoView({
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        block: 'start',
+    });
+}
 
 const fallbackLandingExamples = [{
     root_id: 'demo-guitar-root',
     label: 'Guitar practice tracker',
     root_name: 'Become a skilled guitar player',
     sort_order: 0,
+    showcase: {
+        session_id: 'demo-session-1',
+        activity_ids: ['demo-activity-1'],
+        program_id: 'demo-program-1',
+        program_start_date: '2026-01-05',
+        program_end_date: '2026-02-01',
+        chart_ids: ['demo-session-duration'],
+    },
     evidence_goal_ids: ['demo-guitar-musicianship', 'demo-guitar-caged'],
     metrics_summary: {
         'demo-guitar-root': { total_duration_seconds: 12600, session_count: 6 },
@@ -158,6 +193,8 @@ const fallbackLandingExamples = [{
         has_sets: false,
         metric_definitions: [{ id: 'demo-metric-1', name: 'Reps', unit: 'clean changes' }],
         split_definitions: [],
+        associated_goal_ids: ['demo-guitar-caged'],
+        associated_goals: [{ id: 'demo-guitar-caged', name: 'Practice CAGED triads', type: 'ShortTermGoal' }],
     }],
     activity_groups: [],
     analytics_charts: [{
@@ -217,6 +254,7 @@ const fallbackLandingExamples = [{
                         id: 'demo-guitar-caged',
                         type: 'ShortTermGoal',
                         created_at: '2026-01-01T00:00:00Z',
+                        associated_activity_ids: ['demo-activity-1'],
                         associated_activities: [{
                             id: 'demo-activity-1',
                             name: 'CAGED Triads',
@@ -327,17 +365,31 @@ function Landing() {
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
     const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
     const [isOptionsPaneMinimized, setIsOptionsPaneMinimized] = useState(false);
+    // Hover doesn't exist on touch devices, so hero level tooltips also toggle
+    // on tap and dismiss on outside taps.
+    const [openHeroLevel, setOpenHeroLevel] = useState(null);
     const [formState, setFormState] = useState(initialFormState);
     const [status, setStatus] = useState('idle');
     const [message, setMessage] = useState('');
     const flowTreeRef = useRef(null);
     const flowTreeScopeTransitionTimerRef = useRef(null);
+    const mainRef = useRef(null);
+    const activeSectionId = useActiveLandingSection(mainRef, SECTION_IDS);
 
+    // The page itself is the snap-scroll container (html/body are overflow
+    // hidden), so it must hold focus for Space/PageDown/arrow paging to work.
+    useEffect(() => {
+        mainRef.current?.focus({ preventScroll: true });
+    }, []);
+
+    // Same key/fn/staleTime as the boot-time prefetch in main.jsx, so this
+    // dedupes against the request already in flight instead of starting late.
     const landingExamplesQuery = useQuery({
-        queryKey: ['public', 'landing-examples'],
-        queryFn: async () => (await publicApi.getLandingExamples()).data,
-        staleTime: 5 * 60 * 1000,
+        queryKey: queryKeys.landingExamples(),
+        queryFn: fetchLandingExamples,
+        staleTime: LANDING_EXAMPLES_STALE_TIME,
     });
+    const isExamplesLoading = landingExamplesQuery.isPending;
     const publishedExamples = useMemo(() => {
         const apiExamples = landingExamplesQuery.data?.examples || [];
         const shouldUseFallback = landingExamplesQuery.isError
@@ -366,6 +418,9 @@ function Landing() {
                 activityGroups: Array.isArray(example.activity_groups) ? example.activity_groups : [],
                 analyticsCharts: Array.isArray(example.analytics_charts) ? example.analytics_charts : [],
                 sessionTemplates: Array.isArray(example.session_templates) ? example.session_templates : [],
+                // Admin-curated feature picks (schema v5); null on older v4
+                // snapshots, in which case the Features section auto-derives.
+                showcase: example.showcase || null,
             }))
             .filter((example) => example.id && example.tree);
     }, [landingExamplesQuery.data, landingExamplesQuery.isError, landingExamplesQuery.isSuccess]);
@@ -452,9 +507,7 @@ function Landing() {
     }, []);
 
     const canSubmit = useMemo(() => (
-        formState.name.trim().length >= 2
-        && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email.trim())
-        && formState.use_case.trim().length >= 2
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email.trim())
         && status !== 'submitting'
     ), [formState, status]);
 
@@ -465,10 +518,15 @@ function Landing() {
         }));
     };
 
-    const handleExampleSelect = (exampleId) => {
+    // scrollToTree is only passed from the hero picker's click handler, so the
+    // initial default selection (set directly in an effect) never auto-scrolls.
+    const handleExampleSelect = (exampleId, { scrollToTree = false } = {}) => {
         setSelectedExampleId(exampleId);
         setSelectedGoalId(null);
         setFlowTreeScopeKey((current) => current + 1);
+        if (scrollToTree) {
+            scrollToSection('examples');
+        }
     };
 
     const handleGoalSelect = (goal) => {
@@ -482,6 +540,13 @@ function Landing() {
     const clearSelectedGoal = () => {
         setSelectedGoalId(null);
         setFlowTreeScopeKey((current) => current + 1);
+    };
+
+    // Clicking a goal in the Features lineage demo selects it in the live
+    // example explorer and scrolls back up to it.
+    const handleFeatureGoalSelect = (goal) => {
+        handleGoalSelect(goal);
+        scrollToSection('examples');
     };
 
     // Mirror the goals page: scope-changing toggles fade the tree out, apply after a
@@ -512,6 +577,17 @@ function Landing() {
         }
     }, []);
 
+    useEffect(() => {
+        if (!openHeroLevel) return undefined;
+        const handlePointerDown = (event) => {
+            if (!event.target.closest?.(`.${styles.heroLevelItem}`)) {
+                setOpenHeroLevel(null);
+            }
+        };
+        document.addEventListener('pointerdown', handlePointerDown);
+        return () => document.removeEventListener('pointerdown', handlePointerDown);
+    }, [openHeroLevel]);
+
     const handleSubmit = async (event) => {
         event.preventDefault();
         if (!canSubmit) {
@@ -525,11 +601,7 @@ function Landing() {
 
         try {
             const payload = {
-                ...formState,
-                name: formState.name.trim(),
                 email: formState.email.trim(),
-                use_case: formState.use_case.trim(),
-                note: formState.note.trim() || undefined,
             };
             const response = await publicApi.createBetaSignup(payload);
             setStatus('success');
@@ -544,8 +616,22 @@ function Landing() {
     };
 
     return (
-        <main className={styles.page}>
-            <header className={styles.header}>
+        <main ref={mainRef} className={styles.page} tabIndex={-1}>
+            <LandingSectionNav
+                sections={sectionNavItems}
+                activeId={activeSectionId}
+                onNavigate={scrollToSection}
+            />
+            {activeSectionId !== 'hero' && (
+                <LandingExampleRail
+                    examples={publishedExamples}
+                    activeExampleId={selectedExample?.id}
+                    onSelect={(exampleId) => handleExampleSelect(exampleId)}
+                />
+            )}
+
+            <section className={`${styles.hero} ${styles.snapSection}`} id="hero" aria-labelledby="landing-title">
+                <header className={styles.header}>
                 <a className={styles.brand} href="/">
                     <span className={styles.brandMark}>
                         <GoalIcon
@@ -558,14 +644,12 @@ function Landing() {
                     </span>
                     <span>{landingContent.header.brand}</span>
                 </a>
-                <nav className={styles.nav} aria-label="Primary">
-                    {landingContent.header.nav.map((item) => (
-                        <a href={item.href} key={`${item.href}-${item.label}`}>{item.label}</a>
-                    ))}
-                </nav>
-            </header>
-
-            <section className={styles.hero} aria-labelledby="landing-title">
+                    <nav className={styles.nav} aria-label="Primary">
+                        {landingContent.header.nav.map((item) => (
+                            <a href={item.href} key={`${item.href}-${item.label}`}>{item.label}</a>
+                        ))}
+                    </nav>
+                </header>
                 <div className={styles.heroCopy}>
                     <h1 id="landing-title">{landingContent.hero.title}</h1>
                     <h2>{landingContent.hero.body}</h2>
@@ -580,62 +664,81 @@ function Landing() {
                             </a>
                         ))}
                     </div>
+                    <aside className={styles.heroLevelStack} aria-label="Goal levels from ultimate to immediate">
+                        {heroGoalLevels.map((level) => (
+                            (() => {
+                                const HeroIcon = level.iconProps.isSmart ? AnimatedGoalIcon : GoalIcon;
+                                return (
+                                    <button
+                                        type="button"
+                                        className={`${styles.heroLevelItem} ${openHeroLevel === level.label ? styles.heroLevelItemOpen : ''}`}
+                                        aria-label={`${level.label}: ${level.description}`}
+                                        aria-expanded={openHeroLevel === level.label}
+                                        onClick={() => setOpenHeroLevel((current) => (current === level.label ? null : level.label))}
+                                        key={level.label}
+                                    >
+                                        <span className={styles.heroLevelIcon} aria-hidden="true">
+                                            <HeroIcon
+                                                {...level.iconProps}
+                                                size={96}
+                                                reduced
+                                            />
+                                        </span>
+                                        <span className={styles.heroLevelTooltip} role="tooltip">
+                                            <strong>{level.label}</strong>
+                                            <span>{level.description}</span>
+                                        </span>
+                                    </button>
+                                );
+                            })()
+                        ))}
+                    </aside>
                 </div>
-                <aside className={styles.heroLevelStack} aria-label="Goal levels from ultimate to immediate">
-                    {heroGoalLevels.map((level) => (
-                        (() => {
-                            const HeroIcon = level.iconProps.isSmart ? AnimatedGoalIcon : GoalIcon;
-                            return (
+                <div className={styles.heroExamplePicker}>
+                    <p className={styles.heroPickerLabel}>{landingContent.examples.eyebrow}</p>
+                    {isExamplesLoading && !selectedExample ? (
+                        <div className={styles.exampleToggle} aria-hidden="true" data-testid="example-picker-skeleton">
+                            <LandingSkeleton height="48px" width="200px" radius="6px" />
+                            <LandingSkeleton height="48px" width="200px" radius="6px" />
+                            <LandingSkeleton height="48px" width="200px" radius="6px" />
+                        </div>
+                    ) : (
+                        <div className={styles.exampleToggle} role="tablist" aria-label="Example goal trees">
+                            {publishedExamples.map((example) => (
                                 <button
                                     type="button"
-                                    className={styles.heroLevelItem}
-                                    aria-label={`${level.label}: ${level.description}`}
-                                    key={level.label}
+                                    role="tab"
+                                    aria-selected={example.id === selectedExample?.id}
+                                    className={example.id === selectedExample?.id ? styles.toggleActive : ''}
+                                    onClick={() => handleExampleSelect(example.id, { scrollToTree: true })}
+                                    key={example.id}
                                 >
-                                    <span className={styles.heroLevelIcon} aria-hidden="true">
-                                        <HeroIcon
-                                            {...level.iconProps}
-                                            size={96}
-                                            reduced
+                                    <span aria-hidden="true" className={styles.exampleToggleIcon}>
+                                        <GoalIcon
+                                            {...example.rootIcon}
+                                            size={24}
                                         />
                                     </span>
-                                    <span className={styles.heroLevelTooltip} role="tooltip">
-                                        <strong>{level.label}</strong>
-                                        <span>{level.description}</span>
-                                    </span>
+                                    <span>{example.label}</span>
                                 </button>
-                            );
-                        })()
-                    ))}
-                </aside>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </section>
 
-            {selectedExample && (
-                <section className={styles.treeSection} id="examples" aria-labelledby="examples-title">
-                    <div className={styles.sectionHeader}>
-                        <h2 id="examples-title">{landingContent.examples.title}</h2>
-                        <p>{landingContent.examples.body}</p>
+            <section className={`${styles.treeSection} ${styles.snapSection}`} id="examples" aria-labelledby="examples-title">
+                <div className={`${styles.sectionHeader} ${styles.sectionHeaderCompact}`}>
+                    <h2 id="examples-title">{landingContent.examples.title}</h2>
+                    <p>{landingContent.examples.body}</p>
+                </div>
+                {!selectedExample ? (
+                    <div className={styles.goalExplorer} data-testid="examples-skeleton">
+                        <div className={styles.goalTreeCanvas}>
+                            <LandingSkeleton height="100%" width="100%" className={styles.flowTreeViewport} />
+                        </div>
                     </div>
-                    <div className={styles.exampleToggle} role="tablist" aria-label="Example goal trees">
-                        {publishedExamples.map((example) => (
-                            <button
-                                type="button"
-                                role="tab"
-                                aria-selected={example.id === selectedExample.id}
-                                className={example.id === selectedExample.id ? styles.toggleActive : ''}
-                                onClick={() => handleExampleSelect(example.id)}
-                                key={example.id}
-                            >
-                                <span aria-hidden="true" className={styles.exampleToggleIcon}>
-                                    <GoalIcon
-                                        {...example.rootIcon}
-                                        size={24}
-                                    />
-                                </span>
-                                <span>{example.label}</span>
-                            </button>
-                        ))}
-                    </div>
+                ) : (
                     <div className={styles.goalExplorer}>
                         <div className={styles.goalTreeCanvas} aria-label={`${selectedExample.root} goal tree`}>
                             <div className={styles.flowTreeViewport}>
@@ -692,26 +795,26 @@ function Landing() {
                             )}
                         </div>
                     </div>
-                    {selectedGoal && isMobile && (
-                        <Suspense fallback={<div className={styles.flowTreeLoading}>Loading details...</div>}>
-                            <GoalLevelsProvider seedLevels={snapshotLevels}>
-                                <GoalDetailModal
-                                    isOpen
-                                    onClose={() => setSelectedGoalId(null)}
-                                    goal={selectedGoal}
-                                    rootId={selectedExample.id}
-                                    treeData={selectedExample.tree}
-                                    displayMode="modal"
-                                    readOnly
-                                    onGoalSelect={handleGoalSelect}
-                                />
-                            </GoalLevelsProvider>
-                        </Suspense>
-                    )}
-                </section>
-            )}
+                )}
+                {selectedGoal && isMobile && (
+                    <Suspense fallback={<div className={styles.flowTreeLoading}>Loading details...</div>}>
+                        <GoalLevelsProvider seedLevels={snapshotLevels}>
+                            <GoalDetailModal
+                                isOpen
+                                onClose={() => setSelectedGoalId(null)}
+                                goal={selectedGoal}
+                                rootId={selectedExample.id}
+                                treeData={selectedExample.tree}
+                                displayMode="modal"
+                                readOnly
+                                onGoalSelect={handleGoalSelect}
+                            />
+                        </GoalLevelsProvider>
+                    </Suspense>
+                )}
+            </section>
 
-            <section className={styles.audienceSection} aria-labelledby="audience-title">
+            <section className={`${styles.audienceSection} ${styles.snapSection}`} id="audience" aria-labelledby="audience-title">
                 <div className={styles.sectionHeader}>
                     <h2 id="audience-title">{landingContent.audience.title}</h2>
                 </div>
@@ -725,29 +828,21 @@ function Landing() {
                 </div>
             </section>
 
-            {selectedExample && (
-                <LandingShowcaseFrame
-                    example={selectedExample}
-                    seedLevels={snapshotLevels}
-                />
-            )}
+            <LandingFeaturesSection
+                example={selectedExample}
+                seedLevels={snapshotLevels}
+                isMobile={isMobile}
+                isLoading={isExamplesLoading}
+                onGoalSelect={handleFeatureGoalSelect}
+                className={styles.snapSection}
+            />
 
-            <section className={styles.betaSection} id="beta" aria-labelledby="beta-title">
+            <section className={`${styles.betaSection} ${styles.snapSection}`} id="beta" aria-labelledby="beta-title">
                 <div className={styles.betaCopy}>
                     <h2 id="beta-title">{landingContent.beta.title}</h2>
                     <p>{landingContent.beta.body}</p>
                 </div>
                 <form className={styles.betaForm} onSubmit={handleSubmit}>
-                    <label>
-                        {landingContent.betaForm.nameLabel}
-                        <input
-                            type="text"
-                            value={formState.name}
-                            onChange={updateField('name')}
-                            autoComplete="name"
-                            required
-                        />
-                    </label>
                     <label>
                         {landingContent.betaForm.emailLabel}
                         <input
@@ -756,23 +851,6 @@ function Landing() {
                             onChange={updateField('email')}
                             autoComplete="email"
                             required
-                        />
-                    </label>
-                    <label>
-                        {landingContent.betaForm.useCaseLabel}
-                        <select value={formState.use_case} onChange={updateField('use_case')} required>
-                            {landingContent.betaForm.useCaseOptions.map((option) => (
-                                <option value={option.value} key={option.value}>{option.label}</option>
-                            ))}
-                        </select>
-                    </label>
-                    <label>
-                        {landingContent.betaForm.noteLabel}
-                        <textarea
-                            value={formState.note}
-                            onChange={updateField('note')}
-                            rows={4}
-                            maxLength={1000}
                         />
                     </label>
                     <button type="submit" disabled={!canSubmit}>

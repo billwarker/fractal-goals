@@ -28,9 +28,10 @@ class PublicService:
             request = BetaSignupRequest(email=email, source="landing_page")
             self.db_session.add(request)
 
-        request.name = data["name"]
-        request.use_case = data["use_case"]
-        request.note = data.get("note")
+        request.name = data.get("name") or request.name or "Beta access request"
+        request.use_case = data.get("use_case") or request.use_case or "interested beta user"
+        if "note" in data:
+            request.note = data.get("note")
         if request.status == "dismissed":
             request.status = "new"
 

@@ -31,17 +31,9 @@ import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 import { usePageTitle } from './hooks/usePageTitle';
 import { dismissGoalDetailsForNavigation } from './utils/navigationEvents';
 import { useGoalLevels } from './contexts/GoalLevelsContext';
+import { isPublicMarketingHost } from './utils/marketingHost';
 
-export const isPublicMarketingHost = (hostname = (typeof window === 'undefined' ? '' : window.location.hostname)) => {
-    const normalized = String(hostname || '').toLowerCase();
-    if (!normalized || normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '0.0.0.0') {
-        return false;
-    }
-    if (normalized.startsWith('my.')) {
-        return false;
-    }
-    return normalized === 'fractalgoals.com' || normalized === 'www.fractalgoals.com';
-};
+export { isPublicMarketingHost } from './utils/marketingHost';
 
 // Navigation header component defined outside of App to avoid re-declaration
 const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
