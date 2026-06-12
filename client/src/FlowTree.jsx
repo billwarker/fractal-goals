@@ -115,6 +115,7 @@ const FlowTree = React.forwardRef(({
     activeGoalWindowDays = ACTIVE_GOAL_WINDOW_DAYS,
     scopeTransitionKey = 0,
     layoutMode = 'tree',
+    interactionLocked = false,
 }, ref) => {
     const [rfInstance, setRfInstance] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
@@ -370,9 +371,9 @@ const FlowTree = React.forwardRef(({
                 maxZoom={isMobile ? 1.6 : 2}
                 nodesConnectable={false}
                 nodesDraggable={false}
-                panOnScroll={isMobile}
-                zoomOnScroll={true}
-                panOnDrag={layoutMode === 'hierarchy' ? true : (isMobile ? true : [0])}
+                panOnScroll={!interactionLocked && isMobile}
+                zoomOnScroll={!interactionLocked}
+                panOnDrag={interactionLocked ? false : (layoutMode === 'hierarchy' ? true : (isMobile ? true : [0]))}
                 defaultEdgeOptions={{
                     type: 'straight',
                     style: { stroke: 'var(--color-connection-line)', strokeWidth: 1.5 }

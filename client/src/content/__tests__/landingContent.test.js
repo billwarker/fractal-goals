@@ -113,6 +113,30 @@ Custom extra body.
         ]);
     });
 
+    it('parses examples highlight cards without leaking them into the section body', () => {
+        const content = parseLandingContent(`
+## Examples
+
+# Custom examples title
+
+Custom examples intro.
+
+### Custom highlight
+
+Custom highlight body.
+`);
+
+        expect(content.examples.title).toBe('Custom examples title');
+        expect(content.examples.body).toBe('Custom examples intro.');
+        expect(content.examples.cards).toEqual([
+            { title: 'Custom highlight', body: 'Custom highlight body.' },
+        ]);
+
+        // Omitting the cards keeps the built-in four.
+        const fallbackContent = parseLandingContent('## Examples\n\n# Title only\n');
+        expect(fallbackContent.examples.cards).toHaveLength(4);
+    });
+
     it('parses per-section nav labels and falls back when they are omitted', () => {
         const content = parseLandingContent(`
 ## Hero

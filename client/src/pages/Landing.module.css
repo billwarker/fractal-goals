@@ -56,8 +56,7 @@
     gap: 8px;
 }
 
-.nav a,
-.secondaryAction {
+.nav a {
     color: var(--color-text-secondary);
     border: 1px solid transparent;
     border-radius: var(--border-radius-sm);
@@ -70,8 +69,7 @@
     font-weight: 700;
 }
 
-.nav a:hover,
-.secondaryAction:hover {
+.nav a:hover {
     color: var(--color-text-primary);
     background: var(--color-bg-card-hover);
     border-color: var(--color-border);
@@ -88,22 +86,17 @@
     padding-top: 68px;
 }
 
+.heroBodyPanel {
+    margin-top: 32px;
+    max-width: min(1120px, 100%);
+    padding: clamp(20px, 3vw, 34px);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-lg);
+    background: color-mix(in srgb, var(--color-bg-card) 60%, transparent);
+}
+
 .heroExamplePicker {
     margin-top: 40px;
-}
-
-.heroPickerLabel {
-    margin: 0;
-    color: var(--color-text-muted);
-    font-size: var(--font-size-xs);
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0;
-}
-
-.heroExamplePicker .exampleToggle {
-    margin-top: 6px;
-    justify-content: flex-start;
 }
 
 .hero h1 {
@@ -114,9 +107,8 @@
     letter-spacing: 0;
 }
 
-.hero h2 {
-    margin: 24px 0 0;
-    max-width: var(--landing-readable-max-width);
+.heroBodyPanel p {
+    margin: 0;
     color: var(--color-text-secondary);
     font-size: clamp(1.2rem, 2.5vw, 2rem);
     line-height: var(--line-height-snug);
@@ -124,106 +116,6 @@
     letter-spacing: 0;
 }
 
-.heroActions {
-    margin-top: 32px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.heroLevelStack {
-    display: flex;
-    flex-wrap: wrap;
-    gap: clamp(10px, 1.8vw, 18px);
-    width: min(760px, 100%);
-    margin-top: 28px;
-}
-
-.heroLevelItem {
-    position: relative;
-    width: 104px;
-    height: 104px;
-    display: grid;
-    place-items: center;
-    flex: 0 0 auto;
-    padding: 0;
-    color: var(--color-text-primary);
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: var(--border-radius-sm);
-    cursor: help;
-}
-
-.heroLevelItem:hover,
-.heroLevelItem:focus-visible,
-.heroLevelItemOpen {
-    background: color-mix(in srgb, var(--color-bg-card) 48%, transparent);
-    border-color: color-mix(in srgb, var(--color-border) 78%, transparent);
-}
-
-.heroLevelItem:focus-visible {
-    outline: 2px solid var(--color-brand-primary);
-    outline-offset: 4px;
-}
-
-.heroLevelIcon {
-    display: grid;
-    place-items: center;
-    transform: scale(1);
-    transition: transform 160ms ease;
-}
-
-.heroLevelItem:hover .heroLevelIcon,
-.heroLevelItem:focus-visible .heroLevelIcon,
-.heroLevelItemOpen .heroLevelIcon {
-    transform: scale(1.08);
-}
-
-.heroLevelTooltip {
-    position: absolute;
-    top: calc(100% + 10px);
-    left: 50%;
-    z-index: 4;
-    width: min(280px, calc(100vw - 48px));
-    padding: 12px 14px;
-    color: var(--color-text-primary);
-    background: color-mix(in srgb, var(--color-bg-card) 96%, black);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm);
-    box-shadow: var(--shadow-lg);
-    opacity: 0;
-    pointer-events: none;
-    text-align: left;
-    transform: translate(-50%, -8px);
-    transition: opacity 140ms ease, transform 140ms ease;
-}
-
-.heroLevelTooltip strong,
-.heroLevelTooltip span {
-    display: block;
-}
-
-.heroLevelTooltip strong {
-    font-size: var(--font-size-base);
-    line-height: var(--line-height-snug);
-}
-
-.heroLevelTooltip span {
-    margin-top: 4px;
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
-    line-height: var(--line-height-base);
-}
-
-.heroLevelItem:hover .heroLevelTooltip,
-.heroLevelItem:focus-visible .heroLevelTooltip,
-.heroLevelItemOpen .heroLevelTooltip {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translate(-50%, 0);
-}
-
-.primaryAction,
 .betaForm button {
     min-height: 42px;
     border-radius: var(--border-radius-sm);
@@ -238,7 +130,6 @@
     justify-content: center;
 }
 
-.primaryAction:hover,
 .betaForm button:hover:not(:disabled) {
     color: white;
     background: var(--color-brand-primary-hover);
@@ -315,52 +206,112 @@
 }
 
 .exampleToggle {
-    margin-top: 22px;
+    margin-top: 0;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 18px 28px;
+    gap: clamp(48px, 10vw, 140px);
     align-items: center;
 }
 
 .exampleToggle button {
     font: inherit;
-}
-
-.exampleToggle button {
-    width: max-content;
-    max-width: min(420px, 100%);
-    min-height: 48px;
-    padding: 4px 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 12px;
-    color: var(--color-text-secondary);
-    background: transparent;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
-    cursor: pointer;
-    font-size: var(--font-size-lg);
-    font-weight: 800;
-    text-align: left;
-}
-
-.exampleToggle button span {
-    min-width: 0;
-    overflow-wrap: anywhere;
-}
-
-.exampleToggleIcon {
-    display: inline-flex;
+    position: relative;
+    width: clamp(108px, 10vw, 152px);
+    height: clamp(108px, 10vw, 152px);
+    display: grid;
+    place-items: center;
     flex: 0 0 auto;
+    padding: 0;
+    color: var(--color-text-primary);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
 }
 
 .exampleToggle button:hover,
+.exampleToggle button:focus-visible {
+    transform: translateY(-4px) scale(1.04);
+    background: color-mix(in srgb, var(--color-bg-card) 38%, transparent);
+    border-color: color-mix(in srgb, var(--color-border) 70%, transparent);
+    outline: none;
+}
+
 .exampleToggle .toggleActive {
+    border-color: color-mix(in srgb, var(--color-brand-primary) 58%, transparent);
+}
+
+.exampleToggleIcon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+}
+
+.exampleToggleLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.goalViewCards {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.goalViewCard {
+    display: grid;
+    gap: 6px;
+    align-content: start;
+    padding: 14px 16px;
+    text-align: left;
     color: var(--color-text-primary);
-    background: transparent;
-    border-bottom-color: var(--color-brand-primary);
+    background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.goalViewCard:hover {
+    background: var(--color-bg-card-hover);
+    border-color: color-mix(in srgb, var(--color-brand-primary) 55%, var(--color-border));
+}
+
+.goalViewCard:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 2px;
+}
+
+.goalViewCardActive {
+    border-color: var(--color-brand-primary);
+    box-shadow: inset 0 0 0 1px var(--color-brand-primary);
+}
+
+.goalViewCardTitle {
+    font-size: var(--font-size-base);
+    font-weight: 800;
+    line-height: var(--line-height-snug);
+}
+
+.goalViewCardBody {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-base);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .goalViewCard {
+        transition: none;
+    }
 }
 
 .goalExplorer {
@@ -380,6 +331,15 @@
     transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
+.goalTreeCanvasLocked {
+    cursor: pointer;
+}
+
+.goalTreeCanvas:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 2px;
+}
+
 /*
  * The FlowTree viewport is a flex sibling of the docked detail panel, so opening
  * the panel physically compresses this box. The FlowTree then re-fits/re-centers
@@ -391,6 +351,10 @@
     flex: 1;
     min-width: 0;
     height: 100%;
+}
+
+.flowTreeViewportLocked {
+    pointer-events: none;
 }
 
 .goalTreeCanvas:hover {
@@ -529,19 +493,8 @@
         flex-wrap: wrap;
     }
 
-    .heroLevelStack {
-        width: 100%;
-        gap: 12px;
-    }
-
-    .heroLevelItem {
-        width: 90px;
-        height: 90px;
-        justify-self: center;
-    }
-
     .exampleToggle {
-        justify-content: flex-start;
+        gap: 24px;
     }
 
     .audienceGrid {
@@ -572,32 +525,13 @@
         font-size: 3.2rem;
     }
 
-    .hero h2,
+    .heroBodyPanel p,
     .betaCopy p {
         font-size: var(--font-size-base);
     }
 
-    .heroLevelStack {
-        gap: 6px;
-    }
-
-    .heroLevelItem {
-        width: 60px;
-        height: 60px;
-    }
-
-    .heroLevelIcon {
-        transform: scale(0.64);
-    }
-
-    .heroLevelItem:hover .heroLevelIcon,
-    .heroLevelItem:focus-visible .heroLevelIcon,
-    .heroLevelItemOpen .heroLevelIcon {
-        transform: scale(0.7);
-    }
-
-    .heroLevelTooltip {
-        width: min(260px, calc(100vw - 28px));
+    .heroBodyPanel {
+        padding: 18px;
     }
 
     .audienceGrid {
@@ -605,12 +539,16 @@
     }
 
     .exampleToggle {
-        align-items: stretch;
-        flex-direction: column;
+        gap: 18px;
     }
 
     .exampleToggle button {
-        width: 100%;
+        width: 86px;
+        height: 86px;
+    }
+
+    .exampleToggleIcon {
+        transform: scale(0.7);
     }
 
     .goalTreeCanvas {
@@ -629,6 +567,9 @@
  */
 @media (min-width: 981px) {
     .page {
+        --landing-page-x-padding: clamp(12px, 1.2vw, 24px);
+        --landing-right-rail-reserve: clamp(82px, 4.6vw, 104px);
+
         height: 100%;
         overflow-y: auto;
         padding: 0;
@@ -649,23 +590,101 @@
         padding: 20px var(--landing-page-x-padding) 24px;
     }
 
+    .treeSection {
+        box-sizing: border-box;
+        width: calc(100% - var(--landing-right-rail-reserve));
+        max-width: none;
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: var(--landing-page-x-padding);
+        padding-right: 0;
+    }
+
     .hero {
         min-height: 0;
-        padding-bottom: 32px;
+        padding-bottom: clamp(18px, 3vh, 34px);
+    }
+
+    .hero .header {
+        flex: 0 0 auto;
+        align-self: center;
+        justify-content: center;
+        gap: clamp(24px, 3vw, 44px);
+        min-height: 56px;
+    }
+
+    .brand {
+        font-size: var(--font-size-base);
+    }
+
+    .nav {
+        gap: clamp(12px, 1.6vw, 24px);
+    }
+
+    .nav a {
+        font-size: var(--font-size-base);
     }
 
     .heroCopy {
         flex: 1;
         min-height: 0;
-        padding-top: 0;
+        padding-top: clamp(52px, 9vh, 112px);
         display: flex;
         flex-direction: column;
-        justify-content: center;
+        align-items: center;
+        justify-content: flex-start;
+        text-align: center;
+    }
+
+    .hero h1 {
+        max-width: min(1120px, 100%);
+        font-size: clamp(3.6rem, 5.8vw, 6.8rem);
+        line-height: 0.98;
+        transition: opacity 140ms ease;
+    }
+
+    .heroBodyPanel {
+        margin-top: clamp(32px, 6vh, 76px);
+        width: min(1120px, calc(100% - 120px));
+        text-align: left;
     }
 
     .heroExamplePicker {
         flex: 0 0 auto;
-        margin-top: 24px;
+        margin-top: auto;
+    }
+
+    /* Goals-view section: sidebar (header message + highlight cards) on the
+       left, the goal explorer panel filling the remaining viewport. */
+    .goalViewLayout {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        align-items: stretch;
+        gap: clamp(12px, 1.4vw, 22px);
+        margin-top: 0;
+    }
+
+    .goalViewSidebar {
+        flex: 0 0 clamp(220px, 18vw, 300px);
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        overflow-y: auto;
+    }
+
+    .goalViewCards {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .goalViewMain {
+        flex: 1;
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
     }
 
     .goalExplorer {
@@ -673,7 +692,7 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
-        margin-top: 12px;
+        margin-top: 0;
     }
 
     .goalTreeCanvas {
@@ -709,31 +728,31 @@
     }
 }
 
-/* Tighten the hero so headline + level icons + picker fit shorter screens. */
+/* Tighten the hero so headline + example picker fit shorter screens. */
 @media (min-width: 981px) and (max-height: 820px) {
+    .heroCopy {
+        padding-top: clamp(28px, 6vh, 54px);
+    }
+
     .hero h1 {
         font-size: clamp(2.6rem, 6vw, 4.6rem);
     }
 
-    .hero h2 {
-        margin-top: 14px;
+    .heroBodyPanel {
+        margin-top: clamp(18px, 4vh, 34px);
+        padding: 18px 22px;
+    }
+
+    .heroBodyPanel p {
         font-size: clamp(1.05rem, 2vw, 1.4rem);
     }
 
-    .heroActions {
-        margin-top: 20px;
+    .exampleToggle button {
+        width: 108px;
+        height: 108px;
     }
 
-    .heroLevelStack {
-        margin-top: 18px;
-    }
-
-    .heroLevelItem {
-        width: 80px;
-        height: 80px;
-    }
-
-    .heroExamplePicker {
-        margin-top: 14px;
+    .exampleToggleIcon {
+        transform: scale(0.82);
     }
 }

@@ -10,7 +10,21 @@
         transform: translateY(-50%);
         /* Above the docked goal-detail panel (z-index 10) inside the explorer. */
         z-index: 30;
-        display: block;
+        width: 52px;
+        display: grid;
+        justify-items: center;
+        transition: top 220ms ease, transform 220ms ease;
+    }
+
+    .railWithExamples {
+        top: calc(50% - 14px);
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rail {
+        transition: none;
     }
 }
 
@@ -25,8 +39,8 @@
 
 .dotButton {
     position: relative;
-    width: 28px;
-    height: 28px;
+    width: 40px;
+    height: 40px;
     display: grid;
     place-items: center;
     padding: 0;

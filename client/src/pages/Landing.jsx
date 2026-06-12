@@ -97,6 +97,13 @@ const sectionNavItems = [
 ];
 const SECTION_IDS = sectionNavItems.map((section) => section.id);
 
+// The goals-view sidebar cards demo one tree feature each; card copy comes from
+// landing.md (examples cards) in this fixed order.
+const GOAL_VIEW_DEMO_KEYS = ['lineage', 'evidence', 'metrics', 'layout'];
+const goalViewCards = (landingContent.examples.cards || [])
+    .slice(0, GOAL_VIEW_DEMO_KEYS.length)
+    .map((card, index) => ({ ...card, key: GOAL_VIEW_DEMO_KEYS[index] }));
+
 function prefersReducedMotion() {
     return typeof window !== 'undefined'
         && typeof window.matchMedia === 'function'
@@ -339,24 +346,6 @@ function findFirstGoalByType(rootNode, goalType) {
     return null;
 }
 
-function buildHeroGoalLevels(example) {
-    return goalLevels.map((level) => {
-        const exampleGoal = findFirstGoalByType(example?.tree, level.type);
-        const iconProps = exampleGoal
-            ? getGoalIconProps(exampleGoal)
-            : {
-                shape: level.shape,
-                color: level.color,
-                secondaryColor: level.secondaryColor,
-                isSmart: level.type === 'UltimateGoal',
-            };
-        return {
-            ...level,
-            iconProps,
-        };
-    });
-}
-
 function Landing() {
     const isMobile = useIsMobile();
     const [selectedExampleId, setSelectedExampleId] = useState(null);
@@ -365,9 +354,8 @@ function Landing() {
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
     const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
     const [isOptionsPaneMinimized, setIsOptionsPaneMinimized] = useState(false);
-    // Hover doesn't exist on touch devices, so hero level tooltips also toggle
-    // on tap and dismiss on outside taps.
-    const [openHeroLevel, setOpenHeroLevel] = useState(null);
+    const [hoveredHeroExampleId, setHoveredHeroExampleId] = useState(null);
+    const [isGoalTreeInteractionLocked, setIsGoalTreeInteractionLocked] = useState(true);
     const [formState, setFormState] = useState(initialFormState);
     const [status, setStatus] = useState('idle');
     const [message, setMessage] = useState('');
@@ -445,12 +433,13 @@ function Landing() {
         () => findGoalNodeById(selectedExample?.tree, selectedGoalId),
         [selectedExample, selectedGoalId]
     );
+    const hoveredHeroExample = useMemo(
+        () => publishedExamples.find((example) => example.id === hoveredHeroExampleId) || null,
+        [hoveredHeroExampleId, publishedExamples]
+    );
+    const heroTitle = hoveredHeroExample?.root || landingContent.hero.title;
     const snapshotLevels = useMemo(
         () => collectSnapshotLevels(selectedExample?.tree),
-        [selectedExample]
-    );
-    const heroGoalLevels = useMemo(
-        () => buildHeroGoalLevels(selectedExample),
         [selectedExample]
     );
     useEffect(() => {
@@ -523,6 +512,8 @@ function Landing() {
     const handleExampleSelect = (exampleId, { scrollToTree = false } = {}) => {
         setSelectedExampleId(exampleId);
         setSelectedGoalId(null);
+        setHoveredHeroExampleId(null);
+        setIsGoalTreeInteractionLocked(true);
         setFlowTreeScopeKey((current) => current + 1);
         if (scrollToTree) {
             scrollToSection('examples');
@@ -547,6 +538,49 @@ function Landing() {
     const handleFeatureGoalSelect = (goal) => {
         handleGoalSelect(goal);
         scrollToSection('examples');
+    };
+
+    useEffect(() => {
+        if (activeSectionId !== 'examples') {
+            setIsGoalTreeInteractionLocked(true);
+        }
+    }, [activeSectionId]);
+
+    // A representative mid-tree goal for the lineage-scoping card demo.
+    const demoLineageGoal = useMemo(() => (
+        findFirstGoalByType(selectedExample?.tree, 'ShortTermGoal')
+        || findFirstGoalByType(selectedExample?.tree, 'MidTermGoal')
+        || selectedExample?.tree?.children?.[0]
+        || null
+    ), [selectedExample]);
+
+    const goalViewCardActiveState = {
+        lineage: Boolean(selectedGoal),
+        evidence: viewSettings.fadeInactiveBranches,
+        metrics: viewSettings.showMetricsOverlay,
+        layout: goalsViewMode === 'hierarchy',
+    };
+
+    const handleGoalViewCardActivate = (cardKey) => {
+        if (cardKey === 'lineage') {
+            if (selectedGoalId) {
+                clearSelectedGoal();
+            } else if (demoLineageGoal) {
+                handleGoalSelect(demoLineageGoal);
+            }
+            return;
+        }
+        if (cardKey === 'evidence') {
+            setViewSettings((prev) => ({ ...prev, fadeInactiveBranches: !prev.fadeInactiveBranches }));
+            return;
+        }
+        if (cardKey === 'metrics') {
+            setViewSettings((prev) => ({ ...prev, showMetricsOverlay: !prev.showMetricsOverlay }));
+            return;
+        }
+        if (cardKey === 'layout') {
+            setGoalsViewMode((prev) => (prev === 'tree' ? 'hierarchy' : 'tree'));
+        }
     };
 
     // Mirror the goals page: scope-changing toggles fade the tree out, apply after a
@@ -576,17 +610,6 @@ function Landing() {
             clearTimeout(flowTreeScopeTransitionTimerRef.current);
         }
     }, []);
-
-    useEffect(() => {
-        if (!openHeroLevel) return undefined;
-        const handlePointerDown = (event) => {
-            if (!event.target.closest?.(`.${styles.heroLevelItem}`)) {
-                setOpenHeroLevel(null);
-            }
-        };
-        document.addEventListener('pointerdown', handlePointerDown);
-        return () => document.removeEventListener('pointerdown', handlePointerDown);
-    }, [openHeroLevel]);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -621,6 +644,7 @@ function Landing() {
                 sections={sectionNavItems}
                 activeId={activeSectionId}
                 onNavigate={scrollToSection}
+                hasExampleRail={activeSectionId !== 'hero'}
             />
             {activeSectionId !== 'hero' && (
                 <LandingExampleRail
@@ -651,151 +675,159 @@ function Landing() {
                     </nav>
                 </header>
                 <div className={styles.heroCopy}>
-                    <h1 id="landing-title">{landingContent.hero.title}</h1>
-                    <h2>{landingContent.hero.body}</h2>
-                    <div className={styles.heroActions}>
-                        {landingContent.hero.actions.map((action, index) => (
-                            <a
-                                className={index === 0 ? styles.primaryAction : styles.secondaryAction}
-                                href={action.href}
-                                key={`${action.href}-${action.label}`}
-                            >
-                                {action.label}
-                            </a>
-                        ))}
+                    <h1 id="landing-title">{heroTitle}</h1>
+                    <div className={styles.heroBodyPanel}>
+                        <p>{landingContent.hero.body}</p>
                     </div>
-                    <aside className={styles.heroLevelStack} aria-label="Goal levels from ultimate to immediate">
-                        {heroGoalLevels.map((level) => (
-                            (() => {
-                                const HeroIcon = level.iconProps.isSmart ? AnimatedGoalIcon : GoalIcon;
-                                return (
-                                    <button
-                                        type="button"
-                                        className={`${styles.heroLevelItem} ${openHeroLevel === level.label ? styles.heroLevelItemOpen : ''}`}
-                                        aria-label={`${level.label}: ${level.description}`}
-                                        aria-expanded={openHeroLevel === level.label}
-                                        onClick={() => setOpenHeroLevel((current) => (current === level.label ? null : level.label))}
-                                        key={level.label}
-                                    >
-                                        <span className={styles.heroLevelIcon} aria-hidden="true">
-                                            <HeroIcon
-                                                {...level.iconProps}
-                                                size={96}
-                                                reduced
-                                            />
-                                        </span>
-                                        <span className={styles.heroLevelTooltip} role="tooltip">
-                                            <strong>{level.label}</strong>
-                                            <span>{level.description}</span>
-                                        </span>
-                                    </button>
-                                );
-                            })()
-                        ))}
-                    </aside>
                 </div>
                 <div className={styles.heroExamplePicker}>
-                    <p className={styles.heroPickerLabel}>{landingContent.examples.eyebrow}</p>
                     {isExamplesLoading && !selectedExample ? (
                         <div className={styles.exampleToggle} aria-hidden="true" data-testid="example-picker-skeleton">
-                            <LandingSkeleton height="48px" width="200px" radius="6px" />
-                            <LandingSkeleton height="48px" width="200px" radius="6px" />
-                            <LandingSkeleton height="48px" width="200px" radius="6px" />
+                            <LandingSkeleton height="120px" width="120px" radius="8px" />
+                            <LandingSkeleton height="120px" width="120px" radius="8px" />
+                            <LandingSkeleton height="120px" width="120px" radius="8px" />
                         </div>
                     ) : (
                         <div className={styles.exampleToggle} role="tablist" aria-label="Example goal trees">
-                            {publishedExamples.map((example) => (
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={example.id === selectedExample?.id}
-                                    className={example.id === selectedExample?.id ? styles.toggleActive : ''}
-                                    onClick={() => handleExampleSelect(example.id, { scrollToTree: true })}
-                                    key={example.id}
-                                >
-                                    <span aria-hidden="true" className={styles.exampleToggleIcon}>
-                                        <GoalIcon
-                                            {...example.rootIcon}
-                                            size={24}
-                                        />
-                                    </span>
-                                    <span>{example.label}</span>
-                                </button>
-                            ))}
+                            {publishedExamples.map((example) => {
+                                const HeroExampleIcon = example.rootIcon?.isSmart ? AnimatedGoalIcon : GoalIcon;
+                                return (
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={example.id === selectedExample?.id}
+                                        aria-label={example.root}
+                                        className={example.id === selectedExample?.id ? styles.toggleActive : ''}
+                                        onMouseEnter={() => setHoveredHeroExampleId(example.id)}
+                                        onMouseLeave={() => setHoveredHeroExampleId(null)}
+                                        onFocus={() => setHoveredHeroExampleId(example.id)}
+                                        onBlur={() => setHoveredHeroExampleId(null)}
+                                        onClick={() => handleExampleSelect(example.id, { scrollToTree: true })}
+                                        key={example.id}
+                                    >
+                                        <span aria-hidden="true" className={styles.exampleToggleIcon}>
+                                            <HeroExampleIcon
+                                                {...example.rootIcon}
+                                                size={112}
+                                                reduced
+                                            />
+                                        </span>
+                                        <span className={styles.exampleToggleLabel}>{example.root}</span>
+                                    </button>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
             </section>
 
             <section className={`${styles.treeSection} ${styles.snapSection}`} id="examples" aria-labelledby="examples-title">
-                <div className={`${styles.sectionHeader} ${styles.sectionHeaderCompact}`}>
-                    <h2 id="examples-title">{landingContent.examples.title}</h2>
-                    <p>{landingContent.examples.body}</p>
-                </div>
-                {!selectedExample ? (
-                    <div className={styles.goalExplorer} data-testid="examples-skeleton">
-                        <div className={styles.goalTreeCanvas}>
-                            <LandingSkeleton height="100%" width="100%" className={styles.flowTreeViewport} />
+                <div className={styles.goalViewLayout}>
+                    <aside className={styles.goalViewSidebar}>
+                        <div className={`${styles.sectionHeader} ${styles.sectionHeaderCompact}`}>
+                            <h2 id="examples-title">{landingContent.examples.title}</h2>
+                            <p>{landingContent.examples.body}</p>
                         </div>
-                    </div>
-                ) : (
-                    <div className={styles.goalExplorer}>
-                        <div className={styles.goalTreeCanvas} aria-label={`${selectedExample.root} goal tree`}>
-                            <div className={styles.flowTreeViewport}>
-                                <FlowTreeOptionsPane
-                                    isMobile={isMobile}
-                                    isMinimized={isOptionsPaneMinimized}
-                                    onToggleMinimized={() => setIsOptionsPaneMinimized((prev) => !prev)}
-                                    goalsViewMode={goalsViewMode}
-                                    onGoalsViewModeChange={setGoalsViewMode}
-                                    viewSettings={viewSettings}
-                                    onToggleViewSetting={handleToggleViewSetting}
-                                    inactiveBranchTooltip="Dims branches with no recent completed activity evidence."
-                                    hideInactiveTooltip="Hides goals with no completed activity evidence in the active window."
-                                    hideCompletedTooltip="Hides completed goals from the fractal tree."
-                                />
-                                <Suspense fallback={<div className={styles.flowTreeLoading}>Loading preview...</div>}>
-                                    <FlowTree
-                                        ref={flowTreeRef}
-                                        key={`${selectedExample.id}-${goalsViewMode}`}
-                                        treeData={selectedExample.tree}
-                                        onNodeClick={handleGoalSelect}
-                                        onAddChild={null}
-                                        viewSettings={viewSettings}
-                                        evidenceGoalIds={selectedExample.evidenceGoalIds}
-                                        metricsSummary={selectedExample.metricsSummary}
-                                        programs={selectedExample.programs}
-                                        layoutMode={goalsViewMode}
-                                        selectedNodeId={selectedGoalId}
-                                        zoomTargetNodeId={selectedGoalId}
-                                        scopeTransitionKey={flowTreeScopeKey}
-                                        sidebarOpen={Boolean(selectedGoal)}
-                                    />
-                                </Suspense>
+                        <div className={styles.goalViewCards} role="group" aria-label="Goals view highlights">
+                            {goalViewCards.map((card) => (
+                                <button
+                                    type="button"
+                                    className={`${styles.goalViewCard} ${goalViewCardActiveState[card.key] ? styles.goalViewCardActive : ''}`}
+                                    aria-pressed={Boolean(goalViewCardActiveState[card.key])}
+                                    onClick={() => handleGoalViewCardActivate(card.key)}
+                                    key={card.key}
+                                >
+                                    <span className={styles.goalViewCardTitle}>{card.title}</span>
+                                    <span className={styles.goalViewCardBody}>{card.body}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </aside>
+                    <div className={styles.goalViewMain}>
+                        {!selectedExample ? (
+                            <div className={styles.goalExplorer} data-testid="examples-skeleton">
+                                <div className={styles.goalTreeCanvas}>
+                                    <LandingSkeleton height="100%" width="100%" className={styles.flowTreeViewport} />
+                                </div>
                             </div>
-                            {selectedGoal && !isMobile && (
-                                <div className="details-window sidebar docked landing-goal-dock">
-                                    <div className="window-content landing-goal-dock-content">
-                                        <Suspense fallback={<div className={styles.flowTreeLoading}>Loading details...</div>}>
-                                            <GoalLevelsProvider seedLevels={snapshotLevels}>
-                                                <GoalDetailModal
-                                                    isOpen
-                                                    onClose={clearSelectedGoal}
-                                                    goal={selectedGoal}
-                                                    rootId={selectedExample.id}
-                                                    treeData={selectedExample.tree}
-                                                    displayMode="panel"
-                                                    readOnly
-                                                    onGoalSelect={handleGoalSelect}
-                                                />
-                                            </GoalLevelsProvider>
+                        ) : (
+                            <div className={styles.goalExplorer}>
+                                <div
+                                    className={`${styles.goalTreeCanvas} ${isGoalTreeInteractionLocked ? styles.goalTreeCanvasLocked : ''}`}
+                                    aria-label={`${selectedExample.root} goal tree`}
+                                    aria-describedby="examples-title"
+                                    role="group"
+                                    tabIndex={0}
+                                    onPointerDown={() => setIsGoalTreeInteractionLocked(false)}
+                                    onFocus={() => setIsGoalTreeInteractionLocked(false)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === 'Escape') {
+                                            setIsGoalTreeInteractionLocked(true);
+                                            event.currentTarget.blur();
+                                        }
+                                    }}
+                                >
+                                    <div
+                                        className={`${styles.flowTreeViewport} ${isGoalTreeInteractionLocked ? styles.flowTreeViewportLocked : ''}`}
+                                        data-interaction-locked={isGoalTreeInteractionLocked ? 'true' : 'false'}
+                                    >
+                                        <FlowTreeOptionsPane
+                                            isMobile={isMobile}
+                                            isMinimized={isOptionsPaneMinimized}
+                                            onToggleMinimized={() => setIsOptionsPaneMinimized((prev) => !prev)}
+                                            goalsViewMode={goalsViewMode}
+                                            onGoalsViewModeChange={setGoalsViewMode}
+                                            viewSettings={viewSettings}
+                                            onToggleViewSetting={handleToggleViewSetting}
+                                            inactiveBranchTooltip="Dims branches with no recent completed activity evidence."
+                                            hideInactiveTooltip="Hides goals with no completed activity evidence in the active window."
+                                            hideCompletedTooltip="Hides completed goals from the fractal tree."
+                                        />
+                                        <Suspense fallback={<div className={styles.flowTreeLoading}>Loading preview...</div>}>
+                                            <FlowTree
+                                                ref={flowTreeRef}
+                                                key={`${selectedExample.id}-${goalsViewMode}`}
+                                                treeData={selectedExample.tree}
+                                                onNodeClick={handleGoalSelect}
+                                                onAddChild={null}
+                                                viewSettings={viewSettings}
+                                                evidenceGoalIds={selectedExample.evidenceGoalIds}
+                                                metricsSummary={selectedExample.metricsSummary}
+                                                programs={selectedExample.programs}
+                                                layoutMode={goalsViewMode}
+                                                selectedNodeId={selectedGoalId}
+                                                zoomTargetNodeId={selectedGoalId}
+                                                scopeTransitionKey={flowTreeScopeKey}
+                                                sidebarOpen={Boolean(selectedGoal)}
+                                                interactionLocked={isGoalTreeInteractionLocked}
+                                            />
                                         </Suspense>
                                     </div>
+                                    {selectedGoal && !isMobile && (
+                                        <div className="details-window sidebar docked landing-goal-dock">
+                                            <div className="window-content landing-goal-dock-content">
+                                                <Suspense fallback={<div className={styles.flowTreeLoading}>Loading details...</div>}>
+                                                    <GoalLevelsProvider seedLevels={snapshotLevels}>
+                                                        <GoalDetailModal
+                                                            isOpen
+                                                            onClose={clearSelectedGoal}
+                                                            goal={selectedGoal}
+                                                            rootId={selectedExample.id}
+                                                            treeData={selectedExample.tree}
+                                                            displayMode="panel"
+                                                            readOnly
+                                                            onGoalSelect={handleGoalSelect}
+                                                        />
+                                                    </GoalLevelsProvider>
+                                                </Suspense>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
-                )}
+                </div>
                 {selectedGoal && isMobile && (
                     <Suspense fallback={<div className={styles.flowTreeLoading}>Loading details...</div>}>
                         <GoalLevelsProvider seedLevels={snapshotLevels}>

@@ -61,6 +61,22 @@ Every session you log rolls up to the goal it serves, so you can always see whet
 
 Every Fractal Goals plan starts as a single big goal and branches into smaller, trackable goals, programs, and sessions. Here are four complete examples across different disciplines.
 
+### Focus on any goal
+
+Click a goal to scope the tree to its lineage - everything it serves and everything that serves it.
+
+### Evidence-aware branches
+
+Branches with recent completed work stay bright; inactive ones fade so you can see where the work is landing.
+
+### Metrics at a glance
+
+Overlay practice time and session counts on every goal, pulled straight from the logged sessions.
+
+### Tree or hierarchy
+
+Read the same goals as a spatial tree or a compact hierarchy - whichever fits how you think.
+
 ## Features
 
 **Eyebrow:** The full toolkit

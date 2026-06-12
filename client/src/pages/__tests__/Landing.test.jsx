@@ -19,11 +19,11 @@ vi.mock('../../utils/api', () => ({
 }));
 
 vi.mock('../../components/atoms/GoalIcon', () => ({
-    default: ({ shape }) => <span data-testid="goal-icon">{shape}</span>,
+    default: ({ shape, isSmart }) => <span data-testid="goal-icon" data-smart={isSmart ? 'yes' : 'no'}>{shape}</span>,
 }));
 
 vi.mock('../../components/atoms/AnimatedGoalIcon', () => ({
-    default: ({ shape }) => <span data-testid="animated-goal-icon">{shape}</span>,
+    default: ({ shape, isSmart }) => <span data-testid="animated-goal-icon" data-smart={isSmart ? 'yes' : 'no'}>{shape}</span>,
 }));
 
 vi.mock('../../FlowTree', () => ({
@@ -37,6 +37,8 @@ vi.mock('../../FlowTree', () => ({
         evidenceGoalIds,
         metricsSummary,
         programs,
+        viewSettings,
+        interactionLocked,
     }) => {
         const firstChild = treeData.children[0];
         const displayedLeaf = firstChild?.children?.[0]?.children?.[0] || firstChild?.children?.[0] || firstChild;
@@ -50,6 +52,9 @@ vi.mock('../../FlowTree', () => ({
                 data-evidence-count={evidenceGoalIds ? evidenceGoalIds.size : 'none'}
                 data-has-metrics={metricsSummary ? 'yes' : 'no'}
                 data-program-count={Array.isArray(programs) ? programs.length : 'none'}
+                data-fade-inactive={viewSettings?.fadeInactiveBranches ? 'yes' : 'no'}
+                data-metrics-overlay={viewSettings?.showMetricsOverlay ? 'yes' : 'no'}
+                data-interaction-locked={interactionLocked ? 'yes' : 'no'}
             >
                 <span>{treeData.name}</span>
                 {displayedLeaf && <span>{displayedLeaf.name}</span>}
@@ -175,7 +180,7 @@ const publishedExamples = {
                 name: 'Become a skilled guitar player',
                 type: 'UltimateGoal',
                 level: { icon: 'star', color: '#66d9ef', secondary_color: '#102235' },
-                attributes: { id: 'guitar-root', type: 'UltimateGoal', created_at: '2026-01-01T00:00:00Z' },
+                attributes: { id: 'guitar-root', type: 'UltimateGoal', created_at: '2026-01-01T00:00:00Z', is_smart: true },
                 children: [
                     {
                         id: 'guitar-musicianship',
@@ -307,20 +312,19 @@ describe('Landing', () => {
         renderLanding();
 
         expect(screen.getByRole('heading', { name: landingContent.hero.title })).toBeInTheDocument();
-        expect(screen.getByRole('heading', { name: landingContent.hero.body })).toBeInTheDocument();
+        expect(screen.getByText(landingContent.hero.body)).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: landingContent.audience.title })).toBeInTheDocument();
-        const goalLevels = screen.getByLabelText('Goal levels from ultimate to immediate');
-        expect(goalLevels).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Ultimate: The identity-level ambition/ })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Long Term: Major directions/ })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Mid Term: Trackable milestones/ })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Short Term: Focused projects/ })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Immediate: The next concrete action/ })).toBeInTheDocument();
-        expect(screen.getAllByTestId('animated-goal-icon').length).toBeGreaterThan(0);
         expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '#features');
-        expect(await screen.findByRole('tab', { name: 'Guitar practice tracker' })).toHaveAttribute('aria-selected', 'true');
-        expect(await screen.findByRole('tab', { name: 'Chinese language tracker' })).toBeInTheDocument();
-        expect(screen.getAllByTestId('goal-icon').some((icon) => icon.textContent === 'star')).toBe(true);
+        expect(await screen.findByRole('tab', { name: 'Become a skilled guitar player' })).toHaveAttribute('aria-selected', 'true');
+        const chineseHeroTab = await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
+        expect(chineseHeroTab).toBeInTheDocument();
+        fireEvent.mouseEnter(chineseHeroTab);
+        expect(screen.getByRole('heading', { name: 'Become fluent in Chinese' })).toBeInTheDocument();
+        fireEvent.mouseLeave(chineseHeroTab);
+        expect(screen.getByRole('heading', { name: landingContent.hero.title })).toBeInTheDocument();
+        expect(screen.getAllByTestId('animated-goal-icon').some((icon) => (
+            icon.textContent === 'star' && icon.getAttribute('data-smart') === 'yes'
+        ))).toBe(true);
         expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
         expect(await screen.findByTestId('flow-tree-demo')).toHaveAttribute('data-layout-mode', 'tree');
         expect(screen.getAllByText('Become a skilled guitar player').length).toBeGreaterThan(0);
@@ -334,8 +338,8 @@ describe('Landing', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Close goal details' }));
         expect(screen.queryByLabelText('Build complete musicianship details')).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('tab', { name: 'Chinese language tracker' }));
-        expect(screen.getByRole('tab', { name: 'Chinese language tracker' })).toHaveAttribute('aria-selected', 'true');
+        fireEvent.click(chineseHeroTab);
+        expect(screen.getByRole('tab', { name: 'Become fluent in Chinese' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getAllByText('Shadow 10 minutes').length).toBeGreaterThan(0);
         expect(await screen.findByLabelText('Listening Review detail preview')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Session Notes' })).toBeInTheDocument();
@@ -357,7 +361,7 @@ describe('Landing', () => {
     it('scopes and centers the flow tree to the clicked goal lineage', async () => {
         renderLanding();
 
-        await screen.findByRole('tab', { name: 'Chinese language tracker' });
+        await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         const tree = await screen.findByTestId('flow-tree-demo');
         expect(tree).toHaveAttribute('data-selected-node-id', '');
         const initialScopeKey = tree.getAttribute('data-scope-transition-key');
@@ -399,7 +403,7 @@ describe('Landing', () => {
     it('mirrors the goals page: view-options widget, view-mode toggle, and full snapshot data', async () => {
         renderLanding();
 
-        await screen.findByRole('tab', { name: 'Chinese language tracker' });
+        await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         const tree = await screen.findByTestId('flow-tree-demo');
 
         // The full FlowTreeOptionsPane widget renders (tree/hierarchy toggle + checkboxes).
@@ -426,7 +430,7 @@ describe('Landing', () => {
     it('renders the features section with detached toggles, in-box copy, and read-only surfaces', async () => {
         const { container } = renderLanding();
 
-        await screen.findByRole('tab', { name: 'Chinese language tracker' });
+        await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         expect(screen.getByRole('heading', { name: landingContent.features.title })).toBeInTheDocument();
 
         // The feature toggle row is its own tablist, not nested in the stage frame.
@@ -505,7 +509,7 @@ describe('Landing', () => {
 
         renderLanding();
 
-        await screen.findByRole('tab', { name: 'Chinese language tracker' });
+        await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         // Featured session replaces the most-recent default.
         expect(screen.getByLabelText('Featured Older Session detail preview')).toBeInTheDocument();
 
@@ -529,7 +533,7 @@ describe('Landing', () => {
     it('opens the goal detail in the real docked side-in panel', async () => {
         const { container } = renderLanding();
 
-        await screen.findByRole('tab', { name: 'Chinese language tracker' });
+        await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         await screen.findByTestId('flow-tree-demo');
         fireEvent.click(screen.getByRole('button', { name: 'Open mocked goal' }));
 
@@ -555,7 +559,7 @@ describe('Landing', () => {
 
         resolveExamples({ data: publishedExamples });
 
-        expect(await screen.findByRole('tab', { name: 'Guitar practice tracker' })).toHaveAttribute('aria-selected', 'true');
+        expect(await screen.findByRole('tab', { name: 'Become a skilled guitar player' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
         expect(screen.queryByTestId('example-picker-skeleton')).not.toBeInTheDocument();
         expect(screen.queryByTestId('examples-skeleton')).not.toBeInTheDocument();
@@ -573,7 +577,7 @@ describe('Landing', () => {
         // The initial default selection must not auto-scroll the page.
         expect(scrollIntoViewCalls).toHaveLength(0);
 
-        fireEvent.click(screen.getByRole('tab', { name: 'Chinese language tracker' }));
+        fireEvent.click(screen.getByRole('tab', { name: 'Become fluent in Chinese' }));
         expect(scrollIntoViewCalls).toHaveLength(1);
         expect(scrollIntoViewCalls[0].element.id).toBe('examples');
         expect(scrollIntoViewCalls[0].options).toEqual({ behavior: 'smooth', block: 'start' });
@@ -591,14 +595,14 @@ describe('Landing', () => {
 
         renderLanding();
 
-        fireEvent.click(await screen.findByRole('tab', { name: 'Chinese language tracker' }));
+        fireEvent.click(await screen.findByRole('tab', { name: 'Become fluent in Chinese' }));
         expect(scrollIntoViewCalls).toHaveLength(1);
         expect(scrollIntoViewCalls[0].options).toEqual({ behavior: 'auto', block: 'start' });
     });
 
     it('renders the section dot rail, tracks the active section, and jumps on click', async () => {
         renderLanding();
-        await screen.findByRole('tab', { name: 'Chinese language tracker' });
+        await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
 
         const rail = screen.getByRole('navigation', { name: 'Page sections' });
         const dots = within(rail).getAllByRole('button');
@@ -628,9 +632,70 @@ describe('Landing', () => {
         expect(updatedDots.filter((dot) => dot.getAttribute('aria-current') === 'true')).toHaveLength(1);
     });
 
+    it('drives the live tree from the goals-view highlight cards', async () => {
+        renderLanding();
+        await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
+
+        const cardsGroup = screen.getByRole('group', { name: 'Goals view highlights' });
+        const cards = within(cardsGroup).getAllByRole('button');
+        expect(cards.map((card) => card.textContent)).toEqual(
+            landingContent.examples.cards.map((card) => `${card.title}${card.body}`)
+        );
+        cards.forEach((card) => expect(card).toHaveAttribute('aria-pressed', 'false'));
+
+        // Lineage card scopes the tree to a representative goal and toggles off.
+        const [lineageCard, evidenceCard, metricsCard, layoutCard] = cards;
+        fireEvent.click(lineageCard);
+        await waitFor(() => {
+            expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-selected-node-id', 'guitar-caged');
+        });
+        expect(lineageCard).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(lineageCard);
+        await waitFor(() => {
+            expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-selected-node-id', '');
+        });
+
+        // Evidence and metrics cards toggle their view settings on the tree.
+        fireEvent.click(evidenceCard);
+        expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-fade-inactive', 'yes');
+        expect(evidenceCard).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(metricsCard);
+        expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-metrics-overlay', 'yes');
+
+        // Layout card flips between tree and hierarchy rendering.
+        fireEvent.click(layoutCard);
+        await waitFor(() => {
+            expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-layout-mode', 'hierarchy');
+        });
+        expect(layoutCard).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(layoutCard);
+        await waitFor(() => {
+            expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-layout-mode', 'tree');
+        });
+    });
+
+    it('keeps the landing goal viewport interaction locked until the user clicks it', async () => {
+        renderLanding();
+        await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
+
+        const flowTree = await screen.findByTestId('flow-tree-demo');
+        expect(flowTree).toHaveAttribute('data-interaction-locked', 'yes');
+        expect(document.querySelector('[data-interaction-locked="true"]')).toBeInTheDocument();
+
+        fireEvent.pointerDown(screen.getByLabelText('Become a skilled guitar player goal tree'));
+        expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-interaction-locked', 'no');
+        expect(document.querySelector('[data-interaction-locked="false"]')).toBeInTheDocument();
+
+        const observer = intersectionObservers.at(-1);
+        act(() => {
+            observer.callback([{ target: document.getElementById('features'), isIntersecting: true }]);
+        });
+        expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-interaction-locked', 'yes');
+    });
+
     it('shows the example icon rail past the hero and flips examples in place', async () => {
         renderLanding();
-        await screen.findByRole('tab', { name: 'Chinese language tracker' });
+        await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
 
         // Hidden while the hero is the active section.
         expect(screen.queryByRole('navigation', { name: 'Example fractals' })).not.toBeInTheDocument();
@@ -653,7 +718,7 @@ describe('Landing', () => {
 
         // The active example flips without scrolling the page.
         expect(scrollIntoViewCalls).toHaveLength(0);
-        expect(screen.getByRole('tab', { name: 'Chinese language tracker' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('tab', { name: 'Become fluent in Chinese' })).toHaveAttribute('aria-selected', 'true');
         await waitFor(() => {
             expect(screen.getByLabelText('Become fluent in Chinese goal tree')).toBeInTheDocument();
         });
@@ -672,7 +737,7 @@ describe('Landing', () => {
         getLandingExamples.mockResolvedValue({ data: linkedExamples });
 
         renderLanding();
-        await screen.findByRole('tab', { name: 'Chinese language tracker' });
+        await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
 
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
         scrollIntoViewCalls.length = 0;
@@ -690,7 +755,7 @@ describe('Landing', () => {
             expect(getLandingExamples).toHaveBeenCalled();
         });
         expect(await screen.findByRole('tablist', { name: 'Example goal trees' })).toBeInTheDocument();
-        expect(await screen.findByRole('tab', { name: 'Guitar practice tracker' })).toHaveAttribute('aria-selected', 'true');
+        expect(await screen.findByRole('tab', { name: 'Become a skilled guitar player' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
         expect(screen.getByLabelText('Triad Session detail preview')).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: landingContent.hero.title })).toBeInTheDocument();

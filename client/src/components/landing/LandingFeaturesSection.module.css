@@ -354,7 +354,13 @@
  */
 @media (min-width: 981px) {
     .featuresSection {
+        box-sizing: border-box;
+        width: calc(100% - var(--landing-right-rail-reserve, 0px));
+        max-width: none;
         margin-top: 0;
+        margin-left: 0;
+        margin-right: 0;
+        padding-right: 0;
     }
 
     .sectionHeader h2 {

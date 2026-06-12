@@ -36,6 +36,26 @@ const fallbackContent = {
         navLabel: 'Goals',
         title: "See how real goals break down - from ambition to today's session.",
         body: 'Every Fractal Goals plan starts as a single big goal and branches into smaller, trackable goals, programs, and sessions. Here are four complete examples across different disciplines.',
+        // Card order maps to the goals-view demo keys in Landing.jsx:
+        // lineage, evidence, metrics, layout.
+        cards: [
+            {
+                title: 'Focus on any goal',
+                body: "Click a goal to scope the tree to its lineage - everything it serves and everything that serves it.",
+            },
+            {
+                title: 'Evidence-aware branches',
+                body: 'Branches with recent completed work stay bright; inactive ones fade so you can see where the work is landing.',
+            },
+            {
+                title: 'Metrics at a glance',
+                body: 'Overlay practice time and session counts on every goal, pulled straight from the logged sessions.',
+            },
+            {
+                title: 'Tree or hierarchy',
+                body: 'Read the same goals as a spatial tree or a compact hierarchy - whichever fits how you think.',
+            },
+        ],
     },
     features: {
         eyebrow: 'The full toolkit',
@@ -284,7 +304,15 @@ export function parseLandingContent(markdown) {
         cards: audienceCards.length ? audienceCards : content.audience.cards,
     };
 
+    const examplesSection = getTopLevelSection(markdown, 'Examples');
     content.examples = readStandardSection(markdown, 'Examples', content.examples);
+    if (examplesSection) {
+        // Keep nested highlight-card copy out of the section body.
+        const examplesIntro = getSectionIntro(examplesSection);
+        content.examples.body = readBody(examplesIntro) || content.examples.body;
+        const exampleCards = readCards(examplesSection);
+        content.examples.cards = exampleCards.length ? exampleCards : content.examples.cards;
+    }
 
     const featuresSection = getTopLevelSection(markdown, 'Features');
     if (featuresSection) {
