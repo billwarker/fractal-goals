@@ -768,7 +768,7 @@ def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, a
     assert warm_calls == [{
         'url': warm_url,
         'headers': {'X-Landing-Cache-Warm': '1'},
-        'timeout': 5,
+        'timeout': 1.5,
     }]
 
     def _failing_get(url, headers=None, timeout=None):

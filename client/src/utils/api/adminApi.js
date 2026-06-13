@@ -8,7 +8,11 @@ export const adminApi = {
     getLandingExamples: () => axios.get(`${API_BASE}/admin/landing-examples`),
     getLandingExampleOptions: (rootId) => axios.get(`${API_BASE}/admin/landing-examples/options`, { params: { root_id: rootId } }),
     updateLandingExamples: (data) => axios.patch(`${API_BASE}/admin/landing-examples`, data),
-    publishLandingExamples: (data = {}) => axios.post(`${API_BASE}/admin/landing-examples/publish`, data),
+    publishLandingExamples: (data = {}) => axios.post(
+        `${API_BASE}/admin/landing-examples/publish`,
+        data,
+        { timeout: 90000 }
+    ),
     createUser: (data) => axios.post(`${API_BASE}/admin/users`, data),
     updateUser: (userId, data) => axios.patch(`${API_BASE}/admin/users/${userId}`, data),
     softDeleteUser: (userId) => axios.delete(`${API_BASE}/admin/users/${userId}/soft-delete`),

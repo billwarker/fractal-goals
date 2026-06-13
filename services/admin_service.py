@@ -1027,7 +1027,7 @@ class AdminService:
             response = requests.get(
                 warm_url,
                 headers={"X-Landing-Cache-Warm": "1"},
-                timeout=5,
+                timeout=1.5,
             )
             response.raise_for_status()
             return "ok"

@@ -8,7 +8,6 @@ import {
 } from '../analytics/dashboardState';
 import { normalizeGlobalFilters } from '../analytics/analyticsGlobalFilters';
 import ProfileWindow from '../analytics/ProfileWindow';
-import ProfileWindowLayout from '../analytics/ProfileWindowLayout';
 import { flattenGoalTree } from '../../utils/goalNodeModel';
 import styles from './LandingFeaturesSection.module.css';
 
@@ -69,12 +68,23 @@ function resolveDashboard(view) {
     return sanitized;
 }
 
+function getPreviewWindowIds(layout) {
+    const panels = layout?.type === 'grid' && Array.isArray(layout.panels)
+        ? layout.panels
+        : DEFAULT_LAYOUT.panels;
+    return panels
+        .slice()
+        .sort((left, right) => (left.y - right.y) || (left.x - right.x))
+        .map((panel) => panel.id)
+        .filter(Boolean);
+}
+
 export default function LandingFeatureAnalytics({ example, views }) {
     const validViews = useMemo(() => (views || []).filter((view) => view?.id), [views]);
     const [selectedViewId, setSelectedViewId] = useState(validViews[0]?.id || '');
     const selectedView = validViews.find((view) => view.id === selectedViewId) || validViews[0] || null;
     const dashboard = useMemo(() => resolveDashboard(selectedView), [selectedView]);
-    const [layout, setLayout] = useState(dashboard.layout);
+    const [windowIds, setWindowIds] = useState(() => getPreviewWindowIds(dashboard.layout));
     const [windowStates, setWindowStates] = useState(dashboard.windowStates);
     const [selectedWindowId, setSelectedWindowId] = useState(dashboard.selectedWindowId);
     const [globalFilters, setGlobalFilters] = useState(dashboard.globalFilters);
@@ -88,7 +98,7 @@ export default function LandingFeatureAnalytics({ example, views }) {
     }, [selectedViewId, validViews]);
 
     useEffect(() => {
-        setLayout(dashboard.layout);
+        setWindowIds(getPreviewWindowIds(dashboard.layout));
         setWindowStates(dashboard.windowStates);
         setSelectedWindowId(dashboard.selectedWindowId);
         setGlobalFilters(dashboard.globalFilters);
@@ -166,42 +176,68 @@ export default function LandingFeatureAnalytics({ example, views }) {
 
             <div className={styles.analyticsPreviewBody}>
                 <div className={styles.analyticsWorkspace}>
-                    <ProfileWindowLayout
-                        layout={layout}
-                        onLayoutChange={setLayout}
-                        onBoundsChange={() => {}}
-                        onBlankSpaceMouseDown={(event) => {
+                    <div
+                        className={styles.analyticsDashboardGrid}
+                        data-window-count={windowIds.length}
+                        onMouseDown={(event) => {
                             if (event.target === event.currentTarget) setSelectedWindowId(null);
                         }}
-                        selectedWindowId={selectedWindowId}
-                        transitionsEnabled={false}
-                        renderWindow={(windowId, dragHandleProps) => (
+                    >
+                        {windowIds.map((windowId) => (
+                            <div className={styles.analyticsDashboardPanel} key={windowId}>
+                                <ProfileWindow
+                                    windowId={windowId}
+                                    canSplit={false}
+                                    onSplit={() => {}}
+                                    canClose={false}
+                                    onClose={() => {}}
+                                    data={data}
+                                    windowState={windowStates[windowId] || getDefaultWindowState()}
+                                    updateWindowState={(updates) => {
+                                        setWindowStates((current) => ({
+                                            ...current,
+                                            [windowId]: {
+                                                ...(current[windowId] || getDefaultWindowState()),
+                                                ...updates,
+                                            },
+                                        }));
+                                    }}
+                                    isSelected={selectedWindowId === windowId}
+                                    onSelect={() => setSelectedWindowId(windowId)}
+                                    dragHandleProps={null}
+                                    globalDateRange={globalDateRange}
+                                    onGlobalDateRangeChange={handleDateRangeChange}
+                                    globalFilters={globalFilters}
+                                />
+                            </div>
+                        ))}
+                        {windowIds.length === 0 && (
                             <ProfileWindow
-                                windowId={windowId}
+                                windowId="window-1"
                                 canSplit={false}
                                 onSplit={() => {}}
                                 canClose={false}
                                 onClose={() => {}}
                                 data={data}
-                                windowState={windowStates[windowId] || getDefaultWindowState()}
+                                windowState={windowStates['window-1'] || getDefaultWindowState()}
                                 updateWindowState={(updates) => {
                                     setWindowStates((current) => ({
                                         ...current,
-                                        [windowId]: {
-                                            ...(current[windowId] || getDefaultWindowState()),
+                                        'window-1': {
+                                            ...(current['window-1'] || getDefaultWindowState()),
                                             ...updates,
                                         },
                                     }));
                                 }}
-                                isSelected={selectedWindowId === windowId}
-                                onSelect={() => setSelectedWindowId(windowId)}
-                                dragHandleProps={dragHandleProps}
+                                isSelected={selectedWindowId === 'window-1'}
+                                onSelect={() => setSelectedWindowId('window-1')}
+                                dragHandleProps={null}
                                 globalDateRange={globalDateRange}
                                 onGlobalDateRangeChange={handleDateRangeChange}
                                 globalFilters={globalFilters}
                             />
                         )}
-                    />
+                    </div>
                 </div>
 
                 {isFiltersOpen && (
