@@ -106,9 +106,25 @@ vi.mock('../../components/programs/ProgramCalendarView', () => ({
     ),
 }));
 
-vi.mock('react-chartjs-2', () => ({
-    Bar: ({ data }) => <div data-testid="showcase-chart">{data.labels.join(', ')}</div>,
-    Line: ({ data }) => <div data-testid="showcase-chart">{data.labels.join(', ')}</div>,
+vi.mock('../../components/analytics/ProfileWindowLayout', () => ({
+    GRID_COLUMNS: 96,
+    GRID_ROWS: 48,
+    migrateSplitLayoutToGrid: (layout) => layout?.type === 'grid' ? layout : null,
+    default: ({ renderWindow }) => (
+        <div data-testid="landing-analytics-layout">{renderWindow('window-1', { onDragStart: vi.fn() })}</div>
+    ),
+}));
+
+vi.mock('../../components/analytics/ProfileWindow', () => ({
+    default: ({ windowState }) => (
+        <div data-testid="landing-analytics-window">
+            {windowState?.selectedVisualization || 'empty-window'}
+        </div>
+    ),
+}));
+
+vi.mock('../../components/analytics/AnalyticsFiltersSidebar', () => ({
+    default: () => <aside data-testid="landing-analytics-filters">Filters</aside>,
 }));
 
 vi.mock('../../components/ConnectedGoalDetailModal', () => ({
@@ -155,15 +171,32 @@ const publishedExamples = {
                 metric_definitions: [{ id: 'metric-1', name: 'Reps', unit: 'count' }],
             }],
             activity_groups: [],
-            analytics_charts: [{
-                id: 'chart-1',
-                title: 'Session Duration Trend',
-                type: 'bar',
-                data: {
-                    labels: ['Technique Session'],
-                    datasets: [{ data: [45] }],
+            analytics_views: [{
+                id: 'view-1',
+                name: 'Session Duration Trend',
+                layout: {
+                    version: 3,
+                    layout: { type: 'grid', panels: [{ id: 'window-1', x: 0, y: 0, w: 96, h: 48 }] },
+                    window_states: {
+                        'window-1': {
+                            selectedCategory: 'sessions',
+                            selectedVisualization: 'sessionTrends',
+                            selectedActivity: null,
+                            selectedModeIds: [],
+                            selectedGoal: null,
+                            visualizationState: { grain: 'week', metrics: ['sessions'] },
+                            visualizationStateByKey: {
+                                'sessions:sessionTrends': { grain: 'week', metrics: ['sessions'] },
+                            },
+                        },
+                    },
+                    selected_window_id: 'window-1',
+                    global_filters: {
+                        goals: { goalIds: [], includeDescendants: true, includeInheritedActivities: true },
+                        activities: { activityIds: [], groupIds: [], includeChildren: true },
+                    },
+                    layout_bounds: { columns: 96, rows: 48 },
                 },
-                options: {},
             }],
             session_templates: [{
                 id: 'template-1',
@@ -314,7 +347,8 @@ describe('Landing', () => {
         expect(screen.getByRole('heading', { name: landingContent.hero.title })).toBeInTheDocument();
         expect(screen.getByText(landingContent.hero.body)).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: landingContent.audience.title })).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '#features');
+        expect(screen.getByRole('button', { name: 'Features' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Open app' })).toHaveAttribute('href', 'https://my.fractalgoals.com');
         expect(await screen.findByRole('tab', { name: 'Become a skilled guitar player' })).toHaveAttribute('aria-selected', 'true');
         const chineseHeroTab = await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         expect(chineseHeroTab).toBeInTheDocument();
@@ -427,39 +461,40 @@ describe('Landing', () => {
         });
     });
 
-    it('renders the features section with detached toggles, in-box copy, and read-only surfaces', async () => {
+    it('renders the features section with sidebar controls and read-only surfaces', async () => {
         const { container } = renderLanding();
 
         await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         expect(screen.getByRole('heading', { name: landingContent.features.title })).toBeInTheDocument();
 
-        // The feature toggle row is its own tablist, not nested in the stage frame.
+        // The feature controls live in the sidebar, not nested in the stage frame.
         const featureTabs = screen.getByRole('tablist', { name: 'Product features' });
         const stage = container.querySelector('#features [class*="featureStage"]');
         expect(stage).toBeInTheDocument();
         expect(stage.contains(featureTabs)).toBe(false);
         expect(container.querySelector('#features [class*="featureInfo"]')).not.toBeInTheDocument();
 
-        // Session feature is the default, with its explanatory copy inside the wide stage.
+        // Session feature is the default, with its explanatory copy in the sidebar card.
         expect(screen.getByRole('tab', { name: landingContent.features.items.session.label })).toHaveAttribute('aria-selected', 'true');
-        expect(screen.getByRole('heading', { name: landingContent.features.items.session.heading })).toBeInTheDocument();
+        expect(screen.getByText(landingContent.features.items.session.heading)).toBeInTheDocument();
         expect(screen.getByText(landingContent.features.items.session.body)).toBeInTheDocument();
         expect(screen.getByLabelText('Technique Session detail preview')).toBeInTheDocument();
         expect(screen.getByRole('tablist', { name: 'Session side pane views' })).toBeInTheDocument();
 
         // Activity feature shows the activity card plus the goal lineage demo.
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
-        expect(screen.getByRole('heading', { name: landingContent.features.items.activity.heading })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: landingContent.features.items.activity.label })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByRole('heading', { name: 'CAGED Triads' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Goals this activity feeds' })).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.programs.label }));
-        expect(screen.getByRole('heading', { name: landingContent.features.items.programs.heading })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: landingContent.features.items.programs.label })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByTestId('showcase-calendar')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.analytics.label }));
-        expect(screen.getByRole('heading', { name: 'Session Duration Trend' })).toBeInTheDocument();
-        expect(screen.getAllByTestId('showcase-chart')[0]).toHaveTextContent('Technique Session');
+        expect(screen.getByText('Session Duration Trend')).toBeInTheDocument();
+        expect(screen.getByTestId('landing-analytics-window')).toHaveTextContent('sessionTrends');
+        expect(screen.getByRole('button', { name: 'Show Filters' })).toBeInTheDocument();
 
         // "And more" renders the extras cards, including the live theme toggle.
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.more.label }));
@@ -471,7 +506,7 @@ describe('Landing', () => {
         expect(document.documentElement.getAttribute('data-theme')).not.toBe(themeBefore);
     });
 
-    it('honors admin showcase picks for featured session, activities, and charts', async () => {
+    it('honors admin showcase picks for featured session, activities, and analytics views', async () => {
         const showcaseExamples = JSON.parse(JSON.stringify(publishedExamples));
         const example = showcaseExamples.examples[0];
         example.sessions = [
@@ -487,14 +522,34 @@ describe('Landing', () => {
             ...example.activity_definitions,
             { id: 'activity-2', name: 'Featured Scales', metric_definitions: [], associated_goal_ids: ['guitar-caged'] },
         ];
-        example.analytics_charts = [
-            ...example.analytics_charts,
+        example.analytics_views = [
+            ...example.analytics_views,
             {
-                id: 'chart-2',
-                title: 'Featured Chart',
-                type: 'bar',
-                data: { labels: ['Featured Label'], datasets: [{ data: [1] }] },
-                options: {},
+                id: 'view-2',
+                name: 'Featured Analytics View',
+                layout: {
+                    version: 3,
+                    layout: { type: 'grid', panels: [{ id: 'window-1', x: 0, y: 0, w: 96, h: 48 }] },
+                    window_states: {
+                        'window-1': {
+                            selectedCategory: 'activities',
+                            selectedVisualization: 'activityTrends',
+                            selectedActivity: null,
+                            selectedModeIds: [],
+                            selectedGoal: null,
+                            visualizationState: { metrics: ['duration'] },
+                            visualizationStateByKey: {
+                                'activities:activityTrends': { metrics: ['duration'] },
+                            },
+                        },
+                    },
+                    selected_window_id: 'window-1',
+                    global_filters: {
+                        goals: { goalIds: [], includeDescendants: true, includeInheritedActivities: true },
+                        activities: { activityIds: [], groupIds: [], includeChildren: true },
+                    },
+                    layout_bounds: { columns: 96, rows: 48 },
+                },
             },
         ];
         example.showcase = {
@@ -503,7 +558,7 @@ describe('Landing', () => {
             program_id: 'prog-1',
             program_start_date: '2026-01-01',
             program_end_date: '2026-01-31',
-            chart_ids: ['chart-2'],
+            analytics_view_ids: ['view-2'],
         };
         getLandingExamples.mockResolvedValue({ data: showcaseExamples });
 
@@ -523,11 +578,11 @@ describe('Landing', () => {
         expect(screen.getByText('Map the fretboard')).toBeInTheDocument();
         expect(screen.getAllByText('Build complete musicianship').length).toBeGreaterThan(0);
 
-        // Chart curation filters to the featured chart only.
+        // Analytics view curation filters to the featured view only.
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.analytics.label }));
-        expect(screen.getByRole('heading', { name: 'Featured Chart' })).toBeInTheDocument();
-        expect(screen.getAllByTestId('showcase-chart')).toHaveLength(1);
-        expect(screen.getByTestId('showcase-chart')).toHaveTextContent('Featured Label');
+        expect(screen.getByText('Featured Analytics View')).toBeInTheDocument();
+        expect(screen.getByTestId('landing-analytics-window')).toHaveTextContent('activityTrends');
+        expect(screen.queryByRole('button', { name: 'Session Duration Trend' })).not.toBeInTheDocument();
     });
 
     it('opens the goal detail in the real docked side-in panel', async () => {
@@ -580,7 +635,7 @@ describe('Landing', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Become fluent in Chinese' }));
         expect(scrollIntoViewCalls).toHaveLength(1);
         expect(scrollIntoViewCalls[0].element.id).toBe('examples');
-        expect(scrollIntoViewCalls[0].options).toEqual({ behavior: 'smooth', block: 'start' });
+        expect(scrollIntoViewCalls[0].options).toEqual({ behavior: 'smooth', block: 'nearest', inline: 'start' });
     });
 
     it('jumps without animation when the user prefers reduced motion', async () => {
@@ -597,39 +652,56 @@ describe('Landing', () => {
 
         fireEvent.click(await screen.findByRole('tab', { name: 'Become fluent in Chinese' }));
         expect(scrollIntoViewCalls).toHaveLength(1);
-        expect(scrollIntoViewCalls[0].options).toEqual({ behavior: 'auto', block: 'start' });
+        expect(scrollIntoViewCalls[0].options).toEqual({ behavior: 'auto', block: 'nearest', inline: 'start' });
     });
 
-    it('renders the section dot rail, tracks the active section, and jumps on click', async () => {
+    it('uses the persistent header as section navigation, tracks active section, and jumps on click', async () => {
         renderLanding();
         await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
 
-        const rail = screen.getByRole('navigation', { name: 'Page sections' });
-        const dots = within(rail).getAllByRole('button');
-        expect(dots.map((dot) => dot.getAttribute('aria-label'))).toEqual([
-            landingContent.hero.navLabel,
-            landingContent.examples.navLabel,
-            landingContent.audience.navLabel,
-            landingContent.features.navLabel,
-            landingContent.beta.navLabel,
-        ]);
+        expect(screen.queryByRole('navigation', { name: 'Page sections' })).not.toBeInTheDocument();
+        const headerNav = screen.getByRole('navigation', { name: 'Primary' });
+        expect(within(headerNav).getByRole('button', { name: 'Examples' })).toBeInTheDocument();
+        expect(within(headerNav).getByRole('button', { name: 'Features' })).toBeInTheDocument();
+        expect(within(headerNav).getByRole('button', { name: 'Private beta' })).toBeInTheDocument();
+        expect(within(headerNav).getByRole('link', { name: 'Open app' })).toHaveAttribute('href', 'https://my.fractalgoals.com');
+        expect(within(headerNav).queryAllByRole('button').filter((button) => button.getAttribute('aria-current') === 'page')).toHaveLength(0);
 
-        // The hero starts as the single active section.
-        expect(dots[0]).toHaveAttribute('aria-current', 'true');
-        expect(dots.filter((dot) => dot.getAttribute('aria-current') === 'true')).toHaveLength(1);
-
-        fireEvent.click(within(rail).getByRole('button', { name: landingContent.features.navLabel }));
+        fireEvent.click(within(headerNav).getByRole('button', { name: 'Features' }));
         expect(scrollIntoViewCalls.at(-1).element.id).toBe('features');
 
-        // A section crossing the scroll container's center activates its dot.
+        // A section crossing the scroll container's center activates its header item.
         const observer = intersectionObservers.at(-1);
-        expect(observer.options.rootMargin).toBe('-50% 0px -50% 0px');
+        expect(observer.options.rootMargin).toBe('0px -50% 0px -50%');
         act(() => {
             observer.callback([{ target: document.getElementById('features'), isIntersecting: true }]);
         });
-        const updatedDots = within(rail).getAllByRole('button');
-        expect(within(rail).getByRole('button', { name: landingContent.features.navLabel })).toHaveAttribute('aria-current', 'true');
-        expect(updatedDots.filter((dot) => dot.getAttribute('aria-current') === 'true')).toHaveLength(1);
+        const updatedButtons = within(headerNav).queryAllByRole('button');
+        expect(within(headerNav).getByRole('button', { name: 'Features' })).toHaveAttribute('aria-current', 'page');
+        expect(updatedButtons.filter((button) => button.getAttribute('aria-current') === 'page')).toHaveLength(1);
+    });
+
+    it('maps desktop wheel and trackpad movement to one smooth section jump', async () => {
+        vi.stubGlobal('matchMedia', (query) => ({
+            matches: query === '(min-width: 981px)',
+            media: query,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            addListener: () => {},
+            removeListener: () => {},
+        }));
+
+        const { container } = renderLanding();
+        await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
+
+        const page = container.querySelector('main');
+        fireEvent.wheel(page, { deltaY: 140, deltaX: 0 });
+        fireEvent.wheel(page, { deltaY: 160, deltaX: 0 });
+        fireEvent.wheel(page, { deltaY: 0, deltaX: 180 });
+
+        expect(scrollIntoViewCalls).toHaveLength(1);
+        expect(scrollIntoViewCalls[0].element.id).toBe('examples');
+        expect(scrollIntoViewCalls[0].options).toEqual({ behavior: 'smooth', block: 'nearest', inline: 'start' });
     });
 
     it('drives the live tree from the goals-view highlight cards', async () => {

@@ -479,7 +479,7 @@ describe('Admin', () => {
             program_id: null,
             program_start_date: null,
             program_end_date: null,
-            chart_ids: [],
+            analytics_view_ids: [],
         };
         await waitFor(() => expect(updateLandingExamples).toHaveBeenCalledWith({
             examples: [

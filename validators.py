@@ -388,14 +388,14 @@ class LandingExampleShowcaseSchema(BaseModel):
     program_id: Optional[str] = Field(None, min_length=1, max_length=120)
     program_start_date: Optional[str] = None
     program_end_date: Optional[str] = None
-    chart_ids: List[str] = Field(default_factory=list, max_length=4)
+    analytics_view_ids: List[str] = Field(default_factory=list, max_length=3)
 
     @field_validator('session_id', 'program_id')
     @classmethod
     def sanitize_showcase_id(cls, v: Optional[str]) -> Optional[str]:
         return sanitize_string(v) if v else v
 
-    @field_validator('activity_ids', 'chart_ids')
+    @field_validator('activity_ids', 'analytics_view_ids')
     @classmethod
     def sanitize_showcase_id_lists(cls, v: List[str]) -> List[str]:
         cleaned = [sanitize_string(item) for item in v if item and item.strip()]

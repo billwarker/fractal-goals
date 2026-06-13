@@ -9,7 +9,7 @@ import LandingFeatureAnalytics from './LandingFeatureAnalytics';
 import LandingFeatureMore from './LandingFeatureMore';
 import {
     resolveFeaturedActivities,
-    resolveFeaturedCharts,
+    resolveFeaturedAnalyticsViews,
     resolveFeaturedProgram,
     resolveFeaturedSession,
 } from './landingFeatureModel';
@@ -17,9 +17,8 @@ import styles from './LandingFeaturesSection.module.css';
 
 const FEATURE_ORDER = ['session', 'activity', 'programs', 'analytics', 'more'];
 
-// The landing Features section: a standalone feature toggle row (deliberately
-// detached from the stage frame), with the explainer copy embedded at the top of
-// a goal-explorer-width feature surface.
+// The landing Features section mirrors the goals-view section: message and
+// feature selectors on the left, live viewport on the right.
 export default function LandingFeaturesSection({
     example,
     seedLevels = [],
@@ -35,7 +34,7 @@ export default function LandingFeaturesSection({
     const featuredSession = useMemo(() => resolveFeaturedSession(example), [example]);
     const featuredActivities = useMemo(() => resolveFeaturedActivities(example), [example]);
     const featuredProgram = useMemo(() => resolveFeaturedProgram(example), [example]);
-    const featuredCharts = useMemo(() => resolveFeaturedCharts(example), [example]);
+    const featuredAnalyticsViews = useMemo(() => resolveFeaturedAnalyticsViews(example), [example]);
 
     const renderStage = () => {
         if (isLoading || !example) {
@@ -69,7 +68,7 @@ export default function LandingFeaturesSection({
                     />
                 );
             case 'analytics':
-                return <LandingFeatureAnalytics charts={featuredCharts} />;
+                return <LandingFeatureAnalytics example={example} views={featuredAnalyticsViews} />;
             case 'more':
             default:
                 return <LandingFeatureMore extras={content.extras} />;
@@ -82,50 +81,44 @@ export default function LandingFeaturesSection({
             id="features"
             aria-labelledby="features-title"
         >
-            <div className={styles.sectionHeader}>
-                <p className={styles.eyebrow}>{content.eyebrow}</p>
-                <h2 id="features-title">{content.title}</h2>
-                <p>{content.body}</p>
-            </div>
-
-            <div className={styles.featureToggle} role="tablist" aria-label="Product features">
-                {isLoading && !example
-                    ? FEATURE_ORDER.map((key) => (
-                        <LandingSkeleton key={key} height="44px" width="110px" radius="999px" />
-                    ))
-                    : FEATURE_ORDER.map((key) => (
-                        <button
-                            type="button"
-                            role="tab"
-                            aria-selected={activeFeature === key}
-                            className={activeFeature === key ? styles.featureToggleActive : ''}
-                            onClick={() => setActiveFeature(key)}
-                            key={key}
-                        >
-                            {content.items[key].label}
-                        </button>
-                    ))}
-            </div>
-
-            <div className={styles.featureLayout}>
-                <div className={styles.featureStage}>
-                    <div className={styles.featureStageIntro}>
-                        {isLoading && !example ? (
-                            <>
-                                <LandingSkeleton height="34px" width="46%" />
-                                <LandingSkeleton height="60px" width="72%" />
-                            </>
-                        ) : (
-                            <>
-                                <h3>{activeItem.heading}</h3>
-                                <p>{activeItem.body}</p>
-                            </>
-                        )}
+            <div className={styles.featureViewLayout}>
+                <aside className={styles.featureSidebar}>
+                    <div className={styles.sectionHeader}>
+                        <p className={styles.eyebrow}>{content.eyebrow}</p>
+                        <h2 id="features-title">{content.title}</h2>
+                        <p>{content.body}</p>
                     </div>
-                    <div className={styles.stageBody}>
-                        <GoalLevelsProvider seedLevels={seedLevels}>
-                            {renderStage()}
-                        </GoalLevelsProvider>
+
+                    <div className={styles.featureToggle} role="tablist" aria-label="Product features">
+                        {isLoading && !example
+                            ? FEATURE_ORDER.map((key) => (
+                                <LandingSkeleton key={key} height="118px" width="100%" radius="6px" />
+                            ))
+                            : FEATURE_ORDER.map((key) => (
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeFeature === key}
+                                    aria-label={content.items[key].label}
+                                    className={activeFeature === key ? styles.featureToggleActive : ''}
+                                    onClick={() => setActiveFeature(key)}
+                                    key={key}
+                                >
+                                    <span className={styles.featureCardLabel}>{content.items[key].label}</span>
+                                    <span className={styles.featureCardHeading}>{content.items[key].heading}</span>
+                                    <span className={styles.featureCardBody}>{content.items[key].body}</span>
+                                </button>
+                            ))}
+                    </div>
+                </aside>
+
+                <div className={styles.featureMain}>
+                    <div className={styles.featureStage}>
+                        <div className={styles.stageBody}>
+                            <GoalLevelsProvider seedLevels={seedLevels}>
+                                {renderStage()}
+                            </GoalLevelsProvider>
+                        </div>
                     </div>
                 </div>
             </div>

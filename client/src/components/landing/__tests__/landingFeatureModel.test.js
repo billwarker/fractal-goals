@@ -4,7 +4,7 @@ import {
     buildActivityLineage,
     overlapsDateWindow,
     resolveFeaturedActivities,
-    resolveFeaturedCharts,
+    resolveFeaturedAnalyticsViews,
     resolveFeaturedProgram,
     resolveFeaturedSession,
 } from '../landingFeatureModel';
@@ -52,7 +52,7 @@ const baseExample = {
         { id: 'activity-2', name: 'Unlinked', associated_goal_ids: [] },
     ],
     programs: [{ id: 'p1', name: 'Program One' }, { id: 'p2', name: 'Program Two' }],
-    analyticsCharts: [{ id: 'c1', title: 'One' }, { id: 'c2', title: 'Two' }],
+    analyticsViews: [{ id: 'v1', name: 'One' }, { id: 'v2', name: 'Two' }],
     showcase: null,
 };
 
@@ -72,12 +72,12 @@ describe('landingFeatureModel v4 fallbacks (showcase null)', () => {
         expect(windowEnd).toBeNull();
     });
 
-    it('returns all charts', () => {
-        expect(resolveFeaturedCharts(baseExample)).toHaveLength(2);
+    it('returns analytics views', () => {
+        expect(resolveFeaturedAnalyticsViews(baseExample)).toHaveLength(2);
     });
 });
 
-describe('landingFeatureModel v5 showcase resolution', () => {
+describe('landingFeatureModel v6 showcase resolution', () => {
     const example = {
         ...baseExample,
         showcase: {
@@ -86,29 +86,34 @@ describe('landingFeatureModel v5 showcase resolution', () => {
             program_id: 'p2',
             program_start_date: '2026-01-05',
             program_end_date: '2026-01-20',
-            chart_ids: ['c2'],
+            analytics_view_ids: ['v2'],
         },
     };
 
-    it('honors the featured session/activities/program/charts', () => {
+    it('honors the featured session/activities/program/analytics views', () => {
         expect(resolveFeaturedSession(example).id).toBe('s2');
         expect(resolveFeaturedActivities(example).map((a) => a.id)).toEqual(['activity-2']);
         const { program, windowStart, windowEnd } = resolveFeaturedProgram(example);
         expect(program.id).toBe('p2');
         expect(windowStart).toBe('2026-01-05');
         expect(windowEnd).toBe('2026-01-20');
-        expect(resolveFeaturedCharts(example).map((c) => c.id)).toEqual(['c2']);
+        expect(resolveFeaturedAnalyticsViews(example).map((view) => view.id)).toEqual(['v2']);
     });
 
     it('ignores stale showcase ids and falls back', () => {
         const stale = {
             ...baseExample,
-            showcase: { session_id: 'gone', activity_ids: ['gone'], program_id: 'gone', chart_ids: ['gone'] },
+            showcase: {
+                session_id: 'gone',
+                activity_ids: ['gone'],
+                program_id: 'gone',
+                analytics_view_ids: ['gone'],
+            },
         };
         expect(resolveFeaturedSession(stale).id).toBe('s1');
         expect(resolveFeaturedActivities(stale).map((a) => a.id)).toEqual(['activity-1']);
         expect(resolveFeaturedProgram(stale).program.id).toBe('p1');
-        expect(resolveFeaturedCharts(stale)).toHaveLength(2);
+        expect(resolveFeaturedAnalyticsViews(stale)).toHaveLength(2);
     });
 });
 

@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react';
 
 /**
  * Tracks which full-viewport landing section currently spans the scroll
- * container's vertical center, for the section dot rail.
+ * container's horizontal center, for the persistent landing header.
  *
- * The -50%/-50% rootMargin collapses the observation area to the container's
- * center line, so exactly one section intersects at a time even under the
- * short-viewport proximity-snap fallback where sections can exceed one screen.
+ * The horizontal -50%/-50% rootMargin collapses the observation area to the
+ * container's center line, so exactly one section intersects at a time.
  */
 export default function useActiveLandingSection(containerRef, sectionIds) {
     const [activeId, setActiveId] = useState(sectionIds[0] || null);
@@ -32,7 +31,7 @@ export default function useActiveLandingSection(containerRef, sectionIds) {
             },
             {
                 root: containerRef.current || null,
-                rootMargin: '-50% 0px -50% 0px',
+                rootMargin: '0px -50% 0px -50%',
                 threshold: 0,
             }
         );

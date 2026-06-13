@@ -9,6 +9,7 @@
     cursor: default;
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
     position: relative;
+    container-type: inline-size;
 }
 
 .activityCardSelected {
@@ -85,13 +86,17 @@
     font-weight: bold;
     font-size: 16px;
     color: var(--color-brand-success);
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
+    hyphens: auto;
+    min-width: 0;
 }
 
 .activityNameFlex {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
 }
 
 .activityLabel {
@@ -754,6 +759,31 @@
     margin-left: 12px;
     padding-left: 12px;
     border-left: 1px solid var(--color-border);
+}
+
+@container (max-width: 1180px) {
+    .activityHeader {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding-right: 30px;
+    }
+
+    .activityHeaderLeft {
+        align-items: flex-start;
+    }
+
+    .activityHeaderRight {
+        width: 100%;
+        min-width: 0;
+        flex: 1 1 auto;
+        flex-wrap: nowrap;
+        gap: 6px;
+    }
+
+    .timerControlsGrid {
+        width: 100%;
+    }
 }
 
 @media (max-width: 768px) {

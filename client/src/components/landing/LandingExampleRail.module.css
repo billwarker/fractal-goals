@@ -5,25 +5,31 @@
 @media (min-width: 981px) {
     .rail {
         position: fixed;
-        right: clamp(10px, 1.6vw, 22px);
-        top: calc(50% - 202px);
+        left: 50%;
+        bottom: clamp(14px, 2.4vh, 24px);
         z-index: 30;
-        width: 52px;
+        width: auto;
         display: grid;
         justify-items: center;
+        padding: 8px 18px;
+        background: color-mix(in srgb, var(--color-bg-card) 86%, transparent);
+        border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+        border-radius: 999px;
+        box-shadow: var(--shadow-md);
         animation: railFadeIn 180ms ease;
+        transform: translateX(-50%);
     }
 }
 
 @keyframes railFadeIn {
     from {
         opacity: 0;
-        transform: translateX(8px);
+        transform: translate(-50%, 8px);
     }
 
     to {
         opacity: 1;
-        transform: translateX(0);
+        transform: translate(-50%, 0);
     }
 }
 
@@ -38,7 +44,7 @@
     padding: 0;
     list-style: none;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 8px;
 }
 
@@ -56,19 +62,16 @@
 }
 
 .iconButton:hover {
-    background: var(--color-bg-card-hover);
-    border-color: var(--color-border);
+    transform: scale(1.08);
 }
 
 .iconButton:focus-visible {
-    outline: 2px solid var(--color-brand-primary);
-    outline-offset: 2px;
+    outline: none;
+    transform: scale(1.08);
 }
 
 .iconActive {
-    background: var(--color-bg-card);
-    border-color: var(--color-brand-primary);
-    box-shadow: 0 0 0 1px var(--color-brand-primary);
+    transform: scale(1.12);
 }
 
 .icon {
@@ -78,9 +81,9 @@
 
 .iconLabel {
     position: absolute;
-    right: calc(100% + 8px);
-    top: 50%;
-    transform: translateY(-50%);
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%);
     padding: 4px 10px;
     color: var(--color-text-primary);
     background: color-mix(in srgb, var(--color-bg-card) 96%, black);

@@ -1,8 +1,8 @@
 import { flattenGoalTree } from '../../utils/goalNodeModel';
 
 // Resolution helpers for the landing Features section. Each helper honors the
-// admin-published `showcase` selections (schema v5) and falls back to sensible
-// auto-derived picks for older v4 snapshots where `showcase` is null.
+// admin-published `showcase` selections (schema v6) and falls back to sensible
+// auto-derived picks for older snapshots where `showcase` is null.
 
 export const MAX_FEATURED_ACTIVITIES = 4;
 
@@ -57,15 +57,15 @@ export function resolveFeaturedProgram(example) {
     };
 }
 
-export function resolveFeaturedCharts(example) {
-    const charts = example?.analyticsCharts || [];
-    const featuredIds = getShowcase(example).chart_ids || [];
-    if (featuredIds.length === 0) return charts;
-    const byId = new Map(charts.map((chart) => [String(chart.id), chart]));
+export function resolveFeaturedAnalyticsViews(example) {
+    const views = example?.analyticsViews || [];
+    const featuredIds = getShowcase(example).analytics_view_ids || [];
+    if (featuredIds.length === 0) return views.slice(0, 3);
+    const byId = new Map(views.map((view) => [String(view.id), view]));
     const featured = featuredIds
-        .map((chartId) => byId.get(String(chartId)))
+        .map((viewId) => byId.get(String(viewId)))
         .filter(Boolean);
-    return featured.length > 0 ? featured : charts;
+    return (featured.length > 0 ? featured : views).slice(0, 3);
 }
 
 // Compare YYYY-MM-DD-prefixed date strings; ISO date(-time) strings sort

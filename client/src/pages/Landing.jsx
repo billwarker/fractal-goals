@@ -5,7 +5,6 @@ import GoalIcon from '../components/atoms/GoalIcon';
 import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
 import LandingExampleRail from '../components/landing/LandingExampleRail';
 import LandingFeaturesSection from '../components/landing/LandingFeaturesSection';
-import LandingSectionNav from '../components/landing/LandingSectionNav';
 import LandingSkeleton from '../components/landing/LandingSkeleton';
 import { GoalLevelsProvider } from '../contexts/GoalLevelsContext';
 import landingContent from '../content/landingContent';
@@ -30,6 +29,8 @@ const DEFAULT_VIEW_SETTINGS = {
     showMetricsOverlay: false,
 };
 const FLOWTREE_SCOPE_TRANSITION_MS = 160;
+const WHEEL_SECTION_COOLDOWN_MS = 760;
+const WHEEL_SECTION_DELTA_THRESHOLD = 24;
 
 const goalLevels = [
     {
@@ -86,16 +87,9 @@ const initialFormState = {
     email: '',
 };
 
-// One dot per full-viewport snap section, in document order. Labels come from
-// the markdown content pipeline (Nav Label metadata) with built-in fallbacks.
-const sectionNavItems = [
-    { id: 'hero', label: landingContent.hero.navLabel },
-    { id: 'examples', label: landingContent.examples.navLabel },
-    { id: 'audience', label: landingContent.audience.navLabel },
-    { id: 'features', label: landingContent.features.navLabel },
-    { id: 'beta', label: landingContent.beta.navLabel },
-];
-const SECTION_IDS = sectionNavItems.map((section) => section.id);
+// Full-viewport snap sections in document order. The persistent header uses
+// these IDs for active-section tracking and sideways navigation.
+const SECTION_IDS = ['hero', 'examples', 'audience', 'features', 'beta'];
 
 // The goals-view sidebar cards demo one tree feature each; card copy comes from
 // landing.md (examples cards) in this fixed order.
@@ -113,8 +107,27 @@ function prefersReducedMotion() {
 function scrollToSection(sectionId) {
     document.getElementById(sectionId)?.scrollIntoView({
         behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-        block: 'start',
+        block: 'nearest',
+        inline: 'start',
     });
+}
+
+function canScrollVerticallyWithin(target, boundary, deltaY) {
+    let element = target instanceof Element ? target : null;
+    while (element && element !== boundary) {
+        const style = window.getComputedStyle(element);
+        const canScroll = /(auto|scroll)/.test(style.overflowY)
+            && element.scrollHeight > element.clientHeight;
+        if (canScroll) {
+            const canScrollUp = element.scrollTop > 0;
+            const canScrollDown = element.scrollTop + element.clientHeight < element.scrollHeight - 1;
+            if ((deltaY < 0 && canScrollUp) || (deltaY > 0 && canScrollDown)) {
+                return true;
+            }
+        }
+        element = element.parentElement;
+    }
+    return false;
 }
 
 const fallbackLandingExamples = [{
@@ -128,7 +141,7 @@ const fallbackLandingExamples = [{
         program_id: 'demo-program-1',
         program_start_date: '2026-01-05',
         program_end_date: '2026-02-01',
-        chart_ids: ['demo-session-duration'],
+        analytics_view_ids: ['demo-analytics-view-1'],
     },
     evidence_goal_ids: ['demo-guitar-musicianship', 'demo-guitar-caged'],
     metrics_summary: {
@@ -204,22 +217,42 @@ const fallbackLandingExamples = [{
         associated_goals: [{ id: 'demo-guitar-caged', name: 'Practice CAGED triads', type: 'ShortTermGoal' }],
     }],
     activity_groups: [],
-    analytics_charts: [{
-        id: 'demo-session-duration',
-        title: 'Session Duration Trend',
-        type: 'bar',
-        data: {
-            labels: ['Mon', 'Wed', 'Fri', 'Mon'],
-            datasets: [{
-                label: 'Minutes',
-                data: [30, 35, 42, 45],
-                backgroundColor: '#3A86FF',
-                borderColor: '#3A86FF',
-            }],
-        },
-        options: {
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } },
+    analytics_views: [{
+        id: 'demo-analytics-view-1',
+        name: 'Session Trends',
+        layout: {
+            version: 3,
+            layout: {
+                type: 'grid',
+                panels: [{ id: 'window-1', x: 0, y: 0, w: 96, h: 48 }],
+            },
+            window_states: {
+                'window-1': {
+                    selectedCategory: 'sessions',
+                    selectedVisualization: 'sessionTrends',
+                    selectedActivity: null,
+                    selectedModeIds: [],
+                    selectedGoal: null,
+                    visualizationState: { grain: 'week', metrics: ['sessions', 'duration'] },
+                    visualizationStateByKey: {
+                        'sessions:sessionTrends': { grain: 'week', metrics: ['sessions', 'duration'] },
+                    },
+                },
+            },
+            selected_window_id: 'window-1',
+            global_filters: {
+                goals: {
+                    goalIds: [],
+                    includeDescendants: true,
+                    includeInheritedActivities: true,
+                },
+                activities: {
+                    activityIds: [],
+                    groupIds: [],
+                    includeChildren: true,
+                },
+            },
+            layout_bounds: { columns: 96, rows: 48 },
         },
     }],
     session_templates: [{
@@ -361,6 +394,8 @@ function Landing() {
     const [message, setMessage] = useState('');
     const flowTreeRef = useRef(null);
     const flowTreeScopeTransitionTimerRef = useRef(null);
+    const wheelSectionCooldownTimerRef = useRef(null);
+    const wheelTargetSectionRef = useRef(SECTION_IDS[0]);
     const mainRef = useRef(null);
     const activeSectionId = useActiveLandingSection(mainRef, SECTION_IDS);
 
@@ -369,6 +404,10 @@ function Landing() {
     useEffect(() => {
         mainRef.current?.focus({ preventScroll: true });
     }, []);
+
+    useEffect(() => {
+        wheelTargetSectionRef.current = activeSectionId || SECTION_IDS[0];
+    }, [activeSectionId]);
 
     // Same key/fn/staleTime as the boot-time prefetch in main.jsx, so this
     // dedupes against the request already in flight instead of starting late.
@@ -404,9 +443,9 @@ function Landing() {
                 sessions: Array.isArray(example.sessions) ? example.sessions : [],
                 activityDefinitions: Array.isArray(example.activity_definitions) ? example.activity_definitions : [],
                 activityGroups: Array.isArray(example.activity_groups) ? example.activity_groups : [],
-                analyticsCharts: Array.isArray(example.analytics_charts) ? example.analytics_charts : [],
+                analyticsViews: Array.isArray(example.analytics_views) ? example.analytics_views : [],
                 sessionTemplates: Array.isArray(example.session_templates) ? example.session_templates : [],
-                // Admin-curated feature picks (schema v5); null on older v4
+                // Admin-curated feature picks (schema v6); null on older
                 // snapshots, in which case the Features section auto-derives.
                 showcase: example.showcase || null,
             }))
@@ -507,6 +546,11 @@ function Landing() {
         }));
     };
 
+    const navigateToSection = useCallback((sectionId) => {
+        wheelTargetSectionRef.current = sectionId;
+        scrollToSection(sectionId);
+    }, []);
+
     // scrollToTree is only passed from the hero picker's click handler, so the
     // initial default selection (set directly in an effect) never auto-scrolls.
     const handleExampleSelect = (exampleId, { scrollToTree = false } = {}) => {
@@ -516,7 +560,7 @@ function Landing() {
         setIsGoalTreeInteractionLocked(true);
         setFlowTreeScopeKey((current) => current + 1);
         if (scrollToTree) {
-            scrollToSection('examples');
+            navigateToSection('examples');
         }
     };
 
@@ -537,7 +581,7 @@ function Landing() {
     // example explorer and scrolls back up to it.
     const handleFeatureGoalSelect = (goal) => {
         handleGoalSelect(goal);
-        scrollToSection('examples');
+        navigateToSection('examples');
     };
 
     useEffect(() => {
@@ -583,6 +627,11 @@ function Landing() {
         }
     };
 
+    const isHeaderNavItemActive = (href) => {
+        if (!href?.startsWith('#')) return false;
+        return activeSectionId === href.slice(1);
+    };
+
     // Mirror the goals page: scope-changing toggles fade the tree out, apply after a
     // short delay, and bump the scope key so FlowTree re-centers; others apply instantly.
     const handleToggleViewSetting = useCallback((settingKey) => (event) => {
@@ -608,6 +657,9 @@ function Landing() {
     useEffect(() => () => {
         if (flowTreeScopeTransitionTimerRef.current) {
             clearTimeout(flowTreeScopeTransitionTimerRef.current);
+        }
+        if (wheelSectionCooldownTimerRef.current) {
+            clearTimeout(wheelSectionCooldownTimerRef.current);
         }
     }, []);
 
@@ -638,24 +690,42 @@ function Landing() {
         }
     };
 
-    return (
-        <main ref={mainRef} className={styles.page} tabIndex={-1}>
-            <LandingSectionNav
-                sections={sectionNavItems}
-                activeId={activeSectionId}
-                onNavigate={scrollToSection}
-                hasExampleRail={activeSectionId !== 'hero'}
-            />
-            {activeSectionId !== 'hero' && (
-                <LandingExampleRail
-                    examples={publishedExamples}
-                    activeExampleId={selectedExample?.id}
-                    onSelect={(exampleId) => handleExampleSelect(exampleId)}
-                />
-            )}
+    const handleLandingWheel = useCallback((event) => {
+        const container = mainRef.current;
+        if (!container || event.defaultPrevented) return;
+        if (!window.matchMedia('(min-width: 981px)').matches) return;
+        if (Math.abs(event.deltaY) > Math.abs(event.deltaX)
+            && canScrollVerticallyWithin(event.target, container, event.deltaY)) {
+            return;
+        }
 
-            <section className={`${styles.hero} ${styles.snapSection}`} id="hero" aria-labelledby="landing-title">
-                <header className={styles.header}>
+        event.preventDefault();
+        if (wheelSectionCooldownTimerRef.current) return;
+
+        const primaryDelta = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+            ? event.deltaX
+            : event.deltaY;
+        if (Math.abs(primaryDelta) < WHEEL_SECTION_DELTA_THRESHOLD) return;
+
+        const currentSectionId = wheelTargetSectionRef.current || activeSectionId || SECTION_IDS[0];
+        const currentIndex = SECTION_IDS.indexOf(currentSectionId);
+        const nextIndex = Math.min(
+            Math.max(currentIndex + (primaryDelta > 0 ? 1 : -1), 0),
+            SECTION_IDS.length - 1
+        );
+        if (nextIndex === currentIndex) return;
+
+        const nextSectionId = SECTION_IDS[nextIndex];
+        wheelTargetSectionRef.current = nextSectionId;
+        scrollToSection(nextSectionId);
+        wheelSectionCooldownTimerRef.current = setTimeout(() => {
+            wheelSectionCooldownTimerRef.current = null;
+        }, WHEEL_SECTION_COOLDOWN_MS);
+    }, [activeSectionId]);
+
+    return (
+        <main ref={mainRef} className={styles.page} tabIndex={-1} onWheel={handleLandingWheel}>
+            <header className={styles.header}>
                 <a className={styles.brand} href="/">
                     <span className={styles.brandMark}>
                         <GoalIcon
@@ -668,56 +738,81 @@ function Landing() {
                     </span>
                     <span>{landingContent.header.brand}</span>
                 </a>
-                    <nav className={styles.nav} aria-label="Primary">
-                        {landingContent.header.nav.map((item) => (
-                            <a href={item.href} key={`${item.href}-${item.label}`}>{item.label}</a>
-                        ))}
-                    </nav>
-                </header>
+                <nav className={styles.nav} aria-label="Primary">
+                    {landingContent.header.nav.map((item) => {
+                        const isInternal = item.href?.startsWith('#');
+                        if (!isInternal) {
+                            return <a href={item.href} key={`${item.href}-${item.label}`}>{item.label}</a>;
+                        }
+                        const sectionId = item.href.slice(1);
+                        const isActive = isHeaderNavItemActive(item.href);
+                        return (
+                            <button
+                                type="button"
+                                className={isActive ? styles.navActive : ''}
+                                aria-current={isActive ? 'page' : undefined}
+                                onClick={() => navigateToSection(sectionId)}
+                                key={`${item.href}-${item.label}`}
+                            >
+                                {item.label}
+                            </button>
+                        );
+                    })}
+                </nav>
+            </header>
+            {activeSectionId !== 'hero' && (
+                <LandingExampleRail
+                    examples={publishedExamples}
+                    activeExampleId={selectedExample?.id}
+                    onSelect={(exampleId) => handleExampleSelect(exampleId)}
+                />
+            )}
+
+            <section className={`${styles.hero} ${styles.snapSection}`} id="hero" aria-labelledby="landing-title">
                 <div className={styles.heroCopy}>
                     <h1 id="landing-title">{heroTitle}</h1>
+                    <div className={styles.heroExamplePicker}>
+                        {isExamplesLoading && !selectedExample ? (
+                            <div className={styles.exampleToggle} aria-hidden="true" data-testid="example-picker-skeleton">
+                                <LandingSkeleton height="120px" width="120px" radius="8px" />
+                                <LandingSkeleton height="120px" width="120px" radius="8px" />
+                                <LandingSkeleton height="120px" width="120px" radius="8px" />
+                            </div>
+                        ) : (
+                            <div className={styles.exampleToggle} role="tablist" aria-label="Example goal trees">
+                                {publishedExamples.map((example) => {
+                                    const HeroExampleIcon = example.rootIcon?.isSmart ? AnimatedGoalIcon : GoalIcon;
+                                    return (
+                                        <button
+                                            type="button"
+                                            role="tab"
+                                            aria-selected={example.id === selectedExample?.id}
+                                            aria-label={example.root}
+                                            className={example.id === selectedExample?.id ? styles.toggleActive : ''}
+                                            onMouseEnter={() => setHoveredHeroExampleId(example.id)}
+                                            onMouseLeave={() => setHoveredHeroExampleId(null)}
+                                            onFocus={() => setHoveredHeroExampleId(example.id)}
+                                            onBlur={() => setHoveredHeroExampleId(null)}
+                                            onClick={() => handleExampleSelect(example.id, { scrollToTree: true })}
+                                            key={example.id}
+                                        >
+                                            <span aria-hidden="true" className={styles.exampleToggleIcon}>
+                                                <HeroExampleIcon
+                                                    {...example.rootIcon}
+                                                    size={112}
+                                                    reduced
+                                                />
+                                            </span>
+                                            <span className={styles.exampleToggleLabel}>{example.root}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                     <div className={styles.heroBodyPanel}>
                         <p>{landingContent.hero.body}</p>
                     </div>
-                </div>
-                <div className={styles.heroExamplePicker}>
-                    {isExamplesLoading && !selectedExample ? (
-                        <div className={styles.exampleToggle} aria-hidden="true" data-testid="example-picker-skeleton">
-                            <LandingSkeleton height="120px" width="120px" radius="8px" />
-                            <LandingSkeleton height="120px" width="120px" radius="8px" />
-                            <LandingSkeleton height="120px" width="120px" radius="8px" />
-                        </div>
-                    ) : (
-                        <div className={styles.exampleToggle} role="tablist" aria-label="Example goal trees">
-                            {publishedExamples.map((example) => {
-                                const HeroExampleIcon = example.rootIcon?.isSmart ? AnimatedGoalIcon : GoalIcon;
-                                return (
-                                    <button
-                                        type="button"
-                                        role="tab"
-                                        aria-selected={example.id === selectedExample?.id}
-                                        aria-label={example.root}
-                                        className={example.id === selectedExample?.id ? styles.toggleActive : ''}
-                                        onMouseEnter={() => setHoveredHeroExampleId(example.id)}
-                                        onMouseLeave={() => setHoveredHeroExampleId(null)}
-                                        onFocus={() => setHoveredHeroExampleId(example.id)}
-                                        onBlur={() => setHoveredHeroExampleId(null)}
-                                        onClick={() => handleExampleSelect(example.id, { scrollToTree: true })}
-                                        key={example.id}
-                                    >
-                                        <span aria-hidden="true" className={styles.exampleToggleIcon}>
-                                            <HeroExampleIcon
-                                                {...example.rootIcon}
-                                                size={112}
-                                                reduced
-                                            />
-                                        </span>
-                                        <span className={styles.exampleToggleLabel}>{example.root}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
                 </div>
             </section>
 

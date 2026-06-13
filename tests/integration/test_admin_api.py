@@ -9,6 +9,7 @@ from config import config
 from models import (
     ActivityDefinition,
     ActivityInstance,
+    AnalyticsDashboard,
     AppSetting,
     Goal,
     GoalLevel,
@@ -367,6 +368,46 @@ def admin_landing_fractal(db_session, admin_user):
         content='Public-safe demo note',
     )
     db_session.add_all([target, note])
+    db_session.add(AnalyticsDashboard(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        user_id=admin_user.id,
+        name='Public Demo Analytics View',
+        layout={
+            'version': 3,
+            'layout': {
+                'type': 'grid',
+                'panels': [{'id': 'window-1', 'x': 0, 'y': 0, 'w': 96, 'h': 48}],
+            },
+            'window_states': {
+                'window-1': {
+                    'selectedCategory': 'sessions',
+                    'selectedVisualization': 'sessionTrends',
+                    'selectedActivity': None,
+                    'selectedModeIds': [],
+                    'selectedGoal': None,
+                    'visualizationState': {'grain': 'week', 'metrics': ['sessions', 'duration']},
+                    'visualizationStateByKey': {
+                        'sessions:sessionTrends': {'grain': 'week', 'metrics': ['sessions', 'duration']},
+                    },
+                },
+            },
+            'selected_window_id': 'window-1',
+            'global_filters': {
+                'goals': {
+                    'goalIds': [],
+                    'includeDescendants': True,
+                    'includeInheritedActivities': True,
+                },
+                'activities': {
+                    'activityIds': [],
+                    'groupIds': [],
+                    'includeChildren': True,
+                },
+            },
+            'layout_bounds': {'columns': 96, 'rows': 48},
+        },
+    ))
     db_session.commit()
     return root
 
@@ -456,11 +497,11 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     assert [template['name'] for template in public_example['session_templates']] == ['Public Demo Template']
     assert [activity['name'] for activity in public_example['activity_definitions']] == ['Public Demo Activity']
     assert isinstance(public_example['activity_groups'], list)
-    assert isinstance(public_example['analytics_charts'], list)
+    assert [view['name'] for view in public_example['analytics_views']] == ['Public Demo Analytics View']
 
     # Snapshot carries a schema version for forward-safe shape evolution.
-    assert public_example['schema_version'] == 5
-    assert public_payload['schema_version'] == 5
+    assert public_example['schema_version'] == 6
+    assert public_payload['schema_version'] == 6
 
     # Without admin curation, the showcase key is still present with stable
     # null/empty defaults so the frontend never branches on key existence.
@@ -470,7 +511,7 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
         'program_id': None,
         'program_start_date': None,
         'program_end_date': None,
-        'chart_ids': [],
+        'analytics_view_ids': [],
     }
 
     # Published responses serve with short public caching; the cache only
@@ -480,7 +521,7 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     cache = db_session.get(AppSetting, 'landing_example_cache')
     assert cache is not None
     assert cache.value['examples'][0]['root_id'] == admin_landing_fractal.id
-    assert cache.value['schema_version'] == 5
+    assert cache.value['schema_version'] == 6
 
 
 @pytest.mark.integration
@@ -525,7 +566,7 @@ def test_landing_example_showcase_settings_round_trip(admin_client, db_session, 
         'program_id': 'program-1',
         'program_start_date': '2026-01-05',
         'program_end_date': '2026-01-20',
-        'chart_ids': ['session-duration-trend'],
+        'analytics_view_ids': ['analytics-view-1'],
     }
     response = admin_client.patch(
         '/api/admin/landing-examples',
@@ -553,14 +594,16 @@ def test_landing_example_showcase_settings_round_trip(admin_client, db_session, 
         'program_id': None,
         'program_start_date': None,
         'program_end_date': None,
-        'chart_ids': [],
+        'analytics_view_ids': [],
     }
 
 
 @pytest.mark.integration
 @pytest.mark.parametrize('showcase', [
     {'activity_ids': ['a1', 'a2', 'a3', 'a4', 'a5']},
+    {'analytics_view_ids': ['v1', 'v2', 'v3', 'v4']},
     {'activity_ids': ['a1', 'a1']},
+    {'analytics_view_ids': ['v1', 'v1']},
     {'program_start_date': 'not-a-date'},
     {'program_start_date': '2026-02-01', 'program_end_date': '2026-01-01'},
 ])
@@ -602,7 +645,35 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
         end_date=datetime(2026, 3, 1),
         weekly_schedule={},
     )
-    db_session.add_all([hidden_activity, program])
+    analytics_view = AnalyticsDashboard(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        user_id=root.owner_id,
+        name='Featured Analytics View',
+        layout={
+            'version': 3,
+            'layout': {
+                'type': 'grid',
+                'panels': [{'id': 'window-1', 'x': 0, 'y': 0, 'w': 96, 'h': 48}],
+            },
+            'window_states': {'window-1': {
+                'selectedCategory': 'sessions',
+                'selectedVisualization': 'stats',
+                'selectedActivity': None,
+                'selectedModeIds': [],
+                'selectedGoal': None,
+                'visualizationState': {},
+                'visualizationStateByKey': {},
+            }},
+            'selected_window_id': 'window-1',
+            'global_filters': {
+                'goals': {'goalIds': [], 'includeDescendants': True, 'includeInheritedActivities': True},
+                'activities': {'activityIds': [], 'groupIds': [], 'includeChildren': True},
+            },
+            'layout_bounds': {'columns': 96, 'rows': 48},
+        },
+    )
+    db_session.add_all([hidden_activity, program, analytics_view])
     db_session.commit()
 
     showcase = {
@@ -611,7 +682,7 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
         'program_id': program.id,
         'program_start_date': '2026-01-05',
         'program_end_date': '2026-01-20',
-        'chart_ids': ['session-duration-trend'],
+        'analytics_view_ids': [analytics_view.id],
     }
     publish_response = admin_client.post(
         '/api/admin/landing-examples/publish',
@@ -630,6 +701,7 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
     activity_names = [activity['name'] for activity in public_example['activity_definitions']]
     assert 'Hidden Featured Activity' in activity_names
     assert any(program_item['id'] == program.id for program_item in public_example['programs'])
+    assert [view['name'] for view in public_example['analytics_views']] == ['Featured Analytics View']
 
 
 @pytest.mark.integration
@@ -640,6 +712,7 @@ def test_publish_drops_stale_showcase_refs_with_warnings(admin_client, client, a
         'program_id': str(uuid.uuid4()),
         'program_start_date': '2026-01-05',
         'program_end_date': '2026-01-20',
+        'analytics_view_ids': [str(uuid.uuid4())],
     }
     publish_response = admin_client.post(
         '/api/admin/landing-examples/publish',
@@ -648,7 +721,7 @@ def test_publish_drops_stale_showcase_refs_with_warnings(admin_client, client, a
     )
     assert publish_response.status_code == 200
     warnings = publish_response.get_json()['showcase_warnings']
-    assert len(warnings) == 3
+    assert len(warnings) == 4
 
     public_example = client.get('/api/public/landing-examples').get_json()['examples'][0]
     assert public_example['showcase'] == {
@@ -657,7 +730,7 @@ def test_publish_drops_stale_showcase_refs_with_warnings(admin_client, client, a
         'program_id': None,
         'program_start_date': None,
         'program_end_date': None,
-        'chart_ids': [],
+        'analytics_view_ids': [],
     }
 
 
@@ -729,6 +802,7 @@ def test_landing_example_options_endpoint(admin_client, authed_client, db_sessio
     activity = next(item for item in options['activities'] if item['name'] == 'Public Demo Activity')
     assert activity['associated_goal_count'] == 1
     assert [item['name'] for item in options['programs']] == ['Options Program']
+    assert [item['name'] for item in options['analytics_views']] == ['Public Demo Analytics View']
 
     assert admin_client.get('/api/admin/landing-examples/options').status_code == 400
     # Roots not owned by an active admin are rejected.

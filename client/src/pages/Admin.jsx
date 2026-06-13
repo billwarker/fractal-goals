@@ -239,19 +239,16 @@ const EMPTY_LANDING_SHOWCASE = {
     program_id: null,
     program_start_date: null,
     program_end_date: null,
-    chart_ids: [],
+    analytics_view_ids: [],
 };
 const LANDING_SHOWCASE_ACTIVITY_CAP = 4;
-const LANDING_SHOWCASE_CHARTS = [
-    { id: 'session-duration-trend', label: 'Session duration trend' },
-    { id: 'activity-time-totals', label: 'Activity time totals' },
-];
+const LANDING_SHOWCASE_ANALYTICS_VIEW_CAP = 3;
 
 const normalizeShowcase = (showcase) => ({
     ...EMPTY_LANDING_SHOWCASE,
     ...(showcase || {}),
     activity_ids: (showcase?.activity_ids || []).slice(0, LANDING_SHOWCASE_ACTIVITY_CAP),
-    chart_ids: showcase?.chart_ids || [],
+    analytics_view_ids: (showcase?.analytics_view_ids || []).slice(0, LANDING_SHOWCASE_ANALYTICS_VIEW_CAP),
 });
 
 function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
@@ -275,11 +272,11 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
         update({ activity_ids: next });
     };
 
-    const toggleChart = (chartId) => {
-        const next = showcase.chart_ids.includes(chartId)
-            ? showcase.chart_ids.filter((id) => id !== chartId)
-            : [...showcase.chart_ids, chartId];
-        update({ chart_ids: next });
+    const toggleAnalyticsView = (viewId) => {
+        const next = showcase.analytics_view_ids.includes(viewId)
+            ? showcase.analytics_view_ids.filter((id) => id !== viewId)
+            : [...showcase.analytics_view_ids, viewId].slice(0, LANDING_SHOWCASE_ANALYTICS_VIEW_CAP);
+        update({ analytics_view_ids: next });
     };
 
     const selectedProgram = (options?.programs || []).find((program) => program.id === showcase.program_id) || null;
@@ -287,7 +284,7 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
         showcase.session_id ? 'session' : null,
         showcase.activity_ids.length ? `${showcase.activity_ids.length} activities` : null,
         showcase.program_id ? 'program window' : null,
-        showcase.chart_ids.length ? `${showcase.chart_ids.length} charts` : null,
+        showcase.analytics_view_ids.length ? `${showcase.analytics_view_ids.length} analytics views` : null,
     ].filter(Boolean);
 
     return (
@@ -396,17 +393,26 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
                         )}
 
                         <fieldset>
-                            <legend>Featured charts (none = all)</legend>
-                            {LANDING_SHOWCASE_CHARTS.map((chart) => (
-                                <label className={styles.landingShowcaseCheck} key={chart.id}>
-                                    <input
-                                        type="checkbox"
-                                        checked={showcase.chart_ids.includes(chart.id)}
-                                        onChange={() => toggleChart(chart.id)}
-                                    />
-                                    <span>{chart.label}</span>
-                                </label>
-                            ))}
+                            <legend>Analytics views (max {LANDING_SHOWCASE_ANALYTICS_VIEW_CAP})</legend>
+                            {(options?.analytics_views || []).length === 0 && (
+                                <div className={styles.status}>No saved analytics views in this fractal.</div>
+                            )}
+                            {(options?.analytics_views || []).map((view) => {
+                                const checked = showcase.analytics_view_ids.includes(view.id);
+                                const capped = !checked
+                                    && showcase.analytics_view_ids.length >= LANDING_SHOWCASE_ANALYTICS_VIEW_CAP;
+                                return (
+                                    <label className={styles.landingShowcaseCheck} key={view.id}>
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            disabled={capped}
+                                            onChange={() => toggleAnalyticsView(view.id)}
+                                        />
+                                        <span>{view.name || 'Untitled analytics view'}</span>
+                                    </label>
+                                );
+                            })}
                         </fieldset>
                     </div>
                 )

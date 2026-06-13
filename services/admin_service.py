@@ -68,6 +68,7 @@ from services.serializers import (
     format_utc,
     serialize_activity_definition,
     serialize_activity_group,
+    serialize_analytics_dashboard,
     serialize_session_template,
 )
 from services.service_types import JsonDict, ServiceResult
@@ -79,7 +80,7 @@ LANDING_EXAMPLE_SETTINGS_KEY = "landing_example_settings"
 LANDING_EXAMPLE_CACHE_KEY = "landing_example_cache"
 # Bump when the published landing snapshot shape changes so the frontend / future
 # migrations can detect and handle stale caches.
-LANDING_EXAMPLE_SCHEMA_VERSION = 5
+LANDING_EXAMPLE_SCHEMA_VERSION = 6
 # Bound the per-goal timeline/notes we embed so the public cache stays small.
 LANDING_EXAMPLE_TIMELINE_LIMIT = 50
 LANDING_EXAMPLE_NOTES_LIMIT = 30
@@ -90,13 +91,14 @@ LANDING_EXAMPLE_ANALYTICS_LIMIT = 24
 LANDING_EXAMPLE_OPTIONS_SESSIONS_LIMIT = 50
 LANDING_EXAMPLE_OPTIONS_ACTIVITIES_LIMIT = 200
 LANDING_EXAMPLE_SHOWCASE_ACTIVITY_LIMIT = 4
+LANDING_EXAMPLE_SHOWCASE_ANALYTICS_VIEW_LIMIT = 3
 LANDING_EXAMPLE_SHOWCASE_KEYS = (
     "session_id",
     "activity_ids",
     "program_id",
     "program_start_date",
     "program_end_date",
-    "chart_ids",
+    "analytics_view_ids",
 )
 
 
@@ -371,11 +373,14 @@ class AdminService:
         normalized: JsonDict = {}
         for key in LANDING_EXAMPLE_SHOWCASE_KEYS:
             value = source.get(key)
-            if key in ("activity_ids", "chart_ids"):
+            if key in ("activity_ids", "analytics_view_ids"):
                 normalized[key] = [str(item) for item in (value or []) if item]
             else:
                 normalized[key] = str(value) if value else None
         normalized["activity_ids"] = normalized["activity_ids"][:LANDING_EXAMPLE_SHOWCASE_ACTIVITY_LIMIT]
+        normalized["analytics_view_ids"] = (
+            normalized["analytics_view_ids"][:LANDING_EXAMPLE_SHOWCASE_ANALYTICS_VIEW_LIMIT]
+        )
         return normalized
 
     def _normalize_landing_example_settings(self, examples: list[JsonDict]) -> list[JsonDict]:
@@ -502,6 +507,16 @@ class AdminService:
         except Exception:
             programs = []
 
+        analytics_views = self.db_session.query(AnalyticsDashboard).filter(
+            AnalyticsDashboard.root_id == root.id,
+            AnalyticsDashboard.user_id == owner_id,
+            AnalyticsDashboard.deleted_at.is_(None),
+        ).order_by(
+            AnalyticsDashboard.updated_at.desc(),
+            AnalyticsDashboard.created_at.desc(),
+            AnalyticsDashboard.name.asc(),
+        ).all()
+
         return {
             "root_id": root.id,
             "sessions": [
@@ -544,6 +559,14 @@ class AdminService:
                     ],
                 }
                 for program in programs
+            ],
+            "analytics_views": [
+                {
+                    "id": view.id,
+                    "name": view.name,
+                    "updated_at": format_utc(view.updated_at),
+                }
+                for view in analytics_views
             ],
         }, None, 200
 
@@ -771,75 +794,6 @@ class AdminService:
             "programs": programs,
         }
 
-    @staticmethod
-    def _build_landing_analytics_charts(summary: JsonDict | None) -> list[JsonDict]:
-        """Convert the private analytics summary into static Chart.js payloads."""
-        if not isinstance(summary, dict):
-            return []
-
-        sessions = list(reversed(summary.get("sessions") or []))[-12:]
-        charts: list[JsonDict] = []
-        if sessions:
-            charts.append({
-                "id": "session-duration-trend",
-                "title": "Session Duration Trend",
-                "type": "bar",
-                "data": {
-                    "labels": [session.get("name") or "Session" for session in sessions],
-                    "datasets": [{
-                        "label": "Minutes",
-                        "data": [
-                            round((session.get("total_duration_seconds") or 0) / 60, 1)
-                            for session in sessions
-                        ],
-                        "backgroundColor": "#3A86FF",
-                        "borderColor": "#3A86FF",
-                    }],
-                },
-                "options": {
-                    "plugins": {"legend": {"display": False}},
-                    "scales": {"y": {"beginAtZero": True}},
-                },
-            })
-
-        activity_instances = summary.get("activity_instances") or {}
-        activity_totals = []
-        for activity_id, instances in activity_instances.items():
-            if not isinstance(instances, list):
-                continue
-            total_seconds = sum(instance.get("duration_seconds") or 0 for instance in instances)
-            label = next(
-                (instance.get("definition_name") or instance.get("name") for instance in instances if isinstance(instance, dict)),
-                activity_id,
-            )
-            activity_totals.append({
-                "label": label or activity_id,
-                "minutes": round(total_seconds / 60, 1),
-            })
-        activity_totals = sorted(activity_totals, key=lambda item: item["minutes"], reverse=True)[:8]
-        if activity_totals:
-            charts.append({
-                "id": "activity-time-totals",
-                "title": "Activity Time Totals",
-                "type": "bar",
-                "data": {
-                    "labels": [item["label"] for item in activity_totals],
-                    "datasets": [{
-                        "label": "Minutes",
-                        "data": [item["minutes"] for item in activity_totals],
-                        "backgroundColor": "#06A77D",
-                        "borderColor": "#06A77D",
-                    }],
-                },
-                "options": {
-                    "indexAxis": "y",
-                    "plugins": {"legend": {"display": False}},
-                    "scales": {"x": {"beginAtZero": True}},
-                },
-            })
-
-        return charts
-
     def _resolve_landing_showcase(self, root: Goal, showcase: JsonDict | None) -> tuple[JsonDict, list[str]]:
         """Validate admin-picked showcase references against the root, dropping any
         stale ids (deleted/moved content) instead of failing publish."""
@@ -872,6 +826,26 @@ class AdminService:
                 activity_id for activity_id in resolved["activity_ids"] if activity_id in existing_ids
             ]
 
+        if resolved["analytics_view_ids"]:
+            existing_ids = {
+                row[0]
+                for row in self.db_session.query(AnalyticsDashboard.id).filter(
+                    AnalyticsDashboard.id.in_(resolved["analytics_view_ids"]),
+                    AnalyticsDashboard.root_id == root.id,
+                    AnalyticsDashboard.user_id == root.owner_id,
+                    AnalyticsDashboard.deleted_at.is_(None),
+                ).all()
+            }
+            dropped = [
+                view_id for view_id in resolved["analytics_view_ids"]
+                if view_id not in existing_ids
+            ]
+            if dropped:
+                warnings.append(f"{len(dropped)} analytics views no longer exist and were skipped")
+            resolved["analytics_view_ids"] = [
+                view_id for view_id in resolved["analytics_view_ids"] if view_id in existing_ids
+            ]
+
         if resolved["program_id"]:
             program_exists = self.db_session.query(Program.id).filter(
                 Program.id == resolved["program_id"],
@@ -884,6 +858,28 @@ class AdminService:
                 resolved["program_end_date"] = None
 
         return resolved, warnings
+
+    def _build_landing_analytics_views(self, root: Goal, showcase: JsonDict) -> list[JsonDict]:
+        query = self.db_session.query(AnalyticsDashboard).filter(
+            AnalyticsDashboard.root_id == root.id,
+            AnalyticsDashboard.user_id == root.owner_id,
+            AnalyticsDashboard.deleted_at.is_(None),
+        )
+        selected_ids = showcase.get("analytics_view_ids") or []
+        if selected_ids:
+            views = query.filter(AnalyticsDashboard.id.in_(selected_ids)).all()
+            by_id = {view.id: view for view in views}
+            ordered = [by_id[view_id] for view_id in selected_ids if view_id in by_id]
+        else:
+            ordered = query.order_by(
+                AnalyticsDashboard.updated_at.desc(),
+                AnalyticsDashboard.created_at.desc(),
+                AnalyticsDashboard.name.asc(),
+            ).limit(LANDING_EXAMPLE_SHOWCASE_ANALYTICS_VIEW_LIMIT).all()
+        return [
+            serialize_analytics_dashboard(view)
+            for view in ordered[:LANDING_EXAMPLE_SHOWCASE_ANALYTICS_VIEW_LIMIT]
+        ]
 
     def _build_landing_showcase_data(self, root: Goal, showcase: JsonDict | None = None) -> dict:
         owner_id = root.owner_id
@@ -957,7 +953,7 @@ class AdminService:
             "sessions": sessions,
             "activity_definitions": activity_definitions,
             "activity_groups": [serialize_activity_group(group) for group in activity_groups],
-            "analytics_charts": self._build_landing_analytics_charts(analytics_summary),
+            "analytics_views": self._build_landing_analytics_views(root, showcase),
             "session_templates": [serialize_session_template(template) for template in templates],
         }
 
@@ -997,7 +993,7 @@ class AdminService:
                 "sessions": showcase_data["sessions"],
                 "activity_definitions": showcase_data["activity_definitions"],
                 "activity_groups": showcase_data["activity_groups"],
-                "analytics_charts": showcase_data["analytics_charts"],
+                "analytics_views": showcase_data["analytics_views"],
                 "session_templates": showcase_data["session_templates"],
             })
 

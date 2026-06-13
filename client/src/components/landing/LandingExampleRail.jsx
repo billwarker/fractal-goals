@@ -2,7 +2,7 @@ import React from 'react';
 import GoalIcon from '../atoms/GoalIcon';
 import styles from './LandingExampleRail.module.css';
 
-// Fixed example-fractal switcher that sits above the section dot rail.
+// Fixed example-fractal switcher for comparing published examples.
 // Landing renders it only once the user scrolls past the hero, so the active
 // example can be flipped in place (no scrolling) from the goals view or
 // features section without returning to the hero picker.
