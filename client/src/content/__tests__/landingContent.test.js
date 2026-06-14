@@ -82,6 +82,10 @@ Custom features intro.
 
 Custom session body.
 
+#### Session detail
+
+Session detail body.
+
 ### Programs
 
 **Label:** Custom Programs
@@ -103,6 +107,7 @@ Custom extra body.
             label: 'Custom Sessions',
             heading: 'Custom session heading.',
             body: 'Custom session body.',
+            cards: [{ title: 'Session detail', body: 'Session detail body.' }],
         });
         expect(content.features.items.programs.body).toBe('Custom programs body.');
         // Features missing from markdown keep their fallback copy.

@@ -473,6 +473,9 @@ function LandingExamplesPanel() {
             }));
             notify.success('Landing examples published');
             (res.data.showcase_warnings || []).forEach((warning) => notify.error(warning));
+            if (res.data.static_snapshot === 'failed') {
+                notify.error('Published, but writing the static landing snapshot failed; the API fallback is still live.');
+            }
             if (res.data.cache_warm === 'failed') {
                 notify.error('Published, but warming the landing edge cache failed; it will refresh on its own within ~5 minutes.');
             }
@@ -534,6 +537,9 @@ function LandingExamplesPanel() {
                 <div>
                     <h2>Landing Examples</h2>
                     <p>Choose admin-owned fractals to publish as read-only examples on the public landing page.</p>
+                    <a className={styles.landingExamplesPageLink} href="/landing" target="_blank" rel="noreferrer">
+                        View landing page
+                    </a>
                 </div>
                 <div className={styles.landingExamplesPublishMeta}>
                     <span>Published</span>

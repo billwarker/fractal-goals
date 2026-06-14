@@ -21,7 +21,11 @@
       var path = window.location.pathname;
       var isMarketingHost = host === 'fractalgoals.com' || host === 'www.fractalgoals.com';
       if (path !== '/landing' && !(path === '/' && isMarketingHost)) return;
-      window.__fgLandingExamplesPreload = fetch('/api/public/landing-examples', { credentials: 'same-origin' })
+      var staticUrl = '%VITE_LANDING_EXAMPLES_STATIC_URL%';
+      if (!staticUrl || staticUrl.charAt(0) === '%') staticUrl = '';
+      window.__fgLandingExamplesStaticUrl = staticUrl;
+      var preloadUrl = staticUrl || '/api/public/landing-examples';
+      window.__fgLandingExamplesPreload = fetch(preloadUrl, { credentials: staticUrl ? 'omit' : 'same-origin' })
         .then(function (response) {
           if (!response.ok) throw new Error('landing examples preload failed: ' + response.status);
           return response.json();

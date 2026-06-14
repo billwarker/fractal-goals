@@ -463,6 +463,7 @@ describe('Admin', () => {
         fireEvent.click(screen.getByText('landing'));
         await waitFor(() => expect(screen.getByText('Landing Examples')).toBeInTheDocument());
 
+        expect(screen.getByRole('link', { name: 'View landing page' })).toHaveAttribute('href', '/landing');
         expect(screen.getAllByText('Guitar practice tracker').length).toBeGreaterThan(0);
         expect(screen.getByDisplayValue('Guitar practice')).toBeInTheDocument();
         expect(screen.getByText('Chinese language tracker')).toBeInTheDocument();

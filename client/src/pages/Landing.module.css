@@ -10,7 +10,6 @@
 
 .header,
 .hero,
-.audienceSection,
 .treeSection,
 .betaSection {
     max-width: var(--landing-section-max-width);
@@ -148,7 +147,6 @@
     background: var(--color-brand-primary-hover);
 }
 
-.audienceSection,
 .betaSection {
     margin-top: 72px;
 }
@@ -418,27 +416,49 @@
 
 .betaSection {
     display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(360px, 520px);
-    gap: clamp(20px, 5vw, 64px);
-    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
+    gap: clamp(24px, 5vw, 72px);
+    align-items: center;
     padding-bottom: 28px;
+}
+
+.betaAudience {
+    min-width: 0;
+}
+
+.betaSignup {
+    min-width: 0;
+}
+
+.betaSignupPanel {
+    display: grid;
+    gap: 22px;
+    padding: clamp(20px, 2vw, 30px);
+    background: color-mix(in srgb, var(--color-bg-card) 88%, transparent);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-lg);
+}
+
+.betaCopy h2 {
+    font-size: clamp(2rem, 3vw, 3.5rem);
 }
 
 .betaCopy p {
     color: var(--color-text-secondary);
     font-size: var(--font-size-lg);
     line-height: var(--line-height-relaxed);
-    margin: 22px 0 0;
+    margin: 16px 0 0;
 }
 
 .betaForm {
     display: grid;
     gap: 14px;
-    padding: 18px;
-    background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-md);
-    box-shadow: var(--shadow-lg);
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
 }
 
 .betaForm label {
@@ -549,6 +569,10 @@
         grid-template-columns: 1fr;
     }
 
+    .betaSignupPanel {
+        padding: 18px;
+    }
+
     .exampleToggle {
         gap: 18px;
     }
@@ -616,7 +640,6 @@
     }
 
     .hero,
-    .audienceSection,
     .betaSection {
         width: 100%;
         max-width: none;
@@ -735,14 +758,50 @@
         min-height: 0;
     }
 
-    .audienceSection {
-        justify-content: center;
-    }
-
     .betaSection {
         display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(390px, 31vw);
+        align-items: center;
         align-content: center;
-        padding-bottom: 24px;
+        gap: clamp(28px, 4vw, 76px);
+        padding-bottom: clamp(24px, 5vh, 64px);
+    }
+
+    .betaAudience {
+        align-self: center;
+    }
+
+    .betaAudience .sectionHeader h2 {
+        max-width: min(860px, 100%);
+        font-size: clamp(2.6rem, 3.9vw, 4.8rem);
+        line-height: 1;
+    }
+
+    .betaAudience .audienceGrid {
+        max-width: min(1060px, 100%);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-top: clamp(20px, 3.4vh, 40px);
+        gap: 14px;
+    }
+
+    .betaAudience .audienceCard {
+        min-height: 0;
+        padding: clamp(14px, 1.2vw, 18px);
+    }
+
+    .betaAudience .audienceCard h3 {
+        font-size: var(--font-size-lg);
+    }
+
+    .betaAudience .audienceCard p {
+        margin-top: 10px;
+        font-size: var(--font-size-sm);
+    }
+
+    .betaSignupPanel {
+        align-self: center;
+        max-width: 540px;
+        margin-left: auto;
     }
 }
 

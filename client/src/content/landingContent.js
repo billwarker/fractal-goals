@@ -9,7 +9,7 @@ const fallbackContent = {
     header: {
         brand: 'Fractal Goals',
         nav: [
-            { label: 'Examples', href: '#examples' },
+            { label: 'Goals', href: '#examples' },
             { label: 'Features', href: '#features' },
             { label: 'Private beta', href: '#beta' },
             { label: 'Open app', href: 'https://my.fractalgoals.com' },
@@ -67,26 +67,51 @@ const fallbackContent = {
                 label: 'Sessions',
                 heading: 'Log the work, not just the plan.',
                 body: 'A session is one real block of work: its activities, metrics, timers, and notes in a single record. Run it live with a timer or log it after the fact - either way it rolls up to the goals it serves, so the log always tells you what the work was for.',
+                cards: [
+                    { title: 'One record for the work', body: 'Keep activities, metrics, timers, notes, and completions together instead of scattering the log across tools.' },
+                    { title: 'Live or after the fact', body: 'Run a session with a timer or record it later; either path preserves the same evidence trail.' },
+                    { title: 'Goal credit is automatic', body: 'Completed work rolls up to every connected goal so progress stays tied to the reason you trained.' },
+                    { title: 'Notes stay in context', body: 'Session notes remain attached to the work that produced them, ready for review when patterns emerge.' },
+                ],
             },
             activity: {
                 label: 'Activities',
                 heading: 'Every activity knows which goals it serves.',
                 body: "Activities are reusable building blocks with their own metrics. Link an activity to a goal once and every session that includes it feeds that goal automatically - the credit flows up the tree, from today's reps all the way to the ultimate ambition.",
+                cards: [
+                    { title: 'Reusable building blocks', body: 'Define an activity once, then reuse it across sessions, templates, and programs without rebuilding its metrics.' },
+                    { title: 'Goal associations travel with it', body: 'When an activity belongs to a goal, every future session that uses it contributes to that goal automatically.' },
+                    { title: 'Metrics are activity-native', body: 'Reps, ratings, durations, weights, attempts, and custom measures live with the activity they describe.' },
+                    { title: 'Progress compares to history', body: 'Completed activities can be compared against prior work so the log shows whether practice is improving.' },
+                ],
             },
             programs: {
                 label: 'Programs',
                 heading: 'Structure weeks of work on a real calendar.',
                 body: 'Programs organize goals and session templates into blocks and days. Plan a training block, schedule its days on the calendar, and watch completion fill in as the sessions get logged.',
+                cards: [
+                    { title: 'Blocks create structure', body: 'Group days into training blocks so a long plan has visible phases, focus areas, and deadlines.' },
+                    { title: 'Days carry templates', body: 'Attach session templates to program days so planned work is ready when the calendar date arrives.' },
+                    { title: 'Calendar and blocks stay synced', body: 'Switch between time-based planning and block-based planning without losing context.' },
+                    { title: 'Completion fills itself in', body: 'As sessions are logged, the program shows which days, blocks, and goals are actually getting done.' },
+                ],
             },
             analytics: {
                 label: 'Analytics',
                 heading: 'See whether the work is working.',
                 body: 'Sessions feed your charts automatically: duration trends, time per activity, and metric progress over time. No spreadsheets and no manual exports - the training log is the dataset.',
+                cards: [
+                    { title: 'Views are reusable', body: 'Save focused analytics views and publish the ones that best explain a fractal example.' },
+                    { title: 'Filters follow the goal tree', body: 'Slice charts by goals, descendants, activities, groups, and inherited associations.' },
+                    { title: 'Multiple charts can coexist', body: 'A view can hold several visualizations, from trends to totals, so the story has context.' },
+                    { title: 'No manual export loop', body: 'Every chart is generated from logged sessions, activities, and metrics already in the system.' },
+                ],
             },
             more: {
                 label: 'And more',
                 heading: 'The details that make it livable.',
                 body: 'Fractal Goals is built for daily use, not just planning. Notes, automatic progress comparisons, theming, and per-level customization keep the everyday loop fast and pleasant.',
+                cards: [],
             },
         },
         extras: [
@@ -146,6 +171,7 @@ const metaKeyMap = {
 
 const topLevelHeadingPattern = /^##\s+(.+?)\s*$/;
 const nestedHeadingPattern = /^###\s+(.+?)\s*$/;
+const detailHeadingPattern = /^####\s+(.+?)\s*$/;
 const metaPattern = /^\*\*(.+?):\*\*\s*(.+?)\s*$/;
 const linkPattern = /^-\s+\[(.+?)]\((.+?)\)\s*$/;
 
@@ -234,6 +260,29 @@ function readCards(section) {
     }).filter((card) => card.title && card.body);
 }
 
+function readDetailCards(section) {
+    const lines = section.split(/\r?\n/);
+    const cards = [];
+    let current = null;
+
+    for (const line of lines) {
+        const match = line.match(detailHeadingPattern);
+        if (match) {
+            if (current) cards.push(current);
+            current = { title: match[1].trim(), lines: [] };
+            continue;
+        }
+        if (current) current.lines.push(line);
+    }
+
+    if (current) cards.push(current);
+
+    return cards.map((card) => {
+        const body = readBody(card.lines.join('\n'), { omitLinks: false });
+        return { title: card.title, body };
+    }).filter((card) => card.title && card.body);
+}
+
 function getNestedSection(section, title) {
     const lines = section.split(/\r?\n/);
     const sectionLines = [];
@@ -250,6 +299,16 @@ function getNestedSection(section, title) {
     }
 
     return sectionLines.join('\n').trim();
+}
+
+function getDetailIntro(section) {
+    const lines = section.split(/\r?\n/);
+    const introLines = [];
+    for (const line of lines) {
+        if (line.match(detailHeadingPattern)) break;
+        introLines.push(line);
+    }
+    return introLines.join('\n').trim();
 }
 
 function getSectionIntro(section) {
@@ -329,11 +388,14 @@ export function parseLandingContent(markdown) {
             more: 'More',
         }).forEach(([key, headingTitle]) => {
             const itemSection = getNestedSection(featuresSection, headingTitle);
-            const itemMeta = itemSection ? readMetadata(itemSection) : {};
+            const itemIntro = itemSection ? getDetailIntro(itemSection) : '';
+            const itemMeta = itemIntro ? readMetadata(itemIntro) : {};
+            const itemCards = itemSection ? readDetailCards(itemSection) : [];
             items[key] = {
                 ...content.features.items[key],
                 ...itemMeta,
-                body: (itemSection && readBody(itemSection)) || content.features.items[key].body,
+                body: (itemIntro && readBody(itemIntro)) || content.features.items[key].body,
+                cards: itemCards.length ? itemCards : content.features.items[key].cards,
             };
         });
         content.features = {

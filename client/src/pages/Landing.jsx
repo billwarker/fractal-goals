@@ -89,7 +89,7 @@ const initialFormState = {
 
 // Full-viewport snap sections in document order. The persistent header uses
 // these IDs for active-section tracking and sideways navigation.
-const SECTION_IDS = ['hero', 'examples', 'audience', 'features', 'beta'];
+const SECTION_IDS = ['hero', 'examples', 'features', 'beta'];
 
 // The goals-view sidebar cards demo one tree feature each; card copy comes from
 // landing.md (examples cards) in this fixed order.
@@ -419,7 +419,8 @@ function Landing() {
     const isExamplesLoading = landingExamplesQuery.isPending;
     const publishedExamples = useMemo(() => {
         const apiExamples = landingExamplesQuery.data?.examples || [];
-        const shouldUseFallback = landingExamplesQuery.isError
+        const shouldUseFallback = landingExamplesQuery.isPending
+            || landingExamplesQuery.isError
             || (landingExamplesQuery.isSuccess && apiExamples.length === 0);
         const sourceExamples = apiExamples.length > 0
             ? apiExamples
@@ -760,7 +761,7 @@ function Landing() {
                     })}
                 </nav>
             </header>
-            {activeSectionId !== 'hero' && (
+            {activeSectionId !== 'hero' && activeSectionId !== 'beta' && (
                 <LandingExampleRail
                     examples={publishedExamples}
                     activeExampleId={selectedExample?.id}
@@ -941,20 +942,6 @@ function Landing() {
                 )}
             </section>
 
-            <section className={`${styles.audienceSection} ${styles.snapSection}`} id="audience" aria-labelledby="audience-title">
-                <div className={styles.sectionHeader}>
-                    <h2 id="audience-title">{landingContent.audience.title}</h2>
-                </div>
-                <div className={styles.audienceGrid}>
-                    {landingContent.audience.cards.map((card) => (
-                        <article className={styles.audienceCard} key={card.title}>
-                            <h3>{card.title}</h3>
-                            <p>{card.body}</p>
-                        </article>
-                    ))}
-                </div>
-            </section>
-
             <LandingFeaturesSection
                 example={selectedExample}
                 seedLevels={snapshotLevels}
@@ -965,32 +952,49 @@ function Landing() {
             />
 
             <section className={`${styles.betaSection} ${styles.snapSection}`} id="beta" aria-labelledby="beta-title">
-                <div className={styles.betaCopy}>
-                    <h2 id="beta-title">{landingContent.beta.title}</h2>
-                    <p>{landingContent.beta.body}</p>
+                <div className={styles.betaAudience}>
+                    <div className={styles.sectionHeader}>
+                        <h2>{landingContent.audience.title}</h2>
+                    </div>
+                    <div className={styles.audienceGrid}>
+                        {landingContent.audience.cards.map((card) => (
+                            <article className={styles.audienceCard} key={card.title}>
+                                <h3>{card.title}</h3>
+                                <p>{card.body}</p>
+                            </article>
+                        ))}
+                    </div>
                 </div>
-                <form className={styles.betaForm} onSubmit={handleSubmit}>
-                    <label>
-                        {landingContent.betaForm.emailLabel}
-                        <input
-                            type="email"
-                            value={formState.email}
-                            onChange={updateField('email')}
-                            autoComplete="email"
-                            required
-                        />
-                    </label>
-                    <button type="submit" disabled={!canSubmit}>
-                        {status === 'submitting'
-                            ? landingContent.betaForm.submittingLabel
-                            : landingContent.betaForm.submitLabel}
-                    </button>
-                    {message && (
-                        <p className={status === 'success' ? styles.successMessage : styles.errorMessage} role="status">
-                            {message}
-                        </p>
-                    )}
-                </form>
+                <div className={styles.betaSignup}>
+                    <div className={styles.betaSignupPanel}>
+                        <div className={styles.betaCopy}>
+                            <h2 id="beta-title">{landingContent.beta.title}</h2>
+                            <p>{landingContent.beta.body}</p>
+                        </div>
+                        <form className={styles.betaForm} onSubmit={handleSubmit}>
+                            <label>
+                                {landingContent.betaForm.emailLabel}
+                                <input
+                                    type="email"
+                                    value={formState.email}
+                                    onChange={updateField('email')}
+                                    autoComplete="email"
+                                    required
+                                />
+                            </label>
+                            <button type="submit" disabled={!canSubmit}>
+                                {status === 'submitting'
+                                    ? landingContent.betaForm.submittingLabel
+                                    : landingContent.betaForm.submitLabel}
+                            </button>
+                            {message && (
+                                <p className={status === 'success' ? styles.successMessage : styles.errorMessage} role="status">
+                                    {message}
+                                </p>
+                            )}
+                        </form>
+                    </div>
+                </div>
             </section>
         </main>
     );

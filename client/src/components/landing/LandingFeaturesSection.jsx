@@ -6,7 +6,6 @@ import LandingFeatureSession from './LandingFeatureSession';
 import LandingFeatureActivity from './LandingFeatureActivity';
 import LandingFeaturePrograms from './LandingFeaturePrograms';
 import LandingFeatureAnalytics from './LandingFeatureAnalytics';
-import LandingFeatureMore from './LandingFeatureMore';
 import {
     resolveFeaturedActivities,
     resolveFeaturedAnalyticsViews,
@@ -15,7 +14,7 @@ import {
 } from './landingFeatureModel';
 import styles from './LandingFeaturesSection.module.css';
 
-const FEATURE_ORDER = ['session', 'activity', 'programs', 'analytics', 'more'];
+const PRIMARY_FEATURE_ORDER = ['session', 'activity', 'programs', 'analytics'];
 
 // The landing Features section mirrors the goals-view section: message and
 // feature selectors on the left, live viewport on the right.
@@ -27,7 +26,7 @@ export default function LandingFeaturesSection({
     onGoalSelect,
     className = '',
 }) {
-    const [activeFeature, setActiveFeature] = useState(FEATURE_ORDER[0]);
+    const [activeFeature, setActiveFeature] = useState(PRIMARY_FEATURE_ORDER[0]);
     const content = landingContent.features;
     const activeItem = content.items[activeFeature];
 
@@ -69,11 +68,12 @@ export default function LandingFeaturesSection({
                 );
             case 'analytics':
                 return <LandingFeatureAnalytics example={example} views={featuredAnalyticsViews} />;
-            case 'more':
             default:
-                return <LandingFeatureMore extras={content.extras} />;
+                return <LandingFeatureSession example={example} session={featuredSession} />;
         }
     };
+
+    const activeDetailCards = activeItem.cards?.length ? activeItem.cards : content.extras;
 
     return (
         <section
@@ -89,26 +89,41 @@ export default function LandingFeaturesSection({
                         <p>{content.body}</p>
                     </div>
 
-                    <div className={styles.featureToggle} role="tablist" aria-label="Product features">
-                        {isLoading && !example
-                            ? FEATURE_ORDER.map((key) => (
-                                <LandingSkeleton key={key} height="118px" width="100%" radius="6px" />
-                            ))
-                            : FEATURE_ORDER.map((key) => (
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={activeFeature === key}
-                                    aria-label={content.items[key].label}
-                                    className={activeFeature === key ? styles.featureToggleActive : ''}
-                                    onClick={() => setActiveFeature(key)}
-                                    key={key}
-                                >
-                                    <span className={styles.featureCardLabel}>{content.items[key].label}</span>
-                                    <span className={styles.featureCardHeading}>{content.items[key].heading}</span>
-                                    <span className={styles.featureCardBody}>{content.items[key].body}</span>
-                                </button>
-                            ))}
+                    <div className={styles.featureSidebarBody}>
+                        <div className={styles.featureToggle} role="tablist" aria-label="Product features">
+                            {isLoading && !example
+                                ? PRIMARY_FEATURE_ORDER.map((key) => (
+                                    <LandingSkeleton key={key} height="88px" width="100%" radius="6px" />
+                                ))
+                                : PRIMARY_FEATURE_ORDER.map((key) => (
+                                    <button
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={activeFeature === key}
+                                        aria-label={content.items[key].label}
+                                        className={activeFeature === key ? styles.featureToggleActive : ''}
+                                        onClick={() => setActiveFeature(key)}
+                                        key={key}
+                                    >
+                                        <span className={styles.featureCardLabel}>{content.items[key].label}</span>
+                                    </button>
+                                ))}
+                        </div>
+
+                        <div className={styles.featureDetails} aria-live="polite">
+                            <div className={styles.featureDetailsLead}>
+                                <span>{activeItem.heading}</span>
+                                <p>{activeItem.body}</p>
+                            </div>
+                            <div className={styles.featureDetailGrid}>
+                                {activeDetailCards.map((card) => (
+                                    <article className={styles.featureDetailCard} key={`${activeFeature}-${card.title}`}>
+                                        <h3>{card.title}</h3>
+                                        <p>{card.body}</p>
+                                    </article>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </aside>
 

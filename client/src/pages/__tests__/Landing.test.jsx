@@ -106,6 +106,14 @@ vi.mock('../../components/programs/ProgramCalendarView', () => ({
     ),
 }));
 
+vi.mock('../../components/programs/ProgramBlockView', () => ({
+    default: ({ blocks }) => (
+        <div data-testid="showcase-program-blocks" data-block-count={blocks.length}>
+            Program blocks
+        </div>
+    ),
+}));
+
 vi.mock('../../components/analytics/ProfileWindowLayout', () => ({
     GRID_COLUMNS: 96,
     GRID_ROWS: 48,
@@ -416,20 +424,22 @@ describe('Landing', () => {
         });
     });
 
-    it('keeps the landing sections in document order: hero, goals, audience, features, beta', async () => {
+    it('keeps the landing sections in document order: hero, goals, features, beta', async () => {
         const { container } = renderLanding();
 
         const heroHeading = screen.getByRole('heading', { name: landingContent.hero.title });
         const examplesHeading = await screen.findByRole('heading', { name: landingContent.examples.title });
-        const audienceHeading = screen.getByRole('heading', { name: landingContent.audience.title });
         const features = container.querySelector('#features');
         const betaHeading = screen.getByRole('heading', { name: landingContent.beta.title });
+        const beta = container.querySelector('#beta');
+        const audienceHeading = within(beta).getByRole('heading', { name: landingContent.audience.title });
 
         expect(features).toBeInTheDocument();
+        expect(container.querySelector('#audience')).not.toBeInTheDocument();
         expect(Boolean(heroHeading.compareDocumentPosition(examplesHeading) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
-        expect(Boolean(examplesHeading.compareDocumentPosition(audienceHeading) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
-        expect(Boolean(audienceHeading.compareDocumentPosition(features) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+        expect(Boolean(examplesHeading.compareDocumentPosition(features) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
         expect(Boolean(features.compareDocumentPosition(betaHeading) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+        expect(Boolean(audienceHeading.compareDocumentPosition(betaHeading) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
         expect(container.querySelector('#showcase')).not.toBeInTheDocument();
         expect(container.querySelector('#faq')).not.toBeInTheDocument();
     });
@@ -476,8 +486,11 @@ describe('Landing', () => {
 
         // Session feature is the default, with its explanatory copy in the sidebar card.
         expect(screen.getByRole('tab', { name: landingContent.features.items.session.label })).toHaveAttribute('aria-selected', 'true');
-        expect(screen.getByText(landingContent.features.items.session.heading)).toBeInTheDocument();
+        expect(screen.getAllByText(landingContent.features.items.session.heading)).toHaveLength(1);
         expect(screen.getByText(landingContent.features.items.session.body)).toBeInTheDocument();
+        landingContent.features.items.session.cards.forEach((card) => {
+            expect(screen.getByRole('heading', { name: card.title })).toBeInTheDocument();
+        });
         expect(screen.getByLabelText('Technique Session detail preview')).toBeInTheDocument();
         expect(screen.getByRole('tablist', { name: 'Session side pane views' })).toBeInTheDocument();
 
@@ -490,20 +503,19 @@ describe('Landing', () => {
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.programs.label }));
         expect(screen.getByRole('tab', { name: landingContent.features.items.programs.label })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByTestId('showcase-calendar')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Blocks' }));
+        expect(screen.getByTestId('showcase-program-blocks')).toBeInTheDocument();
+        expect(screen.queryByTestId('showcase-calendar')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Program side pane preview')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Hide Sidebar' }));
+        expect(screen.queryByLabelText('Program side pane preview')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Show Sidebar' })).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.analytics.label }));
         expect(screen.getByText('Session Duration Trend')).toBeInTheDocument();
         expect(screen.getByTestId('landing-analytics-window')).toHaveTextContent('sessionTrends');
         expect(screen.getByRole('button', { name: 'Show Filters' })).toBeInTheDocument();
-
-        // "And more" renders the extras cards, including the live theme toggle.
-        fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.more.label }));
-        landingContent.features.extras.forEach((extra) => {
-            expect(screen.getByRole('heading', { name: extra.title })).toBeInTheDocument();
-        });
-        const themeBefore = document.documentElement.getAttribute('data-theme');
-        fireEvent.click(screen.getByRole('button', { name: /tap for/i }));
-        expect(document.documentElement.getAttribute('data-theme')).not.toBe(themeBefore);
+        expect(screen.queryByRole('tab', { name: landingContent.features.items.more.label })).not.toBeInTheDocument();
     });
 
     it('honors admin showcase picks for featured session, activities, and analytics views', async () => {
@@ -597,7 +609,7 @@ describe('Landing', () => {
         expect(container.querySelector('.details-window.sidebar.docked.landing-goal-dock')).toBeInTheDocument();
     });
 
-    it('does not flash the built-in demo while published examples are loading', async () => {
+    it('shows fallback example icons while published examples are loading', async () => {
         let resolveExamples;
         getLandingExamples.mockReturnValue(new Promise((resolve) => {
             resolveExamples = resolve;
@@ -605,11 +617,10 @@ describe('Landing', () => {
 
         renderLanding();
 
-        expect(screen.queryByRole('tablist', { name: 'Example goal trees' })).not.toBeInTheDocument();
-        expect(screen.queryByLabelText('Become a skilled guitar player goal tree')).not.toBeInTheDocument();
-        // All three surfaces hold their footprint with skeletons instead of unmounting.
-        expect(screen.getByTestId('example-picker-skeleton')).toBeInTheDocument();
-        expect(screen.getByTestId('examples-skeleton')).toBeInTheDocument();
+        expect(screen.getByRole('tablist', { name: 'Example goal trees' })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Become a skilled guitar player' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.queryByTestId('example-picker-skeleton')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
         expect(screen.getByTestId('features-stage-skeleton')).toBeInTheDocument();
 
         resolveExamples({ data: publishedExamples });
@@ -618,7 +629,9 @@ describe('Landing', () => {
         expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
         expect(screen.queryByTestId('example-picker-skeleton')).not.toBeInTheDocument();
         expect(screen.queryByTestId('examples-skeleton')).not.toBeInTheDocument();
-        expect(screen.queryByTestId('features-stage-skeleton')).not.toBeInTheDocument();
+        await waitFor(() => {
+            expect(screen.queryByTestId('features-stage-skeleton')).not.toBeInTheDocument();
+        });
     });
 
     it('hosts the example picker in the hero and auto-scrolls to the goals view on pick', async () => {
@@ -632,7 +645,7 @@ describe('Landing', () => {
         // The initial default selection must not auto-scroll the page.
         expect(scrollIntoViewCalls).toHaveLength(0);
 
-        fireEvent.click(screen.getByRole('tab', { name: 'Become fluent in Chinese' }));
+        fireEvent.click(await screen.findByRole('tab', { name: 'Become fluent in Chinese' }));
         expect(scrollIntoViewCalls).toHaveLength(1);
         expect(scrollIntoViewCalls[0].element.id).toBe('examples');
         expect(scrollIntoViewCalls[0].options).toEqual({ behavior: 'smooth', block: 'nearest', inline: 'start' });
@@ -661,7 +674,7 @@ describe('Landing', () => {
 
         expect(screen.queryByRole('navigation', { name: 'Page sections' })).not.toBeInTheDocument();
         const headerNav = screen.getByRole('navigation', { name: 'Primary' });
-        expect(within(headerNav).getByRole('button', { name: 'Examples' })).toBeInTheDocument();
+        expect(within(headerNav).getByRole('button', { name: 'Goals' })).toBeInTheDocument();
         expect(within(headerNav).getByRole('button', { name: 'Features' })).toBeInTheDocument();
         expect(within(headerNav).getByRole('button', { name: 'Private beta' })).toBeInTheDocument();
         expect(within(headerNav).getByRole('link', { name: 'Open app' })).toHaveAttribute('href', 'https://my.fractalgoals.com');

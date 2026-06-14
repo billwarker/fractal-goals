@@ -44,6 +44,10 @@
     min-width: 0;
 }
 
+.featureSidebarBody {
+    min-width: 0;
+}
+
 .featureMain {
     min-width: 0;
     margin-top: 28px;
@@ -51,23 +55,22 @@
 
 .featureToggle {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
     margin-top: 28px;
 }
 
 .featureToggle button {
-    min-height: 116px;
+    min-height: 42px;
     display: grid;
-    gap: 6px;
-    align-content: start;
-    padding: 14px 16px;
+    place-items: center;
+    padding: 8px 10px;
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius-md);
     background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
     color: var(--color-text-secondary);
     font: inherit;
-    text-align: left;
+    text-align: center;
     cursor: pointer;
     transition: border-color 140ms ease, background-color 140ms ease;
 }
@@ -87,23 +90,65 @@
 
 .featureCardLabel {
     color: var(--color-brand-primary);
-    font-size: var(--font-size-xs);
+    font-size: 11px;
     font-weight: 900;
     text-transform: uppercase;
     letter-spacing: 0.08em;
 }
 
-.featureCardHeading {
+.featureDetails {
+    display: grid;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.featureDetailsLead {
+    display: grid;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--color-bg-card) 74%, transparent);
+}
+
+.featureDetailsLead span {
     color: var(--color-text-primary);
-    font-size: var(--font-size-base);
-    font-weight: 800;
+    font-size: var(--font-size-lg);
+    font-weight: 850;
     line-height: var(--line-height-snug);
 }
 
-.featureCardBody {
+.featureDetailsLead p,
+.featureDetailCard p {
+    margin: 0;
     color: var(--color-text-secondary);
     font-size: var(--font-size-sm);
     line-height: var(--line-height-base);
+}
+
+.featureDetailGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.featureDetailCard {
+    min-width: 0;
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    padding: 13px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--color-bg-card) 82%, transparent);
+}
+
+.featureDetailCard h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-snug);
+    letter-spacing: 0;
 }
 
 .featureStage {
@@ -197,14 +242,236 @@
     font-weight: 800;
 }
 
-.calendarShell {
-    min-height: 680px;
-    padding: 24px;
+.programPagePreview {
+    height: 100%;
+    min-height: 720px;
+    color: var(--color-text-primary);
+    background:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px),
+        var(--color-bg-app);
+    background-size: 20px 20px;
 }
 
-.calendarShell > div {
-    height: 680px;
-    min-height: 680px;
+.programPreviewWorkspace {
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
+    overflow: hidden;
+}
+
+.programPreviewWorkspaceNoSidePane {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.programPreviewMain {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.programPreviewHeader {
+    flex: 0 0 auto;
+    min-height: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-bg-app) 94%, transparent);
+}
+
+.programPreviewTitleBlock {
+    min-width: 0;
+    display: grid;
+    gap: 7px;
+}
+
+.programPreviewTitleBlock h3 {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: clamp(1.2rem, 1.6vw, 1.65rem);
+    line-height: var(--line-height-tight);
+}
+
+.programTitleSeparator {
+    color: var(--color-text-muted);
+    font-weight: 700;
+}
+
+.programPreviewMeta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.programStatusBadge,
+.programBlockBadge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.programStatusBadge {
+    border-color: color-mix(in srgb, var(--color-brand-success) 62%, var(--color-border));
+    background: color-mix(in srgb, var(--color-brand-success) 14%, transparent);
+    color: var(--color-brand-success);
+}
+
+.programPreviewActions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.programPreviewActions button,
+.programViewToggle {
+    min-height: 36px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+}
+
+.programPreviewActions > button {
+    padding: 7px 12px;
+}
+
+.programViewToggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px;
+}
+
+.programViewToggle button {
+    min-height: 28px;
+    padding: 4px 12px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.programViewToggle .programViewToggleActive {
+    background: var(--color-bg-app);
+    color: var(--color-text-primary);
+}
+
+.programPreviewCalendarPanel {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    margin: 28px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-app);
+    overflow: hidden;
+}
+
+.programPreviewCalendarPanel > div {
+    height: 100%;
+    min-height: 0;
+}
+
+.programPreviewBlocksPanel {
+    overflow: auto;
+}
+
+.programPreviewBlocksScroll {
+    min-height: 100%;
+    padding: 20px;
+}
+
+.programPreviewSidePane {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--color-border);
+    background: var(--color-bg-sidebar);
+    overflow: hidden;
+}
+
+.programSidePaneTabs {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    padding: 18px 18px 12px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.programSidePaneTabs button {
+    min-height: 36px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.programSidePaneTabs .programSidePaneTabActive {
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+}
+
+.programSidePaneScroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px;
+}
+
+.programSidePaneSection {
+    display: grid;
+    gap: 12px;
+    padding: 0 0 20px;
+    margin: 0 0 20px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.programSidePaneSection:last-child {
+    border-bottom: 0;
+}
+
+.programSidePaneSectionTitle {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.programSidePaneSection p,
+.programSidePaneMuted {
+    margin: 0;
+    color: var(--color-text-secondary);
+    line-height: var(--line-height-base);
 }
 
 .analyticsPagePreview {
@@ -490,17 +757,32 @@
     }
 
     .featureSidebar {
-        flex: 0 0 clamp(220px, 18vw, 300px);
+        flex: 0 0 clamp(300px, 29vw, 480px);
         min-height: 0;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 16px;
+        overflow: hidden;
+    }
+
+    .featureSidebar .sectionHeader {
+        flex: 0 0 auto;
+    }
+
+    .featureSidebarBody {
+        flex: 1;
+        min-height: 0;
         overflow-y: auto;
+        padding-right: 2px;
     }
 
     .featureToggle {
-        gap: 12px;
-        margin-top: 18px;
+        gap: 8px;
+        margin-top: 0;
+    }
+
+    .featureDetails {
+        margin-top: 14px;
     }
 
     .featureMain {
@@ -546,11 +828,44 @@
     .landingSessionScreen {
         min-height: 620px;
     }
+
+    .programPreviewWorkspace {
+        grid-template-columns: minmax(0, 1fr);
+        overflow-y: auto;
+    }
+
+    .programPreviewHeader {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .programPreviewActions {
+        justify-content: flex-start;
+    }
+
+    .programPreviewCalendarPanel {
+        min-height: 560px;
+    }
+
+    .programPreviewBlocksScroll {
+        padding: 14px;
+    }
+
+    .programPreviewSidePane {
+        min-height: 360px;
+        border-left: 0;
+        border-top: 1px solid var(--color-border);
+    }
 }
 
 @media (max-width: 620px) {
     .featuresSection {
         margin-top: 52px;
+    }
+
+    .featureToggle,
+    .featureDetailGrid {
+        grid-template-columns: 1fr;
     }
 
     .featureStage {
@@ -562,16 +877,31 @@
         min-height: 620px;
     }
 
-    .calendarShell,
-    .calendarShell > div {
-        min-height: 480px;
-        height: 480px;
-    }
-
-    .calendarShell,
     .activityStage,
     .extrasGrid {
         padding: 12px;
+    }
+
+    .programPagePreview {
+        min-height: 760px;
+    }
+
+    .programPreviewHeader {
+        padding: 12px;
+    }
+
+    .programPreviewCalendarPanel {
+        min-height: 480px;
+        margin: 12px;
+    }
+
+    .programPreviewBlocksScroll {
+        padding: 10px;
+    }
+
+    .programPreviewActions button,
+    .programViewToggle {
+        font-size: var(--font-size-xs);
     }
 
     .analyticsPreviewTopBar,

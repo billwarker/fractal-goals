@@ -12,7 +12,7 @@ Edit this file to change the public `/landing` messaging without touching React 
 
 **Brand:** Fractal Goals
 
-- [Examples](#examples)
+- [Goals](#examples)
 - [Features](#features)
 - [Private beta](#beta)
 - [Open app](https://my.fractalgoals.com)
@@ -93,12 +93,44 @@ Pick a feature to see it running on real data from the example fractal above.
 
 A session is one real block of work: its activities, metrics, timers, and notes in a single record. Run it live with a timer or log it after the fact - either way it rolls up to the goals it serves, so the log always tells you what the work was for.
 
+#### One record for the work
+
+Keep activities, metrics, timers, notes, and completions together instead of scattering the log across tools.
+
+#### Live or after the fact
+
+Run a session with a timer or record it later; either path preserves the same evidence trail.
+
+#### Goal credit is automatic
+
+Completed work rolls up to every connected goal so progress stays tied to the reason you trained.
+
+#### Notes stay in context
+
+Session notes remain attached to the work that produced them, ready for review when patterns emerge.
+
 ### Activity
 
 **Label:** Activities
 **Heading:** Every activity knows which goals it serves.
 
 Activities are reusable building blocks with their own metrics. Link an activity to a goal once and every session that includes it feeds that goal automatically - the credit flows up the tree, from today's reps all the way to the ultimate ambition.
+
+#### Reusable building blocks
+
+Define an activity once, then reuse it across sessions, templates, and programs without rebuilding its metrics.
+
+#### Goal associations travel with it
+
+When an activity belongs to a goal, every future session that uses it contributes to that goal automatically.
+
+#### Metrics are activity-native
+
+Reps, ratings, durations, weights, attempts, and custom measures live with the activity they describe.
+
+#### Progress compares to history
+
+Completed activities can be compared against prior work so the log shows whether practice is improving.
 
 ### Programs
 
@@ -107,12 +139,44 @@ Activities are reusable building blocks with their own metrics. Link an activity
 
 Programs organize goals and session templates into blocks and days. Plan a training block, schedule its days on the calendar, and watch completion fill in as the sessions get logged.
 
+#### Blocks create structure
+
+Group days into training blocks so a long plan has visible phases, focus areas, and deadlines.
+
+#### Days carry templates
+
+Attach session templates to program days so planned work is ready when the calendar date arrives.
+
+#### Calendar and blocks stay synced
+
+Switch between time-based planning and block-based planning without losing context.
+
+#### Completion fills itself in
+
+As sessions are logged, the program shows which days, blocks, and goals are actually getting done.
+
 ### Analytics
 
 **Label:** Analytics
 **Heading:** See whether the work is working.
 
 Sessions feed your charts automatically: duration trends, time per activity, and metric progress over time. No spreadsheets and no manual exports - the training log is the dataset.
+
+#### Views are reusable
+
+Save focused analytics views and publish the ones that best explain a fractal example.
+
+#### Filters follow the goal tree
+
+Slice charts by goals, descendants, activities, groups, and inherited associations.
+
+#### Multiple charts can coexist
+
+A view can hold several visualizations, from trends to totals, so the story has context.
+
+#### No manual export loop
+
+Every chart is generated from logged sessions, activities, and metrics already in the system.
 
 ### More
 

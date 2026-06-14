@@ -1,12 +1,17 @@
 import datetime
 import hashlib
+import json
 import logging
+import os
 import re
 import secrets
 import string
+import tempfile
 from copy import deepcopy
+from pathlib import Path
 
 import requests
+from google.cloud import storage
 from sqlalchemy import delete, func, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
@@ -1009,8 +1014,65 @@ class AdminService:
             "published_example_count": len(published_examples),
             "examples": examples,
             "showcase_warnings": showcase_warnings,
+            "static_snapshot": self._write_landing_static_snapshot(cache),
             "cache_warm": self._warm_landing_cache(),
         }, None, 200
+
+    @staticmethod
+    def _serialized_landing_snapshot(cache: JsonDict) -> str:
+        return json.dumps(cache, ensure_ascii=False, separators=(",", ":"))
+
+    @classmethod
+    def _write_landing_static_snapshot(cls, cache: JsonDict) -> str:
+        """Materialize the published snapshot as a static artifact when configured.
+
+        This is intentionally best-effort and post-commit: the database cache
+        remains the source of truth, while a static file/object lets the landing
+        page hydrate before React has to wait on the API path.
+        """
+        payload = cls._serialized_landing_snapshot(cache)
+
+        bucket_name = config.LANDING_EXAMPLES_STATIC_GCS_BUCKET
+        if bucket_name:
+            try:
+                bucket = storage.Client().bucket(bucket_name)
+                blob = bucket.blob(config.LANDING_EXAMPLES_STATIC_GCS_BLOB or "landing-examples.json")
+                blob.cache_control = "public, max-age=300, stale-while-revalidate=86400"
+                blob.upload_from_string(payload, content_type="application/json")
+                return "ok"
+            except Exception:
+                logger.warning("Landing static GCS snapshot write failed", exc_info=True)
+                return "failed"
+
+        static_path = config.LANDING_EXAMPLES_STATIC_PATH
+        if not static_path:
+            return "skipped"
+
+        temp_name = None
+        try:
+            destination = Path(static_path)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                dir=destination.parent,
+                prefix=f".{destination.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temp_file:
+                temp_file.write(payload)
+                temp_file.write("\n")
+                temp_name = temp_file.name
+            os.replace(temp_name, destination)
+            return "ok"
+        except Exception:
+            if temp_name:
+                try:
+                    os.unlink(temp_name)
+                except OSError:
+                    pass
+            logger.warning("Landing static filesystem snapshot write failed for %s", static_path, exc_info=True)
+            return "failed"
 
     @staticmethod
     def _warm_landing_cache() -> str:

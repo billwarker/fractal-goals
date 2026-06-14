@@ -735,7 +735,7 @@ def test_publish_drops_stale_showcase_refs_with_warnings(admin_client, client, a
 
 
 @pytest.mark.integration
-def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, admin_landing_fractal, monkeypatch):
+def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, admin_landing_fractal, monkeypatch, tmp_path):
     import requests as requests_lib
 
     def publish():
@@ -749,6 +749,16 @@ def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, a
 
     # No warm URL configured (the dev/test default): warming is skipped.
     assert publish()['cache_warm'] == 'skipped'
+
+    static_snapshot_path = tmp_path / 'landing-examples.json'
+    monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_PATH', str(static_snapshot_path))
+    static_publish = publish()
+    assert static_publish['static_snapshot'] == 'ok'
+    static_payload = json.loads(static_snapshot_path.read_text())
+    assert static_payload['schema_version'] == 6
+    assert static_payload['published_at'] == static_publish['published_at']
+    assert static_payload['examples'][0]['root_id'] == admin_landing_fractal.id
+    monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_PATH', '')
 
     warm_url = 'https://www.example.com/api/public/landing-examples'
     monkeypatch.setattr(config, 'LANDING_CACHE_WARM_URL', warm_url)

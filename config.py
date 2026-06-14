@@ -74,6 +74,13 @@ class Config:
     # When set, publishing landing examples warms the frontend Nginx cache.
     # Empty disables warming (development/tests).
     LANDING_CACHE_WARM_URL = os.getenv('LANDING_CACHE_WARM_URL', '')
+    # Optional publish-time static landing snapshot destinations. Use either a
+    # local/shared filesystem path or a GCS bucket/blob. The frontend can fetch
+    # the resulting object by setting VITE_LANDING_EXAMPLES_STATIC_URL at build
+    # time; the API remains the fallback and source of truth.
+    LANDING_EXAMPLES_STATIC_PATH = os.getenv('LANDING_EXAMPLES_STATIC_PATH', '')
+    LANDING_EXAMPLES_STATIC_GCS_BUCKET = os.getenv('LANDING_EXAMPLES_STATIC_GCS_BUCKET', '')
+    LANDING_EXAMPLES_STATIC_GCS_BLOB = os.getenv('LANDING_EXAMPLES_STATIC_GCS_BLOB', 'landing-examples.json')
 
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')

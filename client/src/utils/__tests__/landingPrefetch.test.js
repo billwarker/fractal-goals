@@ -8,6 +8,7 @@ vi.mock('../api', () => ({
     },
     publicApi: {
         getLandingExamples: vi.fn().mockResolvedValue({ data: { examples: [] } }),
+        getStaticLandingExamples: vi.fn().mockResolvedValue({ data: { examples: [] } }),
     },
 }));
 
@@ -57,7 +58,10 @@ describe('fetchLandingExamples', () => {
     beforeEach(() => {
         apiState.apiBase = '/api';
         publicApi.getLandingExamples.mockClear();
+        publicApi.getStaticLandingExamples.mockClear();
+        vi.unstubAllGlobals();
         delete window.__fgLandingExamplesPreload;
+        delete window.__fgLandingExamplesStaticUrl;
     });
 
     it('consumes the index.html preload promise once, then uses the API', async () => {
@@ -90,6 +94,23 @@ describe('fetchLandingExamples', () => {
     });
 
     it('uses the API when no preload promise exists', async () => {
+        await expect(fetchLandingExamples()).resolves.toEqual({ examples: [] });
+        expect(publicApi.getLandingExamples).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses the configured static snapshot before the API', async () => {
+        window.__fgLandingExamplesStaticUrl = '/landing-examples.json';
+        publicApi.getStaticLandingExamples.mockResolvedValueOnce({ data: { examples: [{ root_id: 'static-root' }] } });
+
+        await expect(fetchLandingExamples()).resolves.toEqual({ examples: [{ root_id: 'static-root' }] });
+        expect(publicApi.getStaticLandingExamples).toHaveBeenCalledWith('/landing-examples.json');
+        expect(publicApi.getLandingExamples).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the API when the static snapshot is unavailable', async () => {
+        window.__fgLandingExamplesStaticUrl = '/landing-examples.json';
+        publicApi.getStaticLandingExamples.mockRejectedValueOnce(new Error('static snapshot unavailable'));
+
         await expect(fetchLandingExamples()).resolves.toEqual({ examples: [] });
         expect(publicApi.getLandingExamples).toHaveBeenCalledTimes(1);
     });
