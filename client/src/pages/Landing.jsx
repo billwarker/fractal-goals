@@ -445,13 +445,19 @@ function Landing() {
                 activityDefinitions: Array.isArray(example.activity_definitions) ? example.activity_definitions : [],
                 activityGroups: Array.isArray(example.activity_groups) ? example.activity_groups : [],
                 analyticsViews: Array.isArray(example.analytics_views) ? example.analytics_views : [],
+                analyticsActivityInstances: example.analytics_activity_instances || {},
                 sessionTemplates: Array.isArray(example.session_templates) ? example.session_templates : [],
-                // Admin-curated feature picks (schema v6); null on older
+                // Admin-curated feature picks (schema v6+); null on older
                 // snapshots, in which case the Features section auto-derives.
                 showcase: example.showcase || null,
             }))
             .filter((example) => example.id && example.tree);
-    }, [landingExamplesQuery.data, landingExamplesQuery.isError, landingExamplesQuery.isSuccess]);
+    }, [
+        landingExamplesQuery.data,
+        landingExamplesQuery.isError,
+        landingExamplesQuery.isPending,
+        landingExamplesQuery.isSuccess,
+    ]);
 
     useEffect(() => {
         if (publishedExamples.length === 0) {
@@ -573,16 +579,16 @@ function Landing() {
         setFlowTreeScopeKey((current) => current + 1);
     };
 
-    const clearSelectedGoal = () => {
-        setSelectedGoalId(null);
-        setFlowTreeScopeKey((current) => current + 1);
-    };
-
-    // Clicking a goal in the Features lineage demo selects it in the live
-    // example explorer and scrolls back up to it.
+    // Clicking a goal in the Features demos selects it in the live example
+    // explorer and scrolls back to that goals view.
     const handleFeatureGoalSelect = (goal) => {
         handleGoalSelect(goal);
         navigateToSection('examples');
+    };
+
+    const clearSelectedGoal = () => {
+        setSelectedGoalId(null);
+        setFlowTreeScopeKey((current) => current + 1);
     };
 
     useEffect(() => {

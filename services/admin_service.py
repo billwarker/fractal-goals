@@ -73,6 +73,7 @@ from services.serializers import (
     format_utc,
     serialize_activity_definition,
     serialize_activity_group,
+    serialize_activity_instance_for_analytics,
     serialize_analytics_dashboard,
     serialize_session_template,
 )
@@ -85,7 +86,7 @@ LANDING_EXAMPLE_SETTINGS_KEY = "landing_example_settings"
 LANDING_EXAMPLE_CACHE_KEY = "landing_example_cache"
 # Bump when the published landing snapshot shape changes so the frontend / future
 # migrations can detect and handle stale caches.
-LANDING_EXAMPLE_SCHEMA_VERSION = 6
+LANDING_EXAMPLE_SCHEMA_VERSION = 7
 # Bound the per-goal timeline/notes we embed so the public cache stays small.
 LANDING_EXAMPLE_TIMELINE_LIMIT = 50
 LANDING_EXAMPLE_NOTES_LIMIT = 30
@@ -886,9 +887,115 @@ class AdminService:
             for view in ordered[:LANDING_EXAMPLE_SHOWCASE_ANALYTICS_VIEW_LIMIT]
         ]
 
+    @staticmethod
+    def _dashboard_activity_refs(analytics_views: list[JsonDict]) -> tuple[set[str], set[str]]:
+        """Collect activity/group refs a saved dashboard needs to render faithfully."""
+        activity_ids: set[str] = set()
+        group_ids: set[str] = set()
+
+        def add_activity_id(value):
+            if value:
+                activity_ids.add(str(value))
+
+        def collect_filters(filters):
+            if not isinstance(filters, dict):
+                return
+            activities = filters.get("activities") if isinstance(filters.get("activities"), dict) else {}
+            for activity_id in activities.get("activityIds") or []:
+                add_activity_id(activity_id)
+            for group_id in activities.get("groupIds") or []:
+                if group_id:
+                    group_ids.add(str(group_id))
+
+        for view in analytics_views:
+            layout = view.get("layout") if isinstance(view.get("layout"), dict) else {}
+            collect_filters(layout.get("global_filters"))
+            window_states = layout.get("window_states") if isinstance(layout.get("window_states"), dict) else {}
+            for state in window_states.values():
+                if not isinstance(state, dict):
+                    continue
+                selected_activity = state.get("selectedActivity")
+                if isinstance(selected_activity, dict):
+                    add_activity_id(selected_activity.get("id"))
+                else:
+                    add_activity_id(selected_activity)
+
+        return activity_ids, group_ids
+
+    @staticmethod
+    def _collect_descendant_activity_group_ids(groups: list[ActivityGroup], selected_ids: set[str]) -> set[str]:
+        children_by_parent: dict[str, list[str]] = {}
+        for group in groups:
+            if not group.parent_id:
+                continue
+            children_by_parent.setdefault(group.parent_id, []).append(group.id)
+
+        collected = set(selected_ids)
+        stack = list(selected_ids)
+        while stack:
+            group_id = stack.pop()
+            for child_id in children_by_parent.get(group_id, []):
+                if child_id in collected:
+                    continue
+                collected.add(child_id)
+                stack.append(child_id)
+        return collected
+
+    def _build_landing_analytics_activity_instances(
+        self,
+        root: Goal,
+        activity_ids: set[str],
+        seed_instances: dict[str, list[JsonDict]] | None = None,
+    ) -> dict[str, list[JsonDict]]:
+        instances_by_activity: dict[str, list[JsonDict]] = {
+            str(activity_id): [deepcopy(instance) for instance in instances or []]
+            for activity_id, instances in (seed_instances or {}).items()
+        }
+        if not activity_ids:
+            return instances_by_activity
+
+        existing_instance_ids = {
+            instance.get("id")
+            for instances in instances_by_activity.values()
+            for instance in instances
+            if instance.get("id")
+        }
+
+        instances = self.db_session.query(ActivityInstance).options(
+            selectinload(ActivityInstance.session),
+            selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
+            selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
+            selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
+            selectinload(ActivityInstance.progress_record),
+        ).filter(
+            ActivityInstance.root_id == root.id,
+            ActivityInstance.activity_definition_id.in_(activity_ids),
+            ActivityInstance.deleted_at == None,
+        ).order_by(
+            func.coalesce(ActivityInstance.time_stop, ActivityInstance.updated_at, ActivityInstance.created_at).desc()
+        ).limit(LANDING_EXAMPLE_ANALYTICS_LIMIT).all()
+
+        for instance in instances:
+            if instance.id in existing_instance_ids:
+                continue
+            session = instance.session
+            if session and session.deleted_at is not None:
+                continue
+            serialized = serialize_activity_instance_for_analytics(
+                instance,
+                session_name=session.name if session else None,
+                session_date=(session.session_start or session.created_at) if session else None,
+            )
+            instances_by_activity.setdefault(instance.activity_definition_id, []).append(serialized)
+            existing_instance_ids.add(instance.id)
+
+        return instances_by_activity
+
     def _build_landing_showcase_data(self, root: Goal, showcase: JsonDict | None = None) -> dict:
         owner_id = root.owner_id
         showcase = self._normalize_landing_example_showcase(showcase)
+        analytics_views = self._build_landing_analytics_views(root, showcase)
+        analytics_activity_ids, analytics_group_ids = self._dashboard_activity_refs(analytics_views)
         session_service = SessionService(self.db_session)
         sessions_result, sessions_error, _ = session_service.get_fractal_sessions(
             root.id,
@@ -927,6 +1034,23 @@ class AdminService:
         # Explicitly featured activities must always serialize, even when no
         # recent session or analytics row references them.
         activity_ids.update(showcase["activity_ids"])
+        activity_ids.update(analytics_activity_ids)
+
+        activity_groups = self.db_session.query(ActivityGroup).filter(
+            ActivityGroup.root_id == root.id,
+            ActivityGroup.deleted_at == None,
+        ).order_by(ActivityGroup.sort_order.asc(), ActivityGroup.name.asc()).all()
+        analytics_instance_activity_ids = set(analytics_activity_ids)
+        if analytics_group_ids:
+            scoped_group_ids = self._collect_descendant_activity_group_ids(activity_groups, analytics_group_ids)
+            grouped_activity_ids = self.db_session.query(ActivityDefinition.id).filter(
+                ActivityDefinition.root_id == root.id,
+                ActivityDefinition.group_id.in_(scoped_group_ids),
+                ActivityDefinition.deleted_at == None,
+            ).all()
+            grouped_ids = {row[0] for row in grouped_activity_ids}
+            activity_ids.update(grouped_ids)
+            analytics_instance_activity_ids.update(grouped_ids)
 
         activity_definitions = []
         if activity_ids:
@@ -942,10 +1066,11 @@ class AdminService:
             ).all()
             activity_definitions = [serialize_activity_definition(activity) for activity in activities]
 
-        activity_groups = self.db_session.query(ActivityGroup).filter(
-            ActivityGroup.root_id == root.id,
-            ActivityGroup.deleted_at == None,
-        ).order_by(ActivityGroup.sort_order.asc(), ActivityGroup.name.asc()).all()
+        analytics_activity_instances = self._build_landing_analytics_activity_instances(
+            root,
+            analytics_instance_activity_ids,
+            (analytics_summary or {}).get("activity_instances") if analytics_summary else None,
+        )
 
         templates = self.db_session.query(SessionTemplate).options(
             selectinload(SessionTemplate.goals).selectinload(Goal.level),
@@ -958,7 +1083,8 @@ class AdminService:
             "sessions": sessions,
             "activity_definitions": activity_definitions,
             "activity_groups": [serialize_activity_group(group) for group in activity_groups],
-            "analytics_views": self._build_landing_analytics_views(root, showcase),
+            "analytics_views": analytics_views,
+            "analytics_activity_instances": analytics_activity_instances,
             "session_templates": [serialize_session_template(template) for template in templates],
         }
 
@@ -999,6 +1125,7 @@ class AdminService:
                 "activity_definitions": showcase_data["activity_definitions"],
                 "activity_groups": showcase_data["activity_groups"],
                 "analytics_views": showcase_data["analytics_views"],
+                "analytics_activity_instances": showcase_data["analytics_activity_instances"],
                 "session_templates": showcase_data["session_templates"],
             })
 

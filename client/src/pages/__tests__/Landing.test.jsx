@@ -494,11 +494,12 @@ describe('Landing', () => {
         expect(screen.getByLabelText('Technique Session detail preview')).toBeInTheDocument();
         expect(screen.getByRole('tablist', { name: 'Session side pane views' })).toBeInTheDocument();
 
-        // Activity feature shows the activity card plus the goal lineage demo.
+        // Activity feature shows the builder modal plus the goal selector demo.
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
         expect(screen.getByRole('tab', { name: landingContent.features.items.activity.label })).toHaveAttribute('aria-selected', 'true');
-        expect(screen.getByRole('heading', { name: 'CAGED Triads' })).toBeInTheDocument();
-        expect(screen.getByRole('heading', { name: 'Goals this activity feeds' })).toBeInTheDocument();
+        expect(screen.getByLabelText('Activity Name')).toHaveValue('CAGED Triads');
+        expect(screen.getByRole('heading', { name: 'Associate "CAGED Triads"' })).toBeInTheDocument();
+        expect(screen.getByRole('checkbox', { name: 'Select Map the fretboard' })).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.programs.label }));
         expect(screen.getByRole('tab', { name: landingContent.features.items.programs.label })).toHaveAttribute('aria-selected', 'true');
@@ -580,10 +581,10 @@ describe('Landing', () => {
         // Featured session replaces the most-recent default.
         expect(screen.getByLabelText('Featured Older Session detail preview')).toBeInTheDocument();
 
-        // Featured activity is the only chip content shown.
+        // Featured activity is the activity loaded into the builder preview.
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
-        expect(screen.getByRole('heading', { name: 'Featured Scales' })).toBeInTheDocument();
-        expect(screen.queryByRole('heading', { name: 'CAGED Triads' })).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Activity Name')).toHaveValue('Featured Scales');
+        expect(screen.getByRole('heading', { name: 'Associate "Featured Scales"' })).toBeInTheDocument();
         // The featured activity's linked goal and its ancestors render in the
         // lineage (the goal name also appears inside the mocked FlowTree).
         expect(screen.getAllByText('Practice CAGED triads').length).toBeGreaterThan(1);

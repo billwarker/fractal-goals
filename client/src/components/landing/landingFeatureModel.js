@@ -1,7 +1,7 @@
 import { flattenGoalTree } from '../../utils/goalNodeModel';
 
 // Resolution helpers for the landing Features section. Each helper honors the
-// admin-published `showcase` selections (schema v6) and falls back to sensible
+// admin-published `showcase` selections (schema v6+) and falls back to sensible
 // auto-derived picks for older snapshots where `showcase` is null.
 
 export const MAX_FEATURED_ACTIVITIES = 4;

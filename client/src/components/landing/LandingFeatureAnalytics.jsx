@@ -38,11 +38,16 @@ function toGoalAnalyticsGoals(tree) {
 
 function buildActivityInstances(example) {
     const byActivityId = {};
+    Object.entries(example?.analyticsActivityInstances || {}).forEach(([activityId, instances]) => {
+        if (!activityId || !Array.isArray(instances)) return;
+        byActivityId[activityId] = instances.map((instance) => ({ ...instance }));
+    });
     (example?.sessions || []).forEach((session) => {
         (session.activity_instances || []).forEach((instance) => {
             const activityId = instance.activity_definition_id || instance.activityDefinitionId;
             if (!activityId) return;
             if (!byActivityId[activityId]) byActivityId[activityId] = [];
+            if (byActivityId[activityId].some((item) => item.id && item.id === instance.id)) return;
             byActivityId[activityId].push({
                 ...instance,
                 session_id: session.id,

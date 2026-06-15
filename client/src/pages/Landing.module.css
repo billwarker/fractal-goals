@@ -58,6 +58,7 @@
 .nav a,
 .nav button {
     appearance: none;
+    position: relative;
     color: var(--color-text-secondary);
     border: 1px solid transparent;
     border-radius: var(--border-radius-sm);
@@ -85,6 +86,17 @@
 .nav a:focus-visible {
     outline: 2px solid var(--color-brand-primary);
     outline-offset: 2px;
+}
+
+.navActive::after {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 3px;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--color-brand-primary);
 }
 
 .hero {
@@ -654,7 +666,7 @@
 
     .header {
         position: fixed;
-        top: clamp(14px, 2.4vh, 24px);
+        top: clamp(8px, 1.8vh, 18px);
         left: 50%;
         transform: translateX(-50%);
         z-index: 40;

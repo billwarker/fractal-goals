@@ -143,6 +143,25 @@
     background: color-mix(in srgb, var(--color-bg-card) 82%, transparent);
 }
 
+.featureDetailButton {
+    width: 100%;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.featureDetailButton:hover {
+    border-color: color-mix(in srgb, var(--color-brand-primary) 65%, var(--color-border));
+    background: color-mix(in srgb, var(--color-bg-card-hover) 78%, transparent);
+}
+
+.featureDetailCardActive {
+    border-color: var(--color-brand-primary);
+    background: color-mix(in srgb, var(--color-bg-card-hover) 84%, transparent);
+    box-shadow: inset 0 0 0 1px var(--color-brand-primary);
+}
+
 .featureDetailCard h3 {
     margin: 0;
     color: var(--color-text-primary);
@@ -190,17 +209,53 @@
 }
 
 .activityStage {
-    display: grid;
-    gap: 16px;
-    align-content: start;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
     padding: 24px;
+    overflow: hidden;
 }
 
-.activitySplitView {
+.activityViewportHeader {
+    flex: 0 0 auto;
     display: grid;
-    grid-template-columns: minmax(240px, 0.9fr) minmax(300px, 1.1fr);
-    gap: 16px;
-    align-items: start;
+    gap: 10px;
+}
+
+.activityViewportBody {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.activityViewportToggle {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.activityViewportToggle button {
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: color-mix(in srgb, var(--color-bg-card) 90%, transparent);
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 850;
+    cursor: pointer;
+    transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.activityViewportToggle button:hover,
+.activityViewportToggle .activityViewportToggleActive {
+    color: var(--color-text-primary);
+    border-color: var(--color-brand-primary);
+    background: var(--color-bg-card-hover);
 }
 
 .activityChips {
@@ -229,17 +284,405 @@
     border-color: var(--color-brand-primary);
 }
 
-.lineagePanel {
-    padding: 14px;
+.activityModalPreview,
+.activityTimelinePreview {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    gap: 16px;
+    align-content: start;
+    overflow-y: auto;
+    padding: 20px;
     border: 1px solid var(--color-border);
-    background: var(--color-bg-app);
+    background:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px),
+        var(--color-bg-app);
+    background-size: 20px 20px;
 }
 
-.lineageTitle {
-    margin: 0 0 12px;
-    color: var(--color-text-primary);
-    font-size: var(--font-size-base);
+.activityBuilderSplitViewport {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(340px, 0.95fr) minmax(420px, 1.05fr);
+    gap: 16px;
+    align-items: stretch;
+}
+
+.builderModalShell,
+.goalSelectorModalShell {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--color-bg-card) 94%, transparent);
+    box-shadow: var(--shadow-md);
+}
+
+.builderModalShell .previewModalHeader,
+.goalSelectorModalShell .previewModalHeader,
+.metricsModalPreview .previewModalHeader {
+    flex: 0 0 auto;
+    align-items: center;
+    padding: 16px 20px;
+    background: color-mix(in srgb, var(--color-bg-card) 96%, transparent);
+}
+
+.builderModalBody {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    align-content: start;
+    gap: 16px;
+    overflow-y: auto;
+    padding: 18px;
+}
+
+.builderModalBody > label {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
     font-weight: 800;
+}
+
+.previewModalHeader {
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.previewModalHeader h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-tight);
+    letter-spacing: -0.01em;
+}
+
+.readOnlyBadge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 10px;
+    border: 1px solid color-mix(in srgb, var(--color-brand-primary) 62%, var(--color-border));
+    border-radius: var(--border-radius-sm);
+    background: color-mix(in srgb, var(--color-brand-primary) 12%, transparent);
+    color: var(--color-brand-primary);
+    font-size: var(--font-size-xs);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.builderPreviewGrid {
+    display: grid;
+    gap: 14px;
+}
+
+.builderPreviewGrid label,
+.builderMetricPreview > span {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+}
+
+.builderPreviewGrid input,
+.builderPreviewGrid textarea,
+.builderModalBody > label input {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: color-mix(in srgb, var(--color-bg-input) 92%, transparent);
+    color: var(--color-text-primary);
+    font: inherit;
+    resize: none;
+}
+
+.builderPreviewGrid input {
+    min-height: 42px;
+    padding: 8px 10px;
+}
+
+.builderModalBody > label input {
+    min-height: 42px;
+    padding: 8px 10px;
+}
+
+.builderPreviewGrid textarea {
+    min-height: 112px;
+    padding: 10px;
+    line-height: var(--line-height-base);
+}
+
+.builderPreviewWide {
+    grid-column: 1 / -1;
+}
+
+.builderPreviewOptions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.builderAssociationSummary {
+    display: grid;
+    gap: 10px;
+}
+
+.builderAssociationHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 850;
+}
+
+.builderAssociationHeader span:last-child {
+    color: var(--color-brand-primary);
+}
+
+.builderSummaryGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.builderSummaryItem {
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.builderSummaryItem div {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.builderSummaryItem strong {
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-snug);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.builderSummaryItem span {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.builderAssociationSummary p {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-base);
+}
+
+.builderMetricPreview {
+    display: grid;
+    gap: 10px;
+}
+
+.builderMetricCard {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: color-mix(in srgb, var(--color-bg-card-alt) 86%, transparent);
+}
+
+.builderMetricSelect {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+}
+
+.builderMetricSelect span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.builderMetricSelect small {
+    flex: 0 0 auto;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-lg);
+}
+
+.builderMetricBadges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.builderMetricBadges em {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 3px 8px;
+    border-radius: var(--border-radius-sm);
+    background: color-mix(in srgb, var(--color-brand-primary) 16%, var(--color-bg-card));
+    color: var(--color-brand-primary);
+    font-size: var(--font-size-xs);
+    font-style: normal;
+    font-weight: 850;
+}
+
+.builderMetricBadges .builderMetricBadgeMultiplicative {
+    background: color-mix(in srgb, var(--color-brand-danger) 15%, transparent);
+    color: var(--color-brand-danger);
+}
+
+.builderMetricBadges .builderMetricBadgeAdditive,
+.builderMetricBadges .builderMetricBadgeDirection {
+    background: color-mix(in srgb, var(--color-brand-primary) 15%, transparent);
+    color: var(--color-brand-primary);
+}
+
+.goalSelectorModalBody {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 16px;
+}
+
+.readOnlySwitch {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 28px;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    font-style: normal;
+    font-weight: 800;
+}
+
+.readOnlySwitch span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    color: transparent;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.readOnlySwitch em {
+    font-style: normal;
+}
+
+.readOnlySwitchOn {
+    color: var(--color-text-primary);
+}
+
+.readOnlySwitchOn span {
+    background: var(--color-brand-primary);
+    border-color: var(--color-brand-primary);
+    color: white;
+}
+
+.metricsModalPreview {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-bg-card) 94%, transparent);
+}
+
+.metricsModalContent {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+}
+
+.metricsPreviewField {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+}
+
+.metricsPreviewField input {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+}
+
+.timelineSummaryGrid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.timelineSummaryGrid span {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+    padding: 10px;
+    border: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-bg-card) 82%, transparent);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.timelineSummaryGrid strong {
+    min-width: 0;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-snug);
+    text-transform: none;
+    letter-spacing: 0;
+    overflow-wrap: anywhere;
+}
+
+.activityTimelineList {
+    display: grid;
+    gap: 10px;
 }
 
 .programPagePreview {
@@ -667,47 +1110,6 @@
     gap: 12px;
 }
 
-/* Read-only activity definition card (shared with the Activity feature). */
-.previewCard {
-    padding: 18px;
-    border: 1px solid var(--color-border);
-    background: var(--color-bg-app);
-}
-
-.previewCard h4 {
-    margin: 0;
-    color: var(--color-text-primary);
-    font-size: var(--font-size-xl);
-    line-height: var(--line-height-snug);
-    letter-spacing: 0;
-}
-
-.previewCard p {
-    margin: 12px 0 0;
-    color: var(--color-text-secondary);
-    line-height: var(--line-height-base);
-}
-
-.chipRow {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 18px;
-}
-
-.previewChip {
-    display: inline-flex;
-    align-items: center;
-    min-height: 28px;
-    padding: 4px 9px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm);
-    background: var(--color-bg-card);
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-xs);
-    font-weight: 800;
-}
-
 .emptyState {
     min-height: 360px;
     display: grid;
@@ -813,6 +1215,10 @@
         flex: 1 0 auto;
     }
 
+    .stageBody > .activityStage {
+        flex: 1 1 auto;
+    }
+
     .landingSessionScreen {
         flex: 1 1 auto;
         height: auto;
@@ -821,7 +1227,20 @@
 }
 
 @media (max-width: 980px) {
-    .activitySplitView {
+    .activityBuilderSplitViewport {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+    }
+
+    .builderModalShell,
+    .goalSelectorModalShell {
+        min-height: 520px;
+        flex: 0 0 auto;
+    }
+
+    .builderPreviewGrid,
+    .builderSummaryGrid,
+    .timelineSummaryGrid {
         grid-template-columns: 1fr;
     }
 
@@ -880,6 +1299,25 @@
     .activityStage,
     .extrasGrid {
         padding: 12px;
+    }
+
+    .activityModalPreview,
+    .activityTimelinePreview {
+        padding: 14px;
+    }
+
+    .builderModalBody,
+    .goalSelectorModalBody {
+        padding: 14px;
+    }
+
+    .activityViewportToggle {
+        grid-template-columns: 1fr;
+    }
+
+    .previewModalHeader {
+        align-items: flex-start;
+        flex-direction: column;
     }
 
     .programPagePreview {

@@ -15,6 +15,7 @@ import {
 import styles from './LandingFeaturesSection.module.css';
 
 const PRIMARY_FEATURE_ORDER = ['session', 'activity', 'programs', 'analytics'];
+const ACTIVITY_VIEW_ORDER = ['builder', 'metrics', 'timeline'];
 
 // The landing Features section mirrors the goals-view section: message and
 // feature selectors on the left, live viewport on the right.
@@ -23,10 +24,11 @@ export default function LandingFeaturesSection({
     seedLevels = [],
     isMobile = false,
     isLoading = false,
-    onGoalSelect,
     className = '',
+    onGoalSelect,
 }) {
     const [activeFeature, setActiveFeature] = useState(PRIMARY_FEATURE_ORDER[0]);
+    const [activeActivityView, setActiveActivityView] = useState(ACTIVITY_VIEW_ORDER[0]);
     const content = landingContent.features;
     const activeItem = content.items[activeFeature];
 
@@ -53,6 +55,8 @@ export default function LandingFeaturesSection({
                     <LandingFeatureActivity
                         example={example}
                         activities={featuredActivities}
+                        activeView={activeActivityView}
+                        onViewChange={setActiveActivityView}
                         onGoalSelect={onGoalSelect}
                     />
                 );
@@ -74,6 +78,7 @@ export default function LandingFeaturesSection({
     };
 
     const activeDetailCards = activeItem.cards?.length ? activeItem.cards : content.extras;
+    const getActivityViewForCard = (index) => ACTIVITY_VIEW_ORDER[index] || ACTIVITY_VIEW_ORDER[0];
 
     return (
         <section
@@ -116,12 +121,31 @@ export default function LandingFeaturesSection({
                                 <p>{activeItem.body}</p>
                             </div>
                             <div className={styles.featureDetailGrid}>
-                                {activeDetailCards.map((card) => (
-                                    <article className={styles.featureDetailCard} key={`${activeFeature}-${card.title}`}>
-                                        <h3>{card.title}</h3>
-                                        <p>{card.body}</p>
-                                    </article>
-                                ))}
+                                {activeDetailCards.map((card, index) => {
+                                    const activityView = getActivityViewForCard(index);
+                                    const isActivityCard = activeFeature === 'activity' && index < ACTIVITY_VIEW_ORDER.length;
+                                    const isActiveActivityCard = isActivityCard && activeActivityView === activityView;
+                                    if (isActivityCard) {
+                                        return (
+                                            <button
+                                                type="button"
+                                                className={`${styles.featureDetailCard} ${styles.featureDetailButton} ${isActiveActivityCard ? styles.featureDetailCardActive : ''}`}
+                                                aria-pressed={isActiveActivityCard}
+                                                onClick={() => setActiveActivityView(activityView)}
+                                                key={`${activeFeature}-${card.title}`}
+                                            >
+                                                <h3>{card.title}</h3>
+                                                <p>{card.body}</p>
+                                            </button>
+                                        );
+                                    }
+                                    return (
+                                        <article className={styles.featureDetailCard} key={`${activeFeature}-${card.title}`}>
+                                            <h3>{card.title}</h3>
+                                            <p>{card.body}</p>
+                                        </article>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>

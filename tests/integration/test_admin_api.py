@@ -13,7 +13,10 @@ from models import (
     AppSetting,
     Goal,
     GoalLevel,
+    MetricDefinition,
+    MetricValue,
     Note,
+    ProgressRecord,
     Program,
     Session,
     SessionTemplate,
@@ -500,8 +503,8 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     assert [view['name'] for view in public_example['analytics_views']] == ['Public Demo Analytics View']
 
     # Snapshot carries a schema version for forward-safe shape evolution.
-    assert public_example['schema_version'] == 6
-    assert public_payload['schema_version'] == 6
+    assert public_example['schema_version'] == 7
+    assert public_payload['schema_version'] == 7
 
     # Without admin curation, the showcase key is still present with stable
     # null/empty defaults so the frontend never branches on key existence.
@@ -521,7 +524,7 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     cache = db_session.get(AppSetting, 'landing_example_cache')
     assert cache is not None
     assert cache.value['examples'][0]['root_id'] == admin_landing_fractal.id
-    assert cache.value['schema_version'] == 6
+    assert cache.value['schema_version'] == 7
 
 
 @pytest.mark.integration
@@ -636,6 +639,62 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
         id=str(uuid.uuid4()),
         root_id=root.id,
         name='Hidden Featured Activity',
+        has_metrics=True,
+        track_progress=True,
+    )
+    hidden_metric = MetricDefinition(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        activity_id=hidden_activity.id,
+        name='Quality',
+        unit='Rating',
+        track_progress=True,
+    )
+    analytics_session = Session(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        name='Analytics-only Session',
+        session_start=datetime(2025, 12, 20, 9, 0),
+        total_duration_seconds=900,
+    )
+    analytics_instance = ActivityInstance(
+        id=str(uuid.uuid4()),
+        session_id=analytics_session.id,
+        activity_definition_id=hidden_activity.id,
+        root_id=root.id,
+        completed=True,
+        duration_seconds=900,
+        time_stop=datetime(2025, 12, 20, 9, 15),
+        data={},
+    )
+    hidden_metric_value = MetricValue(
+        id=str(uuid.uuid4()),
+        activity_instance_id=analytics_instance.id,
+        metric_definition_id=hidden_metric.id,
+        value=7,
+    )
+    progress_record = ProgressRecord(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        activity_definition_id=hidden_activity.id,
+        activity_instance_id=analytics_instance.id,
+        session_id=analytics_session.id,
+        is_first_instance=False,
+        has_change=True,
+        has_improvement=True,
+        has_regression=False,
+        comparison_type='flat_metrics',
+        metric_comparisons=[{
+            'metric_id': hidden_metric.id,
+            'metric_name': hidden_metric.name,
+            'previous_value': 6,
+            'current_value': 7,
+            'pct_change': 16.7,
+            'improved': True,
+            'regressed': False,
+        }],
+        derived_summary={},
+        created_at=datetime(2025, 12, 20, 9, 16),
     )
     program = Program(
         id=str(uuid.uuid4()),
@@ -657,23 +716,34 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
                 'panels': [{'id': 'window-1', 'x': 0, 'y': 0, 'w': 96, 'h': 48}],
             },
             'window_states': {'window-1': {
-                'selectedCategory': 'sessions',
-                'selectedVisualization': 'stats',
-                'selectedActivity': None,
+                'selectedCategory': 'activities',
+                'selectedVisualization': 'metricProgress',
+                'selectedActivity': {'id': hidden_activity.id, 'name': hidden_activity.name},
                 'selectedModeIds': [],
                 'selectedGoal': None,
-                'visualizationState': {},
-                'visualizationStateByKey': {},
+                'visualizationState': {'metric': hidden_metric.id},
+                'visualizationStateByKey': {
+                    'activities:metricProgress': {'metric': hidden_metric.id},
+                },
             }},
             'selected_window_id': 'window-1',
             'global_filters': {
                 'goals': {'goalIds': [], 'includeDescendants': True, 'includeInheritedActivities': True},
-                'activities': {'activityIds': [], 'groupIds': [], 'includeChildren': True},
+                'activities': {'activityIds': [hidden_activity.id], 'groupIds': [], 'includeChildren': True},
             },
             'layout_bounds': {'columns': 96, 'rows': 48},
         },
     )
-    db_session.add_all([hidden_activity, program, analytics_view])
+    db_session.add_all([
+        hidden_activity,
+        hidden_metric,
+        analytics_session,
+        analytics_instance,
+        hidden_metric_value,
+        progress_record,
+        program,
+        analytics_view,
+    ])
     db_session.commit()
 
     showcase = {
@@ -702,6 +772,10 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
     assert 'Hidden Featured Activity' in activity_names
     assert any(program_item['id'] == program.id for program_item in public_example['programs'])
     assert [view['name'] for view in public_example['analytics_views']] == ['Featured Analytics View']
+    analytics_instances = public_example['analytics_activity_instances'][hidden_activity.id]
+    assert analytics_instances[0]['id'] == analytics_instance.id
+    assert analytics_instances[0]['session_name'] == 'Analytics-only Session'
+    assert analytics_instances[0]['progress_comparison']['metric_comparisons'][0]['pct_change'] == 16.7
 
 
 @pytest.mark.integration
@@ -755,7 +829,7 @@ def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, a
     static_publish = publish()
     assert static_publish['static_snapshot'] == 'ok'
     static_payload = json.loads(static_snapshot_path.read_text())
-    assert static_payload['schema_version'] == 6
+    assert static_payload['schema_version'] == 7
     assert static_payload['published_at'] == static_publish['published_at']
     assert static_payload['examples'][0]['root_id'] == admin_landing_fractal.id
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_PATH', '')

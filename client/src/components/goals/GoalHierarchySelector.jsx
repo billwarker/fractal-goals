@@ -167,6 +167,7 @@ function GoalHierarchySelector({
     connectorHighlightMode = highlightSelectionAncestors ? 'lineage' : 'selected',
     showGoalHighlightHalo = false,
     showAncestorControls = true,
+    compactLayout = false,
 }) {
     const {
         getGoalColor,
@@ -392,7 +393,7 @@ function GoalHierarchySelector({
     };
 
     return (
-        <div className={`${styles.selector} ${isSingleSelect ? styles.singleSelect : styles.multiSelect} ${!isSingleSelect && !showAncestorControls ? styles.noAncestorControls : ''}`}>
+        <div className={`${styles.selector} ${isSingleSelect ? styles.singleSelect : styles.multiSelect} ${!isSingleSelect && !showAncestorControls ? styles.noAncestorControls : ''} ${compactLayout ? styles.compactLayout : ''}`}>
             {searchable && (
                 <div className={styles.searchRow}>
                     <input

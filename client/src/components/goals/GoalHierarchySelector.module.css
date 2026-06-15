@@ -111,6 +111,57 @@
     width: 65px;
 }
 
+.compactLayout {
+    height: 100%;
+    min-height: 0;
+    gap: 10px;
+}
+
+.compactLayout .optionsRow {
+    position: absolute;
+    top: 58px;
+    right: 4px;
+    z-index: 5;
+    justify-content: flex-end;
+    margin-top: 0;
+}
+
+.compactLayout .hideCompletedControl {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.compactLayout .treeFrame {
+    max-height: none;
+    flex: 1;
+    min-height: 0;
+    padding: 8px 4px 8px 72px;
+}
+
+.compactLayout .sessionTreeRow:first-child .sessionNodeContent {
+    padding-right: 220px;
+}
+
+.compactLayout.noAncestorControls .treeFrame {
+    padding-left: 64px;
+}
+
+.compactLayout .controlRow {
+    gap: 6px;
+    width: 54px;
+    transform: translateX(calc(-100% - 8px));
+}
+
+.compactLayout.noAncestorControls .controlRow {
+    width: 54px;
+}
+
+.compactLayout .sessionList {
+    --tree-indent: 26px;
+    --tree-row-height: 31px;
+    --tree-item-pad-y: 5px;
+}
+
 .singleSelect .controlRow {
     display: flex;
     width: 24px;
@@ -252,6 +303,15 @@
 
     .noAncestorControls .treeFrame {
         padding-left: 110px;
+    }
+
+    .compactLayout .treeFrame,
+    .compactLayout.noAncestorControls .treeFrame {
+        padding-left: 64px;
+    }
+
+    .compactLayout .sessionTreeRow:first-child .sessionNodeContent {
+        padding-right: 0;
     }
 
     .controlRow {

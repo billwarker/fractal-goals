@@ -116,21 +116,17 @@ Session notes remain attached to the work that produced them, ready for review w
 
 Activities are reusable building blocks with their own metrics. Link an activity to a goal once and every session that includes it feeds that goal automatically - the credit flows up the tree, from today's reps all the way to the ultimate ambition.
 
-#### Reusable building blocks
+#### Activity builder
 
-Define an activity once, then reuse it across sessions, templates, and programs without rebuilding its metrics.
+Define an activity once with its description, goal links, sets, splits, and reusable structure.
 
-#### Goal associations travel with it
+#### Metrics builder
 
-When an activity belongs to a goal, every future session that uses it contributes to that goal automatically.
+Choose which measures the activity tracks, how they are entered, and which ones compare progress over time.
 
-#### Metrics are activity-native
+#### Progress timeline
 
-Reps, ratings, durations, weights, attempts, and custom measures live with the activity they describe.
-
-#### Progress compares to history
-
-Completed activities can be compared against prior work so the log shows whether practice is improving.
+Completed activities line up chronologically so each session can be compared against prior work.
 
 ### Programs
 
