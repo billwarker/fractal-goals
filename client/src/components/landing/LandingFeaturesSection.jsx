@@ -25,7 +25,6 @@ export default function LandingFeaturesSection({
     isMobile = false,
     isLoading = false,
     className = '',
-    onGoalSelect,
 }) {
     const [activeFeature, setActiveFeature] = useState(PRIMARY_FEATURE_ORDER[0]);
     const [activeActivityView, setActiveActivityView] = useState(ACTIVITY_VIEW_ORDER[0]);
@@ -57,7 +56,6 @@ export default function LandingFeaturesSection({
                         activities={featuredActivities}
                         activeView={activeActivityView}
                         onViewChange={setActiveActivityView}
-                        onGoalSelect={onGoalSelect}
                     />
                 );
             case 'programs':

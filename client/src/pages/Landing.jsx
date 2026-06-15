@@ -579,13 +579,6 @@ function Landing() {
         setFlowTreeScopeKey((current) => current + 1);
     };
 
-    // Clicking a goal in the Features demos selects it in the live example
-    // explorer and scrolls back to that goals view.
-    const handleFeatureGoalSelect = (goal) => {
-        handleGoalSelect(goal);
-        navigateToSection('examples');
-    };
-
     const clearSelectedGoal = () => {
         setSelectedGoalId(null);
         setFlowTreeScopeKey((current) => current + 1);
@@ -953,7 +946,6 @@ function Landing() {
                 seedLevels={snapshotLevels}
                 isMobile={isMobile}
                 isLoading={isExamplesLoading}
-                onGoalSelect={handleFeatureGoalSelect}
                 className={styles.snapSection}
             />
 

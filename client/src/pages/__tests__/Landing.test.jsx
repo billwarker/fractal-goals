@@ -817,7 +817,7 @@ describe('Landing', () => {
         expect(screen.queryByRole('navigation', { name: 'Example fractals' })).not.toBeInTheDocument();
     });
 
-    it('scrolls back to the goals view when a lineage goal is clicked in the Activity feature', async () => {
+    it('keeps users in the Activity feature when the goal selector preview is clicked', async () => {
         const linkedExamples = JSON.parse(JSON.stringify(publishedExamples));
         linkedExamples.examples[0].activity_definitions[0].associated_goal_ids = ['guitar-caged'];
         getLandingExamples.mockResolvedValue({ data: linkedExamples });
@@ -829,7 +829,7 @@ describe('Landing', () => {
         scrollIntoViewCalls.length = 0;
 
         fireEvent.click(screen.getByText('Map the fretboard'));
-        expect(scrollIntoViewCalls.at(-1).element.id).toBe('examples');
+        expect(scrollIntoViewCalls).toHaveLength(0);
     });
 
     it('keeps the sample explorer and showcase visible when no examples are published', async () => {

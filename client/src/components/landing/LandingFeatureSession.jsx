@@ -201,7 +201,7 @@ function LandingSessionScreenWithModel({ sessionName, sections, notes }) {
 }
 
 export default function LandingFeatureSession({ example, session }) {
-    const activityDefinitions = example.activityDefinitions || [];
+    const activityDefinitions = useMemo(() => example.activityDefinitions || [], [example.activityDefinitions]);
     const sessionWithAttributes = useMemo(() => (session ? ensureAttributes(session) : null), [session]);
     const sections = useMemo(() => buildSections(sessionWithAttributes), [sessionWithAttributes]);
     const notes = useMemo(() => normalizeNotes(sessionWithAttributes), [sessionWithAttributes]);

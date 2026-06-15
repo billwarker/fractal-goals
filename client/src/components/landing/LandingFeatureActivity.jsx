@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import GoalIcon from '../atoms/GoalIcon';
 import GoalHierarchySelector from '../goals/GoalHierarchySelector';
 import { ActivityTimelineCard } from '../common/ActivityTimeline';
+import ViewToggleTabs from '../common/ViewToggleTabs';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { buildGoalAssociationSummary, flattenGoals } from '../activityBuilder/activityBuilderUtils';
 import { buildActivityLineage } from './landingFeatureModel';
@@ -199,7 +200,6 @@ export default function LandingFeatureActivity({
     activities,
     activeView = 'builder',
     onViewChange,
-    onGoalSelect,
 }) {
     const { getGoalColor, getGoalIcon } = useGoalLevels();
     const [selectedActivityId, setSelectedActivityId] = useState(activities[0]?.id || null);
@@ -234,15 +234,6 @@ export default function LandingFeatureActivity({
         () => buildGoalAssociationSummary(allGoals, previewSelectedGoalIds),
         [allGoals, previewSelectedGoalIds]
     );
-    const handlePreviewGoalSelection = useCallback((nextIds) => {
-        setPreviewSelectedGoalIds(nextIds);
-        const previousIds = new Set(previewSelectedGoalIds.map((goalId) => String(goalId)));
-        const selectedId = nextIds.find((goalId) => !previousIds.has(String(goalId))) || nextIds.at(-1);
-        const selectedGoal = allGoals.find((goal) => String(goal.id) === String(selectedId));
-        if (selectedGoal) {
-            onGoalSelect?.(selectedGoal);
-        }
-    }, [allGoals, onGoalSelect, previewSelectedGoalIds]);
     const realTimelineItems = useMemo(
         () => resolveActivityInstances(example, selectedActivity),
         [example, selectedActivity]
@@ -352,7 +343,7 @@ export default function LandingFeatureActivity({
                     <GoalHierarchySelector
                         goals={allGoals}
                         selectedGoalIds={previewSelectedGoalIds}
-                        onSelectionChange={handlePreviewGoalSelection}
+                        onSelectionChange={setPreviewSelectedGoalIds}
                         selectionMode="multiple"
                         searchPlaceholder="Search goals..."
                         emptyState="No goals available."
@@ -401,11 +392,6 @@ export default function LandingFeatureActivity({
                                                     <span className={metricModalStyles.badge}>{metric.input_type}</span>
                                                 )}
                                             </div>
-                                        </div>
-                                        <div className={metricModalStyles.metricActions} aria-hidden="true">
-                                            <span className={metricModalStyles.linkButton}>Copy</span>
-                                            <span className={metricModalStyles.linkButton}>Edit</span>
-                                            <span className={`${metricModalStyles.linkButton} ${metricModalStyles.deleteButton}`}>Delete</span>
                                         </div>
                                     </div>
                                     <div className={metricModalStyles.metricBottom}>
@@ -521,35 +507,31 @@ export default function LandingFeatureActivity({
     return (
         <div className={styles.activityStage}>
             <div className={styles.activityViewportHeader}>
-                <div className={styles.activityViewportToggle} role="tablist" aria-label="Activity showcase views">
-                    {ACTIVITY_VIEWS.map((view) => (
-                        <button
-                            type="button"
-                            role="tab"
-                            aria-selected={activeView === view.key}
-                            className={activeView === view.key ? styles.activityViewportToggleActive : ''}
-                            onClick={() => onViewChange?.(view.key)}
-                            key={view.key}
+                <ViewToggleTabs
+                    items={ACTIVITY_VIEWS.map((view) => ({ value: view.key, label: view.label }))}
+                    value={activeView}
+                    onChange={onViewChange}
+                    ariaLabel="Activity showcase views"
+                    className={styles.activityViewTabs}
+                    style={{
+                        '--view-toggle-panel-bg': 'var(--color-bg-card)',
+                    }}
+                />
+                {activities.length > 1 && (
+                    <label className={styles.activitySelectLabel}>
+                        <span>Activity</span>
+                        <select
+                            value={selectedActivity?.id || ''}
+                            onChange={(event) => setSelectedActivityId(event.target.value)}
+                            aria-label="Example activity"
                         >
-                            {view.label}
-                        </button>
-                    ))}
-                </div>
-                {activeView !== 'metrics' && activities.length > 1 && (
-                    <div className={styles.activityChips} role="tablist" aria-label="Example activities">
-                        {activities.map((activity) => (
-                            <button
-                                type="button"
-                                role="tab"
-                                aria-selected={activity.id === selectedActivity.id}
-                                className={activity.id === selectedActivity.id ? styles.activityChipActive : ''}
-                                onClick={() => setSelectedActivityId(activity.id)}
-                                key={activity.id}
-                            >
-                                {activity.name}
-                            </button>
-                        ))}
-                    </div>
+                            {activities.map((activity) => (
+                                <option value={activity.id} key={activity.id}>
+                                    {activity.name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
                 )}
             </div>
             <div className={styles.activityViewportBody}>
