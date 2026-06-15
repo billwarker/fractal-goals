@@ -11,7 +11,12 @@
       "Bash(grep -n \"getByRole\\('button', { name: 'Activities'\" /Users/will/Projects/fractal-goals/client/src/components/__tests__/GoalDetailModal.test.jsx)",
       "Bash(grep -n \"getByRole\\('button', { name: 'Timeline'\\\\|getByRole\\('button', { name: 'Notes'\\\\|getByRole\\('button', { name: 'Details'\" /Users/will/Projects/fractal-goals/client/src/components/__tests__/GoalDetailModal.test.jsx)",
       "Bash(xargs basename *)",
-      "Bash(docker run *)"
+      "Bash(docker run *)",
+      "Bash(dig +short fractalgoals.com A)",
+      "Bash(dig +short fractalgoals.com AAAA)",
+      "Bash(dig +short www.fractalgoals.com)",
+      "Bash(dig +short my.fractalgoals.com)",
+      "Bash(dig +short fractalgoals.com NS)"
     ]
   }
 }
