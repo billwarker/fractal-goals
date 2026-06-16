@@ -1074,6 +1074,10 @@ class ProgramService:
                                         "template_name": template.name,
                                         "template_description": template.description,
                                         "template_data": _safe_load_json(template.template_data, {}),
+                                        "is_archived": bool(getattr(template, "archived_at", None)),
+                                        "archived_at": format_utc(getattr(template, "archived_at", None)),
+                                        "is_used_in_active_program": True,
+                                        "is_effectively_active": True,
                                         "is_required": template_rule.get("is_required", True),
                                         "order": template_rule.get("order", index),
                                     })

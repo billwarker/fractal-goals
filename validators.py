@@ -193,6 +193,17 @@ def validate_session_template_data(template_data: Dict[str, Any]) -> Dict[str, A
             if not section_name:
                 raise ValueError('each section must include a name')
             section['name'] = section_name
+            default_group_id = section.get('default_activity_group_id')
+            if default_group_id in ('', None):
+                section.pop('default_activity_group_id', None)
+            elif not isinstance(default_group_id, str):
+                raise ValueError('section default_activity_group_id must be a string')
+            else:
+                stripped_group_id = default_group_id.strip()
+                if stripped_group_id:
+                    section['default_activity_group_id'] = stripped_group_id
+                else:
+                    section.pop('default_activity_group_id', None)
             section_activities = None
             for key in ('activities', 'exercises', 'activity_ids'):
                 if key in section:
@@ -1637,6 +1648,7 @@ class SessionTemplateCreateSchema(BaseModel):
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     template_data: Dict[str, Any] = Field(...)
+    is_archived: Optional[bool] = False
     
     @field_validator('name')
     @classmethod
@@ -1675,6 +1687,7 @@ class SessionTemplateUpdateSchema(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     template_data: Optional[Dict[str, Any]] = None
+    is_archived: Optional[bool] = None
 
     @field_validator('name')
     @classmethod

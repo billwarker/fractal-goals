@@ -108,6 +108,7 @@ class SessionTemplate(Base):
     root_id = Column(String, ForeignKey('goals.id'), nullable=False, index=True)
     created_at = Column(DateTime, default=utc_now)
     deleted_at = Column(DateTime, nullable=True)
+    archived_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     template_data = Column(JSON_TYPE, nullable=False)
     

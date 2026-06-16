@@ -24,6 +24,7 @@ function ActivityPicker({
     selectionMode = 'multiple',
     selectedActivityIds = [],
     selectedGroupIds = [],
+    initialBrowseGroupId = null,
     allowActivitySelection = true,
     allowGroupSelection = false,
     allowCreateActivity = false,
@@ -55,7 +56,7 @@ function ActivityPicker({
 }) {
     const [pendingActivityIds, setPendingActivityIds] = useState(() => toSet(selectedActivityIds));
     const [pendingGroupIds, setPendingGroupIds] = useState(() => toSet(selectedGroupIds));
-    const [browseGroupId, setBrowseGroupId] = useState(null);
+    const [manualBrowseGroupId, setManualBrowseGroupId] = useState(undefined);
     const [searchText, setSearchText] = useState('');
     const [pickerMode, setPickerMode] = useState(PICK_MODE);
 
@@ -66,6 +67,9 @@ function ActivityPicker({
         () => buildActivityPickerModel(activities, activityGroups),
         [activities, activityGroups]
     );
+    const browseGroupId = manualBrowseGroupId === undefined
+        ? (initialBrowseGroupId && model.normalizedGroupMap[initialBrowseGroupId] ? initialBrowseGroupId : null)
+        : manualBrowseGroupId;
 
     const selectedActivities = useMemo(
         () => model.activities.filter((activity) => pendingActivityIds.has(activity.id)),
@@ -169,7 +173,7 @@ function ActivityPicker({
             return;
         }
         const parentId = model.normalizedGroupMap[browseGroupId]?.normalized_parent_id;
-        setBrowseGroupId(parentId && parentId !== ROOT_KEY ? parentId : null);
+        setManualBrowseGroupId(parentId && parentId !== ROOT_KEY ? parentId : null);
     };
 
     const query = searchText.trim().toLowerCase();
@@ -286,7 +290,7 @@ function ActivityPicker({
                     type="button"
                     aria-label={group.name}
                     className={styles.groupBrowseButton}
-                    onClick={() => setBrowseGroupId(group.id)}
+                    onClick={() => setManualBrowseGroupId(group.id)}
                 >
                     <span className={styles.groupName}>{group.name} {hasChildren ? '›' : ''}</span>
                     <span className={styles.groupMeta}>

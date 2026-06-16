@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import styles from './TemplateBuilderModal.module.css';
 import Modal from '../atoms/Modal';
@@ -49,6 +49,28 @@ function buildActivityPreview(activity) {
     };
 }
 
+function buildActivityGroupOptions(activityGroups) {
+    const groupMap = new Map((activityGroups || []).map((group) => [group.id, group]));
+    const buildPath = (group) => {
+        const names = [];
+        const visited = new Set();
+        let current = group;
+        while (current && !visited.has(current.id)) {
+            visited.add(current.id);
+            names.unshift(current.name);
+            current = current.parent_id ? groupMap.get(current.parent_id) : null;
+        }
+        return names.join(' / ');
+    };
+
+    return (activityGroups || [])
+        .map((group) => ({
+            id: group.id,
+            label: buildPath(group),
+        }))
+        .sort((left, right) => left.label.localeCompare(right.label));
+}
+
 function buildInitialTemplate(editingTemplate) {
     if (!editingTemplate) {
         return {
@@ -95,16 +117,25 @@ function TemplateBuilderModalContent({
         name: '',
         duration_minutes: '10',
         activities: [],
+        default_activity_group_id: '',
     });
     const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '' });
 
     const isExistingTemplate = Boolean(editingTemplate?.id);
     const isQuickTemplate = currentTemplate.sessionType === SESSION_TYPE_QUICK;
     const totalDuration = currentTemplate.sections.reduce((sum, section) => sum + section.duration_minutes, 0);
+    const activityGroupOptions = useMemo(
+        () => buildActivityGroupOptions(activityGroups),
+        [activityGroups]
+    );
+    const activityGroupLabelById = useMemo(
+        () => new Map(activityGroupOptions.map((group) => [group.id, group.label])),
+        [activityGroupOptions]
+    );
 
     const resetSectionEditor = () => {
         setEditingSectionIndex(null);
-        setNewSection({ name: '', duration_minutes: '10', activities: [] });
+        setNewSection({ name: '', duration_minutes: '10', activities: [], default_activity_group_id: '' });
         setShowSectionModal(false);
     };
 
@@ -129,7 +160,15 @@ function TemplateBuilderModalContent({
 
         setCurrentTemplate((previous) => ({
             ...previous,
-            sections: [...previous.sections, { ...newSection, id: createSectionId(), duration_minutes: duration }],
+            sections: [
+                ...previous.sections,
+                {
+                    ...newSection,
+                    id: createSectionId(),
+                    duration_minutes: duration,
+                    default_activity_group_id: newSection.default_activity_group_id || null,
+                },
+            ],
         }));
         resetSectionEditor();
     };
@@ -145,6 +184,7 @@ function TemplateBuilderModalContent({
             name: section.name || '',
             duration_minutes: String(section.duration_minutes || 10),
             activities: section.activities || [],
+            default_activity_group_id: section.default_activity_group_id || '',
         });
         setEditingSectionIndex(index);
         setShowSectionModal(true);
@@ -168,6 +208,7 @@ function TemplateBuilderModalContent({
                 ...updatedSections[editingSectionIndex],
                 name: newSection.name,
                 duration_minutes: duration,
+                default_activity_group_id: newSection.default_activity_group_id || null,
             };
             return {
                 ...previous,
@@ -178,7 +219,7 @@ function TemplateBuilderModalContent({
     };
 
     const handleOpenAddSection = () => {
-        setNewSection({ name: '', duration_minutes: '10', activities: [] });
+        setNewSection({ name: '', duration_minutes: '10', activities: [], default_activity_group_id: '' });
         setEditingSectionIndex(null);
         setShowSectionModal(true);
     };
@@ -222,6 +263,28 @@ function TemplateBuilderModalContent({
                     ...(targetSection.activities || []),
                     activityToAdd,
                 ],
+            };
+
+            return {
+                ...previous,
+                sections: updatedSections,
+            };
+        });
+        resetActivityPicker();
+    };
+
+    const handleSelectSectionDefaultGroup = (sectionIndex, group) => {
+        if (!group?.id) return;
+        setCurrentTemplate((previous) => {
+            const updatedSections = [...previous.sections];
+            const targetSection = updatedSections[sectionIndex];
+            if (!targetSection) {
+                return previous;
+            }
+
+            updatedSections[sectionIndex] = {
+                ...targetSection,
+                default_activity_group_id: group.id,
             };
 
             return {
@@ -447,15 +510,17 @@ function TemplateBuilderModalContent({
                                     <span className={styles.durationText}>
                                         Quick Session: <strong className={styles.durationValue}>{currentTemplate.quickActivities.length}</strong> activit{currentTemplate.quickActivities.length === 1 ? 'y' : 'ies'}
                                     </span>
-                                    <Button
-                                        variant="primary"
-                                        size="sm"
-                                        onClick={() => {
-                                            setShowActivityModal(true);
-                                        }}
-                                    >
-                                        + Add Activity
-                                    </Button>
+                                    {!showActivityModal && (
+                                        <Button
+                                            variant="primary"
+                                            size="sm"
+                                            onClick={() => {
+                                                setShowActivityModal(true);
+                                            }}
+                                        >
+                                            + Add Activity
+                                        </Button>
+                                    )}
                                 </div>
 
                                 <div>
@@ -567,9 +632,16 @@ function TemplateBuilderModalContent({
                                                             </div>
                                                         )}
                                                         meta={(
-                                                            <p className={styles.sectionMeta}>
-                                                                {section.activities?.length || 0} activit{(section.activities?.length || 0) !== 1 ? 'ies' : 'y'}
-                                                            </p>
+                                                            <div className={styles.sectionMetaStack}>
+                                                                <p className={styles.sectionMeta}>
+                                                                    {section.activities?.length || 0} activit{(section.activities?.length || 0) !== 1 ? 'ies' : 'y'}
+                                                                </p>
+                                                                {section.default_activity_group_id && (
+                                                                    <p className={styles.sectionMeta}>
+                                                                        Opens in {activityGroupLabelById.get(section.default_activity_group_id) || 'selected group'}
+                                                                    </p>
+                                                                )}
+                                                            </div>
                                                         )}
                                                         actions={(
                                                             <div className={styles.sectionControls}>
@@ -661,16 +733,18 @@ function TemplateBuilderModalContent({
                                                                 </div>
                                                             </div>
                                                         ))}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setSelectedSectionIndex(sectionIndex);
-                                                                setShowActivityModal(true);
-                                                            }}
-                                                            className={styles.addActivityPrompt}
-                                                        >
-                                                            + Add Activity
-                                                        </button>
+                                                        {!(showActivityModal && selectedSectionIndex === sectionIndex) && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedSectionIndex(sectionIndex);
+                                                                    setShowActivityModal(true);
+                                                                }}
+                                                                className={styles.addActivityPrompt}
+                                                            >
+                                                                + Add Activity
+                                                            </button>
+                                                        )}
 
                                                         {showActivityModal && selectedSectionIndex === sectionIndex && (
                                                             <div className={styles.inlineActivitySelector}>
@@ -679,7 +753,12 @@ function TemplateBuilderModalContent({
                                                                     activityGroups={activityGroups}
                                                                     onClose={resetActivityPicker}
                                                                     onSelectActivity={handleAddActivity}
+                                                                    onSelectGroup={(group) => handleSelectSectionDefaultGroup(sectionIndex, group)}
+                                                                    allowGroupSelection={true}
+                                                                    groupSelectionLabel="Set as Default"
+                                                                    groupSelectedLabel="Default Group"
                                                                     closeOnSelect={true}
+                                                                    initialBrowseGroupId={section.default_activity_group_id || null}
                                                                 />
                                                             </div>
                                                         )}
@@ -736,6 +815,22 @@ function TemplateBuilderModalContent({
                                 onChange={(event) => setNewSection({ ...newSection, duration_minutes: event.target.value })}
                                 fullWidth
                             />
+                        </div>
+
+                        <div className={styles.formGroup}>
+                            <Select
+                                label="Default Activity Group"
+                                value={newSection.default_activity_group_id}
+                                onChange={(event) => setNewSection({ ...newSection, default_activity_group_id: event.target.value })}
+                                fullWidth
+                            >
+                                <option value="">No default group</option>
+                                {activityGroupOptions.map((group) => (
+                                    <option key={group.id} value={group.id}>
+                                        {group.label}
+                                    </option>
+                                ))}
+                            </Select>
                         </div>
 
                         <div className={styles.secondaryActions}>

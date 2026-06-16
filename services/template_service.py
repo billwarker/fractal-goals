@@ -4,7 +4,8 @@ import uuid
 import models
 
 from blueprints.api_utils import require_owned_root
-from models import Session, SessionTemplate
+from models import Program, ProgramBlock, ProgramDay, Session, SessionTemplate, program_day_templates
+from sqlalchemy import distinct
 from sqlalchemy.orm import selectinload, with_loader_criteria
 from services.events import Event, Events, event_bus
 from services.owned_entity_queries import get_owned_session_template
@@ -26,6 +27,28 @@ class TemplateService:
             return None, ("Fractal not found or access denied", 404)
         return root, None
 
+    def _active_program_template_ids(self, root_id):
+        today = models.utc_now().date()
+        rows = (
+            self.db_session.query(distinct(program_day_templates.c.session_template_id))
+            .join(ProgramDay, ProgramDay.id == program_day_templates.c.program_day_id)
+            .join(ProgramBlock, ProgramBlock.id == ProgramDay.block_id)
+            .join(Program, Program.id == ProgramBlock.program_id)
+            .filter(
+                Program.root_id == root_id,
+                Program.start_date <= today,
+                Program.end_date >= today,
+                program_day_templates.c.session_template_id.isnot(None),
+            )
+            .all()
+        )
+        return {row[0] for row in rows if row[0]}
+
+    def _annotate_active_program_usage(self, root_id, templates):
+        active_program_template_ids = self._active_program_template_ids(root_id)
+        for template in templates:
+            template._is_used_in_active_program = template.id in active_program_template_ids
+
     def list_templates(self, root_id, current_user_id, *, limit=None, offset=0) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
@@ -36,6 +59,7 @@ class TemplateService:
             SessionTemplate.deleted_at.is_(None),
         )
         templates = templates_q.all()
+        self._annotate_active_program_usage(root_id, templates)
         stats_service = SessionTemplateStatsService(self.db_session)
         template_ids = [template.id for template in templates]
         stats_by_template = stats_service.persisted_stats_for_templates(root_id, template_ids)
@@ -67,6 +91,7 @@ class TemplateService:
         template = get_owned_session_template(self.db_session, root_id, template_id)
         if not template:
             return None, "Template not found", 404
+        self._annotate_active_program_usage(root_id, [template])
         stats_service = SessionTemplateStatsService(self.db_session)
         template._duration_stats = (
             stats_service.persisted_stats_for_templates(root_id, [template.id]).get(template.id)
@@ -102,6 +127,7 @@ class TemplateService:
             name=data['name'],
             description=data.get('description', ''),
             root_id=root_id,
+            archived_at=models.utc_now() if data.get('is_archived') else None,
             template_data=json.dumps(template_data) if template_data else None,
         )
         self.db_session.add(new_template)
@@ -163,6 +189,8 @@ class TemplateService:
             template.description = data['description']
         if 'template_data' in data:
             template.template_data = json.dumps(data['template_data'])
+        if 'is_archived' in data:
+            template.archived_at = models.utc_now() if data['is_archived'] else None
 
         self.db_session.commit()
         self.db_session.refresh(template)

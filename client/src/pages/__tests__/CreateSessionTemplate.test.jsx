@@ -1,7 +1,7 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import CreateSessionTemplate from '../CreateSessionTemplate';
 import { queryKeys } from '../../hooks/queryKeys';
@@ -9,13 +9,14 @@ import { queryKeys } from '../../hooks/queryKeys';
 const getSessionTemplates = vi.fn();
 const getActivities = vi.fn();
 const getActivityGroups = vi.fn();
+const updateSessionTemplate = vi.fn();
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
         getSessionTemplates: (...args) => getSessionTemplates(...args),
         getActivities: (...args) => getActivities(...args),
         getActivityGroups: (...args) => getActivityGroups(...args),
-        updateSessionTemplate: vi.fn(),
+        updateSessionTemplate: (...args) => updateSessionTemplate(...args),
         createSessionTemplate: vi.fn(),
         deleteSessionTemplate: vi.fn(),
     },
@@ -60,6 +61,7 @@ function renderPage(queryClient) {
 describe('CreateSessionTemplate', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        updateSessionTemplate.mockResolvedValue({ data: {} });
     });
 
     it('stores templates, activities, and activity groups under shared query keys', async () => {
@@ -102,5 +104,49 @@ describe('CreateSessionTemplate', () => {
         expect(queryClient.getQueryData(queryKeys.activityGroups('root-1'))).toEqual([
             { id: 'group-1', name: 'Technique' },
         ]);
+    });
+
+    it('separates archived templates and reactivates them from the card action', async () => {
+        const queryClient = createQueryClient();
+
+        getSessionTemplates.mockResolvedValueOnce({
+            data: [
+                {
+                    id: 'template-active',
+                    name: 'Active Flow',
+                    template_data: { total_duration_minutes: 15, sections: [] },
+                    is_archived: false,
+                },
+                {
+                    id: 'template-archived',
+                    name: 'Old Flow',
+                    template_data: { total_duration_minutes: 15, sections: [] },
+                    is_archived: true,
+                    archived_at: '2026-06-01T00:00:00Z',
+                },
+            ],
+        });
+        getActivities.mockResolvedValueOnce({ data: [] });
+        getActivityGroups.mockResolvedValueOnce({ data: [] });
+
+        renderPage(queryClient);
+
+        await waitFor(() => {
+            expect(screen.getByText('Active Flow')).toBeInTheDocument();
+        });
+
+        expect(screen.getByText('Archived templates (1)')).toBeInTheDocument();
+        fireEvent.click(screen.getByText('Archived templates (1)'));
+        expect(screen.getByText('Old Flow')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Reactivate' }));
+
+        await waitFor(() => {
+            expect(updateSessionTemplate).toHaveBeenCalledWith(
+                'root-1',
+                'template-archived',
+                { is_archived: false }
+            );
+        });
     });
 });

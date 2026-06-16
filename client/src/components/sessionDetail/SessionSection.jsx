@@ -146,6 +146,7 @@ const SessionSection = ({
             onCopyActivityDefinition={(activity) => openActivityBuilder(prepareActivityDefinitionCopy(activity))}
             allowCreate={true}
             allowCopy={true}
+            initialBrowseGroupId={section.default_activity_group_id || null}
         />
     );
 

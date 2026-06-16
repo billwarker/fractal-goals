@@ -772,6 +772,8 @@ def serialize_session_template(template):
     """Serialize a SessionTemplate object."""
     template_data = _safe_load_json(template.template_data, {})
     stats = getattr(template, "_duration_stats", None)
+    archived_at = getattr(template, 'archived_at', None)
+    is_used_in_active_program = bool(getattr(template, '_is_used_in_active_program', False))
     return {
         "id": template.id, 
         "name": template.name, 
@@ -780,6 +782,10 @@ def serialize_session_template(template):
         "template_data": template_data,
         "session_type": get_template_session_type(template_data),
         "template_color": get_template_color(template_data),
+        "archived_at": format_utc(archived_at),
+        "is_archived": bool(archived_at),
+        "is_used_in_active_program": is_used_in_active_program,
+        "is_effectively_active": not bool(archived_at) or is_used_in_active_program,
         "created_at": format_utc(getattr(template, 'created_at', None)),
         "updated_at": format_utc(getattr(template, 'updated_at', None)),
         "stats": stats or {},

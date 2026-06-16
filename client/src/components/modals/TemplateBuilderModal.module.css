@@ -290,6 +290,12 @@
     font-size: 13px;
 }
 
+.sectionMetaStack {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
 .sectionControls {
     display: flex;
     gap: 4px;

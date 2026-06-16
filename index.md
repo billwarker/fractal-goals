@@ -375,6 +375,13 @@ Important program-domain rules now enforced in the backend service layer:
 
 Templates model reusable session structures.
 
+Session templates now have two lifecycle states:
+
+- active templates appear in the manual create-session template picker
+- archived templates remain reusable but are hidden behind a collapsed Archived section in the manual create-session flow
+- archived templates referenced by a day in a currently active program are treated as effectively active for that program-driven flow and are marked with active-program metadata in template responses
+- normal template sections may store `default_activity_group_id`; when a live session is created from the template, adding an activity inside that section opens the activity picker directly inside the configured group
+
 Key backend pieces:
 
 - `services/programs.py`

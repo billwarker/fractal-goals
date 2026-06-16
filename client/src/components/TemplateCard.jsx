@@ -23,11 +23,13 @@ function getNormalActivityCount(template) {
 /**
  * Template Card - Display card for session templates in grid view
  */
-function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
+function TemplateCard({ template, onEdit, onDelete, onDuplicate, onArchiveToggle }) {
     const quickTemplate = isQuickSession(template);
     const sectionCount = template.template_data?.sections?.length || 0;
     const activityCount = quickTemplate ? getQuickActivityCount(template) : getNormalActivityCount(template);
     const averageDuration = getAverageDurationStat(template.stats);
+    const isArchived = Boolean(template.is_archived);
+    const isUsedInActiveProgram = Boolean(template.is_used_in_active_program);
 
     return (
         <div
@@ -37,7 +39,19 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
             <div className={styles.header}>
                 <div className={styles.nameBlock}>
                     <SessionTemplateNameBadge entity={template} size="md" />
-                    <SessionTemplateTypePill entity={template} size="sm" />
+                    <div className={styles.pillRow}>
+                        <SessionTemplateTypePill entity={template} size="sm" />
+                        {isArchived && (
+                            <span className={styles.statusPill}>
+                                Archived
+                            </span>
+                        )}
+                        {isUsedInActiveProgram && (
+                            <span className={styles.activeProgramPill}>
+                                Active Program
+                            </span>
+                        )}
+                    </div>
                 </div>
 
                 {template.description && (
@@ -114,6 +128,18 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate }) {
                         className={styles.ghostAction}
                     >
                         Duplicate
+                    </button>
+                )}
+                {onArchiveToggle && (
+                    <button
+                        type="button"
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            onArchiveToggle(template);
+                        }}
+                        className={styles.ghostAction}
+                    >
+                        {isArchived ? 'Reactivate' : 'Archive'}
                     </button>
                 )}
                 <button

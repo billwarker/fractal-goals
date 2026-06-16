@@ -122,6 +122,44 @@ class TestSessionTemplates:
         assert data['name'] == 'Updated Name'
         assert data['template_data']['sections'][0]['name'] == 'New Section'
 
+    def test_template_archive_state_and_section_default_group(self, authed_client, sample_ultimate_goal, sample_activity_group):
+        root_id = sample_ultimate_goal.id
+        payload = {
+            'name': 'Warmup Template',
+            'template_data': {
+                'sections': [
+                    {
+                        'name': 'Warmup',
+                        'activities': [],
+                        'default_activity_group_id': sample_activity_group.id,
+                    }
+                ]
+            }
+        }
+
+        response = authed_client.post(
+            f'/api/{root_id}/session-templates',
+            data=json.dumps(payload),
+            content_type='application/json'
+        )
+
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data['is_archived'] is False
+        assert data['is_effectively_active'] is True
+        assert data['template_data']['sections'][0]['default_activity_group_id'] == sample_activity_group.id
+
+        response = authed_client.put(
+            f"/api/{root_id}/session-templates/{data['id']}",
+            json={'is_archived': True}
+        )
+
+        assert response.status_code == 200
+        archived = response.get_json()
+        assert archived['is_archived'] is True
+        assert archived['is_effectively_active'] is False
+        assert archived['archived_at'] is not None
+
     def test_create_quick_template(self, authed_client, sample_ultimate_goal, sample_activity_definition):
         root_id = sample_ultimate_goal.id
         payload = {

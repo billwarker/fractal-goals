@@ -97,6 +97,17 @@ function CreateSessionTemplate() {
         },
     });
 
+    const archiveTemplateMutation = useMutation({
+        mutationFn: async ({ templateId, isArchived }) => {
+            await fractalApi.updateSessionTemplate(rootId, templateId, { is_archived: isArchived });
+        },
+        onSuccess: async (_, variables) => {
+            await queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
+            setError(null);
+            notify.success(`Template ${variables.isArchived ? 'archived' : 'reactivated'} successfully!`);
+        },
+    });
+
     const loading = templatesLoading || activitiesLoading || activityGroupsLoading;
     const loadError = templatesError || activitiesError || activityGroupsError;
     const sortedTemplates = [...templates].sort((a, b) => {
@@ -109,6 +120,8 @@ function CreateSessionTemplate() {
         }
         return getTemplateSortTimestamp(b).localeCompare(getTemplateSortTimestamp(a));
     });
+    const activeTemplates = sortedTemplates.filter((template) => !template.is_archived || template.is_used_in_active_program);
+    const archivedTemplates = sortedTemplates.filter((template) => template.is_archived && !template.is_used_in_active_program);
 
     const handleCreateClick = () => {
         setEditingTemplate(null);
@@ -138,6 +151,19 @@ function CreateSessionTemplate() {
 
     const handleDeleteClick = (template) => {
         setTemplateToDelete(template);
+    };
+
+    const handleArchiveToggle = async (template) => {
+        try {
+            await archiveTemplateMutation.mutateAsync({
+                templateId: template.id,
+                isArchived: !template.is_archived,
+            });
+        } catch (err) {
+            console.error("Failed to update template archive state", err);
+            setError('Failed to update template archive state');
+            notify.error('Failed to update template: ' + err.message);
+        }
     };
 
     const handleConfirmDelete = async () => {
@@ -225,16 +251,39 @@ function CreateSessionTemplate() {
                         </HeaderButton>
                     </div>
                 ) : (
-                    <div className={styles.templatesGrid}>
-                        {sortedTemplates.map(template => (
-                            <TemplateCard
-                                key={template.id}
-                                template={template}
-                                onEdit={handleEditClick}
-                                onDelete={handleDeleteClick}
-                                onDuplicate={handleDuplicate}
-                            />
-                        ))}
+                    <div className={styles.templateSections}>
+                        <div className={styles.templatesGrid}>
+                            {activeTemplates.map(template => (
+                                <TemplateCard
+                                    key={template.id}
+                                    template={template}
+                                    onEdit={handleEditClick}
+                                    onDelete={handleDeleteClick}
+                                    onDuplicate={handleDuplicate}
+                                    onArchiveToggle={handleArchiveToggle}
+                                />
+                            ))}
+                        </div>
+
+                        {archivedTemplates.length > 0 && (
+                            <details className={styles.archivedSection}>
+                                <summary className={styles.archivedSummary}>
+                                    Archived templates ({archivedTemplates.length})
+                                </summary>
+                                <div className={styles.templatesGrid}>
+                                    {archivedTemplates.map(template => (
+                                        <TemplateCard
+                                            key={template.id}
+                                            template={template}
+                                            onEdit={handleEditClick}
+                                            onDelete={handleDeleteClick}
+                                            onDuplicate={handleDuplicate}
+                                            onArchiveToggle={handleArchiveToggle}
+                                        />
+                                    ))}
+                                </div>
+                            </details>
+                        )}
                     </div>
                 )}
             </div>

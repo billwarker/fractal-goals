@@ -7,11 +7,16 @@ export default function ActivitySelectorPanel({
     activityGroups = [],
     onClose,
     onSelectActivity,
+    onSelectGroup,
     onCreateActivityDefinition,
     onCopyActivityDefinition,
     allowCreate = false,
     allowCopy = false,
+    allowGroupSelection = false,
     closeOnSelect = false,
+    initialBrowseGroupId = null,
+    groupSelectionLabel = 'Use Group',
+    groupSelectedLabel = 'Selected',
 }) {
     return (
         <ActivityPicker
@@ -20,16 +25,26 @@ export default function ActivitySelectorPanel({
             title="Select Activity Group"
             selectionMode="single"
             allowActivitySelection
+            allowGroupSelection={allowGroupSelection}
             allowCreateActivity={allowCreate}
             allowCopyActivity={allowCopy}
             closeOnSelect={closeOnSelect}
+            initialBrowseGroupId={initialBrowseGroupId}
+            groupSelectionLabel={groupSelectionLabel}
+            groupSelectedLabel={groupSelectedLabel}
             showFooter={false}
             variant="panel"
             onClose={onClose}
             onCancel={onClose}
             onCreateActivity={onCreateActivityDefinition}
             onCopyActivity={onCopyActivityDefinition}
-            onChange={({ activities: selectedActivities }) => {
+            onChange={({ activities: selectedActivities, groups: selectedGroups }) => {
+                const group = selectedGroups[0];
+                if (group && onSelectGroup) {
+                    onSelectGroup(group);
+                    onClose?.();
+                    return;
+                }
                 const activity = selectedActivities[0];
                 if (activity) onSelectActivity?.(activity);
             }}
