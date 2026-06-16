@@ -78,9 +78,12 @@ class BetaSignupRequest(Base):
     __tablename__ = 'beta_signup_requests'
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String(120), nullable=False)
+    # name/use_case are optional: the public landing form collects email and an
+    # optional free-text goal (stored in use_case). They stay on the model for
+    # compatibility with the API's optional fields.
+    name = Column(String(120), nullable=True)
     email = Column(String(120), unique=True, nullable=False, index=True)
-    use_case = Column(String(80), nullable=False)
+    use_case = Column(String(280), nullable=True)
     note = Column(String(1000), nullable=True)
     status = Column(String(32), default='new', nullable=False, index=True)
     source = Column(String(80), default='landing_page', nullable=False)

@@ -141,6 +141,8 @@ const fallbackContent = {
     },
     betaForm: {
         emailLabel: 'Email',
+        goalLabel: 'What goal are you trying to achieve?',
+        goalPlaceholder: 'e.g. Get strong enough for a one-arm pull-up, learn jazz guitar, run a sub-20 5K...',
         submitLabel: 'Request beta access',
         submittingLabel: 'Sending...',
         validationMessage: 'Add a valid email to request beta access.',
@@ -156,6 +158,8 @@ const metaKeyMap = {
     'email label': 'emailLabel',
     'error message': 'errorMessage',
     eyebrow: 'eyebrow',
+    'goal label': 'goalLabel',
+    'goal placeholder': 'goalPlaceholder',
     heading: 'heading',
     kicker: 'kicker',
     label: 'label',

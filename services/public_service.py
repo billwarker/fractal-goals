@@ -28,8 +28,13 @@ class PublicService:
             request = BetaSignupRequest(email=email, source="landing_page")
             self.db_session.add(request)
 
-        request.name = data.get("name") or request.name or "Beta access request"
-        request.use_case = data.get("use_case") or request.use_case or "interested beta user"
+        # Optional fields: only overwrite when the caller actually provides a
+        # value, so resubmitting an email-only signup never wipes a previously
+        # supplied goal/name. No placeholder backfill — exports show real data.
+        if data.get("name"):
+            request.name = data["name"]
+        if data.get("use_case"):
+            request.use_case = data["use_case"]
         if "note" in data:
             request.note = data.get("note")
         if request.status == "dismissed":

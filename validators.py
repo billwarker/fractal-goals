@@ -264,7 +264,7 @@ class BetaSignupRequestSchema(BaseModel):
 
     name: Optional[str] = Field(None, min_length=2, max_length=120)
     email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-    use_case: Optional[str] = Field(None, min_length=2, max_length=80)
+    use_case: Optional[str] = Field(None, min_length=2, max_length=280)
     note: Optional[str] = Field(None, max_length=1000)
 
     @field_validator('name', 'use_case')
@@ -286,6 +286,13 @@ class BetaSignupRequestSchema(BaseModel):
             return v
         cleaned = sanitize_note_content(v)
         return cleaned or None
+
+
+class AdminBetaSignupStatusSchema(BaseModel):
+    """Admin update for a beta signup request's triage status."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    status: str = Field(..., pattern=r'^(new|invited|dismissed)$')
 
 
 class AdminUserCreateSchema(BaseModel):

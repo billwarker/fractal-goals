@@ -11,6 +11,7 @@ from models import (
     ActivityInstance,
     AnalyticsDashboard,
     AppSetting,
+    BetaSignupRequest,
     Goal,
     GoalLevel,
     MetricDefinition,
@@ -1114,3 +1115,91 @@ def test_storage_limit_blocks_large_note(authed_client, db_session, test_user, s
     )
     assert response.status_code == 403
     assert json.loads(response.data)['error']['error'] == 'Storage quota reached'
+
+
+@pytest.fixture
+def sample_beta_signups(db_session):
+    signups = [
+        BetaSignupRequest(email='new@test.example', use_case='Learn jazz guitar', status='new', source='landing_page'),
+        BetaSignupRequest(email='invited@test.example', use_case='Run a sub-20 5K', status='invited', source='landing_page'),
+        BetaSignupRequest(email='dismissed@test.example', status='dismissed', source='landing_page'),
+    ]
+    db_session.add_all(signups)
+    db_session.commit()
+    return signups
+
+
+@pytest.mark.integration
+def test_non_admin_cannot_list_beta_signups(authed_client):
+    response = authed_client.get('/api/admin/beta-signups')
+    assert response.status_code == 403
+
+
+@pytest.mark.integration
+def test_admin_lists_beta_signups_with_status_counts(admin_client, sample_beta_signups):
+    response = admin_client.get('/api/admin/beta-signups')
+    assert response.status_code == 200
+    payload = json.loads(response.data)
+    assert payload['total'] == 3
+    assert payload['status_counts'] == {'new': 1, 'invited': 1, 'dismissed': 1, 'total': 3}
+    # Newest-first ordering puts the most recently created signup first.
+    assert {r['email'] for r in payload['requests']} == {
+        'new@test.example', 'invited@test.example', 'dismissed@test.example',
+    }
+
+
+@pytest.mark.integration
+def test_admin_filters_beta_signups_by_status(admin_client, sample_beta_signups):
+    response = admin_client.get('/api/admin/beta-signups?status=new')
+    assert response.status_code == 200
+    payload = json.loads(response.data)
+    assert payload['total'] == 1
+    assert payload['requests'][0]['email'] == 'new@test.example'
+    # Counts ignore the active filter so the full breakdown stays visible.
+    assert payload['status_counts']['total'] == 3
+
+
+@pytest.mark.integration
+def test_admin_searches_beta_signups_by_goal(admin_client, sample_beta_signups):
+    response = admin_client.get('/api/admin/beta-signups?q=jazz')
+    assert response.status_code == 200
+    payload = json.loads(response.data)
+    assert payload['total'] == 1
+    assert payload['requests'][0]['email'] == 'new@test.example'
+
+
+@pytest.mark.integration
+def test_admin_updates_beta_signup_status(admin_client, db_session, sample_beta_signups):
+    target = sample_beta_signups[0]
+    response = admin_client.patch(
+        f'/api/admin/beta-signups/{target.id}',
+        data=json.dumps({'status': 'invited'}),
+        content_type='application/json',
+    )
+    assert response.status_code == 200
+    assert json.loads(response.data)['request']['status'] == 'invited'
+    db_session.refresh(target)
+    assert target.status == 'invited'
+
+
+@pytest.mark.integration
+def test_admin_rejects_invalid_beta_signup_status(admin_client, sample_beta_signups):
+    target = sample_beta_signups[0]
+    response = admin_client.patch(
+        f'/api/admin/beta-signups/{target.id}',
+        data=json.dumps({'status': 'bogus'}),
+        content_type='application/json',
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.integration
+def test_admin_exports_beta_signups_csv(admin_client, sample_beta_signups):
+    response = admin_client.get('/api/admin/beta-signups/export.csv')
+    assert response.status_code == 200
+    assert response.headers['Content-Type'].startswith('text/csv')
+    assert 'attachment' in response.headers['Content-Disposition']
+    body = response.data.decode('utf-8')
+    assert body.splitlines()[0] == 'email,goal,status,source,created_at,updated_at,note'
+    assert 'new@test.example' in body
+    assert 'Learn jazz guitar' in body

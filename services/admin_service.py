@@ -24,6 +24,7 @@ from models import (
     ActivityInstance,
     AnalyticsDashboard,
     AppSetting,
+    BetaSignupRequest,
     EventLog,
     FractalMetricDefinition,
     Goal,
@@ -1605,6 +1606,77 @@ class AdminService:
             "limit": limit,
             "offset": offset,
         }, None, 200
+
+    BETA_SIGNUP_STATUSES = ("new", "invited", "dismissed")
+
+    def _beta_signup_base_query(self, status: str = "", search: str = ""):
+        query = self.db_session.query(BetaSignupRequest)
+        if status in self.BETA_SIGNUP_STATUSES:
+            query = query.filter(BetaSignupRequest.status == status)
+        if search:
+            term = f"%{search}%"
+            query = query.filter(
+                or_(
+                    BetaSignupRequest.email.ilike(term),
+                    BetaSignupRequest.use_case.ilike(term),
+                )
+            )
+        return query
+
+    def list_beta_signups(
+        self,
+        status: str = "",
+        search: str = "",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> ServiceResult[JsonDict]:
+        from services.public_service import PublicService
+
+        query = self._beta_signup_base_query(status=status, search=search)
+        total = int(query.with_entities(func.count(BetaSignupRequest.id)).scalar() or 0)
+        requests = (
+            query.order_by(BetaSignupRequest.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+
+        # Counts are computed across all statuses (ignoring the status filter) so
+        # the admin UI can show the full breakdown regardless of the active tab.
+        status_counts = {key: 0 for key in self.BETA_SIGNUP_STATUSES}
+        for value, count in (
+            self.db_session.query(BetaSignupRequest.status, func.count(BetaSignupRequest.id))
+            .group_by(BetaSignupRequest.status)
+            .all()
+        ):
+            status_counts[value] = int(count)
+        status_counts["total"] = sum(status_counts[key] for key in self.BETA_SIGNUP_STATUSES)
+
+        return {
+            "requests": [PublicService.serialize_beta_signup(request) for request in requests],
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "status_counts": status_counts,
+        }, None, 200
+
+    def update_beta_signup_status(self, signup_id: str, status: str) -> ServiceResult[JsonDict]:
+        from services.public_service import PublicService
+
+        if status not in self.BETA_SIGNUP_STATUSES:
+            return None, "Invalid beta signup status", 400
+        request = self.db_session.get(BetaSignupRequest, signup_id)
+        if request is None:
+            return None, "Beta signup request not found", 404
+        request.status = status
+        self.db_session.commit()
+        self.db_session.refresh(request)
+        return {"request": PublicService.serialize_beta_signup(request)}, None, 200
+
+    def iter_beta_signups_for_export(self, status: str = "", search: str = ""):
+        """Yield beta signup rows oldest-first for CSV export."""
+        query = self._beta_signup_base_query(status=status, search=search)
+        yield from query.order_by(BetaSignupRequest.created_at.asc()).all()
 
     def summary(self) -> ServiceResult[JsonDict]:
         total_users = int(self.db_session.query(func.count(User.id)).scalar() or 0)

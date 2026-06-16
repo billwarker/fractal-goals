@@ -1,11 +1,14 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
+import csv
+import io
 import logging
 
 from blueprints.api_utils import get_db_session, internal_error, parse_optional_pagination
 from blueprints.auth_api import token_required
 from services.admin_service import AdminService
 from validators import (
+    AdminBetaSignupStatusSchema,
     AdminInviteKeyCreateSchema,
     AdminLandingExamplesUpdateSchema,
     AdminTierQuotaUpdateSchema,
@@ -71,6 +74,96 @@ def list_admin_users(current_user):
     except SQLAlchemyError:
         logger.exception("Error listing admin users")
         return internal_error(logger, "Error listing admin users")
+    finally:
+        db_session.close()
+
+
+@admin_bp.route('/beta-signups', methods=['GET'])
+@token_required
+def list_beta_signups(current_user):
+    db_session = get_db_session()
+    try:
+        service, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+        limit, offset = parse_optional_pagination(request, max_limit=200)
+        payload, error, status = service.list_beta_signups(
+            status=(request.args.get('status') or '').strip(),
+            search=(request.args.get('q') or '').strip(),
+            limit=limit or 50,
+            offset=offset or 0,
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        return internal_error(logger, "Error listing beta signups")
+    finally:
+        db_session.close()
+
+
+@admin_bp.route('/beta-signups/<signup_id>', methods=['PATCH'])
+@token_required
+@validate_request(AdminBetaSignupStatusSchema)
+def update_beta_signup_status(current_user, signup_id, validated_data):
+    db_session = get_db_session()
+    try:
+        service, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+        payload, error, status = service.update_beta_signup_status(
+            signup_id,
+            validated_data["status"],
+        )
+        if error:
+            return jsonify({"error": error}), status
+        logger.info(
+            "Admin user_id=%s updated_beta_signup id=%s status=%s",
+            current_user.id,
+            signup_id,
+            validated_data["status"],
+        )
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        return internal_error(logger, "Error updating beta signup")
+    finally:
+        db_session.close()
+
+
+@admin_bp.route('/beta-signups/export.csv', methods=['GET'])
+@token_required
+def export_beta_signups(current_user):
+    db_session = get_db_session()
+    try:
+        service, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(["email", "goal", "status", "source", "created_at", "updated_at", "note"])
+        for row in service.iter_beta_signups_for_export(
+            status=(request.args.get('status') or '').strip(),
+            search=(request.args.get('q') or '').strip(),
+        ):
+            writer.writerow([
+                row.email,
+                row.use_case or "",
+                row.status,
+                row.source,
+                row.created_at.isoformat() if row.created_at else "",
+                row.updated_at.isoformat() if row.updated_at else "",
+                row.note or "",
+            ])
+
+        return Response(
+            buffer.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment; filename=beta-signups.csv"},
+        )
+    except SQLAlchemyError:
+        return internal_error(logger, "Error exporting beta signups")
     finally:
         db_session.close()
 

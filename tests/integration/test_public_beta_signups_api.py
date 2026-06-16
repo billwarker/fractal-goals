@@ -19,9 +19,22 @@ def test_create_beta_signup_request(client, db_session):
     assert payload['created'] is True
     assert payload['request']['email'] == 'will@test.example'
 
+    # Email-only signups no longer backfill placeholder name/use_case so exports
+    # reflect only real data.
     stored = db_session.query(BetaSignupRequest).filter_by(email='will@test.example').one()
-    assert stored.name == 'Beta access request'
-    assert stored.use_case == 'interested beta user'
+    assert stored.name is None
+    assert stored.use_case is None
+
+
+def test_create_beta_signup_persists_goal_as_use_case(client, db_session):
+    response = client.post('/api/public/beta-signups', json={
+        'email': 'goal@test.example',
+        'use_case': 'Get strong enough for a one-arm pull-up',
+    })
+
+    assert response.status_code == 201
+    stored = db_session.query(BetaSignupRequest).filter_by(email='goal@test.example').one()
+    assert stored.use_case == 'Get strong enough for a one-arm pull-up'
 
 
 def test_duplicate_beta_signup_updates_existing_request(client, db_session):

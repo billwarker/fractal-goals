@@ -211,6 +211,8 @@ Beta access is invite-based while the product is being shaped. Drop your email a
 ## Beta Form
 
 **Email Label:** Email
+**Goal Label:** What goal are you trying to achieve?
+**Goal Placeholder:** e.g. Get strong enough for a one-arm pull-up, learn jazz guitar, run a sub-20 5K...
 **Submit Label:** Request beta access
 **Submitting Label:** Sending...
 **Validation Message:** Add a valid email to request beta access.

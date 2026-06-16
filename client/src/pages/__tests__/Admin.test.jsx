@@ -26,6 +26,8 @@ const {
     getLandingExamples,
     updateLandingExamples,
     publishLandingExamples,
+    getBetaSignups,
+    updateBetaSignupStatus,
 } = vi.hoisted(() => ({
     getSummary: vi.fn(),
     getUsers: vi.fn(),
@@ -47,6 +49,8 @@ const {
     getLandingExamples: vi.fn(),
     updateLandingExamples: vi.fn(),
     publishLandingExamples: vi.fn(),
+    getBetaSignups: vi.fn(),
+    updateBetaSignupStatus: vi.fn(),
 }));
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -78,6 +82,9 @@ vi.mock('../../utils/api', () => ({
         getLandingExamples: (...args) => getLandingExamples(...args),
         updateLandingExamples: (...args) => updateLandingExamples(...args),
         publishLandingExamples: (...args) => publishLandingExamples(...args),
+        getBetaSignups: (...args) => getBetaSignups(...args),
+        updateBetaSignupStatus: (...args) => updateBetaSignupStatus(...args),
+        exportBetaSignupsCsv: vi.fn(),
         revokeInviteKey: vi.fn(),
     },
 }));
@@ -281,6 +288,23 @@ describe('Admin', () => {
                 published_example_count: 2,
             },
         });
+        getBetaSignups.mockResolvedValue({
+            data: {
+                requests: [
+                    {
+                        id: 'signup-1',
+                        email: 'tester@example.com',
+                        use_case: 'Learn jazz guitar',
+                        status: 'new',
+                        source: 'landing_page',
+                        created_at: '2026-06-10T00:00:00Z',
+                    },
+                ],
+                total: 1,
+                status_counts: { new: 1, invited: 0, dismissed: 0, total: 1 },
+            },
+        });
+        updateBetaSignupStatus.mockResolvedValue({ data: { request: { id: 'signup-1', status: 'invited' } } });
     });
 
     it('renders user entity metrics, storage, and invite key creation', async () => {
@@ -496,5 +520,19 @@ describe('Admin', () => {
                 { root_id: 'root-2', label: 'Chinese language tracker', sort_order: 1, showcase: emptyShowcase },
             ],
         }));
+    });
+
+    it('lists beta signups and updates their status', async () => {
+        renderAdmin();
+
+        fireEvent.click(screen.getByText('beta signups'));
+
+        await waitFor(() => expect(screen.getByText('tester@example.com')).toBeInTheDocument());
+        expect(screen.getByText('Learn jazz guitar')).toBeInTheDocument();
+        expect(getBetaSignups).toHaveBeenCalled();
+
+        const statusSelect = screen.getByDisplayValue('new');
+        fireEvent.change(statusSelect, { target: { value: 'invited' } });
+        await waitFor(() => expect(updateBetaSignupStatus).toHaveBeenCalledWith('signup-1', { status: 'invited' }));
     });
 });

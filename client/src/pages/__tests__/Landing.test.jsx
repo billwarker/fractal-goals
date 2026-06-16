@@ -400,12 +400,16 @@ describe('Landing', () => {
         expect(screen.queryByRole('heading', { name: 'Common questions' })).not.toBeInTheDocument();
 
         fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'will@example.com' } });
+        fireEvent.change(screen.getByLabelText(landingContent.betaForm.goalLabel), {
+            target: { value: 'Learn jazz guitar' },
+        });
 
         fireEvent.click(screen.getByRole('button', { name: /request beta access/i }));
 
         await waitFor(() => {
             expect(createBetaSignup).toHaveBeenCalledWith({
                 email: 'will@example.com',
+                use_case: 'Learn jazz guitar',
             });
         });
         expect(await screen.findByText(landingContent.betaForm.successCreatedMessage)).toBeInTheDocument();

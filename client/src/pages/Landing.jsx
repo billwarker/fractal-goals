@@ -86,6 +86,7 @@ const levelByType = {
 
 const initialFormState = {
     email: '',
+    goal: '',
 };
 
 // Full-viewport snap sections in document order. The persistent header uses
@@ -699,8 +700,12 @@ function Landing() {
         setMessage('');
 
         try {
+            const goal = formState.goal.trim();
             const payload = {
                 email: formState.email.trim(),
+                // The "what goal are you trying to achieve" answer is the signup's
+                // use case; optional, so an empty answer is simply omitted.
+                ...(goal ? { use_case: goal } : {}),
             };
             const response = await publicApi.createBetaSignup(payload);
             setStatus('success');
@@ -1021,6 +1026,17 @@ function Landing() {
                                     onChange={updateField('email')}
                                     autoComplete="email"
                                     required
+                                />
+                            </label>
+                            <label>
+                                {landingContent.betaForm.goalLabel}
+                                <textarea
+                                    className={styles.betaGoalInput}
+                                    value={formState.goal}
+                                    onChange={updateField('goal')}
+                                    placeholder={landingContent.betaForm.goalPlaceholder}
+                                    rows={2}
+                                    maxLength={280}
                                 />
                             </label>
                             <button type="submit" disabled={!canSubmit}>
