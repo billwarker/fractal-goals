@@ -374,8 +374,23 @@
     height: 100%;
 }
 
-.flowTreeViewportLocked {
+.goalTreeUnlockHint {
+    position: absolute;
+    top: 34px;
+    left: 292px;
+    z-index: 39;
+    max-width: min(300px, calc(100% - 312px));
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 750;
+    line-height: var(--line-height-snug);
     pointer-events: none;
+    text-shadow: 0 1px 12px var(--color-bg-app);
+    opacity: 0.92;
+}
+
+.goalTreeUnlockHintUnlocked {
+    color: var(--color-success);
 }
 
 .goalTreeCanvas:hover {
@@ -603,6 +618,13 @@
         min-height: 520px;
     }
 
+    .goalTreeUnlockHint {
+        top: 66px;
+        left: 18px;
+        max-width: calc(100% - 36px);
+        font-size: var(--font-size-xs);
+    }
+
 }
 
 /*
@@ -768,6 +790,13 @@
         flex: 1;
         height: auto;
         min-height: 0;
+    }
+
+    .goalTreeUnlockHint {
+        top: 34px;
+        left: 292px;
+        max-width: min(300px, calc(100% - 312px));
+        font-size: var(--font-size-sm);
     }
 
     .betaSection {

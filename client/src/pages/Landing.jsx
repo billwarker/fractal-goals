@@ -31,6 +31,7 @@ const DEFAULT_VIEW_SETTINGS = {
 const FLOWTREE_SCOPE_TRANSITION_MS = 160;
 const WHEEL_SECTION_COOLDOWN_MS = 760;
 const WHEEL_SECTION_DELTA_THRESHOLD = 24;
+const GOAL_TREE_UNLOCK_HINT_MS = 1400;
 
 const goalLevels = [
     {
@@ -386,14 +387,16 @@ function Landing() {
     const [flowTreeScopeKey, setFlowTreeScopeKey] = useState(0);
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
     const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
-    const [isOptionsPaneMinimized, setIsOptionsPaneMinimized] = useState(false);
+    const [isOptionsPaneMinimized, setIsOptionsPaneMinimized] = useState(true);
     const [hoveredHeroExampleId, setHoveredHeroExampleId] = useState(null);
     const [isGoalTreeInteractionLocked, setIsGoalTreeInteractionLocked] = useState(true);
+    const [goalTreeUnlockHint, setGoalTreeUnlockHint] = useState('locked');
     const [formState, setFormState] = useState(initialFormState);
     const [status, setStatus] = useState('idle');
     const [message, setMessage] = useState('');
     const flowTreeRef = useRef(null);
     const flowTreeScopeTransitionTimerRef = useRef(null);
+    const goalTreeUnlockHintTimerRef = useRef(null);
     const wheelSectionCooldownTimerRef = useRef(null);
     const wheelTargetSectionRef = useRef(SECTION_IDS[0]);
     const mainRef = useRef(null);
@@ -587,8 +590,26 @@ function Landing() {
     useEffect(() => {
         if (activeSectionId !== 'examples') {
             setIsGoalTreeInteractionLocked(true);
+            setGoalTreeUnlockHint('locked');
+            if (goalTreeUnlockHintTimerRef.current) {
+                clearTimeout(goalTreeUnlockHintTimerRef.current);
+                goalTreeUnlockHintTimerRef.current = null;
+            }
         }
     }, [activeSectionId]);
+
+    const unlockGoalTreeInteraction = useCallback(() => {
+        if (!isGoalTreeInteractionLocked) return;
+        setIsGoalTreeInteractionLocked(false);
+        setGoalTreeUnlockHint('unlocked');
+        if (goalTreeUnlockHintTimerRef.current) {
+            clearTimeout(goalTreeUnlockHintTimerRef.current);
+        }
+        goalTreeUnlockHintTimerRef.current = setTimeout(() => {
+            setGoalTreeUnlockHint('hidden');
+            goalTreeUnlockHintTimerRef.current = null;
+        }, GOAL_TREE_UNLOCK_HINT_MS);
+    }, [isGoalTreeInteractionLocked]);
 
     // A representative mid-tree goal for the lineage-scoping card demo.
     const demoLineageGoal = useMemo(() => (
@@ -657,6 +678,9 @@ function Landing() {
     useEffect(() => () => {
         if (flowTreeScopeTransitionTimerRef.current) {
             clearTimeout(flowTreeScopeTransitionTimerRef.current);
+        }
+        if (goalTreeUnlockHintTimerRef.current) {
+            clearTimeout(goalTreeUnlockHintTimerRef.current);
         }
         if (wheelSectionCooldownTimerRef.current) {
             clearTimeout(wheelSectionCooldownTimerRef.current);
@@ -853,11 +877,16 @@ function Landing() {
                                     aria-describedby="examples-title"
                                     role="group"
                                     tabIndex={0}
-                                    onPointerDown={() => setIsGoalTreeInteractionLocked(false)}
-                                    onFocus={() => setIsGoalTreeInteractionLocked(false)}
+                                    onPointerDown={unlockGoalTreeInteraction}
+                                    onFocus={unlockGoalTreeInteraction}
                                     onKeyDown={(event) => {
                                         if (event.key === 'Escape') {
                                             setIsGoalTreeInteractionLocked(true);
+                                            setGoalTreeUnlockHint('locked');
+                                            if (goalTreeUnlockHintTimerRef.current) {
+                                                clearTimeout(goalTreeUnlockHintTimerRef.current);
+                                                goalTreeUnlockHintTimerRef.current = null;
+                                            }
                                             event.currentTarget.blur();
                                         }
                                     }}
@@ -878,12 +907,22 @@ function Landing() {
                                             hideInactiveTooltip="Hides goals with no completed activity evidence in the active window."
                                             hideCompletedTooltip="Hides completed goals from the fractal tree."
                                         />
+                                        {goalTreeUnlockHint !== 'hidden' && (
+                                            <div
+                                                className={`${styles.goalTreeUnlockHint} ${goalTreeUnlockHint === 'unlocked' ? styles.goalTreeUnlockHintUnlocked : ''}`}
+                                                aria-live="polite"
+                                            >
+                                                {goalTreeUnlockHint === 'unlocked'
+                                                    ? (isMobile ? 'Unlocked.' : 'Unlocked. Explore the tree.')
+                                                    : (isMobile ? 'Tap graph to unlock.' : 'Click the graph to unlock panning and zooming.')}
+                                            </div>
+                                        )}
                                         <Suspense fallback={<div className={styles.flowTreeLoading}>Loading preview...</div>}>
                                             <FlowTree
                                                 ref={flowTreeRef}
-                                                key={`${selectedExample.id}-${goalsViewMode}`}
+                                                key={selectedExample.id}
                                                 treeData={selectedExample.tree}
-                                                onNodeClick={handleGoalSelect}
+                                                onNodeClick={isGoalTreeInteractionLocked ? () => {} : handleGoalSelect}
                                                 onAddChild={null}
                                                 viewSettings={viewSettings}
                                                 evidenceGoalIds={selectedExample.evidenceGoalIds}
