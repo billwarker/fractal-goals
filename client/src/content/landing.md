@@ -216,6 +216,6 @@ Beta access is invite-based while the product is being shaped. Drop your email a
 **Submit Label:** Request beta access
 **Submitting Label:** Sending...
 **Validation Message:** Add a valid email to request beta access.
-**Success Created Message:** You're on the private beta request list.
-**Success Updated Message:** Your private beta request has been updated.
+**Success Created Message:** You're on the list. We invite new testers in small batches as slots open, and we'll email you from fractalgoals.com when it's your turn.
+**Success Updated Message:** Thanks - we've updated your request. We'll email you from fractalgoals.com as new tester slots open.
 **Error Message:** Could not send the request. Please try again.

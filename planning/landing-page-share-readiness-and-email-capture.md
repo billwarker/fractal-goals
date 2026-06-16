@@ -118,12 +118,10 @@ The shell currently has only charset/viewport/title. Add static (crawler-visible
 - Confirm the Nginx config ([client/nginx.conf](../client/nginx.conf)) serves these at root (they're static
   assets, so the existing static handling should already cover them — verify).
 
-### 2d. Privacy-friendly analytics hook
-- Add a single, opt-in, lightweight analytics include (Plausible-style: one script tag,
-  no cookies, GDPR-friendly) gated behind a `VITE_ANALYTICS_DOMAIN` env var so it's a
-  no-op when unset (local/dev safe).
-- Fire one custom event on successful beta signup (`beta_signup`) so conversion rate on
-  earned traffic is measurable from day one.
+### 2d. Privacy-friendly analytics hook — DEFERRED
+- Deferred until a provider is chosen (Plausible vs. PostHog vs. GA, etc.). When picked:
+  add one env-gated script include (`VITE_ANALYTICS_DOMAIN`, no-op when unset) and fire a
+  `beta_signup` conversion event from the form's success handler.
 
 ### 2e. Post-signup expectation-setting copy
 - In [client/src/content/landing.md](../client/src/content/landing.md) Beta Form section, upgrade the success message to set

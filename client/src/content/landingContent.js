@@ -146,8 +146,8 @@ const fallbackContent = {
         submitLabel: 'Request beta access',
         submittingLabel: 'Sending...',
         validationMessage: 'Add a valid email to request beta access.',
-        successCreatedMessage: "You're on the private beta request list.",
-        successUpdatedMessage: 'Your private beta request has been updated.',
+        successCreatedMessage: "You're on the list. We invite new testers in small batches as slots open, and we'll email you from fractalgoals.com when it's your turn.",
+        successUpdatedMessage: "Thanks - we've updated your request. We'll email you from fractalgoals.com as new tester slots open.",
         errorMessage: 'Could not send the request. Please try again.',
     },
 };

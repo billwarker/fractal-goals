@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://fractalgoals.com/sitemap.xml

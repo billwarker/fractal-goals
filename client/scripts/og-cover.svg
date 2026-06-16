@@ -1,0 +1,83 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    Open Graph cover (1200x630). Source of truth for client/public/og-cover.png,
+    rendered by client/scripts/generate-og-image.mjs. Palette matches the dark
+    theme tokens in src/design-tokens.css and the goal-level colors in
+    src/pages/Landing.jsx (Ultimate/Long/Mid/Short/Immediate).
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0c1219" />
+      <stop offset="1" stop-color="#0a0f16" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.42" r="0.6">
+      <stop offset="0" stop-color="#4f9cf9" stop-opacity="0.20" />
+      <stop offset="1" stop-color="#4f9cf9" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <rect width="1200" height="630" fill="url(#glow)" />
+
+  <!-- Subtle graph-paper grid, matching the app's visual model. -->
+  <g stroke="#a6b6c9" stroke-opacity="0.05" stroke-width="1">
+    <path d="M0 70 H1200 M0 140 H1200 M0 210 H1200 M0 280 H1200 M0 350 H1200 M0 420 H1200 M0 490 H1200 M0 560 H1200" />
+    <path d="M70 0 V630 M140 0 V630 M210 0 V630 M280 0 V630 M350 0 V630 M420 0 V630 M490 0 V630 M560 0 V630 M630 0 V630 M700 0 V630 M770 0 V630 M840 0 V630 M910 0 V630 M980 0 V630 M1050 0 V630 M1120 0 V630" />
+  </g>
+
+  <!-- ============ Left: wordmark + headline + subhead ============ -->
+  <g transform="translate(80, 110)">
+    <!-- Concentric brand mark (fractal nesting motif). -->
+    <g transform="translate(20, 0)">
+      <circle cx="0" cy="0" r="20" fill="none" stroke="#4f9cf9" stroke-width="3.5" />
+      <circle cx="0" cy="0" r="12" fill="none" stroke="#4f9cf9" stroke-width="3.5" />
+      <circle cx="0" cy="0" r="5" fill="#4f9cf9" />
+    </g>
+    <text x="58" y="8" font-family="DM Sans, Helvetica, Arial, sans-serif" font-size="30" font-weight="700" fill="#e6edf5" letter-spacing="0.5">Fractal Goals</text>
+  </g>
+
+  <text x="80" y="250" font-family="DM Serif Display, Georgia, serif" font-size="68" font-weight="400" fill="#e6edf5">Achieve your most</text>
+  <text x="80" y="326" font-family="DM Serif Display, Georgia, serif" font-size="68" font-weight="400" fill="#e6edf5">ambitious goals.</text>
+
+  <text x="80" y="404" font-family="DM Sans, Helvetica, Arial, sans-serif" font-size="26" font-weight="400" fill="#aab8c8">Break any ambition into a tree of</text>
+  <text x="80" y="441" font-family="DM Sans, Helvetica, Arial, sans-serif" font-size="26" font-weight="400" fill="#aab8c8">smaller goals, build programs toward</text>
+  <text x="80" y="478" font-family="DM Sans, Helvetica, Arial, sans-serif" font-size="26" font-weight="400" fill="#aab8c8">them, and log every session in one</text>
+  <text x="80" y="515" font-family="DM Sans, Helvetica, Arial, sans-serif" font-size="26" font-weight="400" fill="#aab8c8">connected system.</text>
+
+  <text x="80" y="575" font-family="JetBrains Mono, monospace" font-size="22" font-weight="500" fill="#4f9cf9">fractalgoals.com</text>
+
+  <!-- ============ Right: a small fractal goal tree ============ -->
+  <g transform="translate(880, 315)">
+    <!-- Edges first so nodes sit on top. -->
+    <g stroke="#304052" stroke-width="2.5" fill="none" stroke-opacity="0.9">
+      <path d="M0 -180 L0 -90" />
+      <path d="M0 -90 L-120 0 M0 -90 L120 0" />
+      <path d="M-120 0 L-180 95 M-120 0 L-55 95" />
+      <path d="M120 0 L55 95 M120 0 L180 95" />
+      <path d="M-180 95 L-180 180 M-55 95 L-55 180 M55 95 L55 180 M180 95 L180 180" />
+    </g>
+
+    <!-- Ultimate (12-point star, blue) -->
+    <g transform="translate(0,-180)">
+      <circle r="30" fill="#102235" stroke="#4f9cf9" stroke-width="3" />
+      <circle r="8" fill="#4f9cf9" />
+    </g>
+    <!-- Long Term (hexagon, green) -->
+    <g transform="translate(0,-90)">
+      <polygon points="0,-22 19,-11 19,11 0,22 -19,11 -19,-11" fill="#0f271c" stroke="#3bc57c" stroke-width="3" />
+    </g>
+    <!-- Mid Term (diamond, orange) -->
+    <g transform="translate(-120,0)"><polygon points="0,-22 22,0 0,22 -22,0" fill="#2c1d0f" stroke="#f59f4d" stroke-width="3" /></g>
+    <g transform="translate(120,0)"><polygon points="0,-22 22,0 0,22 -22,0" fill="#2c1d0f" stroke="#f59f4d" stroke-width="3" /></g>
+    <!-- Short Term (triangle, purple) -->
+    <g transform="translate(-180,95)"><polygon points="0,-22 20,16 -20,16" fill="#181329" stroke="#8b6fff" stroke-width="3" /></g>
+    <g transform="translate(-55,95)"><polygon points="0,-22 20,16 -20,16" fill="#181329" stroke="#8b6fff" stroke-width="3" /></g>
+    <g transform="translate(55,95)"><polygon points="0,-22 20,16 -20,16" fill="#181329" stroke="#8b6fff" stroke-width="3" /></g>
+    <g transform="translate(180,95)"><polygon points="0,-22 20,16 -20,16" fill="#181329" stroke="#8b6fff" stroke-width="3" /></g>
+    <!-- Immediate (circle, red) -->
+    <g transform="translate(-180,180)"><circle r="18" fill="#301515" stroke="#ef6a6a" stroke-width="3" /></g>
+    <g transform="translate(-55,180)"><circle r="18" fill="#301515" stroke="#ef6a6a" stroke-width="3" /></g>
+    <g transform="translate(55,180)"><circle r="18" fill="#301515" stroke="#ef6a6a" stroke-width="3" /></g>
+    <g transform="translate(180,180)"><circle r="18" fill="#301515" stroke="#ef6a6a" stroke-width="3" /></g>
+  </g>
+</svg>
