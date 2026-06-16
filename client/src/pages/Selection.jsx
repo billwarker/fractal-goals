@@ -117,8 +117,8 @@ function Selection() {
         }
         try {
             await createFractalMutation.mutateAsync(data);
-        } catch (err) {
-            console.error('Failed to create fractal:', err);
+        } catch {
+            // React Query invokes onError above; keep expected failures out of stderr.
         }
     };
 
@@ -131,8 +131,8 @@ function Selection() {
         if (!fractalToDelete) return;
         try {
             await deleteFractalMutation.mutateAsync(fractalToDelete.id);
-        } catch (err) {
-            console.error('Failed to delete fractal:', err);
+        } catch {
+            // React Query invokes onError above; keep expected failures out of stderr.
         }
     };
 

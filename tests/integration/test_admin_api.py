@@ -465,7 +465,6 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     assert public_example['tree']['level']['icon'] == 'star'
     assert public_example['tree']['attributes']['level']['color'] == '#66d9ef'
     assert 'owner_id' not in public_example['tree']['attributes']
-    assert public_example['tree']['attributes']['associated_activity_ids'] == []
     assert public_payload['published_at']
 
     # The published snapshot is self-contained: each goal embeds its activities,
@@ -474,6 +473,9 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     assert isinstance(root_attributes['associated_activities'], list)
     assert isinstance(root_attributes['timeline_events'], list)
     assert isinstance(root_attributes['notes'], list)
+    assert [a['name'] for a in root_attributes['associated_activities']] == ['Public Demo Activity']
+    assert root_attributes['associated_activities'][0]['has_direct_association'] is False
+    assert root_attributes['associated_activities'][0]['inherited_from_children'] is True
     child_attributes = public_example['tree']['children'][0]['attributes']
     assert isinstance(child_attributes['associated_activities'], list)
     assert isinstance(child_attributes['timeline_events'], list)
@@ -509,8 +511,8 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     assert [view['name'] for view in public_example['analytics_views']] == ['Public Demo Analytics View']
 
     # Snapshot carries a schema version for forward-safe shape evolution.
-    assert public_example['schema_version'] == 7
-    assert public_payload['schema_version'] == 7
+    assert public_example['schema_version'] == 8
+    assert public_payload['schema_version'] == 8
 
     # Without admin curation, the showcase key is still present with stable
     # null/empty defaults so the frontend never branches on key existence.
@@ -530,7 +532,7 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     cache = db_session.get(AppSetting, 'landing_example_cache')
     assert cache is not None
     assert cache.value['examples'][0]['root_id'] == admin_landing_fractal.id
-    assert cache.value['schema_version'] == 7
+    assert cache.value['schema_version'] == 8
 
 
 @pytest.mark.integration
@@ -835,7 +837,7 @@ def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, a
     static_publish = publish()
     assert static_publish['static_snapshot'] == 'ok'
     static_payload = json.loads(static_snapshot_path.read_text())
-    assert static_payload['schema_version'] == 7
+    assert static_payload['schema_version'] == 8
     assert static_payload['published_at'] == static_publish['published_at']
     assert static_payload['examples'][0]['root_id'] == admin_landing_fractal.id
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_PATH', '')

@@ -67,6 +67,7 @@ from services.goal_loading import load_fractal_goals_for_serialization
 from services.goal_timeline_service import GoalTimelineService
 from services.goal_type_utils import get_canonical_goal_type
 from services.note_service import NoteService
+from services.activity_association_service import ActivityAssociationService
 from services.programs import ProgramService
 from services.serializers import (
     calculate_smart_status,
@@ -86,7 +87,7 @@ LANDING_EXAMPLE_SETTINGS_KEY = "landing_example_settings"
 LANDING_EXAMPLE_CACHE_KEY = "landing_example_cache"
 # Bump when the published landing snapshot shape changes so the frontend / future
 # migrations can detect and handle stale caches.
-LANDING_EXAMPLE_SCHEMA_VERSION = 7
+LANDING_EXAMPLE_SCHEMA_VERSION = 8
 # Match the production goal timeline's first-page depth so the landing modal
 # keeps feature parity while the payload stays lean through field compaction.
 LANDING_EXAMPLE_TIMELINE_LIMIT = 50
@@ -841,12 +842,31 @@ class AdminService:
         """
         timeline_service = GoalTimelineService(self.db_session)
         note_service = NoteService(self.db_session)
+        activity_association_service = ActivityAssociationService(self.db_session)
         owner_id = root.owner_id
 
         def visit(node: JsonDict) -> None:
             attributes = node.get("attributes") or {}
             goal_id = attributes.get("id") or node.get("id")
             if goal_id:
+                activities, activities_error, _ = activity_association_service.get_goal_activities(root.id, goal_id, owner_id)
+                if activities_error is None and isinstance(activities, list):
+                    attributes["associated_activities"] = activities
+                    attributes["associated_activity_ids"] = [
+                        activity.get("id")
+                        for activity in activities
+                        if activity.get("id")
+                    ]
+
+                groups, groups_error, _ = activity_association_service.get_goal_activity_groups(root.id, goal_id, owner_id)
+                if groups_error is None and isinstance(groups, list):
+                    attributes["associated_activity_groups"] = groups
+                    attributes["associated_activity_group_ids"] = [
+                        group.get("id")
+                        for group in groups
+                        if group.get("id")
+                    ]
+
                 timeline_result, timeline_error, _ = timeline_service.get_goal_timeline(
                     root.id,
                     goal_id,

@@ -948,6 +948,8 @@ function Landing() {
                                                             goal={selectedGoal}
                                                             rootId={selectedExample.id}
                                                             treeData={selectedExample.tree}
+                                                            activityDefinitions={selectedExample.activityDefinitions}
+                                                            activityGroups={selectedExample.activityGroups}
                                                             displayMode="panel"
                                                             readOnly
                                                             onGoalSelect={handleGoalSelect}
@@ -971,6 +973,8 @@ function Landing() {
                                 goal={selectedGoal}
                                 rootId={selectedExample.id}
                                 treeData={selectedExample.tree}
+                                activityDefinitions={selectedExample.activityDefinitions}
+                                activityGroups={selectedExample.activityGroups}
                                 displayMode="modal"
                                 readOnly
                                 onGoalSelect={handleGoalSelect}

@@ -10,6 +10,7 @@ const ActivityGroupContainer = ({
     onToggleCollapse,
     onUnlinkGroup,
     renderActivityCard,
+    readOnly = false,
 }) => {
     const children = group.children || [];
     const groupActivities = group.activities || [];
@@ -33,17 +34,19 @@ const ActivityGroupContainer = ({
                     {isLinked && (
                         <>
                             <span className={styles.groupBadge}>Linked</span>
-                            <button
-                                type="button"
-                                className={styles.groupUnlinkBtn}
-                                onClick={(event) => {
-                                    event.stopPropagation();
-                                    onUnlinkGroup(group);
-                                }}
-                                title={`Unlink group "${group.name}"`}
-                            >
-                                Unlink
-                            </button>
+                            {!readOnly && (
+                                <button
+                                    type="button"
+                                    className={styles.groupUnlinkBtn}
+                                    onClick={(event) => {
+                                        event.stopPropagation();
+                                        onUnlinkGroup(group);
+                                    }}
+                                    title={`Unlink group "${group.name}"`}
+                                >
+                                    Unlink
+                                </button>
+                            )}
                         </>
                     )}
                 </div>
@@ -63,6 +66,7 @@ const ActivityGroupContainer = ({
                                     onToggleCollapse={onToggleCollapse}
                                     onUnlinkGroup={onUnlinkGroup}
                                     renderActivityCard={renderActivityCard}
+                                    readOnly={readOnly}
                                 />
                             ))}
                         </div>

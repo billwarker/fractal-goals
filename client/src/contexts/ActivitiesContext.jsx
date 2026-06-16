@@ -222,4 +222,8 @@ export function useActivities() {
     return context;
 }
 
+export function useOptionalActivities() {
+    return useContext(ActivitiesContext);
+}
+
 export default ActivitiesContext;

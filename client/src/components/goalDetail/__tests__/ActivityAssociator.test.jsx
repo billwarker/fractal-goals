@@ -13,6 +13,10 @@ vi.mock('../../../contexts/ActivitiesContext', () => ({
         createActivityGroup: (...args) => createActivityGroup(...args),
         setActivityGroupGoals: (...args) => setActivityGroupGoals(...args),
     }),
+    useOptionalActivities: () => ({
+        createActivityGroup: (...args) => createActivityGroup(...args),
+        setActivityGroupGoals: (...args) => setActivityGroupGoals(...args),
+    }),
 }));
 
 vi.mock('../../../hooks/useGoalQueries', () => ({

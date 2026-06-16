@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useActivities } from '../../contexts/ActivitiesContext';
+import { useOptionalActivities } from '../../contexts/ActivitiesContext';
 import { useGoalAssociations } from '../../hooks/useGoalQueries';
 import { fractalApi } from '../../utils/api';
 import { sortGroupsTreeOrder } from '../../utils/manageActivities';
@@ -72,8 +72,11 @@ const ActivityAssociator = ({
     onCopyActivity,
     isTargetSelectionMode = false,
     onSelectTargetActivity,
+    readOnly = false,
 }) => {
-    const { createActivityGroup, setActivityGroupGoals } = useActivities();
+    const activityActions = useOptionalActivities();
+    const createActivityGroup = activityActions?.createActivityGroup;
+    const setActivityGroupGoals = activityActions?.setActivityGroupGoals;
 
     // STATE
     const [isDiscoveryActive, setIsDiscoveryActive] = useState(false);
@@ -328,6 +331,9 @@ const ActivityAssociator = ({
             notify.error('Please enter a group name');
             return;
         }
+        if (readOnly || !createActivityGroup) {
+            return;
+        }
         setIsCreatingGroup(true);
         try {
             const trimmedName = newGroupName.trim();
@@ -382,7 +388,7 @@ const ActivityAssociator = ({
     };
 
     const handleInheritFromParentChange = async (checked) => {
-        if (!setInheritParentActivities) {
+        if (readOnly || !setInheritParentActivities) {
             return;
         }
 
@@ -534,6 +540,7 @@ const ActivityAssociator = ({
             renderMetricIndicators={renderMetricIndicators}
             isSelectable={isTargetSelectionMode}
             onSelect={onSelectTargetActivity}
+            readOnly={readOnly}
         />
     );
 
@@ -549,7 +556,7 @@ const ActivityAssociator = ({
             }}
         >
             <Modal
-                isOpen={!!pendingActivityRemoval}
+                isOpen={!readOnly && !!pendingActivityRemoval}
                 onClose={() => setPendingActivityRemoval(null)}
                 title="Remove Activity?"
                 size="sm"
@@ -582,7 +589,7 @@ const ActivityAssociator = ({
                             </span>
                         )}
                     </div>
-                    {onOpenSelector && (
+                    {!readOnly && onOpenSelector && (
                         <button
                             onClick={onOpenSelector}
                             className={styles.inlineAssociateBtn}
@@ -644,6 +651,7 @@ const ActivityAssociator = ({
                                             checked={inheritParentActivities}
                                             onChange={(e) => handleInheritFromParentChange(e.target.checked)}
                                             className={styles.inheritCheckboxInput}
+                                            disabled={readOnly}
                                         />
                                     </label>
                                 )}
@@ -655,7 +663,7 @@ const ActivityAssociator = ({
             )}
 
             {/* ============ DISCOVERY AREA (selector mode only) ============ */}
-            {isSelectorMode && isDiscoveryActive && (
+            {isSelectorMode && isDiscoveryActive && !readOnly && (
                 <div className={styles.discoveryWrapper}>
                     <ActivityPicker
                         activities={availableActivityDefinitions}
@@ -711,6 +719,7 @@ const ActivityAssociator = ({
                                 onToggleCollapse={toggleGroupCollapse}
                                 onUnlinkGroup={handleUnlinkGroup}
                                 renderActivityCard={renderActivityCard}
+                                readOnly={readOnly}
                             />
                         ))}
 
@@ -725,13 +734,15 @@ const ActivityAssociator = ({
                     </div>
                 ) : (
                     <div className={styles.emptyState}>
-                        No activities associated yet. Click below to browse and add activities.
-                    </div>
-                )
+                                {readOnly
+                                    ? 'No activities are associated with this goal.'
+                                    : 'No activities associated yet. Click below to browse and add activities.'}
+                            </div>
+                        )
             )}
 
             {/* ============ ASSOCIATE BUTTON (selector mode only) ============ */}
-            {isSelectorMode && !isDiscoveryActive && !useFooterAssociateAction && (
+            {isSelectorMode && !isDiscoveryActive && !useFooterAssociateAction && !readOnly && (
                 <div className={styles.associateActions}>
                     <button
                         type="button"

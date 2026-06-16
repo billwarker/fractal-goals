@@ -5,9 +5,10 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import landingContent from '../../content/landingContent';
 import Landing from '../Landing';
 
-const { createBetaSignup, getLandingExamples } = vi.hoisted(() => ({
+const { createBetaSignup, getLandingExamples, connectedGoalDetailModalMock } = vi.hoisted(() => ({
     createBetaSignup: vi.fn(),
     getLandingExamples: vi.fn(),
+    connectedGoalDetailModalMock: vi.fn(),
 }));
 
 vi.mock('../../utils/api', () => ({
@@ -136,14 +137,18 @@ vi.mock('../../components/analytics/AnalyticsFiltersSidebar', () => ({
 }));
 
 vi.mock('../../components/ConnectedGoalDetailModal', () => ({
-    default: ({ goal, readOnly, displayMode, onClose }) => (
-        <aside aria-label={`${goal.name} details`}>
-            <h3>{goal.name}</h3>
-            <span>{readOnly ? 'Read only' : 'Editable'}</span>
-            <span>{displayMode}</span>
-            <button type="button" onClick={onClose} aria-label="Close goal details">Close</button>
-        </aside>
-    ),
+    default: (props) => {
+        connectedGoalDetailModalMock(props);
+        const { goal, readOnly, displayMode, onClose } = props;
+        return (
+            <aside aria-label={`${goal.name} details`}>
+                <h3>{goal.name}</h3>
+                <span>{readOnly ? 'Read only' : 'Editable'}</span>
+                <span>{displayMode}</span>
+                <button type="button" onClick={onClose} aria-label="Close goal details">Close</button>
+            </aside>
+        );
+    },
 }));
 
 const publishedExamples = {
@@ -176,9 +181,10 @@ const publishedExamples = {
             activity_definitions: [{
                 id: 'activity-1',
                 name: 'CAGED Triads',
+                group_id: 'group-1',
                 metric_definitions: [{ id: 'metric-1', name: 'Reps', unit: 'count' }],
             }],
-            activity_groups: [],
+            activity_groups: [{ id: 'group-1', name: 'Technique', parent_id: null, sort_order: 0 }],
             analytics_views: [{
                 id: 'view-1',
                 name: 'Session Duration Trend',
@@ -378,6 +384,10 @@ describe('Landing', () => {
         expect(screen.getByRole('heading', { name: 'Build complete musicianship' })).toBeInTheDocument();
         expect(screen.getByText('Read only')).toBeInTheDocument();
         expect(screen.getByText('panel')).toBeInTheDocument();
+        expect(connectedGoalDetailModalMock).toHaveBeenLastCalledWith(expect.objectContaining({
+            activityDefinitions: expect.arrayContaining([expect.objectContaining({ id: 'activity-1', name: 'CAGED Triads' })]),
+            activityGroups: expect.arrayContaining([expect.objectContaining({ id: 'group-1', name: 'Technique' })]),
+        }));
         fireEvent.click(screen.getByRole('button', { name: 'Close goal details' }));
         expect(screen.queryByLabelText('Build complete musicianship details')).not.toBeInTheDocument();
 

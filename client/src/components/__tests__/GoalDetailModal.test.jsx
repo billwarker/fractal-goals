@@ -138,6 +138,8 @@ vi.mock('../goalDetail/ActivityAssociator', async () => {
         isTargetSelectionMode,
         onSelectTargetActivity,
         activityGroups,
+        associatedActivities,
+        readOnly,
     }) {
         const [isDiscoveryActive, setIsDiscoveryActive] = ReactModule.useState(false);
 
@@ -181,6 +183,10 @@ vi.mock('../goalDetail/ActivityAssociator', async () => {
             'div',
             null,
             ReactModule.createElement('div', null, 'goal activities view'),
+            ReactModule.createElement('div', null, readOnly ? 'read-only associator' : 'editable associator'),
+            ...(associatedActivities || []).map((activity) => (
+                ReactModule.createElement('div', { key: activity.id }, activity.name)
+            )),
             ReactModule.createElement('div', null, `activity groups:${activityGroups.length}`),
             isDiscoveryActive
                 ? ReactModule.createElement(
@@ -665,6 +671,7 @@ describe('GoalDetailModal smoke coverage', () => {
                 }}
                 rootId="root-1"
                 treeData={[]}
+                activityGroups={[{ id: 'group-1', name: 'Reading', parent_id: null }]}
             />
         );
 
@@ -681,7 +688,10 @@ describe('GoalDetailModal smoke coverage', () => {
         // The Activities tab renders the snapshot activities read-only (no remove control).
         fireEvent.click(screen.getByRole('tab', { name: 'Activities' }));
         await waitFor(() => {
+            expect(screen.getByText('goal activities view')).toBeInTheDocument();
+            expect(screen.getByText('read-only associator')).toBeInTheDocument();
             expect(screen.getByText('Sight reading drill')).toBeInTheDocument();
+            expect(screen.getByText('activity groups:1')).toBeInTheDocument();
             expect(screen.queryByText('+ Associate Activities')).not.toBeInTheDocument();
         }, { timeout: 5000 });
     });

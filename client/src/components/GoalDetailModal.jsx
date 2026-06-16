@@ -39,7 +39,6 @@ const GenericGraphModal = lazyWithRetry(() => import('./analytics/GenericGraphMo
 const GoalOptionsView = lazyWithRetry(() => import('./goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./goalDetail/GoalNotesView'), 'components/goalDetail/GoalNotesView');
 const GoalTimelineView = lazyWithRetry(() => import('./goalDetail/GoalTimelineView'), 'components/goalDetail/GoalTimelineView');
-const ReadOnlyActivitiesView = lazyWithRetry(() => import('./goalDetail/ReadOnlyActivitiesView'), 'components/goalDetail/ReadOnlyActivitiesView');
 
 /**
  * GoalDetailModal Component
@@ -273,6 +272,23 @@ function GoalDetailModal({
         fetchedGroups,
         onAssociationsChanged,
     });
+    const readOnlyAssociatedActivityGroups = useMemo(() => {
+        if (!readOnly) return null;
+        if (Array.isArray(goal?.attributes?.associated_activity_groups)) {
+            return goal.attributes.associated_activity_groups;
+        }
+        const ids = Array.isArray(goal?.attributes?.associated_activity_group_ids)
+            ? goal.attributes.associated_activity_group_ids
+            : [];
+        if (ids.length === 0) return [];
+        const groupsById = new Map((activityGroups || []).map((group) => [group.id, group]));
+        return ids.map((id) => groupsById.get(id) || { id, name: 'Linked group' });
+    }, [
+        activityGroups,
+        goal?.attributes?.associated_activity_group_ids,
+        goal?.attributes?.associated_activity_groups,
+        readOnly,
+    ]);
 
     const handleSave = async () => {
         if (!validateForm()) {
@@ -902,7 +918,25 @@ function GoalDetailModal({
     } else if (viewState === 'goal-activities' && readOnly) {
         content = (
             <Suspense fallback={null}>
-                <ReadOnlyActivitiesView activities={readOnlyAssociatedActivities || []} />
+                <ActivityAssociator
+                    associatedActivities={readOnlyAssociatedActivities || []}
+                    setAssociatedActivities={() => {}}
+                    associatedActivityGroups={readOnlyAssociatedActivityGroups || []}
+                    setAssociatedActivityGroups={() => {}}
+                    activityDefinitions={activityDefinitions}
+                    activityGroups={activityGroups}
+                    setActivityGroups={() => {}}
+                    rootId={rootId}
+                    goalId={goalId}
+                    parentGoalId={goal?.attributes?.parent_id || goal?.parent_id}
+                    goalName={name}
+                    setTargets={() => {}}
+                    targets={targets}
+                    embedded
+                    readOnly
+                    inheritParentActivities={inheritParentActivities}
+                    dividerColor={displayGoalColor}
+                />
             </Suspense>
         );
     } else if (viewState === 'goal-activities') {

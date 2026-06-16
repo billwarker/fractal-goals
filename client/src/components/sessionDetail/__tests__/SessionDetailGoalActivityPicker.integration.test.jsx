@@ -3,11 +3,14 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import SessionDetailModals from '../SessionDetailModals';
 
+const activityActions = {
+    createActivityGroup: vi.fn(),
+    setActivityGroupGoals: vi.fn(),
+};
+
 vi.mock('../../../contexts/ActivitiesContext', () => ({
-    useActivities: () => ({
-        createActivityGroup: vi.fn(),
-        setActivityGroupGoals: vi.fn(),
-    }),
+    useActivities: () => activityActions,
+    useOptionalActivities: () => activityActions,
 }));
 
 vi.mock('../../../hooks/useGoalQueries', () => ({
