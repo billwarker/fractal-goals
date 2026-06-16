@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import ProgramBlockView from '../programs/ProgramBlockView';
 import ProgramCalendarView from '../programs/ProgramCalendarView';
 import ProgramSidebar from '../programs/ProgramSidebar';
@@ -79,10 +79,13 @@ export default function LandingFeaturePrograms({ example, program, windowStart, 
     const initialDate = windowStart
         || calendarEvents.find((event) => event.start)?.start
         || new Date();
-    const getGoalDetails = (goalId) => goals.find((goal) => String(goal.id) === String(goalId)) || null;
+    const getGoalDetails = useCallback(
+        (goalId) => goals.find((goal) => String(goal.id) === String(goalId)) || null,
+        [goals]
+    );
     const sidePaneData = useMemo(() => (
         buildProgramSidePaneData({ program, goals, getGoalDetails })
-    ), [goals, program]);
+    ), [getGoalDetails, goals, program]);
     const focusedBlock = findBlockForDate(program, initialDate) || sidePaneData.activeBlock;
     const programColor = getProgramColor(program);
     const sortedBlocks = useMemo(() => sortProgramBlocks(program?.blocks || []), [program?.blocks]);

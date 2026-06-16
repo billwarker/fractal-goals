@@ -372,6 +372,7 @@ describe('Landing', () => {
         expect(screen.getAllByText('Become a skilled guitar player').length).toBeGreaterThan(0);
         expect(screen.getAllByText('Practice CAGED triads').length).toBeGreaterThan(0);
 
+        fireEvent.pointerDown(screen.getByLabelText('Become a skilled guitar player goal tree'));
         fireEvent.click(screen.getByRole('button', { name: 'Open mocked goal' }));
         expect(await screen.findByLabelText('Build complete musicianship details')).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Build complete musicianship' })).toBeInTheDocument();
@@ -408,6 +409,7 @@ describe('Landing', () => {
         expect(tree).toHaveAttribute('data-selected-node-id', '');
         const initialScopeKey = tree.getAttribute('data-scope-transition-key');
 
+        fireEvent.pointerDown(screen.getByLabelText('Become a skilled guitar player goal tree'));
         fireEvent.click(screen.getByRole('button', { name: 'Open mocked goal' }));
 
         await waitFor(() => {
@@ -450,9 +452,13 @@ describe('Landing', () => {
         await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         const tree = await screen.findByTestId('flow-tree-demo');
 
-        // The full FlowTreeOptionsPane widget renders (tree/hierarchy toggle + checkboxes).
+        // The FlowTreeOptionsPane starts collapsed while keeping the view toggle available.
         expect(screen.getByRole('button', { name: 'Tree' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Hierarchy' })).toBeInTheDocument();
+        expect(screen.queryByLabelText('Fade inactive branches')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Hide inactive goals')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Expand tree view options' }));
         expect(screen.getByLabelText('Fade inactive branches')).toBeInTheDocument();
         expect(screen.getByLabelText('Hide inactive goals')).toBeInTheDocument();
         expect(screen.getByLabelText('Hide completed goals')).toBeInTheDocument();
@@ -464,11 +470,9 @@ describe('Landing', () => {
         expect(tree).toHaveAttribute('data-has-metrics', 'yes');
         expect(tree).toHaveAttribute('data-program-count', '1');
 
-        // Switching to hierarchy view re-renders the tree in hierarchy layout.
+        // Switching to hierarchy view updates the existing tree immediately.
         fireEvent.click(screen.getByRole('button', { name: 'Hierarchy' }));
-        await waitFor(() => {
-            expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-layout-mode', 'hierarchy');
-        });
+        expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-layout-mode', 'hierarchy');
     });
 
     it('renders the features section with sidebar controls and read-only surfaces', async () => {
@@ -603,6 +607,7 @@ describe('Landing', () => {
 
         await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         await screen.findByTestId('flow-tree-demo');
+        fireEvent.pointerDown(screen.getByLabelText('Become a skilled guitar player goal tree'));
         fireEvent.click(screen.getByRole('button', { name: 'Open mocked goal' }));
 
         await screen.findByLabelText('Build complete musicianship details');
@@ -767,16 +772,39 @@ describe('Landing', () => {
         const flowTree = await screen.findByTestId('flow-tree-demo');
         expect(flowTree).toHaveAttribute('data-interaction-locked', 'yes');
         expect(document.querySelector('[data-interaction-locked="true"]')).toBeInTheDocument();
+        expect(screen.getByText('Click the graph to unlock panning and zooming.')).toBeInTheDocument();
 
-        fireEvent.pointerDown(screen.getByLabelText('Become a skilled guitar player goal tree'));
+        const hierarchyButton = screen.getByRole('button', { name: 'Hierarchy' });
+        fireEvent.pointerDown(hierarchyButton);
+        fireEvent.click(hierarchyButton);
         expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-interaction-locked', 'no');
-        expect(document.querySelector('[data-interaction-locked="false"]')).toBeInTheDocument();
+        expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-layout-mode', 'hierarchy');
+        expect(screen.getByText('Unlocked. Explore the tree.')).toBeInTheDocument();
+
+        fireEvent.keyDown(screen.getByLabelText('Become a skilled guitar player goal tree'), { key: 'Escape' });
+        expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-interaction-locked', 'yes');
+        expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-selected-node-id', '');
+
+        vi.useFakeTimers();
+        try {
+            fireEvent.pointerDown(screen.getByLabelText('Become a skilled guitar player goal tree'));
+            expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-interaction-locked', 'no');
+            expect(document.querySelector('[data-interaction-locked="false"]')).toBeInTheDocument();
+            expect(screen.getByText('Unlocked. Explore the tree.')).toBeInTheDocument();
+            act(() => {
+                vi.advanceTimersByTime(1500);
+            });
+            expect(screen.queryByText('Unlocked. Explore the tree.')).not.toBeInTheDocument();
+        } finally {
+            vi.useRealTimers();
+        }
 
         const observer = intersectionObservers.at(-1);
         act(() => {
             observer.callback([{ target: document.getElementById('features'), isIntersecting: true }]);
         });
         expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-interaction-locked', 'yes');
+        expect(screen.getByText('Click the graph to unlock panning and zooming.')).toBeInTheDocument();
     });
 
     it('shows the example icon rail past the hero and flips examples in place', async () => {
@@ -817,7 +845,7 @@ describe('Landing', () => {
         expect(screen.queryByRole('navigation', { name: 'Example fractals' })).not.toBeInTheDocument();
     });
 
-    it('scrolls back to the goals view when a lineage goal is clicked in the Activity feature', async () => {
+    it('keeps users in the Activity feature when the goal selector preview is clicked', async () => {
         const linkedExamples = JSON.parse(JSON.stringify(publishedExamples));
         linkedExamples.examples[0].activity_definitions[0].associated_goal_ids = ['guitar-caged'];
         getLandingExamples.mockResolvedValue({ data: linkedExamples });
@@ -829,7 +857,7 @@ describe('Landing', () => {
         scrollIntoViewCalls.length = 0;
 
         fireEvent.click(screen.getByText('Map the fretboard'));
-        expect(scrollIntoViewCalls.at(-1).element.id).toBe('examples');
+        expect(scrollIntoViewCalls).toHaveLength(0);
     });
 
     it('keeps the sample explorer and showcase visible when no examples are published', async () => {
