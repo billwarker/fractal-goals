@@ -1,6 +1,6 @@
 # Fractal Goals Landing Content
 
-Edit this file to change the public `/landing` messaging without touching React markup.
+Edit this file to change the public landing page messaging without touching React markup.
 
 ## SEO
 

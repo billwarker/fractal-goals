@@ -31,9 +31,9 @@ import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 import { usePageTitle } from './hooks/usePageTitle';
 import { dismissGoalDetailsForNavigation } from './utils/navigationEvents';
 import { useGoalLevels } from './contexts/GoalLevelsContext';
-import { isPublicMarketingHost } from './utils/marketingHost';
+import { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } from './utils/marketingHost';
 
-export { isPublicMarketingHost } from './utils/marketingHost';
+export { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } from './utils/marketingHost';
 
 // Navigation header component defined outside of App to avoid re-declaration
 const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
@@ -240,12 +240,15 @@ function App() {
     const adminParams = new URLSearchParams(location.search);
     const adminMode = adminParams.get('admin_mode');
     const adminUserId = adminParams.get('admin_user_id');
-    const showLandingPage = location.pathname === '/landing' || (location.pathname === '/' && isPublicMarketingHost());
+    const redirectDeprecatedLandingRoute = location.pathname === '/landing' || (
+        location.pathname === LANDING_PREVIEW_PATH && !isLandingPreviewPath(location.pathname)
+    );
+    const showLandingPage = isLandingPreviewPath(location.pathname) || (location.pathname === '/' && isPublicMarketingHost());
     const showSelectionPage = location.pathname === '/' && !showLandingPage;
 
     // Determine page title based on path
     const getPageTitle = (pathname) => {
-        if (pathname === '/landing' || (pathname === '/' && showLandingPage)) return 'Private Beta';
+        if (showLandingPage || redirectDeprecatedLandingRoute) return 'Private Beta';
         if (pathname === '/') return 'Selection';
         if (pathname === '/admin') return 'Admin';
         if (pathname.includes('/goals')) return 'Goals';
@@ -336,7 +339,7 @@ function App() {
     return (
         <HeaderProvider>
             <div className="app-container">
-                {!showSelectionPage && !showLandingPage && location.pathname !== '/admin' && (
+                {!showSelectionPage && !showLandingPage && !redirectDeprecatedLandingRoute && location.pathname !== '/admin' && (
                     <NavigationHeader
                         onOpenSettings={() => setIsSettingsOpen(true)}
                         onHeightChange={setNavHeight}
@@ -349,7 +352,9 @@ function App() {
                             Admin {adminMode === 'read_only' ? 'read-only' : 'read-write'} access
                         </div>
                     )}
-                    {showLandingPage ? (
+                    {redirectDeprecatedLandingRoute ? (
+                        <Navigate to="/" replace />
+                    ) : showLandingPage ? (
                         <Landing />
                     ) : showSelectionPage ? (
                         <Selection />

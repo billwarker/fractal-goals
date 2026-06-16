@@ -13,7 +13,7 @@ vi.mock('../api', () => ({
 }));
 
 import { publicApi } from '../api';
-import { isPublicMarketingHost } from '../marketingHost';
+import { getLandingPageHref, isLandingPreviewPath, isPublicMarketingHost } from '../marketingHost';
 import { fetchLandingExamples, maybePrefetchLandingExamples } from '../landingPrefetch';
 
 describe('isPublicMarketingHost', () => {
@@ -29,15 +29,36 @@ describe('isPublicMarketingHost', () => {
     });
 });
 
+describe('landing preview routing helpers', () => {
+    it('allows the preview path only on local development hosts', () => {
+        expect(isLandingPreviewPath('/landing-preview', 'localhost')).toBe(true);
+        expect(isLandingPreviewPath('/landing-preview', '127.0.0.1')).toBe(true);
+        expect(isLandingPreviewPath('/landing-preview', '::1')).toBe(true);
+        expect(isLandingPreviewPath('/landing-preview', 'my.fractalgoals.com')).toBe(false);
+        expect(isLandingPreviewPath('/landing', 'localhost')).toBe(false);
+    });
+
+    it('links admins to local preview in dev and the apex site elsewhere', () => {
+        expect(getLandingPageHref('localhost')).toBe('/landing-preview');
+        expect(getLandingPageHref('my.fractalgoals.com')).toBe('https://fractalgoals.com/');
+    });
+});
+
 describe('maybePrefetchLandingExamples', () => {
     const makeQueryClient = () => ({ prefetchQuery: vi.fn() });
 
-    it('prefetches on /landing regardless of host', () => {
+    it('prefetches on the local preview path', () => {
         const queryClient = makeQueryClient();
-        expect(maybePrefetchLandingExamples(queryClient, '/landing')).toBe(true);
+        expect(maybePrefetchLandingExamples(queryClient, '/landing-preview')).toBe(true);
         expect(queryClient.prefetchQuery).toHaveBeenCalledWith(expect.objectContaining({
             queryKey: ['public', 'landing-examples'],
         }));
+    });
+
+    it('does not prefetch on the deprecated /landing path', () => {
+        const queryClient = makeQueryClient();
+        expect(maybePrefetchLandingExamples(queryClient, '/landing')).toBe(false);
+        expect(queryClient.prefetchQuery).not.toHaveBeenCalled();
     });
 
     it('skips non-landing paths', () => {

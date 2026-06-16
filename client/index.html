@@ -20,7 +20,9 @@
       var host = window.location.hostname;
       var path = window.location.pathname;
       var isMarketingHost = host === 'fractalgoals.com' || host === 'www.fractalgoals.com';
-      if (path !== '/landing' && !(path === '/' && isMarketingHost)) return;
+      var isLocalDevHost = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
+      var isLocalPreviewPath = path === '/landing-preview' && isLocalDevHost;
+      if (!isLocalPreviewPath && !(path === '/' && isMarketingHost)) return;
       var staticUrl = '%VITE_LANDING_EXAMPLES_STATIC_URL%';
       if (!staticUrl || staticUrl.charAt(0) === '%') staticUrl = '';
       window.__fgLandingExamplesStaticUrl = staticUrl;

@@ -1,6 +1,6 @@
 import { queryKeys } from '../hooks/queryKeys';
 import { API_BASE, publicApi } from './api';
-import { isPublicMarketingHost } from './marketingHost';
+import { isLandingPreviewPath, isPublicMarketingHost } from './marketingHost';
 
 export const LANDING_EXAMPLES_STALE_TIME = 5 * 60 * 1000;
 export const LANDING_EXAMPLES_STATIC_URL = import.meta.env.VITE_LANDING_EXAMPLES_STATIC_URL || '';
@@ -55,7 +55,7 @@ export const fetchLandingExamples = async () => {
 };
 
 const isLandingEntryPath = (pathname) =>
-    pathname === '/landing' || (pathname === '/' && isPublicMarketingHost());
+    isLandingPreviewPath(pathname) || (pathname === '/' && isPublicMarketingHost());
 
 // Kick off the landing-examples request at JS boot (before React mounts the
 // landing page) so the example explorer and feature showcase have data as

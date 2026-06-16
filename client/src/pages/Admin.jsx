@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
 import notify from '../utils/notify';
 import { formatError } from '../utils/mutationNotify';
+import { getLandingPageHref } from '../utils/marketingHost';
 import styles from './Admin.module.css';
 
 const ADMIN_USERS_KEY = ['admin', 'users'];
@@ -537,7 +538,7 @@ function LandingExamplesPanel() {
                 <div>
                     <h2>Landing Examples</h2>
                     <p>Choose admin-owned fractals to publish as read-only examples on the public landing page.</p>
-                    <a className={styles.landingExamplesPageLink} href="/landing" target="_blank" rel="noreferrer">
+                    <a className={styles.landingExamplesPageLink} href={getLandingPageHref()} target="_blank" rel="noreferrer">
                         View landing page
                     </a>
                 </div>
