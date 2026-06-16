@@ -152,24 +152,119 @@ stays the single canonical URL.
 
 ### Step 5 — Backend CORS: allow the apex + www origins
 
-The only code/config change. In [`cloudbuild.yaml`](cloudbuild.yaml), the `Deploy Backend` step's `CORS_ORIGINS` currently is:
-
-```
-CORS_ORIGINS=https://my.fractalgoals.com;https://fractal-frontend-195572181270.us-east1.run.app
-```
-
-Add the apex and www origins:
-
-```
-CORS_ORIGINS=https://my.fractalgoals.com;https://fractalgoals.com;https://www.fractalgoals.com;https://fractal-frontend-195572181270.us-east1.run.app
-```
+This is already reflected in [`cloudbuild.yaml`](cloudbuild.yaml): the backend
+`Deploy Backend` step allows `https://fractalgoals.com`,
+`https://www.fractalgoals.com`, `https://my.fractalgoals.com`, and the
+frontend run.app origin.
 
 Notes:
 - The public landing API (`/api/public/landing-examples`) and beta-signup POST (`/api/public/beta-signups`) are reached **same-origin** through the frontend Nginx `/api/` proxy, so in the normal path CORS is not even exercised for the landing page. Adding these origins is correct hardening and covers any direct cross-origin call.
-- `LANDING_CACHE_WARM_URL` is already `https://www.fractalgoals.com/...`. Since `www` will now 301 to apex, the warm call may follow a redirect. **Optional:** retarget it to `https://fractalgoals.com/api/public/landing-examples` so the publish cache-warm hits the canonical host directly without a redirect hop. (Low priority; warm is best-effort and never blocks publish.)
+- `LANDING_CACHE_WARM_URL` is already retargeted to `https://fractalgoals.com/api/public/landing-examples`, so the publish cache-warm hits the canonical host directly without a `www` redirect hop.
 - This requires a redeploy of the backend (next Cloud Build run) to take effect. No frontend rebuild is required — the frontend image already contains the marketing-host logic.
 
-### Step 6 — (Optional, recommended) Update index.md note
+### Step 6 — GCS static landing snapshot setup
+
+The app can publish the landing examples snapshot to GCS at the same time it
+updates `app_settings.landing_example_cache`. The database cache remains the
+source of truth; the GCS object is a fast static read path consumed by the
+inline preload and `landingPrefetch.js`.
+
+Recommended production shape:
+
+- Bucket: one public-read bucket dedicated to the landing snapshot, for example
+  `fractal-goals-landing-public`.
+- Object: `landing-examples.json`.
+- Frontend build-time URL:
+  `https://storage.googleapis.com/fractal-goals-landing-public/landing-examples.json`.
+- Backend runtime writer:
+  `LANDING_EXAMPLES_STATIC_GCS_BUCKET=fractal-goals-landing-public` and
+  `LANDING_EXAMPLES_STATIC_GCS_BLOB=landing-examples.json`.
+- The Cloud Run backend service account
+  `fractal-runtime@fractal-goals.iam.gserviceaccount.com` needs write access to
+  that bucket; public users only need read access to the object/bucket.
+
+One-time GCS setup:
+
+```bash
+PROJECT_ID=fractal-goals
+REGION=us-east1
+BUCKET=fractal-goals-landing-public
+RUNTIME_SA=fractal-runtime@fractal-goals.iam.gserviceaccount.com
+
+gcloud storage buckets create gs://$BUCKET \
+  --project=$PROJECT_ID \
+  --location=$REGION \
+  --uniform-bucket-level-access
+
+gcloud storage buckets add-iam-policy-binding gs://$BUCKET \
+  --member=serviceAccount:$RUNTIME_SA \
+  --role=roles/storage.objectAdmin
+
+gcloud storage buckets add-iam-policy-binding gs://$BUCKET \
+  --member=allUsers \
+  --role=roles/storage.objectViewer
+```
+
+Optional but recommended CORS policy for direct browser fetches from the static
+URL:
+
+```bash
+cat > /tmp/fractal-landing-gcs-cors.json <<'JSON'
+[
+  {
+    "origin": ["https://fractalgoals.com", "https://www.fractalgoals.com"],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type", "Cache-Control"],
+    "maxAgeSeconds": 300
+  }
+]
+JSON
+
+gcloud storage buckets update gs://$BUCKET \
+  --cors-file=/tmp/fractal-landing-gcs-cors.json
+```
+
+Cloud Build trigger substitutions for production:
+
+```text
+_LANDING_EXAMPLES_STATIC_GCS_BUCKET=fractal-goals-landing-public
+_LANDING_EXAMPLES_STATIC_GCS_BLOB=landing-examples.json
+_LANDING_EXAMPLES_STATIC_URL=https://storage.googleapis.com/fractal-goals-landing-public/landing-examples.json
+```
+
+Deploy order:
+
+1. Create/configure the bucket and IAM above.
+2. Set the three Cloud Build substitutions.
+3. Run Cloud Build so the frontend image bakes in
+   `VITE_LANDING_EXAMPLES_STATIC_URL` and the backend deploy receives the GCS
+   writer env vars.
+4. In Admin → Landing, click **Publish**. The publish response should report
+   `static_snapshot: "ok"` and `cache_warm: "ok"` or `"skipped"`/`"failed"`
+   depending on cache warm reachability.
+
+Verification:
+
+```bash
+curl -sS -D - -o /dev/null \
+  https://storage.googleapis.com/fractal-goals-landing-public/landing-examples.json
+
+curl -sS \
+  https://storage.googleapis.com/fractal-goals-landing-public/landing-examples.json \
+  | jq '{schema_version, example_count: (.examples | length), published_at}'
+
+curl -sS https://fractalgoals.com/ \
+  | grep -o 'https://storage.googleapis.com/fractal-goals-landing-public/landing-examples.json'
+```
+
+Browser verification:
+
+- Open DevTools → Network on `https://fractalgoals.com/`.
+- Confirm the first landing snapshot request is the GCS URL, not the API.
+- Temporarily block the GCS URL or make it 404 in a local test and confirm the
+  landing page falls back to `/api/public/landing-examples`.
+
+### Step 7 — (Optional, recommended) Update index.md note
 
 After verification, the `index.md` line describing routing is already accurate (it states the root serves the landing page on apex/www). No change needed unless the canonical/redirect detail is worth recording. Skip unless you want it documented.
 

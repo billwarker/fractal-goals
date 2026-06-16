@@ -480,6 +480,12 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     assert isinstance(child_attributes['notes'], list)
     # The child goal's associated activity and note are embedded in the snapshot.
     assert [a['name'] for a in child_attributes['associated_activities']] == ['Public Demo Activity']
+    assert 'associated_goals' not in child_attributes['associated_activities'][0]
+    assert 'split_definitions' not in child_attributes['associated_activities'][0]
+    assert 'created_at' not in child_attributes['associated_activities'][0]
+    for event in child_attributes['timeline_events']:
+        assert 'root_id' not in (event.get('payload') or {})
+        assert 'updated_at' not in (event.get('payload') or {})
     assert child_attributes['associated_activity_ids']
     assert any(note.get('content') == 'Public-safe demo note' for note in child_attributes['notes'])
 

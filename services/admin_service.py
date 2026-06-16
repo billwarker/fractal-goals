@@ -87,7 +87,8 @@ LANDING_EXAMPLE_CACHE_KEY = "landing_example_cache"
 # Bump when the published landing snapshot shape changes so the frontend / future
 # migrations can detect and handle stale caches.
 LANDING_EXAMPLE_SCHEMA_VERSION = 7
-# Bound the per-goal timeline/notes we embed so the public cache stays small.
+# Match the production goal timeline's first-page depth so the landing modal
+# keeps feature parity while the payload stays lean through field compaction.
 LANDING_EXAMPLE_TIMELINE_LIMIT = 50
 LANDING_EXAMPLE_NOTES_LIMIT = 30
 LANDING_EXAMPLE_SESSIONS_LIMIT = 4
@@ -598,6 +599,121 @@ class AdminService:
             "completed_at": format_utc(target.completed_at),
         }
 
+    @staticmethod
+    def _serialize_landing_metric_ref(metric: MetricDefinition) -> JsonDict:
+        fm = getattr(metric, 'fractal_metric', None)
+        return {
+            "id": metric.id,
+            "fractal_metric_id": metric.fractal_metric_id,
+            "name": fm.name if fm else metric.name,
+            "unit": fm.unit if fm else metric.unit,
+            "input_type": fm.input_type if fm else "number",
+            "track_progress": metric.track_progress,
+        }
+
+    def _serialize_landing_activity_ref(self, activity: ActivityDefinition) -> JsonDict:
+        """Serialize the compact activity embed stored per goal.
+
+        Root-level ``activity_definitions`` still carries the fuller activity
+        records needed by sessions, analytics, and the activity feature. Goal
+        attributes only need enough data for read-only activity cards and
+        lineage detection, so avoid duplicating full definitions on every goal.
+        """
+        return {
+            "id": activity.id,
+            "name": activity.name,
+            "description": activity.description,
+            "group_id": activity.group_id,
+            "has_sets": activity.has_sets,
+            "has_metrics": activity.has_metrics,
+            "metric_definitions": [
+                self._serialize_landing_metric_ref(metric)
+                for metric in (activity.metric_definitions or [])
+                if not metric.deleted_at
+            ],
+        }
+
+    @staticmethod
+    def _compact_landing_timeline_payload(payload):
+        if not isinstance(payload, dict):
+            return payload
+
+        allowed_keys = {
+            "id",
+            "name",
+            "content",
+            "notes",
+            "created_at",
+            "completed",
+            "completed_at",
+            "goal_id",
+            "goal_name",
+            "type",
+            "level",
+            "level_id",
+            "level_name",
+            "is_smart",
+            "activity_definition_id",
+            "activity_id",
+            "activity_name",
+            "definition_name",
+            "activity_group_id",
+            "activity_group_name",
+            "session_id",
+            "session_name",
+            "session_date",
+            "duration_seconds",
+            "metric_values",
+            "metrics",
+            "progress_comparison",
+            "progress_record",
+            "target_value",
+            "value",
+            "operator",
+            "unit",
+            "time_scope",
+            "start_date",
+            "end_date",
+            "completed_session_id",
+            "completed_instance_id",
+        }
+        compacted = {
+            key: value
+            for key, value in payload.items()
+            if key in allowed_keys and value is not None
+        }
+        if isinstance(compacted.get("notes"), str):
+            compacted["notes"] = compacted["notes"][:1000]
+        return compacted
+
+    @classmethod
+    def _compact_landing_timeline_entry(cls, entry: JsonDict) -> JsonDict:
+        if not isinstance(entry, dict):
+            return entry
+
+        compacted = {
+            key: entry.get(key)
+            for key in (
+                "id",
+                "type",
+                "category",
+                "event_type",
+                "entity_type",
+                "entity_id",
+                "relationship",
+                "source_goal_id",
+                "source_goal_name",
+                "title",
+                "subtitle",
+                "timestamp",
+            )
+            if entry.get(key) is not None
+        }
+        payload = cls._compact_landing_timeline_payload(entry.get("payload"))
+        if payload:
+            compacted["payload"] = payload
+        return compacted
+
     def _serialize_public_goal_tree(
         self,
         goal: Goal,
@@ -625,7 +741,7 @@ class AdminService:
             if target.deleted_at is None
         ]
         associated_activities = [
-            serialize_activity_definition(activity)
+            self._serialize_landing_activity_ref(activity)
             for activity in (goal.associated_activities or [])
             if getattr(activity, "deleted_at", None) is None
         ]
@@ -739,7 +855,10 @@ class AdminService:
                     limit=LANDING_EXAMPLE_TIMELINE_LIMIT,
                 )
                 attributes["timeline_events"] = (
-                    timeline_result.get("entries", []) if timeline_result and not timeline_error else []
+                    [
+                        self._compact_landing_timeline_entry(entry)
+                        for entry in timeline_result.get("entries", [])
+                    ] if timeline_result and not timeline_error else []
                 )
 
                 notes_result, notes_error, _ = note_service.get_goal_notes(
