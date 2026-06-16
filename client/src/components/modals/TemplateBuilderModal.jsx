@@ -15,6 +15,7 @@ import EmptyState from '../common/EmptyState';
 import SectionHeader from '../common/SectionHeader';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
+import ViewToggleTabs from '../common/ViewToggleTabs';
 
 import {
     DEFAULT_TEMPLATE_COLOR,
@@ -436,6 +437,7 @@ function TemplateBuilderModalContent({
                 onClose={handleClose}
                 title={isExistingTemplate ? 'Edit Template' : 'Create Template'}
                 size="xl"
+                className={styles.builderModal}
             >
                 <ModalBody>
                     <div className={styles.contentArea}>
@@ -461,18 +463,20 @@ function TemplateBuilderModalContent({
 
                         <div className={styles.sessionMetaGrid}>
                             <div className={styles.formGroup}>
-                                <Select
-                                    label="Session Type"
+                                <span className={styles.label}>Session Type</span>
+                                <ViewToggleTabs
+                                    className={styles.sessionTypeToggle}
+                                    ariaLabel="Session Type"
                                     value={currentTemplate.sessionType}
-                                    onChange={(event) => setCurrentTemplate((previous) => ({
+                                    items={[
+                                        { value: SESSION_TYPE_NORMAL, label: 'Normal Session' },
+                                        { value: SESSION_TYPE_QUICK, label: 'Quick Session' },
+                                    ]}
+                                    onChange={(sessionType) => setCurrentTemplate((previous) => ({
                                         ...previous,
-                                        sessionType: event.target.value,
+                                        sessionType,
                                     }))}
-                                    fullWidth
-                                >
-                                    <option value={SESSION_TYPE_NORMAL}>Normal Session</option>
-                                    <option value={SESSION_TYPE_QUICK}>Quick Session</option>
-                                </Select>
+                                />
                             </div>
 
                             <div className={styles.formGroup}>
@@ -773,7 +777,7 @@ function TemplateBuilderModalContent({
                     </div>
                 </ModalBody>
 
-                <ModalFooter>
+                <ModalFooter className={styles.builderFooter}>
                     <Button variant="secondary" onClick={handleClose}>
                         Cancel
                     </Button>

@@ -4,6 +4,26 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import TemplateBuilderModal from '../TemplateBuilderModal';
 
 describe('TemplateBuilderModal', () => {
+    it('uses a tab-style session type toggle instead of a dropdown', () => {
+        render(
+            <TemplateBuilderModal
+                isOpen={true}
+                onClose={vi.fn()}
+                onSave={vi.fn()}
+                editingTemplate={null}
+                activities={[{ id: 'activity-1', name: 'Squat', type: 'strength' }]}
+                activityGroups={[]}
+            />
+        );
+
+        expect(screen.queryByRole('combobox', { name: 'Session Type' })).not.toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Normal Session' })).toHaveAttribute('aria-selected', 'true');
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Quick Session' }));
+
+        expect(screen.getByRole('tab', { name: 'Quick Session' })).toHaveAttribute('aria-selected', 'true');
+    });
+
     it('adds a selected activity to a section once', () => {
         render(
             <StrictMode>
