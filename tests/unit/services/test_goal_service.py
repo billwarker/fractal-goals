@@ -117,7 +117,7 @@ def test_update_goal_completion_rejects_paused_goal(
     test_user,
     sample_ultimate_goal,
 ):
-    sample_ultimate_goal.frozen = True
+    sample_ultimate_goal.paused = True
     db_session.commit()
 
     service = GoalService(db_session, sync_targets=sync_goal_targets)

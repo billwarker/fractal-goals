@@ -366,8 +366,6 @@ function GoalDetailModal({
     const isPaused = Boolean(
         goal?.paused
         || goal?.attributes?.paused
-        || goal?.frozen
-        || goal?.attributes?.frozen
     );
 
     const goalStatus = useMemo(() => {

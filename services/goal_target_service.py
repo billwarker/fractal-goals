@@ -335,7 +335,7 @@ class GoalTargetService:
         targets_total = len(targets)
         goal_was_completed = False
 
-        if targets_completed == targets_total and targets_total > 0 and not goal.completed and not goal.frozen:
+        if targets_completed == targets_total and targets_total > 0 and not goal.completed and not goal.paused:
             goal.completed = True
             goal.completed_at = now
             goal.completed_session_id = session_id

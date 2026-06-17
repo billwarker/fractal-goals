@@ -135,8 +135,8 @@ class Goal(Base):
     inherit_parent_activities = Column(Boolean, default=False)
     allow_manual_completion = Column(Boolean, default=True)
     track_activities = Column(Boolean, default=True)
-    frozen = Column(Boolean, default=False)
-    frozen_at = Column(DateTime, nullable=True)
+    paused = Column(Boolean, default=False)
+    paused_at = Column(DateTime, nullable=True)
     targets = Column(JSON_TYPE, nullable=True) # Legacy JSON column
     progress_settings = Column(JSON_TYPE, nullable=True)  # Root-level progress config (ignored on non-root goals)
     
@@ -177,9 +177,39 @@ class Goal(Base):
         cascade="all, delete-orphan",
         foreign_keys="Target.goal_id"
     )
+    pause_intervals = relationship(
+        "GoalPauseInterval",
+        back_populates="goal",
+        cascade="all, delete-orphan",
+        order_by="GoalPauseInterval.paused_at"
+    )
 
     def __repr__(self):
         return f"<Goal(id={self.id}, name={self.name})>"
+
+
+class GoalPauseInterval(Base):
+    """
+    Durable record of each pause window for a goal.
+
+    An open interval (resumed_at is NULL) means the goal is currently paused.
+    Activity performed while a timestamp falls inside any interval must never
+    count as evidence toward the goal, even after the goal is resumed.
+    """
+    __tablename__ = 'goal_pause_intervals'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    goal_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    root_id = Column(String, nullable=True, index=True)
+    paused_at = Column(DateTime, nullable=False)
+    resumed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utc_now)
+
+    goal = relationship("Goal", back_populates="pause_intervals")
+
+    __table_args__ = (
+        sa.Index('ix_goal_pause_intervals_goal_resumed', 'goal_id', 'resumed_at'),
+    )
 
 class TargetTemplate(Base):
     __tablename__ = 'target_templates'

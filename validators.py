@@ -719,11 +719,6 @@ class GoalCompletionUpdateSchema(BaseModel):
     session_id: Optional[str] = None
 
 
-class GoalFreezeSchema(BaseModel):
-    """Compatibility schema for the old frozen goal state."""
-    frozen: bool = True
-
-
 class GoalPauseSchema(BaseModel):
     """Schema for toggling the paused state on a goal."""
     paused: bool = True

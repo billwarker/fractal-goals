@@ -412,7 +412,6 @@ describe('api core auth refresh behavior', () => {
             ['goals.setGoalAssociationsBatch', () => fractalGoalsApi.setGoalAssociationsBatch('root-1', 'goal-1', { activity_ids: [], group_ids: [] })],
             ['goals.copyGoal', () => fractalGoalsApi.copyGoal('root-1', 'goal-1')],
             ['goals.pauseGoal', () => fractalGoalsApi.pauseGoal('root-1', 'goal-1', true)],
-            ['goals.freezeGoal', () => fractalGoalsApi.freezeGoal('root-1', 'goal-1', true)],
             ['goals.moveGoal', () => fractalGoalsApi.moveGoal('root-1', 'goal-1', 'goal-2')],
             ['goals.convertGoalLevel', () => fractalGoalsApi.convertGoalLevel('root-1', 'goal-1', 'level-1')],
             ['meta.createAnalyticsView', () => fractalMetaApi.createAnalyticsView('root-1', { name: 'Dashboard' })],
@@ -513,7 +512,6 @@ describe('api core auth refresh behavior', () => {
             ['goals.setGoalAssociationsBatch', 'put', '/root-1/goals/goal-1/associations/batch', () => fractalGoalsApi.setGoalAssociationsBatch('root-1', 'goal-1', { activity_ids: [], group_ids: [] })],
             ['goals.copyGoal', 'post', '/root-1/goals/goal-1/copy', () => fractalGoalsApi.copyGoal('root-1', 'goal-1')],
             ['goals.pauseGoal', 'patch', '/root-1/goals/goal-1/pause', () => fractalGoalsApi.pauseGoal('root-1', 'goal-1', true)],
-            ['goals.freezeGoal', 'patch', '/root-1/goals/goal-1/freeze', () => fractalGoalsApi.freezeGoal('root-1', 'goal-1', true)],
             ['goals.moveGoal', 'patch', '/root-1/goals/goal-1/move', () => fractalGoalsApi.moveGoal('root-1', 'goal-1', 'goal-2')],
             ['goals.convertGoalLevel', 'patch', '/root-1/goals/goal-1/convert-level', () => fractalGoalsApi.convertGoalLevel('root-1', 'goal-1', 'level-1')],
 

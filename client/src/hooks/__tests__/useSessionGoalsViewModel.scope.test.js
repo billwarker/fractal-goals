@@ -3,7 +3,7 @@ import { renderHook } from '@testing-library/react';
 import { useSessionGoalsViewModel } from '../useSessionGoalsViewModel';
 
 describe('useSessionGoalsViewModel activity scope filtering', () => {
-    it('excludes frozen goals from the activity hierarchy', () => {
+    it('excludes paused goals from the activity hierarchy', () => {
         const sessionGoalsView = {
             goal_tree: {
                 id: 'root',
@@ -13,8 +13,8 @@ describe('useSessionGoalsViewModel activity scope filtering', () => {
                     {
                         id: 'paused',
                         type: 'ImmediateGoal',
-                        name: 'Frozen Activity Goal',
-                        frozen: true,
+                        name: 'Paused Activity Goal',
+                        paused: true,
                         children: []
                     },
                     {
@@ -41,7 +41,7 @@ describe('useSessionGoalsViewModel activity scope filtering', () => {
         }));
 
         const names = result.current.activityHierarchy.map((node) => node.name);
-        expect(names).not.toContain('Frozen Activity Goal');
+        expect(names).not.toContain('Paused Activity Goal');
         expect(names).toContain('Active Activity Goal');
     });
 

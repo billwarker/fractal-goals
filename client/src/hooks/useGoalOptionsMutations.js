@@ -75,7 +75,6 @@ export function useGoalOptionsMutations(rootId, goalId) {
             || convertLevelMutation.isPending,
         copyGoal: () => copyMutation.mutateAsync(),
         pauseGoal: (paused) => pauseMutation.mutateAsync(paused),
-        freezeGoal: (frozen) => pauseMutation.mutateAsync(frozen),
         moveGoal: (newParentId) => moveMutation.mutateAsync(newParentId),
         convertGoalLevel: (levelId) => convertLevelMutation.mutateAsync(levelId),
     };

@@ -14,6 +14,7 @@ def goal_serializer_load_options(*, include_group_activities=False):
         selectinload(Goal.associated_activities),
         selectinload(Goal.associated_activity_groups),
         selectinload(Goal.sessions),
+        selectinload(Goal.pause_intervals),
     ]
     if include_group_activities:
         options.append(selectinload(Goal.associated_activity_groups).selectinload(ActivityGroup.activities))

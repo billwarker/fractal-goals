@@ -43,7 +43,6 @@ def test_core_service_public_methods_have_return_contract_annotations():
             "evaluate_goal_targets",
             "copy_goal",
             "toggle_pause",
-            "toggle_freeze",
             "move_goal",
             "convert_goal_level",
         ],

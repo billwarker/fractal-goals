@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import selectinload
 
-from models import Goal, GoalLevel, validate_root_goal
+from models import Goal, GoalLevel, GoalPauseInterval, validate_root_goal
 from services.goal_type_utils import get_canonical_goal_type
 from services.service_types import ServiceResult
 
@@ -116,14 +116,28 @@ class GoalWorkflowService:
         if not goal:
             return None, "Goal not found", 404
 
-        goal.frozen = paused
-        goal.frozen_at = datetime.now(timezone.utc) if paused else None
+        now = datetime.now(timezone.utc)
+        already_paused = bool(goal.paused)
+        goal.paused = paused
+        goal.paused_at = now if paused else None
+
+        if paused and not already_paused:
+            # Open a new pause window.
+            self.db_session.add(GoalPauseInterval(
+                goal_id=goal.id,
+                root_id=goal.root_id,
+                paused_at=now,
+            ))
+        elif not paused and already_paused:
+            # Close any still-open pause windows for this goal.
+            self.db_session.query(GoalPauseInterval).filter(
+                GoalPauseInterval.goal_id == goal.id,
+                GoalPauseInterval.resumed_at.is_(None),
+            ).update({GoalPauseInterval.resumed_at: now}, synchronize_session=False)
+
         self.db_session.commit()
         self.db_session.refresh(goal)
         return goal, None, 200
-
-    def toggle_freeze(self, root_id, goal_id, current_user_id, frozen: bool) -> ServiceResult[Goal]:
-        return self.toggle_pause(root_id, goal_id, current_user_id, frozen)
 
     def move_goal(self, root_id, goal_id, current_user_id, new_parent_id) -> ServiceResult[Goal]:
         _, error = self._validate_owned_root(root_id, current_user_id)

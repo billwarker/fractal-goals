@@ -12,7 +12,6 @@ from validators import (
     GoalCreateSchema, GoalUpdateSchema,
     GoalCompletionUpdateSchema,
     GoalConvertLevelSchema,
-    GoalFreezeSchema,
     GoalPauseSchema,
     GoalMoveSchema,
     GoalTargetCreateSchema, GoalTargetEvaluationSchema,
@@ -639,31 +638,6 @@ def copy_goal_endpoint(current_user, root_id: str, goal_id: str):
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error copying goal")
-        return internal_error(logger, "Goals API request failed")
-    finally:
-        db_session.close()
-
-
-@goals_bp.route('/<root_id>/goals/<goal_id>/freeze', methods=['PATCH'])
-@token_required
-@validate_request(GoalFreezeSchema, allow_empty_json=True)
-def freeze_goal_endpoint(current_user, root_id: str, goal_id: str, validated_data):
-    """Compatibility endpoint for the old frozen goal state."""
-    db_session = get_db_session()
-    try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
-        goal, error, status = service.toggle_pause(
-            root_id,
-            goal_id,
-            current_user.id,
-            validated_data['frozen'],
-        )
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(serialize_goal(goal)), status
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error pausing goal through compatibility endpoint")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()

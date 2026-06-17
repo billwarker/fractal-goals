@@ -167,7 +167,12 @@ class ActivityAssociationService:
         if error:
             return None, *error
 
-        goal = self.db_session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
+        goals_by_id = load_fractal_goals_for_serialization(
+            self.db_session,
+            root_id,
+            include_group_activities=True,
+        )
+        goal = goals_by_id.get(goal_id)
         if not goal:
             return None, "Goal not found", 404
 

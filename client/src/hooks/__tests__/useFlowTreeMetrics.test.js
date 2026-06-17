@@ -107,7 +107,7 @@ describe('useFlowTreeMetrics activity evidence helpers', () => {
         ]);
         const nodeById = new Map([
             ['child', { id: 'child' }],
-            ['paused-parent', { id: 'paused-parent', frozen: true }],
+            ['paused-parent', { id: 'paused-parent', paused: true }],
             ['root', { id: 'root' }],
         ]);
 

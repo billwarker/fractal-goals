@@ -465,6 +465,44 @@ class TestGoalOptionsEndpoints:
         assert completion_response.status_code == 400
         assert completion_response.get_json()['error'] == 'Cannot complete a paused goal. Resume it first.'
 
+    def test_pause_resume_records_and_closes_interval(self, authed_client, db_session, sample_goal_hierarchy):
+        from models import GoalPauseInterval
+
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal_id = sample_goal_hierarchy['short_term'].id
+
+        pause_response = authed_client.patch(
+            f'/api/{root_id}/goals/{goal_id}/pause',
+            json={'paused': True},
+        )
+        assert pause_response.status_code == 200
+
+        open_intervals = db_session.query(GoalPauseInterval).filter(
+            GoalPauseInterval.goal_id == goal_id,
+            GoalPauseInterval.resumed_at.is_(None),
+        ).all()
+        assert len(open_intervals) == 1
+        assert open_intervals[0].paused_at is not None
+
+        resume_response = authed_client.patch(
+            f'/api/{root_id}/goals/{goal_id}/pause',
+            json={'paused': False},
+        )
+        assert resume_response.status_code == 200
+        assert resume_response.get_json()['paused'] is False
+
+        db_session.expire_all()
+        still_open = db_session.query(GoalPauseInterval).filter(
+            GoalPauseInterval.goal_id == goal_id,
+            GoalPauseInterval.resumed_at.is_(None),
+        ).count()
+        assert still_open == 0
+        closed = db_session.query(GoalPauseInterval).filter(
+            GoalPauseInterval.goal_id == goal_id,
+            GoalPauseInterval.resumed_at.isnot(None),
+        ).count()
+        assert closed == 1
+
     def test_move_goal_endpoint_only_allows_same_parent_tier(
         self,
         authed_client,

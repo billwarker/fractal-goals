@@ -164,12 +164,21 @@ Goals are the core domain object. The app supports a 5-level hierarchy:
 - `ShortTermGoal`
 - `ImmediateGoal`
 
+Goal active/inactive status and activity evidence:
+
+- A goal renders as "active" when a completed activity instance linked to it (or a descendant) has an effective completion timestamp inside the root's `progress_settings.active_goal_window_days` window (default 7, max 90). This is computed on demand, never stored.
+- `services/goal_contribution.py` is the single chokepoint that decides whether an activity at a given timestamp counts toward a goal. `resolve_contribution_goal(goal, timestamp)` excludes goals that are currently paused, goals completed *before* the activity (so completing a goal stops accruing new evidence; pre-completion evidence still fades naturally as it ages out of the window), and activity performed during any past pause window.
+- Pause state is durable: the `paused`/`paused_at` columns on `goals` capture the current flag, and the `goal_pause_intervals` table (model `GoalPauseInterval`) records each pause window (`paused_at`/`resumed_at`, open interval = still paused). `GoalWorkflowService.toggle_pause` opens an interval on pause and closes it on resume. The evidence rule reads these intervals so activity done while paused never counts, even after resume.
+- All evidence/metrics paths share this rule: `SessionAnalyticsService.get_recent_evidence_goal_ids` (drives the tree flip), `get_flowtree_session_metrics` (metrics overlay), and `GoalTreeService` session goal-scope resolution. `goals_by_id` consumers eager-load `Goal.pause_intervals` via `goal_serializer_load_options` to avoid N+1.
+- The pause concept is named `paused` end-to-end (DB → serializer → API `/pause` → frontend `goal.paused`); the legacy `frozen`/`/freeze` vocabulary has been removed.
+
 Key supporting backend pieces:
 
 - `services/goal_service.py`
 - `services/goal_tree_service.py`
 - `services/goal_level_service.py`
 - `services/goal_domain_rules.py`
+- `services/goal_contribution.py`
 - `services/goal_target_rules.py`
 - `services/goal_target_service.py`
 - `services/goal_timeline_service.py`

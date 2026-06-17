@@ -22,7 +22,7 @@ function GoalHeader({
     headerRef = null,
 }) {
     const { timezone } = useTimezone();
-    const normalizedStatus = goalStatus === 'frozen' || goalStatus === 'paused'
+    const normalizedStatus = goalStatus === 'paused'
         ? 'paused'
         : goalStatus === 'inactive'
             ? 'inactive'

@@ -113,9 +113,7 @@ export const deriveEvidenceGoalIds = (sessions = [], activities = [], activityGr
 
 const goalSuppressesActiveEvidence = (goal) => Boolean(
     goal?.paused
-    || goal?.frozen
     || goal?.attributes?.paused
-    || goal?.attributes?.frozen
 );
 
 export const getActiveLineageIds = (evidenceGoalIds, parentById, nodeById = new Map()) => {

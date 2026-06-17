@@ -201,7 +201,7 @@ export const convertTreeToFlow = (
                 type: nodeType,
                 completed: normalizedNode.completed,
                 completed_at: normalizedNode.completed_at,
-                frozen: normalizedNode.frozen,
+                paused: normalizedNode.paused,
                 created_at: normalizedNode.created_at,
                 deadline: normalizedNode.deadline,
                 hasChildren: normalizedNode.children.length > 0,
@@ -278,7 +278,7 @@ export const buildGraphPresentation = ({
     layoutedNodes.forEach((node) => {
         const isActive = activeLineageIds.has(node.id);
         const isInactive = inactiveNodeIds.has(node.id);
-        const isPaused = Boolean(node.data?.paused ?? node.data?.frozen);
+        const isPaused = Boolean(node.data?.paused);
         const shouldFadeInactive = isInactive && !isActive;
         const shouldFade = normalizedSettings.fadeInactiveBranches && (shouldFadeInactive || isPaused);
 

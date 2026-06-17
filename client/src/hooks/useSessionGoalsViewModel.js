@@ -64,7 +64,7 @@ function collectIdsWithAncestors(goalIds, parentMap) {
 }
 
 function isPausedGoal(goal) {
-    return Boolean(goal?.paused || goal?.frozen);
+    return Boolean(goal?.paused);
 }
 
 export function useSessionGoalsViewModel({

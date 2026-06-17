@@ -100,7 +100,7 @@ class SessionService:
             return {}
 
         activities = self.db_session.query(ActivityDefinition).options(
-            selectinload(ActivityDefinition.associated_goals)
+            selectinload(ActivityDefinition.associated_goals).selectinload(Goal.pause_intervals)
         ).filter(
             ActivityDefinition.id.in_(activity_def_ids),
             ActivityDefinition.root_id == root_id,
@@ -110,7 +110,7 @@ class SessionService:
         groups_by_id = {
             group.id: group
             for group in self.db_session.query(ActivityGroup).options(
-                selectinload(ActivityGroup.associated_goals)
+                selectinload(ActivityGroup.associated_goals).selectinload(Goal.pause_intervals)
             ).filter(
                 ActivityGroup.root_id == root_id,
                 ActivityGroup.deleted_at == None

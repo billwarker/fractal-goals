@@ -53,8 +53,6 @@ function GoalOptionsView({
     const isPaused = Boolean(
         goal?.paused
         || goal?.attributes?.paused
-        || goal?.frozen
-        || goal?.attributes?.frozen
     );
     const {
         isLoading: loading,

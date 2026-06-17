@@ -1092,7 +1092,7 @@ class GoalService:
         if goal.root_id and goal.root_id != authorized_root_id:
             return None, "Goal not found in this fractal", 404
 
-        if goal.frozen:
+        if goal.paused:
             return None, "Cannot complete a paused goal. Resume it first.", 400
 
         goal.completed = data['completed'] if 'completed' in data else not goal.completed
@@ -1253,9 +1253,6 @@ class GoalService:
 
     def toggle_pause(self, root_id, goal_id, current_user_id, paused: bool) -> ServiceResult[Goal]:
         return GoalWorkflowService(self.db_session).toggle_pause(root_id, goal_id, current_user_id, paused)
-
-    def toggle_freeze(self, root_id, goal_id, current_user_id, frozen: bool) -> ServiceResult[Goal]:
-        return GoalWorkflowService(self.db_session).toggle_freeze(root_id, goal_id, current_user_id, frozen)
 
     def move_goal(self, root_id, goal_id, current_user_id, new_parent_id) -> ServiceResult[Goal]:
         return GoalWorkflowService(self.db_session).move_goal(root_id, goal_id, current_user_id, new_parent_id)
