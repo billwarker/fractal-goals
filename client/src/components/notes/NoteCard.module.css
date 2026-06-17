@@ -70,6 +70,8 @@
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 10px;
+    /* Reserve space for the corner-pinned options button */
+    padding-right: 24px;
 }
 
 .metaStack {
@@ -153,10 +155,24 @@
     font-size: 10px;
 }
 
-/* Options button + menu */
+/* Options button + menu — pinned to the card's top-right corner */
 .optionsWrapper {
-    position: relative;
+    position: absolute;
+    top: 8px;
+    right: 8px;
     z-index: 20;
+}
+
+.noteCard.flat .optionsWrapper {
+    right: 0;
+}
+
+/* Set label shown on minimal (session-detail) activity set notes */
+.setLabel {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
 }
 
 .optionsBtn {

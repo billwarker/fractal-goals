@@ -93,6 +93,9 @@ function NoteCard({
         ? formatMetadataNoteTypeLabel(resolvedNoteTypeLabel)
         : resolvedNoteTypeLabel;
     const supportsMarkdown = resolvedNoteType === 'fractal_note';
+    const setLabel = resolvedNoteType === 'activity_set_note' && note.set_index != null
+        ? `Set #${note.set_index + 1}`
+        : null;
 
     const adjustHeight = (el) => {
         if (!el) return;
@@ -300,7 +303,40 @@ function NoteCard({
                     <span className={styles.pinnedIndicator} title="Pinned">📌</span>
                 )}
 
-                {/* Top row: timestamp + badges + options */}
+                {/* Options button — pinned to the card's top-right corner */}
+                {hasMenu && (
+                    <div className={styles.optionsWrapper} ref={menuRef}>
+                        <button
+                            className={styles.optionsBtn}
+                            onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }}
+                            title="Options"
+                            aria-label="Note options"
+                        >
+                            ···
+                        </button>
+                        {menuOpen && (
+                            <div className={styles.optionsMenu}>
+                                {canEdit && (
+                                    <button className={styles.optionsMenuItem} onClick={handleEditClick}>
+                                        Edit
+                                    </button>
+                                )}
+                                {canPin && (
+                                    <button className={styles.optionsMenuItem} onClick={handlePinToggle}>
+                                        {note.is_pinned ? 'Unpin' : 'Pin note'}
+                                    </button>
+                                )}
+                                {canDelete && (
+                                    <button className={`${styles.optionsMenuItem} ${styles.optionsMenuItemDanger}`} onClick={handleDelete}>
+                                        Delete
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Top row: timestamp + badges */}
                 <div className={styles.topRow}>
                     {!minimal && (
                         <div className={styles.metaStack}>
@@ -354,38 +390,13 @@ function NoteCard({
                                 {timestamp}
                             </>
                         )}
-                        {minimal && timestamp}
-
-                        {hasMenu && (
-                            <div className={styles.optionsWrapper} ref={menuRef}>
-                                <button
-                                    className={styles.optionsBtn}
-                                    onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }}
-                                    title="Options"
-                                    aria-label="Note options"
-                                >
-                                    ···
-                                </button>
-                                {menuOpen && (
-                                    <div className={styles.optionsMenu}>
-                                        {canEdit && (
-                                            <button className={styles.optionsMenuItem} onClick={handleEditClick}>
-                                                Edit
-                                            </button>
-                                        )}
-                                        {canPin && (
-                                            <button className={styles.optionsMenuItem} onClick={handlePinToggle}>
-                                                {note.is_pinned ? 'Unpin' : 'Pin note'}
-                                            </button>
-                                        )}
-                                        {canDelete && (
-                                            <button className={`${styles.optionsMenuItem} ${styles.optionsMenuItemDanger}`} onClick={handleDelete}>
-                                                Delete
-                                            </button>
-                                        )}
-                                    </div>
+                        {minimal && (
+                            <>
+                                {setLabel && (
+                                    <span className={styles.setLabel}>{setLabel}</span>
                                 )}
-                            </div>
+                                {timestamp}
+                            </>
                         )}
                     </div>
                 </div>
