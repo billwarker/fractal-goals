@@ -32,6 +32,8 @@ function GoalViewMode({
     onClose,
     onUpdate,
     setTargets,
+    onTargetClick,
+    onRequestTargetBuilder,
     readOnly = false,
 }) {
     const navigate = useNavigate();
@@ -110,6 +112,9 @@ function GoalViewMode({
                         headerColor="var(--color-text-primary)"
                         goalType={goalType}
                         goalCompleted={isCompleted}
+                        onTargetClick={readOnly ? undefined : onTargetClick}
+                        onRequestBuilder={readOnly ? undefined : onRequestTargetBuilder}
+                        readOnly={readOnly}
                     />
                 </Suspense>
             )}

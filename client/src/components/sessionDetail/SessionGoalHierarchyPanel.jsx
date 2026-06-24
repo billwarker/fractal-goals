@@ -4,12 +4,14 @@ import { createPortal } from 'react-dom';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
 import { useSessionGoalsViewModel } from '../../hooks/useSessionGoalsViewModel';
+import { useTargetMutations } from '../../hooks/useTargetQueries';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import HierarchySection from './HierarchySection';
 import TargetsSection from './TargetsSection';
 import styles from './SessionGoalHierarchyPanel.module.css';
 
 const GoalDetailModal = lazyWithRetry(() => import('../ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
+const TargetAnalyticsModal = lazyWithRetry(() => import('../goalDetail/TargetAnalyticsModal'), 'components/goalDetail/TargetAnalyticsModal');
 
 function SessionGoalHierarchyPanel({
     selectedActivity,
@@ -32,6 +34,9 @@ function SessionGoalHierarchyPanel({
     const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
 
     const [createSubGoalParent, setCreateSubGoalParent] = useState(null);
+    const [activeTarget, setActiveTarget] = useState(null);
+    const activeTargetGoalId = activeTarget?._goalId || null;
+    const { deleteTarget } = useTargetMutations(rootId, activeTargetGoalId);
 
     const activeActivityDef = useMemo(() => {
         if (!selectedActivity) return null;
@@ -110,6 +115,15 @@ function SessionGoalHierarchyPanel({
         }
     }, [activeActivityDef, createGoal, onGoalCreated]);
 
+    const handleTargetDelete = useCallback((target) => {
+        if (!target?.id || !activeTargetGoalId) return;
+        deleteTarget(target.id)
+            .then(() => setActiveTarget(null))
+            .catch(() => {
+                // The mutation hook owns user-facing error notifications.
+            });
+    }, [activeTargetGoalId, deleteTarget]);
+
     const completedColor = getGoalColor('Completed');
     const completedSecondaryColor = getGoalSecondaryColor('Completed');
     const scopedActivityName = activeActivityDef?.name || null;
@@ -151,9 +165,30 @@ function SessionGoalHierarchyPanel({
                         targets={targetCards}
                         activityDefinitions={activityDefinitions}
                         scopedActivityName={scopedActivityName}
+                        onTargetClick={setActiveTarget}
                     />
                 </div>
             </div>
+
+            {activeTarget && createPortal(
+                <React.Suspense fallback={<div>Loading Target...</div>}>
+                    <TargetAnalyticsModal
+                        mode="view"
+                        rootId={rootId}
+                        goalId={activeTargetGoalId}
+                        target={activeTarget}
+                        goalType={activeTarget._goalType}
+                        goalColor={getGoalColor(activeTarget._goalType)}
+                        activityDefinitions={activityDefinitions}
+                        associatedActivities={activityDefinitions}
+                        targets={targetCards.filter((target) => target._goalId === activeTargetGoalId)}
+                        setTargets={() => {}}
+                        onDelete={handleTargetDelete}
+                        onClose={() => setActiveTarget(null)}
+                    />
+                </React.Suspense>,
+                document.body
+            )}
 
             {createSubGoalParent && createPortal(
                 <React.Suspense fallback={<div>Loading Details...</div>}>

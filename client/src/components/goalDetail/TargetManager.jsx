@@ -1,13 +1,31 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import CheckIcon from '../atoms/CheckIcon';
 import TargetCard from '../TargetCard';
 import notify from '../../utils/notify';
 import { usePrograms } from '../../hooks/useProgramQueries';
+import { useTargetMutations } from '../../hooks/useTargetQueries';
+import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 import styles from './TargetManager.module.css';
+
+const OPERATOR_SYMBOLS = { '>=': '≥', '>': '>', '<=': '≤', '<': '<', '==': '=' };
+
+// Build a default target name from the configured metric conditions, e.g.
+// "Form ≥ 9" or "Reps ≥ 5, Weight ≥ 45". Missing values default to 0 so the
+// name reflects the metric configuration immediately.
+function deriveMetricTargetName(activity, metricValues) {
+    if (!activity?.metric_definitions?.length) return '';
+    const parts = activity.metric_definitions.map((metric) => {
+        const entry = metricValues[metric.id] || {};
+        const op = OPERATOR_SYMBOLS[entry.operator || '>='] || (entry.operator || '>=');
+        const value = (entry.value === '' || entry.value == null) ? 0 : entry.value;
+        return `${metric.name} ${op} ${value}`;
+    });
+    return parts.join(', ');
+}
 
 /**
  * TargetManager Component
- * 
+ *
  * Manages the list of targets for a goal, including adding, editing, and deleting targets.
  * Contains the inline "Target Builder" UI.
  */
@@ -18,6 +36,7 @@ const TargetManager = ({
     associatedActivities,
     isEditing,
     rootId, // Required for fetching programs
+    goalId, // Required for per-target persistence (edit/delete) and analytics
     onSave, // Callback to persist changes if needed (e.g. immediate save in view mode)
     // New props for full view mode
     viewMode = 'list', // 'list' | 'builder'
@@ -26,19 +45,34 @@ const TargetManager = ({
     initialTarget = null, // Target to edit if opening in builder mode
     headerColor, // New prop for header color
     goalType = null,
-    goalCompleted = false,
     showAddButton = true,
     initialActivityId = null,
     lockActivitySelection = false,
+    onTargetClick = null, // (target) => void — opens the target analytics modal
+    onRequestBuilder = null, // (target|null) => void — opens the add/edit builder in a dedicated modal
+    onDraftChange = null, // (draft) => void — live builder form state, for graph preview
+    onSaved = null, // ({ action, target, targets, result }) => void after direct per-target persistence
+    hideBuilderHeader = false, // host renders its own header (e.g. analytics modal)
+    stickyFooter = false, // pin the action footer to the bottom of the scroll area
+    readOnly = false,
 }) => {
+    // Edit/delete affordances on cards are available outside read-only contexts
+    // (e.g. the public landing page), regardless of goal edit mode.
+    const canEditTargets = !readOnly && Boolean(goalId);
+    // Per-target mutations let view-mode add/edit/delete persist immediately.
+    // Goal edit mode still uses the local setTargets/onSave path so unsaved goal
+    // edits stay batched until the goal is saved.
+    const {
+        createTarget: createTargetMutation,
+        updateTarget: updateTargetMutation,
+        deleteTarget: deleteTargetMutation,
+    } = useTargetMutations(rootId, goalId);
     // Internal view state: 'list' | 'add' | 'edit' (still used for internal builder state)
     // BUT we prioritize props if provided for view switching
     const [viewState, setViewState] = useState(initialTarget ? 'edit' : 'list');
     const [editingTarget, setEditingTarget] = useState(initialTarget);
     const [targetToDelete, setTargetToDelete] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-    // Form State
 
     // Form State
     const [selectedActivityId, setSelectedActivityId] = useState(initialTarget?.activity_id || initialActivityId || '');
@@ -78,7 +112,31 @@ const TargetManager = ({
     const activitiesForTargets = activitiesWithMetrics.filter(a =>
         associatedActivityIds.includes(a.id)
     );
-    const selectedActivity = activityDefinitions.find(a => a.id === selectedActivityId);
+    const effectiveSelectedActivityId = selectedActivityId
+        || (activitiesForTargets.length === 1 ? activitiesForTargets[0].id : '');
+    const selectedActivity = activityDefinitions.find(a => a.id === effectiveSelectedActivityId);
+    const metricDerivedName = deriveMetricTargetName(selectedActivity, metricValues);
+
+    // Emit the live builder draft (activity + metric thresholds) so a host (the
+    // analytics modal) can preview it on the graph as the user edits.
+    useEffect(() => {
+        if (!onDraftChange) return;
+        const metrics = Object.entries(metricValues)
+            .filter(([, data]) => data && data.value !== '' && data.value != null)
+            .map(([metric_id, data]) => ({
+                metric_id,
+                metric_definition_id: metric_id,
+                operator: data.operator || '>=',
+                value: parseFloat(data.value),
+                target_value: parseFloat(data.value),
+            }));
+        onDraftChange({
+            activity_id: effectiveSelectedActivityId || null,
+            name: targetName?.trim() || metricDerivedName,
+            type: targetType,
+            metrics,
+        });
+    }, [onDraftChange, effectiveSelectedActivityId, targetName, targetType, metricValues, metricDerivedName]);
 
     // Handlers
     const handleOpenAddTarget = () => {
@@ -94,7 +152,9 @@ const TargetManager = ({
         setLinkedBlockId('');
         setFrequencyCount(1);
 
-        if (onOpenBuilder) {
+        if (onRequestBuilder) {
+            onRequestBuilder(null);
+        } else if (onOpenBuilder) {
             onOpenBuilder(null);
         } else {
             setViewState('add');
@@ -124,7 +184,9 @@ const TargetManager = ({
         }
         setMetricValues(metricsObj);
 
-        if (onOpenBuilder) {
+        if (onRequestBuilder) {
+            onRequestBuilder(target);
+        } else if (onOpenBuilder) {
             onOpenBuilder(target);
         } else {
             setViewState('edit');
@@ -134,10 +196,7 @@ const TargetManager = ({
     const handleActivityChange = (activityId) => {
         setSelectedActivityId(activityId);
         setMetricValues({});
-        const activity = activityDefinitions.find(a => a.id === activityId);
-        if (activity && !targetName) {
-            setTargetName(activity.name);
-        }
+        // The name placeholder/save default follows the selected activity's metrics.
     };
 
     const handleMetricChange = (metricId, field, value) => {
@@ -150,12 +209,8 @@ const TargetManager = ({
         }));
     };
 
-    const handleSaveTarget = () => {
-        if (!selectedActivityId) {
-            notify.error('Please select an activity');
-            return;
-        }
-
+    const buildTargetPayload = () => {
+        const name = targetName?.trim() || metricDerivedName || 'Unnamed Target';
         const metrics = Object.entries(metricValues).map(([metric_id, data]) => ({
             metric_id,
             value: parseFloat(data.value) || 0,
@@ -164,17 +219,60 @@ const TargetManager = ({
 
         const target = {
             id: editingTarget?.id || crypto.randomUUID(),
-            activity_id: selectedActivityId,
-            name: targetName || selectedActivity?.name || 'Unnamed Target',
+            activity_id: effectiveSelectedActivityId,
+            name,
             description: targetDescription,
             type: targetType,
             time_scope: timeScope,
-            start_date: startDate,
-            end_date: endDate,
-            linked_block_id: linkedBlockId,
+            start_date: startDate || null,
+            end_date: endDate || null,
+            linked_block_id: linkedBlockId || null,
             frequency_count: parseInt(frequencyCount) || 1,
             metrics
         };
+        return target;
+    };
+
+    const closeBuilder = () => {
+        setViewState('list');
+        setEditingTarget(null);
+        if (onCloseBuilder) onCloseBuilder();
+    };
+
+    const handleSaveTarget = async () => {
+        if (!effectiveSelectedActivityId) {
+            notify.error('Please select an activity');
+            return;
+        }
+
+        const target = buildTargetPayload();
+
+        if (!isEditing && goalId) {
+            try {
+                const result = editingTarget
+                    ? await updateTargetMutation(editingTarget.id, target)
+                    : await createTargetMutation(target);
+                let nextTargets = targets;
+                if (Array.isArray(result?.targets)) {
+                    nextTargets = result.targets;
+                } else if (result?.target) {
+                    nextTargets = editingTarget
+                        ? targets.map(t => t.id === result.target.id ? result.target : t)
+                        : [...targets, result.target];
+                }
+                setTargets(nextTargets);
+                onSaved?.({
+                    action: editingTarget ? 'update' : 'create',
+                    target: result?.target || target,
+                    targets: nextTargets,
+                    result,
+                });
+                closeBuilder();
+            } catch {
+                // The mutation hook owns user-facing error notifications.
+            }
+            return;
+        }
 
         let newTargets;
         if (editingTarget) {
@@ -185,10 +283,7 @@ const TargetManager = ({
 
         setTargets(newTargets);
         if (onSave) onSave(newTargets);
-
-        setViewState('list');
-        setEditingTarget(null);
-        if (onCloseBuilder) onCloseBuilder();
+        closeBuilder();
     };
 
     const handleDeleteTarget = (targetId) => {
@@ -204,7 +299,13 @@ const TargetManager = ({
 
     const executeDeleteTarget = () => {
         if (targetToDelete) {
-            handleDeleteTarget(targetToDelete);
+            if (isEditing) {
+                // Goal edit mode: keep the change local until the goal is saved.
+                handleDeleteTarget(targetToDelete);
+            } else if (goalId) {
+                // View mode: persist the delete immediately via the per-target API.
+                deleteTargetMutation(targetToDelete).catch(() => { /* notified by hook */ });
+            }
             setViewState('list');
             setEditingTarget(null);
             setTargetToDelete(null);
@@ -214,9 +315,7 @@ const TargetManager = ({
     };
 
     const handleCancel = () => {
-        setViewState('list');
-        setEditingTarget(null);
-        if (onCloseBuilder) onCloseBuilder();
+        closeBuilder();
     };
 
     // Determine current view mode
@@ -226,8 +325,30 @@ const TargetManager = ({
 
     // Ensure we have the correct title if strictly in builder mode but local state was default
     const getBuilderTitle = () => {
-        if (viewState === 'edit' || initialTarget) return 'Edit Target';
-        return 'Add Target';
+        const isEditingTarget = viewState === 'edit' || initialTarget;
+        const verb = isEditingTarget ? 'Edit Target' : 'Add Target';
+        return selectedActivity?.name ? `${verb} for ${selectedActivity.name}` : verb;
+    };
+
+    // Confirmation Modal Render
+    const renderDeleteConfirm = () => {
+        if (!showDeleteConfirm) return null;
+        const pendingTarget = targets.find((target) => target.id === targetToDelete) || editingTarget;
+        const pendingTargetName = pendingTarget?.name || 'this target';
+        return (
+            <DeleteConfirmModal
+                isOpen={showDeleteConfirm}
+                onClose={() => {
+                    setShowDeleteConfirm(false);
+                    setTargetToDelete(null);
+                }}
+                onConfirm={executeDeleteTarget}
+                title="Delete Target"
+                message={`Delete "${pendingTargetName}"? This action cannot be undone.`}
+                confirmText="Delete Target"
+                overlayClassName={styles.deleteConfirmOverlay}
+            />
+        );
     };
 
     // Render Logic
@@ -238,7 +359,9 @@ const TargetManager = ({
 
         return (
             <div className={containerClass}>
-                {/* Header */}
+                {renderDeleteConfirm()}
+                {/* Header (hidden when the host renders its own) */}
+                {!hideBuilderHeader && (
                 <div className={styles.header}>
                     <button
                         onClick={handleCancel}
@@ -250,19 +373,11 @@ const TargetManager = ({
                         {getBuilderTitle()}
                     </h3>
                 </div>
+                )}
 
-                {/* Activity Selector */}
-                {lockActivitySelection ? (
-                    <div>
-                        <label className={styles.inputLabel}>
-                            Activity
-                        </label>
-                        <div className={styles.selectedActivityDisplay}>
-                            <CheckIcon size={13} />
-                            <span>{selectedActivity?.name || 'Selected activity'}</span>
-                        </div>
-                    </div>
-                ) : (
+                {/* Activity Selector — hidden when the activity is already determined
+                    (locked or a single option), since the header names it. */}
+                {(lockActivitySelection || activitiesForTargets.length <= 1) ? null : (
                     <div>
                         <label style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#aaa' }}>
                             Activity *
@@ -315,7 +430,7 @@ const TargetManager = ({
                         type="text"
                         value={targetName}
                         onChange={(e) => setTargetName(e.target.value)}
-                        placeholder={selectedActivity?.name || 'Enter target name...'}
+                        placeholder={metricDerivedName || 'Target metrics'}
                         className={styles.textInput}
                     />
                 </div>
@@ -469,7 +584,7 @@ const TargetManager = ({
                 )}
 
                 {/* Actions */}
-                <div className={styles.actionFooter}>
+                <div className={`${styles.actionFooter} ${stickyFooter ? styles.actionFooterSticky : ''}`}>
                     {(viewState === 'edit' || initialTarget) && editingTarget ? (
                         <button
                             onClick={() => confirmAndDeleteTarget(editingTarget.id)}
@@ -479,7 +594,7 @@ const TargetManager = ({
                         </button>
                     ) : <div />}
 
-                    <div className={styles.flexGap8}>
+                    <div className={styles.actionButtons}>
                         <button
                             onClick={handleCancel}
                             className={styles.cancelButton}
@@ -488,8 +603,8 @@ const TargetManager = ({
                         </button>
                         <button
                             onClick={handleSaveTarget}
-                            disabled={!selectedActivityId}
-                            className={`${styles.saveButton} ${!selectedActivityId ? styles.saveButtonDisabled : ''}`}
+                            disabled={!effectiveSelectedActivityId}
+                            className={`${styles.saveButton} ${!effectiveSelectedActivityId ? styles.saveButtonDisabled : ''}`}
                         >
                             {(viewState === 'edit' || initialTarget) ? 'Update Target' : 'Add Target'}
                         </button>
@@ -498,38 +613,6 @@ const TargetManager = ({
             </div>
         );
     }
-
-    // Confirmation Modal Render
-    const renderDeleteConfirm = () => {
-        if (!showDeleteConfirm) return null;
-        return (
-            <div className={styles.modalOverlay}>
-                <div className={styles.modalContent}>
-                    <h3 className={styles.modalTitle}>Delete Target?</h3>
-                    <p className={styles.modalText}>
-                        Are you sure you want to delete this target? This action cannot be undone.
-                    </p>
-                    <div className={styles.modalActions}>
-                        <button
-                            onClick={() => {
-                                setShowDeleteConfirm(false);
-                                setTargetToDelete(null);
-                            }}
-                            className={styles.modalCancelButton}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={executeDeleteTarget}
-                            className={styles.modalDeleteButton}
-                        >
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
 
     // Default List View
     const canAddTargets = activitiesForTargets.length > 0;
@@ -569,17 +652,16 @@ const TargetManager = ({
                 <div className={styles.targetsWrap}>
                     {targets.map((target, index) => (
                         <div key={target.id || index} className={styles.targetWrapper}>
-                            <div onClick={() => isEditing && handleOpenEditTarget(target)} style={{ cursor: isEditing ? 'pointer' : 'default' }}>
-                                <TargetCard
-                                    target={target}
-                                    isCompleted={Boolean(target.completed)}
-                                    activityDefinitions={activityDefinitions}
-                                    onEdit={undefined} // Handled by parent div click
-                                    onDelete={isEditing ? () => confirmAndDeleteTarget(target.id) : undefined}
-                                    isEditMode={isEditing}
-                                    goalType={goalType}
-                                />
-                            </div>
+                            <TargetCard
+                                target={target}
+                                isCompleted={Boolean(target.completed)}
+                                activityDefinitions={activityDefinitions}
+                                onClick={onTargetClick ? () => onTargetClick(target) : undefined}
+                                onEdit={canEditTargets ? () => handleOpenEditTarget(target) : undefined}
+                                onDelete={canEditTargets ? () => confirmAndDeleteTarget(target.id) : undefined}
+                                isEditMode={isEditing}
+                                goalType={goalType}
+                            />
                         </div>
                     ))}
                 </div>

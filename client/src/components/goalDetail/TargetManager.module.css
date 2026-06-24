@@ -2,6 +2,7 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
+    min-height: 100%;
 }
 
 .containerEmbedded {
@@ -268,12 +269,29 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: 12px;
+    gap: 12px;
+    padding-top: 8px;
     border-top: 1px solid var(--color-border);
 }
 
+/* Pinned footer for the builder hosted inside the analytics modal. */
+.actionFooterSticky {
+    position: sticky;
+    bottom: 0;
+    margin-top: auto;
+    min-height: 58px;
+    padding: 10px 0;
+    background: var(--color-bg-card-alt);
+    z-index: 1;
+}
+
+.actionButtons {
+    display: flex;
+    gap: 8px;
+}
+
 .deleteButton {
-    padding: 8px 14px;
+    padding: 7px 12px;
     background: transparent;
     border: 1px solid var(--color-error);
     border-radius: 4px;
@@ -283,7 +301,7 @@
 }
 
 .cancelButton {
-    padding: 8px 14px;
+    padding: 7px 12px;
     background: transparent;
     border: 1px solid var(--color-border);
     border-radius: 4px;
@@ -293,7 +311,7 @@
 }
 
 .saveButton {
-    padding: 8px 14px;
+    padding: 7px 12px;
     background: var(--color-success);
     border: none;
     border-radius: 4px;
@@ -309,67 +327,8 @@
     cursor: not-allowed;
 }
 
-.modalOverlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    z-index: 1002;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.modalContent {
-    background: var(--color-bg-card);
-    padding: 24px;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 400px;
-    border: 1px solid var(--color-border);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-}
-
-.modalTitle {
-    margin: 0 0 12px 0;
-    font-size: 18px;
-    color: var(--color-text-primary);
-}
-
-.modalText {
-    margin: 0 0 24px 0;
-    font-size: 14px;
-    color: var(--color-text-secondary);
-    line-height: 1.5;
-}
-
-.modalActions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-}
-
-.modalCancelButton {
-    padding: 8px 16px;
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    font-size: 13px;
-}
-
-.modalDeleteButton {
-    padding: 8px 16px;
-    background: var(--color-error);
-    border: none;
-    border-radius: 6px;
-    color: white;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
+.deleteConfirmOverlay {
+    z-index: 5000;
 }
 
 .listContainer {

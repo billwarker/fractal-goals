@@ -1080,6 +1080,15 @@ class GoalService:
     def remove_goal_target(self, goal_id, target_id, current_user_id) -> ServiceResult[JsonDict]:
         return GoalTargetService(self.db_session).remove_goal_target(goal_id, target_id, current_user_id)
 
+    def update_goal_target(self, goal_id, target_id, current_user_id, data) -> ServiceResult[JsonDict]:
+        return GoalTargetService(self.db_session).update_goal_target(goal_id, target_id, current_user_id, data)
+
+    def get_target_analytics(self, root_id, target_id, current_user_id, *, since='creation') -> ServiceResult[JsonDict]:
+        return GoalTargetService(self.db_session).get_target_analytics(root_id, target_id, current_user_id, since=since)
+
+    def get_goal_activity_instances(self, root_id, goal_id, activity_id, current_user_id) -> ServiceResult[JsonDict]:
+        return GoalTargetService(self.db_session).get_goal_activity_instances(root_id, goal_id, activity_id, current_user_id)
+
     def update_goal_completion(self, goal_id, current_user_id, data, root_id=None) -> ServiceResult[Goal]:
         goal = get_goal_by_id(self.db_session, goal_id)
         if not goal:

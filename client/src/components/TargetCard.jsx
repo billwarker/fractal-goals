@@ -1,6 +1,6 @@
 import React from 'react';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
-import CloseIcon from './atoms/CloseIcon';
+import DeleteButton from './atoms/DeleteButton';
 import GoalIcon from './atoms/GoalIcon';
 import { DeletedEntityCard } from './ui/DeletedEntityFallback';
 import styles from './TargetCard.module.css';
@@ -77,19 +77,22 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                         </div>
                     </div>
                     <div className={styles.headerControls}>
-                        {isEditMode && onEdit && (
+                        {onEdit && (
                             <button
+                                type="button"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onEdit();
                                 }}
                                 className={styles.editButton}
+                                title="Edit target"
+                                aria-label="Edit target"
                             >
-                                Edit
+                                ✎
                             </button>
                         )}
                         {onDelete && (
-                            <button
+                            <DeleteButton
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     onDelete();
@@ -97,9 +100,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                                 className={styles.deleteButton}
                                 title="Delete Target"
                                 aria-label="Delete target"
-                            >
-                                <CloseIcon size={14} />
-                            </button>
+                            />
                         )}
                     </div>
                 </div>

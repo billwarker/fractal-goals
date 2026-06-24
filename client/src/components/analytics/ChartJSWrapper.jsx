@@ -14,6 +14,7 @@ import {
     Filler
 } from 'chart.js';
 import 'chartjs-adapter-date-fns';
+import annotationPlugin from 'chartjs-plugin-annotation';
 
 // Register Chart.js components
 ChartJS.register(
@@ -27,7 +28,8 @@ ChartJS.register(
     Tooltip,
     Legend,
     TimeScale,
-    Filler
+    Filler,
+    annotationPlugin
 );
 
 /**

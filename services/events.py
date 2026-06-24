@@ -247,6 +247,7 @@ class Events:
     TARGET_ACHIEVED = 'target.achieved'
     TARGET_REVERTED = 'target.reverted'
     TARGET_CREATED = 'target.created'
+    TARGET_UPDATED = 'target.updated'
     TARGET_DELETED = 'target.deleted'
     
     # Activity Instance events

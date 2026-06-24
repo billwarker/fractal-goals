@@ -23,7 +23,7 @@ import GoalUncompletionModal from './goals/GoalUncompletionModal';
 import GoalHeader from './goals/GoalHeader';
 import GoalViewMode from './goals/GoalViewMode';
 import GoalEditForm from './goals/GoalEditForm';
-import CloseIcon from './atoms/CloseIcon';
+import CloseButton from './atoms/CloseButton';
 import GoalIcon from './atoms/GoalIcon';
 import ModalBackdrop from './atoms/ModalBackdrop';
 import SidePaneNotePanel from './common/SidePaneNotePanel';
@@ -36,6 +36,7 @@ const TargetManager = lazyWithRetry(() => import('./goalDetail/TargetManager'), 
 const ActivityAssociator = lazyWithRetry(() => import('./goalDetail/ActivityAssociator'), 'components/goalDetail/ActivityAssociator');
 const InlineActivityBuilder = lazyWithRetry(() => import('./goalDetail/InlineActivityBuilderModal'), 'components/goalDetail/InlineActivityBuilderModal');
 const GenericGraphModal = lazyWithRetry(() => import('./analytics/GenericGraphModal'), 'components/analytics/GenericGraphModal');
+const TargetAnalyticsModal = lazyWithRetry(() => import('./goalDetail/TargetAnalyticsModal'), 'components/goalDetail/TargetAnalyticsModal');
 const GoalOptionsView = lazyWithRetry(() => import('./goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./goalDetail/GoalNotesView'), 'components/goalDetail/GoalNotesView');
 const GoalTimelineView = lazyWithRetry(() => import('./goalDetail/GoalTimelineView'), 'components/goalDetail/GoalTimelineView');
@@ -136,10 +137,11 @@ function GoalDetailModal({
     const [activityBuilderReturnView, setActivityBuilderReturnView] = useState('activity-associator');
     const [activityBuilderTemplate, setActivityBuilderTemplate] = useState(null);
     const [isActivityBuilderOpen, setIsActivityBuilderOpen] = useState(false);
-    const [embeddedTargetBuilderTarget, setEmbeddedTargetBuilderTarget] = useState(undefined);
-    const [embeddedTargetActivityId, setEmbeddedTargetActivityId] = useState(null);
     const [isTargetSelectionMode, setIsTargetSelectionMode] = useState(false);
     const [targetManagerReturnView, setTargetManagerReturnView] = useState('goal');
+    const [activeAnalyticsTarget, setActiveAnalyticsTarget] = useState(null);
+    // Builder modal config: null = closed; otherwise { target, activityId, lock }.
+    const [builderConfig, setBuilderConfig] = useState(null);
     const goalHeaderRef = React.useRef(null);
     const contentScrollRef = React.useRef(null);
     const [goalHeaderStickyOffset, setGoalHeaderStickyOffset] = useState(0);
@@ -532,14 +534,7 @@ function GoalDetailModal({
             return;
         }
         setTargetToEdit(null);
-        setEmbeddedTargetActivityId(null);
         setIsTargetSelectionMode(true);
-    };
-
-    const handleCloseEmbeddedTargetBuilder = () => {
-        setEmbeddedTargetBuilderTarget(undefined);
-        setEmbeddedTargetActivityId(null);
-        setIsTargetSelectionMode(false);
     };
 
     const handleSelectTargetActivity = (activity) => {
@@ -549,9 +544,9 @@ function GoalDetailModal({
             notify.error('Choose an activity with metrics to create a target.');
             return;
         }
-        setEmbeddedTargetActivityId(fullActivity.id);
-        setEmbeddedTargetBuilderTarget(null);
+        // Open the builder in its dedicated modal, pre-scoped to the chosen activity.
         setIsTargetSelectionMode(false);
+        setBuilderConfig({ target: null, activityId: fullActivity.id, lock: true });
     };
 
     const handleCancelTargetSelection = () => {
@@ -600,8 +595,6 @@ function GoalDetailModal({
             setIsEditing(false);
         }
         if (nextViewState !== 'goal-activities') {
-            setEmbeddedTargetBuilderTarget(undefined);
-            setEmbeddedTargetActivityId(null);
             setIsTargetSelectionMode(false);
             setIsActivitiesAssociationMode(false);
             setActivityPickerFooterActions(null);
@@ -654,13 +647,11 @@ function GoalDetailModal({
     const renderLevelPicker = () => (
         <div className={styles.levelPickerContainer}>
             <div className={styles.levelPickerHeader}>
-                <button
+                <CloseButton
                     onClick={handleClose}
-                    aria-label="Close"
                     className={styles.levelPickerClose}
-                >
-                    <CloseIcon size={16} />
-                </button>
+                    size={20}
+                />
             </div>
             <p className={styles.levelPickerPrompt}>
                 What level of goal do you want to create under{' '}
@@ -793,6 +784,8 @@ function GoalDetailModal({
                         onGoalSelect={onGoalSelect}
                         onUpdate={onUpdate}
                         setTargets={setTargets}
+                        onTargetClick={readOnly ? undefined : setActiveAnalyticsTarget}
+                        onRequestTargetBuilder={readOnly ? undefined : (target) => setBuilderConfig({ target: target ?? null })}
                         readOnly={readOnly}
                     />
                 )
@@ -940,60 +933,38 @@ function GoalDetailModal({
     } else if (viewState === 'goal-activities') {
         content = (
             <Suspense fallback={null}>
-                {embeddedTargetBuilderTarget !== undefined ? (
-                    <TargetManager
-                        targets={targets}
-                        setTargets={setTargets}
-                        activityDefinitions={activityDefinitions}
-                        associatedActivities={associatedActivities}
-                        goalId={goalId}
-                        rootId={rootId}
-                        isEditing
-                        viewMode="builder"
-                        key={embeddedTargetActivityId || embeddedTargetBuilderTarget?.id || 'target-builder'}
-                        initialTarget={embeddedTargetBuilderTarget}
-                        initialActivityId={embeddedTargetActivityId}
-                        lockActivitySelection={Boolean(embeddedTargetActivityId)}
-                        onCloseBuilder={handleCloseEmbeddedTargetBuilder}
-                        onSave={persistTargetChanges}
-                        headerColor="var(--color-text-primary)"
-                        goalType={goalType}
-                        goalCompleted={isCompleted}
-                    />
-                ) : (
-                    <ActivityAssociator
-                        associatedActivities={associatedActivities}
-                        setAssociatedActivities={setAssociatedActivities}
-                        associatedActivityGroups={associatedActivityGroups}
-                        setAssociatedActivityGroups={setAssociatedActivityGroups}
-                        activityDefinitions={activityDefinitions}
-                        activityGroups={activityGroups}
-                        setActivityGroups={setActivityGroups}
-                        rootId={rootId}
-                        goalId={goalId}
-                        parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
-                        goalName={name}
-                        setTargets={setTargets}
-                        isEditing={true}
-                        targets={targets}
-                        embedded
-                        useFooterAssociateAction
-                        registerAssociateAction={registerActivitiesAssociateAction}
-                        registerAssociateCancelAction={registerActivitiesAssociateCancelAction}
-                        onAssociationFlowChange={setIsActivitiesAssociationMode}
-                        registerPickerFooterActions={registerActivityPickerFooterActions}
-                        onClose={handleClose}
-                        onSave={persistAssociations}
-                        onRefreshAssociations={refreshAssociations}
-                        inheritParentActivities={inheritParentActivities}
-                        setInheritParentActivities={setInheritParentActivities}
-                        dividerColor={displayGoalColor}
-                        onCreateActivity={handleCreateActivityFromActivities}
-                        onCopyActivity={handleCopyActivityFromActivities}
-                        isTargetSelectionMode={isTargetSelectionMode}
-                        onSelectTargetActivity={handleSelectTargetActivity}
-                    />
-                )}
+                <ActivityAssociator
+                    associatedActivities={associatedActivities}
+                    setAssociatedActivities={setAssociatedActivities}
+                    associatedActivityGroups={associatedActivityGroups}
+                    setAssociatedActivityGroups={setAssociatedActivityGroups}
+                    activityDefinitions={activityDefinitions}
+                    activityGroups={activityGroups}
+                    setActivityGroups={setActivityGroups}
+                    rootId={rootId}
+                    goalId={goalId}
+                    parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
+                    goalName={name}
+                    setTargets={setTargets}
+                    isEditing={true}
+                    targets={targets}
+                    embedded
+                    useFooterAssociateAction
+                    registerAssociateAction={registerActivitiesAssociateAction}
+                    registerAssociateCancelAction={registerActivitiesAssociateCancelAction}
+                    onAssociationFlowChange={setIsActivitiesAssociationMode}
+                    registerPickerFooterActions={registerActivityPickerFooterActions}
+                    onClose={handleClose}
+                    onSave={persistAssociations}
+                    onRefreshAssociations={refreshAssociations}
+                    inheritParentActivities={inheritParentActivities}
+                    setInheritParentActivities={setInheritParentActivities}
+                    dividerColor={displayGoalColor}
+                    onCreateActivity={handleCreateActivityFromActivities}
+                    onCopyActivity={handleCopyActivityFromActivities}
+                    isTargetSelectionMode={isTargetSelectionMode}
+                    onSelectTargetActivity={handleSelectTargetActivity}
+                />
             </Suspense>
         );
     } else if (viewState === 'goal-options') {
@@ -1116,7 +1087,6 @@ function GoalDetailModal({
     const showActivitiesFooter = viewState === 'goal-activities'
         && mode !== 'create'
         && !readOnly
-        && embeddedTargetBuilderTarget === undefined
         && Boolean(activitiesAssociateAction);
     const isTargetFlowActive = isTargetSelectionMode;
     const isAssociationFlowActive = isActivitiesAssociationMode;
@@ -1319,6 +1289,62 @@ function GoalDetailModal({
     ) : null;
 
 
+    const targetAnalyticsModal = activeAnalyticsTarget ? (
+        <Suspense fallback={null}>
+            <TargetAnalyticsModal
+                mode="view"
+                rootId={rootId}
+                goalId={goalId}
+                target={activeAnalyticsTarget}
+                goalColor={displayGoalColor}
+                goalType={goalType}
+                goalCompleted={isCompleted}
+                targets={targets}
+                setTargets={setTargets}
+                activityDefinitions={activityDefinitions}
+                associatedActivities={associatedActivities}
+                onSave={(newTargets) => { persistTargetChanges(newTargets); }}
+                onDelete={(targetToDelete) => {
+                    const remaining = (targets || []).filter((t) => t.id !== targetToDelete?.id);
+                    setTargets?.(remaining);
+                    persistTargetChanges(remaining);
+                }}
+                onClose={() => setActiveAnalyticsTarget(null)}
+            />
+        </Suspense>
+    ) : null;
+
+    // Add/edit now happens in the analytics modal (graph + builder side-by-side).
+    const targetBuilderModal = (!readOnly && builderConfig) ? (
+        <Suspense fallback={null}>
+            <TargetAnalyticsModal
+                mode={builderConfig.target ? 'edit' : 'add'}
+                rootId={rootId}
+                goalId={goalId}
+                target={builderConfig.target ?? null}
+                goalColor={displayGoalColor}
+                goalType={goalType}
+                goalCompleted={isCompleted}
+                targets={targets}
+                setTargets={setTargets}
+                activityDefinitions={activityDefinitions}
+                associatedActivities={associatedActivities}
+                initialActivityId={builderConfig.activityId ?? null}
+                lockActivitySelection={Boolean(builderConfig.lock)}
+                onSave={(newTargets) => {
+                    persistTargetChanges(newTargets);
+                    setBuilderConfig(null);
+                }}
+                onSaved={({ action }) => {
+                    if (action === 'create') {
+                        setViewState('goal');
+                    }
+                }}
+                onClose={() => setBuilderConfig(null)}
+            />
+        </Suspense>
+    ) : null;
+
     if (displayMode === 'panel') {
         return (
             <>
@@ -1333,6 +1359,8 @@ function GoalDetailModal({
                     )}
                 </div>
                 {activityBuilderModal}
+                {targetAnalyticsModal}
+                {targetBuilderModal}
             </>
         );
     }
@@ -1363,7 +1391,13 @@ function GoalDetailModal({
         </ModalBackdrop>
     );
 
-    return createPortal(modalMarkup, document.body);
+    return (
+        <>
+            {createPortal(modalMarkup, document.body)}
+            {targetAnalyticsModal}
+            {targetBuilderModal}
+        </>
+    );
 }
 
 function shouldMeasureStickyHeader(viewState) {

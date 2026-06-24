@@ -14,7 +14,7 @@ from validators import (
     GoalConvertLevelSchema,
     GoalPauseSchema,
     GoalMoveSchema,
-    GoalTargetCreateSchema, GoalTargetEvaluationSchema,
+    GoalTargetCreateSchema, GoalTargetUpdateSchema, GoalTargetEvaluationSchema,
     FractalCreateSchema,
 )
 from blueprints.auth_api import token_required
@@ -233,6 +233,76 @@ def remove_goal_target(current_user, goal_id, target_id):
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error removing goal target")
+        return internal_error(logger, "Goals API request failed")
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/goals/<goal_id>/targets/<target_id>', methods=['PATCH'])
+@token_required
+@validate_request(GoalTargetUpdateSchema)
+def update_goal_target(current_user, goal_id, target_id, validated_data):
+    """Update a single existing target on a goal."""
+    data = validated_data
+    db_session = get_db_session()
+    try:
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        payload, error, status = service.update_goal_target(goal_id, target_id, current_user.id, data)
+        if error:
+            return jsonify({"error": error}), status
+        goal = payload["goal"]
+        updated_target = payload["target"]
+
+        all_targets = [serialize_target(t) for t in goal.targets_rel if t.deleted_at is None]
+        return jsonify({"targets": all_targets, "id": updated_target.id, "target": serialize_target(updated_target)}), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error updating goal target")
+        return internal_error(logger, "Goals API request failed")
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/<root_id>/targets/<target_id>/analytics', methods=['GET'])
+@token_required
+def get_target_analytics(current_user, root_id, target_id):
+    """Return analytics (contributing instances + progress summary) for a target.
+
+    `since=all` returns the full activity history; `since=creation` (default)
+    bounds instances to the target's effective start.
+    """
+    since = 'all' if request.args.get('since') == 'all' else 'creation'
+    db_session = get_db_session()
+    try:
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        payload, error, status = service.get_target_analytics(root_id, target_id, current_user.id, since=since)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching target analytics")
+        return internal_error(logger, "Goals API request failed")
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/<root_id>/goals/<goal_id>/activities/<activity_id>/instances', methods=['GET'])
+@token_required
+def get_goal_activity_instances(current_user, root_id, goal_id, activity_id):
+    """Return contributing completed instances + activity definition for a
+    goal/activity pair. Powers the live target-builder graph preview before a
+    target is saved."""
+    db_session = get_db_session()
+    try:
+        service = GoalService(db_session, sync_targets=_sync_targets)
+        payload, error, status = service.get_goal_activity_instances(root_id, goal_id, activity_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching goal activity instances")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()

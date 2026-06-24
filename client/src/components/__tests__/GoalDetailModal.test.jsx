@@ -221,11 +221,19 @@ vi.mock('../goalDetail/ActivityAssociator', async () => {
 });
 
 vi.mock('../goalDetail/TargetManager', () => ({
-    default: ({ viewMode, onCloseBuilder }) => (
+    default: ({ viewMode, onCloseBuilder, onSaved }) => (
         viewMode === 'builder' ? (
             <div>
                 <div>embedded target builder</div>
                 <button onClick={onCloseBuilder}>back to activities</button>
+                <button
+                    onClick={() => {
+                        onSaved?.({ action: 'create' });
+                        onCloseBuilder?.();
+                    }}
+                >
+                    save target
+                </button>
             </div>
         ) : (
             <div>target list view</div>
@@ -483,8 +491,16 @@ describe('GoalDetailModal smoke coverage', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'select target activity' }));
 
+        // The builder now opens in its own modal layered above the Activities view,
+        // rather than replacing the goal detail content.
         await waitFor(() => {
             expect(screen.getByText('embedded target builder')).toBeInTheDocument();
+        }, { timeout: 5000 });
+
+        fireEvent.click(screen.getByRole('button', { name: 'save target' }));
+
+        await waitFor(() => {
+            expect(screen.getByText('view:Deep Work')).toBeInTheDocument();
             expect(screen.queryByText('goal activities view')).not.toBeInTheDocument();
         }, { timeout: 5000 });
     });

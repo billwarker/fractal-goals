@@ -1,5 +1,6 @@
 import React from 'react';
 import Linkify from './atoms/Linkify';
+import DeleteButton from './atoms/DeleteButton';
 import { formatAverageDuration } from '../utils/durationStats';
 import styles from './ActivityCard.module.css';
 
@@ -111,15 +112,12 @@ function ActivityCard({
                 >
                     Duplicate
                 </button>
-                <button
+                <DeleteButton
                     onClick={(e) => {
                         e.stopPropagation();
                         onDelete(activity);
                     }}
-                    className={styles.deleteAction}
-                >
-                    Delete
-                </button>
+                />
             </div>
         </div>
     );

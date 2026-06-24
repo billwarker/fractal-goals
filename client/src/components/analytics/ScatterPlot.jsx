@@ -1,6 +1,7 @@
 import React from 'react';
 import { Scatter } from 'react-chartjs-2';
 import { chartDefaults, useChartOptions } from './ChartJSWrapper'; // Import hook
+import { withScatterPointDensity } from './scatterPointProfile';
 import styles from './ScatterPlot.module.css';
 
 /**
@@ -118,7 +119,7 @@ function ScatterPlot({
                         }
 
                         const metricDef = metrics.find(md => md.id === m.metric_id);
-                        if (metricDef && m.value) {
+                        if (metricDef && m.value != null && m.value !== '') {
                             setPoint[metricDef.id] = parseFloat(m.value);
                         }
                     });
@@ -171,7 +172,7 @@ function ScatterPlot({
                 }
 
                 const metricDef = metrics.find(md => md.id === m.metric_id);
-                if (metricDef && m.value) {
+                if (metricDef && m.value != null && m.value !== '') {
                     point[metricDef.id] = parseFloat(m.value);
                 }
             });
@@ -192,7 +193,7 @@ function ScatterPlot({
     }
 
     // Prepare chart data
-    const chartDataPoints = dataPoints.map(p => ({
+    const chartDataPoints = withScatterPointDensity(dataPoints.map(p => ({
         x: p[xMetricToPlot.id],
         y: p[yMetricToPlot.id],
         session_name: p.session_name,
@@ -200,7 +201,7 @@ function ScatterPlot({
         aggregation: p.aggregation,
         set_number: p.set_number,
         mode_label: p.mode_label,
-    }));
+    })));
 
     const chartData = {
         datasets: [{
@@ -209,8 +210,8 @@ function ScatterPlot({
             backgroundColor: 'rgba(33, 150, 243, 0.7)',
             borderColor: chartDefaults.borderColor,
             borderWidth: 1,
-            pointRadius: 8,
-            pointHoverRadius: 12,
+            pointRadius: chartDataPoints.map((point) => point.pointRadius),
+            pointHoverRadius: chartDataPoints.map((point) => point.pointHoverRadius),
             pointHoverBackgroundColor: chartDefaults.primaryColor,
             pointHoverBorderColor: '#fff',
             pointHoverBorderWidth: 2
@@ -241,6 +242,9 @@ function ScatterPlot({
                         lines.push(new Date(point.session_date).toLocaleDateString());
                         lines.push(`${xMetricToPlot.name}: ${point.x} ${xMetricToPlot.unit}`);
                         lines.push(`${yMetricToPlot.name}: ${point.y} ${yMetricToPlot.unit}`);
+                        if (point.densityCount > 1) {
+                            lines.push(`${point.densityCount} entries at this point`);
+                        }
 
                         if (point.mode_label) {
                             lines.push(`Mode: ${point.mode_label}`);

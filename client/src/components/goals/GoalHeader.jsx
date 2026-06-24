@@ -1,7 +1,7 @@
 import React from 'react';
 import { getTypeDisplayName } from '../../utils/goalHelpers';
 import SMARTIndicator from '../SMARTIndicator';
-import CloseIcon from '../atoms/CloseIcon';
+import CloseButton from '../atoms/CloseButton';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../../utils/dateUtils';
 
@@ -105,24 +105,14 @@ function GoalHeader({
                         </button>
                     )}
                     {onClose && (
-                        <button
+                        <CloseButton
                             onClick={onClose}
-                            aria-label="Close"
+                            size={20}
                             style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--color-text-muted)',
-                                fontSize: '24px',
-                                cursor: 'pointer',
-                                padding: '0',
-                                lineHeight: 1,
                                 height: '24px',
-                                display: 'flex',
-                                alignItems: 'center'
+                                width: '24px'
                             }}
-                        >
-                            <CloseIcon size={20} />
-                        </button>
+                        />
                     )}
                 </div>
             </div>

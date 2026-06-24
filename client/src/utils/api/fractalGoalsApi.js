@@ -16,6 +16,16 @@ export const fractalGoalsApi = {
         }),
     evaluateGoalTargets: (rootId, goalId, sessionId) =>
         axios.post(`${API_BASE}/${rootId}/goals/${goalId}/evaluate-targets`, { session_id: sessionId }),
+    createGoalTarget: (goalId, data) =>
+        axios.post(`${API_BASE}/goals/${goalId}/targets`, data),
+    updateGoalTarget: (goalId, targetId, data) =>
+        axios.patch(`${API_BASE}/goals/${goalId}/targets/${targetId}`, data),
+    deleteGoalTarget: (goalId, targetId) =>
+        axios.delete(`${API_BASE}/goals/${goalId}/targets/${targetId}`),
+    getTargetAnalytics: (rootId, targetId, since = 'creation') =>
+        axios.get(`${API_BASE}/${rootId}/targets/${targetId}/analytics${since === 'all' ? '?since=all' : ''}`),
+    getGoalActivityInstances: (rootId, goalId, activityId) =>
+        axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activities/${activityId}/instances`),
     getGoalAnalytics: (rootId) => axios.get(`${API_BASE}/${rootId}/goals/analytics`),
     getGoalActivities: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activities`),
     getGoalActivityGroups: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups`),

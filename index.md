@@ -172,6 +172,15 @@ Goal active/inactive status and activity evidence:
 - All evidence/metrics paths share this rule: `SessionAnalyticsService.get_recent_evidence_goal_ids` (drives the tree flip), `get_flowtree_session_metrics` (metrics overlay), and `GoalTreeService` session goal-scope resolution. `goals_by_id` consumers eager-load `Goal.pause_intervals` via `goal_serializer_load_options` to avoid N+1.
 - The pause concept is named `paused` end-to-end (DB → serializer → API `/pause` → frontend `goal.paused`); the legacy `frozen`/`/freeze` vocabulary has been removed.
 
+Targets and the target analytics experience:
+
+- Targets (`Target` + `TargetMetricCondition`) are measurable thresholds on a goal (e.g. *Playback Speed ≥ 100%*). They have full per-target CRUD: `POST /api/goals/<goal_id>/targets`, `PATCH /api/goals/<goal_id>/targets/<target_id>` (single-target in-place update), and `DELETE .../targets/<target_id>`. The PATCH path and the goal-level bulk `sync_goal_targets` share the metric-condition reconcile helper `_reconcile_target_conditions` in `services/goal_target_service.py`. `update_goal_target` emits `Events.TARGET_UPDATED`.
+- Target cards (`client/src/components/TargetCard.jsx`, managed by `client/src/components/goalDetail/TargetManager.jsx`) expose always-available Edit/Delete affordances (gated only by read-only context, not goal edit mode). View-mode target add/edit/delete persists immediately through `useTargetMutations` (`client/src/hooks/useTargetQueries.js`) rather than a full goal save; the local bulk `setTargets` path is reserved for active goal-edit/create flows where target changes should stay batched with the unsaved goal form.
+- `TargetAnalyticsModal` (`client/src/components/goalDetail/TargetAnalyticsModal.jsx`) is the single surface for both viewing and building targets, layered above `GoalDetailModal` (z-index 3500). It has a `mode` of `view` | `add` | `edit`. Left side is always the live graph (Trend `Line` / Scatter, up to two selectable metrics, threshold reference lines via `chartjs-plugin-annotation` registered in `ChartJSWrapper.jsx`, a single completed-goal-colored target point on the scatter, best-instance markers, and a brand-primary highlight ring on the timeline-selected point). The right side switches by mode: in `view` it shows the minimal target meta line + the contributing-instances timeline (`ActivityTimelineCard`) with a Since-creation / All-history toggle; in `add`/`edit` it hosts the `TargetManager` builder form, which emits its live draft via `onDraftChange` so the graph previews the in-progress activity + thresholds before save.
+  - View data: `GET /api/<root_id>/targets/<target_id>/analytics?since=creation|all` (`GoalTargetService.get_target_analytics`) returns the serialized target, activity definition, contributing completed instances (goal-subtree scoped, date-window filtered in SQL before the final `resolve_contribution_goal` evidence check; `since=all` drops the creation-date lower bound), and a per-condition progress `summary` (best value, met count, first-met, days-since-created).
+  - Builder live preview: `GET /api/<root_id>/goals/<goal_id>/activities/<activity_id>/instances` (`GoalTargetService.get_goal_activity_instances`) returns the activity's full contributing history + definition for a goal/activity pair with no saved target. Both paths share `_collect_goal_activity_instances`.
+- Add/edit entry points (card Edit, and the Activities-tab `+ Add Target` → activity picker) open this modal via `GoalDetailModal`'s `builderConfig` state. Successful direct target creates fire a toast and return the parent `GoalDetailModal` to the Details tab so the new target card is immediately visible. The former standalone `TargetBuilderModal` was retired.
+
 Key supporting backend pieces:
 
 - `services/goal_service.py`
@@ -191,8 +200,11 @@ Key supporting frontend pieces:
 
 - `client/src/utils/goalNodeModel.js`
 - `client/src/hooks/useGoalQueries.js`
+- `client/src/hooks/useTargetQueries.js`
 - `client/src/hooks/useGoalDetailController.js`
 - `client/src/components/GoalDetailModal.jsx`
+- `client/src/components/goalDetail/TargetManager.jsx`
+- `client/src/components/goalDetail/TargetAnalyticsModal.jsx`
 - `client/src/components/goals/GoalHierarchyList.jsx`
 - `client/src/components/flowTree/FlowTreeNode.jsx`
 - `client/src/components/flowTree/FlowTreeOptionsPane.jsx`

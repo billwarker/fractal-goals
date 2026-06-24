@@ -14,6 +14,7 @@ function TargetsSection({
     allowedActivityIds, activityDefinitions = [], targetAchievements, achievedTargetIds,
     targets = null,
     scopedActivityName = null,
+    onTargetClick = null,
 }) {
     const { data: goalTree } = useFractalTree(rootId);
 
@@ -107,6 +108,7 @@ function TargetsSection({
                             isCompleted={target.is_completed_realtime}
                             isEditMode={false}
                             goalType={target._goalType}
+                            onClick={onTargetClick ? () => onTargetClick(target) : undefined}
                         />
                     </div>
                 ))}

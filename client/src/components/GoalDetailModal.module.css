@@ -773,16 +773,8 @@
 }
 
 .levelPickerClose {
-    background: transparent;
-    border: none;
-    color: var(--color-text-muted);
-    font-size: 24px;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
     height: 24px;
-    display: flex;
-    align-items: center;
+    width: 24px;
 }
 
 .levelPickerPrompt {

@@ -1,6 +1,7 @@
 import React from 'react';
 
 import Linkify from './atoms/Linkify';
+import DeleteButton from './atoms/DeleteButton';
 import SessionTemplateNameBadge from './common/SessionTemplateNameBadge';
 import SessionTemplateTypePill from './common/SessionTemplateTypePill';
 import styles from './TemplateCard.module.css';
@@ -142,16 +143,12 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate, onArchiveToggle
                         {isArchived ? 'Reactivate' : 'Archive'}
                     </button>
                 )}
-                <button
-                    type="button"
+                <DeleteButton
                     onClick={(event) => {
                         event.stopPropagation();
                         onDelete(template);
                     }}
-                    className={styles.deleteAction}
-                >
-                    Delete
-                </button>
+                />
             </div>
         </div>
     );

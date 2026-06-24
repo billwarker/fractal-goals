@@ -15,6 +15,7 @@ const Modal = ({
     children,
     size = 'md', // sm, md, lg, xl
     className = '',
+    overlayClassName = '',
     showCloseButton = true,
     closeOnEsc = true,
     closeOnBackdrop = true
@@ -44,7 +45,7 @@ const Modal = ({
 
     const modalContent = (
         <ModalBackdrop
-            className={styles.overlay}
+            className={`${styles.overlay} ${overlayClassName}`}
             closeOnBackdrop={closeOnBackdrop}
             onClose={onClose}
             aria-modal="true"

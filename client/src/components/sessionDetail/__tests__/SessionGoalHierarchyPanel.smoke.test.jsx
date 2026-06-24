@@ -1,5 +1,5 @@
 import React from 'react';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import SessionGoalHierarchyPanel from '../SessionGoalHierarchyPanel';
 
@@ -65,11 +65,26 @@ vi.mock('../../../utils/api', () => ({
 }));
 
 vi.mock('../TargetsSection', () => ({
-    default: ({ scopedActivityName }) => (
-        <div>{scopedActivityName ? `Targets: ${scopedActivityName}` : 'Targets'}</div>
+    default: ({ scopedActivityName, onTargetClick }) => (
+        <button
+            type="button"
+            onClick={() => onTargetClick?.({
+                id: 'target-1',
+                name: 'Target 1',
+                activity_id: 'activity-1',
+                _goalId: 'ig-1',
+                _goalType: 'ImmediateGoal',
+                metrics: [],
+            })}
+        >
+            {scopedActivityName ? `Targets: ${scopedActivityName}` : 'Targets'}
+        </button>
     ),
 }));
 vi.mock('../GoalRow', () => ({ default: () => <div /> }));
+vi.mock('../../goalDetail/TargetAnalyticsModal', () => ({
+    default: ({ target }) => <div data-testid="target-analytics-modal">{target.name}</div>,
+}));
 
 describe('SessionGoalHierarchyPanel smoke', () => {
     beforeEach(() => {
@@ -151,6 +166,30 @@ describe('SessionGoalHierarchyPanel smoke', () => {
         expect(screen.getByText('STG')).toBeInTheDocument();
         expect(screen.getByText('IG')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Activity' })).not.toBeInTheDocument();
+    });
+
+    it('opens the target manager modal from a session target card', async () => {
+        renderWithProviders(
+            <SessionGoalHierarchyPanel
+                selectedActivity={{
+                    id: 'instance-1',
+                    activity_definition_id: 'activity-1',
+                    name: 'Pull Up'
+                }}
+                onGoalClick={vi.fn()}
+                onGoalCreated={vi.fn()}
+                onOpenGoals={vi.fn()}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Targets: Pull Up' }));
+        expect(await screen.findByTestId('target-analytics-modal')).toHaveTextContent('Target 1');
     });
 
     it('does not fall back to session hierarchy when focused activity has no eligible goals', async () => {

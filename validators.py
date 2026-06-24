@@ -636,7 +636,7 @@ class GoalUpdateSchema(BaseModel):
         if v is None:
             return v
         return sanitize_string(v)
-    
+
     @field_validator('description')
     @classmethod
     def sanitize_description(cls, v: Optional[str]) -> Optional[str]:
@@ -757,6 +757,21 @@ class GoalTargetCreateSchema(BaseModel):
         if v is None:
             return v
         return sanitize_string(v)
+
+    @field_validator('frequency_days', 'frequency_count', mode='before')
+    @classmethod
+    def empty_frequency_to_none(cls, v):
+        if v == '':
+            return None
+        return v
+
+
+class GoalTargetUpdateSchema(GoalTargetCreateSchema):
+    """Schema for updating an existing target on a goal.
+
+    All fields remain optional; only supplied fields are applied.
+    """
+    pass
 
 
 class GoalTargetEvaluationSchema(BaseModel):

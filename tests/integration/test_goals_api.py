@@ -641,6 +641,29 @@ class TestGoalTargetEndpoints:
         )
         assert response.status_code == 400
         assert response.get_json()['error'] == 'Validation failed'
+
+    def test_add_target_normalizes_empty_optional_fields(self, authed_client, db_session, sample_ultimate_goal):
+        """Empty builder optional fields should not crash direct target create."""
+        response = authed_client.post(
+            f'/api/goals/{sample_ultimate_goal.id}/targets',
+            json={
+                'name': 'Form ≥ 0',
+                'type': 'threshold',
+                'time_scope': 'all_time',
+                'start_date': '',
+                'end_date': '',
+                'linked_block_id': '',
+                'frequency_count': '',
+                'metrics': [],
+            }
+        )
+        assert response.status_code == 201
+        target = db_session.query(Target).filter(Target.id == response.get_json()['id']).first()
+        assert target is not None
+        assert target.start_date is None
+        assert target.end_date is None
+        assert target.linked_block_id is None
+        assert target.frequency_count is None
     
     def test_remove_target_from_goal(self, authed_client, sample_ultimate_goal):
         """Test removing a target from a goal."""
@@ -705,6 +728,69 @@ class TestGoalTargetEndpoints:
         target = db_session.query(Target).filter(Target.id == target_id).first()
         assert target is not None
         assert target.deleted_at is not None
+
+    def test_update_target_patches_name(self, authed_client, db_session, sample_ultimate_goal):
+        """PATCH on a single target updates it in place without a goal save."""
+        create_response = authed_client.post(
+            f'/api/goals/{sample_ultimate_goal.id}/targets',
+            json={'name': 'Original Name', 'metrics': []}
+        )
+        assert create_response.status_code == 201
+        target_id = create_response.get_json()['id']
+
+        patch_response = authed_client.patch(
+            f'/api/goals/{sample_ultimate_goal.id}/targets/{target_id}',
+            json={'name': 'Updated Name'}
+        )
+        assert patch_response.status_code == 200
+        assert patch_response.get_json()['target']['name'] == 'Updated Name'
+
+        target = db_session.query(Target).filter(Target.id == target_id).first()
+        assert target.name == 'Updated Name'
+        assert target.deleted_at is None
+
+    def test_update_target_missing_returns_404(self, authed_client, sample_ultimate_goal):
+        """PATCH on a non-existent target returns 404."""
+        response = authed_client.patch(
+            f'/api/goals/{sample_ultimate_goal.id}/targets/does-not-exist',
+            json={'name': 'X'}
+        )
+        assert response.status_code == 404
+
+    def test_target_analytics_returns_read_model(self, authed_client, sample_ultimate_goal):
+        """The analytics endpoint returns target + instances + summary."""
+        create_response = authed_client.post(
+            f'/api/goals/{sample_ultimate_goal.id}/targets',
+            json={'name': 'Analytics Target', 'metrics': []}
+        )
+        assert create_response.status_code == 201
+        target_id = create_response.get_json()['id']
+
+        root_id = sample_ultimate_goal.root_id or sample_ultimate_goal.id
+        response = authed_client.get(f'/api/{root_id}/targets/{target_id}/analytics')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert 'target' in data
+        assert 'instances' in data and isinstance(data['instances'], list)
+        assert 'summary' in data
+        assert data['summary']['total_count'] == 0
+
+        # `since=all` is accepted and still returns the read model.
+        all_response = authed_client.get(f'/api/{root_id}/targets/{target_id}/analytics?since=all')
+        assert all_response.status_code == 200
+        assert 'instances' in all_response.get_json()
+
+    def test_goal_activity_instances_endpoint(self, authed_client, sample_ultimate_goal):
+        """The goal/activity instances endpoint powers the builder live preview."""
+        root_id = sample_ultimate_goal.root_id or sample_ultimate_goal.id
+        # Unknown activity id returns an empty instance list (no crash).
+        response = authed_client.get(
+            f'/api/{root_id}/goals/{sample_ultimate_goal.id}/activities/nonexistent-activity/instances'
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['instances'] == []
+        assert 'activity_definition' in data
 
 
 @pytest.mark.integration

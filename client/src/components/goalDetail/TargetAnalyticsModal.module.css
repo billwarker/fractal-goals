@@ -1,0 +1,398 @@
+.overlay {
+    position: fixed;
+    top: var(--app-nav-height, 0px);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--color-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3500;
+    padding: 24px;
+}
+
+.deleteConfirmOverlay {
+    z-index: 5000;
+}
+
+.content {
+    background: var(--color-bg-app);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    width: min(1100px, 96vw);
+    height: min(640px, calc(88vh - var(--app-nav-height, 0px)));
+    max-height: calc(88vh - var(--app-nav-height, 0px));
+    display: flex;
+    flex-direction: row;
+    min-height: 0;
+    overflow: hidden;
+    color: var(--color-text-primary);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58);
+}
+
+.mainColumn {
+    flex: 1 1 62%;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    padding: 18px 24px 24px;
+}
+
+.header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+}
+
+.headerText {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Activity name shown above the target title — matches the muted activity-name
+   subtext used on session/timeline cards (theme-aware, normal case). */
+.activityEyebrow {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--color-text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: bold;
+    line-height: 1.2;
+}
+
+/* Builder pane title ("Add Target"), sitting level with the close button. */
+.builderTitle {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Pencil edit button — mirrors the activity-definition edit button on session
+   detail activity cards. */
+.headerIconButton {
+    appearance: none;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    height: 32px;
+    width: 32px;
+    padding: 0;
+    flex: 0 0 auto;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.headerIconButton:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
+    color: var(--color-text-primary);
+}
+
+/* Minimal metadata line beneath the header */
+.meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.metaDot {
+    opacity: 0.5;
+}
+
+.metaStatusSuccess {
+    color: var(--color-success);
+    font-weight: 600;
+}
+
+.metaStatusPending {
+    color: var(--color-text-secondary);
+    font-weight: 600;
+}
+
+.metaStalled {
+    color: var(--color-brand-danger);
+    font-weight: 600;
+}
+
+.graphPane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.graphControls {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.metricControls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+    gap: 10px;
+    flex: 1 1 340px;
+    max-width: 520px;
+}
+
+.metricField {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    color: var(--color-text-muted);
+    font-size: 11px;
+}
+
+.viewModeField {
+    flex: 0 0 150px;
+    position: relative;
+    z-index: 5;
+}
+
+.metricField select {
+    width: 100%;
+    min-height: 34px;
+    padding: 8px 34px 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm, 4px);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.metricField select:focus {
+    outline: none;
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand-primary) 24%, transparent);
+}
+
+.graphTypeTrigger {
+    appearance: none;
+    width: 100%;
+    min-height: 34px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm, 4px);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.graphTypeTrigger:focus {
+    outline: none;
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand-primary) 24%, transparent);
+}
+
+.graphTypeChevron {
+    color: var(--color-text-secondary);
+    font-size: 16px;
+    line-height: 1;
+}
+
+.graphTypeMenu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm, 4px);
+    background: var(--color-bg-elevated, var(--color-bg-input));
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.42);
+}
+
+.graphTypeOption {
+    appearance: none;
+    border: 0;
+    border-radius: var(--radius-xs, 3px);
+    background: transparent;
+    color: var(--color-text-primary);
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    min-height: 30px;
+    padding: 7px 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-align: left;
+}
+
+.graphTypeOption:hover,
+.graphTypeOption:focus {
+    outline: none;
+    background: var(--color-bg-card-hover);
+}
+
+.graphTypeOption[aria-selected="true"] {
+    font-weight: 700;
+}
+
+.graphTypeCheck {
+    width: 12px;
+    flex: 0 0 12px;
+    color: var(--color-text-primary);
+}
+
+.chartArea {
+    position: relative;
+    flex: 1;
+    min-height: 200px;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md, 6px);
+    padding: 12px;
+}
+
+.placeholder {
+    height: 100%;
+    min-height: 180px;
+    display: grid;
+    place-items: center;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    text-align: center;
+}
+
+.timelinePane {
+    flex: 0 0 38%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border-left: 1px solid var(--color-border);
+    background: var(--color-bg-card-alt);
+    padding: 18px 18px 0;
+}
+
+.timelineHeaderRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.timelineTitle {
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.timelineScroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 18px;
+}
+
+.builderScroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 18px;
+}
+
+.timelineToggleRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.timelineToggleRow input {
+    cursor: pointer;
+}
+
+.timelineItem {
+    cursor: pointer;
+    border-radius: var(--radius-md, 6px);
+    border: 1px solid transparent;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.timelineItem + .timelineItem {
+    margin-top: 10px;
+}
+
+.timelineItem:hover {
+    border-color: var(--color-border);
+}
+
+.timelineItemSelected {
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 0 0 1px var(--color-brand-primary) inset;
+}
+
+.timelineItemSelected:hover {
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 0 0 1px var(--color-brand-primary) inset;
+}
+
+@media (max-width: 880px) {
+    .content {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .timelinePane {
+        flex: 1 1 auto;
+        max-width: none;
+        border-left: none;
+        border-top: 1px solid var(--color-border);
+        padding: 16px 18px 0;
+    }
+}

@@ -6,7 +6,7 @@ import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import { Text } from '../atoms/Typography';
 
-const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requireMatchingText, confirmText = 'Delete' }) => {
+const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requireMatchingText, confirmText = 'Delete', overlayClassName = '' }) => {
     const [matchingText, setMatchingText] = useState('');
     const handleClose = () => {
         setMatchingText('');
@@ -26,6 +26,7 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requir
             title={title || "Confirm Delete"}
             size="sm"
             showCloseButton={true}
+            overlayClassName={overlayClassName}
         >
             <ModalBody>
                 <div style={{ marginBottom: '15px' }}>
