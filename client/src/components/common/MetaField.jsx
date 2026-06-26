@@ -8,11 +8,12 @@ function MetaField({
     muted = false,
     emphasize = false,
     className = '',
+    labelClassName = '',
     valueClassName = '',
 }) {
     return (
         <div className={`${styles.field} ${className}`.trim()}>
-            <div className={styles.label}>{label}</div>
+            <div className={[styles.label, labelClassName].filter(Boolean).join(' ')}>{label}</div>
             <div
                 className={[
                     muted ? styles.valueMuted : styles.value,

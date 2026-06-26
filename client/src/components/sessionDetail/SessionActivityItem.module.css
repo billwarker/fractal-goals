@@ -282,6 +282,10 @@
     position: relative;
 }
 
+.timerMetaColumn .timerFieldContainer {
+    flex: 0 0 auto;
+}
+
 .durationMetaField {
     min-width: 0;
 }
@@ -290,6 +294,7 @@
     font-size: 9px;
     color: var(--color-text-muted);
     text-transform: uppercase;
+    line-height: 1.2;
 }
 
 .timerInput {
@@ -761,7 +766,7 @@
     border-left: 1px solid var(--color-border);
 }
 
-@container (max-width: 1180px) {
+@container (max-width: 760px) {
     .activityHeader {
         flex-direction: column;
         align-items: stretch;
@@ -783,6 +788,114 @@
 
     .timerControlsGrid {
         width: 100%;
+    }
+
+    /* Set row becomes: [#] [metrics]  then  [yield] on its own row below */
+    .setRow {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: start;
+        column-gap: 8px;
+        row-gap: 8px;
+    }
+
+    .setNumber {
+        grid-column: 1;
+        grid-row: 1;
+        padding-top: 6px;
+    }
+
+    .setMetricsContent {
+        grid-column: 2;
+        grid-row: 1;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .removeSetButton {
+        grid-column: 3;
+        grid-row: 1;
+        margin-left: 0;
+        padding-top: 6px;
+    }
+
+    /* Yield drops below the metrics, full width, left-aligned — no longer squishing horizontally */
+    .setYield {
+        grid-column: 2 / 4;
+        grid-row: 2;
+        min-width: 0;
+        text-align: left;
+        padding-right: 0;
+        white-space: normal;
+    }
+
+    /* Metric row: fixed tracks so every (independent) row grid aligns identically */
+    .metricInputContainer {
+        display: grid;
+        grid-template-columns: 64px minmax(0, 1fr) 64px;
+        width: 100%;
+        column-gap: 12px;
+        row-gap: 4px;
+        align-items: center;
+    }
+
+    .metricLabel,
+    .metricLabelLarge {
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.2;
+    }
+
+    .metricInput {
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .metricValueControl {
+        width: 100%;
+    }
+
+    .metricMeta,
+    .metricMetaLarge {
+        justify-self: start;
+        gap: 6px;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+    }
+
+    .metricUnit,
+    .metricUnitLarge {
+        white-space: nowrap;
+    }
+
+    .singleMetricGroupContent {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    /* Split groups stack their label above the metric rows */
+    .splitContainer {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .splitLabel {
+        min-width: 0;
+    }
+
+    /* Stacked layout: drop the left divider/indent on cascade buttons */
+    .cascadeButtonsContainer {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: none;
+        flex-wrap: wrap;
     }
 }
 
@@ -843,27 +956,86 @@
         width: 100%;
     }
 
+    /* Set row becomes: [#] [metrics]  then  [yield] on its own row below */
     .setRow {
-        flex-wrap: wrap;
-        align-items: flex-start;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: start;
+        column-gap: 8px;
+        row-gap: 8px;
     }
 
+    .setNumber {
+        grid-column: 1;
+        grid-row: 1;
+        padding-top: 6px;
+    }
+
+    .setMetricsContent {
+        grid-column: 2;
+        grid-row: 1;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .removeSetButton {
+        grid-column: 3;
+        grid-row: 1;
+        margin-left: 0;
+        padding-top: 6px;
+    }
+
+    /* Yield drops below the metrics, full width, left-aligned — no longer squishing horizontally */
+    .setYield {
+        grid-column: 2 / 4;
+        grid-row: 2;
+        min-width: 0;
+        text-align: left;
+        padding-right: 0;
+        white-space: normal;
+    }
+
+    /* Metric row: fixed tracks so every (independent) row grid aligns identically */
     .metricInputContainer {
+        display: grid;
+        grid-template-columns: 64px minmax(0, 1fr) 64px;
         width: 100%;
-        flex-wrap: wrap;
-        gap: 6px;
+        column-gap: 12px;
+        row-gap: 4px;
         align-items: center;
     }
 
     .metricLabel,
     .metricLabelLarge {
         max-width: 100%;
-        overflow-wrap: anywhere;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.2;
     }
 
     .metricInput {
-        min-width: 72px;
-        max-width: 120px;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+    }
+
+    .metricValueControl {
+        width: 100%;
+    }
+
+    .metricMeta,
+    .metricMetaLarge {
+        justify-self: start;
+        gap: 6px;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+    }
+
+    .metricUnit,
+    .metricUnitLarge {
+        white-space: nowrap;
     }
 
     .singleMetricGroupContent {
@@ -872,8 +1044,23 @@
         gap: 10px;
     }
 
+    /* Split groups stack their label above the metric rows */
     .splitContainer {
         width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .splitLabel {
+        min-width: 0;
+    }
+
+    /* Stacked layout: drop the left divider/indent on cascade buttons */
+    .cascadeButtonsContainer {
+        margin-left: 0;
+        padding-left: 0;
+        border-left: none;
         flex-wrap: wrap;
     }
 

@@ -1207,6 +1207,7 @@ function SessionActivityItem({
                                         ) : (
                                             <MetaField
                                                 className={styles.durationMetaField}
+                                                labelClassName={styles.timerLabel}
                                                 label={isCountingDown ? 'Remaining' : 'Duration'}
                                                 value={isCountingDown ? formatDuration(countdownRemaining) : formatDuration(displayedDuration)}
                                                 valueClassName={[
