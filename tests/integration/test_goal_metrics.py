@@ -1,7 +1,16 @@
 import pytest
 from datetime import datetime, timedelta
 import uuid
-from models import Goal, Session, ActivityDefinition, ActivityInstance, session_goals, activity_goal_associations
+from models import (
+    Goal,
+    Session,
+    ActivityDefinition,
+    ActivityGroup,
+    ActivityInstance,
+    session_goals,
+    activity_goal_associations,
+    goal_activity_group_associations,
+)
 from services.metrics import GoalMetricsService
 
 @pytest.fixture
@@ -203,3 +212,114 @@ def test_recursive_activity_metrics(db_session):
     # Recursive rollup
     assert root_metrics["recursive"]["activities_count"] == 1
     assert root_metrics["recursive"]["activities_duration_seconds"] == 600
+
+def test_metrics_count_group_activity_evidence_sessions_and_daily_points(db_session):
+    root_id = str(uuid.uuid4())
+    created_at = datetime(2026, 6, 17, 10, 0)
+    root = Goal(id=root_id, name="Root Goal", root_id=root_id, created_at=created_at)
+    child = Goal(
+        id=str(uuid.uuid4()),
+        name="Child Goal",
+        parent_id=root_id,
+        root_id=root_id,
+        created_at=created_at,
+    )
+    db_session.add_all([root, child])
+    db_session.flush()
+
+    group = ActivityGroup(id=str(uuid.uuid4()), root_id=root_id, name="Practice Group")
+    activity = ActivityDefinition(
+        id=str(uuid.uuid4()),
+        name="Grouped Activity",
+        root_id=root_id,
+        group_id=group.id,
+    )
+    session_start = datetime(2026, 6, 25, 18, 15)
+    session = Session(
+        id=str(uuid.uuid4()),
+        name="Evidence Session",
+        root_id=root_id,
+        session_start=session_start,
+        total_duration_seconds=3600,
+    )
+    instance = ActivityInstance(
+        id=str(uuid.uuid4()),
+        root_id=root_id,
+        session_id=session.id,
+        activity_definition_id=activity.id,
+        completed=True,
+        created_at=session_start,
+        time_start=session_start,
+        time_stop=session_start + timedelta(minutes=45),
+        duration_seconds=2710,
+    )
+    db_session.add_all([group, activity, session, instance])
+    db_session.flush()
+    db_session.execute(goal_activity_group_associations.insert().values(
+        goal_id=child.id,
+        activity_group_id=group.id,
+    ))
+    db_session.commit()
+
+    service = GoalMetricsService(db_session)
+    metrics = service.get_metrics_for_goal(root_id)
+
+    assert metrics["recursive"]["sessions_count"] == 1
+    assert metrics["recursive"]["sessions_duration_seconds"] == 3600
+    assert metrics["recursive"]["activities_count"] == 1
+    assert metrics["recursive"]["activities_duration_seconds"] == 2710
+
+    daily = service.get_goal_daily_durations(root_id)
+    assert daily["points"] == [{
+        "date": "2026-06-25",
+        "session_duration": 3600,
+        "activity_duration": 2710,
+    }]
+
+def test_metrics_count_parent_inherited_activity_evidence(db_session):
+    root_id = str(uuid.uuid4())
+    created_at = datetime(2026, 6, 17, 10, 0)
+    parent = Goal(id=root_id, name="Parent Goal", root_id=root_id, created_at=created_at)
+    child = Goal(
+        id=str(uuid.uuid4()),
+        name="Child Goal",
+        parent_id=root_id,
+        root_id=root_id,
+        inherit_parent_activities=True,
+        created_at=created_at,
+    )
+    db_session.add_all([parent, child])
+    db_session.flush()
+
+    activity = ActivityDefinition(id=str(uuid.uuid4()), name="Inherited Activity", root_id=root_id)
+    session = Session(
+        id=str(uuid.uuid4()),
+        name="Inherited Evidence Session",
+        root_id=root_id,
+        session_start=datetime(2026, 6, 25, 23, 17),
+        total_duration_seconds=1800,
+    )
+    instance = ActivityInstance(
+        id=str(uuid.uuid4()),
+        root_id=root_id,
+        session_id=session.id,
+        activity_definition_id=activity.id,
+        completed=True,
+        created_at=session.session_start,
+        time_start=session.session_start,
+        duration_seconds=1662,
+    )
+    db_session.add_all([activity, session, instance])
+    db_session.flush()
+    db_session.execute(activity_goal_associations.insert().values(
+        activity_id=activity.id,
+        goal_id=parent.id,
+    ))
+    db_session.commit()
+
+    metrics = GoalMetricsService(db_session).get_metrics_for_goal(child.id)
+
+    assert metrics["recursive"]["sessions_count"] == 1
+    assert metrics["recursive"]["sessions_duration_seconds"] == 1800
+    assert metrics["recursive"]["activities_count"] == 1
+    assert metrics["recursive"]["activities_duration_seconds"] == 1662

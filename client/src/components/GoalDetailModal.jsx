@@ -5,16 +5,15 @@ import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { useGoalAssociationMutations } from '../hooks/useGoalAssociationMutations';
 import useGoalDetailController from '../hooks/useGoalDetailController';
-import useGoalDurationModal from '../hooks/useGoalDurationModal';
 import { useGoalForm } from '../hooks/useGoalForm';
 import { useGoalNotes } from '../hooks/useGoalNotes';
-import { useGoalAssociations, useGoalMetrics } from '../hooks/useGoalQueries';
+import { useGoalAssociations, useGoalDailyDurations, useGoalMetrics } from '../hooks/useGoalQueries';
 import { getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
 import { getChildType, getValidChildTypes, getTypeDisplayName } from '../utils/goalHelpers';
 import { flattenGoalTree, isExecutionGoalType } from '../utils/goalNodeModel';
 import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
-import { lazyWithRetry } from '../utils/lazyWithRetry';
+import { importWithRetry, lazyWithRetry } from '../utils/lazyWithRetry';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
 import { getParentGoalInfo } from './goals/goalDetailUtils';
@@ -35,11 +34,50 @@ import styles from './GoalDetailModal.module.css';
 const TargetManager = lazyWithRetry(() => import('./goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
 const ActivityAssociator = lazyWithRetry(() => import('./goalDetail/ActivityAssociator'), 'components/goalDetail/ActivityAssociator');
 const InlineActivityBuilder = lazyWithRetry(() => import('./goalDetail/InlineActivityBuilderModal'), 'components/goalDetail/InlineActivityBuilderModal');
-const GenericGraphModal = lazyWithRetry(() => import('./analytics/GenericGraphModal'), 'components/analytics/GenericGraphModal');
+const loadGraphProfileModal = () => import('./analytics/graphs/GraphProfileModal');
+const GraphProfileModal = lazyWithRetry(loadGraphProfileModal, 'components/analytics/graphs/GraphProfileModal');
 const TargetAnalyticsModal = lazyWithRetry(() => import('./goalDetail/TargetAnalyticsModal'), 'components/goalDetail/TargetAnalyticsModal');
 const GoalOptionsView = lazyWithRetry(() => import('./goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./goalDetail/GoalNotesView'), 'components/goalDetail/GoalNotesView');
 const GoalTimelineView = lazyWithRetry(() => import('./goalDetail/GoalTimelineView'), 'components/goalDetail/GoalTimelineView');
+
+function GraphProfileLoadingFallback({ title, color, onClose }) {
+    return createPortal(
+        <ModalBackdrop
+            className={styles.graphProfileLoadingOverlay}
+            onClose={onClose}
+        >
+            <section
+                className={styles.graphProfileLoadingContainer}
+                onClick={(event) => event.stopPropagation()}
+                aria-label="Loading graph"
+            >
+                <header className={styles.graphProfileLoadingHeader}>
+                    <div className={styles.graphProfileLoadingTitleGroup}>
+                        <div
+                            className={styles.graphProfileLoadingDot}
+                            style={{ '--graph-accent': color || 'var(--color-brand-primary)' }}
+                            aria-hidden="true"
+                        />
+                        <div>
+                            <h2 className={styles.graphProfileLoadingTitle}>{title || 'Time Spent'}</h2>
+                            <div className={styles.graphProfileLoadingSubtitle}>
+                                Daily time spent from goal evidence
+                            </div>
+                        </div>
+                    </div>
+                    <CloseButton
+                        onClick={onClose}
+                        className={styles.graphProfileLoadingClose}
+                        size={28}
+                    />
+                </header>
+                <div className={styles.graphProfileLoadingFrame}>Loading graph...</div>
+            </section>
+        </ModalBackdrop>,
+        document.body
+    );
+}
 
 /**
  * GoalDetailModal Component
@@ -140,6 +178,7 @@ function GoalDetailModal({
     const [isTargetSelectionMode, setIsTargetSelectionMode] = useState(false);
     const [targetManagerReturnView, setTargetManagerReturnView] = useState('goal');
     const [activeAnalyticsTarget, setActiveAnalyticsTarget] = useState(null);
+    const [isTimeGraphOpen, setIsTimeGraphOpen] = useState(false);
     // Builder modal config: null = closed; otherwise { target, activityId, lock }.
     const [builderConfig, setBuilderConfig] = useState(null);
     const goalHeaderRef = React.useRef(null);
@@ -165,7 +204,6 @@ function GoalDetailModal({
     const { createNote: createGoalNote } = useGoalNotes(queryRootId, queryGoalId);
     const goalColor = getGoalColor(goalType);
     const goalSecondaryColor = getGoalSecondaryColor(goalType);
-    const goalIcon = getGoalIcon(goalType);
     const goalIsSmart = isSMART(goal);
     const depGoalId = goal?.attributes?.id || goal?.id;
 
@@ -216,20 +254,21 @@ function GoalDetailModal({
     const displayGoalColor = mode !== 'create' && isCompleted ? completedColor : goalColor;
     const displayGoalSecondaryColor = mode !== 'create' && isCompleted ? completedSecondaryColor : goalSecondaryColor;
     const displayTextColor = mode !== 'create' && isCompleted ? completedTextColor : textColor;
+    const shouldPreloadTimeGraph = viewState === 'goal-timeline' && !readOnly;
+    const shouldLoadTimeGraph = isTimeGraphOpen || shouldPreloadTimeGraph;
     const {
-        graphModalConfig,
-        openDurationModal,
-        closeDurationModal,
-    } = useGoalDurationModal({
-        goalId: depGoalId,
-        goalName: goal?.name,
-        fallbackName: name,
-        goalType,
-        goalColor: displayGoalColor,
-        goalIcon,
-        goalSecondaryColor: displayGoalSecondaryColor,
-        isSmart: goalIsSmart,
-    });
+        data: dailyDurationsData,
+        isLoading: isDailyDurationsLoading,
+        isFetching: isDailyDurationsFetching,
+        isError: isDailyDurationsError,
+    } = useGoalDailyDurations(depGoalId, shouldLoadTimeGraph);
+
+    React.useEffect(() => {
+        if (!shouldPreloadTimeGraph) {
+            return;
+        }
+        importWithRetry(loadGraphProfileModal, 'components/analytics/graphs/GraphProfileModal').catch(() => {});
+    }, [shouldPreloadTimeGraph]);
 
     React.useEffect(() => {
         const handleNavigationIntent = () => {
@@ -696,22 +735,6 @@ function GoalDetailModal({
     const renderGoalContent = () => {
         return (
             <>
-                <Suspense fallback={null}>
-                    <GenericGraphModal
-                        isOpen={!!graphModalConfig}
-                        onClose={closeDurationModal}
-                        title={graphModalConfig?.title}
-                        goalType={graphModalConfig?.goalType}
-                        goalColor={graphModalConfig?.goalColor}
-                        goalIcon={graphModalConfig?.goalIcon}
-                        goalSecondaryColor={graphModalConfig?.goalSecondaryColor}
-                        isSmart={graphModalConfig?.isSmart}
-                        graphData={graphModalConfig?.graphData}
-                        options={graphModalConfig?.options}
-                        type={graphModalConfig?.type}
-                    />
-                </Suspense>
-
                 {isEditing ? (
                     /* ============ EDIT MODE ============ */
                     <GoalEditForm
@@ -1005,7 +1028,7 @@ function GoalDetailModal({
                     rootId={rootId}
                     goalId={goalId}
                     metrics={fetchedMetrics}
-                    onTimeSpentClick={readOnly ? undefined : openDurationModal}
+                    onTimeSpentClick={readOnly ? undefined : () => setIsTimeGraphOpen(true)}
                     readOnlyEntries={readOnlyTimelineEntries}
                 />
             </Suspense>
@@ -1261,6 +1284,34 @@ function GoalDetailModal({
         </div>
     ) : null;
 
+    const timeGraphModal = isTimeGraphOpen ? (
+        <Suspense fallback={
+            <GraphProfileLoadingFallback
+                title={name || goal?.name || 'Time Spent'}
+                color={displayGoalColor}
+                onClose={() => setIsTimeGraphOpen(false)}
+            />
+        }>
+            <GraphProfileModal
+                profileId="goalDuration"
+                title={name || goal?.name || 'Time Spent'}
+                onClose={() => setIsTimeGraphOpen(false)}
+                data={{
+                    goal: {
+                        id: depGoalId,
+                        name: name || goal?.name,
+                        type: goalType,
+                        color: displayGoalColor,
+                    },
+                    points: dailyDurationsData?.points || [],
+                    metrics: fetchedMetrics,
+                }}
+                isLoading={isDailyDurationsLoading || isDailyDurationsFetching}
+                isError={isDailyDurationsError}
+            />
+        </Suspense>
+    ) : null;
+
     const activityBuilderModal = isActivityBuilderOpen ? (
         <Suspense fallback={null}>
             <InlineActivityBuilder
@@ -1358,6 +1409,7 @@ function GoalDetailModal({
                         </div>
                     )}
                 </div>
+                {timeGraphModal}
                 {activityBuilderModal}
                 {targetAnalyticsModal}
                 {targetBuilderModal}
@@ -1394,6 +1446,7 @@ function GoalDetailModal({
     return (
         <>
             {createPortal(modalMarkup, document.body)}
+            {timeGraphModal}
             {targetAnalyticsModal}
             {targetBuilderModal}
         </>

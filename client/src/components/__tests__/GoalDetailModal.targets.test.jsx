@@ -104,7 +104,7 @@ vi.mock('../goalDetail/TargetManager', () => ({
     default: () => <div>target manager</div>,
 }));
 
-vi.mock('../analytics/GenericGraphModal', () => ({
+vi.mock('../analytics/graphs/GraphProfileModal', () => ({
     default: () => null,
 }));
 
