@@ -42,6 +42,7 @@ from blueprints.timers_api import timers_bp
 from blueprints.programs_api import programs_bp
 from blueprints.notes_api import notes_bp
 from blueprints.dashboards_api import dashboards_bp
+from blueprints.analytics_api import analytics_bp
 from blueprints.logs_api import logs_api
 from blueprints.auth_api import auth_bp
 from blueprints.admin_api import admin_bp
@@ -81,6 +82,7 @@ def app():
     test_app.register_blueprint(programs_bp)
     test_app.register_blueprint(notes_bp)
     test_app.register_blueprint(dashboards_bp)
+    test_app.register_blueprint(analytics_bp)
     test_app.register_blueprint(logs_api)
     test_app.register_blueprint(auth_bp)
     test_app.register_blueprint(admin_bp)

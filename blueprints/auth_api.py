@@ -10,7 +10,7 @@ from validators import (
 from services.serializers import serialize_user
 from services.auth_service import AuthService
 from services.user_service import UserService
-from models import validate_root_goal
+from models import User, validate_root_goal
 from blueprints.api_utils import get_db_session, internal_error
 from extensions import limiter
 from config import config
@@ -130,16 +130,30 @@ def token_required(f):
             root_id = kwargs.get('root_id')
             admin_user_id = request.args.get('admin_user_id')
             admin_mode = request.args.get('admin_mode')
-            if root_id and admin_user_id and admin_mode:
+            is_user_wide_analytics_route = request.path.startswith('/api/analytics')
+            if (root_id or is_user_wide_analytics_route) and admin_user_id and admin_mode:
                 if not getattr(current_user, 'is_admin', False):
                     return jsonify({'error': 'Admin access required'}), 403
                 if admin_mode not in ('read_only', 'read_write'):
                     return jsonify({'error': 'Invalid admin_mode'}), 400
-                if admin_mode == 'read_only' and request.method not in ('GET', 'HEAD', 'OPTIONS'):
+                analytics_read_post = (
+                    is_user_wide_analytics_route
+                    and request.path == '/api/analytics/query/run'
+                    and request.method == 'POST'
+                )
+                if admin_mode == 'read_only' and request.method not in ('GET', 'HEAD', 'OPTIONS') and not analytics_read_post:
                     return jsonify({'error': 'Admin read-only mode does not permit writes'}), 403
-                root = validate_root_goal(db_session, root_id, owner_id=admin_user_id)
-                if not root:
-                    return jsonify({'error': 'Fractal not found'}), 404
+                if root_id:
+                    root = validate_root_goal(db_session, root_id, owner_id=admin_user_id)
+                    if not root:
+                        return jsonify({'error': 'Fractal not found'}), 404
+                else:
+                    target_user = db_session.query(User).filter(
+                        User.id == admin_user_id,
+                        User.is_active.is_(True),
+                    ).first()
+                    if not target_user:
+                        return jsonify({'error': 'User not found'}), 404
                 g.admin_actor_user_id = current_user.id
                 g.admin_target_user_id = admin_user_id
                 g.admin_mode = admin_mode

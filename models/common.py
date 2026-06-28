@@ -53,6 +53,32 @@ class AnalyticsDashboard(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
 
+
+class AnalyticsQueryProfile(Base):
+    __tablename__ = 'analytics_query_profiles'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    query_spec = Column(JSON_TYPE, nullable=False)
+    visualization_spec = Column(JSON_TYPE, nullable=True)
+    spec_version = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    deleted_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        sa.Index('ix_analytics_query_profiles_user_deleted', 'user_id', 'deleted_at'),
+        sa.Index(
+            'uq_analytics_query_profiles_active_user_name',
+            'user_id',
+            'name',
+            unique=True,
+            postgresql_where=deleted_at.is_(None),
+        ),
+    )
+
 class EventLog(Base):
     __tablename__ = 'event_logs'
     __table_args__ = (

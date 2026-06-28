@@ -457,6 +457,10 @@ describe('api core auth refresh behavior', () => {
             ['global.deleteFractal', () => globalApi.deleteFractal('root-1')],
             ['global.updateGoalLevel', () => globalApi.updateGoalLevel('level-1', { name: 'Level' })],
             ['global.resetGoalLevel', () => globalApi.resetGoalLevel('level-1')],
+            ['global.runAnalyticsQuery', () => globalApi.runAnalyticsQuery({ version: 1, dataset: 'sessions', fields: ['name'] })],
+            ['global.createAnalyticsQueryProfile', () => globalApi.createAnalyticsQueryProfile({ name: 'Query', query_spec: { version: 1, dataset: 'sessions', fields: ['name'] } })],
+            ['global.updateAnalyticsQueryProfile', () => globalApi.updateAnalyticsQueryProfile('profile-1', { name: 'Query' })],
+            ['global.deleteAnalyticsQueryProfile', () => globalApi.deleteAnalyticsQueryProfile('profile-1')],
             ['legacy.createGoal', () => legacyApi.createGoal({ name: 'Legacy Goal' })],
             ['legacy.createSession', () => legacyApi.createSession({ name: 'Legacy Session' })],
         ];
@@ -498,6 +502,7 @@ describe('api core auth refresh behavior', () => {
         const { fractalNotesApi } = await import('../fractalNotesApi');
         const { fractalProgramsApi } = await import('../fractalProgramsApi');
         const { fractalSessionsApi } = await import('../fractalSessionsApi');
+        const { globalApi } = await import('../globalApi');
         const calls = [];
         const originalAdapter = axios.defaults.adapter;
 
@@ -560,6 +565,10 @@ describe('api core auth refresh behavior', () => {
             ['analytics.createAnalyticsView', 'post', '/roots/root-1/dashboards', () => fractalMetaApi.createAnalyticsView('root-1', { name: 'Dashboard' })],
             ['analytics.updateAnalyticsView', 'put', '/roots/root-1/dashboards/dashboard-1', () => fractalMetaApi.updateAnalyticsView('root-1', 'dashboard-1', { name: 'Dashboard' })],
             ['analytics.deleteAnalyticsView', 'delete', '/roots/root-1/dashboards/dashboard-1', () => fractalMetaApi.deleteAnalyticsView('root-1', 'dashboard-1')],
+            ['analytics.runQuery', 'post', '/analytics/query/run', () => globalApi.runAnalyticsQuery({ version: 1, dataset: 'sessions', fields: ['name'] })],
+            ['analytics.createQueryProfile', 'post', '/analytics/query-profiles', () => globalApi.createAnalyticsQueryProfile({ name: 'Query', query_spec: { version: 1, dataset: 'sessions', fields: ['name'] } })],
+            ['analytics.updateQueryProfile', 'patch', '/analytics/query-profiles/profile-1', () => globalApi.updateAnalyticsQueryProfile('profile-1', { name: 'Query' })],
+            ['analytics.deleteQueryProfile', 'delete', '/analytics/query-profiles/profile-1', () => globalApi.deleteAnalyticsQueryProfile('profile-1')],
         ];
 
         axios.defaults.adapter = async (config) => {

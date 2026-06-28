@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import Analytics from '../Analytics';
 
@@ -37,6 +37,32 @@ vi.mock('../../hooks/useDashboardQueries', () => ({
     }),
 }));
 
+vi.mock('../../hooks/useAnalyticsEngine', () => ({
+    useAnalyticsEngine: () => ({
+        catalog: {
+            datasets: [
+                {
+                    id: 'sessions',
+                    label: 'Sessions',
+                    description: 'Session analytics',
+                    fields: [
+                        { id: 'name', label: 'Name', type: 'string', filterable: true, aggregations: [] },
+                        { id: 'duration_seconds', label: 'Duration Seconds', type: 'number', filterable: true, aggregations: ['sum', 'avg'] },
+                    ],
+                },
+            ],
+        },
+        catalogLoading: false,
+        profiles: [],
+        profilesLoading: false,
+        runQuery: vi.fn(),
+        isRunning: false,
+        createProfile: vi.fn(),
+        updateProfile: vi.fn(),
+        deleteProfile: vi.fn(),
+    }),
+}));
+
 vi.mock('../../components/analytics/ProfileWindow', () => ({
     default: () => <div>Analytics panel</div>,
 }));
@@ -56,6 +82,10 @@ describe('Analytics page', () => {
             })),
             configurable: true,
         });
+    });
+
+    afterEach(() => {
+        cleanup();
     });
 
     it('creates a saved analytics view from Empty Analytics View', async () => {
@@ -142,5 +172,24 @@ describe('Analytics page', () => {
 
         expect(screen.getByRole('button', { name: 'Show Filters' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Hide Filters' })).not.toBeInTheDocument();
+    });
+
+    it('opens the query console from the analytics header mode switch', async () => {
+        render(<Analytics />);
+
+        expect(screen.getByRole('button', { name: 'Save View' })).toBeInTheDocument();
+        expect(
+            screen.queryByText('Analytics panel') || screen.queryByText('Loading analytics panel...')
+        ).toBeInTheDocument();
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('tab', { name: 'Query Console' }));
+        });
+
+        expect(screen.getByRole('heading', { name: 'Query Console', level: 1 })).toBeInTheDocument();
+        expect(screen.getByRole('region', { name: 'Analytics query console' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Save View' })).not.toBeInTheDocument();
+        expect(screen.queryByText('Analytics panel')).not.toBeInTheDocument();
+        expect(screen.queryByText('Loading analytics panel...')).not.toBeInTheDocument();
     });
 });

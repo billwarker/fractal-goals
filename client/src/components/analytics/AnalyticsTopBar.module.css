@@ -22,6 +22,35 @@
     align-self: center;
 }
 
+.modeSwitch {
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr;
+    width: 246px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-surface);
+    padding: 3px;
+}
+
+.modeButton {
+    min-width: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-text-muted);
+    padding: 7px 10px;
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.modeButtonActive {
+    background: var(--color-bg-elevated);
+    color: var(--color-text-primary);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14);
+}
+
 .viewMeta {
     display: flex;
     flex-direction: column;
@@ -77,6 +106,11 @@
         width: auto;
         justify-content: flex-start;
         align-items: center;
+    }
+
+    .modeSwitch {
+        width: 228px;
+        flex: 0 0 auto;
     }
 
     .pageTitle {

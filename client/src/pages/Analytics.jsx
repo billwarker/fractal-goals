@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
 import AnalyticsFiltersSidebar from '../components/analytics/AnalyticsFiltersSidebar';
+import AnalyticsQueryConsole from '../components/analytics/AnalyticsQueryConsole';
 import {
     createDashboardLayoutPayload,
     getDefaultGlobalFilters,
@@ -103,6 +104,7 @@ function Analytics() {
     const [isHydrated, setIsHydrated] = useState(false);
     const [isViewsModalOpen, setIsViewsModalOpen] = useState(false);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+    const [activeMode, setActiveMode] = useState('dashboard');
     const [dashboardBounds, setDashboardBounds] = useState(null);
     const [isDashboardSettling, setIsDashboardSettling] = useState(false);
 
@@ -424,38 +426,44 @@ function Analytics() {
             <div className={styles.leftPanel}>
                 <AnalyticsTopBar
                     currentViewName={currentViewName}
+                    activeMode={activeMode}
+                    onModeChange={setActiveMode}
                     onOpenViewsModal={() => setIsViewsModalOpen(true)}
                     onSaveView={handleSaveView}
                     isFiltersPaneOpen={isFiltersPaneOpen}
                     onToggleFiltersPane={() => setIsFiltersPaneOpen((current) => !current)}
                 />
 
-                <div className={styles.workspace} onMouseDown={handleWorkspaceMouseDown}>
-                    <div
-                        className={`${styles.gridSurface} ${debugMode ? styles.gridSurfaceDebug : ''} ${isDashboardSettling ? styles.gridSurfaceSettling : ''}`}
-                        onMouseDown={handleWorkspaceMouseDown}
-                    >
-                        <ProfileWindowLayout
-                            layout={layout}
-                            onLayoutChange={setLayout}
-                            onBoundsChange={setDashboardBounds}
-                            onBlankSpaceMouseDown={() => setSelectedWindowId(null)}
-                            selectedWindowId={selectedWindowId}
-                            transitionsEnabled={!isDashboardSettling}
-                            renderWindow={renderWindow}
-                        />
+                {activeMode === 'query' ? (
+                    <AnalyticsQueryConsole />
+                ) : (
+                    <div className={styles.workspace} onMouseDown={handleWorkspaceMouseDown}>
+                        <div
+                            className={`${styles.gridSurface} ${debugMode ? styles.gridSurfaceDebug : ''} ${isDashboardSettling ? styles.gridSurfaceSettling : ''}`}
+                            onMouseDown={handleWorkspaceMouseDown}
+                        >
+                            <ProfileWindowLayout
+                                layout={layout}
+                                onLayoutChange={setLayout}
+                                onBoundsChange={setDashboardBounds}
+                                onBlankSpaceMouseDown={() => setSelectedWindowId(null)}
+                                selectedWindowId={selectedWindowId}
+                                transitionsEnabled={!isDashboardSettling}
+                                renderWindow={renderWindow}
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
-            {isFiltersPaneOpen && isMobile && (
+            {activeMode === 'dashboard' && isFiltersPaneOpen && isMobile && (
                 <ModalBackdrop
                     className={styles.sheetBackdrop}
                     onClose={() => setIsFiltersPaneOpen(false)}
                     aria-hidden="true"
                 />
             )}
-            {isFiltersPaneOpen && (
+            {activeMode === 'dashboard' && isFiltersPaneOpen && (
                 <div className={styles.rightPanel}>
                     <AnalyticsFiltersSidebar
                         filters={globalFilters}

@@ -11,6 +11,7 @@ Fractal Goals is a full-stack goal and practice-tracking application built aroun
 - Sessions capture real execution work
 - Activities, templates, and programs structure recurring practice
 - Analytics, dashboards, annotations, and logs explain what happened over time
+- The analytics engine direction is now a user-wide semantic query layer: users can run structured queries against governed datasets, save query profiles, and power dashboard charts from those profiles while the backend enforces tenant isolation.
 - Auth, admin tooling, quotas, storage limits, and tier limits provide the current SaaS account boundary
 
 The codebase is now organized around two main ideas:
@@ -146,6 +147,15 @@ Performance and production-hardening notes:
 - Backend performance tests include query-count, response-size, and latency budget checks for core endpoints.
 - Large-account budget tests cover goal-tree, sessions search, notes pagination, and admin user-list paths.
 - Frontend performance coverage includes a large session-goals view-model budget test.
+
+Analytics engine build-out:
+
+- The target architecture is captured in `docs/analytics-engine-plan.md`.
+- The engine is intended to be user-wide rather than root-only: every query runs within the authenticated user's owned roots, with optional root/fractal filters.
+- V1 uses a structured query spec compiled by a backend semantic catalog, not raw SQL. Catalog datasets expose user-facing analytics objects and inject tenant policies server-side.
+- The analytics query console is SQL-editor first: users browse actual queryable database table objects/columns in the analytics page, write read-only PostgreSQL `SELECT`/`WITH` queries with table/column/function autocomplete, and the backend executes those queries against tenant-filtered catalog CTEs. This supports normal SQL shapes such as `SELECT *`, joins, aliases, expressions, grouping, nested selects, and aggregates while keeping user SQL away from raw app tables. The backend catalog includes direct user/root-scoped tables, selected stats tables, analytics profile/dashboard tables, and tenant-safe junction tables with join-through policies; auth/system tables remain outside the user catalog. Mutating statements, multiple statements, comments, and schema-qualified bypasses such as `public.sessions` are rejected.
+- Saved query profiles are separate from dashboard layout state so the same query can power the console, dashboard windows, and future chart profiles.
+- Core handcrafted analytics charts should be rewritten onto the engine as equivalent query-backed profiles, then retired to avoid competing implementations.
 
 Remaining SaaS build-out to know:
 
