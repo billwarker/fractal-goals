@@ -43,6 +43,16 @@
     font-family: var(--font-family);
 }
 
+.configText {
+    margin: 0;
+    font-family: var(--font-family-config);
+    font-size: var(--font-size-sm);
+    line-height: 20px;
+    letter-spacing: 0.02em;
+    font-weight: var(--font-weight-medium);
+    font-variant-numeric: tabular-nums;
+}
+
 /* Sizes */
 .sm {
     font-size: var(--font-size-xs);

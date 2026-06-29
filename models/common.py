@@ -1,5 +1,5 @@
 import sqlalchemy as sa
-from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, Text
+from sqlalchemy import Boolean, Column, String, DateTime, Integer, ForeignKey, Text
 from sqlalchemy.orm import relationship
 import uuid
 from .base import Base, utc_now, JSON_TYPE
@@ -47,6 +47,38 @@ class AnalyticsDashboard(Base):
 
     __table_args__ = (
         sa.Index('ix_analytics_dashboards_root_user_deleted', 'root_id', 'user_id', 'deleted_at'),
+    )
+
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    deleted_at = Column(DateTime, nullable=True)
+
+
+class PageSurfaceLayout(Base):
+    """User-configurable page surface (canvas) layout.
+
+    A surface places a goal-tree region and optional widgets on the shared
+    grid-cell engine. The ``page`` discriminator keeps the table extensible to
+    other pages beyond goals; ``desktop_config``/``mobile_config`` store the two
+    responsive variants of the surface payload (grid layout + panel contents).
+    """
+
+    __tablename__ = 'page_surface_layouts'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    page = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    is_default = Column(Boolean, nullable=False, server_default=sa.text('false'), default=False)
+    desktop_config = Column(JSON_TYPE, nullable=False)
+    mobile_config = Column(JSON_TYPE, nullable=False)
+
+    __table_args__ = (
+        sa.Index(
+            'ix_page_surface_layouts_root_user_page_deleted',
+            'root_id', 'user_id', 'page', 'deleted_at',
+        ),
     )
 
     created_at = Column(DateTime, default=utc_now)

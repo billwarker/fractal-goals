@@ -38,6 +38,7 @@ from blueprints.timers_api import timers_bp
 from blueprints.programs_api import programs_bp
 from blueprints.notes_api import notes_bp
 from blueprints.dashboards_api import dashboards_bp
+from blueprints.page_surface_api import page_surface_bp
 from blueprints.analytics_api import analytics_bp
 from blueprints.logs_api import logs_api
 from blueprints.auth_api import auth_bp
@@ -155,6 +156,7 @@ for write_limited_blueprint in (
     programs_bp,
     notes_bp,
     dashboards_bp,
+    page_surface_bp,
     analytics_bp,
     logs_api,
 ):
@@ -179,6 +181,7 @@ app.register_blueprint(timers_bp)
 app.register_blueprint(programs_bp)
 app.register_blueprint(notes_bp)
 app.register_blueprint(dashboards_bp)
+app.register_blueprint(page_surface_bp)
 app.register_blueprint(analytics_bp)
 app.register_blueprint(logs_api)
 app.register_blueprint(auth_bp)

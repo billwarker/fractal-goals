@@ -969,6 +969,21 @@ def serialize_analytics_dashboard(dashboard):
         "updated_at": format_utc(dashboard.updated_at),
     }
 
+def serialize_page_surface_layout(layout):
+    """Serialize a PageSurfaceLayout object."""
+    return {
+        "id": layout.id,
+        "root_id": layout.root_id,
+        "user_id": layout.user_id,
+        "page": layout.page,
+        "name": layout.name,
+        "is_default": bool(layout.is_default),
+        "desktop_config": layout.desktop_config,
+        "mobile_config": layout.mobile_config,
+        "created_at": format_utc(layout.created_at),
+        "updated_at": format_utc(layout.updated_at),
+    }
+
 def serialize_event_log(log):
     """Serialize an EventLog object."""
     return {

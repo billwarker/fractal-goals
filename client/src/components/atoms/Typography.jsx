@@ -38,3 +38,20 @@ export const Text = ({
         </Tag>
     );
 };
+
+export const ConfigText = ({
+    children,
+    className = '',
+    as = 'span',
+    ...props
+}) => {
+    const Tag = as;
+    return (
+        <Tag
+            className={`${styles.configText} ${className}`}
+            {...props}
+        >
+            {children}
+        </Tag>
+    );
+};

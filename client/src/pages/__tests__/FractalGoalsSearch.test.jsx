@@ -105,6 +105,16 @@ vi.mock('../../hooks/useProgramQueries', () => ({
     usePrograms: () => ({ programs: [] }),
 }));
 
+vi.mock('../../hooks/usePageSurfaceQueries', () => ({
+    usePageSurfaces: () => ({
+        surfaces: [],
+        createSurface: vi.fn(),
+        updateSurface: vi.fn(),
+        setDefaultSurface: vi.fn(),
+        deleteSurface: vi.fn(),
+    }),
+}));
+
 vi.mock('../../hooks/useIsMobile', () => ({
     default: () => isMobileMock.value,
     getIsMobileViewport: () => isMobileMock.value,
@@ -414,5 +424,24 @@ describe('FractalGoals type-to-zoom search', () => {
 
         expect(screen.getByText('Hierarchy View')).toBeInTheDocument();
         expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-layout-mode', 'hierarchy');
+    });
+
+    it('lets desktop users switch the configured surface target to mobile and back', async () => {
+        renderFractalGoals();
+
+        expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-layout-mode', 'tree');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Mobile' }));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-layout-mode', 'hierarchy');
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Desktop' }));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-layout-mode', 'tree');
+        });
     });
 });
