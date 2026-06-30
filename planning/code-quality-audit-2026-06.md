@@ -55,7 +55,7 @@ Over the implicit ~800-LOC decomposition threshold; the index's own "decompose b
 
 ## New findings (discovered during remediation)
 
-- [ ] **NF-1 — 3 pre-existing landing test failures on `main`/HEAD.** `tests/integration/test_admin_api.py::{test_admin_can_manage_and_publish_landing_examples, test_publish_honors_showcase_selections, test_landing_example_options_endpoint}` fail on a clean checkout (before any audit work). Root cause: `get_landing_example_options` returns empty `analytics_views`; the test creates an `AnalyticsDashboard` with `kind="view"` but the query / fixture isn't matching (likely test-DB schema default `kind='dashboard'` vs expected `'view'`). **Not introduced by P0-1** — verified identical pass/fail on HEAD and branch. Needs its own fix.
+- [x] **NF-1 — 3 pre-existing landing test failures on `main`/HEAD.** ✅ **Fixed.** Root cause was a test-fixture bug, not production code: both fixtures created `AnalyticsDashboard` rows intended as analytics *views* but omitted `kind='view'`, so the model default `kind='dashboard'` made them invisible to the (correct) `kind == "view"` query in the options/publish paths. Added `kind='view'` to both fixtures. All 38 admin tests now pass — which also re-confirms P0-1's extraction is behavior-preserving.
 
 ## Progress log
 
