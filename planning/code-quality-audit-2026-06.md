@@ -16,7 +16,7 @@
 
 These directly violate guarantees the index makes. Low-risk, high-value.
 
-- [ ] **P0-1 — Split `AdminService` god-class (1,710 LOC).** Extract the ~650 lines of landing-example serialization/snapshot/publish logic (`_serialize_public_goal_tree`, `_build_landing_showcase_data`, `_write_landing_static_snapshot`, `_warm_landing_cache`, etc.) into `services/landing_publish_service.py`. — [services/admin_service.py](../services/admin_service.py)
+- [x] **P0-1 — Split `AdminService` god-class (1,710 LOC).** ✅ Moved the full landing cluster (~1,030 lines incl. settings/options/snapshot/publish + app-setting helpers + all landing constants) into `services/landing_publish_service.py` (`LandingPublishService`). AdminService dropped to **680 LOC**. Repointed `admin_api` landing routes and `public_service` constant import to the new module; pruned 21 now-unused imports from AdminService. Full move (no delegation shim). Pyflakes clean, imports resolve, 35/38 admin tests pass — the 3 failures are **pre-existing on HEAD** (see findings below), not caused by this change.
 - [x] **P0-2 — Consolidate duplicated `formatDuration`.** ✅ MetricCardWidget, LandingFeatureAnalytics, AnalyticsExtraCharts now use canonical `formatDurationSeconds` (formatters.js); SessionCard now uses `formatClockDuration` (sessionTime.js) — its `MM:SS` was a distinct clock format that already had a canonical home and now correctly rolls hours into `H:MM:SS`. Lint clean, 16 component tests green.
 - [x] **P0-3 — Delete dead `legacyApi`.** ✅ Removed `legacyApi.js`, its re-exports in `api.js`, and the two `legacy.*` cases from the CSRF contract test. App code had zero consumers. core.test.js green.
 - [ ] **P0-4 — Reconcile competing analytics implementations.** index.md:163 says handcrafted charts should be migrated onto the engine registry then retired; [AnalyticsExtraCharts.jsx](../client/src/components/analytics/AnalyticsExtraCharts.jsx) (288 LOC) still coexists. Migrate or mark as tracked retirement target.
@@ -52,6 +52,10 @@ Over the implicit ~800-LOC decomposition threshold; the index's own "decompose b
 
 ---
 
+## New findings (discovered during remediation)
+
+- [ ] **NF-1 — 3 pre-existing landing test failures on `main`/HEAD.** `tests/integration/test_admin_api.py::{test_admin_can_manage_and_publish_landing_examples, test_publish_honors_showcase_selections, test_landing_example_options_endpoint}` fail on a clean checkout (before any audit work). Root cause: `get_landing_example_options` returns empty `analytics_views`; the test creates an `AnalyticsDashboard` with `kind="view"` but the query / fixture isn't matching (likely test-DB schema default `kind='dashboard'` vs expected `'view'`). **Not introduced by P0-1** — verified identical pass/fail on HEAD and branch. Needs its own fix.
+
 ## Progress log
 
 | Date | Item | Notes |
@@ -59,3 +63,4 @@ Over the implicit ~800-LOC decomposition threshold; the index's own "decompose b
 | 2026-06-29 | — | Audit completed, tracking doc created. |
 | 2026-06-29 | P0-3 | Deleted dead `legacyApi` (module + re-exports + test cases). |
 | 2026-06-29 | P0-2 | Consolidated 4 `formatDuration` reimplementations onto canonical formatters. |
+| 2026-06-29 | P0-1 | Extracted `LandingPublishService` from AdminService (1710→680 LOC). Found NF-1 (pre-existing landing test failures). |
