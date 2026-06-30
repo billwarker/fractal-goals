@@ -16,6 +16,7 @@ import json
 
 from services.events import event_bus, Event, Events
 from services.progress_service import ProgressService
+from services.activity_instance_data import load_instance_sets, resolve_metric_id
 from services.goal_target_rules import (
     check_metric_value as _check_metric_value,
     check_metrics_meet_target as _check_metrics_meet_target,
@@ -78,12 +79,12 @@ def _target_metrics_from_conditions(target: Target):
 def _collect_actual_metric_values_from_instance_dict(instance_dict: dict):
     actual_map = {}
     for m in (instance_dict.get('metrics') or []):
-        metric_id = m.get('metric_id') or m.get('metric_definition_id')
+        metric_id = resolve_metric_id(m)
         if metric_id and m.get('value') is not None:
             actual_map[metric_id] = float(m.get('value'))
     for s in (instance_dict.get('sets') or []):
         for m in (s.get('metrics') or []):
-            metric_id = m.get('metric_id') or m.get('metric_definition_id')
+            metric_id = resolve_metric_id(m)
             if metric_id and m.get('value') is not None:
                 actual_map[metric_id] = max(actual_map.get(metric_id, 0.0), float(m.get('value')))
     return actual_map
@@ -99,13 +100,11 @@ def _serialize_instance_for_target_evaluation(instance: ActivityInstance):
         for metric in (instance.metric_values or [])
         if metric.value is not None
     ]
-    raw_data = models._safe_load_json(instance.data, {})
-    sets = raw_data.get('sets', []) if isinstance(raw_data, dict) else []
     return {
         'id': instance.id,
         'completed': bool(instance.completed),
         'metrics': metrics,
-        'sets': sets,
+        'sets': load_instance_sets(instance),
     }
 
 def _record_target_contributions(db_session, target: Target, instance_id: str, actual_metric_map: dict):

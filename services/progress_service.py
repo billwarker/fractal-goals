@@ -10,7 +10,7 @@ import logging
 from typing import Optional
 
 from models import ActivityInstance, ActivityDefinition, MetricDefinition, ProgressRecord, Session, Goal
-import models
+from services.activity_instance_data import load_instance_sets, resolve_metric_id
 
 logger = logging.getLogger(__name__)
 
@@ -219,8 +219,7 @@ class ProgressService:
         If no metric is flagged, falls back to the first metric in the list.
         If no sets exist, returns None.
         """
-        raw_data = models._safe_load_json(instance.data, {})
-        sets = raw_data.get('sets', []) if isinstance(raw_data, dict) else []
+        sets = load_instance_sets(instance)
         if not sets:
             return None
 
@@ -235,7 +234,7 @@ class ProgressService:
         best_val = None
         for set_index, s in enumerate(sets):
             for m in s.get('metrics', []):
-                mid = m.get('metric_id') or m.get('metric_definition_id')
+                mid = resolve_metric_id(m)
                 if mid == anchor.id:
                     v = self._coerce_numeric(m.get('value'))
                     if v is None:
@@ -291,12 +290,11 @@ class ProgressService:
         metric_def: MetricDefinition,
     ) -> list:
         """Return a list of (set_index, numeric_value) for each set that has this metric."""
-        raw_data = models._safe_load_json(instance.data, {})
-        sets = raw_data.get('sets', []) if isinstance(raw_data, dict) else []
+        sets = load_instance_sets(instance)
         result = []
         for set_index, s in enumerate(sets):
             for m in s.get('metrics', []):
-                mid = m.get('metric_id') or m.get('metric_definition_id')
+                mid = resolve_metric_id(m)
                 if mid == metric_def.id:
                     v = self._coerce_numeric(m.get('value'))
                     if v is not None:
@@ -371,8 +369,7 @@ class ProgressService:
         'yield' is handled separately via _resolve_yield.
         Returns None if no data is available.
         """
-        raw_data = models._safe_load_json(instance.data, {})
-        sets = raw_data.get('sets', []) if isinstance(raw_data, dict) else []
+        sets = load_instance_sets(instance)
 
         if aggregation == 'last':
             # For set-based activities always read from sets so the value
@@ -381,7 +378,7 @@ class ProgressService:
                 values = []
                 for s in sets:
                     for m in s.get('metrics', []):
-                        mid = m.get('metric_id') or m.get('metric_definition_id')
+                        mid = resolve_metric_id(m)
                         numeric_value = self._coerce_numeric(m.get('value'))
                         if mid == metric_def.id and numeric_value is not None:
                             values.append(numeric_value)
@@ -410,14 +407,14 @@ class ProgressService:
             if best_index is not None:
                 s = sets[best_index]
                 for m in s.get('metrics', []):
-                    mid = m.get('metric_id') or m.get('metric_definition_id')
+                    mid = resolve_metric_id(m)
                     if mid == metric_def.id:
                         return self._coerce_numeric(m.get('value'))
             # No best set found — fall back to per-metric max
             values = []
             for s in sets:
                 for m in s.get('metrics', []):
-                    mid = m.get('metric_id') or m.get('metric_definition_id')
+                    mid = resolve_metric_id(m)
                     v = self._coerce_numeric(m.get('value'))
                     if mid == metric_def.id and v is not None:
                         values.append(v)
@@ -426,7 +423,7 @@ class ProgressService:
         values = []
         for s in sets:
             for m in s.get('metrics', []):
-                mid = m.get('metric_id') or m.get('metric_definition_id')
+                mid = resolve_metric_id(m)
                 numeric_value = self._coerce_numeric(m.get('value'))
                 if mid == metric_def.id and numeric_value is not None:
                     values.append(numeric_value)
@@ -454,8 +451,7 @@ class ProgressService:
           - best_set_yield: yield value of the best set (None if not multiplicative)
           - best_set_values: {metric_id: value} for all metrics in the best set
         """
-        raw_data = models._safe_load_json(instance.data, {})
-        sets = raw_data.get('sets', []) if isinstance(raw_data, dict) else []
+        sets = load_instance_sets(instance)
 
         result = {
             'additive_totals': {},
@@ -480,7 +476,7 @@ class ProgressService:
                 values = []
                 for s in sets:
                     for m in s.get('metrics', []):
-                        mid = m.get('metric_id') or m.get('metric_definition_id')
+                        mid = resolve_metric_id(m)
                         v = self._coerce_numeric(m.get('value'))
                         if mid == md.id and v is not None:
                             values.append(v)
@@ -502,7 +498,7 @@ class ProgressService:
             has_any_yield = False
             for set_index, s in enumerate(sets):
                 set_metrics = {
-                    (m.get('metric_id') or m.get('metric_definition_id')): self._coerce_numeric(m.get('value'))
+                    (resolve_metric_id(m)): self._coerce_numeric(m.get('value'))
                     for m in s.get('metrics', [])
                 }
                 product = 1.0
@@ -548,7 +544,7 @@ class ProgressService:
                 best_val = None
                 for set_index, s in enumerate(sets):
                     for m in s.get('metrics', []):
-                        mid = m.get('metric_id') or m.get('metric_definition_id')
+                        mid = resolve_metric_id(m)
                         if mid == anchor.id:
                             v = self._coerce_numeric(m.get('value'))
                             if v is None:
@@ -575,7 +571,7 @@ class ProgressService:
                 best_val = None
                 for set_index, s in enumerate(sets):
                     for m in s.get('metrics', []):
-                        mid = m.get('metric_id') or m.get('metric_definition_id')
+                        mid = resolve_metric_id(m)
                         if mid == primary.id:
                             v = self._coerce_numeric(m.get('value'))
                             if v is None:
@@ -593,14 +589,14 @@ class ProgressService:
             if result['best_set_index'] is not None and result['best_set_index'] < len(sets):
                 best_s = sets[result['best_set_index']]
                 for m in best_s.get('metrics', []):
-                    mid = m.get('metric_id') or m.get('metric_definition_id')
+                    mid = resolve_metric_id(m)
                     v = self._coerce_numeric(m.get('value'))
                     if mid and v is not None:
                         result['best_set_values'][mid] = v
                 # Also attach yield for best set if multiplicative
                 if has_yield and result['best_set_yield'] is None:
                     set_metrics = {
-                        (m.get('metric_id') or m.get('metric_definition_id')): self._coerce_numeric(m.get('value'))
+                        (resolve_metric_id(m)): self._coerce_numeric(m.get('value'))
                         for m in best_s.get('metrics', [])
                     }
                     product = 1.0
@@ -634,8 +630,7 @@ class ProgressService:
         mult_defs = metric_defs
         used_ids = [md.id for md in mult_defs]
 
-        raw_data = models._safe_load_json(instance.data, {})
-        sets = raw_data.get('sets', []) if isinstance(raw_data, dict) else []
+        sets = load_instance_sets(instance)
 
         if sets:
             # Per-set multiplication then sum across sets.
@@ -644,7 +639,7 @@ class ProgressService:
             contributed = False
             for s in sets:
                 set_metrics = {
-                    (m.get('metric_id') or m.get('metric_definition_id')): self._coerce_numeric(m.get('value'))
+                    (resolve_metric_id(m)): self._coerce_numeric(m.get('value'))
                     for m in s.get('metrics', [])
                 }
                 product = 1.0
@@ -727,8 +722,7 @@ class ProgressService:
         has_regression = False
         has_change = False
 
-        curr_data = models._safe_load_json(current_instance.data, {})
-        curr_sets = curr_data.get('sets', []) if isinstance(curr_data, dict) else []
+        curr_sets = load_instance_sets(current_instance)
         has_sets = bool(curr_sets)
 
         # Yield is derived only when every tracked metric is multiplicative.
