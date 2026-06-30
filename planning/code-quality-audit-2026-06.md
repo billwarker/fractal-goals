@@ -19,7 +19,7 @@ These directly violate guarantees the index makes. Low-risk, high-value.
 - [x] **P0-1 — Split `AdminService` god-class (1,710 LOC).** ✅ Moved the full landing cluster (~1,030 lines incl. settings/options/snapshot/publish + app-setting helpers + all landing constants) into `services/landing_publish_service.py` (`LandingPublishService`). AdminService dropped to **680 LOC**. Repointed `admin_api` landing routes and `public_service` constant import to the new module; pruned 21 now-unused imports from AdminService. Full move (no delegation shim). Pyflakes clean, imports resolve, 35/38 admin tests pass — the 3 failures are **pre-existing on HEAD** (see findings below), not caused by this change.
 - [x] **P0-2 — Consolidate duplicated `formatDuration`.** ✅ MetricCardWidget, LandingFeatureAnalytics, AnalyticsExtraCharts now use canonical `formatDurationSeconds` (formatters.js); SessionCard now uses `formatClockDuration` (sessionTime.js) — its `MM:SS` was a distinct clock format that already had a canonical home and now correctly rolls hours into `H:MM:SS`. Lint clean, 16 component tests green.
 - [x] **P0-3 — Delete dead `legacyApi`.** ✅ Removed `legacyApi.js`, its re-exports in `api.js`, and the two `legacy.*` cases from the CSRF contract test. App code had zero consumers. core.test.js green.
-- [ ] **P0-4 — Reconcile competing analytics implementations.** index.md:163 says handcrafted charts should be migrated onto the engine registry then retired; [AnalyticsExtraCharts.jsx](../client/src/components/analytics/AnalyticsExtraCharts.jsx) (288 LOC) still coexists. Migrate or mark as tracked retirement target.
+- [x] **P0-4 — Reconcile competing analytics implementations.** ⚠️ **Investigated — original finding was a false positive.** `AnalyticsExtraCharts.jsx` is NOT a competing/orphaned render path: it is the shared chart-component library imported exclusively by the registry's `visualizations/{goals,sessions,activities}/index.jsx`. `Analytics.jsx` renders only through `ProfileWindow` → registry (single path, no duplication). The catalog-vs-read-model split index.md warns about is already governed: each visualization carries an `execution` tag in `visualizationQueryExplanations.js` (`catalog_sql` default vs `read_model_sql`), and read-model charts are labeled, show equivalent SQL, and disable console handoff. **Status: 22 catalog-backed, 6 read-model-backed.** No refactor needed; residual work re-scoped as P3-23 below (migrate the 6 remaining read-model charts to catalog). The misleading `AnalyticsExtraCharts` filename is the only real wart — optional rename deferred (touches 4 importers for cosmetic gain).
 
 ## P1 — Half-baked / oversized surfaces
 
@@ -49,6 +49,7 @@ Over the implicit ~800-LOC decomposition threshold; the index's own "decompose b
 - [ ] **P3-20 — Centralize the tier enum** (`"legacy"`/`"free"`/`"paid"` hardcoded across quota_service.py, Admin.jsx).
 - [ ] **P3-21 — Retire `progress_service` legacy aggregation / `metrics_multiplicative` fallback** once no rows depend on it. — progress_service.py:152
 - [ ] **P3-22 — Split `Admin.jsx` (1,452) and `ProgramCalendarPage.jsx` (1,319)** into per-tab/per-view subcomponents + hooks.
+- [ ] **P3-23 — Migrate the 6 remaining `read_model_sql` analytics charts to catalog-backed SQL** (re-scoped from P0-4). These are correctly labeled today; goal is to expose the missing catalog lineage/section fields so they become directly runnable + console-openable. Source of truth: `client/src/components/analytics/visualizationQueryExplanations.js` (`execution: 'read_model_sql'`).
 
 ---
 
@@ -63,4 +64,5 @@ Over the implicit ~800-LOC decomposition threshold; the index's own "decompose b
 | 2026-06-29 | — | Audit completed, tracking doc created. |
 | 2026-06-29 | P0-3 | Deleted dead `legacyApi` (module + re-exports + test cases). |
 | 2026-06-29 | P0-2 | Consolidated 4 `formatDuration` reimplementations onto canonical formatters. |
-| 2026-06-29 | P0-1 | Extracted `LandingPublishService` from AdminService (1710→680 LOC). Found NF-1 (pre-existing landing test failures). |
+| 2026-06-29 | P0-1 | Extracted `LandingPublishService` from AdminService (1710→631 LOC). Found NF-1 (pre-existing landing test failures). |
+| 2026-06-29 | P0-4 | Investigated: false positive. No competing render path; catalog/read-model split already governed. Re-scoped residual to P3-23. |
