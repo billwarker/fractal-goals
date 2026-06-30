@@ -169,6 +169,14 @@ const globalNoImportPatterns = [
   /import\s+['"].*Sessions\.css['"]/,
 ];
 
+const INLINE_STYLE_GLOBAL_BUDGET = 356;
+const inlineStyleBudgets = new Map([
+  ['src/components/GoalDetailModal.jsx', 18],
+  ['src/components/goalDetail/GoalTimelineView.jsx', 1],
+  ['src/components/goals/GoalHeader.jsx', 1],
+  ['src/components/goals/GoalUncompletionModal.jsx', 0],
+]);
+
 const importGroupOrder = {
   builtin: 0,
   external: 1,
@@ -287,6 +295,21 @@ const auditFileSize = (file, content) => {
   }
 };
 
+const countInlineStyleBlocks = (content) => (content.match(/style=\{\{/g) ?? []).length;
+
+const auditInlineStyles = (file, content) => {
+  const count = countInlineStyleBlocks(content);
+  const budget = inlineStyleBudgets.get(file);
+  if (budget === undefined || count <= budget) return count;
+
+  console.error(
+    `[maintainability-audit] ${file} has ${count} inline style blocks, exceeding the limit of ${budget}. ` +
+    'Move static styles into CSS modules and keep inline styles limited to runtime CSS variables or measured layout values.'
+  );
+  hasFailure = true;
+  return count;
+};
+
 for (const check of checks) {
   const content = readFile(check.file);
   if (!content) continue;
@@ -315,6 +338,7 @@ for (const check of checks) {
 }
 
 const sourceFiles = collectSourceFiles(resolve('src'));
+let inlineStyleCount = 0;
 for (const file of sourceFiles) {
   const content = readFileSync(file, 'utf8');
   if (!content) continue;
@@ -331,6 +355,15 @@ for (const file of sourceFiles) {
   const relativePath = relative(resolve(''), file);
   auditImportOrder(relativePath, content);
   auditFileSize(relativePath, content);
+  inlineStyleCount += auditInlineStyles(relativePath, content);
+}
+
+if (inlineStyleCount > INLINE_STYLE_GLOBAL_BUDGET) {
+  console.error(
+    `[maintainability-audit] Frontend has ${inlineStyleCount} inline style blocks, exceeding the repo budget of ` +
+    `${INLINE_STYLE_GLOBAL_BUDGET}. Convert static styles to CSS modules before adding more.`
+  );
+  hasFailure = true;
 }
 
 if (hasFailure) {

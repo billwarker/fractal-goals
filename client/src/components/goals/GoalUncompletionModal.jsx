@@ -1,5 +1,7 @@
 import React from 'react';
 
+import styles from './GoalUncompletionModal.module.css';
+
 function GoalUncompletionModal({
     goal,
     goalType,
@@ -26,47 +28,29 @@ function GoalUncompletionModal({
     const associatedPrograms = findProgramsForGoal();
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div className={styles.container}>
             {/* Header */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                paddingBottom: '12px',
-                borderBottom: '1px solid var(--color-warning, #ff9800)'
-            }}>
+            <div className={styles.header}>
                 <button
                     onClick={onCancel}
-                    style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--color-text-muted)',
-                        fontSize: '18px',
-                        cursor: 'pointer',
-                        padding: '0 4px'
-                    }}
+                    className={styles.backButton}
                 >
                     ←
                 </button>
-                <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-warning, #ff9800)' }}>
+                <h3 className={styles.title}>
                     ⚠ Confirm Mark as Incomplete
                 </h3>
             </div>
 
             {/* Goal Name */}
-            <div style={{
-                padding: '14px',
-                background: 'var(--color-bg-card-alt)',
-                border: '1px solid var(--color-warning, #ff9800)',
-                borderRadius: '6px'
-            }}>
-                <div style={{ fontSize: '11px', color: 'var(--color-warning, #ff9800)', marginBottom: '4px' }}>
+            <div className={styles.goalCard}>
+                <div className={styles.eyebrow}>
                     Marking as Incomplete:
                 </div>
-                <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--color-text-primary)' }}>
+                <div className={styles.goalName}>
                     {goal.name}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
+                <div className={styles.mutedMeta}>
                     Type: {goalType}
                 </div>
             </div>
@@ -74,58 +58,34 @@ function GoalUncompletionModal({
             {/* Originally Completed Date */}
             {completedAt && (
                 <div>
-                    <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                    <label className={styles.fieldLabel}>
                         Was completed on:
                     </label>
-                    <div style={{
-                        padding: '12px',
-                        background: 'var(--color-bg-input)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: '4px',
-                        fontSize: '14px',
-                        color: 'var(--color-brand-success, #4caf50)'
-                    }}>
+                    <div className={styles.completedDate}>
                         📅 {new Date(completedAt).toLocaleDateString()} at {new Date(completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                 </div>
             )}
 
             {/* Warning */}
-            <div style={{
-                padding: '12px',
-                background: 'var(--color-bg-card-alt)',
-                border: '1px solid var(--color-warning, #ff9800)',
-                borderRadius: '4px',
-                fontSize: '13px',
-                color: 'var(--color-warning, #ffcc80)'
-            }}>
+            <div className={styles.warning}>
                 ⚠️ This will remove the completion status and completion date from this goal.
             </div>
 
             {/* Associated Programs */}
             <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                <label className={styles.fieldLabel}>
                     Programs that will update:
                 </label>
                 {associatedPrograms.length === 0 ? (
-                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                    <div className={styles.emptyText}>
                         No programs found
                     </div>
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div className={styles.list}>
                         {associatedPrograms.map((program, idx) => (
-                            <div key={idx} style={{
-                                padding: '10px 12px',
-                                background: 'var(--color-bg-input)',
-                                border: '1px solid var(--color-border)',
-                                borderRadius: '4px',
-                                fontSize: '13px',
-                                color: 'var(--color-text-primary)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '8px'
-                            }}>
-                                <span style={{ color: 'var(--color-warning)' }}>📁</span>
+                            <div key={idx} className={styles.listItem}>
+                                <span className={styles.warningIcon}>📁</span>
                                 {program.name}
                             </div>
                         ))}
@@ -135,25 +95,20 @@ function GoalUncompletionModal({
 
             {/* Associated Targets */}
             <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                <label className={styles.fieldLabel}>
                     Targets that will be marked incomplete ({targets.length}):
                 </label>
                 {targets.length === 0 ? (
-                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                    <div className={styles.emptyText}>
                         No targets defined for this goal
                     </div>
                 ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div className={styles.list}>
                         {targets.map(target => {
                             const activity = activityDefinitions.find(a => a.id === target.activity_id);
                             return (
-                                <div key={target.id} style={{
-                                    padding: '10px 12px',
-                                    background: 'var(--color-bg-input)',
-                                    border: '1px solid var(--color-border)',
-                                    borderRadius: '4px'
-                                }}>
-                                    <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--color-text-primary)' }}>
+                                <div key={target.id} className={styles.targetItem}>
+                                    <div className={styles.targetName}>
                                         🎯 {target.name || activity?.name || 'Target'}
                                     </div>
                                 </div>
@@ -164,35 +119,16 @@ function GoalUncompletionModal({
             </div>
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: '10px', paddingTop: '12px', borderTop: '1px solid var(--color-border)' }}>
+            <div className={styles.actions}>
                 <button
                     onClick={onCancel}
-                    style={{
-                        flex: 1,
-                        padding: '12px',
-                        background: 'transparent',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: '4px',
-                        color: 'var(--color-text-secondary)',
-                        cursor: 'pointer',
-                        fontSize: '14px'
-                    }}
+                    className={`${styles.button} ${styles.cancelButton}`}
                 >
                     Cancel
                 </button>
                 <button
                     onClick={onConfirm}
-                    style={{
-                        flex: 1,
-                        padding: '12px',
-                        background: 'var(--color-warning, #ff9800)',
-                        border: 'none',
-                        borderRadius: '4px',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 'bold'
-                    }}
+                    className={`${styles.button} ${styles.confirmButton}`}
                 >
                     Mark Incomplete
                 </button>

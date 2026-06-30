@@ -605,6 +605,8 @@ Useful modes:
 - test runner: Vitest
 - lint: ESLint
 - maintainability audit: `client/scripts/maintainability-audit.mjs`
+  - enforces source-size caps, import-order rules, removed legacy CSS imports, and inline-style budgets
+  - new static styling should use CSS modules/design tokens; inline styles should be limited to runtime CSS variables or measured layout values
 - responsive audit: `client/scripts/responsive-audit.mjs`
 
 ### Backend

@@ -1,0 +1,147 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-warning, #ff9800);
+}
+
+.backButton {
+    padding: 0 4px;
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.title {
+    margin: 0;
+    color: var(--color-warning, #ff9800);
+    font-size: 16px;
+}
+
+.goalCard {
+    padding: 14px;
+    border: 1px solid var(--color-warning, #ff9800);
+    border-radius: 6px;
+    background: var(--color-bg-card-alt);
+}
+
+.eyebrow {
+    margin-bottom: 4px;
+    color: var(--color-warning, #ff9800);
+    font-size: 11px;
+}
+
+.goalName {
+    color: var(--color-text-primary);
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.mutedMeta {
+    margin-top: 4px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.fieldLabel {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.completedDate {
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-input);
+    color: var(--color-brand-success, #4caf50);
+    font-size: 14px;
+}
+
+.warning {
+    padding: 12px;
+    border: 1px solid var(--color-warning, #ff9800);
+    border-radius: 4px;
+    background: var(--color-bg-card-alt);
+    color: var(--color-warning, #ffcc80);
+    font-size: 13px;
+}
+
+.emptyText {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-style: italic;
+}
+
+.list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.listItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-size: 13px;
+}
+
+.targetItem {
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-input);
+}
+
+.targetName {
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.warningIcon {
+    color: var(--color-warning);
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+}
+
+.button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.cancelButton {
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-secondary);
+}
+
+.confirmButton {
+    border: none;
+    background: var(--color-warning, #ff9800);
+    color: white;
+    font-weight: 700;
+}

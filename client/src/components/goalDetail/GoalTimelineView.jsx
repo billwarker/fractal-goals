@@ -6,7 +6,11 @@ import {
     DEFAULT_GOAL_TIMELINE_TYPES,
     useGoalTimeline,
 } from '../../hooks/useGoalTimeline';
-import { formatDurationSeconds } from '../../utils/formatters';
+import {
+    formatDateTimeParts,
+    formatDurationSeconds,
+    formatMetricDisplayValue,
+} from '../../utils/formatters';
 import GoalIcon from '../atoms/GoalIcon';
 import { ActivityTimelineCard } from '../common/ActivityTimeline';
 import styles from './GoalTimelineView.module.css';
@@ -16,35 +20,6 @@ const FILTERS = [
     { type: 'target', label: 'Targets' },
     { type: 'child_goal', label: 'Child Goals' },
 ];
-
-function formatDateTime(isoString, timezone) {
-    if (!isoString) return { date: '', time: '' };
-    try {
-        const date = new Date(isoString);
-        return {
-            date: date.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-                timeZone: timezone,
-            }),
-            time: date.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                timeZone: timezone,
-            }),
-        };
-    } catch {
-        return { date: '', time: '' };
-    }
-}
-
-function formatMetricValue(metric) {
-    if (!metric || metric.value == null) return null;
-    const value = Number(metric.value);
-    const formatted = Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '');
-    return `${metric.name || 'Metric'}: ${formatted}${metric.unit ? ` ${metric.unit}` : ''}`;
-}
 
 function formatTimelineTitle(item) {
     const payload = item.payload || {};
@@ -117,7 +92,7 @@ function normalizeTimelineEntry(item, goalLevelHelpers) {
         ? normalizeActivityTimelineInstance(item)
         : null;
     const metrics = Array.isArray(payload.metrics) ? payload.metrics : [];
-    const visibleMetrics = metrics.map(formatMetricValue).filter(Boolean).slice(0, 4);
+    const visibleMetrics = metrics.map(formatMetricDisplayValue).filter(Boolean).slice(0, 4);
     const duration = payload.duration_seconds ? formatDurationSeconds(payload.duration_seconds) : null;
     const goalLevel = item.type === 'child_goal' ? getTimelineGoalLevel(payload) : null;
     const goalColor = goalLevel ? goalLevelHelpers.getGoalColor(goalLevel) : null;
@@ -247,7 +222,7 @@ function GoalTimelineView({ rootId, goalId, metrics, onTimeSpentClick, readOnlyE
 }
 
 function TimelineItem({ item, rootId, timezone }) {
-    const { date, time } = formatDateTime(item.timestamp, timezone);
+    const { date, time } = formatDateTimeParts(item.timestamp, timezone);
     const goalLevelHelpers = useGoalLevels();
     const card = normalizeTimelineEntry(item, goalLevelHelpers);
 

@@ -695,7 +695,12 @@ function GoalDetailModal({
             </div>
             <p className={styles.levelPickerPrompt}>
                 What level of goal do you want to create under{' '}
-                <strong style={{ color: getGoalColor(parentType) }}>{parentGoal?.attributes?.name || parentGoal?.name}</strong>?
+                <strong
+                    className={styles.levelPickerParentName}
+                    style={{ '--level-picker-accent': getGoalColor(parentType) }}
+                >
+                    {parentGoal?.attributes?.name || parentGoal?.name}
+                </strong>?
             </p>
             <div className={styles.levelPickerGrid}>
                 {validChildTypes.map((type) => {
@@ -706,7 +711,7 @@ function GoalDetailModal({
                         <button
                             key={type}
                             className={styles.levelPickerOption}
-                            style={{ borderColor: color, color: color }}
+                            style={{ '--level-picker-accent': color }}
                             onClick={() => setSelectedChildType(type)}
                         >
                             <GoalIcon
@@ -714,7 +719,7 @@ function GoalDetailModal({
                                 color={color}
                                 secondaryColor={secondaryColor}
                                 size={20}
-                                style={{ flexShrink: 0 }}
+                                className={styles.levelPickerIcon}
                             />
                             {getTypeDisplayName(type)}
                         </button>
@@ -1035,7 +1040,6 @@ function GoalDetailModal({
             </Suspense>
         );
     } else if (needsLevelPicker && selectedChildType === null) {
-        // Show level picker before the create form when multiple levels are valid.
         content = renderLevelPicker();
     } else {
         content = renderGoalContent();
@@ -1090,7 +1094,6 @@ function GoalDetailModal({
         );
     }
 
-    // ============ RENDER ============
     const showGoalNoteComposer = !readOnly
         && viewState === 'goal-notes'
         && mode !== 'create'
@@ -1418,7 +1421,6 @@ function GoalDetailModal({
         );
     }
 
-    // Modal mode
     const modalMarkup = (
         <ModalBackdrop
             className={styles.modalOverlay}
@@ -1427,9 +1429,7 @@ function GoalDetailModal({
             <div
                 onClick={(e) => e.stopPropagation()}
                 className={`${styles.modalContent} ${readOnly ? styles.readOnlySurface : ''}`}
-                style={{
-                    borderTop: `4px solid ${displayGoalColor}`,
-                }}
+                style={{ '--goal-detail-accent': displayGoalColor }}
             >
                 <div className={styles.modalScrollArea} ref={contentScrollRef}>
                     {content}
