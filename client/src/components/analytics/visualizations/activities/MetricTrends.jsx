@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
 
-import { chartDefaults, DISABLED_CHART_ANIMATION } from '../../ChartJSWrapper';
+import EmptyState from '../../../common/EmptyState';
+import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../ChartJSWrapper';
 
 const palette = ['#3b82f6', '#22c55e'];
 
@@ -53,24 +54,20 @@ function resolveMetricValue(instance, metricDef, setsHandling = 'top', selectedS
 }
 
 function EmptyMetricTrends({ children = 'Metric trends appear once the selected activity has metric values.' }) {
-    return (
-        <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'var(--color-text-muted)', fontSize: 13, textAlign: 'center' }}>
-            {children}
-        </div>
-    );
+    return <EmptyState compact description={children} />;
 }
 
-function buildYAxis(metric, index) {
+function buildYAxis(metric, index, chartTheme) {
     return {
         type: 'linear',
         beginAtZero: false,
         position: index === 0 ? 'left' : 'right',
-        ticks: { color: chartDefaults.textColor },
-        grid: { drawOnChartArea: index === 0, color: chartDefaults.gridColor },
+        ticks: { color: chartTheme.textColor },
+        grid: { drawOnChartArea: index === 0, color: chartTheme.gridColor },
         title: {
             display: true,
             text: metric?.unit || metric?.name || 'Metric',
-            color: chartDefaults.textColor,
+            color: chartTheme.textColor,
         },
     };
 }
@@ -124,6 +121,7 @@ export function MetricTrendsChart({
     selectedSplit = 'all',
 }) {
     const metricDefinitions = useMemo(() => activity?.metric_definitions || [], [activity?.metric_definitions]);
+    const chartTheme = useChartThemeDefaults();
     const chartData = useMemo(() => buildMetricTrendData({
         instances: activity ? activityInstances[activity.id] || [] : [],
         metricDefinitions,
@@ -151,24 +149,24 @@ export function MetricTrendsChart({
                     legend: {
                         display: true,
                         position: 'top',
-                        labels: { color: chartDefaults.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
+                        labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
                     },
-                    title: { display: true, text: 'Metric Trends', color: chartDefaults.textColor },
+                    title: { display: true, text: 'Metric Trends', color: chartTheme.textColor },
                     tooltip: {
-                        backgroundColor: 'rgba(30, 30, 30, 0.95)',
-                        titleColor: '#fff',
-                        bodyColor: '#ddd',
+                        backgroundColor: chartTheme.tooltipBg,
+                        titleColor: chartTheme.tooltipText,
+                        bodyColor: chartTheme.tooltipBody,
                         padding: 12,
                     },
                 },
                 scales: {
                     x: {
-                        ticks: { color: chartDefaults.textColor, maxRotation: 45, minRotation: 0 },
-                        grid: { color: chartDefaults.gridColor },
+                        ticks: { color: chartTheme.textColor, maxRotation: 45, minRotation: 0 },
+                        grid: { color: chartTheme.gridColor },
                     },
                     ...Object.fromEntries(chartData.selectedMetricDefs.map((metric, index) => [
                         `metric${index + 1}`,
-                        buildYAxis(metric, index),
+                        buildYAxis(metric, index, chartTheme),
                     ])),
                 },
             }}

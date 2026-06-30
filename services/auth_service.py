@@ -3,6 +3,7 @@ import logging
 
 import jwt
 
+from account_tiers import DEFAULT_ACCOUNT_TIER
 from config import config
 from models import User
 from services.serializers import serialize_user
@@ -63,7 +64,10 @@ class AuthService:
         new_user = User(
             username=data['username'],
             email=data['email'],
-            storage_limit_bytes=QuotaService(self.db_session).get_tier_storage_limit_bytes("free") or DEFAULT_STORAGE_LIMIT_BYTES,
+            storage_limit_bytes=(
+                QuotaService(self.db_session).get_tier_storage_limit_bytes(DEFAULT_ACCOUNT_TIER)
+                or DEFAULT_STORAGE_LIMIT_BYTES
+            ),
         )
         new_user.set_password(data['password'])
 

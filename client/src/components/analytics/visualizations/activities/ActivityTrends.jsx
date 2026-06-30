@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 
-import { chartDefaults, DISABLED_CHART_ANIMATION } from '../../ChartJSWrapper';
+import EmptyState from '../../../common/EmptyState';
+import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../ChartJSWrapper';
 
 const METRIC_OPTIONS = [
     { value: 'instances', label: 'Instances', color: '#3b82f6', type: 'bar' },
@@ -48,11 +49,7 @@ function isCompletedActivityInstance(instance) {
 }
 
 function EmptyActivityTrends() {
-    return (
-        <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'var(--color-text-muted)', fontSize: 13, textAlign: 'center' }}>
-            Activity trends appear once activity instances have dates in the selected scope.
-        </div>
-    );
+    return <EmptyState compact description="Activity trends appear once activity instances have dates in the selected scope." />;
 }
 
 export function getActivityTrendRows(activityInstances = {}) {
@@ -80,6 +77,7 @@ export function getActivityTrendRows(activityInstances = {}) {
 }
 
 export function ActivityTrendsChart({ activityInstances = {}, chartRef, metrics = ['instances', 'duration'] }) {
+    const chartTheme = useChartThemeDefaults();
     const selectedMetrics = useMemo(() => (metrics.length ? metrics : ['instances']), [metrics]);
     const rows = useMemo(() => getActivityTrendRows(activityInstances), [activityInstances]);
 
@@ -124,17 +122,17 @@ export function ActivityTrendsChart({ activityInstances = {}, chartRef, metrics 
                         display: true,
                         position: 'top',
                         labels: {
-                            color: chartDefaults.textColor,
+                            color: chartTheme.textColor,
                             usePointStyle: true,
                             boxWidth: 8,
                             font: { size: 11 },
                         },
                     },
-                    title: { display: true, text: 'Activity Trends', color: chartDefaults.textColor },
+                    title: { display: true, text: 'Activity Trends', color: chartTheme.textColor },
                     tooltip: {
-                        backgroundColor: 'rgba(30, 30, 30, 0.95)',
-                        titleColor: '#fff',
-                        bodyColor: '#ddd',
+                        backgroundColor: chartTheme.tooltipBg,
+                        titleColor: chartTheme.tooltipText,
+                        bodyColor: chartTheme.tooltipBody,
                         padding: 12,
                         callbacks: {
                             label: (ctx) => {
@@ -148,29 +146,29 @@ export function ActivityTrendsChart({ activityInstances = {}, chartRef, metrics 
                 },
                 scales: {
                     x: {
-                        ticks: { color: chartDefaults.textColor, maxRotation: 45, minRotation: 0 },
-                        grid: { color: chartDefaults.gridColor },
+                        ticks: { color: chartTheme.textColor, maxRotation: 45, minRotation: 0 },
+                        grid: { color: chartTheme.gridColor },
                     },
                     instances: {
                         type: 'linear',
                         beginAtZero: true,
                         position: 'left',
                         display: selectedMetrics.includes('instances'),
-                        ticks: { color: chartDefaults.textColor, precision: 0 },
-                        grid: { color: chartDefaults.gridColor },
-                        title: { display: true, text: 'Instances', color: chartDefaults.textColor },
+                        ticks: { color: chartTheme.textColor, precision: 0 },
+                        grid: { color: chartTheme.gridColor },
+                        title: { display: true, text: 'Instances', color: chartTheme.textColor },
                     },
                     duration: {
                         type: 'linear',
                         beginAtZero: true,
                         position: selectedMetrics.includes('instances') ? 'right' : 'left',
                         display: selectedMetrics.includes('duration'),
-                        ticks: { color: chartDefaults.textColor },
+                        ticks: { color: chartTheme.textColor },
                         grid: {
                             drawOnChartArea: !selectedMetrics.includes('instances'),
-                            color: chartDefaults.gridColor,
+                            color: chartTheme.gridColor,
                         },
-                        title: { display: true, text: 'Minutes', color: chartDefaults.textColor },
+                        title: { display: true, text: 'Minutes', color: chartTheme.textColor },
                     },
                 },
             }}

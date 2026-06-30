@@ -8,6 +8,12 @@ from copy import deepcopy
 from sqlalchemy import delete, func, or_
 from sqlalchemy.orm.attributes import flag_modified
 
+from account_tiers import (
+    DEFAULT_ACCOUNT_TIER,
+    FINITE_QUOTA_TIERS,
+    TIER_LEGACY,
+    UNLIMITED_QUOTA_TIERS,
+)
 from models import (
     ActivityDefinition,
     ActivityDurationStats,
@@ -173,7 +179,7 @@ class AdminService:
             return None, "Username or email already exists", 400
 
         raw_password = data.get("password") or generate_password()
-        membership_tier = data.get("membership_tier") or "free"
+        membership_tier = data.get("membership_tier") or DEFAULT_ACCOUNT_TIER
         user = User(
             username=data["username"],
             email=data["email"],
@@ -225,13 +231,13 @@ class AdminService:
             "tier_storage_limit_bytes": self.quota_service.get_tier_storage_limits(),
             "resources": RESOURCE_ORDER,
             "labels": RESOURCE_LABELS,
-            "editable_tiers": ["free", "paid"],
-            "unlimited_tiers": ["legacy"],
+            "editable_tiers": list(FINITE_QUOTA_TIERS),
+            "unlimited_tiers": list(UNLIMITED_QUOTA_TIERS),
         }, None, 200
 
     def update_tier_quota_settings(self, data: JsonDict) -> ServiceResult[JsonDict]:
         tier = self.quota_service.normalize_tier(data.get("tier"))
-        if tier == "legacy":
+        if tier == TIER_LEGACY:
             return None, "Legacy tier remains unlimited and cannot be assigned finite default quotas", 400
 
         try:
@@ -256,10 +262,10 @@ class AdminService:
         setting = self.db_session.get(AppSetting, TIER_DEFAULT_LIMITS_SETTING_KEY)
         configured_defaults = deepcopy(current_defaults)
         configured_defaults[tier] = normalized_limits
-        configured_defaults["legacy"] = None
+        configured_defaults[TIER_LEGACY] = None
         configured_defaults["storage_limit_bytes"] = deepcopy(current_storage_defaults)
         configured_defaults["storage_limit_bytes"][tier] = storage_limit_bytes
-        configured_defaults["storage_limit_bytes"]["legacy"] = None
+        configured_defaults["storage_limit_bytes"][TIER_LEGACY] = None
 
         if setting is None:
             setting = AppSetting(key=TIER_DEFAULT_LIMITS_SETTING_KEY, value=configured_defaults)
@@ -495,7 +501,7 @@ class AdminService:
             "role": getattr(user, "role", "user") or "user",
             "is_admin": bool(getattr(user, "is_admin", False)),
             "is_active": bool(user.is_active),
-            "membership_tier": getattr(user, "membership_tier", "free") or "free",
+            "membership_tier": getattr(user, "membership_tier", DEFAULT_ACCOUNT_TIER) or DEFAULT_ACCOUNT_TIER,
             "quota_overrides": user.quota_overrides or {},
             "storage_limit_bytes": getattr(user, "storage_limit_bytes", DEFAULT_STORAGE_LIMIT_BYTES),
             "tier_storage_limit_bytes": self.quota_service.get_tier_storage_limits(),

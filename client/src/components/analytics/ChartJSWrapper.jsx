@@ -237,12 +237,52 @@ export function useChartOptions({
     return options;
 }
 
+export function useChartThemeDefaults() {
+    const [defaults, setDefaults] = useState(() => ({
+        backgroundColor: chartDefaults.backgroundColor,
+        gridColor: getCSSVar('--color-border') || chartDefaults.gridColor,
+        textColor: getCSSVar('--color-text-secondary') || chartDefaults.textColor,
+        primaryColor: getCSSVar('--color-primary') || chartDefaults.primaryColor,
+        secondaryColor: getCSSVar('--color-accent') || chartDefaults.secondaryColor,
+        borderColor: getCSSVar('--color-primary') || chartDefaults.borderColor,
+        tooltipBg: getCSSVar('--color-bg-tooltip') || 'rgba(30, 30, 30, 0.95)',
+        tooltipText: getCSSVar('--color-text-primary') || '#fff',
+        tooltipBody: getCSSVar('--color-text-secondary') || '#ddd',
+        tooltipBorder: getCSSVar('--color-border') || '#444',
+        font: chartDefaults.font,
+    }));
+
+    useEffect(() => {
+        const updateDefaults = () => {
+            setDefaults({
+                backgroundColor: chartDefaults.backgroundColor,
+                gridColor: getCSSVar('--color-border') || chartDefaults.gridColor,
+                textColor: getCSSVar('--color-text-secondary') || chartDefaults.textColor,
+                primaryColor: getCSSVar('--color-primary') || chartDefaults.primaryColor,
+                secondaryColor: getCSSVar('--color-accent') || chartDefaults.secondaryColor,
+                borderColor: getCSSVar('--color-primary') || chartDefaults.borderColor,
+                tooltipBg: getCSSVar('--color-bg-tooltip') || 'rgba(30, 30, 30, 0.95)',
+                tooltipText: getCSSVar('--color-text-primary') || '#fff',
+                tooltipBody: getCSSVar('--color-text-secondary') || '#ddd',
+                tooltipBorder: getCSSVar('--color-border') || '#444',
+                font: chartDefaults.font,
+            });
+        };
+
+        updateDefaults();
+        const observer = new MutationObserver(updateDefaults);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'class'] });
+        return () => observer.disconnect();
+    }, []);
+
+    return defaults;
+}
+
 /**
  * Static Chart.js color fallbacks for chart configs built outside a React
- * render (and the ~12 chart components that still read these directly).
+ * render.
  * For theme-reactive options inside a component, prefer the useChartOptions
- * hook. Migrating the remaining direct consumers is tracked as P3-24 in
- * planning/code-quality-audit-2026-06.md.
+ * or useChartThemeDefaults hook.
  */
 export const chartDefaults = {
     backgroundColor: '#1e1e1e', // Fallbacks

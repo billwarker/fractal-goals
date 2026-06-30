@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 
-import { chartDefaults, DISABLED_CHART_ANIMATION } from '../../ChartJSWrapper';
+import EmptyState from '../../../common/EmptyState';
+import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../ChartJSWrapper';
 
 const GRAIN_OPTIONS = [
     { value: 'day', label: 'Day' },
@@ -83,11 +84,7 @@ function formatDuration(seconds = 0) {
 }
 
 function EmptySessionTrends() {
-    return (
-        <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'var(--color-text-muted)', fontSize: 13, textAlign: 'center' }}>
-            Session trends appear once sessions have dates in the selected scope.
-        </div>
-    );
+    return <EmptyState compact description="Session trends appear once sessions have dates in the selected scope." />;
 }
 
 export function getSessionTrendRows(sessions = [], grain = 'week') {
@@ -108,6 +105,7 @@ export function getSessionTrendRows(sessions = [], grain = 'week') {
 }
 
 export function SessionTrendsChart({ sessions = [], chartRef, grain = 'week', metrics = ['sessions', 'duration'] }) {
+    const chartTheme = useChartThemeDefaults();
     const selectedMetrics = useMemo(() => (metrics.length ? metrics : ['sessions']), [metrics]);
     const rows = useMemo(() => getSessionTrendRows(sessions, grain), [grain, sessions]);
 
@@ -147,16 +145,16 @@ export function SessionTrendsChart({ sessions = [], chartRef, grain = 'week', me
                         display: true,
                         position: 'top',
                         labels: {
-                            color: chartDefaults.textColor,
+                            color: chartTheme.textColor,
                             usePointStyle: true,
                             boxWidth: 8,
                             font: { size: 11 },
                         },
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(30, 30, 30, 0.95)',
-                        titleColor: '#fff',
-                        bodyColor: '#ddd',
+                        backgroundColor: chartTheme.tooltipBg,
+                        titleColor: chartTheme.tooltipText,
+                        bodyColor: chartTheme.tooltipBody,
                         padding: 12,
                         callbacks: {
                             label: (ctx) => {
@@ -171,26 +169,26 @@ export function SessionTrendsChart({ sessions = [], chartRef, grain = 'week', me
                 },
                 scales: {
                     x: {
-                        ticks: { color: chartDefaults.textColor, maxRotation: 45, minRotation: 0 },
-                        grid: { color: chartDefaults.gridColor },
+                        ticks: { color: chartTheme.textColor, maxRotation: 45, minRotation: 0 },
+                        grid: { color: chartTheme.gridColor },
                     },
                     sessions: {
                         type: 'linear',
                         beginAtZero: true,
                         position: 'left',
                         display: selectedMetrics.includes('sessions'),
-                        ticks: { color: chartDefaults.textColor, precision: 0 },
-                        grid: { color: chartDefaults.gridColor },
-                        title: { display: true, text: 'Sessions', color: chartDefaults.textColor },
+                        ticks: { color: chartTheme.textColor, precision: 0 },
+                        grid: { color: chartTheme.gridColor },
+                        title: { display: true, text: 'Sessions', color: chartTheme.textColor },
                     },
                     duration: {
                         type: 'linear',
                         beginAtZero: true,
                         position: selectedMetrics.includes('sessions') ? 'right' : 'left',
                         display: selectedMetrics.includes('duration'),
-                        ticks: { color: chartDefaults.textColor },
-                        grid: { drawOnChartArea: !selectedMetrics.includes('sessions'), color: chartDefaults.gridColor },
-                        title: { display: true, text: 'Minutes', color: chartDefaults.textColor },
+                        ticks: { color: chartTheme.textColor },
+                        grid: { drawOnChartArea: !selectedMetrics.includes('sessions'), color: chartTheme.gridColor },
+                        title: { display: true, text: 'Minutes', color: chartTheme.textColor },
                     },
                 },
             }}

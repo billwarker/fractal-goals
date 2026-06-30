@@ -85,7 +85,7 @@ describe('visualizationQueryExplanations', () => {
         expect(explanation.sql).toContain('AVG(mv.value::numeric) AS metric_value');
     });
 
-    it('marks read-model-only explanations as not directly runnable in the SQL console', () => {
+    it('keeps all visualization SQL explanations catalog-backed and runnable', () => {
         const explanation = buildVisualizationQueryExplanation(baseContext({
             selectedCategory: 'goals',
             selectedVisualization: 'goalMomentum',
@@ -93,8 +93,8 @@ describe('visualizationQueryExplanations', () => {
             effectiveSelectedGoal: { id: 'goal-1', name: 'Practice Song' },
         }));
 
-        expect(explanation.metadata.execution).toBe('read_model_sql');
-        expect(explanation.metadata.runnable).toBe(false);
-        expect(explanation.metadata.notes[0]).toContain('read-model lineage rollups');
+        expect(explanation.metadata.execution).not.toBe('read_model_sql');
+        expect(explanation.metadata.runnable).not.toBe(false);
+        expect(explanation.metadata.notes.join(' ')).not.toContain('read-model lineage');
     });
 });

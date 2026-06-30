@@ -1,6 +1,8 @@
 import copy
 from datetime import datetime, timezone, date
 import json
+
+from account_tiers import DEFAULT_ACCOUNT_TIER
 from models import _safe_load_json
 from .goal_type_utils import get_canonical_goal_type
 from .goal_domain_rules import goal_uses_child_completion
@@ -686,7 +688,7 @@ def serialize_user(user):
         "role": getattr(user, "role", "user") or "user",
         "is_admin": bool(getattr(user, "is_admin", False)),
         "preferences": _safe_load_json(user.preferences, {}),
-        "membership_tier": getattr(user, "membership_tier", "free") or "free",
+        "membership_tier": getattr(user, "membership_tier", DEFAULT_ACCOUNT_TIER) or DEFAULT_ACCOUNT_TIER,
         "subscription_status": getattr(user, "subscription_status", "none") or "none",
         "paid_amount_cad_cents": getattr(user, "paid_amount_cad_cents", None),
         "storage_limit_bytes": getattr(user, "storage_limit_bytes", None),

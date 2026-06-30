@@ -258,18 +258,15 @@ function sessionTrends(context) {
 
 function sectionPie(context) {
     const clauses = [
-        completedActivityPredicate('ai'),
         ...dateWhereClauses(context.dateRange, 'COALESCE(s.session_start, s.created_at)'),
     ];
     return {
-        sql: `SELECT\n  COALESCE(ss.name, 'Unnamed section') AS section_name,\n  ROUND(SUM(COALESCE(ai.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM session_sections ss\nJOIN session_section_activities ssa ON ssa.section_id = ss.id\nJOIN activity_instances ai ON ai.id = ssa.activity_instance_id\nJOIN sessions s ON s.id = ai.session_id${buildWhere(clauses)}\nGROUP BY COALESCE(ss.name, 'Unnamed section')\nHAVING SUM(COALESCE(ai.duration_seconds, 0)) > 0\nORDER BY minutes DESC\nLIMIT 5000`,
+        sql: `WITH expanded_sections AS (\n  SELECT\n    COALESCE(section->>'name', 'Unnamed section') AS section_name,\n    COALESCE((section->>'duration_minutes')::numeric * 60, 0) AS duration_seconds\n  FROM sessions s\n  CROSS JOIN LATERAL jsonb_array_elements(COALESCE((s.attributes::jsonb #> '{session_data,sections}'), '[]'::jsonb)) AS section${buildWhere(clauses)}\n)\nSELECT\n  section_name,\n  ROUND(SUM(duration_seconds) / 60.0)::integer AS minutes\nFROM expanded_sections\nGROUP BY section_name\nHAVING SUM(duration_seconds) > 0\nORDER BY minutes DESC\nLIMIT 5000`,
         metadata: baseMetadata({
-            dataset: 'session_sections + activity_instances',
+            dataset: 'sessions',
             chartFields: ['section_name', 'minutes'],
             aggregation: 'activity duration by session section',
-            execution: 'read_model_sql',
-            runnable: false,
-            notes: ['Session section membership is currently delivered through the analytics read model; this shows the relational shape required to reproduce the chart.'],
+            notes: ['Session sections are stored in the governed sessions.attributes JSON payload.'],
         }),
     };
 }
@@ -355,8 +352,8 @@ function timeDistribution(context) {
     const mode = context.visualizationState?.durationMode || 'activity';
     const durationExpr = mode === 'session' ? 's.duration_seconds' : 'ai.duration_seconds';
     const join = mode === 'session'
-        ? '\nLEFT JOIN sessions s ON s.goal_id = g.id'
-        : '\nLEFT JOIN activity_instances ai ON ai.goal_id = g.id';
+        ? '\nJOIN session_goals sg ON sg.goal_id = g.id\nJOIN sessions s ON s.id = sg.session_id'
+        : '\nJOIN activity_goal_associations aga ON aga.goal_id = g.id\nJOIN activity_instances ai ON ai.activity_definition_id = aga.activity_id';
     const dateColumn = mode === 'session' ? 'COALESCE(s.session_start, s.created_at)' : 'COALESCE(ai.time_stop, ai.time_start, ai.created_at)';
     const clauses = [
         ...globalGoalWhereClauses(context.globalFilters, 'g'),
@@ -368,9 +365,7 @@ function timeDistribution(context) {
             dataset: mode === 'session' ? 'goals + sessions' : 'goals + activity_instances',
             chartFields: ['goal_name', 'minutes'],
             aggregation: `${mode} duration by goal`,
-            execution: 'read_model_sql',
-            runnable: false,
-            notes: ['Goal duration charts use analytics lineage rollups in the read model. This SQL shows the direct-goal equivalent.'],
+            notes: ['Uses direct session-goal or activity-goal associations from the governed catalog.'],
         }),
     };
 }
@@ -405,15 +400,13 @@ function goalMomentum(context) {
         ...dateWhereClauses(context.dateRange, 'COALESCE(ai.time_stop, ai.time_start, ai.created_at)'),
     ];
     return {
-        sql: `SELECT\n  g.id AS goal_id,\n  g.name AS goal_name,\n  ROUND(SUM(COALESCE(ai.duration_seconds, 0)) / 60.0)::integer AS activity_minutes\nFROM goals g\nLEFT JOIN activity_instances ai ON ai.goal_id = g.id${buildWhere(clauses)}\nGROUP BY g.id, g.name\nHAVING SUM(COALESCE(ai.duration_seconds, 0)) > 0\nORDER BY activity_minutes DESC, goal_name ASC\nLIMIT 12`,
+        sql: `SELECT\n  g.id AS goal_id,\n  g.name AS goal_name,\n  ROUND(SUM(COALESCE(ai.duration_seconds, 0)) / 60.0)::integer AS activity_minutes\nFROM goals g\nJOIN activity_goal_associations aga ON aga.goal_id = g.id\nJOIN activity_instances ai ON ai.activity_definition_id = aga.activity_id${buildWhere(clauses)}\nGROUP BY g.id, g.name\nHAVING SUM(COALESCE(ai.duration_seconds, 0)) > 0\nORDER BY activity_minutes DESC, goal_name ASC\nLIMIT 12`,
         metadata: baseMetadata({
-            dataset: 'goals + activity_instances',
+            dataset: 'goals + activity_goal_associations + activity_instances',
             rowLimit: 12,
             chartFields: ['goal_name', 'activity_minutes'],
             aggregation: 'top goals by activity time',
-            execution: 'read_model_sql',
-            runnable: false,
-            notes: ['Goal momentum uses read-model lineage rollups; this SQL is the direct-goal equivalent.'],
+            notes: ['Uses direct activity-goal associations from the governed catalog.'],
         }),
     };
 }
@@ -421,15 +414,13 @@ function goalMomentum(context) {
 function staleGoals(context) {
     const clauses = ['g.completed = false', ...globalGoalWhereClauses(context.globalFilters, 'g')];
     return {
-        sql: `WITH goal_activity AS (\n  SELECT\n    g.id,\n    g.name,\n    GREATEST(\n      COALESCE(MAX(COALESCE(ai.time_stop, ai.time_start, ai.created_at)), g.created_at),\n      COALESCE(MAX(COALESCE(s.session_start, s.created_at)), g.created_at),\n      g.created_at\n    ) AS last_activity_at\n  FROM goals g\n  LEFT JOIN activity_instances ai ON ai.goal_id = g.id\n  LEFT JOIN sessions s ON s.goal_id = g.id${buildWhere(clauses)}\n  GROUP BY g.id, g.name, g.created_at\n)\nSELECT\n  id AS goal_id,\n  name AS goal_name,\n  FLOOR(EXTRACT(epoch FROM (NOW() - last_activity_at)) / 86400)::integer AS days_stale\nFROM goal_activity\nWHERE last_activity_at <= NOW() - INTERVAL '14 days'\nORDER BY days_stale DESC, goal_name ASC\nLIMIT 10`,
+        sql: `WITH direct_activity AS (\n  SELECT\n    aga.goal_id,\n    MAX(COALESCE(ai.time_stop, ai.time_start, ai.created_at)) AS last_activity_at\n  FROM activity_goal_associations aga\n  JOIN activity_instances ai ON ai.activity_definition_id = aga.activity_id\n  GROUP BY aga.goal_id\n), direct_sessions AS (\n  SELECT\n    sg.goal_id,\n    MAX(COALESCE(s.session_start, s.created_at)) AS last_session_at\n  FROM session_goals sg\n  JOIN sessions s ON s.id = sg.session_id\n  GROUP BY sg.goal_id\n), goal_activity AS (\n  SELECT\n    g.id,\n    g.name,\n    GREATEST(\n      COALESCE(da.last_activity_at, g.created_at),\n      COALESCE(ds.last_session_at, g.created_at),\n      g.created_at\n    ) AS last_activity_at\n  FROM goals g\n  LEFT JOIN direct_activity da ON da.goal_id = g.id\n  LEFT JOIN direct_sessions ds ON ds.goal_id = g.id${buildWhere(clauses)}\n)\nSELECT\n  id AS goal_id,\n  name AS goal_name,\n  FLOOR(EXTRACT(epoch FROM (NOW() - last_activity_at)) / 86400)::integer AS days_stale\nFROM goal_activity\nWHERE last_activity_at <= NOW() - INTERVAL '14 days'\nORDER BY days_stale DESC, goal_name ASC\nLIMIT 10`,
         metadata: baseMetadata({
-            dataset: 'goals + activity_instances + sessions',
+            dataset: 'goals + activity_goal_associations + activity_instances + session_goals + sessions',
             rowLimit: 10,
             chartFields: ['goal_name', 'days_stale'],
             aggregation: 'active goals with no recent activity',
-            execution: 'read_model_sql',
-            runnable: false,
-            notes: ['Stale-goal charts use lineage-expanded read-model activity dates. This SQL is the direct-goal equivalent.'],
+            notes: ['Uses direct catalog associations to compute last activity/session evidence.'],
         }),
     };
 }
@@ -443,14 +434,12 @@ function goalDetail(context) {
             ...dateWhereClauses(context.dateRange, 'COALESCE(ai.time_stop, ai.time_start, ai.created_at)'),
         ];
         return {
-            sql: `SELECT\n  ad.name AS activity_name,\n  COUNT(ai.id) AS instances,\n  ROUND(SUM(COALESCE(ai.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM goals g\nJOIN activity_instances ai ON ai.goal_id = g.id\nJOIN activity_definitions ad ON ad.id = ai.activity_definition_id${buildWhere(activityClauses)}\nGROUP BY ad.name\nORDER BY instances DESC, activity_name ASC\nLIMIT 5000`,
+            sql: `SELECT\n  ad.name AS activity_name,\n  COUNT(ai.id) AS instances,\n  ROUND(SUM(COALESCE(ai.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM goals g\nJOIN activity_goal_associations aga ON aga.goal_id = g.id\nJOIN activity_instances ai ON ai.activity_definition_id = aga.activity_id\nJOIN activity_definitions ad ON ad.id = ai.activity_definition_id${buildWhere(activityClauses)}\nGROUP BY ad.name\nORDER BY instances DESC, activity_name ASC\nLIMIT 5000`,
             metadata: baseMetadata({
-                dataset: 'goals + activity_instances + activity_definitions',
+                dataset: 'goals + activity_goal_associations + activity_instances + activity_definitions',
                 chartFields: ['activity_name', 'instances', 'minutes'],
                 aggregation: 'selected goal activity breakdown',
-                execution: 'read_model_sql',
-                runnable: false,
-                notes: ['Goal detail respects scoped lineage in the read model; this SQL is the direct-goal equivalent.'],
+                notes: ['Uses direct activity-goal associations from the governed catalog.'],
             }),
         };
     }
@@ -459,14 +448,12 @@ function goalDetail(context) {
         ...dateWhereClauses(context.dateRange, 'COALESCE(s.session_start, s.created_at)'),
     ];
     return {
-        sql: `SELECT\n  COALESCE(s.session_start, s.created_at)::date AS session_day,\n  ROUND(SUM(COALESCE(s.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM goals g\nJOIN sessions s ON s.goal_id = g.id${buildWhere(durationClauses)}\nGROUP BY session_day\nORDER BY session_day ASC\nLIMIT 5000`,
+        sql: `SELECT\n  COALESCE(s.session_start, s.created_at)::date AS session_day,\n  ROUND(SUM(COALESCE(s.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM goals g\nJOIN session_goals sg ON sg.goal_id = g.id\nJOIN sessions s ON s.id = sg.session_id${buildWhere(durationClauses)}\nGROUP BY session_day\nORDER BY session_day ASC\nLIMIT 5000`,
         metadata: baseMetadata({
-            dataset: 'goals + sessions',
+            dataset: 'goals + session_goals + sessions',
             chartFields: ['session_day', 'minutes'],
             aggregation: 'selected goal duration by day',
-            execution: 'read_model_sql',
-            runnable: false,
-            notes: ['Goal detail duration uses scoped lineage in the read model; this SQL is the direct-goal equivalent.'],
+            notes: ['Uses direct session-goal associations from the governed catalog.'],
         }),
     };
 }

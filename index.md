@@ -40,7 +40,7 @@ The backend is split into:
 - `blueprints/`: thin HTTP route layers
 - `services/`: business logic, orchestration, domain rules, serialization, and shared query helpers
 - `models/`: SQLAlchemy models and session/engine management
-- `validators.py`: request validation schemas and decorators
+- `validators/`: request validation schemas and decorators, split by domain with package-level re-exports for existing `from validators import ...` imports
 - `migrations/`: Alembic schema history
 
 The intended backend flow is:
@@ -130,6 +130,8 @@ Key frontend pieces:
 
 - `client/src/contexts/AuthContext.jsx`
 - `client/src/pages/Admin.jsx`
+- `client/src/components/admin/BetaSignupsPanel.jsx`
+- `client/src/components/admin/TierQuotasPanel.jsx`
 - `client/src/components/modals/AuthModal.jsx`
 - `client/src/components/modals/SettingsModal.jsx`
 
@@ -153,12 +155,13 @@ Performance and production-hardening notes:
 Analytics engine build-out:
 
 - The target architecture is captured in `docs/analytics-engine-plan.md`.
+- Current service ownership is captured in `docs/architecture/ADR_0003_ANALYTICS_SERVICE_TOPOLOGY.md`.
 - The engine is intended to be user-wide rather than root-only: every query runs within the authenticated user's owned roots, with optional root/fractal filters.
 - V1 uses a structured query spec compiled by a backend semantic catalog, not raw SQL. Catalog datasets expose user-facing analytics objects and inject tenant policies server-side.
 - The analytics query console is SQL-editor first: users browse actual queryable database table objects/columns in the analytics page, write read-only PostgreSQL `SELECT`/`WITH` queries with table/column/function autocomplete, and the backend executes those queries against tenant-filtered catalog CTEs. This supports normal SQL shapes such as `SELECT *`, joins, aliases, expressions, grouping, nested selects, and aggregates while keeping user SQL away from raw app tables. The backend catalog includes direct user/root-scoped tables, selected stats tables, analytics profile/dashboard tables, and tenant-safe junction tables with join-through policies; auth/system tables remain outside the user catalog. Mutating statements, multiple statements, comments, and schema-qualified bypasses such as `public.sessions` are rejected.
 - Saved query profiles are separate from dashboard layout state so the same query can power the console, dashboard windows, and future chart profiles.
 - Saved analytics objects now carry `kind: "view" | "dashboard"` while keeping the legacy `/api/roots/<root_id>/dashboards` route for compatibility. A single configured chart saves as a portable `analytics_view` profile payload; multiple configured charts save as an analytics dashboard layout. Existing rows are backfilled by configured chart count.
-- Each configured chart has a query inspector affordance backed by an explicit per-visualization query explanation builder; registered chart profiles cannot silently fall back to generic raw-table SQL. Catalog-backed charts show runnable SQL plus scope/filter metadata and can open the SQL console with that query. Charts still produced from frontend/read-model rollups show the equivalent relational/read-model explanation, label the source, and disable console handoff until the catalog exposes the required lineage or section fields.
+- Each configured chart has a query inspector affordance backed by an explicit per-visualization query explanation builder; registered chart profiles cannot silently fall back to generic raw-table SQL. Chart explanations now use catalog-backed/direct-lineage SQL, including goal activity/session lineage and governed `sessions.attributes` JSON for session sections, so they can remain runnable in the SQL console instead of relying on read-model-only explanations.
 - The SQL query console infers compatible visualization recommendations from result column names/types, lets users adjust simple x/y/group mappings, and can save a recommended SQL visualization as an analytics view referencing the saved query profile.
 - Core handcrafted analytics charts should continue being rewritten onto the engine as equivalent query-backed profiles, then retired to avoid competing implementations.
 
@@ -438,6 +441,7 @@ Key frontend pieces:
 - `client/src/hooks/useProgramDetailMutations.js`
 - `client/src/hooks/useProgramDetailViewModel.js`
 - `client/src/pages/CreateSessionTemplate.jsx`
+- `client/src/components/programs/ProgramSidePane.jsx`
 - `client/src/components/modals/ProgramBuilder.jsx`
 - `client/src/components/modals/ProgramBlockModal.jsx`
 - `client/src/components/modals/ProgramDayModal.jsx`

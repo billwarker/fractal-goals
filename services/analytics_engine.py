@@ -295,6 +295,7 @@ def _datasets() -> dict[str, AnalyticsDataset]:
                 "completed_at": _field("completed_at", "Completed At", "datetime", Session.completed_at),
                 "created_at": _field("created_at", "Created", "datetime", Session.created_at),
                 "completed": _field("completed", "Completed", "boolean", Session.completed),
+                "attributes": _field("attributes", "Attributes", "json", Session.attributes, filterable=False, sortable=False),
                 "duration_seconds": _field("duration_seconds", "Duration Seconds", "number", session_duration, aggs=("sum", "avg", "min", "max")),
             },
         ),
