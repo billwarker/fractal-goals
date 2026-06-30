@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 
 import { chartDefaults, DISABLED_CHART_ANIMATION } from './ChartJSWrapper';
+import { formatDurationSeconds } from '../../utils/formatters';
 
 const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444', '#64748b'];
 const DEFAULT_TIME_MARKERS = ['start'];
@@ -10,14 +11,6 @@ function getSessionDate(session) {
     const value = session?.session_start || session?.created_at;
     const date = value ? new Date(value) : null;
     return date && !Number.isNaN(date.getTime()) ? date : null;
-}
-
-function formatDuration(seconds = 0) {
-    const total = Math.max(0, Math.round(seconds || 0));
-    const hours = Math.floor(total / 3600);
-    const minutes = Math.round((total % 3600) / 60);
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
 }
 
 function EmptyChart({ title, children = 'No data available yet' }) {
@@ -99,7 +92,7 @@ export function SessionSectionPie({ sessions = [], activityInstances = {}, chart
                 plugins: {
                     legend: { position: 'right', labels: { color: chartDefaults.textColor, usePointStyle: true, boxWidth: 8 } },
                     title: { display: true, text: 'Time Spent By Session Section', color: chartDefaults.textColor },
-                    tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatDuration(ctx.raw)}` } },
+                    tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatDurationSeconds(ctx.raw)}` } },
                 },
             }}
         />

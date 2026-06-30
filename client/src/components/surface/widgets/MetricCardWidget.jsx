@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 
 import { useFlowtreeSessionMetrics } from '../../../hooks/useSessionQueries';
 import { getDefaultFlowTreeSessionMetricsSummary } from '../../../hooks/useFlowTreeMetrics';
+import { formatDurationSeconds } from '../../../utils/formatters';
 
 const METRIC_DEFINITIONS = [
     {
@@ -31,13 +32,13 @@ const METRIC_DEFINITIONS = [
     {
         key: 'recentSessionDuration',
         label: 'Recent Time',
-        value: (summary) => formatDuration(summary.recent_session_duration_seconds),
+        value: (summary) => formatDurationSeconds(summary.recent_session_duration_seconds),
         subLabel: (summary) => `Last ${summary.window_days} days`,
     },
     {
         key: 'totalSessionDuration',
         label: 'Total Time',
-        value: (summary) => formatDuration(summary.total_session_duration_seconds),
+        value: (summary) => formatDurationSeconds(summary.total_session_duration_seconds),
         subLabel: () => 'Completed sessions',
     },
     {
@@ -52,14 +53,6 @@ const METRIC_DEFINITIONS = [
 ];
 
 const METRIC_BY_KEY = new Map(METRIC_DEFINITIONS.map((metric) => [metric.key, metric]));
-
-function formatDuration(seconds) {
-    const safeSeconds = Math.max(0, Number(seconds) || 0);
-    const hours = Math.floor(safeSeconds / 3600);
-    const minutes = Math.floor((safeSeconds % 3600) / 60);
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-}
 
 export default function MetricCardWidget({ state, onStateChange, sharedData, configureMode }) {
     const rootId = sharedData?.rootId;

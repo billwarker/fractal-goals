@@ -9,18 +9,12 @@ import {
 import { normalizeGlobalFilters } from '../analytics/analyticsGlobalFilters';
 import ProfileWindow from '../analytics/ProfileWindow';
 import { flattenGoalTree } from '../../utils/goalNodeModel';
+import { formatDurationSeconds } from '../../utils/formatters';
 import styles from './LandingFeaturesSection.module.css';
 
 const DEFAULT_LAYOUT = { type: 'grid', panels: [{ id: 'window-1', x: 0, y: 0, w: 96, h: 48 }] };
 const DEFAULT_WINDOW_STATES = {
     'window-1': getDefaultWindowState(),
-};
-
-const formatDuration = (seconds) => {
-    if (!seconds || seconds === 0) return '0m';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 };
 
 function toGoalAnalyticsGoals(tree) {
@@ -118,7 +112,7 @@ export default function LandingFeatureAnalytics({ example, views }) {
         activities: example?.activityDefinitions || [],
         activityGroups: example?.activityGroups || [],
         activityInstances: buildActivityInstances(example),
-        formatDuration,
+        formatDuration: formatDurationSeconds,
         rootId: example?.id || example?.root_id,
     }), [example]);
 

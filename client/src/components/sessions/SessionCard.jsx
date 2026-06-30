@@ -11,6 +11,7 @@ import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { formatDateInTimezone } from '../../utils/dateUtils';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { getTemplateColor } from '../../utils/sessionRuntime';
+import { formatClockDuration } from '../../utils/sessionTime';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import './SessionCard.css';
 
@@ -50,13 +51,6 @@ function SessionCard({
         });
     };
 
-    const formatDuration = (seconds) => {
-        if (!seconds) return '--:--';
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    };
-
     const handleClick = (e) => {
         e.stopPropagation();
         onSelect?.(session.id);
@@ -86,7 +80,7 @@ function SessionCard({
                 </div>
                 <div className="session-card-meta">
                     <span className="session-card-duration">
-                        {formatDuration(totalSeconds)}
+                        {formatClockDuration(totalSeconds)}
                     </span>
                     <CompletionCheckBadge
                         checked={sessionCompleted}

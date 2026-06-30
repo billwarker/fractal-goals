@@ -359,7 +359,6 @@ describe('api core auth refresh behavior', () => {
         const { fractalProgramsApi } = await import('../fractalProgramsApi');
         const { fractalSessionsApi } = await import('../fractalSessionsApi');
         const { globalApi } = await import('../globalApi');
-        const { legacyApi } = await import('../legacyApi');
         const calls = [];
         const originalAdapter = axios.defaults.adapter;
 
@@ -461,8 +460,6 @@ describe('api core auth refresh behavior', () => {
             ['global.createAnalyticsQueryProfile', () => globalApi.createAnalyticsQueryProfile({ name: 'Query', query_spec: { version: 1, dataset: 'sessions', fields: ['name'] } })],
             ['global.updateAnalyticsQueryProfile', () => globalApi.updateAnalyticsQueryProfile('profile-1', { name: 'Query' })],
             ['global.deleteAnalyticsQueryProfile', () => globalApi.deleteAnalyticsQueryProfile('profile-1')],
-            ['legacy.createGoal', () => legacyApi.createGoal({ name: 'Legacy Goal' })],
-            ['legacy.createSession', () => legacyApi.createSession({ name: 'Legacy Session' })],
         ];
 
         axios.defaults.adapter = async (config) => {
