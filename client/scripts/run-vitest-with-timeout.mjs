@@ -1,6 +1,9 @@
 import { spawn } from 'node:child_process';
 
-const DEFAULT_TIMEOUT_MS = 120_000;
+// The full suite runs ~115s on a warm machine, so a 120s ceiling tripped on
+// normal timing variance. 240s leaves headroom while still catching real hangs.
+// Override with VITEST_WALL_TIMEOUT_MS when needed.
+const DEFAULT_TIMEOUT_MS = 240_000;
 const timeoutMs = Number.parseInt(process.env.VITEST_WALL_TIMEOUT_MS || '', 10) || DEFAULT_TIMEOUT_MS;
 const args = ['vitest', 'run', ...process.argv.slice(2)];
 
