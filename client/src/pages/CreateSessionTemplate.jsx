@@ -14,6 +14,7 @@ import headerStyles from '../components/layout/PageHeader.module.css';
 import HeaderButton from '../components/layout/HeaderButton';
 import { getTemplateSortTimestamp } from '../utils/durationStats';
 import styles from './CreateSessionTemplate.module.css';
+import { logError } from '../utils/logger';
 
 function readStoredSort(rootId) {
     try {
@@ -143,7 +144,7 @@ function CreateSessionTemplate() {
         try {
             await saveTemplateMutation.mutateAsync({ payload, templateId });
         } catch (err) {
-            console.error("Failed to save template", err);
+            logError("Failed to save template", err);
             setError('Failed to save template');
             notify.error('Failed to save template: ' + err.message);
         }
@@ -160,7 +161,7 @@ function CreateSessionTemplate() {
                 isArchived: !template.is_archived,
             });
         } catch (err) {
-            console.error("Failed to update template archive state", err);
+            logError("Failed to update template archive state", err);
             setError('Failed to update template archive state');
             notify.error('Failed to update template: ' + err.message);
         }
@@ -171,7 +172,7 @@ function CreateSessionTemplate() {
         try {
             await deleteTemplateMutation.mutateAsync(templateToDelete.id);
         } catch (err) {
-            console.error("Failed to delete template", err);
+            logError("Failed to delete template", err);
             setError("Failed to delete template");
             setTemplateToDelete(null);
         }
@@ -187,7 +188,7 @@ function CreateSessionTemplate() {
             setShowBuilder(true);
             setError(null);
         } catch (err) {
-            console.error("Failed to duplicate template", err);
+            logError("Failed to duplicate template", err);
             setError('Failed to duplicate template');
             notify.error('Failed to duplicate template: ' + err.message);
         }

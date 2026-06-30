@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import styles from './TimelinePanel.module.css';
+import { logError } from '../../utils/logger';
 
 function SessionNotesPanel({
     sessionId,
@@ -54,7 +55,7 @@ function SessionNotesPanel({
             });
             onNoteAdded?.();
         } catch (err) {
-            console.error('Failed to add note:', err);
+            logError('Failed to add note:', err);
         }
     };
 

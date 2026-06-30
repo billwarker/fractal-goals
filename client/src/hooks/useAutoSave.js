@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { logError } from '../utils/logger';
 
 /**
  * @param {any} data - Data to save (changes trigger debounce)
@@ -65,7 +66,7 @@ export function useAutoSave(data, saveFn, options = {}) {
                 // Reset to idle after showing "saved" briefly
                 setTimeout(() => setStatus('idle'), 2000);
             } catch (err) {
-                console.error('Auto-save failed:', err);
+                logError('Auto-save failed:', err);
                 setLastError(err.message || 'Save failed');
                 setStatus('error');
 
@@ -102,7 +103,7 @@ export function useAutoSave(data, saveFn, options = {}) {
             setStatus('saved');
             setTimeout(() => setStatus('idle'), 2000);
         } catch (err) {
-            console.error('Immediate save failed:', err);
+            logError('Immediate save failed:', err);
             setLastError(err.message || 'Save failed');
             setStatus('error');
             setTimeout(() => setStatus('idle'), 3000);

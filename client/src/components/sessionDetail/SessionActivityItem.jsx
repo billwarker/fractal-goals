@@ -1,3 +1,4 @@
+import { logError } from '../../utils/logger';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { useActiveSessionData, useActiveSessionActions } from '../../contexts/ActiveSessionContext';
@@ -529,7 +530,7 @@ function SessionActivityItem({
             });
             if (onNoteCreated) onNoteCreated();
         } catch (err) {
-            console.error("Failed to create note", err);
+            logError("Failed to create note", err);
         }
     };
 
@@ -1140,7 +1141,7 @@ function SessionActivityItem({
                                                         onUpdate('time_start', isoValue);
                                                         setStartTimeDraft(null);
                                                     } catch (err) {
-                                                        console.error('Invalid date format:', err);
+                                                        logError('Invalid date format:', err);
                                                         setStartTimeDraft(null);
                                                     }
                                                 } else {
@@ -1167,7 +1168,7 @@ function SessionActivityItem({
                                                         onUpdate('time_stop', isoValue);
                                                         setStopTimeDraft(null);
                                                     } catch (err) {
-                                                        console.error('Invalid date format:', err);
+                                                        logError('Invalid date format:', err);
                                                         setStopTimeDraft(null);
                                                     }
                                                 } else {

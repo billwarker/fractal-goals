@@ -16,6 +16,7 @@ import { formatClockDuration } from '../../utils/sessionTime';
 import { getTemplateColor } from '../../utils/sessionRuntime';
 
 import styles from './SessionInfoPanel.module.css';
+import { logError } from '../../utils/logger';
 
 function SessionInfoPanel() {
     const {
@@ -76,7 +77,7 @@ function SessionInfoPanel() {
 
             setEditingField(null);
         } catch (error) {
-            console.error("Failed to update session time", error);
+            logError("Failed to update session time", error);
             notify.error("Failed to update time");
         } finally {
             setSaving(false);

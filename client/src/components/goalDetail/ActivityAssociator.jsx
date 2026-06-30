@@ -13,6 +13,7 @@ import ActivityMiniCard from './ActivityMiniCard';
 import InlineGroupCreator from './InlineGroupCreator';
 import { useActivityAssociatorDerivedData } from './useActivityAssociatorDerivedData';
 import styles from './ActivityAssociator.module.css';
+import { logError } from '../../utils/logger';
 
 const collectGroupIds = (groups = []) => {
     const ids = [];
@@ -380,7 +381,7 @@ const ActivityAssociator = ({
             setNewGroupParentId('');
             setShowGroupCreator(false);
         } catch (error) {
-            console.error('Failed to create activity group', error);
+            logError('Failed to create activity group', error);
             notify.error('Failed to create group');
         } finally {
             setIsCreatingGroup(false);
@@ -419,7 +420,7 @@ const ActivityAssociator = ({
             notify.success(checked ? 'Enabled parent activity inheritance' : 'Disabled parent activity inheritance');
         } catch (err) {
             setInheritParentActivities(!checked);
-            console.error('Failed to update parent activity inheritance', err);
+            logError('Failed to update parent activity inheritance', err);
             notify.error('Failed to update parent activity inheritance');
         }
     };

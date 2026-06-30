@@ -5,6 +5,7 @@ import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
 import { mergeUniqueIds } from '../utils/sessionGoalScope';
+import { logError } from '../utils/logger';
 
 export function normalizeGoalIds(goalIds) {
     return Array.from(new Set(
@@ -121,7 +122,7 @@ export function useActivityGoalAssociations({
 
             return response;
         } catch (error) {
-            console.error('Failed to set activity goal associations', error);
+            logError('Failed to set activity goal associations', error);
             if (options.notify !== false && errorMessage) {
                 notify.error(errorMessage);
             }

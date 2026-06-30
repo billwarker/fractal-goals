@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { logError } from '../utils/logger';
 
 /**
  * A lightweight hook for handling form state and validation.
@@ -81,7 +82,7 @@ export function useForm(initialValues = {}, validate, validateOnChange = false) 
             try {
                 await onSubmit(values);
             } catch (error) {
-                console.error("Form submission error", error);
+                logError("Form submission error", error);
             }
         }
         setIsSubmitting(false);

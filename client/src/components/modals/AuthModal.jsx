@@ -11,6 +11,7 @@ import { useForm } from '../../hooks/useForm';
 import styles from './AuthModal.module.css';
 import '../../App.css';
 import notify from '../../utils/notify';
+import { logError } from '../../utils/logger';
 
 /**
  * AuthModal - Refactored to match exactly the application modal standards
@@ -79,7 +80,7 @@ function AuthModalInner({ onClose }) {
                 setFieldValue('usernameOrEmail', formValues.username);
             }
         } catch (err) {
-            console.error("Auth error:", err);
+            logError("Auth error:", err);
             let errorMessage = "An error occurred";
 
             // Check for network errors (no response from server)

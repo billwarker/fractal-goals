@@ -30,6 +30,7 @@ import ViewToggleTabs from './common/ViewToggleTabs';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
 
 import styles from './GoalDetailModal.module.css';
+import { logError } from '../utils/logger';
 
 const TargetManager = lazyWithRetry(() => import('./goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
 const ActivityAssociator = lazyWithRetry(() => import('./goalDetail/ActivityAssociator'), 'components/goalDetail/ActivityAssociator');
@@ -381,9 +382,9 @@ function GoalDetailModal({
                     notify.success(`Goal created: ${newGoal?.name || newGoal?.attributes?.name || name}`);
                 }
             } catch (err) {
-                console.error('Goal creation failed EXCEPTION:', err);
+                logError('Goal creation failed EXCEPTION:', err);
                 if (err.response) {
-                    console.error('Goal creation error response:', err.response.data);
+                    logError('Goal creation error response:', err.response.data);
                 }
                 notify.error('Failed to create goal: ' + (err.response?.data?.error || err.message));
             }

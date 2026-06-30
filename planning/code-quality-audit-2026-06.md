@@ -34,7 +34,7 @@ Over the implicit ~800-LOC decomposition threshold; the index's own "decompose b
 ## P2 — Redundancy & centralization gaps
 
 - [ ] **P2-10 — Replace 409 inline `style={{}}` blocks with design tokens** (worst: GoalUncompletionModal 24, GoalHeader 20, GoalDetailModal 19). Start with worst offenders.
-- [ ] **P2-11 — Triage 73 non-test `console.*` calls;** route through a logging utility so production logs are filterable/silenceable.
+- [x] **P2-11 — Triage 73 non-test `console.*` calls.** ✅ Added `client/src/utils/logger.js` (`logError`/`logWarn`/`logDebug`): dev prints to console as before; prod suppresses debug/warn and forwards errors to Sentry (already wired in main.jsx) when a DSN is set. Migrated all 72 `console.error` calls across 27 files to `logError`. Intentionally left: the 3 framework error boundaries (Sentry's React integration auto-captures those) and the one debug-toggle `console.log` in DebugContext. Single chokepoint now exists for production log routing.
 - [ ] **P2-12 — Centralize duplicated `formatDate`/`formatDateTime`/`formatMetricValue`** into formatters.js/dateUtils.js. — GoalTimelineView.jsx:20 (SessionCard's date helper is a thin local wrapper over `formatDateInTimezone`, acceptable; remaining work is `formatMetricValue`/`formatDateTime` dedup)
 - [x] **P2-13 — Quarantine `python-scripts/` one-off migrations.** ✅ Done **in place** rather than by relocation: moving the files would have broken ~40 path references in `docs/migrations/` runbooks (net negative). Instead added a prominent status section to `python-scripts/README.md` explicitly labeling the pre-Alembic schema scripts as historical/reference-only ("do not run"), separating them from still-operational debug/inspect/demo-data utilities, and stating that new schema changes go through Alembic only. Resolves the navigability/confusion problem the audit flagged without rotting doc links.
 - [x] **P2-14 — Resolve `@deprecated` markers in active code.** ✅ Both markers sat on still-load-bearing exports, so the `@deprecated` tag (implies "removable") was misleading. `getChildType` (4 valid single-default-child call sites) and `chartDefaults` (~12 components, ~70 sites) reworded to accurate guidance notes. The real `chartDefaults → useChartOptions` theme migration re-scoped as P3-24.
@@ -67,3 +67,7 @@ Over the implicit ~800-LOC decomposition threshold; the index's own "decompose b
 | 2026-06-29 | P0-2 | Consolidated 4 `formatDuration` reimplementations onto canonical formatters. |
 | 2026-06-29 | P0-1 | Extracted `LandingPublishService` from AdminService (1710→631 LOC). Found NF-1 (pre-existing landing test failures). |
 | 2026-06-29 | P0-4 | Investigated: false positive. No competing render path; catalog/read-model split already governed. Re-scoped residual to P3-23. |
+| 2026-06-29 | NF-1 | Fixed landing fixtures missing `kind='view'`; all 38 admin tests pass. |
+| 2026-06-29 | P2-13 | Labeled pre-Alembic python-scripts historical in README (kept paths for docs). |
+| 2026-06-29 | P2-14 | Reworded misleading `@deprecated` tags; re-scoped chartDefaults migration to P3-24. |
+| 2026-06-29 | P2-11 | Added `utils/logger.js`; migrated 72 `console.error` → `logError` across 27 files. |

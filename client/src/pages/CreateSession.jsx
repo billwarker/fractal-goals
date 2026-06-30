@@ -1,3 +1,4 @@
+import { logError } from '../utils/logger';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -398,7 +399,7 @@ function CreateSession() {
             navigate(`/${rootId}/session/${createdSession.id}`);
             return createdSession;
         } catch (err) {
-            console.error('Error creating session:', err);
+            logError('Error creating session:', err);
             const errorMessage = err.response?.data?.error || err.message;
             notify.error('Error creating session: ' + errorMessage);
             return null;
@@ -441,7 +442,7 @@ function CreateSession() {
             setActiveQuickSessionId(completedSession.id);
             notify.success('Quick session completed.');
         } catch (err) {
-            console.error('Error completing queued quick session:', err);
+            logError('Error completing queued quick session:', err);
             notify.error('Error completing quick session: ' + (err.response?.data?.error || err.message));
         }
     };

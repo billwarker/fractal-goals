@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { withNotify } from '../utils/mutationNotify';
 import { queryKeys } from '../hooks/queryKeys';
+import { logError } from '../utils/logger';
 
 const ActivitiesContext = createContext();
 
@@ -26,7 +27,7 @@ export function ActivitiesProvider({ children }) {
             success: (created) => `Created activity "${created?.name || 'Untitled'}"`,
             error: 'Failed to create activity',
             onError: (err) => {
-                console.error('Failed to create activity:', err);
+                logError('Failed to create activity:', err);
             },
         },
     ), [queryClient]);
@@ -55,7 +56,7 @@ export function ActivitiesProvider({ children }) {
             },
             error: 'Failed to update activity',
             onError: (err) => {
-                console.error('Failed to update activity:', err);
+                logError('Failed to update activity:', err);
             },
         },
     ), [queryClient]);
@@ -79,7 +80,7 @@ export function ActivitiesProvider({ children }) {
             success: (deletedActivity) => `Deleted activity "${deletedActivity?.name || 'Untitled'}"`,
             error: 'Failed to delete activity',
             onError: (err) => {
-                console.error('Failed to delete activity:', err);
+                logError('Failed to delete activity:', err);
             },
         },
     ), [queryClient]);
@@ -102,7 +103,7 @@ export function ActivitiesProvider({ children }) {
             success: (created) => `Created group "${created?.name || 'Untitled'}"`,
             error: 'Failed to create group',
             onError: (err) => {
-                console.error('Failed to create activity group:', err);
+                logError('Failed to create activity group:', err);
             },
         },
     ), [queryClient]);
@@ -123,7 +124,7 @@ export function ActivitiesProvider({ children }) {
             success: (updated) => `Updated group "${updated?.name || 'Untitled'}"`,
             error: 'Failed to update group',
             onError: (err) => {
-                console.error('Failed to update activity group:', err);
+                logError('Failed to update activity group:', err);
             },
         },
     ), [queryClient]);
@@ -148,7 +149,7 @@ export function ActivitiesProvider({ children }) {
             success: null,
             error: 'Failed to update group goals',
             onError: (err) => {
-                console.error('Failed to set activity group goals:', err);
+                logError('Failed to set activity group goals:', err);
             },
         },
     ), [queryClient]);
@@ -168,7 +169,7 @@ export function ActivitiesProvider({ children }) {
             success: 'Deleted group',
             error: 'Failed to delete group',
             onError: (err) => {
-                console.error('Failed to delete activity group:', err);
+                logError('Failed to delete activity group:', err);
             },
         },
     ), [queryClient]);
@@ -182,7 +183,7 @@ export function ActivitiesProvider({ children }) {
             success: null,
             error: 'Failed to reorder groups',
             onError: (err) => {
-                console.error('Failed to reorder activity groups:', err);
+                logError('Failed to reorder activity groups:', err);
             },
         },
     ), [queryClient]);

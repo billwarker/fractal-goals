@@ -6,6 +6,7 @@ import { formatDateInTimezone } from '../utils/dateUtils';
 import { useLogsData } from '../hooks/useLogsData';
 import useIsMobile from '../hooks/useIsMobile';
 import './Logs.css';
+import { logError } from '../utils/logger';
 
 /**
  * Logs Page - Standalone view for application event logs
@@ -46,7 +47,7 @@ function Logs() {
             await clearLogs();
             setPage(1);
         } catch (err) {
-            console.error("Failed to clear logs:", err);
+            logError("Failed to clear logs:", err);
         }
     };
 

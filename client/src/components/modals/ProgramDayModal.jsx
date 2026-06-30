@@ -16,6 +16,7 @@ import styles from './ProgramDayModal.module.css';
 import { isQuickSession } from '../../utils/sessionRuntime';
 
 import DeleteConfirmModal from './DeleteConfirmModal';
+import { logError } from '../../utils/logger';
 
 function getInitialSelectedDaysOfWeek(initialData) {
     if (!initialData) {
@@ -203,7 +204,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
         try {
             await saveTemplateMutation.mutateAsync({ payload, templateId });
         } catch (err) {
-            console.error("Failed to save template", err);
+            logError("Failed to save template", err);
             // Show error - could add alert modal here
         }
     };

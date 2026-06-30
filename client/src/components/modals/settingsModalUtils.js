@@ -1,8 +1,9 @@
+import { logError } from '../../utils/logger';
 export function getAvailableTimezones() {
     try {
         return Intl.supportedValuesOf('timeZone');
     } catch (error) {
-        console.error('Timezone API not supported', error);
+        logError('Timezone API not supported', error);
         return ['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo'];
     }
 }

@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { authApi, clearAccessToken, setAccessToken } from '../utils/api';
 import notify from '../utils/notify';
+import { logError } from '../utils/logger';
 
 const AuthContext = createContext();
 
@@ -90,7 +91,7 @@ export function AuthProvider({ children }) {
                     replaceUser(null);
                 }
             } else {
-                console.error("Failed to fetch current user:", err);
+                logError("Failed to fetch current user:", err);
             }
         } finally {
             setLoading(false);
@@ -110,7 +111,7 @@ export function AuthProvider({ children }) {
             replaceUser(userData);
             return res.data;
         } catch (err) {
-            console.error("Login failed:", err);
+            logError("Login failed:", err);
             throw err;
         }
     };
@@ -125,7 +126,7 @@ export function AuthProvider({ children }) {
             });
             return res.data;
         } catch (err) {
-            console.error("Signup failed:", err);
+            logError("Signup failed:", err);
             throw err;
         }
     };
