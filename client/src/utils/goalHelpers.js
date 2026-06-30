@@ -45,9 +45,9 @@ export const getValidChildTypes = (parentType) => {
 };
 
 /**
- * Returns the single default child type (adjacent next level).
- * Kept for backward-compat with callsites that only need one type.
- * @deprecated Prefer getValidChildTypes where multiple levels are possible.
+ * Returns the single default child type (the adjacent next level).
+ * Use this when a callsite only needs one type; when multiple child
+ * levels are valid and the user should pick, use getValidChildTypes.
  */
 export const getChildType = (parentType) => {
     const valid = getValidChildTypes(parentType);

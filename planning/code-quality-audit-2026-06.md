@@ -37,7 +37,7 @@ Over the implicit ~800-LOC decomposition threshold; the index's own "decompose b
 - [ ] **P2-11 — Triage 73 non-test `console.*` calls;** route through a logging utility so production logs are filterable/silenceable.
 - [ ] **P2-12 — Centralize duplicated `formatDate`/`formatDateTime`/`formatMetricValue`** into formatters.js/dateUtils.js. — GoalTimelineView.jsx:20 (SessionCard's date helper is a thin local wrapper over `formatDateInTimezone`, acceptable; remaining work is `formatMetricValue`/`formatDateTime` dedup)
 - [x] **P2-13 — Quarantine `python-scripts/` one-off migrations.** ✅ Done **in place** rather than by relocation: moving the files would have broken ~40 path references in `docs/migrations/` runbooks (net negative). Instead added a prominent status section to `python-scripts/README.md` explicitly labeling the pre-Alembic schema scripts as historical/reference-only ("do not run"), separating them from still-operational debug/inspect/demo-data utilities, and stating that new schema changes go through Alembic only. Resolves the navigability/confusion problem the audit flagged without rotting doc links.
-- [ ] **P2-14 — Resolve `@deprecated` markers in active code.** — goalHelpers.js:50 (`getValidChildTypes`), ChartJSWrapper.jsx:242 (`useChartOptions`)
+- [x] **P2-14 — Resolve `@deprecated` markers in active code.** ✅ Both markers sat on still-load-bearing exports, so the `@deprecated` tag (implies "removable") was misleading. `getChildType` (4 valid single-default-child call sites) and `chartDefaults` (~12 components, ~70 sites) reworded to accurate guidance notes. The real `chartDefaults → useChartOptions` theme migration re-scoped as P3-24.
 - [ ] **P2-15 — Reduce `legacy` serializer branches** in [services/serializers.py](../services/serializers.py) (`_merge_legacy_activity_payload`, legacy `session_data`/`sets` reconcile ~195–597); data-migrate old rows if possible.
 
 ## P3 — Hardening & polish
@@ -50,6 +50,7 @@ Over the implicit ~800-LOC decomposition threshold; the index's own "decompose b
 - [ ] **P3-21 — Retire `progress_service` legacy aggregation / `metrics_multiplicative` fallback** once no rows depend on it. — progress_service.py:152
 - [ ] **P3-22 — Split `Admin.jsx` (1,452) and `ProgramCalendarPage.jsx` (1,319)** into per-tab/per-view subcomponents + hooks.
 - [ ] **P3-23 — Migrate the 6 remaining `read_model_sql` analytics charts to catalog-backed SQL** (re-scoped from P0-4). These are correctly labeled today; goal is to expose the missing catalog lineage/section fields so they become directly runnable + console-openable. Source of truth: `client/src/components/analytics/visualizationQueryExplanations.js` (`execution: 'read_model_sql'`).
+- [ ] **P3-24 — Migrate direct `chartDefaults` consumers to `useChartOptions`** (re-scoped from P2-14). ~12 chart components / ~70 sites read static `chartDefaults` colors instead of the theme-reactive hook. Behavior-affecting (theme colors); do per-component with visual checks. — `client/src/components/analytics/ChartJSWrapper.jsx`
 
 ---
 

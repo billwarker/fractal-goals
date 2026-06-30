@@ -238,8 +238,11 @@ export function useChartOptions({
 }
 
 /**
- * Chart.js configuration defaults for consistent styling using CSS variables
- * @deprecated Use useChartOptions hook instead for theme support
+ * Static Chart.js color fallbacks for chart configs built outside a React
+ * render (and the ~12 chart components that still read these directly).
+ * For theme-reactive options inside a component, prefer the useChartOptions
+ * hook. Migrating the remaining direct consumers is tracked as P3-24 in
+ * planning/code-quality-audit-2026-06.md.
  */
 export const chartDefaults = {
     backgroundColor: '#1e1e1e', // Fallbacks
