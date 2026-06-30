@@ -141,6 +141,123 @@
     flex-shrink: 0;
 }
 
+.queryOverlay {
+    position: absolute;
+    top: 58px;
+    right: 10px;
+    z-index: 80;
+    width: min(520px, calc(100% - 20px));
+    max-height: min(520px, calc(100% - 72px));
+    overflow: auto;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--color-bg-surface) 96%, black 4%);
+    box-shadow: var(--shadow-lg);
+    padding: 12px;
+}
+
+.queryOverlayHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.queryOverlayHeader div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.queryOverlayHeader strong {
+    color: var(--color-text-primary);
+    font-size: 13px;
+}
+
+.queryOverlayHeader span {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}
+
+.queryOverlayHeader button {
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.querySql {
+    margin: 0;
+    max-height: 190px;
+    overflow: auto;
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    padding: 10px;
+    font-family: var(--font-family-config);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.queryMeta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.queryMeta div {
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    padding: 7px;
+}
+
+.queryMeta dt {
+    color: var(--color-text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+}
+
+.queryMeta dd {
+    margin: 3px 0 0;
+    color: var(--color-text-primary);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.queryNotes {
+    margin: -2px 0 10px;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.queryActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.queryActions button {
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
+    padding: 7px 10px;
+    cursor: pointer;
+}
+
+.queryActions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
 .minimizedHeaderOverlay {
     position: absolute;
     top: 8px;

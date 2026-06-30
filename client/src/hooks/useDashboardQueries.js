@@ -31,23 +31,26 @@ export function useAnalyticsViews(rootId) {
     const createMutation = useMutation({
         mutationFn: (data) => fractalApi.createAnalyticsView(rootId, data),
         onSuccess: invalidate,
-        onError: (error) => notify.error(getErrorMessage(error, 'Failed to create analytics view')),
+        onError: (error) => notify.error(getErrorMessage(error, 'Failed to create saved analytics')),
     });
 
     const updateMutation = useMutation({
         mutationFn: ({ dashboardId, ...data }) => fractalApi.updateAnalyticsView(rootId, dashboardId, data),
         onSuccess: invalidate,
-        onError: (error) => notify.error(getErrorMessage(error, 'Failed to update analytics view')),
+        onError: (error) => notify.error(getErrorMessage(error, 'Failed to update saved analytics')),
     });
 
     const deleteMutation = useMutation({
         mutationFn: (dashboardId) => fractalApi.deleteAnalyticsView(rootId, dashboardId),
         onSuccess: invalidate,
-        onError: (error) => notify.error(getErrorMessage(error, 'Failed to delete analytics view')),
+        onError: (error) => notify.error(getErrorMessage(error, 'Failed to delete saved analytics')),
     });
 
     return {
         analyticsViews: query.data || [],
+        analyticsSavedObjects: query.data || [],
+        analyticsViewItems: (query.data || []).filter((item) => (item.kind || 'dashboard') === 'view'),
+        analyticsDashboards: (query.data || []).filter((item) => (item.kind || 'dashboard') === 'dashboard'),
         isLoading: query.isLoading,
         error: query.error,
         createAnalyticsView: async (data) => {

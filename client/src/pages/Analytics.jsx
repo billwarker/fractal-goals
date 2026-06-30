@@ -6,8 +6,11 @@ import AnalyticsFiltersSidebar from '../components/analytics/AnalyticsFiltersSid
 import AnalyticsQueryConsole from '../components/analytics/AnalyticsQueryConsole';
 import {
     createDashboardLayoutPayload,
+    createAnalyticsViewPayload,
     getDefaultGlobalFilters,
     getDefaultWindowState,
+    getConfiguredWindowIds,
+    getConfiguredWindowCount,
     getHighestWindowIndex,
     sanitizeDashboardLayoutPayload,
 } from '../components/analytics/dashboardState';
@@ -104,7 +107,9 @@ function Analytics() {
     const [isHydrated, setIsHydrated] = useState(false);
     const [isViewsModalOpen, setIsViewsModalOpen] = useState(false);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+    const [saveKind, setSaveKind] = useState('view');
     const [activeMode, setActiveMode] = useState('dashboard');
+    const [consoleInitialSql, setConsoleInitialSql] = useState('');
     const [dashboardBounds, setDashboardBounds] = useState(null);
     const [isDashboardSettling, setIsDashboardSettling] = useState(false);
 
@@ -143,7 +148,7 @@ function Analytics() {
         const sanitized = sanitizeDashboardLayoutPayload(payload);
         if (!sanitized) {
             notify.error(source === 'analytics-view'
-                ? 'Saved analytics view is no longer compatible'
+                ? 'Saved analytics item is no longer compatible'
                 : 'Analytics draft could not be restored');
             return false;
         }
@@ -293,7 +298,7 @@ function Analytics() {
 
         const view = analyticsViews.find((item) => item.id === viewId);
         if (!view) {
-            notify.error('Analytics view not found');
+            notify.error('Saved analytics item not found');
             return;
         }
 
@@ -312,17 +317,38 @@ function Analytics() {
         layoutBounds: dashboardBounds,
     }), [dashboardBounds, globalFilters, layout, selectedWindowId, windowStates]);
 
+    const getCurrentSavedObjectKind = useCallback(() => (
+        getConfiguredWindowCount(layout, windowStates) > 1 ? 'dashboard' : 'view'
+    ), [layout, windowStates]);
+
+    const buildCurrentSavedObjectPayload = useCallback((kind) => {
+        if (kind === 'view') {
+            const configuredIds = getConfiguredWindowIds(layout, windowStates);
+            const windowId = configuredIds[0] || selectedWindowId || Object.keys(windowStates)[0] || DEFAULT_SELECTED_WINDOW_ID;
+            return createAnalyticsViewPayload({
+                windowState: windowStates[windowId] || getDefaultWindowState(),
+                globalFilters,
+            });
+        }
+        return buildCurrentLayoutPayload();
+    }, [buildCurrentLayoutPayload, globalFilters, layout, selectedWindowId, windowStates]);
+
     const handleSaveView = useCallback(async () => {
-        if (selectedViewId) {
+        const nextKind = getCurrentSavedObjectKind();
+        const selectedSavedObject = selectedViewId
+            ? analyticsViews.find((item) => item.id === selectedViewId)
+            : null;
+        if (selectedViewId && (selectedSavedObject?.kind || 'dashboard') === nextKind) {
             try {
                 const saved = await updateAnalyticsView({
                     dashboardId: selectedViewId,
                     name: currentViewName,
-                    layout: buildCurrentLayoutPayload(),
+                    kind: nextKind,
+                    layout: buildCurrentSavedObjectPayload(nextKind),
                 });
                 if (saved) {
                     setCurrentViewName(saved.name);
-                    notify.success('Analytics view updated');
+                    notify.success(nextKind === 'view' ? 'Analytics view updated' : 'Analytics dashboard updated');
                 }
             } catch {
                 // handled by hook toast
@@ -330,8 +356,16 @@ function Analytics() {
             return;
         }
 
+        setSaveKind(nextKind);
         setIsSaveModalOpen(true);
-    }, [buildCurrentLayoutPayload, currentViewName, selectedViewId, updateAnalyticsView]);
+    }, [
+        analyticsViews,
+        buildCurrentSavedObjectPayload,
+        currentViewName,
+        getCurrentSavedObjectKind,
+        selectedViewId,
+        updateAnalyticsView,
+    ]);
 
     const handleCreateView = useCallback(async (name) => {
         if (!name) {
@@ -340,20 +374,22 @@ function Analytics() {
         }
 
         try {
+            const kind = saveKind || getCurrentSavedObjectKind();
             const created = await createAnalyticsView({
                 name,
-                layout: buildCurrentLayoutPayload(),
+                kind,
+                layout: buildCurrentSavedObjectPayload(kind),
             });
             if (created) {
                 setSelectedViewId(created.id);
                 setCurrentViewName(created.name);
                 setIsSaveModalOpen(false);
-                notify.success('Analytics view saved');
+                notify.success(kind === 'view' ? 'Analytics view saved' : 'Analytics dashboard saved');
             }
         } catch {
             // handled by hook toast
         }
-    }, [buildCurrentLayoutPayload, createAnalyticsView]);
+    }, [buildCurrentSavedObjectPayload, createAnalyticsView, getCurrentSavedObjectKind, saveKind]);
 
     const handleDeleteView = useCallback(async (viewId) => {
         try {
@@ -366,6 +402,11 @@ function Analytics() {
             // handled by hook toast
         }
     }, [deleteAnalyticsView, handleSelectAnalyticsView, selectedViewId]);
+
+    const handleOpenQueryConsole = useCallback((sql) => {
+        setConsoleInitialSql(sql || '');
+        setActiveMode('query');
+    }, []);
 
     const renderWindow = useCallback((windowId, layoutControls = {}) => {
         const windowCount = countWindows(layout);
@@ -397,6 +438,7 @@ function Analytics() {
                     globalDateRange={globalDateRange}
                     onGlobalDateRangeChange={handleDateRangeChange}
                     globalFilters={globalFilters}
+                    onOpenQueryConsole={handleOpenQueryConsole}
                 />
             </Suspense>
         );
@@ -406,6 +448,7 @@ function Analytics() {
         globalFilters,
         handleCloseWindow,
         handleDateRangeChange,
+        handleOpenQueryConsole,
         handleSplit,
         layout,
         selectedWindowId,
@@ -435,7 +478,7 @@ function Analytics() {
                 />
 
                 {activeMode === 'query' ? (
-                    <AnalyticsQueryConsole />
+                    <AnalyticsQueryConsole rootId={rootId} initialSql={consoleInitialSql} />
                 ) : (
                     <div className={styles.workspace} onMouseDown={handleWorkspaceMouseDown}>
                         <div
@@ -499,6 +542,7 @@ function Analytics() {
                 <Suspense fallback={null}>
                     <AnalyticsViewNameModal
                         initialName=""
+                        kind={saveKind}
                         onConfirm={handleCreateView}
                         onClose={() => setIsSaveModalOpen(false)}
                     />

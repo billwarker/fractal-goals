@@ -7,6 +7,7 @@ import {
 } from './visualizations/state';
 
 export const ANALYTICS_DASHBOARD_VERSION = 3;
+export const ANALYTICS_VIEW_VERSION = 1;
 
 function normalizeLayoutBounds(bounds) {
     const columns = Math.round(Number(bounds?.columns));
@@ -37,7 +38,7 @@ function isPlainObject(value) {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function collectWindowIds(node, target = []) {
+export function collectWindowIds(node, target = []) {
     if (!isPlainObject(node)) {
         return target;
     }
@@ -86,6 +87,28 @@ function normalizeWindowState(state) {
     };
 }
 
+export function isConfiguredWindowState(state) {
+    return Boolean(state?.selectedCategory && state?.selectedVisualization);
+}
+
+export function getConfiguredWindowIds(layout, windowStates) {
+    const windowIds = collectWindowIds(normalizeLayoutNode(layout) || layout);
+    return windowIds.filter((windowId) => isConfiguredWindowState(windowStates?.[windowId]));
+}
+
+export function getConfiguredWindowCount(layout, windowStates) {
+    return getConfiguredWindowIds(layout, windowStates).length;
+}
+
+export function createAnalyticsViewPayload({ windowState, globalFilters }) {
+    return {
+        type: 'analytics_view',
+        version: ANALYTICS_VIEW_VERSION,
+        profile: normalizeWindowState(windowState),
+        global_filters: normalizeGlobalFilters(globalFilters),
+    };
+}
+
 export function createDashboardLayoutPayload({ layout, windowStates, selectedWindowId, globalFilters, layoutBounds }) {
     const normalizedLayout = normalizeLayoutNode(layout) || { type: 'grid', panels: [{ id: 'window-1', x: 0, y: 0, w: 96, h: 48 }] };
     const windowIds = collectWindowIds(normalizedLayout);
@@ -109,6 +132,17 @@ export function createDashboardLayoutPayload({ layout, windowStates, selectedWin
 export function sanitizeDashboardLayoutPayload(payload) {
     if (!isPlainObject(payload)) {
         return null;
+    }
+    if (payload.type === 'analytics_view') {
+        const profile = normalizeWindowState(payload.profile);
+        return {
+            layout: { type: 'grid', panels: [{ id: 'window-1', x: 0, y: 0, w: 96, h: 48 }] },
+            windowStates: { 'window-1': profile },
+            selectedWindowId: 'window-1',
+            globalFilters: normalizeGlobalFilters(payload.global_filters),
+            layoutBounds: null,
+            savedObjectKind: 'view',
+        };
     }
     if (![1, 2, ANALYTICS_DASHBOARD_VERSION].includes(payload.version)) {
         return null;
@@ -138,6 +172,7 @@ export function sanitizeDashboardLayoutPayload(payload) {
             : windowIds[0],
         globalFilters: normalizeGlobalFilters(payload.global_filters),
         layoutBounds: payload.layout_bounds ? normalizeLayoutBounds(payload.layout_bounds) : null,
+        savedObjectKind: getConfiguredWindowCount(normalizedLayout, windowStates) <= 1 ? 'view' : 'dashboard',
     };
 }
 

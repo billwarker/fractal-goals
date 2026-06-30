@@ -1,6 +1,7 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAnalyticsEngine } from '../../hooks/useAnalyticsEngine';
+import { useAnalyticsViews } from '../../hooks/useDashboardQueries';
 import notify from '../../utils/notify';
 import Button from '../atoms/Button';
 import styles from './AnalyticsQueryConsole.module.css';
@@ -103,8 +104,34 @@ function getDatasetFromSql(sql, datasets) {
     return datasets.find((dataset) => dataset.id.toLowerCase() === match[1].toLowerCase()) || null;
 }
 
+function inferVisualizationSuggestions(result) {
+    const columns = result?.columns || [];
+    if (!columns.length) return [];
+    const numeric = columns.filter((column) => column.type === 'number');
+    const temporal = columns.filter((column) => ['date', 'datetime'].includes(column.type) || /date|time|at$/i.test(column.id));
+    const dimensions = columns.filter((column) => !numeric.includes(column));
+    const suggestions = [];
+    const push = (suggestion) => {
+        if (!suggestions.some((item) => item.type === suggestion.type && item.x === suggestion.x && item.y === suggestion.y)) {
+            suggestions.push(suggestion);
+        }
+    };
 
-function AnalyticsQueryConsole() {
+    if (temporal[0] && numeric[0]) {
+        push({ type: 'line', label: `${numeric[0].label || numeric[0].id} over time`, x: temporal[0].id, y: numeric[0].id, confidence: 0.9 });
+    }
+    if (dimensions[0] && numeric[0]) {
+        push({ type: 'bar', label: `${numeric[0].label || numeric[0].id} by ${dimensions[0].label || dimensions[0].id}`, x: dimensions[0].id, y: numeric[0].id, confidence: 0.84 });
+    }
+    if (numeric.length >= 2) {
+        push({ type: 'scatter', label: `${numeric[1].label || numeric[1].id} vs ${numeric[0].label || numeric[0].id}`, x: numeric[0].id, y: numeric[1].id, confidence: 0.76 });
+    }
+    push({ type: 'table', label: 'Table', confidence: 1.0, x: columns[0]?.id || '', y: numeric[0]?.id || '' });
+    return suggestions;
+}
+
+
+function AnalyticsQueryConsole({ rootId = null, initialSql = '' }) {
     const {
         catalog,
         catalogLoading,
@@ -118,6 +145,7 @@ function AnalyticsQueryConsole() {
         updateProfile,
         deleteProfile,
     } = useAnalyticsEngine();
+    const { createAnalyticsView } = useAnalyticsViews(rootId);
 
     const datasets = useMemo(() => catalog.datasets || [], [catalog.datasets]);
     const catalogErrorMessage = catalogError
@@ -132,6 +160,8 @@ function AnalyticsQueryConsole() {
     const [profileName, setProfileName] = useState('');
     const [selectedProfileId, setSelectedProfileId] = useState('');
     const [result, setResult] = useState(null);
+    const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+    const [fieldMapping, setFieldMapping] = useState({ x: '', y: '', group: '' });
     const [browserWidth, setBrowserWidth] = useState(248);
     const [editorHeight, setEditorHeight] = useState(300);
     const [sqlError, setSqlError] = useState('');
@@ -148,6 +178,37 @@ function AnalyticsQueryConsole() {
         || datasets[0]
         || null
     ), [activeDatasetId, datasets, sql]);
+
+    useEffect(() => {
+        if (!initialSql) return;
+        setSql(initialSql);
+        setActiveDatasetId(getDatasetFromSql(initialSql, datasets)?.id || '');
+        setResult(null);
+        setSqlError('');
+    }, [datasets, initialSql]);
+
+    const compatibleVisualizations = useMemo(() => {
+        const inferred = inferVisualizationSuggestions(result);
+        const backendSuggestions = result?.chart_suggestions || [];
+        const merged = [...backendSuggestions, ...inferred];
+        return merged.filter((suggestion, index) => (
+            merged.findIndex((item) => item.type === suggestion.type && item.x === suggestion.x && item.y === suggestion.y) === index
+        ));
+    }, [result]);
+
+    const selectedSuggestion = compatibleVisualizations[selectedSuggestionIndex] || compatibleVisualizations[0] || null;
+
+    useEffect(() => {
+        if (!selectedSuggestion) {
+            setFieldMapping({ x: '', y: '', group: '' });
+            return;
+        }
+        setFieldMapping({
+            x: selectedSuggestion.x || '',
+            y: selectedSuggestion.y || '',
+            group: selectedSuggestion.group || '',
+        });
+    }, [selectedSuggestion]);
 
     const filteredDatasets = useMemo(() => {
         const query = objectSearch.trim().toLowerCase();
@@ -305,8 +366,73 @@ function AnalyticsQueryConsole() {
         try {
             const payload = await runQuery(querySpec);
             setResult(payload);
+            setSelectedSuggestionIndex(0);
         } catch (error) {
             setSqlError(error?.response?.data?.error || error?.response?.data?.message || 'Failed to run SQL query');
+        }
+    };
+
+    const ensureSavedProfile = async () => {
+        const querySpec = compileSql();
+        if (!querySpec) return null;
+        const payload = {
+            name: profileName.trim() || `SQL view ${new Date().toLocaleString()}`,
+            query_spec: querySpec,
+            visualization_spec: {
+                sql,
+                suggestion: selectedSuggestion || null,
+                mapping: fieldMapping,
+            },
+        };
+        const saved = selectedProfileId
+            ? await updateProfile({ profileId: selectedProfileId, ...payload })
+            : await createProfile(payload);
+        if (saved) {
+            setSelectedProfileId(saved.id);
+            setProfileName(saved.name);
+        }
+        return saved;
+    };
+
+    const handleSaveAnalyticsView = async () => {
+        if (!rootId) {
+            notify.error('Open a fractal before saving an analytics view');
+            return;
+        }
+        if (!selectedSuggestion) {
+            notify.error('Run a query and choose a compatible visualization first');
+            return;
+        }
+        try {
+            const savedProfile = await ensureSavedProfile();
+            if (!savedProfile) return;
+            const created = await createAnalyticsView({
+                name: `${savedProfile.name} ${selectedSuggestion.label || 'Visualization'}`,
+                kind: 'view',
+                layout: {
+                    type: 'analytics_view',
+                    version: 1,
+                    profile: {
+                        selectedCategory: 'query',
+                        selectedVisualization: selectedSuggestion.type,
+                        selectedActivity: null,
+                        selectedGoal: null,
+                        visualizationState: {
+                            queryProfileId: savedProfile.id,
+                            sql,
+                            suggestion: selectedSuggestion,
+                            mapping: fieldMapping,
+                        },
+                        visualizationStateByKey: {},
+                    },
+                    global_filters: {},
+                },
+            });
+            if (created) {
+                notify.success('Analytics view saved from SQL');
+            }
+        } catch {
+            // hook toasts cover API errors
         }
     };
 
@@ -503,7 +629,7 @@ function AnalyticsQueryConsole() {
                         </div>
 
                         <label className={`${styles.field} ${styles.savedViewControl}`}>
-                            <span className={styles.label}>Saved View</span>
+                            <span className={styles.label}>Query Profile</span>
                             <select
                                 className={styles.select}
                                 value={selectedProfileId}
@@ -553,12 +679,49 @@ function AnalyticsQueryConsole() {
                     </div>
 
                     <div className={styles.visualizationSpace}>
-                        {(result?.chart_suggestions || []).slice(0, 3).map((suggestion) => (
-                            <span key={`${suggestion.type}-${suggestion.label}`} className={styles.suggestion}>
-                                {suggestion.label}
-                            </span>
-                        ))}
-                        {!result?.chart_suggestions?.length && <span>Visualization suggestions appear after a query runs.</span>}
+                        {compatibleVisualizations.length > 0 ? (
+                            <>
+                                <div className={styles.recommendationHeader}>
+                                    <strong>Recommended Visualizations</strong>
+                                    <Button size="sm" variant="secondary" onClick={handleSaveAnalyticsView}>Save as View</Button>
+                                </div>
+                                <div className={styles.recommendationList}>
+                                    {compatibleVisualizations.slice(0, 4).map((suggestion, index) => (
+                                        <button
+                                            key={`${suggestion.type}-${suggestion.label}-${suggestion.x || ''}-${suggestion.y || ''}`}
+                                            type="button"
+                                            className={index === selectedSuggestionIndex ? styles.suggestionActive : styles.suggestion}
+                                            onClick={() => setSelectedSuggestionIndex(index)}
+                                        >
+                                            {suggestion.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                {selectedSuggestion && (
+                                    <div className={styles.mappingGrid}>
+                                        {['x', 'y', 'group'].map((field) => (
+                                            <label key={field}>
+                                                <span>{field.toUpperCase()}</span>
+                                                <select
+                                                    value={fieldMapping[field] || ''}
+                                                    onChange={(event) => setFieldMapping((current) => ({ ...current, [field]: event.target.value }))}
+                                                >
+                                                    <option value="">None</option>
+                                                    {(result?.columns || []).map((column) => (
+                                                        <option key={column.id} value={column.id}>{column.label || column.id}</option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                        ))}
+                                        <div className={styles.previewSummary}>
+                                            {selectedSuggestion.type} · {fieldMapping.x || 'no x'} / {fieldMapping.y || 'no y'}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <span>Visualization suggestions appear after a query runs.</span>
+                        )}
                     </div>
 
                     <div className={styles.tableWrap}>

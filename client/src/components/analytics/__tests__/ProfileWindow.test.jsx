@@ -186,4 +186,43 @@ describe('ProfileWindow', () => {
             }),
         }));
     });
+
+    it('shows visualization-specific SQL for activity totals', () => {
+        render(
+            <ProfileWindow
+                data={{
+                    sessions: [],
+                    goalAnalytics: { goals: [], summary: {} },
+                    activities: [
+                        { id: 'activity-1', name: 'Squat', group_id: 'group-1' },
+                    ],
+                    activityGroups: [
+                        { id: 'group-1', name: 'Strength', parent_id: null },
+                    ],
+                    activityInstances: {
+                        'activity-1': [{ id: 'instance-1', completed: true }],
+                    },
+                    formatDuration: (seconds) => `${seconds}s`,
+                    rootId: null,
+                }}
+                windowState={{
+                    selectedCategory: 'activities',
+                    selectedVisualization: 'activityFrequency',
+                    visualizationState: { metric: 'instances', showGroups: false, limit: 8 },
+                    selectedActivity: null,
+                    selectedGoal: null,
+                }}
+                updateWindowState={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Show chart query' }));
+
+        const sql = screen.getByText((content) => content.includes('FROM activity_instances ai'));
+        expect(sql).toHaveTextContent('JOIN activity_definitions ad ON ad.id = ai.activity_definition_id');
+        expect(sql).toHaveTextContent('COUNT(ai.id) AS completed_instances');
+        expect(sql).toHaveTextContent('GROUP BY ad.name');
+        expect(sql).toHaveTextContent('ORDER BY completed_instances DESC, activity_name ASC');
+        expect(sql).toHaveTextContent('LIMIT 8');
+    });
 });

@@ -491,6 +491,7 @@ def _datasets() -> dict[str, AnalyticsDataset]:
                 "id": _field("id", "View ID", "string", AnalyticsDashboard.id),
                 "root_id": _field("root_id", "Fractal ID", "string", AnalyticsDashboard.root_id),
                 "name": _field("name", "Name", "string", AnalyticsDashboard.name),
+                "kind": _field("kind", "Kind", "string", AnalyticsDashboard.kind),
                 "created_at": _field("created_at", "Created", "datetime", AnalyticsDashboard.created_at),
                 "updated_at": _field("updated_at", "Updated", "datetime", AnalyticsDashboard.updated_at),
             },

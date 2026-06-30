@@ -1328,6 +1328,17 @@ def validate_dashboard_layout(value: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError('layout must be an object')
 
+    if value.get('type') == 'analytics_view':
+        required_view_keys = {'type', 'version', 'profile'}
+        missing_view = sorted(required_view_keys - set(value.keys()))
+        if missing_view:
+            raise ValueError(f"analytics view layout is missing required keys: {', '.join(missing_view)}")
+        if not isinstance(value.get('version'), int):
+            raise ValueError('layout.version must be an integer')
+        if not isinstance(value.get('profile'), dict):
+            raise ValueError('layout.profile must be an object')
+        return value
+
     required_keys = {'layout', 'window_states', 'selected_window_id', 'version'}
     missing = sorted(required_keys - set(value.keys()))
     if missing:
@@ -1520,12 +1531,20 @@ class DashboardCreateSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
+    kind: str = Field('dashboard')
     layout: Dict[str, Any] = Field(...)
 
     @field_validator('name')
     @classmethod
     def sanitize_name(cls, v: str) -> str:
         return sanitize_string(v)
+
+    @field_validator('kind')
+    @classmethod
+    def validate_kind(cls, v: str) -> str:
+        if v not in {'view', 'dashboard'}:
+            raise ValueError("kind must be 'view' or 'dashboard'")
+        return v
 
     @field_validator('layout')
     @classmethod
@@ -1537,6 +1556,7 @@ class DashboardUpdateSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
+    kind: Optional[str] = None
     layout: Optional[Dict[str, Any]] = None
 
     @field_validator('name')
@@ -1545,6 +1565,15 @@ class DashboardUpdateSchema(BaseModel):
         if v is None:
             return v
         return sanitize_string(v)
+
+    @field_validator('kind')
+    @classmethod
+    def validate_kind(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if v not in {'view', 'dashboard'}:
+            raise ValueError("kind must be 'view' or 'dashboard'")
+        return v
 
     @field_validator('layout')
     @classmethod
@@ -1555,8 +1584,8 @@ class DashboardUpdateSchema(BaseModel):
 
     @model_validator(mode='after')
     def require_at_least_one_field(self):
-        if self.name is None and self.layout is None:
-            raise ValueError('At least one of name or layout is required')
+        if self.name is None and self.kind is None and self.layout is None:
+            raise ValueError('At least one of name, kind, or layout is required')
         return self
 
 

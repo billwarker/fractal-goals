@@ -964,6 +964,7 @@ def serialize_analytics_dashboard(dashboard):
         "root_id": dashboard.root_id,
         "user_id": dashboard.user_id,
         "name": dashboard.name,
+        "kind": dashboard.kind or "dashboard",
         "layout": dashboard.layout,
         "created_at": format_utc(dashboard.created_at),
         "updated_at": format_utc(dashboard.updated_at),

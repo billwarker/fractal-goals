@@ -1,6 +1,8 @@
 import {
+    createAnalyticsViewPayload,
     createDashboardLayoutPayload,
     getDefaultWindowState,
+    getConfiguredWindowCount,
     getHighestWindowIndex,
     sanitizeDashboardLayoutPayload,
 } from '../dashboardState';
@@ -179,5 +181,51 @@ describe('dashboardState helpers', () => {
             grain: 'week',
             metrics: ['sessions', 'duration'],
         });
+    });
+
+    it('saves a portable analytics view and restores it as a one-window layout', () => {
+        const payload = createAnalyticsViewPayload({
+            windowState: {
+                selectedCategory: 'sessions',
+                selectedVisualization: 'sessionTrends',
+                visualizationState: { grain: 'month', metrics: ['duration'] },
+            },
+            globalFilters: {
+                goals: { goalIds: ['goal-1'], includeDescendants: true },
+            },
+        });
+
+        expect(payload.type).toBe('analytics_view');
+        expect(payload.profile.selectedVisualization).toBe('sessionTrends');
+
+        const restored = sanitizeDashboardLayoutPayload(payload);
+
+        expect(restored.savedObjectKind).toBe('view');
+        expect(restored.selectedWindowId).toBe('window-1');
+        expect(restored.windowStates['window-1'].visualizationState).toEqual({
+            grain: 'month',
+            metrics: ['duration'],
+        });
+        expect(restored.globalFilters.goals.goalIds).toEqual(['goal-1']);
+    });
+
+    it('counts configured chart windows separately from empty split panels', () => {
+        const layout = {
+            type: 'grid',
+            panels: [
+                { id: 'window-1', x: 0, y: 0, w: 48, h: 48 },
+                { id: 'window-2', x: 48, y: 0, w: 48, h: 48 },
+            ],
+        };
+
+        expect(getConfiguredWindowCount(layout, {
+            'window-1': { selectedCategory: 'goals', selectedVisualization: 'stats' },
+            'window-2': { selectedCategory: 'sessions' },
+        })).toBe(1);
+
+        expect(getConfiguredWindowCount(layout, {
+            'window-1': { selectedCategory: 'goals', selectedVisualization: 'stats' },
+            'window-2': { selectedCategory: 'sessions', selectedVisualization: 'sessionTrends' },
+        })).toBe(2);
     });
 });

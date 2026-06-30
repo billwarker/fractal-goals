@@ -43,6 +43,7 @@ class AnalyticsDashboard(Base):
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
     user_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
     name = Column(String, nullable=False)
+    kind = Column(String, nullable=False, server_default='dashboard', default='dashboard')
     layout = Column(JSON_TYPE, nullable=False)
 
     __table_args__ = (

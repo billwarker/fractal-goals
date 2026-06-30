@@ -487,13 +487,14 @@ export default function PageSurface({
                     state={content?.state}
                     onStateChange={(next) => handleWidgetStateChange(panelId, next)}
                     sharedData={sharedWidgetData}
+                    viewMode={viewMode}
                     configureMode={configureMode}
                     onDragStart={onDragStart}
                     onRemove={() => handleRemovePanel(panelId)}
                 />
             </div>
         );
-    }, [config.panel_contents, treePanelId, configureMode, selectedPanelId, onSelectedPanelIdChange, renderTree, sharedWidgetData, handleWidgetStateChange, handleRemovePanel]);
+    }, [config.panel_contents, treePanelId, configureMode, selectedPanelId, onSelectedPanelIdChange, renderTree, sharedWidgetData, viewMode, handleWidgetStateChange, handleRemovePanel]);
 
     const detailLive = viewMode === 'scoped';
 

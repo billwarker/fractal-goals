@@ -519,6 +519,7 @@ class AdminService:
         analytics_views = self.db_session.query(AnalyticsDashboard).filter(
             AnalyticsDashboard.root_id == root.id,
             AnalyticsDashboard.user_id == owner_id,
+            AnalyticsDashboard.kind == "view",
             AnalyticsDashboard.deleted_at.is_(None),
         ).order_by(
             AnalyticsDashboard.updated_at.desc(),
@@ -975,6 +976,7 @@ class AdminService:
                     AnalyticsDashboard.id.in_(resolved["analytics_view_ids"]),
                     AnalyticsDashboard.root_id == root.id,
                     AnalyticsDashboard.user_id == root.owner_id,
+                    AnalyticsDashboard.kind == "view",
                     AnalyticsDashboard.deleted_at.is_(None),
                 ).all()
             }
@@ -1005,6 +1007,7 @@ class AdminService:
         query = self.db_session.query(AnalyticsDashboard).filter(
             AnalyticsDashboard.root_id == root.id,
             AnalyticsDashboard.user_id == root.owner_id,
+            AnalyticsDashboard.kind == "view",
             AnalyticsDashboard.deleted_at.is_(None),
         )
         selected_ids = showcase.get("analytics_view_ids") or []

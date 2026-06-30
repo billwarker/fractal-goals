@@ -21,10 +21,10 @@ function AnalyticsTopBar({
                 {activeMode === 'dashboard' && (
                     <div className={styles.actions}>
                         <Button variant="secondary" size="sm" onClick={onOpenViewsModal}>
-                            Other Views
+                            Saved Analytics
                         </Button>
                         <Button variant="primary" size="sm" onClick={onSaveView}>
-                            Save View
+                            Save
                         </Button>
                     </div>
                 )}

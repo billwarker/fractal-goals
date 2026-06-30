@@ -17,6 +17,7 @@ export default function SurfaceWidget({
     state,
     onStateChange,
     sharedData,
+    viewMode = 'overview',
     configureMode,
     onDragStart,
     onRemove,
@@ -26,7 +27,7 @@ export default function SurfaceWidget({
     const body = useMemo(() => {
         switch (widgetType) {
             case 'analytics':
-                return <AnalyticsWidget state={state} onStateChange={onStateChange} sharedData={sharedData} configureMode={configureMode} />;
+                return <AnalyticsWidget state={state} onStateChange={onStateChange} sharedData={sharedData} viewMode={viewMode} configureMode={configureMode} />;
             case 'calendar':
                 return <CalendarWidget state={state} onStateChange={onStateChange} sharedData={sharedData} configureMode={configureMode} />;
             case 'lastSession':
@@ -36,7 +37,7 @@ export default function SurfaceWidget({
             default:
                 return <div className="surface-widget-empty">Unknown widget</div>;
         }
-    }, [widgetType, state, onStateChange, sharedData, configureMode]);
+    }, [widgetType, state, onStateChange, sharedData, viewMode, configureMode]);
 
     return (
         <div className="surface-widget">
