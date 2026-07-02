@@ -56,11 +56,11 @@
     max-width: min(460px, calc(100% - 40px));
     padding: 0;
     color: color-mix(in srgb, var(--color-text-primary) 88%, transparent);
-    font-family: var(--font-family-config);
+    font-family: var(--font-family);
     font-size: 12px;
     font-weight: var(--font-weight-medium);
     line-height: 20px;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
     font-variant-numeric: tabular-nums;
     text-shadow:
         0 1px 0 color-mix(in srgb, var(--bg-color) 70%, transparent),
@@ -68,10 +68,11 @@
 }
 
 .flowtree-options-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: 140px max-content;
     align-items: end;
-    justify-content: space-between;
-    gap: 12px;
+    justify-content: start;
+    column-gap: 20px;
     min-height: 40px;
     padding-bottom: 0;
 }
@@ -486,6 +487,11 @@
         min-width: 0;
         max-width: calc(100% - 40px);
         font-size: 11px;
+    }
+
+    .flowtree-options-header {
+        grid-template-columns: minmax(100px, 1fr) max-content;
+        column-gap: 20px;
     }
 
     .flowtree-options-title,

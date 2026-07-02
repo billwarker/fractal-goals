@@ -1127,7 +1127,7 @@ html {
     padding-top: env(safe-area-inset-top, 0px);
     padding-right: max(32px, env(safe-area-inset-right, 0px));
     padding-left: max(32px, env(safe-area-inset-left, 0px));
-    overflow: hidden;
+    overflow: visible;
 }
 
 .nav-group {

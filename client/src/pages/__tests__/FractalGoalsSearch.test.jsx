@@ -10,6 +10,7 @@ const toggleGoalCompletionMock = vi.fn();
 const setActiveRootIdMock = vi.fn();
 const startFadeOutMock = vi.hoisted(() => vi.fn());
 const isMobileMock = vi.hoisted(() => ({ value: false }));
+const localStorageStore = new Map();
 
 let fractalTree;
 
@@ -134,13 +135,22 @@ function renderFractalGoals() {
     );
 }
 
+function expandOptionsPane() {
+    fireEvent.click(screen.getByRole('button', { name: 'Expand tree view options' }));
+}
+
 describe('FractalGoals type-to-zoom search', () => {
     beforeEach(() => {
         isMobileMock.value = false;
+        localStorageStore.clear();
         vi.stubGlobal('localStorage', {
-            getItem: vi.fn(() => null),
-            setItem: vi.fn(),
-            removeItem: vi.fn(),
+            getItem: vi.fn((key) => localStorageStore.get(key) ?? null),
+            setItem: vi.fn((key, value) => {
+                localStorageStore.set(key, String(value));
+            }),
+            removeItem: vi.fn((key) => {
+                localStorageStore.delete(key);
+            }),
         });
 
         fractalTree = {
@@ -175,6 +185,44 @@ describe('FractalGoals type-to-zoom search', () => {
         vi.clearAllTimers();
         vi.useRealTimers();
         vi.unstubAllGlobals();
+    });
+
+    it('starts with the goals view options pane minimized', () => {
+        renderFractalGoals();
+
+        expect(screen.getByRole('button', { name: 'Expand tree view options' })).toBeInTheDocument();
+        expect(screen.queryByLabelText('Fade inactive branches')).not.toBeInTheDocument();
+
+        expandOptionsPane();
+
+        expect(screen.getByLabelText('Fade inactive branches')).toBeInTheDocument();
+    });
+
+    it('persists goals view options for the current user and root across remounts', async () => {
+        const view = renderFractalGoals();
+        expandOptionsPane();
+
+        fireEvent.click(screen.getByLabelText('Fade inactive branches'));
+        fireEvent.click(screen.getByRole('button', { name: 'Hierarchy' }));
+
+        await waitFor(() => {
+            const stored = JSON.parse(localStorageStore.get('flowtree-view-settings:user-1:root'));
+            expect(stored).toMatchObject({
+                goalsViewMode: 'hierarchy',
+                viewSettings: {
+                    fadeInactiveBranches: true,
+                },
+            });
+        });
+
+        view.unmount();
+        renderFractalGoals();
+        expandOptionsPane();
+
+        await waitFor(() => {
+            expect(screen.getByLabelText('Fade inactive branches')).toBeChecked();
+            expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-layout-mode', 'hierarchy');
+        });
     });
 
     it('opens the palette and zooms when typing creates a unique match', async () => {
@@ -364,6 +412,7 @@ describe('FractalGoals type-to-zoom search', () => {
     it('offers a tree option to hide inactive goals', () => {
         vi.useFakeTimers();
         renderFractalGoals();
+        expandOptionsPane();
 
         const hideInactiveToggle = screen.getByLabelText('Hide inactive goals');
         expect(hideInactiveToggle).not.toBeChecked();
@@ -385,6 +434,7 @@ describe('FractalGoals type-to-zoom search', () => {
     it('transitions before applying the hide completed goals tree option', () => {
         vi.useFakeTimers();
         renderFractalGoals();
+        expandOptionsPane();
 
         fireEvent.click(screen.getByLabelText('Hide completed goals'));
 
@@ -428,6 +478,7 @@ describe('FractalGoals type-to-zoom search', () => {
 
     it('lets desktop users switch the configured surface target to mobile and back', async () => {
         renderFractalGoals();
+        expandOptionsPane();
 
         expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-layout-mode', 'tree');
 

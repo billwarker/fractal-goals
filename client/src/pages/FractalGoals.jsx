@@ -41,6 +41,7 @@ import './FractalGoals.css';
 import '../components/surface/PageSurface.css';
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 const FLOWTREE_SETTINGS_STORAGE_KEY = 'flowtree-view-settings';
+const FLOWTREE_SETTINGS_STORAGE_VERSION = 1;
 const DEFAULT_VIEW_SETTINGS = {
     fadeInactiveBranches: false,
     hideInactiveGoals: false,
@@ -82,10 +83,30 @@ function removeLocalStorageValue(key) {
     }
 }
 
+function normalizeStoredFlowTreeSettings(rawValue) {
+    if (!rawValue) return null;
+    const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+    const storedViewSettings = parsed?.viewSettings || parsed;
+    const viewSettings = {};
+    for (const key of Object.keys(DEFAULT_VIEW_SETTINGS)) {
+        if (typeof storedViewSettings?.[key] === 'boolean') {
+            viewSettings[key] = storedViewSettings[key];
+        }
+    }
+    const goalsViewMode = parsed?.goalsViewMode === 'tree' || parsed?.goalsViewMode === 'hierarchy'
+        ? parsed.goalsViewMode
+        : null;
+    return {
+        goalsViewMode,
+        viewSettings,
+        hasSettings: goalsViewMode || Object.keys(viewSettings).length > 0,
+    };
+}
+
 function FractalGoals() {
     const hideCompletedTooltip = 'Hides completed goals from the fractal tree.';
     const hideInactiveTooltip = 'Hides goals with no completed activity evidence in the active window.';
-    const [isOptionsPaneMinimized, setIsOptionsPaneMinimized] = useState(false);
+    const [isOptionsPaneMinimized, setIsOptionsPaneMinimized] = useState(true);
     const { rootId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
@@ -111,6 +132,14 @@ function FractalGoals() {
     const { debugMode } = useDebug();
     const isMobile = useIsMobile();
     const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
+    const flowTreeSettingsStorageKey = useMemo(
+        () => rootId ? `${FLOWTREE_SETTINGS_STORAGE_KEY}:${user?.id || 'anonymous'}:${rootId}` : null,
+        [rootId, user?.id]
+    );
+    const legacyFlowTreeSettingsStorageKey = useMemo(
+        () => rootId ? `${FLOWTREE_SETTINGS_STORAGE_KEY}:${rootId}` : null,
+        [rootId]
+    );
     const { programs = EMPTY_ARRAY } = usePrograms(rootId);
     const loading = goalsLoading || activitiesLoading || activityGroupsLoading || evidenceLoading;
     const [sidebarMode, setSidebarMode] = useState(null);
@@ -142,6 +171,8 @@ function FractalGoals() {
     const typeToZoomIdleTimerRef = useRef(null);
     const flowTreeRef = useRef(null);
     const flowTreeScopeTransitionTimerRef = useRef(null);
+    const shouldPreserveFlowTreePreferencesRef = useRef(false);
+    const [hasHydratedFlowTreeSettings, setHasHydratedFlowTreeSettings] = useState(false);
     const selectedNodeId = viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null;
     const evidenceGoalIds = useMemo(() => {
         if (!evidenceData) return null;
@@ -222,29 +253,52 @@ function FractalGoals() {
     }, [rootId, navigate, setActiveRootId, user?.id]);
 
     useEffect(() => {
-        if (!rootId) return;
+        shouldPreserveFlowTreePreferencesRef.current = false;
+        setHasHydratedFlowTreeSettings(false);
+        if (!flowTreeSettingsStorageKey) {
+            setHasHydratedFlowTreeSettings(true);
+            return;
+        }
+
         try {
-            const raw = readLocalStorageValue(`${FLOWTREE_SETTINGS_STORAGE_KEY}:${rootId}`);
-            if (!raw) return;
-            const parsed = JSON.parse(raw);
-            setViewSettings((prev) => ({
-                ...prev,
-                ...parsed
-            }));
+            const raw = readLocalStorageValue(flowTreeSettingsStorageKey)
+                || readLocalStorageValue(legacyFlowTreeSettingsStorageKey);
+            const normalized = normalizeStoredFlowTreeSettings(raw);
+            if (normalized?.hasSettings) {
+                shouldPreserveFlowTreePreferencesRef.current = true;
+                if (Object.keys(normalized.viewSettings).length > 0) {
+                    setViewSettings((prev) => ({
+                        ...prev,
+                        ...normalized.viewSettings,
+                    }));
+                }
+                if (normalized.goalsViewMode) {
+                    setGoalsViewMode(normalized.goalsViewMode);
+                }
+            }
         } catch {
             // Ignore stale or malformed preference data.
+        } finally {
+            setHasHydratedFlowTreeSettings(true);
         }
-    }, [rootId]);
+    }, [flowTreeSettingsStorageKey, legacyFlowTreeSettingsStorageKey]);
 
     useEffect(() => {
-        if (!rootId) return;
-        writeLocalStorageValue(`${FLOWTREE_SETTINGS_STORAGE_KEY}:${rootId}`, JSON.stringify(viewSettings));
-    }, [rootId, viewSettings]);
+        if (!flowTreeSettingsStorageKey || !hasHydratedFlowTreeSettings) return;
+        writeLocalStorageValue(flowTreeSettingsStorageKey, JSON.stringify({
+            version: FLOWTREE_SETTINGS_STORAGE_VERSION,
+            goalsViewMode,
+            viewSettings,
+        }));
+    }, [flowTreeSettingsStorageKey, goalsViewMode, hasHydratedFlowTreeSettings, viewSettings]);
 
     const isSidebarOpen = showGoalModal || !!sidebarMode;
     const surfaceViewMode = isSidebarOpen && !isMobile ? 'scoped' : 'overview';
 
-    const applySurfaceTreeView = useCallback((config, mode = surfaceViewMode, mobileOverride = configViewportIsMobile) => {
+    const applySurfaceTreeView = useCallback((config, mode = surfaceViewMode, mobileOverride = configViewportIsMobile, options = {}) => {
+        if (options.respectStoredPreferences !== false && shouldPreserveFlowTreePreferencesRef.current) {
+            return;
+        }
         const activeConfig = getSurfaceModeConfig(config, mode, { mobile: mobileOverride });
         const treeId = getTreePanelId(activeConfig?.panel_contents);
         const treeView = treeId ? activeConfig.panel_contents[treeId]?.treeView : null;
@@ -264,7 +318,7 @@ function FractalGoals() {
     // resolve, and hydrate the tree's view settings from its tree panel. On
     // mobile we load the mobile_config variant (seeding it from desktop if the
     // surface predates mobile support).
-    const loadSurfaceConfig = useCallback((surface, mobileOverride = null) => {
+    const loadSurfaceConfig = useCallback((surface, mobileOverride = null, options = {}) => {
         const targetIsMobile = mobileOverride ?? isMobile;
         let desktopConfig = null;
         let mobileConfig = null;
@@ -281,7 +335,7 @@ function FractalGoals() {
         setActiveSurfaceId(surface?.id || null);
         setConfigViewportIsMobile(targetIsMobile);
         setIsSurfaceDirty(false);
-        applySurfaceTreeView(effective, surfaceViewMode, targetIsMobile);
+        applySurfaceTreeView(effective, surfaceViewMode, targetIsMobile, options);
     }, [applySurfaceTreeView, isMobile, surfaceViewMode]);
 
     useEffect(() => {
@@ -482,6 +536,7 @@ function FractalGoals() {
     }, [activeSurfaceId, configViewportIsMobile, deleteSurface, loadSurfaceConfig]);
 
     const handleGoalsViewModeChange = useCallback((mode) => {
+        shouldPreserveFlowTreePreferencesRef.current = true;
         setGoalsViewMode(mode);
         if (isConfigureMode) setIsSurfaceDirty(true);
     }, [isConfigureMode]);
@@ -712,6 +767,7 @@ function FractalGoals() {
     const handleToggleViewSetting = (settingKey) => (event) => {
         const nextChecked = event.target.checked;
         const shouldTransitionScope = settingKey === 'hideInactiveGoals' || settingKey === 'hideCompletedGoals';
+        shouldPreserveFlowTreePreferencesRef.current = true;
         if (isConfigureMode) setIsSurfaceDirty(true);
 
         if (!shouldTransitionScope) {
@@ -779,7 +835,11 @@ function FractalGoals() {
                         surfaces={surfaces}
                         activeSurfaceId={activeSurfaceId}
                         isSurfaceDirty={isSurfaceDirty}
-                        onSelectSurface={(id) => loadSurfaceConfig(surfaces.find((s) => s.id === id) || null, configViewportIsMobile)}
+                        onSelectSurface={(id) => loadSurfaceConfig(
+                            surfaces.find((s) => s.id === id) || null,
+                            configViewportIsMobile,
+                            { respectStoredPreferences: false }
+                        )}
                         onSaveSurface={handleSaveSurface}
                         onSaveSurfaceAs={handleSaveSurfaceAs}
                         onSetDefaultSurface={handleSetDefaultSurface}

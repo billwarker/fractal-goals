@@ -83,6 +83,7 @@ Important frontend design choices:
 - Account-owned homepage data must be scoped by the authenticated user id or cleared on auth transitions; auth changes clear the query cache to prevent cross-account data bleed.
 - Auth bootstrap attempts a cookie refresh when `/auth/me` is stale. Production frontend builds must call same-origin `/api`, with Cloud Build passing `VITE_API_URL=/api` and Nginx proxying to the backend through runtime `BACKEND_URL`, so remembered-device cookies remain first-party on mobile browsers.
 - The selection page consumes `/api/fractals` summaries directly, including effective `display_level` metadata, rather than issuing per-fractal goal-level fetches.
+- The authenticated app header also consumes the same user-scoped fractal summaries cache (`queryKeys.fractals(userId)`) for its root-goal switcher, so users can change fractals from the nav while preserving the current high-level section when possible.
 - Older hand-managed fetch state has largely been removed.
 - Large multi-mode components were decomposed into coordinators plus focused subcomponents/hooks.
 - Modal behavior and state reset patterns are more standardized than before.

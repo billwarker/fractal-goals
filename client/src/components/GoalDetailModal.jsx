@@ -22,6 +22,7 @@ import GoalUncompletionModal from './goals/GoalUncompletionModal';
 import GoalHeader from './goals/GoalHeader';
 import GoalViewMode from './goals/GoalViewMode';
 import GoalEditForm from './goals/GoalEditForm';
+import GraphProfileLoadingFallback from './goalDetail/GraphProfileLoadingFallback';
 import CloseButton from './atoms/CloseButton';
 import GoalIcon from './atoms/GoalIcon';
 import ModalBackdrop from './atoms/ModalBackdrop';
@@ -41,44 +42,6 @@ const TargetAnalyticsModal = lazyWithRetry(() => import('./goalDetail/TargetAnal
 const GoalOptionsView = lazyWithRetry(() => import('./goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./goalDetail/GoalNotesView'), 'components/goalDetail/GoalNotesView');
 const GoalTimelineView = lazyWithRetry(() => import('./goalDetail/GoalTimelineView'), 'components/goalDetail/GoalTimelineView');
-
-function GraphProfileLoadingFallback({ title, color, onClose }) {
-    return createPortal(
-        <ModalBackdrop
-            className={styles.graphProfileLoadingOverlay}
-            onClose={onClose}
-        >
-            <section
-                className={styles.graphProfileLoadingContainer}
-                onClick={(event) => event.stopPropagation()}
-                aria-label="Loading graph"
-            >
-                <header className={styles.graphProfileLoadingHeader}>
-                    <div className={styles.graphProfileLoadingTitleGroup}>
-                        <div
-                            className={styles.graphProfileLoadingDot}
-                            style={{ '--graph-accent': color || 'var(--color-brand-primary)' }}
-                            aria-hidden="true"
-                        />
-                        <div>
-                            <h2 className={styles.graphProfileLoadingTitle}>{title || 'Time Spent'}</h2>
-                            <div className={styles.graphProfileLoadingSubtitle}>
-                                Daily time spent from goal evidence
-                            </div>
-                        </div>
-                    </div>
-                    <CloseButton
-                        onClick={onClose}
-                        className={styles.graphProfileLoadingClose}
-                        size={28}
-                    />
-                </header>
-                <div className={styles.graphProfileLoadingFrame}>Loading graph...</div>
-            </section>
-        </ModalBackdrop>,
-        document.body
-    );
-}
 
 /**
  * GoalDetailModal Component
