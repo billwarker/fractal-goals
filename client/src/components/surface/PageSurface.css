@@ -1,0 +1,419 @@
+/* Configurable page surface styling. The grid-cell background lives on the
+   page container (FractalGoals.css); these rules style panels and widgets. */
+
+.page-surface {
+    width: 100%;
+    height: 100%;
+}
+
+.page-surface-grid-region {
+    isolation: isolate;
+}
+
+.surface-grid-cell-hover {
+    position: absolute;
+    z-index: 0;
+    pointer-events: none;
+    box-sizing: border-box;
+    border: 1px solid color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 58%, transparent);
+    background:
+        linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 18%, transparent),
+            color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 7%, transparent)
+        );
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, #fff 8%, transparent),
+        0 0 10px color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 18%, transparent);
+}
+
+.surface-widget-footprint-preview {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+    box-sizing: border-box;
+    border: 1px solid color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 72%, transparent);
+    background:
+        linear-gradient(
+            135deg,
+            color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 16%, transparent),
+            color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 7%, transparent)
+        );
+    box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, #fff 8%, transparent),
+        0 0 18px color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 22%, transparent);
+}
+
+.surface-panel {
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.surface-panel-tree {
+    /* Tree panel is transparent so the goal graph sits directly on the grid. */
+    background: transparent;
+}
+
+/* Analytics-profile-window-style outlines for configure mode. Every editable
+   surface window (tree, widgets, detail placeholder) shares this treatment so
+   the grid reads as a set of resizable windows. */
+.surface-window-outline {
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+    transition: border 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+}
+
+.page-surface-configuring .surface-window-outline {
+    border-color: color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 72%, var(--color-border));
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 28%, transparent),
+        0 0 16px color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 18%, transparent);
+}
+
+.surface-window-selected {
+    border: 2px solid var(--color-brand-primary, var(--color-primary)) !important;
+    box-shadow: 0 0 12px rgba(33, 150, 243, 0.3) !important;
+}
+
+.surface-panel-configurable {
+    cursor: pointer;
+}
+
+/* Window chrome (drag handle / title bar) */
+.surface-window {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg-surface, var(--color-bg-sidebar, #1a1d24));
+    overflow: hidden;
+}
+
+.surface-window-chrome {
+    display: flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--color-border);
+    user-select: none;
+    flex: 0 0 auto;
+}
+
+/* On the transparent tree panel, the chrome floats at the top-left so it does
+   not paint a full bar over the graph. */
+.surface-window-chrome-tree {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 5;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+    background: color-mix(in srgb, var(--color-bg-app, #121419) 70%, transparent);
+    backdrop-filter: blur(4px);
+}
+
+.surface-window-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary, #9aa6b2);
+}
+
+.surface-window-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-secondary, #9aa6b2);
+    font-size: 13px;
+    border-radius: 8px;
+    background: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--color-primary) 6%, transparent),
+        color-mix(in srgb, var(--color-primary) 6%, transparent) 10px,
+        transparent 10px,
+        transparent 20px
+    );
+}
+
+/* Two-region split: detail region + draggable splitter (configure mode). */
+.page-surface-detail-region {
+    box-sizing: border-box;
+    overflow: hidden;
+    position: relative;
+    padding: 0;
+    min-width: 0;
+}
+
+.surface-detail-content {
+    flex: 1;
+    min-height: 0;
+}
+
+.surface-detail-window {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-bg-sidebar);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(10px);
+    opacity: 1;
+    animation: none;
+}
+
+.page-surface-configuring .surface-detail-window {
+    border-color: color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 72%, var(--color-border));
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 28%, transparent),
+        0 0 16px color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 18%, transparent);
+}
+
+.surface-detail-window-content {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.surface-splitter {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    cursor: ew-resize;
+    background: transparent;
+    z-index: 80;
+}
+
+.surface-panel-widget {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.surface-panel-selected {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
+/* Widget chrome + body */
+.surface-widget {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    background: var(--color-bg-sidebar, var(--color-bg-elevated, #1a1d24));
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+}
+
+.surface-widget-chrome {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--color-border);
+    user-select: none;
+    flex: 0 0 auto;
+}
+
+.surface-widget-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary, #9aa6b2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.surface-widget-remove {
+    background: transparent;
+    border: none;
+    color: var(--color-text-secondary, #9aa6b2);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+    border-radius: 4px;
+}
+
+.surface-widget-remove:hover {
+    color: var(--color-error);
+    background: color-mix(in srgb, var(--color-error) 14%, transparent);
+}
+
+.surface-widget-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 8px;
+}
+
+.surface-widget-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--color-text-secondary, #9aa6b2);
+    font-size: 13px;
+    text-align: center;
+    padding: 12px;
+}
+
+/* Add-widget menu */
+.surface-add-widget-menu {
+    width: 220px;
+    background: var(--color-bg-sidebar, #1a1d24);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.4));
+    padding: 6px;
+}
+
+.surface-add-widget-menu-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary, #9aa6b2);
+    padding: 6px 8px;
+}
+
+.surface-add-widget-menu-item {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 8px;
+    cursor: pointer;
+    gap: 2px;
+}
+
+.surface-add-widget-menu-item:hover {
+    background: var(--color-bg-hover, rgba(255, 255, 255, 0.06));
+}
+
+.surface-add-widget-menu-item-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary, #e6edf3);
+}
+
+.surface-add-widget-menu-item-desc {
+    font-size: 11px;
+    color: var(--color-text-secondary, #9aa6b2);
+}
+
+/* Calendar widget */
+.surface-calendar { display: flex; flex-direction: column; height: 100%; gap: 8px; }
+.surface-calendar-header { display: flex; align-items: center; gap: 8px; }
+.surface-calendar-title { flex: 1; font-weight: 600; font-size: 13px; }
+.surface-calendar-nav {
+    background: transparent; border: 1px solid var(--color-border);
+    border-radius: 6px; cursor: pointer; color: inherit; width: 24px; height: 24px;
+}
+.surface-calendar-grain { display: flex; gap: 4px; }
+.surface-calendar-grain button {
+    font-size: 11px; padding: 2px 8px; border-radius: 6px;
+    border: 1px solid var(--color-border); background: transparent; color: inherit; cursor: pointer;
+}
+.surface-calendar-grain button.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.surface-calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; flex: 1; min-height: 0; }
+.surface-calendar-daylabel { font-size: 10px; text-align: center; color: var(--color-text-secondary, #9aa6b2); }
+.surface-calendar-cell {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; border-radius: 6px; aspect-ratio: 1; min-height: 18px;
+}
+.surface-calendar-cell-muted { opacity: 0.35; }
+.surface-calendar-cell-active { background: color-mix(in srgb, var(--color-primary) 30%, transparent); font-weight: 600; }
+
+/* Analytics widget */
+.surface-analytics { display: flex; flex-direction: column; height: 100%; gap: 8px; }
+.surface-analytics-picker { display: flex; flex-direction: column; gap: 6px; }
+.surface-analytics-picker-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.surface-analytics-picker-row select { flex: 1; max-width: 60%; }
+.surface-analytics-chart { flex: 1; min-height: 0; }
+.surface-analytics-query-view {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-elevated);
+    padding: 12px;
+}
+.surface-analytics-query-view strong { color: var(--color-text-primary); font-size: 13px; }
+.surface-analytics-query-view span,
+.surface-analytics-query-view small { color: var(--color-text-secondary); font-size: 12px; }
+
+.surface-last-session { height: 100%; }
+
+.surface-metric-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    gap: 8px;
+}
+
+.surface-metric-picker {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.surface-metric-picker select {
+    min-width: 0;
+    max-width: 68%;
+}
+
+.surface-metric-card-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    padding: 10px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--color-bg-input, #10141b) 62%, transparent);
+}
+
+.surface-metric-value {
+    color: var(--color-brand-primary, var(--color-primary));
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.surface-metric-label {
+    color: var(--color-text-primary, #e6edf3);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.surface-metric-sub-label {
+    color: var(--color-text-secondary, #9aa6b2);
+    font-size: 11px;
+    line-height: 1.25;
+}

@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
-import { useTheme } from '../../contexts/ThemeContext'
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
-import { chartDefaults, DISABLED_CHART_ANIMATION } from './ChartJSWrapper'; // Import chartDefaults for consistent coloring
+import EmptyState from '../common/EmptyState';
+import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from './ChartJSWrapper';
 
 /**
  * GoalTimeDistribution - Stacked bar chart showing time spent working towards goals over time
@@ -21,6 +21,7 @@ function GoalTimeDistribution({
     durationMode = 'activity',
 }) {
     const { getGoalColor } = useGoalLevels();;
+    const chartTheme = useChartThemeDefaults();
 
     // Format duration in hours and minutes
     const formatDuration = (seconds) => {
@@ -168,7 +169,7 @@ function GoalTimeDistribution({
                 display: true,
                 position: 'top',
                 labels: {
-                    color: chartDefaults.textColor,
+                    color: chartTheme.textColor,
                     usePointStyle: true,
                     pointStyle: 'circle',
                     padding: 12,
@@ -177,9 +178,9 @@ function GoalTimeDistribution({
                 }
             },
             tooltip: {
-                backgroundColor: 'rgba(30, 30, 30, 0.95)', // Chart.js needs exact color often, keep dark for now or use var if supported
-                titleColor: '#fff',
-                bodyColor: '#ccc',
+                backgroundColor: chartTheme.tooltipBg,
+                titleColor: chartTheme.tooltipText,
+                bodyColor: chartTheme.tooltipBody,
                 padding: 12,
                 callbacks: {
                     title: (ctx) => {
@@ -215,17 +216,17 @@ function GoalTimeDistribution({
                 title: {
                     display: true,
                     text: 'Date',
-                    color: chartDefaults.textColor,
+                    color: chartTheme.textColor,
                     font: { size: 12 }
                 },
                 ticks: {
-                    color: chartDefaults.textColor,
+                    color: chartTheme.textColor,
                     maxRotation: 45,
                     minRotation: 0,
                     autoSkip: true,
                     maxTicksLimit: 15
                 },
-                grid: { color: chartDefaults.gridColor }
+                grid: { color: chartTheme.gridColor }
             },
             y: {
                 stacked: true,
@@ -233,17 +234,17 @@ function GoalTimeDistribution({
                 title: {
                     display: true,
                     text: 'Time (hours)',
-                    color: chartDefaults.textColor,
+                    color: chartTheme.textColor,
                     font: { size: 12 }
                 },
                 ticks: {
-                    color: chartDefaults.textColor,
+                    color: chartTheme.textColor,
                     callback: (value) => `${value}h`
                 },
-                grid: { color: chartDefaults.gridColor }
+                grid: { color: chartTheme.gridColor }
             }
         }
-    }), [chartData.sortedDates]);
+    }), [chartData.sortedDates, chartTheme]);
 
     // Empty state
     if (!chartData.datasets.length) {
@@ -265,23 +266,11 @@ function GoalTimeDistribution({
                     </h3>
                 </div>
 
-                <div style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'column',
-                    color: 'var(--color-text-muted)',
-                    padding: '40px'
-                }}>
-                    <div style={{ fontSize: '13px', marginBottom: '12px', opacity: 0.7 }}>No tracked time</div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 500, color: 'var(--color-text-secondary)', margin: 0 }}>
-                        No Time Recorded Yet
-                    </h3>
-                    <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '8px', textAlign: 'center', maxWidth: '300px' }}>
-                        Start working on goals to see time distribution over time
-                    </p>
-                </div>
+                <EmptyState
+                    compact
+                    title="No Time Recorded Yet"
+                    description="Start working on goals to see time distribution over time."
+                />
             </div>
         );
     }

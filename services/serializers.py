@@ -1,6 +1,8 @@
 import copy
 from datetime import datetime, timezone, date
 import json
+
+from account_tiers import DEFAULT_ACCOUNT_TIER
 from models import _safe_load_json
 from .goal_type_utils import get_canonical_goal_type
 from .goal_domain_rules import goal_uses_child_completion
@@ -306,6 +308,162 @@ def serialize_session_for_analytics(session):
         "sections": _serialize_session_sections_for_analytics(session),
     }
 
+
+def _canonical_session_data(session):
+    return {
+        "session_start": format_utc(session.session_start),
+        "session_end": format_utc(session.session_end),
+        "duration_minutes": session.duration_minutes,
+        "total_duration_seconds": session.total_duration_seconds,
+        "is_paused": getattr(session, 'is_paused', False),
+        "last_paused_at": format_utc(getattr(session, 'last_paused_at', None)),
+        "total_paused_seconds": getattr(session, 'total_paused_seconds', 0),
+        "completed": session.completed,
+    }
+
+
+def _merge_session_attributes(session, result_attributes):
+    """Return canonical session_data plus compatibility fields from older attrs shapes."""
+    attrs = _safe_load_json(session.attributes, {})
+    session_data = _canonical_session_data(session)
+
+    if attrs:
+        legacy_session_data = attrs.get("session_data")
+        session_data.update(copy.deepcopy(
+            legacy_session_data if isinstance(legacy_session_data, dict) else attrs
+        ))
+
+        for key, value in attrs.items():
+            if key not in result_attributes:
+                result_attributes[key] = copy.deepcopy(value)
+
+    # Relational columns win over any legacy embedded payload.
+    session_data.update(_canonical_session_data(session))
+    return session_data
+
+
+def _apply_template_metadata(session, session_data, template_payload):
+    if not isinstance(template_payload, dict):
+        return
+    if not session_data.get("template_name") and getattr(getattr(session, "template", None), "name", None):
+        session_data["template_name"] = session.template.name
+    if not session_data.get("template_color"):
+        fallback_color = get_template_color(template_payload)
+        if fallback_color:
+            session_data["template_color"] = fallback_color
+    if not session_data.get("session_type"):
+        session_data["session_type"] = get_template_session_type(template_payload)
+
+
+def _extract_legacy_activity_definition_id(item):
+    if isinstance(item, str):
+        return item
+    if not isinstance(item, dict):
+        return None
+    for key in ("activity_id", "activity_definition_id", "activityId", "activityDefinitionId", "definition_id", "id"):
+        val = item.get(key)
+        if isinstance(val, str) and val:
+            return val
+    nested = item.get("activity")
+    if isinstance(nested, dict):
+        for key in ("id", "activity_id", "activity_definition_id"):
+            val = nested.get(key)
+            if isinstance(val, str) and val:
+                return val
+    return None
+
+
+def _build_section_activity_ids(section, raw_items, instance_map, ids_by_def, used_ids, remaining_ids, section_count):
+    activity_ids = section.get("activity_ids") if isinstance(section.get("activity_ids"), list) else []
+    normalized_ids = [iid for iid in activity_ids if iid in instance_map and iid not in used_ids]
+    legacy_items_by_instance_id = {}
+
+    if normalized_ids:
+        return normalized_ids, {
+            item.get("instance_id"): item
+            for item in raw_items
+            if isinstance(item, dict) and item.get("instance_id")
+        }
+
+    for item in raw_items:
+        if not isinstance(item, dict):
+            continue
+        iid = item.get("instance_id")
+        if iid in instance_map and iid not in used_ids and iid not in normalized_ids:
+            normalized_ids.append(iid)
+            legacy_items_by_instance_id[iid] = item
+
+    if not normalized_ids:
+        for item in raw_items:
+            def_id = _extract_legacy_activity_definition_id(item)
+            if not def_id:
+                continue
+            for iid in ids_by_def.get(def_id, []):
+                if iid not in used_ids and iid not in normalized_ids:
+                    normalized_ids.append(iid)
+                    legacy_items_by_instance_id[iid] = item
+                    break
+
+    if not normalized_ids and section_count == 1:
+        normalized_ids = [iid for iid in remaining_ids if iid not in used_ids]
+
+    return normalized_ids, legacy_items_by_instance_id
+
+
+def _hydrate_session_sections_from_instances(session_sections, active_instances, serialized_activity_instances):
+    """Normalize legacy section shapes and hydrate section exercises from canonical instances."""
+    if not isinstance(session_sections, list):
+        return
+
+    instance_map = {inst.id: inst for inst in active_instances}
+    serialized_instance_map = {
+        inst_payload["id"]: inst_payload
+        for inst_payload in serialized_activity_instances
+        if isinstance(inst_payload, dict) and inst_payload.get("id")
+    }
+    remaining_ids = [inst.id for inst in active_instances]
+    used_ids = set()
+    ids_by_def = {}
+    for inst in active_instances:
+        ids_by_def.setdefault(inst.activity_definition_id, []).append(inst.id)
+
+    for section in session_sections:
+        if not isinstance(section, dict):
+            continue
+
+        raw_items = section.get("exercises") or section.get("activities") or []
+        normalized_ids, legacy_items_by_instance_id = _build_section_activity_ids(
+            section,
+            raw_items,
+            instance_map,
+            ids_by_def,
+            used_ids,
+            remaining_ids,
+            len(session_sections),
+        )
+
+        section["activity_ids"] = normalized_ids
+        used_ids.update(normalized_ids)
+
+        exercises = []
+        for inst_id in normalized_ids:
+            if inst_id not in instance_map:
+                continue
+            inst = instance_map[inst_id]
+            ex = serialize_activity_instance(inst)
+            legacy_item = legacy_items_by_instance_id.get(inst_id)
+            ex = _merge_legacy_activity_payload(ex, legacy_item)
+            if inst_id in serialized_instance_map:
+                _merge_legacy_activity_payload(serialized_instance_map[inst_id], legacy_item)
+            ex['type'] = 'activity'
+            ex['instance_id'] = inst.id
+            ex['activity_id'] = inst.activity_definition_id
+            ex['has_sets'] = len(ex.get('sets', []) or []) > 0
+            ex['has_metrics'] = (len(ex.get('metrics', []) or []) > 0) or (len(ex.get('metric_values', []) or []) > 0)
+            exercises.append(ex)
+        section["exercises"] = exercises
+
+
 def serialize_goal(goal, include_children=True):
     """Serialize a Goal object."""
     smart_status = calculate_smart_status(goal)
@@ -449,159 +607,18 @@ def serialize_session(session):
         "notes": [serialize_note(n) for n in session.notes_list if not n.deleted_at] if hasattr(session, 'notes_list') else []
     }
     
-    # Parse session data from attributes
-    attrs = _safe_load_json(session.attributes, {})
-    
-    # Initialize legacy session_data structure with canonical fields from DB
-    session_data = {
-        "session_start": format_utc(session.session_start),
-        "session_end": format_utc(session.session_end),
-        "duration_minutes": session.duration_minutes,
-        "total_duration_seconds": session.total_duration_seconds,
-        "is_paused": getattr(session, 'is_paused', False),
-        "last_paused_at": format_utc(getattr(session, 'last_paused_at', None)),
-        "total_paused_seconds": getattr(session, 'total_paused_seconds', 0),
-        "completed": session.completed,
-    }
-    
-    # Merge existing attributes:
-    # 1. If 'session_data' key exists in attrs, merge its contents
-    # 2. Otherwise merge the attrs themselves (legacy support)
-    if attrs:
-        if "session_data" in attrs and isinstance(attrs["session_data"], dict):
-            session_data.update(copy.deepcopy(attrs["session_data"]))
-        else:
-            session_data.update(copy.deepcopy(attrs))
-            
-        # Ensure top-level attributes dict has all keys for flexibility
-        for k, v in attrs.items():
-            if k not in result["attributes"]:
-                result["attributes"][k] = copy.deepcopy(v)
+    session_data = _merge_session_attributes(session, result["attributes"])
+    _apply_template_metadata(session, session_data, template_payload)
 
-    session_data.update({
-        "session_start": format_utc(session.session_start),
-        "session_end": format_utc(session.session_end),
-        "duration_minutes": session.duration_minutes,
-        "total_duration_seconds": session.total_duration_seconds,
-        "is_paused": getattr(session, 'is_paused', False),
-        "last_paused_at": format_utc(getattr(session, 'last_paused_at', None)),
-        "total_paused_seconds": getattr(session, 'total_paused_seconds', 0),
-        "completed": session.completed,
-    })
-
-    if isinstance(template_payload, dict):
-        if not session_data.get("template_name") and getattr(getattr(session, "template", None), "name", None):
-            session_data["template_name"] = session.template.name
-        if not session_data.get("template_color"):
-            fallback_color = get_template_color(template_payload)
-            if fallback_color:
-                session_data["template_color"] = fallback_color
-        if not session_data.get("session_type"):
-            session_data["session_type"] = get_template_session_type(template_payload)
-                
     result["attributes"]["session_data"] = session_data
     result["session_type"] = get_template_session_type(session_data)
     result["template_color"] = get_template_color(session_data)
 
-    # Hydrate section activity ordering + exercises from database ActivityInstances.
-    # SessionDetail renders from section.activity_ids, so normalize legacy shapes too.
-    session_sections = result["attributes"]["session_data"].get("sections")
-    if isinstance(session_sections, list):
-        instance_map = {inst.id: inst for inst in active_instances}
-        serialized_instance_map = {
-            inst_payload["id"]: inst_payload
-            for inst_payload in serialized_activity_instances
-            if isinstance(inst_payload, dict) and inst_payload.get("id")
-        }
-        remaining_ids = [inst.id for inst in active_instances]
-        used_ids = set()
-
-        def _extract_def_id(item):
-            if isinstance(item, str):
-                return item
-            if not isinstance(item, dict):
-                return None
-            for key in ("activity_id", "activity_definition_id", "activityId", "activityDefinitionId", "definition_id", "id"):
-                val = item.get(key)
-                if isinstance(val, str) and val:
-                    return val
-            nested = item.get("activity")
-            if isinstance(nested, dict):
-                for key in ("id", "activity_id", "activity_definition_id"):
-                    val = nested.get(key)
-                    if isinstance(val, str) and val:
-                        return val
-            return None
-
-        # Build definition -> instance ids map in creation order.
-        ids_by_def = {}
-        for inst in active_instances:
-            ids_by_def.setdefault(inst.activity_definition_id, []).append(inst.id)
-
-        for section in session_sections:
-            if not isinstance(section, dict):
-                continue
-
-            raw_items = section.get("exercises") or section.get("activities") or []
-            activity_ids = section.get("activity_ids") if isinstance(section.get("activity_ids"), list) else []
-            normalized_ids = [iid for iid in activity_ids if iid in instance_map and iid not in used_ids]
-            legacy_items_by_instance_id = {}
-
-            if not normalized_ids:
-                # Prefer explicit instance ids when provided.
-                for item in raw_items:
-                    if not isinstance(item, dict):
-                        continue
-                    iid = item.get("instance_id")
-                    if iid in instance_map and iid not in used_ids and iid not in normalized_ids:
-                        normalized_ids.append(iid)
-                        legacy_items_by_instance_id[iid] = item
-
-                # Otherwise map template activity definitions to first unused instances.
-                if not normalized_ids:
-                    for item in raw_items:
-                        def_id = _extract_def_id(item)
-                        if not def_id:
-                            continue
-                        for iid in ids_by_def.get(def_id, []):
-                            if iid not in used_ids and iid not in normalized_ids:
-                                normalized_ids.append(iid)
-                                legacy_items_by_instance_id[iid] = item
-                                break
-
-                # Last-resort: if only one section, include all remaining instances.
-                if not normalized_ids and len(session_sections) == 1:
-                    normalized_ids = [iid for iid in remaining_ids if iid not in used_ids]
-            else:
-                raw_items_by_instance_id = {}
-                for item in raw_items:
-                    if not isinstance(item, dict):
-                        continue
-                    iid = item.get("instance_id")
-                    if iid:
-                        raw_items_by_instance_id[iid] = item
-                legacy_items_by_instance_id = raw_items_by_instance_id
-
-            section["activity_ids"] = normalized_ids
-            for iid in normalized_ids:
-                used_ids.add(iid)
-
-            exercises = []
-            for inst_id in normalized_ids:
-                if inst_id in instance_map:
-                    inst = instance_map[inst_id]
-                    ex = serialize_activity_instance(inst)
-                    legacy_item = legacy_items_by_instance_id.get(inst_id)
-                    ex = _merge_legacy_activity_payload(ex, legacy_item)
-                    if inst_id in serialized_instance_map:
-                        _merge_legacy_activity_payload(serialized_instance_map[inst_id], legacy_item)
-                    ex['type'] = 'activity'
-                    ex['instance_id'] = inst.id
-                    ex['activity_id'] = inst.activity_definition_id
-                    ex['has_sets'] = len(ex.get('sets', []) or []) > 0
-                    ex['has_metrics'] = (len(ex.get('metrics', []) or []) > 0) or (len(ex.get('metric_values', []) or []) > 0)
-                    exercises.append(ex)
-            section["exercises"] = exercises
+    _hydrate_session_sections_from_instances(
+        result["attributes"]["session_data"].get("sections"),
+        active_instances,
+        serialized_activity_instances,
+    )
     
     # Hydrate canonical session goals across every goal level.
     goals_source = getattr(session, '_derived_goals', None)
@@ -686,7 +703,7 @@ def serialize_user(user):
         "role": getattr(user, "role", "user") or "user",
         "is_admin": bool(getattr(user, "is_admin", False)),
         "preferences": _safe_load_json(user.preferences, {}),
-        "membership_tier": getattr(user, "membership_tier", "free") or "free",
+        "membership_tier": getattr(user, "membership_tier", DEFAULT_ACCOUNT_TIER) or DEFAULT_ACCOUNT_TIER,
         "subscription_status": getattr(user, "subscription_status", "none") or "none",
         "paid_amount_cad_cents": getattr(user, "paid_amount_cad_cents", None),
         "storage_limit_bytes": getattr(user, "storage_limit_bytes", None),
@@ -964,9 +981,25 @@ def serialize_analytics_dashboard(dashboard):
         "root_id": dashboard.root_id,
         "user_id": dashboard.user_id,
         "name": dashboard.name,
+        "kind": dashboard.kind or "dashboard",
         "layout": dashboard.layout,
         "created_at": format_utc(dashboard.created_at),
         "updated_at": format_utc(dashboard.updated_at),
+    }
+
+def serialize_page_surface_layout(layout):
+    """Serialize a PageSurfaceLayout object."""
+    return {
+        "id": layout.id,
+        "root_id": layout.root_id,
+        "user_id": layout.user_id,
+        "page": layout.page,
+        "name": layout.name,
+        "is_default": bool(layout.is_default),
+        "desktop_config": layout.desktop_config,
+        "mobile_config": layout.mobile_config,
+        "created_at": format_utc(layout.created_at),
+        "updated_at": format_utc(layout.updated_at),
     }
 
 def serialize_event_log(log):

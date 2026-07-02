@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef, Suspense } from 'react';
-import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
 import { HeaderProvider, useHeader } from './contexts/HeaderContext';
+import { useAuth } from './contexts/AuthContext';
 import { useRootGoal } from './hooks/useGoalQueries';
 import useIsMobile from './hooks/useIsMobile';
 import { lazyWithRetry } from './utils/lazyWithRetry';
@@ -8,6 +10,8 @@ import { getViewportMetaContent, shouldAllowZoom } from './utils/viewportMeta';
 import styles from './AppRouter.module.css';
 import './App.css';
 import GoalIcon from './components/atoms/GoalIcon';
+import { globalApi } from './utils/api';
+import { queryKeys } from './hooks/queryKeys';
 
 // Import page components
 import Selection from './pages/Selection';
@@ -35,11 +39,175 @@ import { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } fro
 
 export { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } from './utils/marketingHost';
 
+function getFractalSwitchPath(pathname, nextRootId) {
+    const pathParts = pathname.split('/').filter(Boolean);
+    const section = pathParts[1];
+    const knownSection = {
+        analytics: 'analytics',
+        'create-session': 'create-session',
+        goals: 'goals',
+        logs: 'logs',
+        notes: 'notes',
+        programs: 'programs',
+        session: 'sessions',
+        sessions: 'sessions',
+    }[section] || 'goals';
+
+    return `/${nextRootId}/${knownSection}`;
+}
+
+function getFractalDisplay(fractal, rootGoal, goalLevels) {
+    const level = fractal?.display_level || null;
+    const type = fractal?.type || rootGoal?.attributes?.type || rootGoal?.type;
+    const isSmart = Boolean(fractal?.is_smart ?? fractal?.attributes?.is_smart ?? rootGoal?.attributes?.is_smart ?? rootGoal?.is_smart);
+
+    return {
+        name: fractal?.name || rootGoal?.name || 'Fractal Goals',
+        shape: level?.icon || (type ? goalLevels.getGoalIcon(type) : null) || 'circle',
+        color: level?.color || (type ? goalLevels.getGoalColor(type) : null),
+        secondaryColor: level?.secondary_color || (type ? goalLevels.getGoalSecondaryColor(type) : null),
+        isSmart,
+        type,
+    };
+}
+
+function FractalSwitcher({
+    rootId,
+    rootGoal,
+    isFractalRoute,
+    isMobile,
+    onSwitch,
+}) {
+    const location = useLocation();
+    const navigate = useNavigate();
+    const { user, isAuthenticated } = useAuth();
+    const goalLevels = useGoalLevels();
+    const [isOpen, setIsOpen] = useState(false);
+    const switcherRef = useRef(null);
+    const userId = user?.id || null;
+
+    const fractalsQuery = useQuery({
+        queryKey: queryKeys.fractals(userId),
+        queryFn: async () => {
+            const res = await globalApi.getAllFractals();
+            return res.data || [];
+        },
+        enabled: Boolean(isFractalRoute && isAuthenticated && userId),
+    });
+
+    const fractals = useMemo(() => (
+        Array.isArray(fractalsQuery.data) ? fractalsQuery.data : []
+    ), [fractalsQuery.data]);
+    const switchableFractals = useMemo(() => (
+        fractals.filter((fractal) => fractal.id !== rootId)
+    ), [fractals, rootId]);
+    const currentFractal = fractals.find((fractal) => fractal.id === rootId) || null;
+    const currentDisplay = getFractalDisplay(currentFractal, rootGoal, goalLevels);
+    const menuId = `fractal-switcher-menu-${rootId}`;
+
+    useEffect(() => {
+        if (!isOpen) return undefined;
+
+        const handlePointerDown = (event) => {
+            if (switcherRef.current && !switcherRef.current.contains(event.target)) {
+                setIsOpen(false);
+            }
+        };
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                setIsOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isOpen]);
+
+    useEffect(() => {
+        setIsOpen(false);
+    }, [location.pathname]);
+
+    const handleSelectFractal = (nextRootId) => {
+        if (!nextRootId || nextRootId === rootId) {
+            setIsOpen(false);
+            return;
+        }
+
+        onSwitch();
+        navigate(getFractalSwitchPath(location.pathname, nextRootId));
+    };
+
+    return (
+        <div className={`${styles.fractalSwitcher} ${isMobile ? styles.fractalSwitcherMobile : ''}`} ref={switcherRef}>
+            <button
+                type="button"
+                className={styles.fractalSwitcherButton}
+                aria-haspopup="menu"
+                aria-expanded={isOpen}
+                aria-controls={menuId}
+                aria-label={`Switch fractal. Current fractal: ${currentDisplay.name}`}
+                onClick={() => setIsOpen((value) => !value)}
+            >
+                {currentDisplay.type && (
+                    <GoalIcon
+                        shape={currentDisplay.shape}
+                        color={currentDisplay.color}
+                        secondaryColor={currentDisplay.secondaryColor}
+                        isSmart={currentDisplay.isSmart}
+                        size={isMobile ? 18 : 22}
+                        className={styles.fractalTitleIcon}
+                    />
+                )}
+                <span className={`fractal-title ${styles.fractalTitle}`}>{currentDisplay.name}</span>
+                <span className={styles.fractalSwitcherChevron} aria-hidden="true">▾</span>
+            </button>
+
+            {isOpen && (
+                <div className={styles.fractalSwitcherMenu} id={menuId} role="menu" aria-label="Available fractals">
+                    {fractalsQuery.isLoading && (
+                        <div className={styles.fractalSwitcherStatus}>Loading fractals...</div>
+                    )}
+                    {!fractalsQuery.isLoading && switchableFractals.length === 0 && (
+                        <div className={styles.fractalSwitcherStatus}>No other fractals available</div>
+                    )}
+                    {!fractalsQuery.isLoading && switchableFractals.map((fractal) => {
+                        const display = getFractalDisplay(fractal, null, goalLevels);
+                        return (
+                            <button
+                                key={fractal.id}
+                                type="button"
+                                role="menuitem"
+                                className={styles.fractalSwitcherItem}
+                                onClick={() => handleSelectFractal(fractal.id)}
+                            >
+                                <GoalIcon
+                                    shape={display.shape}
+                                    color={display.color}
+                                    secondaryColor={display.secondaryColor}
+                                    isSmart={display.isSmart}
+                                    size={22}
+                                    className={styles.fractalSwitcherItemIcon}
+                                />
+                                <span className={`fractal-title ${styles.fractalTitle} ${styles.fractalSwitcherItemName}`}>
+                                    {display.name}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
+
 // Navigation header component defined outside of App to avoid re-declaration
-const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
+export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
     const location = useLocation();
     const { headerActions } = useHeader();
-    const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
     const isMobile = useIsMobile();
     const navRef = useRef(null);
 
@@ -53,12 +221,6 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
     );
 
     const { data: rootGoal } = useRootGoal(rootId, { enabled: isFractalRoute });
-    const fractalName = rootGoal?.name || 'Fractal Goals';
-    const rootGoalType = rootGoal?.attributes?.type || rootGoal?.type;
-    const rootGoalIsSmart = Boolean(rootGoal?.attributes?.is_smart ?? rootGoal?.is_smart);
-    const rootGoalColor = rootGoalType ? getGoalColor(rootGoalType) : null;
-    const rootGoalSecondaryColor = rootGoalType ? getGoalSecondaryColor(rootGoalType) : null;
-    const rootGoalIcon = rootGoalType ? getGoalIcon(rootGoalType) : 'circle';
 
     useEffect(() => {
         if (typeof onHeightChange !== 'function') {
@@ -113,12 +275,22 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
         dismissGoalDetailsForNavigation();
         onOpenSettings();
     };
+    const handleSwitchFractal = () => {
+        dismissGoalDetailsForNavigation();
+    };
 
     if (isMobile) {
         return (
             <div className="top-nav-links" ref={navRef}>
                 <div className={styles.mobileNav}>
                     <div className={styles.mobileControlsRow}>
+                        <FractalSwitcher
+                            rootId={rootId}
+                            rootGoal={rootGoal}
+                            isFractalRoute={isFractalRoute}
+                            isMobile
+                            onSwitch={handleSwitchFractal}
+                        />
                         <Link
                             to={`/${rootId}/create-session`}
                             className={`${styles.addSessionBtn} ${styles.mobileBtn} ${styles.mobileTopAddBtn}`}
@@ -164,19 +336,12 @@ const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
             <div className="nav-group">
                 {/* Left Side: Title and Primary Nav */}
                 <div className={styles.navContainer}>
-                    <span className={styles.fractalTitleWrap}>
-                        {rootGoalType && (
-                            <GoalIcon
-                                shape={rootGoalIcon}
-                                color={rootGoalColor}
-                                secondaryColor={rootGoalSecondaryColor}
-                                isSmart={rootGoalIsSmart}
-                                size={22}
-                                className={styles.fractalTitleIcon}
-                            />
-                        )}
-                        <span className={`fractal-title ${styles.fractalTitle}`}>{fractalName}</span>
-                    </span>
+                    <FractalSwitcher
+                        rootId={rootId}
+                        rootGoal={rootGoal}
+                        isFractalRoute={isFractalRoute}
+                        onSwitch={handleSwitchFractal}
+                    />
 
                     <Link
                         to={`/${rootId}/create-session`}

@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 
-import { chartDefaults, DISABLED_CHART_ANIMATION } from './ChartJSWrapper';
+import EmptyState from '../common/EmptyState';
+import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from './ChartJSWrapper';
+import { formatDurationSeconds } from '../../utils/formatters';
 
 const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444', '#64748b'];
 const DEFAULT_TIME_MARKERS = ['start'];
@@ -12,26 +14,16 @@ function getSessionDate(session) {
     return date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
-function formatDuration(seconds = 0) {
-    const total = Math.max(0, Math.round(seconds || 0));
-    const hours = Math.floor(total / 3600);
-    const minutes = Math.round((total % 3600) / 60);
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-}
-
 function EmptyChart({ title, children = 'No data available yet' }) {
     return (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
             {title && <h3 style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)' }}>{title}</h3>}
-            <div style={{ flex: 1, display: 'grid', placeItems: 'center', color: 'var(--color-text-muted)', fontSize: 13, textAlign: 'center' }}>
-                {children}
-            </div>
+            <EmptyState compact description={children} />
         </div>
     );
 }
 
-function chartScaffoldOptions(title, yAxisLabel, isTimeScale = false) {
+function chartScaffoldOptions(title, yAxisLabel, chartTheme, isTimeScale = false) {
     return {
         responsive: true,
         maintainAspectRatio: false,
@@ -40,13 +32,13 @@ function chartScaffoldOptions(title, yAxisLabel, isTimeScale = false) {
             legend: {
                 display: true,
                 position: 'top',
-                labels: { color: chartDefaults.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
+                labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
             },
-            title: { display: Boolean(title), text: title, color: chartDefaults.textColor },
+            title: { display: Boolean(title), text: title, color: chartTheme.textColor },
             tooltip: {
-                backgroundColor: 'rgba(30, 30, 30, 0.95)',
-                titleColor: '#fff',
-                bodyColor: '#ddd',
+                backgroundColor: chartTheme.tooltipBg,
+                titleColor: chartTheme.tooltipText,
+                bodyColor: chartTheme.tooltipBody,
                 padding: 12,
             },
         },
@@ -54,20 +46,21 @@ function chartScaffoldOptions(title, yAxisLabel, isTimeScale = false) {
             x: {
                 type: isTimeScale ? 'time' : 'category',
                 time: isTimeScale ? { unit: 'day', displayFormats: { day: 'MMM d' } } : undefined,
-                ticks: { color: chartDefaults.textColor },
-                grid: { color: chartDefaults.gridColor },
+                ticks: { color: chartTheme.textColor },
+                grid: { color: chartTheme.gridColor },
             },
             y: {
                 beginAtZero: true,
-                title: { display: Boolean(yAxisLabel), text: yAxisLabel, color: chartDefaults.textColor },
-                ticks: { color: chartDefaults.textColor },
-                grid: { color: chartDefaults.gridColor },
+                title: { display: Boolean(yAxisLabel), text: yAxisLabel, color: chartTheme.textColor },
+                ticks: { color: chartTheme.textColor },
+                grid: { color: chartTheme.gridColor },
             },
         },
     };
 }
 
 export function SessionSectionPie({ sessions = [], activityInstances = {}, chartRef }) {
+    const chartTheme = useChartThemeDefaults();
     const data = useMemo(() => {
         const instanceDurations = new Map();
         Object.values(activityInstances).flat().forEach((instance) => {
@@ -97,9 +90,9 @@ export function SessionSectionPie({ sessions = [], activityInstances = {}, chart
                 maintainAspectRatio: false,
                 ...DISABLED_CHART_ANIMATION,
                 plugins: {
-                    legend: { position: 'right', labels: { color: chartDefaults.textColor, usePointStyle: true, boxWidth: 8 } },
-                    title: { display: true, text: 'Time Spent By Session Section', color: chartDefaults.textColor },
-                    tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatDuration(ctx.raw)}` } },
+                    legend: { position: 'right', labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8 } },
+                    title: { display: true, text: 'Time Spent By Session Section', color: chartTheme.textColor },
+                    tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatDurationSeconds(ctx.raw)}` } },
                 },
             }}
         />
@@ -107,6 +100,7 @@ export function SessionSectionPie({ sessions = [], activityInstances = {}, chart
 }
 
 export function GoalCompletionRateByLevel({ goals = [], chartRef }) {
+    const chartTheme = useChartThemeDefaults();
     const data = useMemo(() => {
         const counts = new Map();
         goals.forEach((goal) => {
@@ -123,10 +117,11 @@ export function GoalCompletionRateByLevel({ goals = [], chartRef }) {
         return { labels: rows.map((row) => row.label), datasets: [{ label: 'Completion rate', data: rows.map((row) => row.rate), backgroundColor: palette[1] }] };
     }, [goals]);
     if (!data.labels.length) return <EmptyChart title="Goal Completion Rate By Level" />;
-    return <Bar ref={chartRef} data={data} options={chartScaffoldOptions('Goal Completion Rate By Level', 'Percent')} />;
+    return <Bar ref={chartRef} data={data} options={chartScaffoldOptions('Goal Completion Rate By Level', 'Percent', chartTheme)} />;
 }
 
 export function GoalAgingChart({ goals = [], chartRef }) {
+    const chartTheme = useChartThemeDefaults();
     const data = useMemo(() => {
         const buckets = [['0-7 days', 0], ['8-30 days', 0], ['31-90 days', 0], ['90+ days', 0]];
         goals.filter((goal) => !goal.completed).forEach((goal) => {
@@ -138,10 +133,11 @@ export function GoalAgingChart({ goals = [], chartRef }) {
         });
         return { labels: buckets.map(([label]) => label), datasets: [{ label: 'Active goals', data: buckets.map(([, count]) => count), backgroundColor: palette[2] }] };
     }, [goals]);
-    return <Bar ref={chartRef} data={data} options={chartScaffoldOptions('Active Goal Aging', 'Goals')} />;
+    return <Bar ref={chartRef} data={data} options={chartScaffoldOptions('Active Goal Aging', 'Goals', chartTheme)} />;
 }
 
 export function GoalMomentumChart({ goals = [], chartRef }) {
+    const chartTheme = useChartThemeDefaults();
     const data = useMemo(() => {
         const rows = goals
             .map((goal) => ({ label: goal.name, seconds: (goal.activity_durations_by_date || []).reduce((sum, item) => sum + (item.duration_seconds || 0), 0) }))
@@ -151,7 +147,7 @@ export function GoalMomentumChart({ goals = [], chartRef }) {
         return { labels: rows.map((row) => row.label), datasets: [{ label: 'Activity time', data: rows.map((row) => Math.round(row.seconds / 60)), backgroundColor: palette[3] }] };
     }, [goals]);
     if (!data.labels.length) return <EmptyChart title="Goal Momentum" />;
-    return <Bar ref={chartRef} data={data} options={{ ...chartScaffoldOptions('Goal Momentum', 'Minutes'), indexAxis: 'y' }} />;
+    return <Bar ref={chartRef} data={data} options={{ ...chartScaffoldOptions('Goal Momentum', 'Minutes', chartTheme), indexAxis: 'y' }} />;
 }
 
 export function StaleGoalsChart({ goals = [] }) {
@@ -215,10 +211,11 @@ export function buildSessionTimeDistributionData(sessions = [], markers = DEFAUL
 }
 
 export function SessionStartDistribution({ sessions = [], chartRef, markers = DEFAULT_TIME_MARKERS }) {
+    const chartTheme = useChartThemeDefaults();
     const data = useMemo(() => {
         return buildSessionTimeDistributionData(sessions, markers);
     }, [markers, sessions]);
-    return <Bar ref={chartRef} data={data} options={chartScaffoldOptions('Session Start and End Time Distribution', 'Sessions')} />;
+    return <Bar ref={chartRef} data={data} options={chartScaffoldOptions('Session Start and End Time Distribution', 'Sessions', chartTheme)} />;
 }
 
 function formatMinutesLabel(value) {
@@ -265,13 +262,15 @@ export function buildSessionDurationHistogramData(sessions = [], bucketCount = 5
 }
 
 export function SessionDurationHistogram({ sessions = [], chartRef, bucketCount = 5 }) {
+    const chartTheme = useChartThemeDefaults();
     const data = useMemo(() => {
         return buildSessionDurationHistogramData(sessions, bucketCount);
     }, [bucketCount, sessions]);
-    return <Bar ref={chartRef} data={data} options={chartScaffoldOptions('Session Duration Histogram', 'Sessions')} />;
+    return <Bar ref={chartRef} data={data} options={chartScaffoldOptions('Session Duration Histogram', 'Sessions', chartTheme)} />;
 }
 
 export function ActivityGroupMixChart({ activities = [], activityGroups = [], activityInstances = {}, chartRef }) {
+    const chartTheme = useChartThemeDefaults();
     const data = useMemo(() => {
         const groups = new Map(activityGroups.map((group) => [group.id, group.name]));
         const totals = new Map();
@@ -284,5 +283,5 @@ export function ActivityGroupMixChart({ activities = [], activityGroups = [], ac
         return { labels: rows.map(([label]) => label), datasets: [{ data: rows.map(([, count]) => count), backgroundColor: rows.map((_, index) => palette[index % palette.length]), borderWidth: 0 }] };
     }, [activities, activityGroups, activityInstances]);
     if (!data.labels.length) return <EmptyChart title="Activity Mix By Group" />;
-    return <Doughnut ref={chartRef} data={data} options={{ responsive: true, maintainAspectRatio: false, ...DISABLED_CHART_ANIMATION, plugins: { legend: { position: 'right', labels: { color: chartDefaults.textColor, usePointStyle: true, boxWidth: 8 } }, title: { display: true, text: 'Activity Mix By Group', color: chartDefaults.textColor } } }} />;
+    return <Doughnut ref={chartRef} data={data} options={{ responsive: true, maintainAspectRatio: false, ...DISABLED_CHART_ANIMATION, plugins: { legend: { position: 'right', labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8 } }, title: { display: true, text: 'Activity Mix By Group', color: chartTheme.textColor } } }} />;
 }

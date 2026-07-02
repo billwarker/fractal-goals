@@ -222,7 +222,7 @@ def test_create_block_accepts_camel_case_dates(db_session, sample_program, sampl
 def test_create_block_emits_program_block_created_event(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
     root_id = sample_goal_hierarchy['ultimate'].id
     emitted = []
-    monkeypatch.setattr("services.programs.event_bus.emit", lambda event: emitted.append(event))
+    monkeypatch.setattr("services.events.event_bus.emit", lambda event: emitted.append(event))
 
     block_res = ProgramService.create_block(db_session, root_id, sample_program.id, {
         'name': 'Emitted Block',
@@ -247,7 +247,7 @@ def test_update_block_emits_program_block_updated_event(db_session, sample_progr
     db_session.commit()
 
     emitted = []
-    monkeypatch.setattr("services.programs.event_bus.emit", lambda event: emitted.append(event))
+    monkeypatch.setattr("services.events.event_bus.emit", lambda event: emitted.append(event))
 
     result = ProgramService.update_block(db_session, root_id, sample_program.id, block.id, {
         'name': 'Updated Block',
@@ -300,9 +300,9 @@ def test_schedule_block_day_emits_program_day_scheduled_event(db_session, sample
     db_session.commit()
 
     emitted = []
-    monkeypatch.setattr("services.programs.event_bus.emit", lambda event: emitted.append(event))
+    monkeypatch.setattr("services.events.event_bus.emit", lambda event: emitted.append(event))
     monkeypatch.setattr(
-        "services.programs.SessionService.create_session",
+        "services.session_service.SessionService.create_session",
         lambda self, root_id, current_user_id, payload: (
             {'id': 'session-1', 'name': payload['name']},
             None,
@@ -351,7 +351,7 @@ def test_unschedule_block_day_occurrence_emits_program_day_unscheduled_event(db_
     db_session.commit()
 
     emitted = []
-    monkeypatch.setattr("services.programs.event_bus.emit", lambda event: emitted.append(event))
+    monkeypatch.setattr("services.events.event_bus.emit", lambda event: emitted.append(event))
 
     result = ProgramService.unschedule_block_day_occurrence(
         db_session,
@@ -384,7 +384,7 @@ def test_unschedule_block_day_occurrence_skips_unscheduled_event_when_nothing_ma
     db_session.commit()
 
     emitted = []
-    monkeypatch.setattr("services.programs.event_bus.emit", lambda event: emitted.append(event))
+    monkeypatch.setattr("services.events.event_bus.emit", lambda event: emitted.append(event))
 
     result = ProgramService.unschedule_block_day_occurrence(
         db_session,
@@ -624,7 +624,7 @@ def test_check_program_day_completion_queues_events_until_commit(
 
     emitted = []
     pending_events = []
-    monkeypatch.setattr("services.programs.event_bus.emit", lambda event: emitted.append(event.name))
+    monkeypatch.setattr("services.events.event_bus.emit", lambda event: emitted.append(event.name))
 
     is_complete = ProgramService.check_program_day_completion(
         db_session,

@@ -2,10 +2,36 @@
 
 Utility scripts for database management, debugging, and data generation.
 
+> ## ⚠️ Status & scope (read first)
+>
+> **Schema migrations are owned by Alembic** (`migrations/versions/`), not this
+> directory. The schema-mutating scripts here predate Alembic (which landed
+> 2026-01-17) and are **historical / reference-only** — do NOT run them against a
+> current database. They are kept in place (paths unchanged) because the
+> migration runbooks in `docs/migrations/` link to them.
+>
+> ### Historical — superseded by Alembic, do not run
+> - All of `migrations/` (`migrate_to_db.py`, `migrate_add_*.py`,
+>   `backfill_goal_levels.py`, `fix_activity_instances_constraint.py`, …)
+> - Top-level one-off migrations: `migrate_smart_goals.py`,
+>   `migrate_add_notes_table.py`, `migrate_add_image_to_notes.py`
+> - `utilities/` schema mutators: `add_metric_flags.py`,
+>   `add_metrics_multiplicative_column.py`, `add_updated_at_column.py`,
+>   `update_schema.py`, `init_new_tables.py`, `recreate_program_tables.py`
+>
+> ### Still operational — safe to use
+> - `debug/` and `utilities/inspect_*` / `list_*` / `get_*` — read-only inspection
+> - `demo-data/` — sample data generation for dev DBs
+> - Data-only backfills/cleanups that are not schema changes (e.g.
+>   `recompute_session_template_stats.py`, `utilities/cleanup_empty_days.py`,
+>   `utilities/resync_programs.py`) — review before running; dev DB first.
+>
+> **New schema change?** Add an Alembic revision (`db_migrate.py`), never a script here.
+
 ## Directory Structure
 
-### `/migrations/`
-**Purpose:** Database schema migration scripts.
+### `/migrations/` *(historical — see status note above)*
+**Purpose:** Pre-Alembic database schema migration scripts. Superseded by `migrations/versions/`.
 
 **Usage:**
 ```bash

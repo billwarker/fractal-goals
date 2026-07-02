@@ -10,6 +10,7 @@ import useIsMobile from '../hooks/useIsMobile';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
 import styles from './GoalCharacteristicsSettings.module.css';
+import { logError } from '../utils/logger';
 
 const GoalCharacteristicsSettings = () => {
     const { goalLevels, updateGoalLevel, resetGoalLevel } = useGoalLevels();
@@ -51,7 +52,7 @@ const GoalCharacteristicsSettings = () => {
                 return next;
             });
         } catch (error) {
-            console.error(error);
+            logError(error);
             notify.error(`Failed to save settings: ${formatError(error)}`);
         }
     };
@@ -375,7 +376,7 @@ const CompletedGoalSettingsCard = ({ user, setUser, animatedIcons, isMobile }) =
             notify.success('Completed goal colors saved.');
             setEdits({});
         } catch (error) {
-            console.error(error);
+            logError(error);
             notify.error(`Failed to save settings: ${formatError(error)}`);
         }
     };

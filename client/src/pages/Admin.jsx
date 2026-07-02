@@ -1,9 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { adminApi } from '../utils/api';
+import {
+    ACCOUNT_TIERS,
+    DEFAULT_ACCOUNT_TIER,
+} from '../constants/accountTiers';
+import BetaSignupsPanel from '../components/admin/BetaSignupsPanel';
+import TierQuotasPanel from '../components/admin/TierQuotasPanel';
 import { useAuth } from '../contexts/AuthContext';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
+import { adminApi } from '../utils/api';
 import notify from '../utils/notify';
 import { formatError } from '../utils/mutationNotify';
 import { getLandingPageHref } from '../utils/marketingHost';
@@ -14,16 +20,7 @@ const ADMIN_SUMMARY_KEY = ['admin', 'summary'];
 const ADMIN_INVITES_KEY = ['admin', 'invite-keys'];
 const ADMIN_TIER_QUOTAS_KEY = ['admin', 'tier-quotas'];
 const ADMIN_LANDING_EXAMPLES_KEY = ['admin', 'landing-examples'];
-const ADMIN_BETA_SIGNUPS_KEY = ['admin', 'beta-signups'];
 const QUOTA_PLACEHOLDER = '{"goals": 100, "sessions": 500}';
-
-const BETA_STATUS_FILTERS = [
-    { key: '', label: 'All' },
-    { key: 'new', label: 'New' },
-    { key: 'invited', label: 'Invited' },
-    { key: 'dismissed', label: 'Dismissed' },
-];
-const BETA_NEXT_STATUS = ['new', 'invited', 'dismissed'];
 
 const formatDate = (value) => value ? new Date(value).toLocaleString() : 'Never';
 const formatBytes = (bytes) => {
@@ -40,7 +37,7 @@ const formatBytes = (bytes) => {
 const formatQuotaJson = (value) => JSON.stringify(value || {}, null, 2);
 const getTierDefaultQuotas = (user, tier) => {
     const defaults = user?.tier_default_limits || {};
-    const tierDefaults = defaults[tier] ?? defaults.free ?? {};
+    const tierDefaults = defaults[tier] ?? defaults[DEFAULT_ACCOUNT_TIER] ?? {};
     return tierDefaults || {};
 };
 
@@ -86,160 +83,6 @@ function StorageEditor({ user }) {
             <span>MB</span>
             <button onClick={() => mutation.mutate()} disabled={mutation.isPending}>Save</button>
         </div>
-    );
-}
-
-function TierQuotasPanel({ tierQuotasQuery }) {
-    const queryClient = useQueryClient();
-    const [selectedTier, setSelectedTier] = useState('free');
-    const [quotaDraft, setQuotaDraft] = useState('{}');
-    const [storageDraftMb, setStorageDraftMb] = useState('100');
-    const [applyExistingUsers, setApplyExistingUsers] = useState(false);
-
-    const tierDefaultLimits = tierQuotasQuery.data?.tier_default_limits || {};
-    const tierStorageLimitBytes = tierQuotasQuery.data?.tier_storage_limit_bytes || {};
-    const tierOptions = useMemo(() => Object.keys(tierDefaultLimits), [tierDefaultLimits]);
-    const editableTiers = tierQuotasQuery.data?.editable_tiers || ['free', 'paid'];
-    const unlimitedTiers = tierQuotasQuery.data?.unlimited_tiers || ['legacy'];
-    const selectedTierIsUnlimited = unlimitedTiers.includes(selectedTier);
-
-    React.useEffect(() => {
-        if (!tierQuotasQuery.data) return;
-        if (!Object.prototype.hasOwnProperty.call(tierDefaultLimits, selectedTier)) {
-            setSelectedTier(editableTiers[0] || tierOptions[0] || 'free');
-            return;
-        }
-        const limits = tierDefaultLimits[selectedTier];
-        setQuotaDraft(limits === null || limits === undefined ? 'null' : formatQuotaJson(limits));
-        const storageBytes = tierStorageLimitBytes[selectedTier];
-        setStorageDraftMb(storageBytes === null || storageBytes === undefined ? 'unlimited' : String(Math.round(storageBytes / 1048576)));
-    }, [editableTiers, selectedTier, tierDefaultLimits, tierOptions, tierQuotasQuery.data, tierStorageLimitBytes]);
-
-    const mutation = useMutation({
-        mutationFn: () => {
-            const parsed = JSON.parse(quotaDraft);
-            return adminApi.updateTierQuotas({
-                tier: selectedTier,
-                limits: parsed,
-                storage_limit_bytes: Math.max(0, Number(storageDraftMb || 0)) * 1048576,
-                apply_existing_users: applyExistingUsers,
-            });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ADMIN_TIER_QUOTAS_KEY });
-            queryClient.invalidateQueries({ queryKey: ADMIN_USERS_KEY });
-            queryClient.invalidateQueries({ queryKey: ADMIN_SUMMARY_KEY });
-            notify.success('Tier quotas updated');
-        },
-        onError: (error) => notify.error(`Failed to update tier quotas: ${formatError(error)}`),
-    });
-
-    const saveTierQuotas = () => {
-        if (selectedTierIsUnlimited || !editableTiers.includes(selectedTier)) {
-            notify.error('Legacy tier is unlimited and cannot be assigned finite default quotas');
-            return;
-        }
-        try {
-            const parsed = JSON.parse(quotaDraft);
-            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-                notify.error('Tier quota JSON must be an object');
-                return;
-            }
-        } catch {
-                notify.error('Tier quota JSON must be valid JSON');
-                return;
-            }
-        const storageMb = Number(storageDraftMb);
-        if (!Number.isFinite(storageMb) || storageMb < 0) {
-            notify.error('Storage MB must be a non-negative number');
-            return;
-        }
-        mutation.mutate();
-    };
-
-    if (tierQuotasQuery.isLoading) {
-        return <div className={styles.status}>Loading tier quotas...</div>;
-    }
-
-    if (tierQuotasQuery.isError) {
-        return <div className={styles.status}>Failed to load tier quotas.</div>;
-    }
-
-    return (
-        <section className={styles.section}>
-            <div className={styles.tierQuotaEditor}>
-                <div className={styles.tierQuotaHeader}>
-                    <div>
-                        <h2>Tier Quotas</h2>
-                        <p>Manage default resource quotas for account tiers.</p>
-                    </div>
-                    <label>
-                        <span>Tier</span>
-                        <select value={selectedTier} onChange={(event) => setSelectedTier(event.target.value)}>
-                            {tierOptions.map((tier) => (
-                                <option key={tier} value={tier}>{tier}</option>
-                            ))}
-                        </select>
-                    </label>
-                </div>
-
-                <label className={styles.tierQuotaStorageField}>
-                    <span>Default Storage MB</span>
-                    <input
-                        type="number"
-                        min="0"
-                        value={storageDraftMb}
-                        onChange={(event) => setStorageDraftMb(event.target.value)}
-                        disabled={selectedTierIsUnlimited}
-                    />
-                </label>
-
-                <label className={styles.tierQuotaJsonField}>
-                    <span>Default Quotas JSON</span>
-                    <textarea
-                        value={quotaDraft}
-                        onChange={(event) => setQuotaDraft(event.target.value)}
-                        rows={12}
-                        disabled={selectedTierIsUnlimited}
-                    />
-                </label>
-
-                {selectedTierIsUnlimited ? (
-                    <div className={styles.tierQuotaNotice}>
-                        Legacy remains unlimited. Use user-specific quota overrides if an individual legacy account needs finite limits.
-                    </div>
-                ) : (
-                    <div className={styles.tierQuotaApplyPanel}>
-                        <label>
-                            <input
-                                type="radio"
-                                name="tier-quota-apply"
-                                checked={!applyExistingUsers}
-                                onChange={() => setApplyExistingUsers(false)}
-                            />
-                            <span>New users only</span>
-                        </label>
-                        <label>
-                            <input
-                                type="radio"
-                                name="tier-quota-apply"
-                                checked={applyExistingUsers}
-                                onChange={() => setApplyExistingUsers(true)}
-                            />
-                            <span>Apply to existing users in this tier</span>
-                        </label>
-                    </div>
-                )}
-
-                <button
-                    className={styles.tierQuotaSaveButton}
-                    onClick={saveTierQuotas}
-                    disabled={mutation.isPending || selectedTierIsUnlimited}
-                >
-                    {mutation.isPending ? 'Saving...' : 'Save Tier Quotas'}
-                </button>
-            </div>
-        </section>
     );
 }
 
@@ -654,7 +497,7 @@ function LandingExamplesPanel() {
 
 function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generatedPassword }) {
     const [activeTab, setActiveTab] = useState('account');
-    const [tierDraft, setTierDraft] = useState(user?.membership_tier || 'free');
+    const [tierDraft, setTierDraft] = useState(user?.membership_tier || DEFAULT_ACCOUNT_TIER);
     const [roleDraft, setRoleDraft] = useState(user?.role || 'user');
     const [storageDraftMb, setStorageDraftMb] = useState('0');
     const [quotaDraft, setQuotaDraft] = useState('{}');
@@ -663,7 +506,7 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
 
     React.useEffect(() => {
         if (!user) return;
-        setTierDraft(user.membership_tier || 'free');
+        setTierDraft(user.membership_tier || DEFAULT_ACCOUNT_TIER);
         setRoleDraft(user.role || 'user');
         setStorageDraftMb(String(Math.round((user.storage_limit_bytes ?? 0) / 1048576)));
         setQuotaDraft(formatQuotaJson(user.limits || user.quota_overrides || {}));
@@ -753,9 +596,9 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
                                         <label>
                                             <span>Tier</span>
                                             <select value={tierDraft} onChange={(event) => setTierDraft(event.target.value)}>
-                                                <option value="free">free</option>
-                                                <option value="paid">paid</option>
-                                                <option value="legacy">legacy</option>
+                                                {ACCOUNT_TIERS.map((tier) => (
+                                                    <option key={tier} value={tier}>{tier}</option>
+                                                ))}
                                             </select>
                                         </label>
                                         <button
@@ -1003,140 +846,6 @@ function UserRow({ user, onActions }) {
                 </tr>
             )}
         </>
-    );
-}
-
-function BetaSignupsPanel({ enabled }) {
-    const queryClient = useQueryClient();
-    const [statusFilter, setStatusFilter] = useState('');
-    const [search, setSearch] = useState('');
-
-    const betaSignupsQuery = useQuery({
-        queryKey: [...ADMIN_BETA_SIGNUPS_KEY, statusFilter, search],
-        queryFn: async () => (await adminApi.getBetaSignups({
-            ...(statusFilter ? { status: statusFilter } : {}),
-            ...(search ? { q: search } : {}),
-        })).data,
-        enabled,
-    });
-
-    const statusMutation = useMutation({
-        mutationFn: ({ id, status }) => adminApi.updateBetaSignupStatus(id, { status }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ADMIN_BETA_SIGNUPS_KEY });
-            notify.success('Beta signup updated');
-        },
-        onError: (error) => notify.error(`Failed to update signup: ${formatError(error)}`),
-    });
-
-    const requests = betaSignupsQuery.data?.requests || [];
-    const counts = betaSignupsQuery.data?.status_counts || {};
-
-    const copyAllEmails = async () => {
-        const emails = requests.map((request) => request.email).filter(Boolean).join(', ');
-        if (!emails) {
-            notify.error('No emails to copy');
-            return;
-        }
-        try {
-            await navigator.clipboard?.writeText(emails);
-            notify.success(`Copied ${requests.length} email${requests.length === 1 ? '' : 's'}`);
-        } catch {
-            notify.error('Could not copy to clipboard');
-        }
-    };
-
-    const exportCsv = async () => {
-        try {
-            const response = await adminApi.exportBetaSignupsCsv({
-                ...(statusFilter ? { status: statusFilter } : {}),
-                ...(search ? { q: search } : {}),
-            });
-            const url = URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'beta-signups.csv';
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            URL.revokeObjectURL(url);
-        } catch (error) {
-            notify.error(`Failed to export CSV: ${formatError(error)}`);
-        }
-    };
-
-    return (
-        <section className={styles.section}>
-            <div className={styles.betaSignupControls}>
-                <div className={styles.betaStatusFilters}>
-                    {BETA_STATUS_FILTERS.map((filter) => {
-                        const count = filter.key === '' ? counts.total : counts[filter.key];
-                        return (
-                            <button
-                                key={filter.key || 'all'}
-                                className={statusFilter === filter.key ? styles.activeTab : ''}
-                                onClick={() => setStatusFilter(filter.key)}
-                            >
-                                {filter.label}{typeof count === 'number' ? ` (${count})` : ''}
-                            </button>
-                        );
-                    })}
-                </div>
-                <input
-                    className={styles.search}
-                    placeholder="Search email or goal"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                />
-                <div className={styles.betaSignupActions}>
-                    <button onClick={copyAllEmails} disabled={requests.length === 0}>Copy all emails</button>
-                    <button onClick={exportCsv} disabled={requests.length === 0}>Export CSV</button>
-                </div>
-            </div>
-
-            {betaSignupsQuery.isPending ? (
-                <p className={styles.status}>Loading beta signups...</p>
-            ) : requests.length === 0 ? (
-                <p className={styles.status}>No beta signups yet.</p>
-            ) : (
-                <table className={styles.table}>
-                    <thead>
-                        <tr>
-                            <th>Email</th>
-                            <th>Goal</th>
-                            <th>Status</th>
-                            <th>Source</th>
-                            <th>Requested</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {requests.map((request) => (
-                            <tr key={request.id}>
-                                <td>{request.email}</td>
-                                <td>{request.use_case || '—'}</td>
-                                <td>
-                                    <select
-                                        value={request.status}
-                                        onChange={(event) => statusMutation.mutate({ id: request.id, status: event.target.value })}
-                                        disabled={statusMutation.isPending}
-                                    >
-                                        {BETA_NEXT_STATUS.map((status) => (
-                                            <option key={status} value={status}>{status}</option>
-                                        ))}
-                                    </select>
-                                </td>
-                                <td>{request.source}</td>
-                                <td>{formatDate(request.created_at)}</td>
-                                <td>
-                                    <button onClick={() => navigator.clipboard?.writeText(request.email)}>Copy email</button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            )}
-        </section>
     );
 }
 

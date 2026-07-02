@@ -4,6 +4,7 @@ import { fractalApi } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
 import { useProgramLogic } from './useProgramLogic';
+import { logError } from '../utils/logger';
 
 function formatGoalTypeLabel(type) {
     if (!type) return 'Goal';
@@ -45,7 +46,7 @@ export function useProgramDetailMutations({
             notify.success('Program updated');
             onProgramSaved?.();
         } catch (error) {
-            console.error('Failed to update program:', error);
+            logError('Failed to update program:', error);
             notify.error(`Failed to update program: ${formatError(error)}`);
             throw error;
         }
@@ -57,7 +58,7 @@ export function useProgramDetailMutations({
             notify.success('Training block saved');
             onBlockSaved?.();
         } catch (error) {
-            console.error('Failed to save training block:', error);
+            logError('Failed to save training block:', error);
             notify.error(`Failed to save training block: ${formatError(error)}`);
         }
     }, [actions, onBlockSaved]);
@@ -67,7 +68,7 @@ export function useProgramDetailMutations({
             await actions.deleteBlock(blockId);
             notify.success('Training block deleted');
         } catch (error) {
-            console.error('Failed to delete block:', error);
+            logError('Failed to delete block:', error);
             notify.error(`Failed to delete block: ${formatError(error)}`);
         }
     }, [actions]);
@@ -79,7 +80,7 @@ export function useProgramDetailMutations({
             notify.success('Day saved');
             onDaySaved?.();
         } catch (error) {
-            console.error('Failed to save day:', error);
+            logError('Failed to save day:', error);
             notify.error(`Failed to save day: ${formatError(error)}`);
         }
     }, [actions, dayModalInitialData, selectedBlockId, onDaySaved]);
@@ -90,7 +91,7 @@ export function useProgramDetailMutations({
             notify.success('Day copied');
             return result;
         } catch (error) {
-            console.error('Failed to copy day:', error);
+            logError('Failed to copy day:', error);
             notify.error(`Failed to copy day: ${formatError(error)}`);
             throw error;
         }
@@ -102,7 +103,7 @@ export function useProgramDetailMutations({
             notify.success('Day deleted');
             onDaySaved?.();
         } catch (error) {
-            console.error('Failed to delete day:', error);
+            logError('Failed to delete day:', error);
             notify.error(`Failed to delete day: ${formatError(error)}`);
         }
     }, [actions, selectedBlockId, onDaySaved]);
@@ -130,7 +131,7 @@ export function useProgramDetailMutations({
             }
             notify.success('Day unscheduled');
         } catch (error) {
-            console.error('Failed to unschedule day:', error);
+            logError('Failed to unschedule day:', error);
             notify.error(`Failed to unschedule day: ${formatError(error)}`);
         } finally {
             onUnscheduleFinished?.();
@@ -149,7 +150,7 @@ export function useProgramDetailMutations({
             notify.success('Day scheduled');
             onScheduleDaySaved?.();
         } catch (error) {
-            console.error('Failed to schedule day:', error);
+            logError('Failed to schedule day:', error);
             notify.error(`Failed to schedule day: ${formatError(error)}`);
         }
     }, [actions, onScheduleDaySaved]);
@@ -160,7 +161,7 @@ export function useProgramDetailMutations({
             notify.success('Goal attached');
             onAttachGoalSaved?.();
         } catch (error) {
-            console.error('Failed to attach goal:', error);
+            logError('Failed to attach goal:', error);
             notify.error(`Failed to attach goal: ${formatError(error)}`);
         }
     }, [actions, attachBlockId, onAttachGoalSaved]);
@@ -171,7 +172,7 @@ export function useProgramDetailMutations({
             await actions.attachGoalToDay(block_id, day_id, { goal_id });
             notify.success('Goal attached to day');
         } catch (error) {
-            console.error('Failed to attach goal to day:', error);
+            logError('Failed to attach goal to day:', error);
             notify.error(`Failed to attach goal to day: ${formatError(error)}`);
         }
     }, [actions]);
@@ -181,7 +182,7 @@ export function useProgramDetailMutations({
             await actions.setProgramGoalDeadline({ goal_id: goalId, deadline });
             notify.success('Deadline updated');
         } catch (error) {
-            console.error('Failed to set goal deadline:', error);
+            logError('Failed to set goal deadline:', error);
             notify.error(`Failed to set goal deadline: ${formatError(error)}`);
         }
     }, [actions]);
@@ -192,7 +193,7 @@ export function useProgramDetailMutations({
             await resolvedRefreshers.programGoals();
             return response?.data || null;
         } catch (error) {
-            console.error('Failed to update goal:', error);
+            logError('Failed to update goal:', error);
             notify.error(`Failed to update goal: ${formatError(error)}`);
             throw error;
         }
@@ -208,7 +209,7 @@ export function useProgramDetailMutations({
             const goalName = goalResponse?.name;
             notify.success(goalName ? `${goalType} ${action}: ${goalName}` : `${goalType} ${action}`);
         } catch (error) {
-            console.error('Failed to toggle goal completion:', error);
+            logError('Failed to toggle goal completion:', error);
             notify.error(`Failed to toggle goal completion: ${formatError(error)}`);
         }
     }, [resolvedRefreshers, rootId]);
@@ -224,7 +225,7 @@ export function useProgramDetailMutations({
             await resolvedRefreshers.programGoals();
             notify.success('Goal deleted');
         } catch (error) {
-            console.error('Failed to delete goal:', error);
+            logError('Failed to delete goal:', error);
             notify.error(`Failed to delete goal: ${formatError(error)}`);
         }
     }, [onGoalEditorClosed, resolvedRefreshers, rootId]);
@@ -236,7 +237,7 @@ export function useProgramDetailMutations({
             await resolvedRefreshers.programGoals();
             notify.success('Goal created');
         } catch (error) {
-            console.error('Failed to create goal:', error);
+            logError('Failed to create goal:', error);
             notify.error(`Failed to create goal: ${formatError(error)}`);
         }
     }, [onGoalEditorClosed, resolvedRefreshers, rootId]);

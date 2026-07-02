@@ -22,6 +22,7 @@ import GoalUncompletionModal from './goals/GoalUncompletionModal';
 import GoalHeader from './goals/GoalHeader';
 import GoalViewMode from './goals/GoalViewMode';
 import GoalEditForm from './goals/GoalEditForm';
+import GraphProfileLoadingFallback from './goalDetail/GraphProfileLoadingFallback';
 import CloseButton from './atoms/CloseButton';
 import GoalIcon from './atoms/GoalIcon';
 import ModalBackdrop from './atoms/ModalBackdrop';
@@ -30,6 +31,7 @@ import ViewToggleTabs from './common/ViewToggleTabs';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
 
 import styles from './GoalDetailModal.module.css';
+import { logError } from '../utils/logger';
 
 const TargetManager = lazyWithRetry(() => import('./goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
 const ActivityAssociator = lazyWithRetry(() => import('./goalDetail/ActivityAssociator'), 'components/goalDetail/ActivityAssociator');
@@ -40,44 +42,6 @@ const TargetAnalyticsModal = lazyWithRetry(() => import('./goalDetail/TargetAnal
 const GoalOptionsView = lazyWithRetry(() => import('./goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./goalDetail/GoalNotesView'), 'components/goalDetail/GoalNotesView');
 const GoalTimelineView = lazyWithRetry(() => import('./goalDetail/GoalTimelineView'), 'components/goalDetail/GoalTimelineView');
-
-function GraphProfileLoadingFallback({ title, color, onClose }) {
-    return createPortal(
-        <ModalBackdrop
-            className={styles.graphProfileLoadingOverlay}
-            onClose={onClose}
-        >
-            <section
-                className={styles.graphProfileLoadingContainer}
-                onClick={(event) => event.stopPropagation()}
-                aria-label="Loading graph"
-            >
-                <header className={styles.graphProfileLoadingHeader}>
-                    <div className={styles.graphProfileLoadingTitleGroup}>
-                        <div
-                            className={styles.graphProfileLoadingDot}
-                            style={{ '--graph-accent': color || 'var(--color-brand-primary)' }}
-                            aria-hidden="true"
-                        />
-                        <div>
-                            <h2 className={styles.graphProfileLoadingTitle}>{title || 'Time Spent'}</h2>
-                            <div className={styles.graphProfileLoadingSubtitle}>
-                                Daily time spent from goal evidence
-                            </div>
-                        </div>
-                    </div>
-                    <CloseButton
-                        onClick={onClose}
-                        className={styles.graphProfileLoadingClose}
-                        size={28}
-                    />
-                </header>
-                <div className={styles.graphProfileLoadingFrame}>Loading graph...</div>
-            </section>
-        </ModalBackdrop>,
-        document.body
-    );
-}
 
 /**
  * GoalDetailModal Component
@@ -381,9 +345,9 @@ function GoalDetailModal({
                     notify.success(`Goal created: ${newGoal?.name || newGoal?.attributes?.name || name}`);
                 }
             } catch (err) {
-                console.error('Goal creation failed EXCEPTION:', err);
+                logError('Goal creation failed EXCEPTION:', err);
                 if (err.response) {
-                    console.error('Goal creation error response:', err.response.data);
+                    logError('Goal creation error response:', err.response.data);
                 }
                 notify.error('Failed to create goal: ' + (err.response?.data?.error || err.message));
             }
@@ -694,7 +658,12 @@ function GoalDetailModal({
             </div>
             <p className={styles.levelPickerPrompt}>
                 What level of goal do you want to create under{' '}
-                <strong style={{ color: getGoalColor(parentType) }}>{parentGoal?.attributes?.name || parentGoal?.name}</strong>?
+                <strong
+                    className={styles.levelPickerParentName}
+                    style={{ '--level-picker-accent': getGoalColor(parentType) }}
+                >
+                    {parentGoal?.attributes?.name || parentGoal?.name}
+                </strong>?
             </p>
             <div className={styles.levelPickerGrid}>
                 {validChildTypes.map((type) => {
@@ -705,7 +674,7 @@ function GoalDetailModal({
                         <button
                             key={type}
                             className={styles.levelPickerOption}
-                            style={{ borderColor: color, color: color }}
+                            style={{ '--level-picker-accent': color }}
                             onClick={() => setSelectedChildType(type)}
                         >
                             <GoalIcon
@@ -713,7 +682,7 @@ function GoalDetailModal({
                                 color={color}
                                 secondaryColor={secondaryColor}
                                 size={20}
-                                style={{ flexShrink: 0 }}
+                                className={styles.levelPickerIcon}
                             />
                             {getTypeDisplayName(type)}
                         </button>
@@ -1034,7 +1003,6 @@ function GoalDetailModal({
             </Suspense>
         );
     } else if (needsLevelPicker && selectedChildType === null) {
-        // Show level picker before the create form when multiple levels are valid.
         content = renderLevelPicker();
     } else {
         content = renderGoalContent();
@@ -1089,7 +1057,6 @@ function GoalDetailModal({
         );
     }
 
-    // ============ RENDER ============
     const showGoalNoteComposer = !readOnly
         && viewState === 'goal-notes'
         && mode !== 'create'
@@ -1417,7 +1384,6 @@ function GoalDetailModal({
         );
     }
 
-    // Modal mode
     const modalMarkup = (
         <ModalBackdrop
             className={styles.modalOverlay}
@@ -1426,9 +1392,7 @@ function GoalDetailModal({
             <div
                 onClick={(e) => e.stopPropagation()}
                 className={`${styles.modalContent} ${readOnly ? styles.readOnlySurface : ''}`}
-                style={{
-                    borderTop: `4px solid ${displayGoalColor}`,
-                }}
+                style={{ '--goal-detail-accent': displayGoalColor }}
             >
                 <div className={styles.modalScrollArea} ref={contentScrollRef}>
                     {content}

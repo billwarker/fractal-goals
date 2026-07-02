@@ -32,12 +32,48 @@ function AnalyticsViewsModal({
             ].some((value) => String(value || '').toLowerCase().includes(normalizedSearch));
         });
     }, [normalizedSearch, views]);
+    const analyticsViewItems = filteredViews.filter((view) => (view.kind || 'dashboard') === 'view');
+    const analyticsDashboardItems = filteredViews.filter((view) => (view.kind || 'dashboard') === 'dashboard');
+
+    const renderRows = (items, noun) => (
+        items.map((view) => {
+            const updatedDate = formatUpdatedDate(view.updated_at);
+            return (
+                <div
+                    key={view.id}
+                    className={`${styles.viewRow} ${selectedViewId === view.id ? styles.selected : ''}`}
+                >
+                    <button
+                        type="button"
+                        className={styles.viewSelectButton}
+                        onClick={() => {
+                            onSelectView?.(view.id);
+                            onClose?.();
+                        }}
+                    >
+                        <div className={styles.viewName}>{view.name}</div>
+                        <div className={styles.viewMeta}>
+                            {noun} · Updated {updatedDate}
+                        </div>
+                    </button>
+                    <button
+                        type="button"
+                        className={styles.deleteButton}
+                        onClick={() => setViewToDelete(view)}
+                        title={`Delete ${view.name}`}
+                    >
+                        Delete
+                    </button>
+                </div>
+            );
+        })
+    );
 
     return (
         <ModalBackdrop className={styles.overlay} onClose={onClose}>
             <div className={styles.sheet} onClick={(event) => event.stopPropagation()}>
                 <div className={styles.header}>
-                    <h3 className={styles.title}>Analytics Views</h3>
+                    <h3 className={styles.title}>Saved Analytics</h3>
                     <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close analytics views">
                         <CloseIcon size={16} />
                     </button>
@@ -71,40 +107,23 @@ function AnalyticsViewsModal({
                     </button>
 
                     {filteredViews.length > 0 ? (
-                        filteredViews.map((view) => {
-                            const updatedDate = formatUpdatedDate(view.updated_at);
-                            return (
-                                <div
-                                    key={view.id}
-                                    className={`${styles.viewRow} ${selectedViewId === view.id ? styles.selected : ''}`}
-                                >
-                                    <button
-                                        type="button"
-                                        className={styles.viewSelectButton}
-                                        onClick={() => {
-                                            onSelectView?.(view.id);
-                                            onClose?.();
-                                        }}
-                                    >
-                                        <div className={styles.viewName}>{view.name}</div>
-                                        <div className={styles.viewMeta}>
-                                            Updated {updatedDate}
-                                        </div>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={styles.deleteButton}
-                                        onClick={() => setViewToDelete(view)}
-                                        title={`Delete ${view.name}`}
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            );
-                        })
+                        <>
+                            {analyticsViewItems.length > 0 && (
+                                <>
+                                    <div className={styles.sectionLabel}>Analytics Views</div>
+                                    {renderRows(analyticsViewItems, 'View')}
+                                </>
+                            )}
+                            {analyticsDashboardItems.length > 0 && (
+                                <>
+                                    <div className={styles.sectionLabel}>Analytics Dashboards</div>
+                                    {renderRows(analyticsDashboardItems, 'Dashboard')}
+                                </>
+                            )}
+                        </>
                     ) : (
                         <div className={styles.emptyState}>
-                            {views.length > 0 ? 'No analytics views match your search.' : 'No saved analytics views yet.'}
+                            {views.length > 0 ? 'No saved analytics items match your search.' : 'No saved analytics yet.'}
                         </div>
                     )}
                 </div>
@@ -117,7 +136,7 @@ function AnalyticsViewsModal({
                     onDeleteView?.(viewToDelete.id);
                     setViewToDelete(null);
                 }}
-                title="Delete Analytics View"
+                title={`Delete ${viewToDelete?.kind === 'dashboard' ? 'Analytics Dashboard' : 'Analytics View'}`}
                 message={`Are you sure you want to delete "${viewToDelete?.name}"?`}
             />
         </ModalBackdrop>

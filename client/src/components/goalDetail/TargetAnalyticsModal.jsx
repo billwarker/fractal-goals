@@ -7,7 +7,7 @@ import CloseButton from '../atoms/CloseButton';
 import DeleteButton from '../atoms/DeleteButton';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 import { ActivityTimelineCard } from '../common/ActivityTimeline';
-import { chartDefaults, DISABLED_CHART_ANIMATION } from '../analytics/ChartJSWrapper';
+import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../analytics/ChartJSWrapper';
 import { withScatterPointDensity } from '../analytics/scatterPointProfile';
 import { useTargetAnalytics, useGoalActivityInstances } from '../../hooks/useTargetQueries';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
@@ -194,6 +194,7 @@ function TargetAnalyticsModal({
     const startedInView = mode === 'view';
     const isBuilding = activeMode === 'add' || activeMode === 'edit';
     const { getGoalColor } = useGoalLevels();
+    const chartTheme = useChartThemeDefaults();
     const completedColor = getGoalColor?.('Completed') || '#22c55e';
     const [viewMode, setViewMode] = useState('trend'); // 'trend' | 'scatter'
     const [graphTypeMenuOpen, setGraphTypeMenuOpen] = useState(false);
@@ -352,7 +353,7 @@ function TargetAnalyticsModal({
         },
         interaction: { mode: 'index', intersect: false },
         plugins: {
-            legend: { display: true, position: 'top', labels: { color: chartDefaults.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
+            legend: { display: true, position: 'top', labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
             tooltip: {
                 backgroundColor: 'rgba(30,30,30,0.95)',
                 titleColor: '#fff',
@@ -368,7 +369,7 @@ function TargetAnalyticsModal({
             annotation: { annotations: thresholdLineAnnotations(selectedMetricDefs, conditionByMetric) },
         },
         scales: {
-            x: { ticks: { color: chartDefaults.textColor, maxRotation: 45 }, grid: { color: chartDefaults.gridColor } },
+            x: { ticks: { color: chartTheme.textColor, maxRotation: 45 }, grid: { color: chartTheme.gridColor } },
             ...Object.fromEntries(selectedMetricDefs.map((metricDef, index) => [
                 `metric${index + 1}`,
                 {
@@ -376,16 +377,16 @@ function TargetAnalyticsModal({
                     position: index === 0 ? 'left' : 'right',
                     ticks: {
                         display: true,
-                        color: chartDefaults.textColor,
+                        color: chartTheme.textColor,
                         padding: 8,
                     },
-                    grid: { drawOnChartArea: index === 0, color: chartDefaults.gridColor },
-                    title: { display: true, text: metricDef.unit || metricDef.name, color: chartDefaults.textColor },
+                    grid: { drawOnChartArea: index === 0, color: chartTheme.gridColor },
+                    title: { display: true, text: metricDef.unit || metricDef.name, color: chartTheme.textColor },
                     ...metricScaleDomain(metricDef, index, conditionByMetric),
                 },
             ])),
         },
-    }), [selectedMetricDefs, conditionByMetric]);
+    }), [selectedMetricDefs, conditionByMetric, chartTheme]);
 
     // ---- Scatter (metric X vs metric Y, or value vs index for single metric) ----
     const scatterData = useMemo(() => {
@@ -467,16 +468,16 @@ function TargetAnalyticsModal({
             },
             scales: {
                 x: {
-                    ticks: { color: chartDefaults.textColor }, grid: { color: chartDefaults.gridColor },
-                    title: { display: true, text: `${xDef.name} (${xDef.unit || ''})`, color: chartDefaults.textColor },
+                    ticks: { color: chartTheme.textColor }, grid: { color: chartTheme.gridColor },
+                    title: { display: true, text: `${xDef.name} (${xDef.unit || ''})`, color: chartTheme.textColor },
                 },
                 y: {
-                    ticks: { color: chartDefaults.textColor }, grid: { color: chartDefaults.gridColor },
-                    title: { display: true, text: yDef ? `${yDef.name} (${yDef.unit || ''})` : 'Instance #', color: chartDefaults.textColor },
+                    ticks: { color: chartTheme.textColor }, grid: { color: chartTheme.gridColor },
+                    title: { display: true, text: yDef ? `${yDef.name} (${yDef.unit || ''})` : 'Instance #', color: chartTheme.textColor },
                 },
             },
         };
-    }, [scatterData]);
+    }, [scatterData, chartTheme]);
 
     const accent = goalColor || 'var(--color-primary)';
     const draftName = draft?.name;

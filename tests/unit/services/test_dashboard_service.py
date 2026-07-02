@@ -19,6 +19,7 @@ def test_dashboard_service_creates_and_lists_dashboards(db_session, sample_ultim
     assert error is None
     assert status == 201
     assert created["data"]["name"] == "Default Layout"
+    assert created["data"]["kind"] == "view"
     assert created["data"]["layout"]["layout"]["id"] == "window-1"
 
     listed, error, status = service.list_dashboards(sample_ultimate_goal.id, test_user.id)
@@ -26,6 +27,7 @@ def test_dashboard_service_creates_and_lists_dashboards(db_session, sample_ultim
     assert error is None
     assert status == 200
     assert [dashboard["name"] for dashboard in listed["data"]] == ["Default Layout"]
+    assert listed["data"][0]["kind"] == "view"
 
 
 def test_dashboard_service_rejects_duplicate_active_names(db_session, sample_ultimate_goal, test_user):
@@ -188,3 +190,62 @@ def test_dashboard_service_rejects_rename_to_soft_deleted_name(db_session, sampl
     assert updated is None
     assert status == 409
     assert error == "An analytics view with that name already exists"
+
+
+def test_dashboard_service_saves_portable_views_and_multi_chart_dashboards(db_session, sample_ultimate_goal, test_user):
+    service = DashboardService(db_session)
+
+    view_layout = {
+        "type": "analytics_view",
+        "version": 1,
+        "profile": {
+            "selectedCategory": "sessions",
+            "selectedVisualization": "sessionTrends",
+            "visualizationState": {"grain": "week"},
+        },
+        "global_filters": {},
+    }
+    view, error, status = service.create_dashboard(sample_ultimate_goal.id, test_user.id, {
+        "name": "Focused View",
+        "kind": "view",
+        "layout": view_layout,
+    })
+
+    assert error is None
+    assert status == 201
+    assert view["data"]["kind"] == "view"
+    assert view["data"]["layout"]["type"] == "analytics_view"
+
+    dashboard_layout = {
+        "version": 3,
+        "layout": {
+            "type": "grid",
+            "panels": [
+                {"id": "window-1", "x": 0, "y": 0, "w": 48, "h": 48},
+                {"id": "window-2", "x": 48, "y": 0, "w": 48, "h": 48},
+            ],
+        },
+        "window_states": {
+            "window-1": {"selectedCategory": "sessions", "selectedVisualization": "sessionTrends"},
+            "window-2": {"selectedCategory": "activities", "selectedVisualization": "activityTrends"},
+        },
+        "selected_window_id": "window-1",
+    }
+    dashboard, error, status = service.create_dashboard(sample_ultimate_goal.id, test_user.id, {
+        "name": "Two Charts",
+        "layout": dashboard_layout,
+    })
+
+    assert error is None
+    assert status == 201
+    assert dashboard["data"]["kind"] == "dashboard"
+
+    rejected, error, status = service.create_dashboard(sample_ultimate_goal.id, test_user.id, {
+        "name": "Invalid View",
+        "kind": "view",
+        "layout": dashboard_layout,
+    })
+
+    assert rejected is None
+    assert status == 400
+    assert error == "Analytics views can contain only one configured chart"

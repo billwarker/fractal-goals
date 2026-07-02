@@ -548,7 +548,7 @@ class TestProgramStructure:
         assert schedule_response.status_code == 201
 
         emitted = []
-        monkeypatch.setattr('services.programs.event_bus.emit', lambda event: emitted.append(event))
+        monkeypatch.setattr('services.events.event_bus.emit', lambda event: emitted.append(event))
 
         unschedule_response = authed_client.post(
             f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days/{day_id}/unschedule',

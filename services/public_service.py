@@ -1,5 +1,5 @@
 from models import AppSetting, BetaSignupRequest, format_utc
-from services.admin_service import LANDING_EXAMPLE_CACHE_KEY
+from services.landing_publish_service import LANDING_EXAMPLE_CACHE_KEY
 
 
 class PublicService:

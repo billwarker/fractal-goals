@@ -1,3 +1,4 @@
+import { logError } from '../utils/logger';
 import { useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
@@ -81,7 +82,7 @@ export function useSessionDetailMutations({
         onError: (error) => {
             const status = error?.response?.status;
             const endpoint = error?.config?.url;
-            console.error('[addActivityMutation] failed', {
+            logError('[addActivityMutation] failed', {
                 status,
                 endpoint,
                 message: error?.message,
@@ -351,7 +352,7 @@ export function useSessionDetailMutations({
                 queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
                 queryClient.invalidateQueries({ queryKey: sessionKey });
                 queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
-                console.error('[updateInstance] failed', {
+                logError('[updateInstance] failed', {
                     instanceId,
                     message: error?.message,
                     status: error?.response?.status,
@@ -418,7 +419,7 @@ export function useSessionDetailMutations({
                 invalidateFlowTreeActivityEvidence();
             }
         } catch (error) {
-            console.error('Timer action failed', error);
+            logError('Timer action failed', error);
             notify.error(`Timer action failed: ${error.response?.data?.error || error.message}`);
         }
     }, [activityInstances, invalidateFlowTreeActivityEvidence, invalidateSessionListQueries, queryClient, rootId, sessionActivitiesKey, sessionGoalsViewKey, sessionId, sessionKey]);
@@ -521,7 +522,7 @@ export function useSessionDetailMutations({
             setShowActivitySelector((previous) => ({ ...previous, [sectionIndex]: false }));
             return newInstance;
         } catch (error) {
-            console.error('Error adding activity:', error);
+            logError('Error adding activity:', error);
             throw error;
         }
     }, [activities, addActivityMutation, queryClient, sessionGoalsViewKey, setShowActivitySelector, updateSessionDataDraft]);
@@ -547,7 +548,7 @@ export function useSessionDetailMutations({
             }
             notify.success(newCompleted ? 'Session completed!' : 'Session marked as incomplete');
         } catch (error) {
-            console.error('Failed to toggle session completion', error);
+            logError('Failed to toggle session completion', error);
             notify.error(`Failed to update session completion: ${error?.response?.data?.error || error?.message || 'Unknown error'}`);
         }
     }, [activityInstances, handleUpdateTimer, rootId, session, updateSession]);
@@ -564,7 +565,7 @@ export function useSessionDetailMutations({
             queryClient.invalidateQueries({ queryKey: activitiesKey });
             return response.data;
         } catch (error) {
-            console.error('Failed to create goal', error);
+            logError('Failed to create goal', error);
             notify.error(`Failed to create goal: ${formatError(error)}`);
             throw error;
         }

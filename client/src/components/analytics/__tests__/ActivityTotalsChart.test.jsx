@@ -11,10 +11,14 @@ vi.mock('react-chartjs-2', () => ({
 }));
 
 vi.mock('../ChartJSWrapper', () => ({
-    chartDefaults: {
+    useChartThemeDefaults: () => ({
         textColor: '#ddd',
         gridColor: '#333',
-    },
+        primaryColor: '#4f46e5',
+        secondaryColor: '#10b981',
+        borderColor: '#4f46e5',
+        font: { family: 'Inter, sans-serif' },
+    }),
     DISABLED_CHART_ANIMATION: {
         animation: false,
     },

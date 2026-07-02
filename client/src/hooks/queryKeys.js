@@ -19,6 +19,7 @@ export const queryKeys = {
     analyticsQueryProfiles: () => ['analytics-engine', 'query-profiles'],
     analyticsQueryRun: (querySpec) => ['analytics-engine', 'query-run', querySpec],
     dashboards: (rootId) => ['analytics-views', rootId],
+    pageSurfaces: (rootId, page = 'goals') => ['page-surfaces', rootId, page],
     rootGoal: (rootId) => ['root-goal', rootId],
     fractalTree: (rootId) => ['fractalTree', rootId],
     fractals: (userId = null) => userId ? ['fractals', userId] : ['fractals'],

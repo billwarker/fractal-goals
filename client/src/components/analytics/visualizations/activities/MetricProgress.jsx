@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 
-import { chartDefaults, DISABLED_CHART_ANIMATION } from '../../ChartJSWrapper';
+import EmptyState from '../../../common/EmptyState';
+import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../ChartJSWrapper';
 
 const improvedColor = '#22c55e';
 const regressedColor = '#ef4444';
@@ -50,11 +51,7 @@ function progressValue(comparison) {
 }
 
 function EmptyMetricProgress({ children = 'Metric progress appears once persisted progress comparisons exist for this activity.' }) {
-    return (
-        <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: 'var(--color-text-muted)', fontSize: 13, textAlign: 'center' }}>
-            {children}
-        </div>
-    );
+    return <EmptyState compact description={children} />;
 }
 
 export function buildMetricProgressRows({ instances = [], selectedMetricId = null }) {
@@ -85,6 +82,7 @@ export function MetricProgressChart({
     chartRef,
     metric = null,
 }) {
+    const chartTheme = useChartThemeDefaults();
     const metricDefinitions = activity?.metric_definitions || [];
     const selectedMetricId = metric?.id || metric || metricDefinitions.find((item) => item.track_progress !== false)?.id || null;
     const rows = useMemo(() => buildMetricProgressRows({
@@ -122,13 +120,13 @@ export function MetricProgressChart({
                     legend: {
                         display: true,
                         position: 'top',
-                        labels: { color: chartDefaults.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
+                        labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
                     },
-                    title: { display: true, text: 'Metric Progress', color: chartDefaults.textColor },
+                    title: { display: true, text: 'Metric Progress', color: chartTheme.textColor },
                     tooltip: {
-                        backgroundColor: 'rgba(30, 30, 30, 0.95)',
-                        titleColor: '#fff',
-                        bodyColor: '#ddd',
+                        backgroundColor: chartTheme.tooltipBg,
+                        titleColor: chartTheme.tooltipText,
+                        bodyColor: chartTheme.tooltipBody,
                         padding: 12,
                         callbacks: {
                             afterTitle: (ctx) => {
@@ -141,15 +139,15 @@ export function MetricProgressChart({
                 },
                 scales: {
                     x: {
-                        ticks: { color: chartDefaults.textColor, maxRotation: 45, minRotation: 0 },
-                        grid: { color: chartDefaults.gridColor },
+                        ticks: { color: chartTheme.textColor, maxRotation: 45, minRotation: 0 },
+                        grid: { color: chartTheme.gridColor },
                     },
                     y: {
                         type: 'linear',
                         beginAtZero: true,
-                        ticks: { color: chartDefaults.textColor },
-                        grid: { color: chartDefaults.gridColor },
-                        title: { display: true, text: '% improvement', color: chartDefaults.textColor },
+                        ticks: { color: chartTheme.textColor },
+                        grid: { color: chartTheme.gridColor },
+                        title: { display: true, text: '% improvement', color: chartTheme.textColor },
                     },
                 },
             }}

@@ -4,6 +4,7 @@ import SMARTIndicator from '../SMARTIndicator';
 import CloseButton from '../atoms/CloseButton';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../../utils/dateUtils';
+import styles from './GoalHeader.module.css';
 
 function GoalHeader({
     mode,
@@ -47,59 +48,30 @@ function GoalHeader({
             color: '#93c5fd',
         },
     }[normalizedStatus];
-    const levelBadgeBackground = goalColor;
 
     return (
-        <div ref={headerRef} style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            paddingBottom: '14px',
-            marginBottom: '0',
-            borderBottom: headerTabs ? 'none' : `2px solid ${goalColor}`,
-            position: 'sticky',
-            top: '-24px', // Stick to the very top (covering parent padding)
-            background: 'var(--color-bg-surface)',
-            zIndex: 20,
-            // Negative margins to span full width of modal padding for sticky header
-            marginRight: '-24px',
-            marginLeft: '-24px',
-            paddingLeft: '24px',
-            paddingRight: '24px',
-            marginTop: '-24px',
-            paddingTop: '24px',
-            isolation: 'isolate',
-        }}>
+        <div
+            ref={headerRef}
+            className={`${styles.header} ${headerTabs ? styles.headerWithTabs : ''}`}
+            style={{
+                '--goal-header-color': goalColor,
+                '--goal-header-text-color': textColor,
+                '--goal-status-border': statusConfig.borderColor,
+                '--goal-status-bg': statusConfig.background,
+                '--goal-status-color': statusConfig.color,
+            }}
+        >
             {/* Top Row: Name and Close Button */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
-                <div style={{
-                    fontSize: '24px', // Fixed font size, no scaling
-                    fontWeight: 'bold',
-                    color: goalColor,
-                    lineHeight: '1.2',
-                    // Allow normal wrapping
-                    whiteSpace: 'normal',
-                }}>
+            <div className={styles.topRow}>
+                <div className={styles.title}>
                     {mode === 'create' ? (name || 'New Goal') : (name || goal.name)}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div className={styles.actions}>
                     {onCollapse && (
                         <button
                             onClick={onCollapse}
                             title="Collapse panel"
-                            style={{
-                                background: 'transparent',
-                                border: '1px solid var(--color-border)',
-                                color: '#888',
-                                fontSize: '16px',
-                                cursor: 'pointer',
-                                width: '30px',
-                                height: '30px',
-                                borderRadius: '6px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}
+                            className={styles.collapseButton}
                         >
                             ▼
                         </button>
@@ -108,10 +80,7 @@ function GoalHeader({
                         <CloseButton
                             onClick={onClose}
                             size={20}
-                            style={{
-                                height: '24px',
-                                width: '24px'
-                            }}
+                            className={styles.closeButton}
                         />
                     )}
                 </div>
@@ -119,29 +88,16 @@ function GoalHeader({
 
 
             {/* Collapsible Section: Badges, Status, Dates */}
-            <div style={{
-                display: isCompact ? 'none' : 'flex', // Standard display toggle, no animation
-                flexDirection: 'column',
-                gap: '10px'
-            }}>
+            <div className={`${styles.metaPanel} ${isCompact ? styles.metaPanelCompact : ''}`}>
                 {/* Second Row: Badges, Status, and Dates */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', width: '100%' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: '1 1 auto', minWidth: 0 }}>
+                <div className={styles.metaRow}>
+                    <div className={styles.badgeRow}>
                         {mode === 'create' && (
-                            <span style={{ color: '#4caf50', fontSize: '13px', fontWeight: 'bold' }}>
+                            <span className={styles.createLabel}>
                                 + Create
                             </span>
                         )}
-                        <div style={{
-                            padding: '4px 10px',
-                            background: levelBadgeBackground,
-                            color: textColor,
-                            border: '1px solid transparent',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            fontWeight: 'bold',
-                            whiteSpace: 'nowrap',
-                        }}>
+                        <div className={styles.levelBadge}>
                             {getTypeDisplayName(goalType)}
                         </div>
 
@@ -155,46 +111,32 @@ function GoalHeader({
                         )}
                         {mode !== 'create' && (
                             <>
-                                <span style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    minHeight: '22px',
-                                    padding: '0 8px',
-                                    border: `1px solid ${statusConfig.borderColor}`,
-                                    borderRadius: '999px',
-                                    background: statusConfig.background,
-                                    color: statusConfig.color,
-                                    fontSize: '11px',
-                                    fontWeight: 700,
-                                    lineHeight: 1,
-                                    whiteSpace: 'nowrap',
-                                }}>
+                                <span className={styles.statusBadge}>
                                     {statusConfig.label}
                                 </span>
                             </>
                         )}
 
                         {mode === 'create' && parentGoal && (
-                            <span style={{ color: '#888', fontSize: '12px' }}>
+                            <span className={styles.parentLabel}>
                                 under "{parentGoal.name}"
                             </span>
                         )}
 
                         {(mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline || deadline)) && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                            <div className={styles.dateRow}>
                                 {goal?.attributes?.created_at && (
-                                    <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Created</span>
-                                        <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
+                                    <div className={styles.dateItem}>
+                                        <span className={styles.dateLabel}>Created</span>
+                                        <span className={styles.dateValue}>
                                             {formatDateInTimezone(goal.attributes.created_at, timezone, { month: 'short', day: 'numeric', year: 'numeric', hour: undefined, minute: undefined })}
                                         </span>
                                     </div>
                                 )}
                                 {(deadline || goal?.attributes?.deadline) && (
-                                    <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ color: goalColor, opacity: 0.9, textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.5px', fontWeight: 'bold' }}>Due</span>
-                                        <span style={{ color: 'var(--color-text-secondary)', fontWeight: '500' }}>
+                                    <div className={styles.dateItem}>
+                                        <span className={styles.dateLabel}>Due</span>
+                                        <span className={styles.dateValue}>
                                             {(() => {
                                                 const d = deadline || goal?.attributes?.deadline;
                                                 // Deadlines are often YYYY-MM-DD.

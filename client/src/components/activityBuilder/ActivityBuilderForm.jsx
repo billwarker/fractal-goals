@@ -1,3 +1,4 @@
+import { logError } from '../../utils/logger';
 import React, { useState } from 'react';
 
 import ActivityAssociationModal from '../sessionDetail/ActivityAssociationModal';
@@ -171,7 +172,7 @@ function ActivityBuilderForm({
             onSave?.(result);
             onClose();
         } catch (err) {
-            console.error(editingActivity ? 'Failed to update activity' : 'Failed to create activity', err);
+            logError(editingActivity ? 'Failed to update activity' : 'Failed to create activity', err);
             setError(err?.response?.data?.error || (editingActivity ? 'Failed to update activity' : 'Failed to create activity'));
             setCreating(false);
         }

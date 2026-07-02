@@ -7,6 +7,7 @@ import logging
 from blueprints.api_utils import get_db_session, internal_error, parse_optional_pagination
 from blueprints.auth_api import token_required
 from services.admin_service import AdminService
+from services.landing_publish_service import LandingPublishService
 from validators import (
     AdminBetaSignupStatusSchema,
     AdminInviteKeyCreateSchema,
@@ -220,10 +221,11 @@ def update_tier_quotas(current_user, validated_data):
 def get_landing_examples_settings(current_user):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user, db_session)
+        _, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
-        payload, error, status = service.get_landing_example_settings()
+        landing_service = LandingPublishService(db_session)
+        payload, error, status = landing_service.get_landing_example_settings()
         if error:
             return jsonify({"error": error}), status
         return jsonify(payload), status
@@ -240,10 +242,11 @@ def get_landing_examples_settings(current_user):
 def update_landing_examples_settings(current_user, validated_data):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user, db_session)
+        _, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
-        payload, error, status = service.update_landing_example_settings(validated_data)
+        landing_service = LandingPublishService(db_session)
+        payload, error, status = landing_service.update_landing_example_settings(validated_data)
         if error:
             return jsonify({"error": error}), status
         logger.info("Admin user_id=%s updated landing examples", current_user.id)
@@ -261,13 +264,14 @@ def update_landing_examples_settings(current_user, validated_data):
 def get_landing_example_options(current_user):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user, db_session)
+        _, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
         root_id = (request.args.get('root_id') or '').strip()
         if not root_id:
             return jsonify({"error": "root_id is required"}), 400
-        payload, error, status = service.get_landing_example_options(root_id)
+        landing_service = LandingPublishService(db_session)
+        payload, error, status = landing_service.get_landing_example_options(root_id)
         if error:
             return jsonify({"error": error}), status
         return jsonify(payload), status
@@ -284,14 +288,15 @@ def get_landing_example_options(current_user):
 def publish_landing_examples(current_user, validated_data):
     db_session = get_db_session()
     try:
-        service, response = _admin_service_or_response(current_user, db_session)
+        _, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
+        landing_service = LandingPublishService(db_session)
         if "examples" in validated_data:
-            _, error, status = service.update_landing_example_settings(validated_data)
+            _, error, status = landing_service.update_landing_example_settings(validated_data)
             if error:
                 return jsonify({"error": error}), status
-        payload, error, status = service.publish_landing_examples()
+        payload, error, status = landing_service.publish_landing_examples()
         if error:
             return jsonify({"error": error}), status
         logger.info(

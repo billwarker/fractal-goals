@@ -533,6 +533,80 @@
     font-size: 0.84rem;
 }
 
+.recommendationHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+}
+
+.recommendationHeader strong {
+    color: var(--color-text-primary);
+}
+
+.recommendationList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
+
+.suggestion,
+.suggestionActive {
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-bg-surface);
+    color: var(--color-text-secondary);
+    padding: 6px 10px;
+    cursor: pointer;
+    font: inherit;
+}
+
+.suggestionActive {
+    border-color: var(--color-brand-primary);
+    color: var(--color-text-primary);
+    background: color-mix(in srgb, var(--color-brand-primary) 16%, var(--color-bg-surface));
+}
+
+.mappingGrid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    align-items: end;
+}
+
+.mappingGrid label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.mappingGrid label span {
+    color: var(--color-text-muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.mappingGrid select {
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    padding: 7px;
+}
+
+.previewSummary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-secondary);
+}
+
 .tableWrap {
     min-height: 0;
     overflow: auto;

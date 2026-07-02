@@ -23,8 +23,8 @@ def get_dashboards(current_user, root_id):
         return jsonify(payload), status
     except SQLAlchemyError:
         db_session.rollback()
-        logger.exception("Error fetching analytics views")
-        return internal_error(logger, "Error fetching analytics views")
+        logger.exception("Error fetching saved analytics")
+        return internal_error(logger, "Error fetching saved analytics")
     finally:
         db_session.close()
 
@@ -42,8 +42,8 @@ def create_dashboard(current_user, root_id, validated_data):
         return jsonify(payload), status
     except SQLAlchemyError:
         db_session.rollback()
-        logger.exception("Error creating analytics view")
-        return internal_error(logger, "Error creating analytics view")
+        logger.exception("Error creating saved analytics")
+        return internal_error(logger, "Error creating saved analytics")
     finally:
         db_session.close()
 
@@ -61,8 +61,8 @@ def update_dashboard(current_user, root_id, dashboard_id, validated_data):
         return jsonify(payload), status
     except SQLAlchemyError:
         db_session.rollback()
-        logger.exception("Error updating analytics view")
-        return internal_error(logger, "Error updating analytics view")
+        logger.exception("Error updating saved analytics")
+        return internal_error(logger, "Error updating saved analytics")
     finally:
         db_session.close()
 
@@ -79,7 +79,7 @@ def delete_dashboard(current_user, root_id, dashboard_id):
         return jsonify(payload), status
     except SQLAlchemyError:
         db_session.rollback()
-        logger.exception("Error deleting analytics view")
-        return internal_error(logger, "Error deleting analytics view")
+        logger.exception("Error deleting saved analytics")
+        return internal_error(logger, "Error deleting saved analytics")
     finally:
         db_session.close()

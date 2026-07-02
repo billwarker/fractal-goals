@@ -9,6 +9,7 @@ import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import GoalHierarchySelector from '../goals/GoalHierarchySelector';
+import { logError } from '../../utils/logger';
 
 function flattenGoals(node, goals = [], parentId = null) {
     if (!node) return goals;
@@ -168,7 +169,7 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
             onSave?.();
             onClose();
         } catch (err) {
-            console.error("Failed to save group", err);
+            logError("Failed to save group", err);
             const message = err?.response?.data?.error || "Failed to save group";
             setError(message);
             notify.error(message);

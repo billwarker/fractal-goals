@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 
-import { chartDefaults, DISABLED_CHART_ANIMATION } from '../ChartJSWrapper';
+import EmptyState from '../../common/EmptyState';
+import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../ChartJSWrapper';
 import { formatDurationSeconds } from '../../../utils/formatters';
 import styles from './GraphProfileModal.module.css';
 
@@ -10,12 +11,13 @@ function formatTooltipMinutes(minutes) {
 }
 
 export default function GoalDurationGraph({ data = {} }) {
+    const chartTheme = useChartThemeDefaults();
     const rawPoints = data.points;
     const points = useMemo(() => (
         Array.isArray(rawPoints) ? rawPoints : []
     ), [rawPoints]);
     const goal = data.goal || {};
-    const goalColor = goal.color || chartDefaults.primaryColor;
+    const goalColor = goal.color || chartTheme.primaryColor;
 
     const chartData = useMemo(() => ({
         labels: points.map((point) => new Date(point.date)),
@@ -44,7 +46,7 @@ export default function GoalDurationGraph({ data = {} }) {
                 display: true,
                 position: 'top',
                 labels: {
-                    color: chartDefaults.textColor,
+                    color: chartTheme.textColor,
                     usePointStyle: true,
                     pointStyle: 'circle',
                     padding: 16,
@@ -52,9 +54,9 @@ export default function GoalDurationGraph({ data = {} }) {
                 },
             },
             tooltip: {
-                backgroundColor: 'rgba(30, 30, 30, 0.95)',
-                titleColor: '#fff',
-                bodyColor: '#ccc',
+                backgroundColor: chartTheme.tooltipBg,
+                titleColor: chartTheme.tooltipText,
+                bodyColor: chartTheme.tooltipBody,
                 padding: 12,
                 displayColors: true,
                 callbacks: {
@@ -79,35 +81,31 @@ export default function GoalDurationGraph({ data = {} }) {
                 title: {
                     display: true,
                     text: 'Date',
-                    color: chartDefaults.textColor,
+                    color: chartTheme.textColor,
                     font: { size: 12 },
                 },
-                ticks: { color: chartDefaults.textColor },
-                grid: { color: chartDefaults.gridColor },
+                ticks: { color: chartTheme.textColor },
+                grid: { color: chartTheme.gridColor },
             },
             y: {
                 beginAtZero: true,
                 title: {
                     display: true,
                     text: 'Duration (min)',
-                    color: chartDefaults.textColor,
+                    color: chartTheme.textColor,
                     font: { size: 12 },
                 },
                 ticks: {
-                    color: chartDefaults.textColor,
+                    color: chartTheme.textColor,
                     callback: (value) => formatTooltipMinutes(value),
                 },
-                grid: { color: chartDefaults.gridColor },
+                grid: { color: chartTheme.gridColor },
             },
         },
-    }), []);
+    }), [chartTheme]);
 
     if (!points.some((point) => point.activity_duration > 0)) {
-        return (
-            <div className={styles.emptyState}>
-                No time evidence has been recorded for this goal.
-            </div>
-        );
+        return <EmptyState compact className={styles.emptyState} description="No time evidence has been recorded for this goal." />;
     }
 
     return <Bar data={chartData} options={options} />;

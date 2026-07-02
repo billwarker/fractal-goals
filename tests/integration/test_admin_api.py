@@ -377,6 +377,7 @@ def admin_landing_fractal(db_session, admin_user):
         root_id=root.id,
         user_id=admin_user.id,
         name='Public Demo Analytics View',
+        kind='view',
         layout={
             'version': 3,
             'layout': {
@@ -718,6 +719,7 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
         root_id=root.id,
         user_id=root.owner_id,
         name='Featured Analytics View',
+        kind='view',
         layout={
             'version': 3,
             'layout': {

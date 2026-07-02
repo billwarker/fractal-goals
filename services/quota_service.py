@@ -6,6 +6,13 @@ from typing import Optional, Sequence
 
 from sqlalchemy import func, or_, select
 
+from account_tiers import (
+    DEFAULT_ACCOUNT_TIER,
+    FINITE_QUOTA_TIERS,
+    TIER_FREE,
+    TIER_LEGACY,
+    TIER_PAID,
+)
 import models
 from models import (
     ActivityDefinition,
@@ -90,23 +97,23 @@ class QuotaService:
 
     @staticmethod
     def normalize_tier(tier: Optional[str]) -> str:
-        tier = (tier or "free").strip().lower()
-        return tier if tier in {"free", "paid", "legacy"} else "free"
+        tier = (tier or DEFAULT_ACCOUNT_TIER).strip().lower()
+        return tier if tier in {TIER_FREE, TIER_PAID, TIER_LEGACY} else DEFAULT_ACCOUNT_TIER
 
     @staticmethod
     def get_builtin_tier_default_limits() -> JsonDict:
         return {
-            "free": deepcopy(FREE_LIMITS),
-            "paid": deepcopy(PAID_LIMITS),
-            "legacy": None,
+            TIER_FREE: deepcopy(FREE_LIMITS),
+            TIER_PAID: deepcopy(PAID_LIMITS),
+            TIER_LEGACY: None,
         }
 
     @staticmethod
     def get_builtin_tier_storage_limits() -> JsonDict:
         return {
-            "free": DEFAULT_STORAGE_LIMIT_BYTES,
-            "paid": DEFAULT_STORAGE_LIMIT_BYTES,
-            "legacy": None,
+            TIER_FREE: DEFAULT_STORAGE_LIMIT_BYTES,
+            TIER_PAID: DEFAULT_STORAGE_LIMIT_BYTES,
+            TIER_LEGACY: None,
         }
 
     @staticmethod
@@ -136,7 +143,7 @@ class QuotaService:
         if not isinstance(configured, dict):
             return defaults
 
-        for tier in ("free", "paid"):
+        for tier in FINITE_QUOTA_TIERS:
             tier_limits = configured.get(tier)
             if tier_limits is None:
                 continue
@@ -157,7 +164,7 @@ class QuotaService:
         if not isinstance(configured_storage, dict):
             return defaults
 
-        for tier in ("free", "paid"):
+        for tier in FINITE_QUOTA_TIERS:
             value = configured_storage.get(tier)
             if isinstance(value, int) and value >= 0:
                 defaults[tier] = value
@@ -168,7 +175,7 @@ class QuotaService:
         return self.get_tier_storage_limits().get(normalized_tier)
 
     def get_effective_limits(self, user: User) -> Optional[JsonDict]:
-        tier = self.normalize_tier(getattr(user, "membership_tier", "free"))
+        tier = self.normalize_tier(getattr(user, "membership_tier", DEFAULT_ACCOUNT_TIER))
         default_limits = self.get_tier_default_limits().get(tier)
         if default_limits is None:
             return None
@@ -387,7 +394,7 @@ class QuotaService:
         storage_bytes = self.get_storage_usage_bytes(user_id, selected_root_ids or None)
         storage_limit_bytes = getattr(user, "storage_limit_bytes", None)
         return {
-            "tier": self.normalize_tier(getattr(user, "membership_tier", "free")),
+            "tier": self.normalize_tier(getattr(user, "membership_tier", DEFAULT_ACCOUNT_TIER)),
             "subscription_status": getattr(user, "subscription_status", "none") or "none",
             "paid_amount_cad_cents": getattr(user, "paid_amount_cad_cents", None),
             "unlimited": limits is None,
@@ -467,5 +474,5 @@ class QuotaService:
             "current": current,
             "limit": limit,
             "requested": increment,
-            "tier": self.normalize_tier(getattr(user, "membership_tier", "free")),
+            "tier": self.normalize_tier(getattr(user, "membership_tier", DEFAULT_ACCOUNT_TIER)),
         }, 403

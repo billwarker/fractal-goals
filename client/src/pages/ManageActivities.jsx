@@ -17,6 +17,7 @@ import HeaderButton from '../components/layout/HeaderButton';
 import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
 import { buildGroupReorderPayload } from '../utils/manageActivities';
 import styles from './ManageActivities.module.css'; // Import CSS Module
+import { logError } from '../utils/logger';
 
 /**
  * Manage Activities Page - Grid view of activity tiles with modal builder
@@ -179,7 +180,7 @@ function ManageActivities() {
             await deleteActivityGroup(rootId, groupToDelete.id);
             setGroupToDelete(null);
         } catch (err) {
-            console.error("Failed to delete group", err);
+            logError("Failed to delete group", err);
             setError("Failed to delete activity group");
         }
     };
@@ -221,7 +222,7 @@ function ManageActivities() {
         try {
             await reorderActivityGroups(rootId, orderedIds);
         } catch (err) {
-            console.error('Failed to reorder activity groups', err);
+            logError('Failed to reorder activity groups', err);
             setError('Failed to reorder activity groups');
         }
     };
@@ -256,7 +257,7 @@ function ManageActivities() {
             await deleteActivity(rootId, activityToDelete.id);
             setActivityToDelete(null);
         } catch (err) {
-            console.error("Failed to delete activity", err);
+            logError("Failed to delete activity", err);
             setError("Failed to delete activity");
             setActivityToDelete(null);
         }
@@ -325,8 +326,8 @@ function ManageActivities() {
                 { action: 'regroup', groupName }
             );
         } catch (err) {
-            console.error('Failed to move activity:', err);
-            console.error('Error response:', err.response?.data);
+            logError('Failed to move activity:', err);
+            logError('Error response:', err.response?.data);
             setError('Failed to move activity to group');
         }
 

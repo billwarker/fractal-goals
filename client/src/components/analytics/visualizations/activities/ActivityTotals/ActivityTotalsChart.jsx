@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 
-import { chartDefaults, DISABLED_CHART_ANIMATION } from '../../../ChartJSWrapper';
+import EmptyState from '../../../../common/EmptyState';
+import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../../ChartJSWrapper';
 
 const palette = {
     instances: '#3b82f6',
@@ -32,14 +33,12 @@ function EmptyChart({ title, children = 'No data available yet' }) {
     return (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
             {title && <h3 style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)' }}>{title}</h3>}
-            <div style={{ flex: 1, display: 'grid', placeItems: 'center', color: 'var(--color-text-muted)', fontSize: 13, textAlign: 'center' }}>
-                {children}
-            </div>
+            <EmptyState compact description={children} />
         </div>
     );
 }
 
-function buildOptions({ metric, showGroupNames }) {
+function buildOptions({ metric, showGroupNames, chartTheme }) {
     const xAxisLabel = metric === 'duration' ? 'Minutes' : 'Completed instances';
     return {
         responsive: true,
@@ -50,32 +49,32 @@ function buildOptions({ metric, showGroupNames }) {
             x: {
                 type: 'linear',
                 beginAtZero: true,
-                title: { display: true, text: xAxisLabel, color: chartDefaults.textColor },
+                title: { display: true, text: xAxisLabel, color: chartTheme.textColor },
                 ticks: {
-                    color: chartDefaults.textColor,
+                    color: chartTheme.textColor,
                     precision: 0,
                     stepSize: metric === 'instances' ? 1 : undefined,
                     callback: (value) => value,
                 },
-                grid: { color: chartDefaults.gridColor },
+                grid: { color: chartTheme.gridColor },
             },
             y: {
                 type: 'category',
-                ticks: { color: chartDefaults.textColor },
-                grid: { color: chartDefaults.gridColor },
+                ticks: { color: chartTheme.textColor },
+                grid: { color: chartTheme.gridColor },
             },
         },
         plugins: {
             legend: {
                 display: true,
                 position: 'top',
-                labels: { color: chartDefaults.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
+                labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
             },
-            title: { display: true, text: 'Activity Totals', color: chartDefaults.textColor },
+            title: { display: true, text: 'Activity Totals', color: chartTheme.textColor },
             tooltip: {
-                backgroundColor: 'rgba(30, 30, 30, 0.95)',
-                titleColor: '#fff',
-                bodyColor: '#ddd',
+                backgroundColor: chartTheme.tooltipBg,
+                titleColor: chartTheme.tooltipText,
+                bodyColor: chartTheme.tooltipBody,
                 padding: 12,
                 callbacks: {
                     afterTitle: (ctx) => {
@@ -101,6 +100,7 @@ export default function ActivityTotalsChart({
     showGroupNames = false,
     limit = 15,
 }) {
+    const chartTheme = useChartThemeDefaults();
     const data = useMemo(() => {
         const normalizedLimit = Math.min(50, Math.max(1, Number(limit) || 15));
         const groupNamesById = new Map(activityGroups.map((group) => [group.id, group.name]));
@@ -136,5 +136,5 @@ export default function ActivityTotalsChart({
 
     if (!data.labels.length) return <EmptyChart title="Activity Totals" />;
 
-    return <Bar ref={chartRef} data={data} options={buildOptions({ metric, showGroupNames })} />;
+    return <Bar ref={chartRef} data={data} options={buildOptions({ metric, showGroupNames, chartTheme })} />;
 }

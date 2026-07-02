@@ -28,6 +28,7 @@ import { lazyWithRetry } from '../utils/lazyWithRetry';
 import '../App.css';
 import styles from './Sessions.module.css';
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
+import { logError } from '../utils/logger';
 
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 
@@ -305,7 +306,7 @@ function Sessions() {
 
             notify.success('Session deleted');
         } catch (err) {
-            console.error('Failed to delete session:', err);
+            logError('Failed to delete session:', err);
             notify.error('Failed to delete session: ' + (err.response?.data?.error || err.message));
         }
     }, [queryClient, rootId, sessionToDelete]);

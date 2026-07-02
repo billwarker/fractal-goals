@@ -9,6 +9,7 @@ import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import HierarchySection from './HierarchySection';
 import TargetsSection from './TargetsSection';
 import styles from './SessionGoalHierarchyPanel.module.css';
+import { logError } from '../../utils/logger';
 
 const GoalDetailModal = lazyWithRetry(() => import('../ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 const TargetAnalyticsModal = lazyWithRetry(() => import('../goalDetail/TargetAnalyticsModal'), 'components/goalDetail/TargetAnalyticsModal');
@@ -110,7 +111,7 @@ function SessionGoalHierarchyPanel({
             if (onGoalCreated) onGoalCreated(newGoalData?.name);
             return newGoalData;
         } catch (err) {
-            console.error('Failed to create sub goal', err);
+            logError('Failed to create sub goal', err);
             throw err;
         }
     }, [activeActivityDef, createGoal, onGoalCreated]);

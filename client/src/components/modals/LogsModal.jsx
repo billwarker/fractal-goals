@@ -8,6 +8,7 @@ import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import './LogsModal.css';
+import { logError } from '../../utils/logger';
 /**
  * LogsModal - Displays a searchable and filterable list of application event logs.
  */
@@ -61,7 +62,7 @@ function LogsModalInner({ onClose, rootId }) {
         try {
             await clearLogsMutation.mutateAsync();
         } catch (err) {
-            console.error("Failed to clear logs:", err);
+            logError("Failed to clear logs:", err);
         }
     };
 

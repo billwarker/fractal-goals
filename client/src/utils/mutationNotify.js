@@ -1,4 +1,5 @@
 import notify from './notify';
+import { logError } from '../utils/logger';
 
 function formatStructuredError(value) {
     if (!value) {
@@ -65,7 +66,7 @@ export function withNotify(
             try {
                 onError?.(err, ...args);
             } catch (handlerError) {
-                console.error('withNotify onError handler failed', handlerError);
+                logError('withNotify onError handler failed', handlerError);
             }
 
             const message = typeof error === 'function'

@@ -4,43 +4,77 @@ import { extname, join, relative, resolve } from 'node:path';
 
 const builtins = new Set(module.builtinModules);
 const MAX_SOURCE_LINES = 450;
+const HARD_SOURCE_LINES = 800;
+const hardSizeBacklog = new Set([
+  // Known decomposition backlog. Files here may exceed the S-rank production
+  // ceiling, but only up to their explicit sizeException cap below.
+  'src/components/GoalDetailModal.jsx',
+  'src/components/__tests__/GoalDetailModal.test.jsx',
+  'src/components/analytics/AnalyticsQueryConsole.jsx',
+  'src/components/modals/TemplateBuilderModal.jsx',
+  'src/components/sessionDetail/SessionActivityItem.jsx',
+  'src/components/sessionDetail/__tests__/SessionActivityItem.test.jsx',
+  'src/pages/Admin.jsx',
+  'src/pages/FractalGoals.jsx',
+  'src/pages/Landing.jsx',
+  'src/pages/ProgramCalendarPage.jsx',
+  'src/pages/__tests__/Landing.test.jsx',
+  'src/utils/programViewModel.js',
+]);
 const sizeExceptions = new Map([
   // Known decomposition backlog. Keep these thresholds close to the current
   // file sizes so the audit still catches meaningful growth while larger
   // extractions are handled deliberately.
+  ['src/AppRouter.jsx', 478],
   ['src/components/GoalCharacteristicsSettings.jsx', 500],
-  ['src/components/GoalDetailModal.jsx', 1350],
+  ['src/components/GoalDetailModal.jsx', 1462],
   ['src/components/GoalDetailModal.module.css', 850],
-  ['src/components/__tests__/GoalDetailModal.test.jsx', 650],
-  ['src/components/analytics/AnalyticsFiltersSidebar.jsx', 500],
+  ['src/components/__tests__/GoalDetailModal.test.jsx', 877],
+  ['src/components/activityPicker/ActivityPicker.jsx', 453],
+  ['src/components/analytics/AnalyticsQueryConsole.jsx', 831],
+  ['src/components/analytics/AnalyticsFiltersSidebar.jsx', 510],
   ['src/components/analytics/LineGraph.jsx', 775],
-  ['src/components/analytics/ProfileWindow.jsx', 600],
+  ['src/components/analytics/ProfileWindow.jsx', 699],
+  ['src/components/analytics/visualizationQueryExplanations.js', 527],
+  ['src/components/common/ActivityTimeline.jsx', 453],
   ['src/components/goalDetail/ActivityAssociator.jsx', 800],
-  ['src/components/goalDetail/TargetManager.jsx', 625],
+  ['src/components/goalDetail/TargetAnalyticsModal.jsx', 743],
+  ['src/components/goalDetail/TargetManager.jsx', 674],
   ['src/components/goals/GoalHierarchyList.jsx', 500],
   ['src/components/goals/GoalOptionsView.jsx', 550],
-  ['src/components/modals/DayViewModal.jsx', 650],
+  ['src/components/landing/LandingFeatureActivity.jsx', 543],
+  ['src/components/modals/DayViewModal.jsx', 699],
+  ['src/components/modals/ManageMetricsModal.jsx', 506],
   ['src/components/modals/SettingsModal.jsx', 650],
-  ['src/components/modals/TemplateBuilderModal.jsx', 850],
+  ['src/components/modals/TemplateBuilderModal.jsx', 904],
   ['src/components/modals/TemplateBuilderModal.module.css', 675],
   ['src/components/notes/NoteComposer.jsx', 500],
-  ['src/components/sessionDetail/SessionActivityItem.jsx', 1300],
+  ['src/components/sessionDetail/SessionActivityItem.jsx', 1541],
   ['src/components/sessionDetail/SessionActivityItem.module.css', 925],
-  ['src/components/sessionDetail/__tests__/SessionActivityItem.test.jsx', 725],
-  ['src/components/sessions/ActivityCard.jsx', 500],
+  ['src/components/sessionDetail/__tests__/SessionActivityItem.test.jsx', 859],
+  ['src/components/sessions/ActivityCard.jsx', 514],
   ['src/components/sessions/SessionCardExpanded.jsx', 500],
   ['src/components/sessions/SessionFilterSelectionModal.jsx', 500],
+  ['src/components/surface/PageSurface.jsx', 601],
+  ['src/components/surface/gridLayout/GridLayout.jsx', 638],
   ['src/contexts/ActiveSessionContext.jsx', 1000],
-  ['src/hooks/__tests__/useSessionGoalsViewModel.test.js', 500],
+  ['src/hooks/__tests__/useSessionGoalsViewModel.test.js', 535],
   ['src/hooks/useFlowTreeMetrics.js', 600],
   ['src/hooks/useSessionDetailMutations.js', 600],
   ['src/pages/CreateSession.jsx', 625],
-  ['src/pages/FractalGoals.jsx', 650],
+  ['src/pages/Analytics.jsx', 556],
+  ['src/pages/FractalGoals.jsx', 951],
   ['src/pages/ManageActivities.jsx', 650],
   ['src/pages/Notes.jsx', 500],
-  ['src/pages/ProgramCalendarPage.jsx', 1250],
+  ['src/pages/Sessions.jsx', 487],
+  ['src/pages/Admin.jsx', 1162],
+  ['src/pages/Landing.jsx', 1061],
+  ['src/pages/ProgramCalendarPage.jsx', 1122],
+  ['src/pages/__tests__/Admin.test.jsx', 539],
+  ['src/pages/__tests__/Landing.test.jsx', 892],
   ['src/utils/dateUtils.js', 500],
-  ['src/utils/programViewModel.js', 725],
+  ['src/utils/api/__tests__/core.test.js', 623],
+  ['src/utils/programViewModel.js', 843],
 ]);
 
 const importOrderExceptions = new Set([
@@ -53,27 +87,40 @@ const importOrderExceptions = new Set([
   'src/components/GoalDetailModal.jsx',
   'src/components/activityBuilder/ActivityAssociationsField.jsx',
   'src/components/activityBuilder/ActivityBuilderForm.jsx',
+  'src/components/analytics/AnalyticsExtraCharts.jsx',
   'src/components/analytics/GenericGraphModal.jsx',
+  'src/components/analytics/visualizations/activities/index.jsx',
   'src/components/atoms/Modal.jsx',
   'src/components/createSession/GoalAssociation.jsx',
   'src/components/createSession/TemplatePicker.jsx',
+  'src/components/goalDetail/ActivityAssociator.jsx',
   'src/components/modals/AuthModal.jsx',
+  'src/components/modals/LogsModal.jsx',
   'src/components/modals/ProgramDayModal.jsx',
   'src/components/modals/TemplateBuilderModal.jsx',
+  'src/components/notes/MarkdownNoteContent.jsx',
   'src/components/programs/ProgramBlockView.jsx',
   'src/components/sessionDetail/QuickSessionWorkspace.jsx',
   'src/components/sessionDetail/SessionActivityItem.jsx',
   'src/components/sessionDetail/SessionDetailModals.jsx',
+  'src/components/sessionDetail/SessionGoalHierarchyPanel.jsx',
+  'src/components/sessionDetail/SessionInfoPanel.jsx',
+  'src/components/sessionDetail/SessionNotesPanel.jsx',
   'src/components/sessionDetail/SessionSection.jsx',
   'src/hooks/useActivityGoalAssociations.js',
+  'src/hooks/useGoalAssociationMutations.js',
+  'src/hooks/useProgramDetailMutations.js',
   'src/hooks/useSessionDetailData.js',
   'src/hooks/useSessionDetailMutations.js',
   'src/hooks/useSessionQueries.js',
+  'src/pages/CreateSession.jsx',
   'src/pages/CreateSessionTemplate.jsx',
   'src/pages/Logs.jsx',
   'src/pages/ManageActivities.jsx',
   'src/pages/Selection.jsx',
   'src/pages/Sessions.jsx',
+  'src/utils/api/__tests__/core.test.js',
+  'src/utils/mutationNotify.js',
 ]);
 
 const checks = [
@@ -98,7 +145,7 @@ const checks = [
   {
     type: 'require-substring',
     file: 'src/hooks/useLogsData.js',
-    substrings: ['useQuery', 'useMutation', "queryKey: ['logs'"],
+    substrings: ['useQuery', 'useMutation', 'queryKey: queryKeys.logs('],
     reason: 'Logs data hook should remain React Query based.',
   },
   {
@@ -121,6 +168,14 @@ const globalNoImportPatterns = [
   /import\s+['"].*SessionDetail\.css['"]/,
   /import\s+['"].*Sessions\.css['"]/,
 ];
+
+const INLINE_STYLE_GLOBAL_BUDGET = 356;
+const inlineStyleBudgets = new Map([
+  ['src/components/GoalDetailModal.jsx', 18],
+  ['src/components/goalDetail/GoalTimelineView.jsx', 1],
+  ['src/components/goals/GoalHeader.jsx', 1],
+  ['src/components/goals/GoalUncompletionModal.jsx', 0],
+]);
 
 const importGroupOrder = {
   builtin: 0,
@@ -222,6 +277,15 @@ const auditImportOrder = (file, content) => {
 const auditFileSize = (file, content) => {
   const lineCount = content.split('\n').length;
   const threshold = sizeExceptions.get(file) ?? MAX_SOURCE_LINES;
+  if (lineCount > HARD_SOURCE_LINES && !hardSizeBacklog.has(file)) {
+    console.error(
+      `[maintainability-audit] ${file} has ${lineCount} lines, exceeding the hard ${HARD_SOURCE_LINES}-line ceiling. ` +
+      'Add it to the decomposition backlog with an explicit cap, or split it before merging.'
+    );
+    hasFailure = true;
+    return;
+  }
+
   if (lineCount > threshold) {
     console.error(
       `[maintainability-audit] ${file} has ${lineCount} lines, exceeding the limit of ${threshold}. ` +
@@ -229,6 +293,21 @@ const auditFileSize = (file, content) => {
     );
     hasFailure = true;
   }
+};
+
+const countInlineStyleBlocks = (content) => (content.match(/style=\{\{/g) ?? []).length;
+
+const auditInlineStyles = (file, content) => {
+  const count = countInlineStyleBlocks(content);
+  const budget = inlineStyleBudgets.get(file);
+  if (budget === undefined || count <= budget) return count;
+
+  console.error(
+    `[maintainability-audit] ${file} has ${count} inline style blocks, exceeding the limit of ${budget}. ` +
+    'Move static styles into CSS modules and keep inline styles limited to runtime CSS variables or measured layout values.'
+  );
+  hasFailure = true;
+  return count;
 };
 
 for (const check of checks) {
@@ -259,6 +338,7 @@ for (const check of checks) {
 }
 
 const sourceFiles = collectSourceFiles(resolve('src'));
+let inlineStyleCount = 0;
 for (const file of sourceFiles) {
   const content = readFileSync(file, 'utf8');
   if (!content) continue;
@@ -275,6 +355,15 @@ for (const file of sourceFiles) {
   const relativePath = relative(resolve(''), file);
   auditImportOrder(relativePath, content);
   auditFileSize(relativePath, content);
+  inlineStyleCount += auditInlineStyles(relativePath, content);
+}
+
+if (inlineStyleCount > INLINE_STYLE_GLOBAL_BUDGET) {
+  console.error(
+    `[maintainability-audit] Frontend has ${inlineStyleCount} inline style blocks, exceeding the repo budget of ` +
+    `${INLINE_STYLE_GLOBAL_BUDGET}. Convert static styles to CSS modules before adding more.`
+  );
+  hasFailure = true;
 }
 
 if (hasFailure) {

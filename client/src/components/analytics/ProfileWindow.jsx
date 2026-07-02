@@ -27,6 +27,9 @@ import {
     getVisualizationStateUpdate,
     normalizeVisualizationState,
 } from './visualizations/state';
+import { buildVisualizationQueryExplanation } from './visualizationQueryExplanations';
+
+const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((category) => [category.id, category.name]));
 
 /**
  * ProfileWindow - A single analytics window that can display various visualizations
@@ -57,6 +60,7 @@ function ProfileWindow({
     globalDateRange = null,
     onGlobalDateRangeChange,
     globalFilters = null,
+    onOpenQueryConsole = null,
 }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const { sessions, goalAnalytics, activities, activityGroups, activityInstances, rootId } = data;
@@ -66,6 +70,7 @@ function ProfileWindow({
     // Local state for split dropdown
     const [showSplitMenu, setShowSplitMenu] = useState(false);
     const [isHeaderMinimized, setIsHeaderMinimized] = useState(false);
+    const [isQueryOverlayOpen, setIsQueryOverlayOpen] = useState(false);
 
     // Track container width for responsive styling
     const [isNarrow, setIsNarrow] = useState(false);
@@ -190,8 +195,6 @@ function ProfileWindow({
         sessions: <TimerIcon size={16} />,
         activities: <LightningIcon size={16} />,
     };
-
-    const categoryLabels = Object.fromEntries(VISUALIZATION_CATEGORIES.map((category) => [category.id, category.name]));
 
     const renderVisualizationIcon = (visualization, size = 16) => {
         if (visualization?.id === 'goalDetail') {
@@ -357,6 +360,51 @@ function ProfileWindow({
         selectedVisualizationMeta,
     ]);
 
+    const queryExplanation = useMemo(() => {
+        if (!selectedVisualizationMeta) return null;
+        return buildVisualizationQueryExplanation({
+            selectedCategory,
+            selectedVisualization,
+            visualization: selectedVisualizationMeta,
+            visualizationState,
+            categoryLabel: CATEGORY_LABELS[selectedCategory] || selectedCategory,
+            dateRange: effectiveDateRange,
+            globalFilters: resolvedGlobalFilters,
+            effectiveSelectedActivity,
+            effectiveSelectedGoal,
+            resultShape: {
+                sessions: filteredSessions.length,
+                activities: scopedActivities.length,
+                goals: filteredGoalAnalyticsGoals.length,
+            },
+        });
+    }, [
+        effectiveDateRange,
+        effectiveSelectedActivity,
+        effectiveSelectedGoal,
+        filteredGoalAnalyticsGoals.length,
+        filteredSessions.length,
+        resolvedGlobalFilters,
+        scopedActivities.length,
+        selectedCategory,
+        selectedVisualization,
+        selectedVisualizationMeta,
+        visualizationState,
+    ]);
+
+    const handleCopyQuery = async (event) => {
+        event.stopPropagation();
+        if (!queryExplanation?.sql || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
+        await navigator.clipboard.writeText(`${queryExplanation.sql}\n\n-- Metadata\n${JSON.stringify(queryExplanation.metadata, null, 2)}`);
+    };
+
+    const handleOpenQueryConsole = (event) => {
+        event.stopPropagation();
+        if (queryExplanation?.sql && queryExplanation.metadata.runnable !== false) {
+            onOpenQueryConsole?.(queryExplanation.sql);
+        }
+    };
+
     const renderUnifiedHeader = () => {
         const hasCategory = !!selectedCategory;
 
@@ -400,13 +448,28 @@ function ProfileWindow({
                                     : <ChartIcon size={16} />}
                         </span>
                         <span>
-                            {selectedVisualizationMeta?.name || categoryLabels[selectedCategory] || 'Analytics'}
+                            {selectedVisualizationMeta?.name || CATEGORY_LABELS[selectedCategory] || 'Analytics'}
                         </span>
                     </div>
                 </div>
 
                 {/* Global Actions (Annotations, Split, Close) */}
                 <div className={styles.globalActions}>
+                    {selectedVisualizationMeta && (
+                        <Button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsQueryOverlayOpen((current) => !current);
+                            }}
+                            variant="secondary"
+                            size="sm"
+                            style={{ padding: '0 8px', minWidth: '32px' }}
+                            aria-label="Show chart query"
+                            title="Show chart query"
+                        >
+                            SQL
+                        </Button>
+                    )}
                     {canSplit && (
                         <div style={{ position: 'relative' }}>
                             <Button
@@ -494,6 +557,44 @@ function ProfileWindow({
         </div>
     );
 
+    const renderQueryOverlay = () => {
+        if (!isQueryOverlayOpen || !queryExplanation) return null;
+        return (
+            <div className={styles.queryOverlay} onClick={(event) => event.stopPropagation()}>
+                <div className={styles.queryOverlayHeader}>
+                    <div>
+                        <strong>Chart Query</strong>
+                        <span>{queryExplanation.metadata.visualization}</span>
+                    </div>
+                    <button type="button" onClick={() => setIsQueryOverlayOpen(false)} aria-label="Close chart query">x</button>
+                </div>
+                <pre className={styles.querySql}>{queryExplanation.sql}</pre>
+                <dl className={styles.queryMeta}>
+                    <div><dt>Dataset</dt><dd>{queryExplanation.metadata.dataset}</dd></div>
+                    <div><dt>Source</dt><dd>{queryExplanation.metadata.execution || 'catalog_sql'}</dd></div>
+                    <div><dt>Goals</dt><dd>{queryExplanation.metadata.resultShape.goals}</dd></div>
+                    <div><dt>Sessions</dt><dd>{queryExplanation.metadata.resultShape.sessions}</dd></div>
+                </dl>
+                {queryExplanation.metadata.notes?.length > 0 && (
+                    <div className={styles.queryNotes}>
+                        {queryExplanation.metadata.notes[0]}
+                    </div>
+                )}
+                <div className={styles.queryActions}>
+                    <button type="button" onClick={handleCopyQuery}>Copy</button>
+                    <button
+                        type="button"
+                        onClick={handleOpenQueryConsole}
+                        disabled={queryExplanation.metadata.runnable === false}
+                        title={queryExplanation.metadata.runnable === false ? 'This chart is produced from the analytics read model and is not directly runnable in the SQL console yet.' : 'Open in SQL console'}
+                    >
+                        Open Console
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     const renderCategoryCards = () => (
         <div className={styles.selectionSurface}>
             <div className={styles.selectionGrid}>
@@ -505,7 +606,7 @@ function ProfileWindow({
                         onClick={() => handleCategoryChange(category)}
                     >
                         <span className={styles.selectionIcon}>{categoryIcons[category]}</span>
-                        <span className={styles.selectionName}>{categoryLabels[category]}</span>
+                        <span className={styles.selectionName}>{CATEGORY_LABELS[category]}</span>
                     </button>
                 ))}
             </div>
@@ -588,6 +689,7 @@ function ProfileWindow({
             className={`${styles.windowContainer} ${isSelected ? styles.selected : ''}`}
         >
             {isHeaderMinimized ? renderMinimizedHeaderOverlay() : renderUnifiedHeader()}
+            {renderQueryOverlay()}
             {renderVisualizationContent()}
         </div>
     );

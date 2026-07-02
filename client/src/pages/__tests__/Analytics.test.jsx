@@ -31,6 +31,8 @@ vi.mock('../../hooks/useAnalyticsPageData', () => ({
 vi.mock('../../hooks/useDashboardQueries', () => ({
     useAnalyticsViews: () => ({
         analyticsViews: [],
+        analyticsViewItems: [],
+        analyticsDashboards: [],
         createAnalyticsView,
         updateAnalyticsView,
         deleteAnalyticsView,
@@ -94,7 +96,7 @@ describe('Analytics page', () => {
         expect(screen.getByText('Empty Analytics View')).toBeInTheDocument();
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Save View' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
         });
 
         expect(await screen.findByText('Save Analytics View')).toBeInTheDocument();
@@ -114,27 +116,19 @@ describe('Analytics page', () => {
         await waitFor(() => {
             expect(createAnalyticsView).toHaveBeenCalledWith({
                 name: 'My Saved View',
+                kind: 'view',
                 layout: {
-                    version: 3,
-                    layout: {
-                        type: 'grid',
-                        panels: [
-                            { id: 'window-1', x: 0, y: 0, w: 96, h: 48 },
-                        ],
+                    type: 'analytics_view',
+                    version: 1,
+                    profile: {
+                        selectedActivity: null,
+                        selectedCategory: null,
+                        selectedGoal: null,
+                        selectedModeIds: [],
+                        selectedVisualization: null,
+                        visualizationState: {},
+                        visualizationStateByKey: {},
                     },
-                    layout_bounds: { columns: 12, rows: 6 },
-                    window_states: {
-                        'window-1': {
-                            selectedActivity: null,
-                            selectedCategory: null,
-                            selectedGoal: null,
-                            selectedModeIds: [],
-                            selectedVisualization: null,
-                            visualizationState: {},
-                            visualizationStateByKey: {},
-                        },
-                    },
-                    selected_window_id: 'window-1',
                     global_filters: {
                         goals: {
                             goalIds: [],
@@ -177,7 +171,7 @@ describe('Analytics page', () => {
     it('opens the query console from the analytics header mode switch', async () => {
         render(<Analytics />);
 
-        expect(screen.getByRole('button', { name: 'Save View' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
         expect(
             screen.queryByText('Analytics panel') || screen.queryByText('Loading analytics panel...')
         ).toBeInTheDocument();
@@ -188,7 +182,7 @@ describe('Analytics page', () => {
 
         expect(screen.getByRole('heading', { name: 'Query Console', level: 1 })).toBeInTheDocument();
         expect(screen.getByRole('region', { name: 'Analytics query console' })).toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Save View' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Saved Analytics' })).not.toBeInTheDocument();
         expect(screen.queryByText('Analytics panel')).not.toBeInTheDocument();
         expect(screen.queryByText('Loading analytics panel...')).not.toBeInTheDocument();
     });

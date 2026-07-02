@@ -5,6 +5,7 @@ import { invalidateGoalAssociationQueries } from '../components/goals/goalDetail
 import { fractalApi } from '../utils/api';
 import { useActivityGoalAssociations } from './useActivityGoalAssociations';
 import { queryKeys } from './queryKeys';
+import { logError } from '../utils/logger';
 
 function dedupeById(items) {
     return Array.from(new Map((items || []).map((item) => [item.id, item])).values());
@@ -170,7 +171,7 @@ export function useGoalAssociationMutations({
 
             return true;
         } catch (error) {
-            console.error('Error persisting activity associations:', error);
+            logError('Error persisting activity associations:', error);
             return false;
         }
     };

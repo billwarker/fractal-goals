@@ -19,6 +19,8 @@ from models import (
     Program,
     ProgramBlock,
     ProgramDay,
+    SessionTemplate,
+    Target,
     User,
     activity_goal_associations,
 )
@@ -238,6 +240,134 @@ def auth_headers_for(user):
     return {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
 
 
+@pytest.fixture
+def landing_publish_budget_dataset(db_session):
+    admin = User(
+        id=str(uuid.uuid4()),
+        username="landingadmin",
+        email="landingadmin@example.com",
+        role="admin",
+    )
+    admin.set_password("Password123")
+    db_session.add(admin)
+
+    ultimate_level = GoalLevel(
+        id=str(uuid.uuid4()),
+        name="Ultimate Goal",
+        rank=0,
+        owner_id=admin.id,
+        color="#4f9cf9",
+    )
+    child_level = GoalLevel(
+        id=str(uuid.uuid4()),
+        name="Long Term Goal",
+        rank=1,
+        owner_id=admin.id,
+        color="#22c55e",
+    )
+    db_session.add_all([ultimate_level, child_level])
+    db_session.flush()
+
+    root = Goal(
+        id=str(uuid.uuid4()),
+        name="Landing Budget Root",
+        description="Budget fixture root",
+        owner_id=admin.id,
+        level_id=ultimate_level.id,
+        created_at=datetime.now(timezone.utc),
+    )
+    root.root_id = root.id
+    db_session.add(root)
+    db_session.flush()
+
+    activity = ActivityDefinition(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        name="Landing Budget Activity",
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(activity)
+    db_session.flush()
+
+    session = PracticeSession(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        name="Landing Budget Session",
+        session_start=datetime.now(timezone.utc) - timedelta(days=1),
+        total_duration_seconds=1800,
+        completed=True,
+        completed_at=datetime.now(timezone.utc) - timedelta(days=1),
+        attributes=json.dumps({"session_data": {"sections": [{"name": "Main", "activity_ids": []}]}}),
+    )
+    db_session.add(session)
+    db_session.flush()
+
+    instance = ActivityInstance(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        session_id=session.id,
+        activity_definition_id=activity.id,
+        duration_seconds=1800,
+        completed=True,
+        created_at=session.created_at,
+        data=json.dumps({}),
+    )
+    db_session.add(instance)
+    db_session.flush()
+    session.attributes = json.dumps({
+        "session_data": {
+            "sections": [{"name": "Main", "activity_ids": [instance.id]}],
+        },
+    })
+
+    for index in range(16):
+        child = Goal(
+            id=str(uuid.uuid4()),
+            name=f"Landing Child {index}",
+            description="Budget child",
+            relevance_statement="Public-safe relevance",
+            parent_id=root.id,
+            root_id=root.id,
+            owner_id=admin.id,
+            level_id=child_level.id,
+            created_at=datetime.now(timezone.utc) - timedelta(days=index),
+        )
+        db_session.add(child)
+        db_session.flush()
+        db_session.execute(activity_goal_associations.insert().values(activity_id=activity.id, goal_id=child.id))
+        db_session.add(Target(
+            id=str(uuid.uuid4()),
+            goal_id=child.id,
+            root_id=root.id,
+            name=f"Landing Target {index}",
+        ))
+        db_session.add(Note(
+            id=str(uuid.uuid4()),
+            root_id=root.id,
+            context_type="goal",
+            context_id=child.id,
+            goal_id=child.id,
+            content=f"Budget note {index}",
+        ))
+
+    db_session.add(SessionTemplate(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        name="Landing Budget Template",
+        template_data={"sections": [{"name": "Main", "activities": [{"activity_id": activity.id, "name": activity.name}]}]},
+    ))
+    db_session.add(AnalyticsDashboard(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        user_id=admin.id,
+        name="Landing Budget View",
+        kind="view",
+        layout={"version": 3, "layout": {"type": "grid", "panels": []}, "window_states": {}},
+    ))
+    db_session.commit()
+    return {"admin": admin, "root": root}
+
+
 @pytest.mark.integration
 def test_get_session_activities_query_budget(authed_client, query_counter, sample_practice_session, sample_activity_instance):
     """
@@ -252,6 +382,32 @@ def test_get_session_activities_query_budget(authed_client, query_counter, sampl
 
     assert_response_budget(response, max_bytes=80_000, max_ms=500, elapsed_ms=elapsed_ms)
     assert query_counter["total"] <= 15
+
+
+@pytest.mark.integration
+def test_publish_landing_examples_query_budget(client, query_counter, landing_publish_budget_dataset):
+    """Landing snapshot publish should batch goal tree enrichment instead of querying per goal."""
+    admin = landing_publish_budget_dataset["admin"]
+    root = landing_publish_budget_dataset["root"]
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_request(
+        client,
+        "post",
+        "/api/admin/landing-examples/publish",
+        data=json.dumps({
+            "examples": [{
+                "root_id": root.id,
+                "label": "Budget fixture",
+                "sort_order": 0,
+            }],
+        }),
+        headers=auth_headers_for(admin),
+        content_type="application/json",
+    )
+
+    assert_response_budget(response, max_bytes=100_000, max_ms=1_200, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 80
 
 
 @pytest.mark.integration

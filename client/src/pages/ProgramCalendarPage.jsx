@@ -5,15 +5,11 @@ import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import ProgramBlockView from '../components/programs/ProgramBlockView';
 import ProgramCalendarView from '../components/programs/ProgramCalendarView';
-import ProgramSidebar from '../components/programs/ProgramSidebar';
+import ProgramSidePane from '../components/programs/ProgramSidePane';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/atoms/Modal';
-import SidePaneHeader from '../components/common/SidePaneHeader';
-import SidePaneHeaderButton from '../components/common/SidePaneHeaderButton';
-import ViewToggleTabs from '../components/common/ViewToggleTabs';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
-import SidePaneNotePanel from '../components/common/SidePaneNotePanel';
 import { useGoals } from '../contexts/GoalsContext';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -30,7 +26,7 @@ import { formatLiteralDate, getISOYMDInTimezone, subtractDaysToDateString } from
 import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
 import { createProgramCalendarContext, programCalendarContextReducer } from '../utils/programCalendarContext';
-import { buildProgramSidePaneData, getProgramColor } from '../utils/programViewModel';
+import { getProgramColor } from '../utils/programViewModel';
 import styles from './ProgramCalendarPage.module.css';
 
 const ProgramBlockModal = lazyWithRetry(() => import('../components/modals/ProgramBlockModal'), 'components/modals/ProgramBlockModal');
@@ -86,36 +82,6 @@ function getStatusLabel(status) {
     return 'Inactive';
 }
 
-function ProgramSidePaneSection({
-    title,
-    collapsed,
-    onToggle,
-    children,
-    className = '',
-    contentClassName = '',
-}) {
-    return (
-        <section className={`${styles.sidePaneSectionGroup} ${collapsed ? styles.sidePaneSectionGroupCollapsed : ''} ${className}`.trim()}>
-            <div className={styles.sidePaneSectionTitleRow}>
-                <div className={styles.sidePaneSectionTitle}>{title}</div>
-                <button
-                    type="button"
-                    className={styles.sidePaneSectionToggle}
-                    onClick={onToggle}
-                    aria-expanded={!collapsed}
-                >
-                    {collapsed ? 'Show' : 'Hide'}
-                </button>
-            </div>
-            {!collapsed ? (
-                <div className={`${styles.sidePaneSectionContent} ${contentClassName}`.trim()}>
-                    {children}
-                </div>
-            ) : null}
-        </section>
-    );
-}
-
 function getDayOffset(startDate, nextStartDate) {
     const source = new Date(`${getDatePart(startDate)}T00:00:00`);
     const target = new Date(`${getDatePart(nextStartDate)}T00:00:00`);
@@ -130,170 +96,6 @@ function shiftDatePart(dateValue, dayOffset) {
     if (Number.isNaN(shifted.getTime())) return null;
     shifted.setDate(shifted.getDate() + dayOffset);
     return shifted.toISOString().slice(0, 10);
-}
-
-function ProgramSidePane({
-    program,
-    goals,
-    onCreate,
-    onCollapse,
-    view,
-    onViewChange,
-    programMetrics,
-    activeBlock,
-    blockMetrics,
-    programGoalSeeds,
-    onGoalClick,
-    notesQuery,
-    notes,
-    onCreateNote,
-}) {
-    const fallbackSidePaneData = useMemo(() => buildProgramSidePaneData({
-        program,
-        goals,
-    }), [goals, program]);
-    const getGoalDetails = (goalId) => goals.find((goal) => goal.id === goalId) || null;
-    const [collapsedSections, setCollapsedSections] = useState({
-        details: false,
-        metrics: false,
-        notes: false,
-        goals: false,
-    });
-    const toggleSection = (key) => {
-        setCollapsedSections((current) => ({
-            ...current,
-            [key]: !current[key],
-        }));
-    };
-    const sidePaneData = {
-        programMetrics: programMetrics || fallbackSidePaneData.programMetrics,
-        activeBlock: activeBlock || fallbackSidePaneData.activeBlock,
-        blockMetrics: blockMetrics || fallbackSidePaneData.blockMetrics,
-        programGoalSeeds: programGoalSeeds || fallbackSidePaneData.programGoalSeeds,
-    };
-
-    return (
-        <aside className={styles.sidePane} aria-label="Program side pane">
-            <SidePaneHeader
-                actions={(
-                    <SidePaneHeaderButton
-                        onClick={onCollapse}
-                    >
-                        Collapse
-                    </SidePaneHeaderButton>
-                )}
-            >
-                <ViewToggleTabs
-                    items={[
-                        { value: 'details', label: 'Details' },
-                        { value: 'goals', label: 'Goals' },
-                    ]}
-                    value={view}
-                    onChange={onViewChange}
-                    ariaLabel="Program side pane views"
-                    style={{
-                        '--view-toggle-panel-bg': 'var(--color-bg-sidebar)',
-                    }}
-                />
-            </SidePaneHeader>
-
-            {program && view === 'details' ? (
-                <div className={styles.detailsPane}>
-                    <ProgramSidePaneSection
-                        title="Details"
-                        collapsed={collapsedSections.details}
-                        onToggle={() => toggleSection('details')}
-                    >
-                        {program.description ? (
-                            <p className={styles.sectionDescription}>{program.description}</p>
-                        ) : (
-                            <p className={styles.emptySectionText}>No details yet.</p>
-                        )}
-                    </ProgramSidePaneSection>
-
-                    <ProgramSidePaneSection
-                        title="Metrics"
-                        collapsed={collapsedSections.metrics}
-                        onToggle={() => toggleSection('metrics')}
-                        contentClassName={styles.metricsSectionContent}
-                    >
-                        <ProgramSidebar
-                            program={program}
-                            programMetrics={sidePaneData.programMetrics}
-                            activeBlock={sidePaneData.activeBlock}
-                            blockMetrics={sidePaneData.blockMetrics}
-                            programGoalSeeds={sidePaneData.programGoalSeeds}
-                            onGoalClick={onGoalClick || (() => {})}
-                            getGoalDetails={getGoalDetails}
-                            compact
-                            hideGoals
-                            flushMetricsPadding
-                            className={styles.embeddedSidebarMetrics}
-                        />
-                    </ProgramSidePaneSection>
-
-                    <ProgramSidePaneSection
-                        title={notes.length > 0 ? `Program Notes (${notes.length})` : 'Program Notes'}
-                        collapsed={collapsedSections.notes}
-                        onToggle={() => toggleSection('notes')}
-                        className={styles.notesSidePaneSection}
-                        contentClassName={styles.notesSectionContent}
-                    >
-                        <SidePaneNotePanel
-                            notes={notes}
-                            isLoading={notesQuery.isLoading}
-                            error={notesQuery.error}
-                            onSubmit={onCreateNote}
-                            onEdit={notesQuery.updateNote}
-                            onDelete={notesQuery.deleteNote}
-                            onPin={notesQuery.pinNote}
-                            onUnpin={notesQuery.unpinNote}
-                            hasMore={notesQuery.hasMore}
-                            onLoadMore={notesQuery.loadNextPage}
-                            placeholder="Add a program note..."
-                            label="Program Notes"
-                            hideHeader
-                        />
-                    </ProgramSidePaneSection>
-                </div>
-            ) : null}
-
-            {program && view === 'goals' ? (
-                <div className={styles.goalsPane}>
-                    <ProgramSidePaneSection
-                        title="Program Goals"
-                        collapsed={collapsedSections.goals}
-                        onToggle={() => toggleSection('goals')}
-                        className={styles.goalsSidePaneSection}
-                        contentClassName={styles.goalsSectionContent}
-                    >
-                        <ProgramSidebar
-                            program={program}
-                            programMetrics={sidePaneData.programMetrics}
-                            activeBlock={sidePaneData.activeBlock}
-                            blockMetrics={sidePaneData.blockMetrics}
-                            programGoalSeeds={sidePaneData.programGoalSeeds}
-                            onGoalClick={onGoalClick || (() => {})}
-                            getGoalDetails={getGoalDetails}
-                            compact
-                            hideMetrics
-                            hideGoalsHeader
-                            className={styles.embeddedSidebar}
-                        />
-                    </ProgramSidePaneSection>
-                </div>
-            ) : null}
-
-            {!program ? (
-                <div className={styles.emptySidePane}>
-                    <div className={styles.emptySidePaneCard}>
-                        <p>No program is scheduled for this day.</p>
-                        <button className={styles.emptySidePaneButton} onClick={onCreate}>New Program</button>
-                    </div>
-                </div>
-            ) : null}
-        </aside>
-    );
 }
 
 function ProgramCalendarPage() {

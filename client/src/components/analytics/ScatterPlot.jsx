@@ -1,6 +1,6 @@
 import React from 'react';
 import { Scatter } from 'react-chartjs-2';
-import { chartDefaults, useChartOptions } from './ChartJSWrapper'; // Import hook
+import { useChartOptions, useChartThemeDefaults } from './ChartJSWrapper';
 import { withScatterPointDensity } from './scatterPointProfile';
 import styles from './ScatterPlot.module.css';
 
@@ -21,6 +21,7 @@ function ScatterPlot({
     selectedMetricX = null,
     selectedMetricY = null,
 }) {
+    const chartTheme = useChartThemeDefaults();
     const activityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
     const metrics = activityDef?.metric_definitions || [];
 
@@ -208,11 +209,11 @@ function ScatterPlot({
             label: selectedActivity.name,
             data: chartDataPoints,
             backgroundColor: 'rgba(33, 150, 243, 0.7)',
-            borderColor: chartDefaults.borderColor,
+            borderColor: chartTheme.borderColor,
             borderWidth: 1,
             pointRadius: chartDataPoints.map((point) => point.pointRadius),
             pointHoverRadius: chartDataPoints.map((point) => point.pointHoverRadius),
-            pointHoverBackgroundColor: chartDefaults.primaryColor,
+            pointHoverBackgroundColor: chartTheme.primaryColor,
             pointHoverBorderColor: '#fff',
             pointHoverBorderWidth: 2
         }]
