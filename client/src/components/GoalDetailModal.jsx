@@ -1,5 +1,4 @@
-import React, { Suspense, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useMemo, useState } from 'react';
 
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -9,39 +8,20 @@ import { useGoalForm } from '../hooks/useGoalForm';
 import { useGoalNotes } from '../hooks/useGoalNotes';
 import { useGoalAssociations, useGoalDailyDurations, useGoalMetrics } from '../hooks/useGoalQueries';
 import { getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
-import { getChildType, getValidChildTypes, getTypeDisplayName } from '../utils/goalHelpers';
+import { getChildType, getValidChildTypes } from '../utils/goalHelpers';
 import { flattenGoalTree, isExecutionGoalType } from '../utils/goalNodeModel';
 import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
-import { importWithRetry, lazyWithRetry } from '../utils/lazyWithRetry';
+import { importWithRetry } from '../utils/lazyWithRetry';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
 import { getParentGoalInfo } from './goals/goalDetailUtils';
-import GoalCompletionModal from './goals/GoalCompletionModal';
-import GoalUncompletionModal from './goals/GoalUncompletionModal';
-import GoalHeader from './goals/GoalHeader';
-import GoalViewMode from './goals/GoalViewMode';
-import GoalEditForm from './goals/GoalEditForm';
-import GraphProfileLoadingFallback from './goalDetail/GraphProfileLoadingFallback';
-import CloseButton from './atoms/CloseButton';
-import GoalIcon from './atoms/GoalIcon';
-import ModalBackdrop from './atoms/ModalBackdrop';
-import SidePaneNotePanel from './common/SidePaneNotePanel';
-import ViewToggleTabs from './common/ViewToggleTabs';
+import GoalDetailModalRenderSurface from './goalDetail/GoalDetailModalRenderSurface';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
 
-import styles from './GoalDetailModal.module.css';
 import { logError } from '../utils/logger';
 
-const TargetManager = lazyWithRetry(() => import('./goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
-const ActivityAssociator = lazyWithRetry(() => import('./goalDetail/ActivityAssociator'), 'components/goalDetail/ActivityAssociator');
-const InlineActivityBuilder = lazyWithRetry(() => import('./goalDetail/InlineActivityBuilderModal'), 'components/goalDetail/InlineActivityBuilderModal');
 const loadGraphProfileModal = () => import('./analytics/graphs/GraphProfileModal');
-const GraphProfileModal = lazyWithRetry(loadGraphProfileModal, 'components/analytics/graphs/GraphProfileModal');
-const TargetAnalyticsModal = lazyWithRetry(() => import('./goalDetail/TargetAnalyticsModal'), 'components/goalDetail/TargetAnalyticsModal');
-const GoalOptionsView = lazyWithRetry(() => import('./goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
-const GoalNotesView = lazyWithRetry(() => import('./goalDetail/GoalNotesView'), 'components/goalDetail/GoalNotesView');
-const GoalTimelineView = lazyWithRetry(() => import('./goalDetail/GoalTimelineView'), 'components/goalDetail/GoalTimelineView');
 
 /**
  * GoalDetailModal Component
@@ -646,774 +626,137 @@ function GoalDetailModal({
     // Allow rendering without goal in create mode
     if (!goal && mode !== 'create') return null;
 
-    // ============ LEVEL PICKER (CREATE MODE — multiple valid levels) ============
-    const renderLevelPicker = () => (
-        <div className={styles.levelPickerContainer}>
-            <div className={styles.levelPickerHeader}>
-                <CloseButton
-                    onClick={handleClose}
-                    className={styles.levelPickerClose}
-                    size={20}
-                />
-            </div>
-            <p className={styles.levelPickerPrompt}>
-                What level of goal do you want to create under{' '}
-                <strong
-                    className={styles.levelPickerParentName}
-                    style={{ '--level-picker-accent': getGoalColor(parentType) }}
-                >
-                    {parentGoal?.attributes?.name || parentGoal?.name}
-                </strong>?
-            </p>
-            <div className={styles.levelPickerGrid}>
-                {validChildTypes.map((type) => {
-                    const color = getGoalColor(type);
-                    const secondaryColor = getGoalSecondaryColor(type);
-                    const icon = getGoalIcon(type);
-                    return (
-                        <button
-                            key={type}
-                            className={styles.levelPickerOption}
-                            style={{ '--level-picker-accent': color }}
-                            onClick={() => setSelectedChildType(type)}
-                        >
-                            <GoalIcon
-                                shape={icon}
-                                color={color}
-                                secondaryColor={secondaryColor}
-                                size={20}
-                                className={styles.levelPickerIcon}
-                            />
-                            {getTypeDisplayName(type)}
-                        </button>
-                    );
-                })}
-            </div>
-            {onGoalSelect && parentGoal && (
-                <button
-                    onClick={() => onGoalSelect(parentGoal)}
-                    className={styles.levelPickerBack}
-                >
-                    ← Back
-                </button>
-            )}
-        </div>
-    );
-
-    // ============ GOAL CONTENT (VIEW/EDIT) ============
-    const renderGoalContent = () => {
-        return (
-            <>
-                {isEditing ? (
-                    /* ============ EDIT MODE ============ */
-                    <GoalEditForm
-                        mode={mode}
-                        goal={goal}
-                        goalId={goalId}
-                        rootId={rootId}
-                        goalType={goalType}
-                        goalColor={displayGoalColor}
-                        textColor={displayTextColor}
-                        parentGoal={parentGoal}
-                        parentGoalName={parentGoalName}
-                        parentGoalColor={parentGoalColor}
-                        isCompleted={isCompleted}
-                        validChildTypes={validChildTypes}
-                        onLevelChange={setSelectedChildType}
-                        name={name} setName={setName}
-                        description={description} setDescription={setDescription}
-                        deadline={deadline} setDeadline={setDeadline}
-                        relevanceStatement={relevanceStatement} setRelevanceStatement={setRelevanceStatement}
-                        trackActivities={trackActivities} setTrackActivities={setTrackActivities}
-                        completedViaChildren={completedViaChildren} setCompletedViaChildren={setCompletedViaChildren}
-                        inheritParentActivities={inheritParentActivities} setInheritParentActivities={setInheritParentActivities}
-                        allowManualCompletion={allowManualCompletion} setAllowManualCompletion={setAllowManualCompletion}
-                        targets={targets} setTargets={setTargets}
-                        associatedActivities={associatedActivities} setAssociatedActivities={setAssociatedActivities}
-                        associatedActivityGroups={associatedActivityGroups} setAssociatedActivityGroups={setAssociatedActivityGroups}
-                        activityDefinitions={activityDefinitions}
-                        activityGroups={activityGroups} setActivityGroups={setActivityGroups}
-                        setViewState={(view, target) => {
-                            if (target) setTargetToEdit(target);
-                            if (view === 'target-manager') setTargetManagerReturnView('goal');
-                            setViewState(view);
-                        }}
-                        refreshAssociations={refreshAssociations}
-                        handleCancel={handleCancel}
-                        handleSave={handleSave}
-                        showActions={false}
-                        errors={errors}
-                    />
-                ) : (
-                    /* ============ VIEW MODE ============ */
-                    <GoalViewMode
-                        mode={mode}
-                        goal={goal}
-                        goalId={goalId}
-                        rootId={rootId}
-                        goalType={goalType}
-                        goalColor={displayGoalColor}
-                        textColor={displayTextColor}
-                        parentGoalName={parentGoalName}
-                        parentGoalColor={parentGoalColor}
-                        isCompleted={isCompleted}
-                        levelConfig={levelConfig}
-                        allowManualCompletion={allowManualCompletion}
-                        trackActivities={trackActivities}
-                        childType={childType}
-                        displayMode={displayMode}
-                        programs={programs}
-                        targets={targets}
-                        associatedActivities={readOnly ? (readOnlyAssociatedActivities || []) : associatedActivities}
-                        activityDefinitions={readOnly ? (readOnlyAssociatedActivities || []) : activityDefinitions}
-                        treeData={treeData}
-                        name={name}
-                        description={description}
-                        deadline={deadline}
-                        relevanceStatement={relevanceStatement}
-                        setViewState={setViewState}
-                        onClose={handleClose}
-                        onGoalSelect={onGoalSelect}
-                        onUpdate={onUpdate}
-                        setTargets={setTargets}
-                        onTargetClick={readOnly ? undefined : setActiveAnalyticsTarget}
-                        onRequestTargetBuilder={readOnly ? undefined : (target) => setBuilderConfig({ target: target ?? null })}
-                        readOnly={readOnly}
-                    />
-                )
-                }
-            </>
-        );
-    };
-
-    // ============ DETERMINE WHICH CONTENT TO RENDER ============
-    // Read-only supports the same navigation tabs as the editable modal
-    // (Details / Timeline / Activities / Notes), all fed from the goal snapshot.
-    // Any other viewState is an editing flow that has no read-only surface, so
-    // fall back to the Details content.
-    const READ_ONLY_VIEW_STATES = ['goal', 'goal-timeline', 'goal-activities', 'goal-notes'];
-    let content;
-    if (readOnly && !READ_ONLY_VIEW_STATES.includes(viewState)) {
-        content = renderGoalContent();
-    } else if (viewState === 'complete-confirm') {
-        content = (
-            <GoalCompletionModal
-                goal={goal}
-                goalType={goalType}
-                programs={programs}
-                treeData={treeData}
-                targets={targets}
-                activityDefinitions={activityDefinitions}
-                onConfirm={handleCompletionConfirm}
-                onCancel={() => setViewState('goal')}
-            />
-        );
-    } else if (viewState === 'uncomplete-confirm') {
-        content = (
-            <GoalUncompletionModal
-                goal={goal}
-                goalType={goalType}
-                programs={programs}
-                treeData={treeData}
-                targets={targets}
-                activityDefinitions={activityDefinitions}
-                completedAt={localCompletedAt}
-                onConfirm={handleUncompletionConfirm}
-                onCancel={() => setViewState('goal')}
-            />
-        );
-    } else if (viewState === 'target-manager') {
-        content = (
-            <Suspense fallback={null}>
-                <TargetManager
-                    targets={targets}
-                    setTargets={setTargets}
-                    activityDefinitions={activityDefinitions}
-                    associatedActivities={associatedActivities}
-                    goalId={goalId}
-                    rootId={rootId}
-                    isEditing={true}
-                    viewMode="builder"
-                    headerColor="var(--color-text-muted)"
-                    initialTarget={targetToEdit}
-                    onCloseBuilder={() => {
-                        setTargetToEdit(null);
-                        setViewState(targetManagerReturnView);
-                    }}
-                    goalType={goalType}
-                    goalCompleted={isCompleted}
-                    onSave={(newTargets) => {
-                        if (onUpdate && goalId) {
-                            onUpdate(goalId, {
-                                name,
-                                description,
-                                deadline,
-                                relevance_statement: relevanceStatement,
-                                targets: newTargets,
-                                inherit_parent_activities: inheritParentActivities,
-                            });
-                        }
-                        setViewState(targetManagerReturnView);
-                    }}
-                />
-            </Suspense>
-        );
-    } else if (viewState === 'activity-associator') {
-        content = (
-            <Suspense fallback={null}>
-                <ActivityAssociator
-                    associatedActivities={associatedActivities}
-                    setAssociatedActivities={setAssociatedActivities}
-                    associatedActivityGroups={associatedActivityGroups}
-                    setAssociatedActivityGroups={setAssociatedActivityGroups}
-                    activityDefinitions={activityDefinitions}
-                    activityGroups={activityGroups}
-                    setActivityGroups={setActivityGroups}
-                    rootId={rootId}
-                    goalId={goalId}
-                    parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
-                    goalName={name}
-                    setTargets={setTargets}
-                    isEditing={true}
-                    targets={targets}
-                    viewMode="selector"
-                    onCloseSelector={() => setViewState('goal')}
-                    goalType={goalType}
-                    headerColor="var(--color-text-primary)"
-                    onClose={handleClose}
-                    onSave={!isEditing ? persistAssociations : undefined}
-                    onRefreshAssociations={refreshAssociations}
-                    inheritParentActivities={inheritParentActivities}
-                    setInheritParentActivities={setInheritParentActivities}
-                    onCreateActivity={() => {
-                        setActivityBuilderReturnView('activity-associator');
-                        setActivityBuilderTemplate(null);
-                        setIsActivityBuilderOpen(true);
-                    }}
-                    onCopyActivity={(activity) => {
-                        setActivityBuilderReturnView('activity-associator');
-                        setActivityBuilderTemplate(prepareActivityDefinitionCopy(activity));
-                        setIsActivityBuilderOpen(true);
-                    }}
-                />
-            </Suspense>
-        );
-    } else if (viewState === 'goal-activities' && readOnly) {
-        content = (
-            <Suspense fallback={null}>
-                <ActivityAssociator
-                    associatedActivities={readOnlyAssociatedActivities || []}
-                    setAssociatedActivities={() => {}}
-                    associatedActivityGroups={readOnlyAssociatedActivityGroups || []}
-                    setAssociatedActivityGroups={() => {}}
-                    activityDefinitions={activityDefinitions}
-                    activityGroups={activityGroups}
-                    setActivityGroups={() => {}}
-                    rootId={rootId}
-                    goalId={goalId}
-                    parentGoalId={goal?.attributes?.parent_id || goal?.parent_id}
-                    goalName={name}
-                    setTargets={() => {}}
-                    targets={targets}
-                    embedded
-                    readOnly
-                    inheritParentActivities={inheritParentActivities}
-                    dividerColor={displayGoalColor}
-                />
-            </Suspense>
-        );
-    } else if (viewState === 'goal-activities') {
-        content = (
-            <Suspense fallback={null}>
-                <ActivityAssociator
-                    associatedActivities={associatedActivities}
-                    setAssociatedActivities={setAssociatedActivities}
-                    associatedActivityGroups={associatedActivityGroups}
-                    setAssociatedActivityGroups={setAssociatedActivityGroups}
-                    activityDefinitions={activityDefinitions}
-                    activityGroups={activityGroups}
-                    setActivityGroups={setActivityGroups}
-                    rootId={rootId}
-                    goalId={goalId}
-                    parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
-                    goalName={name}
-                    setTargets={setTargets}
-                    isEditing={true}
-                    targets={targets}
-                    embedded
-                    useFooterAssociateAction
-                    registerAssociateAction={registerActivitiesAssociateAction}
-                    registerAssociateCancelAction={registerActivitiesAssociateCancelAction}
-                    onAssociationFlowChange={setIsActivitiesAssociationMode}
-                    registerPickerFooterActions={registerActivityPickerFooterActions}
-                    onClose={handleClose}
-                    onSave={persistAssociations}
-                    onRefreshAssociations={refreshAssociations}
-                    inheritParentActivities={inheritParentActivities}
-                    setInheritParentActivities={setInheritParentActivities}
-                    dividerColor={displayGoalColor}
-                    onCreateActivity={handleCreateActivityFromActivities}
-                    onCopyActivity={handleCopyActivityFromActivities}
-                    isTargetSelectionMode={isTargetSelectionMode}
-                    onSelectTargetActivity={handleSelectTargetActivity}
-                />
-            </Suspense>
-        );
-    } else if (viewState === 'goal-options') {
-        content = (
-            <Suspense fallback={null}>
-                <GoalOptionsView
-                    goal={goal}
-                    goalId={goalId}
-                    rootId={rootId}
-                    goalColor={displayGoalColor}
-                    textColor={displayTextColor}
-                    goalType={goalType}
-                    treeData={treeData}
-                    onGoalSelect={onGoalSelect}
-                    setViewState={setViewState}
-                    setIsEditing={setIsEditing}
-                    onDelete={onDelete}
-                    onClose={handleClose}
-                    displayMode={displayMode}
-                />
-            </Suspense>
-        );
-    } else if (viewState === 'goal-notes') {
-        content = (
-            <Suspense fallback={null}>
-                <GoalNotesView
-                    rootId={rootId}
-                    goalId={goalId}
-                    hideComposer
-                    readOnlyNotes={readOnlyNotes}
-                />
-            </Suspense>
-        );
-    } else if (viewState === 'goal-timeline') {
-        content = (
-            <Suspense fallback={null}>
-                <GoalTimelineView
-                    rootId={rootId}
-                    goalId={goalId}
-                    metrics={fetchedMetrics}
-                    onTimeSpentClick={readOnly ? undefined : () => setIsTimeGraphOpen(true)}
-                    readOnlyEntries={readOnlyTimelineEntries}
-                />
-            </Suspense>
-        );
-    } else if (needsLevelPicker && selectedChildType === null) {
-        content = renderLevelPicker();
-    } else {
-        content = renderGoalContent();
-    }
-
-    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline' || viewState === 'goal-activities')
-        && !(needsLevelPicker && selectedChildType === null);
-    if (shouldShowPersistentHeader) {
-        const headerTabs = mode !== 'create' ? (
-            <ViewToggleTabs
-                items={[
-                    { value: 'goal', label: 'Details' },
-                    { value: 'goal-timeline', label: 'Timeline' },
-                    { value: 'goal-activities', label: 'Activities' },
-                    { value: 'goal-notes', label: 'Notes' },
-                ]}
-                value={viewState}
-                onChange={handleGoalViewNavigation}
-                ariaLabel="Goal detail views"
-                className={styles.goalViewTabs}
-                style={{
-                    '--view-toggle-panel-bg': 'var(--color-bg-surface)',
-                }}
-            />
-        ) : null;
-
-        content = (
-            <>
-                <GoalHeader
-                    mode={mode}
-                    name={name}
-                    goal={goalForSmart}
-                    goalType={goalType}
-                    goalColor={displayGoalColor}
-                    goalSecondaryColor={mode !== 'create' && (isCompleted || goalIsSmart) ? displayGoalSecondaryColor : null}
-                    textColor={displayTextColor}
-                    parentGoal={parentGoal}
-                    onClose={handleClose}
-                    onCollapse={onMobileCollapse}
-                    deadline={deadline}
-                    goalStatus={goalStatus}
-                    headerTabs={headerTabs}
-                    headerRef={goalHeaderRef}
-                />
-                <div
-                    className={styles.afterHeaderContent}
-                    style={{ '--goal-detail-sticky-offset': `${goalHeaderStickyOffset}px` }}
-                >
-                    {content}
-                </div>
-            </>
-        );
-    }
-
-    const showGoalNoteComposer = !readOnly
-        && viewState === 'goal-notes'
-        && mode !== 'create'
-        && Boolean(rootId && goalId)
-        && !['complete-confirm', 'uncomplete-confirm'].includes(viewState);
-    const showCreateFooter = viewState === 'goal'
-        && mode === 'create'
-        && isEditing
-        && !(needsLevelPicker && selectedChildType === null);
-    const showEditFooter = viewState === 'goal'
-        && mode !== 'create'
-        && !readOnly
-        && isEditing;
-    const showDetailFooter = viewState === 'goal'
-        && mode !== 'create'
-        && !readOnly
-        && !isEditing;
-    const showActivitiesFooter = viewState === 'goal-activities'
-        && mode !== 'create'
-        && !readOnly
-        && Boolean(activitiesAssociateAction);
-    const isTargetFlowActive = isTargetSelectionMode;
-    const isAssociationFlowActive = isActivitiesAssociationMode;
-    const footerContent = showGoalNoteComposer ? (
-        <SidePaneNotePanel
-            composerOnly
-            onSubmit={handleQuickGoalNote}
-            placeholder="Add a goal note..."
-            className={styles.modalFooterComposer}
-        />
-    ) : (showCreateFooter || showEditFooter) ? (
-        <div className={styles.completionFooter}>
-            <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit}`}>
-                <button
-                    type="button"
-                    onClick={handleCancel}
-                    className={styles.completionFooterButton}
-                    style={{
-                        '--completion-accent': displayGoalColor,
-                        '--completion-text': 'var(--color-text-primary)',
-                    }}
-                >
-                    Cancel
-                </button>
-                <button
-                    type="button"
-                    onClick={handleSave}
-                    className={`${styles.completionFooterButton} ${styles.editFooterSaveButton}`}
-                    style={{
-                        '--completion-accent': displayGoalColor,
-                        '--completion-text': displayTextColor,
-                    }}
-                >
-                    {showCreateFooter ? 'Create' : 'Save'}
-                </button>
-            </div>
-        </div>
-    ) : showActivitiesFooter ? (
-        <div className={styles.completionFooter}>
-            {isTargetSelectionMode && (
-                <div
-                    className={styles.targetSelectionBanner}
-                    role="status"
-                    style={{ '--target-selection-accent': displayGoalColor }}
-                >
-                    Select the activity you want to create a target for.
-                </div>
-            )}
-            {isAssociationFlowActive && activityPickerFooterActions ? (
-                <div className={`${styles.completionFooterActions} ${styles.activitiesFooterSelectionActions}`}>
-                    <button
-                        type="button"
-                        onClick={activityPickerFooterActions.onCancel}
-                        className={styles.completionFooterButton}
-                        style={{
-                            '--completion-accent': displayGoalColor,
-                            '--completion-text': 'var(--color-text-primary)',
-                        }}
-                    >
-                        {activityPickerFooterActions.cancelLabel}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={activityPickerFooterActions.onClear}
-                        className={styles.completionFooterButton}
-                        disabled={!activityPickerFooterActions.canClear}
-                        style={{
-                            '--completion-accent': displayGoalColor,
-                            '--completion-text': 'var(--color-text-primary)',
-                        }}
-                    >
-                        {activityPickerFooterActions.clearLabel}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={activityPickerFooterActions.onConfirm}
-                        className={`${styles.completionFooterButton} ${styles.activitiesFooterConfirmButton}`}
-                        disabled={!activityPickerFooterActions.canConfirm}
-                        style={{
-                            '--completion-accent': displayGoalColor,
-                            '--completion-text': activityPickerFooterActions.canConfirm
-                                ? displayTextColor
-                                : 'var(--color-text-secondary)',
-                        }}
-                    >
-                        {activityPickerFooterActions.confirmLabel}
-                    </button>
-                </div>
-            ) : (
-                <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit}`}>
-                    <button
-                        type="button"
-                        onClick={isTargetFlowActive ? handleCancelActivitiesFlow : activitiesAssociateAction}
-                        className={`${styles.completionFooterButton} ${isAssociationFlowActive ? styles.completionFooterButtonActive : ''}`}
-                        disabled={isAssociationFlowActive}
-                        style={{
-                            '--completion-accent': displayGoalColor,
-                            '--completion-text': 'var(--color-text-primary)',
-                        }}
-                    >
-                        {isTargetFlowActive ? 'Cancel' : '+ Associate Activities'}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={isAssociationFlowActive ? handleCancelActivitiesFlow : handleAddTargetFromActivities}
-                        className={`${styles.completionFooterButton} ${isTargetFlowActive ? styles.completionFooterButtonActive : ''}`}
-                        disabled={isTargetFlowActive}
-                        style={{
-                            '--completion-accent': displayGoalColor,
-                            '--completion-text': 'var(--color-text-primary)',
-                        }}
-                    >
-                        {isAssociationFlowActive ? 'Cancel' : '+ Add Target'}
-                    </button>
-                </div>
-            )}
-        </div>
-    ) : showDetailFooter ? (
-        <div className={styles.completionFooter}>
-            <div className={`${styles.completionFooterActions} ${styles.completionFooterMulti}`}>
-                <button
-                    type="button"
-                    onClick={handleEditDetails}
-                    className={styles.completionFooterButton}
-                    style={{
-                        '--completion-accent': displayGoalColor,
-                        '--completion-text': 'var(--color-text-primary)',
-                    }}
-                >
-                    Edit
-                </button>
-                <button
-                    type="button"
-                    onClick={() => handleGoalViewNavigation('goal-options')}
-                    className={styles.completionFooterButton}
-                    style={{
-                        '--completion-accent': displayGoalColor,
-                        '--completion-text': 'var(--color-text-primary)',
-                    }}
-                >
-                    Options
-                </button>
-                {canAddChildGoal && (
-                    <button
-                        type="button"
-                        onClick={handleAddChildGoal}
-                        className={styles.completionFooterButton}
-                        style={{
-                            '--completion-accent': displayGoalColor,
-                            '--completion-text': 'var(--color-text-primary)',
-                        }}
-                    >
-                        + Add Child Goal
-                    </button>
-                )}
-                {onToggleCompletion && (
-                    <button
-                        type="button"
-                        onClick={handleCompletionFooterClick}
-                        disabled={!completionFooterState.canToggleCompletion}
-                        className={`${styles.completionFooterButton} ${isCompleted ? styles.completionFooterDone : ''} ${isPaused ? styles.completionFooterPaused : ''}`}
-                        style={{
-                            '--completion-accent': isCompleted ? completedColor : displayGoalColor,
-                            '--completion-secondary': isCompleted ? completedSecondaryColor : displayGoalSecondaryColor,
-                            '--completion-text': isCompleted ? completedTextColor : 'var(--color-text-primary)',
-                        }}
-                    >
-                        {completionFooterState.label}
-                    </button>
-                )}
-            </div>
-        </div>
-    ) : null;
-
-    const timeGraphModal = isTimeGraphOpen ? (
-        <Suspense fallback={
-            <GraphProfileLoadingFallback
-                title={name || goal?.name || 'Time Spent'}
-                color={displayGoalColor}
-                onClose={() => setIsTimeGraphOpen(false)}
-            />
-        }>
-            <GraphProfileModal
-                profileId="goalDuration"
-                title={name || goal?.name || 'Time Spent'}
-                onClose={() => setIsTimeGraphOpen(false)}
-                data={{
-                    goal: {
-                        id: depGoalId,
-                        name: name || goal?.name,
-                        type: goalType,
-                        color: displayGoalColor,
-                    },
-                    points: dailyDurationsData?.points || [],
-                    metrics: fetchedMetrics,
-                }}
-                isLoading={isDailyDurationsLoading || isDailyDurationsFetching}
-                isError={isDailyDurationsError}
-            />
-        </Suspense>
-    ) : null;
-
-    const activityBuilderModal = isActivityBuilderOpen ? (
-        <Suspense fallback={null}>
-            <InlineActivityBuilder
-                rootId={rootId}
-                goalId={goalId}
-                activityGroups={activityGroups}
-                activityTemplate={activityBuilderTemplate}
-                onSuccess={async (newActivity) => {
-                    if (newActivity && newActivity.id) {
-                        await attachInlineCreatedActivity(newActivity);
-                        if (goalId) {
-                            notify.success(`Associated "${newActivity.name}" with goal`);
-                        }
-                    }
-                    setActivityBuilderTemplate(null);
-                    setIsActivityBuilderOpen(false);
-                    setViewState(activityBuilderReturnView);
-                }}
-                onCancel={() => {
-                    setActivityBuilderTemplate(null);
-                    setIsActivityBuilderOpen(false);
-                    setViewState(activityBuilderReturnView);
-                }}
-            />
-        </Suspense>
-    ) : null;
-
-
-    const targetAnalyticsModal = activeAnalyticsTarget ? (
-        <Suspense fallback={null}>
-            <TargetAnalyticsModal
-                mode="view"
-                rootId={rootId}
-                goalId={goalId}
-                target={activeAnalyticsTarget}
-                goalColor={displayGoalColor}
-                goalType={goalType}
-                goalCompleted={isCompleted}
-                targets={targets}
-                setTargets={setTargets}
-                activityDefinitions={activityDefinitions}
-                associatedActivities={associatedActivities}
-                onSave={(newTargets) => { persistTargetChanges(newTargets); }}
-                onDelete={(targetToDelete) => {
-                    const remaining = (targets || []).filter((t) => t.id !== targetToDelete?.id);
-                    setTargets?.(remaining);
-                    persistTargetChanges(remaining);
-                }}
-                onClose={() => setActiveAnalyticsTarget(null)}
-            />
-        </Suspense>
-    ) : null;
-
-    // Add/edit now happens in the analytics modal (graph + builder side-by-side).
-    const targetBuilderModal = (!readOnly && builderConfig) ? (
-        <Suspense fallback={null}>
-            <TargetAnalyticsModal
-                mode={builderConfig.target ? 'edit' : 'add'}
-                rootId={rootId}
-                goalId={goalId}
-                target={builderConfig.target ?? null}
-                goalColor={displayGoalColor}
-                goalType={goalType}
-                goalCompleted={isCompleted}
-                targets={targets}
-                setTargets={setTargets}
-                activityDefinitions={activityDefinitions}
-                associatedActivities={associatedActivities}
-                initialActivityId={builderConfig.activityId ?? null}
-                lockActivitySelection={Boolean(builderConfig.lock)}
-                onSave={(newTargets) => {
-                    persistTargetChanges(newTargets);
-                    setBuilderConfig(null);
-                }}
-                onSaved={({ action }) => {
-                    if (action === 'create') {
-                        setViewState('goal');
-                    }
-                }}
-                onClose={() => setBuilderConfig(null)}
-            />
-        </Suspense>
-    ) : null;
-
-    if (displayMode === 'panel') {
-        return (
-            <>
-                <div className={`${styles.panelContainer} ${readOnly ? styles.readOnlySurface : ''}`}>
-                    <div className={styles.panelContent} ref={contentScrollRef}>
-                        {content}
-                    </div>
-                    {footerContent && (
-                        <div className={styles.panelNoteComposer}>
-                            {footerContent}
-                        </div>
-                    )}
-                </div>
-                {timeGraphModal}
-                {activityBuilderModal}
-                {targetAnalyticsModal}
-                {targetBuilderModal}
-            </>
-        );
-    }
-
-    const modalMarkup = (
-        <ModalBackdrop
-            className={styles.modalOverlay}
-            onClose={handleClose}
-        >
-            <div
-                onClick={(e) => e.stopPropagation()}
-                className={`${styles.modalContent} ${readOnly ? styles.readOnlySurface : ''}`}
-                style={{ '--goal-detail-accent': displayGoalColor }}
-            >
-                <div className={styles.modalScrollArea} ref={contentScrollRef}>
-                    {content}
-                </div>
-                {footerContent && (
-                    <div className={styles.modalNoteComposer}>
-                        {footerContent}
-                    </div>
-                )}
-            </div>
-            {activityBuilderModal}
-        </ModalBackdrop>
-    );
-
     return (
-        <>
-            {createPortal(modalMarkup, document.body)}
-            {timeGraphModal}
-            {targetAnalyticsModal}
-            {targetBuilderModal}
-        </>
+        <GoalDetailModalRenderSurface
+            activeAnalyticsTarget={activeAnalyticsTarget}
+            activitiesAssociateAction={activitiesAssociateAction}
+            activityBuilderReturnView={activityBuilderReturnView}
+            activityBuilderTemplate={activityBuilderTemplate}
+            activityDefinitions={activityDefinitions}
+            activityGroups={activityGroups}
+            activityPickerFooterActions={activityPickerFooterActions}
+            allowManualCompletion={allowManualCompletion}
+            associatedActivities={associatedActivities}
+            associatedActivityGroups={associatedActivityGroups}
+            attachInlineCreatedActivity={attachInlineCreatedActivity}
+            builderConfig={builderConfig}
+            canAddChildGoal={canAddChildGoal}
+            childType={childType}
+            completedColor={completedColor}
+            completedSecondaryColor={completedSecondaryColor}
+            completedTextColor={completedTextColor}
+            completedViaChildren={completedViaChildren}
+            completionFooterState={completionFooterState}
+            contentScrollRef={contentScrollRef}
+            dailyDurationsData={dailyDurationsData}
+            deadline={deadline}
+            depGoalId={depGoalId}
+            description={description}
+            displayGoalColor={displayGoalColor}
+            displayGoalSecondaryColor={displayGoalSecondaryColor}
+            displayMode={displayMode}
+            displayTextColor={displayTextColor}
+            errors={errors}
+            fetchedMetrics={fetchedMetrics}
+            goal={goal}
+            goalColor={goalColor}
+            goalForSmart={goalForSmart}
+            goalHeaderRef={goalHeaderRef}
+            goalHeaderStickyOffset={goalHeaderStickyOffset}
+            goalId={goalId}
+            goalIsSmart={goalIsSmart}
+            goalSecondaryColor={goalSecondaryColor}
+            goalStatus={goalStatus}
+            goalType={goalType}
+            handleAddChildGoal={handleAddChildGoal}
+            handleAddTargetFromActivities={handleAddTargetFromActivities}
+            handleCancel={handleCancel}
+            handleCancelActivitiesFlow={handleCancelActivitiesFlow}
+            handleClose={handleClose}
+            handleCompletionConfirm={handleCompletionConfirm}
+            handleCompletionFooterClick={handleCompletionFooterClick}
+            handleCopyActivityFromActivities={handleCopyActivityFromActivities}
+            handleCreateActivityFromActivities={handleCreateActivityFromActivities}
+            handleEditDetails={handleEditDetails}
+            handleGoalViewNavigation={handleGoalViewNavigation}
+            handleQuickGoalNote={handleQuickGoalNote}
+            handleSave={handleSave}
+            handleSelectTargetActivity={handleSelectTargetActivity}
+            handleUncompletionConfirm={handleUncompletionConfirm}
+            inheritParentActivities={inheritParentActivities}
+            isActivitiesAssociationMode={isActivitiesAssociationMode}
+            isActivityBuilderOpen={isActivityBuilderOpen}
+            isCompleted={isCompleted}
+            isDailyDurationsError={isDailyDurationsError}
+            isDailyDurationsFetching={isDailyDurationsFetching}
+            isDailyDurationsLoading={isDailyDurationsLoading}
+            isEditing={isEditing}
+            isPaused={isPaused}
+            isTargetSelectionMode={isTargetSelectionMode}
+            isTimeGraphOpen={isTimeGraphOpen}
+            levelConfig={levelConfig}
+            localCompletedAt={localCompletedAt}
+            mode={mode}
+            name={name}
+            needsLevelPicker={needsLevelPicker}
+            onClose={onClose}
+            onDelete={onDelete}
+            onGoalSelect={onGoalSelect}
+            onMobileCollapse={onMobileCollapse}
+            onToggleCompletion={onToggleCompletion}
+            onUpdate={onUpdate}
+            parentGoal={parentGoal}
+            parentGoalColor={parentGoalColor}
+            parentGoalName={parentGoalName}
+            parentType={parentType}
+            persistAssociations={persistAssociations}
+            persistTargetChanges={persistTargetChanges}
+            programs={programs}
+            readOnly={readOnly}
+            readOnlyAssociatedActivities={readOnlyAssociatedActivities}
+            readOnlyAssociatedActivityGroups={readOnlyAssociatedActivityGroups}
+            readOnlyNotes={readOnlyNotes}
+            readOnlyTimelineEntries={readOnlyTimelineEntries}
+            refreshAssociations={refreshAssociations}
+            registerActivitiesAssociateAction={registerActivitiesAssociateAction}
+            registerActivitiesAssociateCancelAction={registerActivitiesAssociateCancelAction}
+            registerActivityPickerFooterActions={registerActivityPickerFooterActions}
+            relevanceStatement={relevanceStatement}
+            rootId={rootId}
+            selectedChildType={selectedChildType}
+            setActiveAnalyticsTarget={setActiveAnalyticsTarget}
+            setActivityBuilderReturnView={setActivityBuilderReturnView}
+            setActivityBuilderTemplate={setActivityBuilderTemplate}
+            setActivityGroups={setActivityGroups}
+            setAssociatedActivities={setAssociatedActivities}
+            setAssociatedActivityGroups={setAssociatedActivityGroups}
+            setAllowManualCompletion={setAllowManualCompletion}
+            setBuilderConfig={setBuilderConfig}
+            setCompletedViaChildren={setCompletedViaChildren}
+            setDeadline={setDeadline}
+            setDescription={setDescription}
+            setInheritParentActivities={setInheritParentActivities}
+            setIsActivitiesAssociationMode={setIsActivitiesAssociationMode}
+            setIsActivityBuilderOpen={setIsActivityBuilderOpen}
+            setIsEditing={setIsEditing}
+            setIsTimeGraphOpen={setIsTimeGraphOpen}
+            setName={setName}
+            setRelevanceStatement={setRelevanceStatement}
+            setSelectedChildType={setSelectedChildType}
+            setTargetManagerReturnView={setTargetManagerReturnView}
+            setTargetToEdit={setTargetToEdit}
+            setTargets={setTargets}
+            setTrackActivities={setTrackActivities}
+            setViewState={setViewState}
+            targetManagerReturnView={targetManagerReturnView}
+            targetToEdit={targetToEdit}
+            targets={targets}
+            textColor={textColor}
+            trackActivities={trackActivities}
+            treeData={treeData}
+            validChildTypes={validChildTypes}
+            viewState={viewState}
+        />
     );
 }
 
