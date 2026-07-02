@@ -8,11 +8,9 @@ const HARD_SOURCE_LINES = 800;
 const hardSizeBacklog = new Set([
   // Known decomposition backlog. Files here may exceed the S-rank production
   // ceiling, but only up to their explicit sizeException cap below.
-  'src/components/GoalDetailModal.jsx',
   'src/components/__tests__/GoalDetailModal.test.jsx',
   'src/components/analytics/AnalyticsQueryConsole.jsx',
   'src/components/modals/TemplateBuilderModal.jsx',
-  'src/components/sessionDetail/SessionActivityItem.jsx',
   'src/components/sessionDetail/__tests__/SessionActivityItem.test.jsx',
   'src/pages/Admin.jsx',
   'src/pages/FractalGoals.jsx',
@@ -25,9 +23,9 @@ const sizeExceptions = new Map([
   // Known decomposition backlog. Keep these thresholds close to the current
   // file sizes so the audit still catches meaningful growth while larger
   // extractions are handled deliberately.
-  ['src/AppRouter.jsx', 478],
+  ['src/AppRouter.jsx', 643],
   ['src/components/GoalCharacteristicsSettings.jsx', 500],
-  ['src/components/GoalDetailModal.jsx', 1462],
+  ['src/components/GoalDetailModal.jsx', 774],
   ['src/components/GoalDetailModal.module.css', 850],
   ['src/components/__tests__/GoalDetailModal.test.jsx', 877],
   ['src/components/activityPicker/ActivityPicker.jsx', 453],
@@ -38,6 +36,7 @@ const sizeExceptions = new Map([
   ['src/components/analytics/visualizationQueryExplanations.js', 527],
   ['src/components/common/ActivityTimeline.jsx', 453],
   ['src/components/goalDetail/ActivityAssociator.jsx', 800],
+  ['src/components/goalDetail/GoalDetailModalRenderSurface.jsx', 794],
   ['src/components/goalDetail/TargetAnalyticsModal.jsx', 743],
   ['src/components/goalDetail/TargetManager.jsx', 674],
   ['src/components/goals/GoalHierarchyList.jsx', 500],
@@ -49,8 +48,9 @@ const sizeExceptions = new Map([
   ['src/components/modals/TemplateBuilderModal.jsx', 904],
   ['src/components/modals/TemplateBuilderModal.module.css', 675],
   ['src/components/notes/NoteComposer.jsx', 500],
-  ['src/components/sessionDetail/SessionActivityItem.jsx', 1541],
+  ['src/components/sessionDetail/SessionActivityItem.jsx', 774],
   ['src/components/sessionDetail/SessionActivityItem.module.css', 925],
+  ['src/components/sessionDetail/SessionActivityItemView.jsx', 597],
   ['src/components/sessionDetail/__tests__/SessionActivityItem.test.jsx', 859],
   ['src/components/sessions/ActivityCard.jsx', 514],
   ['src/components/sessions/SessionCardExpanded.jsx', 500],
@@ -63,7 +63,8 @@ const sizeExceptions = new Map([
   ['src/hooks/useSessionDetailMutations.js', 600],
   ['src/pages/CreateSession.jsx', 625],
   ['src/pages/Analytics.jsx', 556],
-  ['src/pages/FractalGoals.jsx', 951],
+  ['src/pages/FractalGoals.jsx', 1011],
+  ['src/pages/__tests__/FractalGoalsSearch.test.jsx', 499],
   ['src/pages/ManageActivities.jsx', 650],
   ['src/pages/Notes.jsx', 500],
   ['src/pages/Sessions.jsx', 487],

@@ -224,6 +224,8 @@ Key supporting frontend pieces:
 - `client/src/hooks/useTargetQueries.js`
 - `client/src/hooks/useGoalDetailController.js`
 - `client/src/components/GoalDetailModal.jsx`
+- `client/src/components/goalDetail/GoalDetailModalRenderSurface.jsx`
+- `client/src/components/goalDetail/GoalDetailModalFooter.jsx`
 - `client/src/components/goalDetail/TargetManager.jsx`
 - `client/src/components/goalDetail/TargetAnalyticsModal.jsx`
 - `client/src/components/goals/GoalHierarchyList.jsx`
@@ -318,7 +320,7 @@ Key backend pieces:
 - `services/serializers.py`
 - `services/view_serializers.py`
 - `blueprints/notes_api.py`
-- `validators.py`
+- `validators/` package
 
 Key frontend pieces:
 
@@ -393,6 +395,7 @@ Key frontend pieces:
 - `client/src/hooks/useSessionProgressSummary.js`
 - `client/src/hooks/useRootProgressSettings.js`
 - `client/src/components/sessionDetail/SessionActivityItem.jsx`
+- `client/src/components/sessionDetail/SessionActivityItemView.jsx`
 - `client/src/components/sessionDetail/TimelinePanel.jsx`
 - `client/src/components/modals/SettingsModal.jsx`
 
@@ -427,6 +430,9 @@ Session templates now have two lifecycle states:
 Key backend pieces:
 
 - `services/programs.py`
+- `services/_program_crud.py`
+- `services/_program_days.py`
+- `services/_program_goals.py`
 - `services/template_service.py`
 - `blueprints/programs_api.py`
 - `blueprints/templates_api.py`
