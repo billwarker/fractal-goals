@@ -34,11 +34,7 @@
 }
 
 .sessionInfoToggle {
-    font-size: 10px;
     color: var(--color-text-muted);
-    min-height: auto;
-    height: auto;
-    padding: 4px 8px;
 }
 
 .sessionInfoToggle:hover {

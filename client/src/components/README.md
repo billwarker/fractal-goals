@@ -4,6 +4,7 @@ Use these shared primitives before adding local UI controls:
 
 - `atoms/Button.jsx` - text buttons and icon+text command buttons.
 - `atoms/IconButton.jsx` - icon-only controls; `aria-label` is required.
+- `atoms/DisclosureButton.jsx` - expand/collapse chevrons for sections, panels, and tree rows.
 - `atoms/CloseButton.jsx` - dismissing dialogs, panels, sheets, and overlays.
 - `atoms/RemoveButton.jsx` - removing chips, rows, widgets, or collection items.
 - `atoms/DeleteButton.jsx` - labeled destructive delete actions.

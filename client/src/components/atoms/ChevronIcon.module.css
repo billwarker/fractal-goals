@@ -1,0 +1,19 @@
+.chevron {
+    transform-origin: center;
+}
+
+.down {
+    transform: rotate(0deg);
+}
+
+.right {
+    transform: rotate(-90deg);
+}
+
+.up {
+    transform: rotate(180deg);
+}
+
+.left {
+    transform: rotate(90deg);
+}

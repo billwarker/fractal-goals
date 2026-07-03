@@ -9,6 +9,7 @@ import notify from '../../utils/notify';
 import Button from '../atoms/Button';
 import CheckIcon from '../atoms/CheckIcon';
 import CloseIcon from '../atoms/CloseIcon';
+import DisclosureButton from '../atoms/DisclosureButton';
 import EditIcon from '../atoms/EditIcon';
 import { Heading } from '../atoms/Typography';
 import Input from '../atoms/Input';
@@ -106,15 +107,13 @@ function SessionInfoPanel() {
                         </span>
                     ) : session.name}
                 </Heading>
-                <Button
-                    variant="ghost"
-                    size="sm"
+                <DisclosureButton
+                    expanded={isExpanded}
                     className={styles.sessionInfoToggle}
                     onClick={() => setIsExpanded(!isExpanded)}
                     title={isExpanded ? 'Collapse' : 'Expand'}
-                >
-                    {isExpanded ? '▲' : '▼'}
-                </Button>
+                    aria-label={isExpanded ? 'Hide session details' : 'Show session details'}
+                />
             </div>
 
             {/* Always visible summary */}

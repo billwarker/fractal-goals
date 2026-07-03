@@ -50,6 +50,16 @@
     background: transparent;
 }
 
+.plain {
+    background: transparent;
+}
+
+.plain:hover:not(:disabled),
+.plain:focus-visible {
+    background: transparent;
+    color: var(--color-text-primary);
+}
+
 .subtle {
     background: var(--color-bg-input);
     border-color: var(--color-border);

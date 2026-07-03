@@ -4,6 +4,7 @@ import SidePaneHeader from '../common/SidePaneHeader';
 import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
 import SidePaneNotePanel from '../common/SidePaneNotePanel';
 import ViewToggleTabs from '../common/ViewToggleTabs';
+import DisclosureButton from '../atoms/DisclosureButton';
 import { buildProgramSidePaneData } from '../../utils/programViewModel';
 import ProgramSidebar from './ProgramSidebar';
 import styles from '../../pages/ProgramCalendarPage.module.css';
@@ -20,14 +21,14 @@ function ProgramSidePaneSection({
         <section className={`${styles.sidePaneSectionGroup} ${collapsed ? styles.sidePaneSectionGroupCollapsed : ''} ${className}`.trim()}>
             <div className={styles.sidePaneSectionTitleRow}>
                 <div className={styles.sidePaneSectionTitle}>{title}</div>
-                <button
-                    type="button"
+                <DisclosureButton
+                    expanded={!collapsed}
                     className={styles.sidePaneSectionToggle}
                     onClick={onToggle}
                     aria-expanded={!collapsed}
-                >
-                    {collapsed ? 'Show' : 'Hide'}
-                </button>
+                    aria-label={`${collapsed ? 'Show' : 'Hide'} ${title}`}
+                    title={`${collapsed ? 'Show' : 'Hide'} ${title}`}
+                />
             </div>
             {!collapsed ? (
                 <div className={`${styles.sidePaneSectionContent} ${contentClassName}`.trim()}>

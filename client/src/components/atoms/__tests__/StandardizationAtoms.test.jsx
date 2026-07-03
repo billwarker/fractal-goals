@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 
 import Badge from '../Badge';
 import CloseButton from '../CloseButton';
+import DisclosureButton from '../DisclosureButton';
 import IconButton from '../IconButton';
 import Radio from '../Radio';
 import RemoveButton from '../RemoveButton';
@@ -65,5 +66,12 @@ describe('standardization atoms', () => {
 
         expect(tooltip).toHaveTextContent('Save changes');
         expect(trigger.getAttribute('aria-describedby')).toBe(tooltip.id);
+    });
+
+    it('renders disclosure controls with expanded state', () => {
+        render(<DisclosureButton expanded={true} aria-label="Hide details" />);
+
+        const trigger = screen.getByRole('button', { name: 'Hide details' });
+        expect(trigger).toHaveAttribute('aria-expanded', 'true');
     });
 });
