@@ -179,6 +179,10 @@ function FractalGoals() {
         return new Set((evidenceData.goal_ids || []).map((goalId) => String(goalId)));
     }, [evidenceData]);
     const flowtreeMaps = useMemo(() => buildTreeMaps(fractalData), [fractalData]);
+    const surfaceGoals = useMemo(
+        () => Array.from(flowtreeMaps.nodeById.values()),
+        [flowtreeMaps.nodeById]
+    );
     const hiddenInactiveGoalIds = useMemo(() => {
         if (!viewSettings.hideInactiveGoals) return null;
         return getInactiveNodeIds(
@@ -418,12 +422,14 @@ function FractalGoals() {
 
     const surfaceSharedData = useMemo(() => ({
         rootId,
+        goals: surfaceGoals,
         activities,
         activityGroups,
         programs,
         visibleGoalIds,
         activeGoalWindowDays,
-    }), [rootId, activities, activityGroups, programs, visibleGoalIds, activeGoalWindowDays]);
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    }), [rootId, surfaceGoals, activities, activityGroups, programs, visibleGoalIds, activeGoalWindowDays]);
 
     const buildSurfacePayload = useCallback(() => {
         // The working config corresponds to the selected target (desktop vs

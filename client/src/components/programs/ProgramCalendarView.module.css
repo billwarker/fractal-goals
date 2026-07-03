@@ -8,6 +8,101 @@
     border: 1px solid var(--color-border);
 }
 
+.calendarContainerCompact {
+    height: 100%;
+    min-height: 0;
+    padding: 8px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.calendarContainerCompact :global(.fc) {
+    height: 100% !important;
+}
+
+.calendarContainerCompact :global(.fc-header-toolbar) {
+    height: 28px !important;
+    margin-bottom: 8px !important;
+}
+
+.calendarContainerCompact :global(.fc-toolbar-title) {
+    font-size: 0.95rem !important;
+}
+
+.calendarContainerCompact :global(.fc-button) {
+    height: 28px !important;
+    padding: 0 9px !important;
+    font-size: 11px !important;
+}
+
+.calendarContainerCompact :global(.fc-view-harness) {
+    height: calc(100% - 36px) !important;
+    min-height: 0 !important;
+}
+
+.calendarContainerCompact :global(.fc-scrollgrid),
+.calendarContainerCompact :global(.fc-scrollgrid-section-body > td),
+.calendarContainerCompact :global(.fc-daygrid-body),
+.calendarContainerCompact :global(.fc-daygrid-body table) {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.calendarContainerCompact :global(.fc-bg-event) {
+    display: none !important;
+}
+
+.calendarContainerCompact :global(.fc-col-header-cell) {
+    padding: 3px 0 !important;
+}
+
+.calendarContainerCompact :global(.fc-col-header-cell-cushion) {
+    color: var(--color-brand-primary) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+}
+
+.calendarContainerCompact :global(.fc-daygrid-day-frame) {
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 2px !important;
+}
+
+.calendarContainerCompact :global(.fc-daygrid-day-number) {
+    padding: 2px 4px !important;
+    font-size: 11px !important;
+}
+
+.calendarContainerCompact :global(.fc-daygrid-day-events) {
+    margin: 0 2px !important;
+}
+
+.calendarContainerCompact .eventPill {
+    min-height: 16px;
+    padding: 1px 4px;
+}
+
+.calendarContainerCompact .eventPillText,
+.calendarContainerCompact .blockCellLabel {
+    font-size: 10px;
+}
+
+.calendarContainerCompact .blockCellLabel {
+    top: 5px;
+    left: 5px;
+    right: 28px;
+    max-width: calc(100% - 33px);
+}
+
+.calendarContainerCompact .compactProgramCell {
+    background: color-mix(in srgb, var(--program-compact-cell-bg) 18%, var(--color-bg-card)) !important;
+}
+
+.calendarContainerCompact .compactBlockCell {
+    background: color-mix(in srgb, var(--program-compact-cell-bg) 44%, var(--color-bg-card)) !important;
+}
+
 .headerActions {
     position: absolute;
     top: 32px;

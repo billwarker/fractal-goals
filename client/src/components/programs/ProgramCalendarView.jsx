@@ -75,6 +75,13 @@ function formatCalendarCellDate(date) {
     return `${year}-${month}-${day}`;
 }
 
+function normalizeCalendarEventDate(date) {
+    if (typeof date === 'string') {
+        return date.slice(0, 10);
+    }
+    return formatCalendarCellDate(date);
+}
+
 function ProgramCalendarView({
     calendarEvents,
     blockLabels = [],
@@ -95,6 +102,8 @@ function ProgramCalendarView({
     onCalendarBackgroundClick,
     onTodayClick,
     onBlockLabelClick,
+    compact = false,
+    readOnly = false,
 }) {
     const calendarRef = React.useRef(null);
     const calendarContainerRef = React.useRef(null);
@@ -129,6 +138,45 @@ function ProgramCalendarView({
         return labels;
     }, [blockLabels]);
 
+    const compactBackgroundRanges = React.useMemo(() => {
+        if (!compact) return [];
+
+        return (calendarEvents || [])
+            .filter((event) => event?.display === 'background')
+            .map((event) => {
+                const eventType = event.extendedProps?.type;
+                if (eventType !== 'program_background' && eventType !== 'block_background') {
+                    return null;
+                }
+
+                const start = normalizeCalendarEventDate(event.start);
+                const end = normalizeCalendarEventDate(event.end);
+                if (!start || !end) return null;
+
+                return {
+                    start,
+                    end,
+                    color: event.backgroundColor || event.borderColor || 'var(--color-brand-primary)',
+                    sortOrder: event.extendedProps?.sortOrder ?? (eventType === 'block_background' ? -10 : -20),
+                    type: eventType,
+                };
+            })
+            .filter(Boolean);
+    }, [calendarEvents, compact]);
+
+    const getCompactCellBackground = React.useCallback((dateStr) => {
+        let selectedRange = null;
+
+        compactBackgroundRanges.forEach((range) => {
+            if (dateStr < range.start || dateStr >= range.end) return;
+            if (!selectedRange || range.sortOrder >= selectedRange.sortOrder) {
+                selectedRange = range;
+            }
+        });
+
+        return selectedRange;
+    }, [compactBackgroundRanges]);
+
     const syncBlockLabelForCell = React.useCallback((dayEl) => {
         const dateStr = dayEl.getAttribute('data-date');
         if (!dateStr) return;
@@ -138,9 +186,23 @@ function ProgramCalendarView({
 
         if (!frame) return;
 
+        dayEl.classList.remove(styles.compactProgramCell, styles.compactBlockCell);
+        dayEl.style.removeProperty('--program-compact-cell-bg');
         frame.querySelector(`.${styles.blockCellLabel}`)?.remove();
         frame.removeAttribute('data-block-label');
         frame.style.removeProperty('--program-block-label-color');
+
+        if (compact) {
+            const cellBackground = getCompactCellBackground(dateStr);
+            if (cellBackground) {
+                dayEl.classList.add(
+                    cellBackground.type === 'block_background'
+                        ? styles.compactBlockCell
+                        : styles.compactProgramCell,
+                );
+                dayEl.style.setProperty('--program-compact-cell-bg', cellBackground.color);
+            }
+        }
 
         if (blockLabel) {
             const labelButton = document.createElement('button');
@@ -168,10 +230,12 @@ function ProgramCalendarView({
             });
             frame.appendChild(labelButton);
         }
-    }, [blockLabelsByDate, onBlockLabelClick]);
+    }, [blockLabelsByDate, compact, getCompactCellBackground, onBlockLabelClick]);
 
     const clearBlockLabelForCell = (dayEl) => {
         const frame = dayEl.querySelector('.fc-daygrid-day-frame');
+        dayEl.classList.remove(styles.compactProgramCell, styles.compactBlockCell);
+        dayEl.style.removeProperty('--program-compact-cell-bg');
         frame?.querySelector(`.${styles.blockCellLabel}`)?.remove();
     };
 
@@ -187,9 +251,13 @@ function ProgramCalendarView({
     };
 
     return (
-        <div ref={calendarContainerRef} className={styles.calendarContainer} onClick={onCalendarBackgroundClick}>
+        <div
+            ref={calendarContainerRef}
+            className={`${styles.calendarContainer} ${compact ? styles.calendarContainerCompact : ''}`}
+            onClick={readOnly ? undefined : onCalendarBackgroundClick}
+        >
             {/* Block creation controls - positioned at top right of calendar area */}
-            {showBlockControls ? (
+            {showBlockControls && !readOnly ? (
                 <div className={styles.headerActions}>
                     <button
                         onClick={() => setBlockCreationMode(!blockCreationMode)}
@@ -224,16 +292,17 @@ function ProgramCalendarView({
                 headerToolbar={{ left: 'prev,next contextualToday', center: 'title', right: '' }}
                 initialDate={initialDate}
                 events={calendarEvents}
-                height={isMobile ? 560 : '100%'}
-                dayMaxEvents={5}
+                height={compact ? '100%' : (isMobile ? 560 : '100%')}
+                expandRows={compact}
+                dayMaxEvents={compact ? 3 : 5}
                 eventOrder="sortOrder"
-                selectable={blockCreationMode}
-                select={onDateSelect}
-                dateClick={onDateClick}
-                eventClick={onEventClick}
+                selectable={!readOnly && blockCreationMode}
+                select={readOnly ? undefined : onDateSelect}
+                dateClick={readOnly ? undefined : onDateClick}
+                eventClick={readOnly ? undefined : onEventClick}
                 eventContent={renderEventContent}
                 datesSet={onDatesSet}
-                dayCellClassNames={getDayCellClassNames}
+                dayCellClassNames={readOnly ? undefined : getDayCellClassNames}
                 dayCellDidMount={(dayInfo) => syncBlockLabelForCell(dayInfo.el)}
                 dayCellWillUnmount={(dayInfo) => clearBlockLabelForCell(dayInfo.el)}
             />

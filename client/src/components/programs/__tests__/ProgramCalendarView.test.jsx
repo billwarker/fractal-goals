@@ -31,11 +31,17 @@ vi.mock('@fullcalendar/react', async () => {
         }, [props]);
 
         return (
-            <div data-testid="mock-calendar">
+            <div
+                data-testid="mock-calendar"
+                data-height={props.height}
+                data-expand-rows={String(Boolean(props.expandRows))}
+                data-day-max-events={String(props.dayMaxEvents)}
+                data-selectable={String(Boolean(props.selectable))}
+            >
                 <button type="button" onClick={props.customButtons.contextualToday.click}>
                     Today
                 </button>
-                <div ref={dayRef} className="fc-daygrid-day" data-date="2026-05-17">
+                <div ref={dayRef} data-testid="mock-day-cell" className="fc-daygrid-day" data-date="2026-05-17">
                     <div className="fc-daygrid-day-frame" />
                 </div>
             </div>
@@ -95,5 +101,31 @@ describe('ProgramCalendarView', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Today' }));
 
         expect(props.onTodayClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('expands rows and disables editing affordances in compact read-only mode', () => {
+        renderCalendar({
+            calendarEvents: [{
+                id: 'block-bg-1',
+                start: '2026-05-10',
+                end: '2026-05-24',
+                backgroundColor: '#89cff0',
+                display: 'background',
+                extendedProps: {
+                    type: 'block_background',
+                    sortOrder: -10,
+                },
+            }],
+            blockCreationMode: true,
+            compact: true,
+            readOnly: true,
+        });
+
+        const calendar = screen.getByTestId('mock-calendar');
+        expect(calendar).toHaveAttribute('data-height', '100%');
+        expect(calendar).toHaveAttribute('data-expand-rows', 'true');
+        expect(calendar).toHaveAttribute('data-day-max-events', '3');
+        expect(calendar).toHaveAttribute('data-selectable', 'false');
+        expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-compact-cell-bg: #89cff0');
     });
 });
