@@ -296,6 +296,7 @@
 
 /* Add-widget menu */
 .surface-add-widget-menu {
+    z-index: 10000;
     width: 220px;
     background: var(--color-bg-sidebar, #1a1d24);
     border: 1px solid var(--color-border);

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 import { listWidgetDefinitions } from './widgetRegistry';
 
@@ -33,12 +34,12 @@ export default function AddWidgetMenu({ position, onSelect, onClose, onPreviewCh
     const left = Math.min(position?.x || 0, window.innerWidth - 240);
     const top = Math.min(position?.y || 0, window.innerHeight - 280);
 
-    return (
+    const menu = (
         <div
             ref={ref}
             className="surface-add-widget-menu"
             role="menu"
-            style={{ position: 'fixed', left, top, zIndex: 1200 }}
+            style={{ position: 'fixed', left, top, zIndex: 10000 }}
         >
             <div className="surface-add-widget-menu-title">Add widget</div>
             {listWidgetDefinitions().map((def) => (
@@ -59,4 +60,6 @@ export default function AddWidgetMenu({ position, onSelect, onClose, onPreviewCh
             ))}
         </div>
     );
+
+    return createPortal(menu, document.body);
 }

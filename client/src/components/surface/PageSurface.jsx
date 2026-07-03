@@ -103,32 +103,60 @@ function findAvailablePlacement(panels, preferred, size, bounds) {
     return null;
 }
 
-function fillTrailingScopedTreeCell(layout, treePanelId, panelContents, bounds) {
-    if (!bounds?.columns || !treePanelId || !layout?.panels?.length) return layout;
+function getScopedHierarchyGapCells(layout, treePanelId, columns) {
+    if (!columns || !treePanelId || !layout?.panels?.length) return 0;
     const treePanel = layout.panels.find((panel) => panel.id === treePanelId);
-    if (!treePanel) return layout;
+    if (!treePanel) return 0;
+    return Math.max(0, columns - (treePanel.x + treePanel.w));
+}
 
-    const treeRight = treePanel.x + treePanel.w;
-    const trailingCells = bounds.columns - treeRight;
-    if (trailingCells !== 1) return layout;
-
-    const trailingCellOccupied = layout.panels.some((panel) => {
-        if (panel.id === treePanelId) return false;
-        const content = panelContents?.[panel.id];
-        if (!content) return false;
-        const overlapsTrailingColumn = panel.x < bounds.columns && panel.x + panel.w > treeRight;
-        const overlapsTreeRows = panel.y < treePanel.y + treePanel.h && panel.y + panel.h > treePanel.y;
-        return overlapsTrailingColumn && overlapsTreeRows;
-    });
-    if (trailingCellOccupied) return layout;
-
+function clampLayoutInsideBounds(layout, { columns, rows }) {
+    const grid = migrateSplitLayoutToGrid(layout);
+    if (!grid?.panels?.length) return layout;
+    const maxColumns = Math.max(1, Math.round(Number(columns) || GRID_COLUMNS));
+    const maxRows = Math.max(1, Math.round(Number(rows) || GRID_ROWS));
     return {
-        ...layout,
-        panels: layout.panels.map((panel) => (
-            panel.id === treePanelId
-                ? { ...panel, w: bounds.columns - panel.x }
-                : panel
-        )),
+        type: 'grid',
+        panels: grid.panels.map((panel) => {
+            const w = Math.min(panel.w, maxColumns);
+            const h = Math.min(panel.h, maxRows);
+            return {
+                ...panel,
+                x: Math.max(0, Math.min(panel.x, maxColumns - w)),
+                y: Math.max(0, Math.min(panel.y, maxRows - h)),
+                w,
+                h,
+            };
+        }),
+    };
+}
+
+function detailHintWithGap(detailPanel, gap, { columns, rows }) {
+    const cols = Math.max(1, columns || GRID_COLUMNS);
+    const resolvedRows = Math.max(1, rows || GRID_ROWS);
+    const resolvedGap = Math.max(0, Math.round(Number(gap) || 0));
+
+    if (detailPanel && typeof detailPanel === 'object') {
+        const w = clampDetailCells(detailPanel.w || Math.round((DEFAULT_DETAIL_PCT / 100) * cols), cols);
+        return {
+            ...detailPanel,
+            x: cols - w,
+            y: 0,
+            w,
+            h: detailPanel.h || resolvedRows,
+            cols,
+            gap: resolvedGap,
+        };
+    }
+
+    const w = detailCellsFromHint(detailPanel, cols);
+    return {
+        x: cols - w,
+        y: 0,
+        w,
+        h: resolvedRows,
+        cols,
+        gap: resolvedGap,
     };
 }
 
@@ -168,14 +196,21 @@ export default function PageSurface({
     const containerRef = useRef(null);
     const gridRegionRef = useRef(null);
     const prevConfigKeyRef = useRef(null);
+    const splitterDragLayoutRef = useRef(null);
 
     const storedConfig = useMemo(
         () => sanitizeSurfaceConfig(activeConfig) || getDefaultSurfaceConfig(),
         [activeConfig],
     );
     const config = useMemo(
-        () => (bounds ? fitConfigToBounds(storedConfig, bounds) : storedConfig),
-        [storedConfig, bounds],
+        () => {
+            if (!bounds) return storedConfig;
+            if (viewMode === 'scoped' && dragDetailCells != null) {
+                return storedConfig;
+            }
+            return fitConfigToBounds(storedConfig, bounds);
+        },
+        [bounds, dragDetailCells, storedConfig, viewMode],
     );
 
     const treePanelId = getTreePanelId(config.panel_contents);
@@ -204,12 +239,7 @@ export default function PageSurface({
     const minDetailWidthPx = detailWidthFromCells(minDetailCells);
     const maxDetailWidthPx = detailWidthFromCells(maxDetailCells);
     const splitterRightPx = Math.max(0, detailWidthPx - (GRID_UNIT / 2));
-    const displayLayout = useMemo(
-        () => (showDetailRegion
-            ? fillTrailingScopedTreeCell(liveLayout, treePanelId, config.panel_contents, bounds)
-            : liveLayout),
-        [bounds, config.panel_contents, liveLayout, showDetailRegion, treePanelId],
-    );
+    const displayLayout = liveLayout;
     const widgetFootprintPreview = useMemo(() => {
         if (!addMenu || !previewWidgetType || !bounds) return null;
         const size = getWidgetMinimumSize(previewWidgetType);
@@ -276,13 +306,22 @@ export default function PageSurface({
             const prevGrid = migrateSplitLayoutToGrid(fittedPrev.layout) || { type: 'grid', panels: [] };
             const nextLayout = typeof updater === 'function' ? updater(prevGrid) : updater;
             const nextGrid = migrateSplitLayoutToGrid(nextLayout) || prevGrid;
+            const scopedGap = viewMode === 'scoped'
+                ? getScopedHierarchyGapCells(nextGrid, getTreePanelId(fittedPrev.panel_contents), bounds?.columns)
+                : null;
             return {
                 ...fittedPrev,
                 layout: nextGrid,
                 layout_bounds: bounds || fittedPrev.layout_bounds,
+                detail_panel: scopedGap == null
+                    ? fittedPrev.detail_panel
+                    : detailHintWithGap(fittedPrev.detail_panel, scopedGap, {
+                        columns: surfaceBounds?.columns || fittedPrev.detail_panel?.cols || GRID_COLUMNS,
+                        rows: surfaceBounds?.rows || bounds?.rows || GRID_ROWS,
+                    }),
             };
         });
-    }, [onConfigChange, bounds]);
+    }, [onConfigChange, bounds, surfaceBounds, viewMode]);
 
     // Persist the split ratio as the detail_panel hint (width in grid cells
     // over the current bounds, so it scales like every other panel).
@@ -291,15 +330,33 @@ export default function PageSurface({
         onConfigChange((prevConfig) => {
             const prev = sanitizeSurfaceConfig(prevConfig) || getDefaultSurfaceConfig();
             const fittedPrev = bounds ? fitConfigToBounds(prev, bounds) : prev;
+            const basePrev = viewMode === 'scoped' ? prev : fittedPrev;
             const cols = Math.max(1, totalColumns || surfaceBounds?.columns || GRID_COLUMNS);
             const rows = Math.max(1, surfaceBounds?.rows || bounds?.rows || GRID_ROWS);
             const w = clampDetailCells(cells, cols);
+            const gridColumns = Math.max(1, cols - w);
+            const gridRows = bounds?.rows || basePrev.layout_bounds?.rows || rows;
+            const dragBaseLayout = viewMode === 'scoped' && splitterDragLayoutRef.current
+                ? splitterDragLayoutRef.current
+                : basePrev.layout;
+            const nextLayout = viewMode === 'scoped'
+                ? clampLayoutInsideBounds(dragBaseLayout, { columns: gridColumns, rows: gridRows })
+                : basePrev.layout;
+            const scopedGap = viewMode === 'scoped'
+                ? getScopedHierarchyGapCells(
+                    migrateSplitLayoutToGrid(nextLayout) || nextLayout,
+                    getTreePanelId(basePrev.panel_contents),
+                    gridColumns
+                )
+                : 0;
             return {
-                ...fittedPrev,
-                detail_panel: { x: cols - w, y: 0, w, h: rows, cols },
+                ...basePrev,
+                layout: nextLayout,
+                layout_bounds: { columns: gridColumns, rows: gridRows },
+                detail_panel: { x: cols - w, y: 0, w, h: rows, cols, gap: scopedGap },
             };
         });
-    }, [onConfigChange, bounds, surfaceBounds]);
+    }, [onConfigChange, bounds, surfaceBounds, viewMode]);
 
     // Splitter drag: adjust the detail region width (snapped to grid cells).
     const handleSplitterMouseDown = useCallback((event) => {
@@ -307,24 +364,26 @@ export default function PageSurface({
         event.stopPropagation();
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
+        splitterDragLayoutRef.current = liveLayout;
         const cols = Math.max(1, Math.floor(rect.width / GRID_UNIT));
+        let latestCells = detailCells;
 
         const onMove = (e) => {
             const boundaryCellsFromLeft = Math.round((e.clientX - rect.left) / GRID_UNIT);
             const cellsFromRight = cols - boundaryCellsFromLeft;
-            setDragDetailCells(clampDetailCells(cellsFromRight, cols));
+            latestCells = clampDetailCells(cellsFromRight, cols);
+            setDragDetailCells(latestCells);
         };
         const onUp = () => {
             window.removeEventListener('mousemove', onMove);
             window.removeEventListener('mouseup', onUp);
-            setDragDetailCells((finalCells) => {
-                if (finalCells != null) persistDetailCells(finalCells, cols);
-                return null;
-            });
+            persistDetailCells(latestCells, cols);
+            setDragDetailCells(null);
+            splitterDragLayoutRef.current = null;
         };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
-    }, [persistDetailCells]);
+    }, [detailCells, liveLayout, persistDetailCells]);
 
     const handleBlankSpaceMouseDown = useCallback((cellInfo, event) => {
         onSelectedPanelIdChange?.(null);

@@ -80,6 +80,24 @@ describe('sanitize/create round trip', () => {
         expect(sanitized.panel_contents['panel-2'].state.metricKey).toBe('totalSessionDuration');
     });
 
+    it('preserves scoped detail panel columns and gap metadata', () => {
+        const built = createSurfaceConfigPayload({
+            layout: {
+                type: 'grid',
+                panels: [{ id: 'tree-1', x: 0, y: 0, w: 48, h: 48 }],
+            },
+            panelContents: {
+                'tree-1': { kind: 'tree', treeView: { mode: 'tree' } },
+            },
+            detailPanel: { x: 72, y: 0, w: 24, h: 48, cols: 96, gap: 3 },
+            layoutBounds: { columns: 96, rows: 48 },
+        });
+
+        const sanitized = sanitizeSurfaceConfig(built);
+
+        expect(sanitized.detail_panel).toMatchObject({ w: 24, cols: 96, gap: 3 });
+    });
+
     it('separates overview widgets from the scoped surface when migrating legacy configs', () => {
         const built = createSurfaceConfigPayload({
             layout: {

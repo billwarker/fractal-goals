@@ -307,6 +307,56 @@ describe('PageSurface', () => {
         const updater = handleConfigChange.mock.calls[0][0];
         const nextConfig = updater(config);
         expect(nextConfig.detail_panel).toMatchObject({ w: 25, cols: 50 });
+        expect(nextConfig.layout_bounds).toMatchObject({ columns: 25 });
+        expect(nextConfig.layout.panels.find((panel) => panel.id === 'tree-1')).toMatchObject({ w: 25 });
+    });
+
+    it('keeps a scoped splitter-created gap when the detail panel gets narrower', () => {
+        const handleConfigChange = vi.fn();
+        const config = updateSurfaceModeConfig(getDefaultSurfaceConfig(), 'scoped', {
+            ...getDefaultSurfaceConfig(),
+            layout: {
+                type: 'grid',
+                panels: [{ id: 'tree-1', x: 0, y: 0, w: 30, h: 48 }],
+            },
+            layout_bounds: { columns: 50, rows: 48 },
+            detail_panel: { x: 30, y: 0, w: 20, h: 48, cols: 50 },
+            panel_contents: {
+                'tree-1': { kind: 'tree', treeView: { mode: 'tree' } },
+            },
+        });
+        const { container } = render(
+            <PageSurface
+                activeConfig={config}
+                onConfigChange={handleConfigChange}
+                configureMode
+                viewMode="scoped"
+                renderTree={() => <div>Tree content</div>}
+                renderDetail={() => <div>Detail content</div>}
+            />
+        );
+        const surface = container.querySelector('.page-surface');
+        vi.spyOn(surface, 'getBoundingClientRect').mockReturnValue({
+            left: 0,
+            top: 0,
+            right: 1000,
+            bottom: 800,
+            width: 1000,
+            height: 800,
+            x: 0,
+            y: 0,
+            toJSON: () => {},
+        });
+
+        fireEvent.mouseDown(screen.getByRole('separator'), { clientX: 600, clientY: 100 });
+        fireEvent.mouseMove(window, { clientX: 760, clientY: 100 });
+        fireEvent.mouseUp(window);
+
+        const updater = handleConfigChange.mock.calls[0][0];
+        const nextConfig = updater(config);
+        expect(nextConfig.detail_panel).toMatchObject({ w: 12, cols: 50, gap: 8 });
+        expect(nextConfig.layout_bounds).toMatchObject({ columns: 38 });
+        expect(nextConfig.layout.panels.find((panel) => panel.id === 'tree-1')).toMatchObject({ w: 30 });
     });
 
     it('uses the detail window perimeter as the scoped configure highlight', () => {
@@ -325,7 +375,7 @@ describe('PageSurface', () => {
         expect(screen.getByRole('separator')).toHaveAttribute('data-no-panel-drag', 'true');
     });
 
-    it('fills an accidental one-cell scoped gap between tree and detail regions', () => {
+    it('preserves a saved scoped gap between tree and detail regions', () => {
         const config = updateSurfaceModeConfig(getDefaultSurfaceConfig(), 'scoped', {
             ...getDefaultSurfaceConfig(),
             layout: {
@@ -333,6 +383,7 @@ describe('PageSurface', () => {
                 panels: [{ id: 'tree-1', x: 0, y: 0, w: 49, h: 48 }],
             },
             layout_bounds: { columns: 50, rows: 48 },
+            detail_panel: { x: 32, y: 0, w: 18, h: 48, cols: 50, gap: 1 },
             panel_contents: {
                 'tree-1': { kind: 'tree', treeView: { mode: 'tree' } },
             },
@@ -349,6 +400,6 @@ describe('PageSurface', () => {
         );
 
         const panels = JSON.parse(screen.getByTestId('grid-layout').dataset.layoutPanels);
-        expect(panels.find((panel) => panel.id === 'tree-1')).toMatchObject({ x: 0, w: 50 });
+        expect(panels.find((panel) => panel.id === 'tree-1')).toMatchObject({ x: 0, w: 49 });
     });
 });

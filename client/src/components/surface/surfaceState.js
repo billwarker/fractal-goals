@@ -43,6 +43,14 @@ function normalizeDetailHint(hint) {
             if (!Number.isFinite(v)) return 'auto';
             out[axis] = v;
         }
+        const cols = Math.round(Number(hint.cols));
+        if (Number.isFinite(cols) && cols > 0) {
+            out.cols = cols;
+        }
+        const gap = Math.round(Number(hint.gap));
+        if (Number.isFinite(gap) && gap >= 0) {
+            out.gap = gap;
+        }
         return out;
     }
     return 'auto';
