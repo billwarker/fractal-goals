@@ -12,6 +12,7 @@ import { withScatterPointDensity } from '../analytics/scatterPointProfile';
 import { useTargetAnalytics, useGoalActivityInstances } from '../../hooks/useTargetQueries';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
+import { themedTooltipOptions, thresholdLineAnnotations } from './targetAnalyticsChartOptions';
 import styles from './TargetAnalyticsModal.module.css';
 
 const TargetManager = lazyWithRetry(
@@ -66,34 +67,6 @@ function resolveMetricValue(instance, metricId, higherIsBetter) {
 
 function operatorIsHigherBetter(operator = '>=') {
     return ['>=', '>', '==', '='].includes(operator);
-}
-
-function thresholdLineAnnotations(metricDefs, conditionByMetric) {
-    const annotations = {};
-    metricDefs.forEach((metricDef, index) => {
-        const condition = conditionByMetric.get(metricDef.id);
-        if (!condition || condition.target_value == null) return;
-        annotations[`threshold-${metricDef.id}`] = {
-            type: 'line',
-            yMin: condition.target_value,
-            yMax: condition.target_value,
-            yScaleID: `metric${index + 1}`,
-            borderColor: SERIES_PALETTE[index],
-            borderWidth: 2,
-            borderDash: [6, 4],
-            borderDashOffset: index * 5,
-            label: {
-                display: true,
-                content: `Target ${condition.operator} ${condition.target_value}`,
-                position: index === 0 ? 'start' : 'end',
-                xAdjust: index === 0 ? 10 : -10,
-                backgroundColor: 'rgba(20,20,20,0.85)',
-                color: SERIES_PALETTE[index],
-                font: { size: 10 },
-            },
-        };
-    });
-    return annotations;
 }
 
 function thresholdScalePadding(metricDef, index, conditionByMetric) {
@@ -355,10 +328,7 @@ function TargetAnalyticsModal({
         plugins: {
             legend: { display: true, position: 'top', labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } } },
             tooltip: {
-                backgroundColor: 'rgba(30,30,30,0.95)',
-                titleColor: '#fff',
-                bodyColor: '#ddd',
-                padding: 12,
+                ...themedTooltipOptions(chartTheme),
                 callbacks: {
                     label: (ctx) => {
                         const rawValue = ctx.dataset.rawData?.[ctx.dataIndex] ?? ctx.parsed.y;
@@ -366,7 +336,7 @@ function TargetAnalyticsModal({
                     },
                 },
             },
-            annotation: { annotations: thresholdLineAnnotations(selectedMetricDefs, conditionByMetric) },
+            annotation: { annotations: thresholdLineAnnotations(selectedMetricDefs, conditionByMetric, chartTheme, SERIES_PALETTE) },
         },
         scales: {
             x: { ticks: { color: chartTheme.textColor, maxRotation: 45 }, grid: { color: chartTheme.gridColor } },
@@ -448,7 +418,7 @@ function TargetAnalyticsModal({
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(30,30,30,0.95)', titleColor: '#fff', bodyColor: '#ddd', padding: 12,
+                    ...themedTooltipOptions(chartTheme),
                     callbacks: {
                         title: (ctx) => ctx[0]?.raw?.label || '',
                         label: (ctx) => {

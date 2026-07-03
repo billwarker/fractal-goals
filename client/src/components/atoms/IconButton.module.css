@@ -57,6 +57,7 @@
 
 .danger:hover:not(:disabled),
 .danger:focus-visible {
+    background: transparent;
     color: var(--color-brand-danger);
 }
 

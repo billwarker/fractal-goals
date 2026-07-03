@@ -110,6 +110,10 @@ describe('TargetAnalyticsModal', () => {
         mockPreviewData.current = null;
         chartMocks.line.mockClear();
         chartMocks.scatter.mockClear();
+        document.documentElement.style.removeProperty('--color-bg-tooltip');
+        document.documentElement.style.removeProperty('--color-text-primary');
+        document.documentElement.style.removeProperty('--color-text-secondary');
+        document.documentElement.style.removeProperty('--color-border');
     });
 
     function setup() {
@@ -215,6 +219,38 @@ describe('TargetAnalyticsModal', () => {
             borderColor: '#22c55e',
             yAxisID: 'metric2',
             data: [7],
+        });
+    });
+
+    it('uses theme colors for chart and threshold tooltips', () => {
+        document.documentElement.style.setProperty('--color-bg-tooltip', 'rgb(250, 251, 252)');
+        document.documentElement.style.setProperty('--color-text-primary', 'rgb(10, 20, 30)');
+        document.documentElement.style.setProperty('--color-text-secondary', 'rgb(70, 80, 90)');
+        document.documentElement.style.setProperty('--color-border', 'rgb(190, 200, 210)');
+
+        setup();
+        const lineProps = chartMocks.line.mock.calls.at(-1)?.[0];
+        expect(lineProps.options.plugins.tooltip).toMatchObject({
+            backgroundColor: 'rgb(250, 251, 252)',
+            titleColor: 'rgb(10, 20, 30)',
+            bodyColor: 'rgb(70, 80, 90)',
+            borderColor: 'rgb(190, 200, 210)',
+            borderWidth: 1,
+        });
+        expect(lineProps.options.plugins.annotation.annotations['threshold-speed'].label).toMatchObject({
+            backgroundColor: 'rgb(250, 251, 252)',
+            borderColor: 'rgb(190, 200, 210)',
+            borderWidth: 1,
+        });
+
+        switchGraphType('Scatter');
+        const scatterProps = chartMocks.scatter.mock.calls.at(-1)?.[0];
+        expect(scatterProps.options.plugins.tooltip).toMatchObject({
+            backgroundColor: 'rgb(250, 251, 252)',
+            titleColor: 'rgb(10, 20, 30)',
+            bodyColor: 'rgb(70, 80, 90)',
+            borderColor: 'rgb(190, 200, 210)',
+            borderWidth: 1,
         });
     });
 
