@@ -3,7 +3,6 @@ import { formatForInput, localToISO } from '../../utils/dateUtils';
 import { formatAggValue } from '../../utils/progressAggregations';
 import { formatDuration } from '../../utils/sessionActivityMetrics';
 import ActivityCompletionButton from '../common/ActivityCompletionButton';
-import MetaField from '../common/MetaField';
 import Linkify from '../atoms/Linkify';
 import CloseIcon from '../atoms/CloseIcon';
 import { DeletedBadge } from '../ui/DeletedEntityFallback';
@@ -262,17 +261,16 @@ function SessionActivityItemView({
                                                 )}
                                             </>
                                         ) : (
-                                            <MetaField
-                                                className={styles.durationMetaField}
-                                                labelClassName={styles.timerLabel}
-                                                label={isCountingDown ? 'Remaining' : 'Duration'}
-                                                value={isCountingDown ? formatDuration(countdownRemaining) : formatDuration(displayedDuration)}
-                                                valueClassName={[
-                                                    styles.durationDisplay,
-                                                    isRunning ? styles.durationActive : styles.durationInactive,
-                                                    isCountingDown && countdownRemaining <= 10 ? styles.durationCountdownAlert : '',
-                                                ].join(' ')}
-                                            />
+                                            <>
+                                                <label className={styles.timerLabel}>{isCountingDown ? 'Remaining' : 'Duration'}</label>
+                                                <div
+                                                    className={[
+                                                        styles.durationDisplay,
+                                                        isRunning ? styles.durationActive : styles.durationInactive,
+                                                        isCountingDown && countdownRemaining <= 10 ? styles.durationCountdownAlert : '',
+                                                    ].join(' ')}
+                                                >{isCountingDown ? formatDuration(countdownRemaining) : formatDuration(displayedDuration)}</div>
+                                            </>
                                         )}
                                     </div>
                                 </div>
