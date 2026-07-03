@@ -164,17 +164,22 @@ function ProgramCalendarView({
             .filter(Boolean);
     }, [calendarEvents, compact]);
 
-    const getCompactCellBackground = React.useCallback((dateStr) => {
-        let selectedRange = null;
+    const getCompactCellBackgrounds = React.useCallback((dateStr) => {
+        const selectedRanges = {
+            program: null,
+            block: null,
+        };
 
         compactBackgroundRanges.forEach((range) => {
             if (dateStr < range.start || dateStr >= range.end) return;
-            if (!selectedRange || range.sortOrder >= selectedRange.sortOrder) {
-                selectedRange = range;
+
+            const key = range.type === 'block_background' ? 'block' : 'program';
+            if (!selectedRanges[key] || range.sortOrder >= selectedRanges[key].sortOrder) {
+                selectedRanges[key] = range;
             }
         });
 
-        return selectedRange;
+        return selectedRanges;
     }, [compactBackgroundRanges]);
 
     const syncBlockLabelForCell = React.useCallback((dayEl) => {
@@ -187,20 +192,21 @@ function ProgramCalendarView({
         if (!frame) return;
 
         dayEl.classList.remove(styles.compactProgramCell, styles.compactBlockCell);
-        dayEl.style.removeProperty('--program-compact-cell-bg');
+        dayEl.style.removeProperty('--program-compact-program-bg');
+        dayEl.style.removeProperty('--program-compact-block-bg');
         frame.querySelector(`.${styles.blockCellLabel}`)?.remove();
         frame.removeAttribute('data-block-label');
         frame.style.removeProperty('--program-block-label-color');
 
         if (compact) {
-            const cellBackground = getCompactCellBackground(dateStr);
-            if (cellBackground) {
-                dayEl.classList.add(
-                    cellBackground.type === 'block_background'
-                        ? styles.compactBlockCell
-                        : styles.compactProgramCell,
-                );
-                dayEl.style.setProperty('--program-compact-cell-bg', cellBackground.color);
+            const cellBackgrounds = getCompactCellBackgrounds(dateStr);
+            if (cellBackgrounds.program) {
+                dayEl.classList.add(styles.compactProgramCell);
+                dayEl.style.setProperty('--program-compact-program-bg', cellBackgrounds.program.color);
+            }
+            if (cellBackgrounds.block) {
+                dayEl.classList.add(styles.compactBlockCell);
+                dayEl.style.setProperty('--program-compact-block-bg', cellBackgrounds.block.color);
             }
         }
 
@@ -230,12 +236,13 @@ function ProgramCalendarView({
             });
             frame.appendChild(labelButton);
         }
-    }, [blockLabelsByDate, compact, getCompactCellBackground, onBlockLabelClick]);
+    }, [blockLabelsByDate, compact, getCompactCellBackgrounds, onBlockLabelClick]);
 
     const clearBlockLabelForCell = (dayEl) => {
         const frame = dayEl.querySelector('.fc-daygrid-day-frame');
         dayEl.classList.remove(styles.compactProgramCell, styles.compactBlockCell);
-        dayEl.style.removeProperty('--program-compact-cell-bg');
+        dayEl.style.removeProperty('--program-compact-program-bg');
+        dayEl.style.removeProperty('--program-compact-block-bg');
         frame?.querySelector(`.${styles.blockCellLabel}`)?.remove();
     };
 

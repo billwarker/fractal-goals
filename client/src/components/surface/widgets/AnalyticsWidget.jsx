@@ -1,10 +1,8 @@
 import React, { useMemo, useRef } from 'react';
 
 import {
-    VISUALIZATION_CATEGORIES,
     getVisualization,
     getVisualizationDefaultState,
-    getVisualizationsByCategory,
 } from '../../analytics/visualizations/registry';
 import { sanitizeDashboardLayoutPayload } from '../../analytics/dashboardState';
 import { useAnalyticsViews } from '../../../hooks/useDashboardQueries';
@@ -12,12 +10,69 @@ import { useAnalyticsPageData } from '../../../hooks/useAnalyticsPageData';
 
 const EMPTY = [];
 
+function useSavedAnalyticsViewName(state, sharedData) {
+    const rootId = sharedData?.rootId;
+    const { analyticsViewItems } = useAnalyticsViews(rootId);
+    const savedViewId = state?.savedViewId || '';
+
+    return useMemo(() => {
+        if (!savedViewId) return '';
+        const view = (analyticsViewItems || []).find((item) => item.id === savedViewId);
+        return view?.name || '';
+    }, [analyticsViewItems, savedViewId]);
+}
+
+export function AnalyticsWidgetHeaderTitle({ baseTitle, state, sharedData }) {
+    const savedViewName = useSavedAnalyticsViewName(state, sharedData);
+
+    if (!savedViewName) {
+        return baseTitle;
+    }
+
+    return (
+        <>
+            {baseTitle}
+            <span className="surface-widget-title-detail"> - {savedViewName}</span>
+        </>
+    );
+}
+
+export function AnalyticsWidgetHeaderControls({ state, onStateChange, sharedData }) {
+    const rootId = sharedData?.rootId;
+    const { analyticsViewItems } = useAnalyticsViews(rootId);
+    const savedViewId = state?.savedViewId || '';
+
+    return (
+        <label className="surface-analytics-header-picker" data-no-panel-drag="true">
+            <span>Saved view</span>
+            <span className="surface-analytics-header-select-wrap">
+                <select
+                    className="surface-analytics-header-select"
+                    aria-label="Saved analytics view"
+                    value={savedViewId}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onChange={(event) => onStateChange?.({
+                        savedViewId: event.target.value || null,
+                        category: null,
+                        visualization: null,
+                    })}
+                >
+                    <option value="">Choose view</option>
+                    {(analyticsViewItems || []).map((view) => (
+                        <option key={view.id} value={view.id}>{view.name}</option>
+                    ))}
+                </select>
+            </span>
+        </label>
+    );
+}
+
 /**
  * Renders a saved analytics view's primary visualization, or a category +
  * visualization the user selects inline. The chart context is assembled from
  * the goals page's shared data so the widget needs no analytics page state.
  */
-export default function AnalyticsWidget({ state, onStateChange, sharedData, viewMode = 'overview', configureMode }) {
+export default function AnalyticsWidget({ state, sharedData, viewMode = 'overview' }) {
     const rootId = sharedData?.rootId;
     const chartRef = useRef(null);
     const { analyticsViewItems } = useAnalyticsViews(rootId);
@@ -109,54 +164,6 @@ export default function AnalyticsWidget({ state, onStateChange, sharedData, view
         onGlobalDateRangeChange: () => {},
     }), [effectiveSharedData, resolved]);
 
-    // Picker (shown when nothing resolved, or always available in configure mode)
-    const renderPicker = () => (
-        <div className="surface-analytics-picker">
-            <label className="surface-analytics-picker-row">
-                <span>Saved view</span>
-                <select
-                    value={savedViewId || ''}
-                    onChange={(e) => onStateChange?.({ savedViewId: e.target.value || null, category: null, visualization: null })}
-                >
-                    <option value="">— choose —</option>
-                    {(analyticsViewItems || []).map((v) => (
-                        <option key={v.id} value={v.id}>{v.name}</option>
-                    ))}
-                </select>
-            </label>
-            {!savedViewId && (
-                <>
-                    <label className="surface-analytics-picker-row">
-                        <span>Category</span>
-                        <select
-                            value={category || ''}
-                            onChange={(e) => onStateChange?.({ category: e.target.value || null, visualization: null })}
-                        >
-                            <option value="">— choose —</option>
-                            {VISUALIZATION_CATEGORIES.map((c) => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                        </select>
-                    </label>
-                    {category && (
-                        <label className="surface-analytics-picker-row">
-                            <span>Chart</span>
-                            <select
-                                value={visualizationId || ''}
-                                onChange={(e) => onStateChange?.({ visualization: e.target.value || null })}
-                            >
-                                <option value="">— choose —</option>
-                                {getVisualizationsByCategory(category).map((v) => (
-                                    <option key={v.id} value={v.id}>{v.name}</option>
-                                ))}
-                            </select>
-                        </label>
-                    )}
-                </>
-            )}
-        </div>
-    );
-
     const Chart = resolved.viz?.Chart;
 
     const renderQueryProfileView = () => (
@@ -169,7 +176,6 @@ export default function AnalyticsWidget({ state, onStateChange, sharedData, view
 
     return (
         <div className="surface-analytics" data-no-panel-drag="true">
-            {configureMode && renderPicker()}
             {resolved.queryProfileView ? (
                 renderQueryProfileView()
             ) : Chart ? (
@@ -177,7 +183,7 @@ export default function AnalyticsWidget({ state, onStateChange, sharedData, view
                     <Chart context={context} />
                 </div>
             ) : (
-                !configureMode && <div className="surface-widget-empty">Choose an analytics view in configure mode.</div>
+                <div className="surface-widget-empty">Choose an analytics view in configure mode.</div>
             )}
         </div>
     );

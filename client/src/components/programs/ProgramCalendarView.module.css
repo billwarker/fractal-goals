@@ -96,11 +96,16 @@
 }
 
 .calendarContainerCompact .compactProgramCell {
-    background: color-mix(in srgb, var(--program-compact-cell-bg) 18%, var(--color-bg-card)) !important;
+    background:
+        linear-gradient(color-mix(in srgb, var(--program-compact-program-bg) 30%, transparent), color-mix(in srgb, var(--program-compact-program-bg) 30%, transparent)),
+        var(--color-bg-card) !important;
 }
 
 .calendarContainerCompact .compactBlockCell {
-    background: color-mix(in srgb, var(--program-compact-cell-bg) 44%, var(--color-bg-card)) !important;
+    background:
+        linear-gradient(color-mix(in srgb, var(--program-compact-block-bg) 30%, transparent), color-mix(in srgb, var(--program-compact-block-bg) 30%, transparent)),
+        linear-gradient(color-mix(in srgb, var(--program-compact-program-bg) 30%, transparent), color-mix(in srgb, var(--program-compact-program-bg) 30%, transparent)),
+        var(--color-bg-card) !important;
 }
 
 .headerActions {

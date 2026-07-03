@@ -105,17 +105,30 @@ describe('ProgramCalendarView', () => {
 
     it('expands rows and disables editing affordances in compact read-only mode', () => {
         renderCalendar({
-            calendarEvents: [{
-                id: 'block-bg-1',
-                start: '2026-05-10',
-                end: '2026-05-24',
-                backgroundColor: '#89cff0',
-                display: 'background',
-                extendedProps: {
-                    type: 'block_background',
-                    sortOrder: -10,
+            calendarEvents: [
+                {
+                    id: 'program-bg-1',
+                    start: '2026-05-01',
+                    end: '2026-06-01',
+                    backgroundColor: '#224466',
+                    display: 'background',
+                    extendedProps: {
+                        type: 'program_background',
+                        sortOrder: -20,
+                    },
                 },
-            }],
+                {
+                    id: 'block-bg-1',
+                    start: '2026-05-10',
+                    end: '2026-05-24',
+                    backgroundColor: '#89cff0',
+                    display: 'background',
+                    extendedProps: {
+                        type: 'block_background',
+                        sortOrder: -10,
+                    },
+                },
+            ],
             blockCreationMode: true,
             compact: true,
             readOnly: true,
@@ -126,6 +139,7 @@ describe('ProgramCalendarView', () => {
         expect(calendar).toHaveAttribute('data-expand-rows', 'true');
         expect(calendar).toHaveAttribute('data-day-max-events', '3');
         expect(calendar).toHaveAttribute('data-selectable', 'false');
-        expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-compact-cell-bg: #89cff0');
+        expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-compact-program-bg: #224466');
+        expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-compact-block-bg: #89cff0');
     });
 });

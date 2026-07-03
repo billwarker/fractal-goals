@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 
 import RemoveButton from '../atoms/RemoveButton';
 import { getWidgetDefinition } from './widgetRegistry';
-import AnalyticsWidget from './widgets/AnalyticsWidget';
+import AnalyticsWidget, { AnalyticsWidgetHeaderControls, AnalyticsWidgetHeaderTitle } from './widgets/AnalyticsWidget';
 import CalendarWidget from './widgets/CalendarWidget';
 import LastSessionWidget from './widgets/LastSessionWidget';
 import MetricCardWidget from './widgets/MetricCardWidget';
@@ -28,7 +28,7 @@ export default function SurfaceWidget({
     const body = useMemo(() => {
         switch (widgetType) {
             case 'analytics':
-                return <AnalyticsWidget state={state} onStateChange={onStateChange} sharedData={sharedData} viewMode={viewMode} configureMode={configureMode} />;
+                return <AnalyticsWidget state={state} sharedData={sharedData} viewMode={viewMode} />;
             case 'calendar':
                 return <CalendarWidget state={state} onStateChange={onStateChange} sharedData={sharedData} configureMode={configureMode} />;
             case 'lastSession':
@@ -38,7 +38,28 @@ export default function SurfaceWidget({
             default:
                 return <div className="surface-widget-empty">Unknown widget</div>;
         }
-    }, [widgetType, state, onStateChange, sharedData, viewMode, configureMode]);
+    }, [widgetType, state, sharedData, viewMode, configureMode, onStateChange]);
+
+    const headerControls = useMemo(() => {
+        if (widgetType !== 'analytics' || !configureMode) {
+            return null;
+        }
+        return (
+            <AnalyticsWidgetHeaderControls
+                state={state}
+                onStateChange={onStateChange}
+                sharedData={sharedData}
+            />
+        );
+    }, [configureMode, onStateChange, sharedData, state, widgetType]);
+
+    const title = widgetType === 'analytics' && !configureMode ? (
+        <AnalyticsWidgetHeaderTitle
+            baseTitle={def.name}
+            state={state}
+            sharedData={sharedData}
+        />
+    ) : def.name;
 
     return (
         <div className="surface-widget">
@@ -47,7 +68,12 @@ export default function SurfaceWidget({
                 onMouseDown={configureMode ? onDragStart : undefined}
                 style={{ cursor: configureMode ? 'grab' : 'default' }}
             >
-                <span className="surface-widget-title">{def.name}</span>
+                <span className="surface-widget-title">{title}</span>
+                {headerControls ? (
+                    <div className="surface-widget-header-controls">
+                        {headerControls}
+                    </div>
+                ) : null}
                 {configureMode && (
                     <RemoveButton
                         className="surface-widget-remove"
