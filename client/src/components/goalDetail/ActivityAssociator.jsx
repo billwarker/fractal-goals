@@ -5,7 +5,7 @@ import { fractalApi } from '../../utils/api';
 import { sortGroupsTreeOrder } from '../../utils/manageActivities';
 import Modal from '../atoms/Modal';
 import Button from '../atoms/Button';
-import CloseIcon from '../atoms/CloseIcon';
+import CloseButton from '../atoms/CloseButton';
 import { ActivityPicker } from '../activityPicker';
 import notify from '../../utils/notify';
 import ActivityGroupContainer from './ActivityGroupContainer';
@@ -620,9 +620,7 @@ const ActivityAssociator = ({
                             </h3>
                             <div className={styles.headerRight}>
                                 {onClose && (
-                                    <button onClick={onClose} className={styles.closeBtn} aria-label="Close">
-                                        <CloseIcon size={16} />
-                                    </button>
+                                    <CloseButton onClick={onClose} className={styles.closeBtn} size={16} />
                                 )}
                             </div>
                         </div>

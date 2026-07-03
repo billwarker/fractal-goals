@@ -89,6 +89,7 @@ Important frontend design choices:
 - Modal behavior and state reset patterns are more standardized than before.
 - Backdrop dismissal for modals and mobile sheets is centralized through `client/src/components/atoms/ModalBackdrop.jsx` and guarded while text inputs, textareas, or contenteditable fields are focused so accidental outside clicks do not discard in-progress typing.
 - The app shell exposes `--app-viewport-height`, using dynamic viewport units when available, so mobile browser chrome does not hide headers or bottom content.
+- Canonical UI primitives are documented in `client/src/components/README.md`. New compact controls should use the atom/common map rather than local copies: `Button` for text commands, `IconButton` for icon-only controls, `CloseButton` for dismissals, `RemoveButton` for collection-item removal, `DeleteButton` for labeled destructive actions, `Badge` for badges/pills/chips/tags, `Spinner` via `LoadingState` for loading states, form atoms for inputs, and `Tooltip` for hover/focus help. `Modal` now composes `CloseButton`, so modal close affordances share one hover/focus implementation.
 
 ## SaaS And Account Layer
 

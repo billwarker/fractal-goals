@@ -7,6 +7,7 @@ import { authApi, fractalApi, globalApi } from '../../utils/api';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import GoalCharacteristicsSettings from '../GoalCharacteristicsSettings';
+import CloseButton from '../atoms/CloseButton';
 import useIsMobile from '../../hooks/useIsMobile';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
 import {
@@ -219,13 +220,11 @@ const SettingsModalInner = ({ onClose }) => {
                 {/* Header */}
                 <div className={`${styles.header} ${isMobile ? styles.headerMobile : styles.headerDesktop}`}>
                     <h2 className={`${styles.title} ${isMobile ? styles.titleMobile : styles.titleDesktop}`}>Settings</h2>
-                    <button
+                    <CloseButton
                         onClick={onClose}
                         className={`${styles.closeButton} ${isMobile ? styles.closeButtonMobile : styles.closeButtonDesktop}`}
                         aria-label="Close settings"
-                    >
-                        &times;
-                    </button>
+                    />
                 </div>
 
                 <div className={`${styles.body} ${isMobile ? styles.bodyMobile : styles.bodyDesktop}`}>

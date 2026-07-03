@@ -1,26 +1,8 @@
 .deleteButton {
-    padding: 8px 12px;
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
     color: var(--color-text-muted);
-    font-size: 12px;
-    cursor: pointer;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
 .deleteButton:hover:not(:disabled) {
     border-color: var(--color-brand-danger);
     color: var(--color-brand-danger);
-}
-
-.deleteButton:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-@media (max-width: 768px) {
-    .deleteButton {
-        min-height: 44px;
-    }
 }

@@ -1,4 +1,6 @@
 import React from 'react';
+
+import Button from './Button';
 import styles from './DeleteButton.module.css';
 
 /**
@@ -9,13 +11,15 @@ import styles from './DeleteButton.module.css';
  */
 function DeleteButton({ children = 'Delete', className = '', type = 'button', ...props }) {
     return (
-        <button
+        <Button
             type={type}
-            className={`${styles.deleteButton} ${className}`}
+            variant="secondary"
+            size="sm"
+            className={`${styles.deleteButton} ${className}`.trim()}
             {...props}
         >
             {children}
-        </button>
+        </Button>
     );
 }
 

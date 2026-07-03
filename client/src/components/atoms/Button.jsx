@@ -1,4 +1,6 @@
 import React from 'react';
+
+import Spinner from './Spinner';
 import styles from './Button.module.css';
 
 /**
@@ -30,7 +32,7 @@ const Button = ({
             disabled={disabled || isLoading}
             {...props}
         >
-            {isLoading && <span className={styles.loader} aria-hidden="true"></span>}
+            {isLoading && <Spinner className={styles.loader} size="sm" label="Loading" />}
             {!isLoading && leftIcon && <span className={styles.iconLeft}>{leftIcon}</span>}
             {children}
             {!isLoading && rightIcon && <span className={styles.iconRight}>{rightIcon}</span>}

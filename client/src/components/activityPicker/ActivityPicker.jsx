@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-import CloseIcon from '../atoms/CloseIcon';
+import CloseButton from '../atoms/CloseButton';
 import {
     ROOT_KEY,
     UNGROUPED_KEY,
@@ -337,9 +337,7 @@ function ActivityPicker({
                                 </button>
                             )}
                             {showCloseButton && onClose && (
-                                <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close activity picker">
-                                    <CloseIcon size={14} />
-                                </button>
+                                <CloseButton className={styles.closeButton} onClick={onClose} aria-label="Close activity picker" size={14} />
                             )}
                         </div>
                     </div>

@@ -16,7 +16,7 @@ import { useActivities, useActivityGroups } from '../hooks/useActivityQueries';
 import { useNotesPageQuery } from '../hooks/useNotesPageQuery';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
-import CloseIcon from '../components/atoms/CloseIcon';
+import CloseButton from '../components/atoms/CloseButton';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
 import ActivityFilterModal from '../components/common/ActivityFilterModal';
 import GoalTreePicker from '../components/common/GoalTreePicker';
@@ -48,9 +48,12 @@ function GoalPickerModal({ rootId, selectedGoalId, onSelect, onClose }) {
             <div className={styles.modalSheet} onClick={e => e.stopPropagation()}>
                 <div className={styles.modalHeader}>
                     <span className={styles.modalTitle}>Filter by Goal</span>
-                    <button className={styles.modalClose} onClick={onClose} aria-label="Close goal picker">
-                        <CloseIcon size={16} />
-                    </button>
+                    <CloseButton
+                        className={styles.modalClose}
+                        onClick={onClose}
+                        aria-label="Close goal picker"
+                        size={16}
+                    />
                 </div>
                 <div className={styles.modalBody}>
                     {selectedGoalId && (

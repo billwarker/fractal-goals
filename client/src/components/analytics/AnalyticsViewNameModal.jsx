@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import CloseIcon from '../atoms/CloseIcon';
+import CloseButton from '../atoms/CloseButton';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import styles from './AnalyticsViewsModal.module.css';
 
@@ -18,9 +18,12 @@ function AnalyticsViewNameModal({
             <div className={styles.namingSheet} onClick={(event) => event.stopPropagation()}>
                 <div className={styles.header}>
                     <h3 className={styles.title}>Save {label}</h3>
-                    <button type="button" className={styles.closeButton} onClick={onClose} aria-label={`Close save ${label.toLowerCase()}`}>
-                        <CloseIcon size={16} />
-                    </button>
+                    <CloseButton
+                        className={styles.closeButton}
+                        onClick={onClose}
+                        aria-label={`Close save ${label.toLowerCase()}`}
+                        size={16}
+                    />
                 </div>
                 <form
                     className={styles.namingBody}

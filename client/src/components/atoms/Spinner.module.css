@@ -1,0 +1,28 @@
+.spinner {
+    display: inline-block;
+    width: var(--spinner-size);
+    height: var(--spinner-size);
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    color: var(--spinner-color, currentColor);
+    animation: atomSpin 0.8s linear infinite;
+}
+
+.sm {
+    --spinner-size: 14px;
+}
+
+.md {
+    --spinner-size: 18px;
+}
+
+.lg {
+    --spinner-size: 28px;
+}
+
+@keyframes atomSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}

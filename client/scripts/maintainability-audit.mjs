@@ -171,6 +171,9 @@ const globalNoImportPatterns = [
 ];
 
 const INLINE_STYLE_GLOBAL_BUDGET = 356;
+const RAW_CLOSE_GLYPH_BUDGET = 3;
+const RAW_BUTTON_CLASS_DRIFT_BUDGET = 137;
+const BESPOKE_BADGE_SELECTOR_BUDGET = 162;
 const inlineStyleBudgets = new Map([
   ['src/components/GoalDetailModal.jsx', 18],
   ['src/components/goalDetail/GoalTimelineView.jsx', 1],
@@ -213,6 +216,24 @@ const collectSourceFiles = (directory) => {
 
     const extension = extname(fullPath);
     if (extension === '.js' || extension === '.jsx' || extension === '.ts' || extension === '.tsx') {
+      files.push(fullPath);
+    }
+  }
+  return files;
+};
+
+const collectFilesByExtension = (directory, extensions) => {
+  const entries = readdirSync(directory);
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = join(directory, entry);
+    const stats = statSync(fullPath);
+    if (stats.isDirectory()) {
+      files.push(...collectFilesByExtension(fullPath, extensions));
+      continue;
+    }
+
+    if (extensions.has(extname(fullPath))) {
       files.push(fullPath);
     }
   }
@@ -297,6 +318,18 @@ const auditFileSize = (file, content) => {
 };
 
 const countInlineStyleBlocks = (content) => (content.match(/style=\{\{/g) ?? []).length;
+const countRawCloseGlyphs = (content) => (
+  content.match(/aria-label=\{?['"`][^'"`]*[Cc]lose[^'"`]*['"`]\}?[^>]*>[\s\S]{0,80}?(?:&times;|×|x)/g) ?? []
+).length;
+const countRawButtonClassDrift = (content) => (
+  content.match(/<button\b[^>]*className=\{?[^>]*(?:btn|button|Button)[^>]*>/g) ?? []
+).length;
+const countBespokeBadgeSelectors = (file, content) => {
+  if (file === 'src/components/atoms/Badge.module.css') return 0;
+  return (
+    content.match(/\.(?:[A-Za-z0-9_-]*(?:badge|Badge|pill|Pill|chip|Chip|tag|Tag)[A-Za-z0-9_-]*)\b/g) ?? []
+  ).length;
+};
 
 const auditInlineStyles = (file, content) => {
   const count = countInlineStyleBlocks(content);
@@ -340,6 +373,8 @@ for (const check of checks) {
 
 const sourceFiles = collectSourceFiles(resolve('src'));
 let inlineStyleCount = 0;
+let rawCloseGlyphCount = 0;
+let rawButtonClassDriftCount = 0;
 for (const file of sourceFiles) {
   const content = readFileSync(file, 'utf8');
   if (!content) continue;
@@ -357,12 +392,46 @@ for (const file of sourceFiles) {
   auditImportOrder(relativePath, content);
   auditFileSize(relativePath, content);
   inlineStyleCount += auditInlineStyles(relativePath, content);
+  rawCloseGlyphCount += countRawCloseGlyphs(content);
+  rawButtonClassDriftCount += countRawButtonClassDrift(content);
+}
+
+const cssFiles = collectFilesByExtension(resolve('src'), new Set(['.css']));
+let bespokeBadgeSelectorCount = 0;
+for (const file of cssFiles) {
+  const relativePath = relative(resolve(''), file);
+  const content = readFileSync(file, 'utf8');
+  bespokeBadgeSelectorCount += countBespokeBadgeSelectors(relativePath, content);
 }
 
 if (inlineStyleCount > INLINE_STYLE_GLOBAL_BUDGET) {
   console.error(
     `[maintainability-audit] Frontend has ${inlineStyleCount} inline style blocks, exceeding the repo budget of ` +
     `${INLINE_STYLE_GLOBAL_BUDGET}. Convert static styles to CSS modules before adding more.`
+  );
+  hasFailure = true;
+}
+
+if (rawCloseGlyphCount > RAW_CLOSE_GLYPH_BUDGET) {
+  console.error(
+    `[maintainability-audit] Found ${rawCloseGlyphCount} raw close glyph controls, exceeding the baseline ` +
+    `budget of ${RAW_CLOSE_GLYPH_BUDGET}. Use CloseButton for dismissals or RemoveButton for collection-item removal.`
+  );
+  hasFailure = true;
+}
+
+if (rawButtonClassDriftCount > RAW_BUTTON_CLASS_DRIFT_BUDGET) {
+  console.error(
+    `[maintainability-audit] Found ${rawButtonClassDriftCount} raw button class controls, exceeding the baseline ` +
+    `budget of ${RAW_BUTTON_CLASS_DRIFT_BUDGET}. Use Button or IconButton for new controls.`
+  );
+  hasFailure = true;
+}
+
+if (bespokeBadgeSelectorCount > BESPOKE_BADGE_SELECTOR_BUDGET) {
+  console.error(
+    `[maintainability-audit] Found ${bespokeBadgeSelectorCount} bespoke badge/pill/chip/tag CSS selectors, exceeding ` +
+    `the baseline budget of ${BESPOKE_BADGE_SELECTOR_BUDGET}. Use atoms/Badge.jsx for new compact labels.`
   );
   hasFailure = true;
 }

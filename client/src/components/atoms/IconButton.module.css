@@ -1,0 +1,68 @@
+.iconButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: var(--icon-button-size);
+    height: var(--icon-button-size);
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    line-height: 1;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, opacity 0.16s ease, transform 0.16s ease;
+}
+
+.iconButton:hover:not(:disabled) {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}
+
+.iconButton:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.iconButton:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.iconButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.sm {
+    --icon-button-size: 28px;
+}
+
+.md {
+    --icon-button-size: 34px;
+}
+
+.lg {
+    --icon-button-size: 40px;
+}
+
+.ghost {
+    background: transparent;
+}
+
+.subtle {
+    background: var(--color-bg-input);
+    border-color: var(--color-border);
+}
+
+.danger:hover:not(:disabled),
+.danger:focus-visible {
+    color: var(--color-brand-danger);
+}
+
+@media (pointer: coarse) {
+    .sm,
+    .md {
+        --icon-button-size: 44px;
+    }
+}

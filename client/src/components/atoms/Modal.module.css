@@ -60,24 +60,6 @@
     line-height: var(--line-height-tight);
 }
 
-.closeButton {
-    background: transparent;
-    border: none;
-    color: var(--color-text-secondary);
-    font-size: 24px;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.2s;
-}
-
-.closeButton:hover {
-    color: var(--color-text-primary);
-}
-
 .body {
     display: flex;
     flex-direction: column;

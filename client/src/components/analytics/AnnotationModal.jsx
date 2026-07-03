@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import useIsMobile from '../../hooks/useIsMobile';
-import CloseIcon from '../atoms/CloseIcon';
+import CloseButton from '../atoms/CloseButton';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import styles from './AnnotationModal.module.css';
 
@@ -83,9 +83,12 @@ function AnnotationModal({
             >
                 <div className={styles.header}>
                     <h3 className={styles.title}>✏️ Add Annotation</h3>
-                    <button className={styles.closeBtn} onClick={handleClose} aria-label="Close annotation modal">
-                        <CloseIcon size={16} />
-                    </button>
+                    <CloseButton
+                        className={styles.closeBtn}
+                        onClick={handleClose}
+                        aria-label="Close annotation modal"
+                        size={16}
+                    />
                 </div>
 
                 <div className={styles.selectedDataBox}>

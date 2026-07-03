@@ -1,8 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import Button from '../atoms/Button';
-import CloseIcon from '../atoms/CloseIcon';
-
+import CloseButton from '../atoms/CloseButton';
+import IconButton from '../atoms/IconButton';
 import {
     AnalyticsGoalIcon,
     BackIcon,
@@ -512,22 +512,18 @@ function ProfileWindow({
                     >
                         <MinimizeHeaderIcon size={16} />
                     </Button>
-                    <Button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (canClose) {
-                                onClose();
-                            }
+                    <CloseButton
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            if (canClose) onClose();
                         }}
-                        variant="ghost"
-                        size="sm"
                         style={{ padding: '0 8px', minWidth: '32px' }}
                         aria-label="Close analytics window"
                         title={canClose ? 'Close analytics window' : 'At least one analytics panel is required'}
                         disabled={!canClose}
-                    >
-                        <CloseIcon size={16} />
-                    </Button>
+                        size={16}
+                        buttonSize="sm"
+                    />
                 </div>
             </div>
         );
@@ -535,25 +531,24 @@ function ProfileWindow({
 
     const renderMinimizedHeaderOverlay = () => (
         <div className={styles.minimizedHeaderOverlay} onClick={(event) => event.stopPropagation()}>
-            <button
-                type="button"
+            <IconButton
                 className={styles.minimizedHeaderButton}
                 onClick={() => setIsHeaderMinimized(false)}
                 aria-label="Restore analytics panel header"
                 title="Restore header"
+                size="sm"
             >
                 <RestoreHeaderIcon size={15} />
-            </button>
-            <button
-                type="button"
+            </IconButton>
+            <CloseButton
                 className={styles.minimizedHeaderButton}
                 onClick={onClose}
                 aria-label="Close analytics window"
                 title={canClose ? 'Close analytics window' : 'At least one analytics panel is required'}
                 disabled={!canClose}
-            >
-                <CloseIcon size={15} />
-            </button>
+                size={15}
+                buttonSize="sm"
+            />
         </div>
     );
 
@@ -566,7 +561,12 @@ function ProfileWindow({
                         <strong>Chart Query</strong>
                         <span>{queryExplanation.metadata.visualization}</span>
                     </div>
-                    <button type="button" onClick={() => setIsQueryOverlayOpen(false)} aria-label="Close chart query">x</button>
+                    <CloseButton
+                        onClick={() => setIsQueryOverlayOpen(false)}
+                        aria-label="Close chart query"
+                        size={14}
+                        buttonSize="sm"
+                    />
                 </div>
                 <pre className={styles.querySql}>{queryExplanation.sql}</pre>
                 <dl className={styles.queryMeta}>

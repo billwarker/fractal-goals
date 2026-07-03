@@ -8,6 +8,7 @@ import {
 import BetaSignupsPanel from '../components/admin/BetaSignupsPanel';
 import TierQuotasPanel from '../components/admin/TierQuotasPanel';
 import { useAuth } from '../contexts/AuthContext';
+import CloseButton from '../components/atoms/CloseButton';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
 import { adminApi } from '../utils/api';
 import notify from '../utils/notify';
@@ -564,9 +565,7 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
             <div className={styles.actionsShell} onClick={(event) => event.stopPropagation()}>
                 <div className={styles.actionsHeader}>
                     <h2>Actions for {user.username}</h2>
-                    <button onClick={onClose} className={styles.actionsCloseButton} aria-label="Close user actions">
-                        &times;
-                    </button>
+                    <CloseButton onClick={onClose} className={styles.actionsCloseButton} aria-label="Close user actions" />
                 </div>
                 <div className={styles.actionsBody}>
                     <aside className={styles.actionsSidebar}>

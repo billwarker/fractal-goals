@@ -13,6 +13,7 @@ import { SessionCardExpanded, SessionsQuerySidebar } from '../components/session
 import { QuickSessionWorkspace } from '../components/sessionDetail';
 import CardCornerActionButton from '../components/common/CardCornerActionButton';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
+import Spinner from '../components/atoms/Spinner';
 import EmptyState from '../components/common/EmptyState';
 import LoadingState from '../components/common/LoadingState';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
@@ -29,7 +30,6 @@ import '../App.css';
 import styles from './Sessions.module.css';
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
 import { logError } from '../utils/logger';
-
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 
 /**
@@ -382,7 +382,7 @@ function Sessions() {
                                     >
                                         {isFetchingNextPage ? (
                                             <>
-                                                <span className={styles.loadingSpinner} />
+                                                <Spinner size="sm" label="Loading more sessions" />
                                                 Loading...
                                             </>
                                         ) : (

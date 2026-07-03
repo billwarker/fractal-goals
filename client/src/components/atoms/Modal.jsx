@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './Modal.module.css';
 import Card from './Card';
+import CloseButton from './CloseButton';
 import { Heading } from './Typography';
 import ModalBackdrop from './ModalBackdrop';
 
@@ -63,9 +64,7 @@ const Modal = ({
                             </Heading>
                         )}
                         {showCloseButton && (
-                            <button className={styles.closeButton} onClick={onClose} aria-label="Close">
-                                &times;
-                            </button>
+                            <CloseButton onClick={onClose} />
                         )}
                     </div>
 

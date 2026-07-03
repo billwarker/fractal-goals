@@ -1,6 +1,6 @@
 import React from 'react';
 
-import CloseIcon from '../atoms/CloseIcon';
+import CloseButton from '../atoms/CloseButton';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import SessionSidePane from './SessionSidePane';
 import styles from '../../pages/SessionDetail.module.css';
@@ -32,14 +32,12 @@ function SessionDetailPaneLayout({
                     >
                         <div className={styles.mobilePaneHeader}>
                             <div className={styles.mobilePaneTitle}>{selectedModeLabel}</div>
-                            <button
-                                type="button"
+                            <CloseButton
                                 className={styles.mobilePaneClose}
                                 onClick={onCloseMobilePane}
                                 aria-label="Close panel"
-                            >
-                                <CloseIcon size={16} />
-                            </button>
+                                size={16}
+                            />
                         </div>
                         <SessionSidePane model={sidePaneModel} showModeTabs={false} embedded />
                     </div>

@@ -12,6 +12,7 @@ import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
+import CloseButton from '../atoms/CloseButton';
 import CloseIcon from '../atoms/CloseIcon';
 import GoalHierarchySelector from '../goals/GoalHierarchySelector';
 import { useProgramDayViewModel } from '../../hooks/useProgramDayViewModel';
@@ -221,13 +222,12 @@ const DayViewModal = ({
                                 </div>
                             )}
                         </div>
-                        <button
+                        <CloseButton
                             onClick={handleClose}
                             className={styles.closeButton}
                             aria-label="Close"
-                        >
-                            <CloseIcon size={16} />
-                        </button>
+                            size={16}
+                        />
                     </div>
                 </div>
             }

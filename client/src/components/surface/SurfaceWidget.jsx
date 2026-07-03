@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 
+import RemoveButton from '../atoms/RemoveButton';
 import { getWidgetDefinition } from './widgetRegistry';
 import AnalyticsWidget from './widgets/AnalyticsWidget';
 import CalendarWidget from './widgets/CalendarWidget';
@@ -48,16 +49,13 @@ export default function SurfaceWidget({
             >
                 <span className="surface-widget-title">{def.name}</span>
                 {configureMode && (
-                    <button
-                        type="button"
+                    <RemoveButton
                         className="surface-widget-remove"
                         data-no-panel-drag="true"
                         aria-label={`Remove ${def.name}`}
                         onClick={onRemove}
                         onMouseDown={(e) => e.stopPropagation()}
-                    >
-                        ×
-                    </button>
+                    />
                 )}
             </div>
             <div className="surface-widget-body" data-no-panel-drag={configureMode ? undefined : 'true'}>
