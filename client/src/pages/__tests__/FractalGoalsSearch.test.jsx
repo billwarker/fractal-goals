@@ -10,6 +10,12 @@ const toggleGoalCompletionMock = vi.fn();
 const setActiveRootIdMock = vi.fn();
 const startFadeOutMock = vi.hoisted(() => vi.fn());
 const isMobileMock = vi.hoisted(() => ({ value: false }));
+const surfaceMocks = vi.hoisted(() => ({
+    createSurface: vi.fn(),
+    updateSurface: vi.fn(),
+    setDefaultSurface: vi.fn(),
+    deleteSurface: vi.fn(),
+}));
 const localStorageStore = new Map();
 
 let fractalTree;
@@ -109,10 +115,10 @@ vi.mock('../../hooks/useProgramQueries', () => ({
 vi.mock('../../hooks/usePageSurfaceQueries', () => ({
     usePageSurfaces: () => ({
         surfaces: [],
-        createSurface: vi.fn(),
-        updateSurface: vi.fn(),
-        setDefaultSurface: vi.fn(),
-        deleteSurface: vi.fn(),
+        createSurface: surfaceMocks.createSurface,
+        updateSurface: surfaceMocks.updateSurface,
+        setDefaultSurface: surfaceMocks.setDefaultSurface,
+        deleteSurface: surfaceMocks.deleteSurface,
     }),
 }));
 
@@ -141,6 +147,7 @@ function expandOptionsPane() {
 
 describe('FractalGoals type-to-zoom search', () => {
     beforeEach(() => {
+        vi.clearAllMocks();
         isMobileMock.value = false;
         localStorageStore.clear();
         vi.stubGlobal('localStorage', {
@@ -178,7 +185,10 @@ describe('FractalGoals type-to-zoom search', () => {
                 },
             ],
         };
-        startFadeOutMock.mockClear();
+        surfaceMocks.createSurface.mockResolvedValue({ id: 'surface-1' });
+        surfaceMocks.updateSurface.mockResolvedValue({ id: 'surface-1' });
+        surfaceMocks.setDefaultSurface.mockResolvedValue({ id: 'surface-1' });
+        surfaceMocks.deleteSurface.mockResolvedValue(undefined);
     });
 
     afterEach(() => {
@@ -494,5 +504,38 @@ describe('FractalGoals type-to-zoom search', () => {
         await waitFor(() => {
             expect(screen.getByTestId('fractal-view')).toHaveAttribute('data-layout-mode', 'tree');
         });
+    });
+
+    it('saves a named goals surface layout with desktop and mobile configs', async () => {
+        renderFractalGoals();
+        expandOptionsPane();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Configure' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save as...' }));
+        fireEvent.change(screen.getByLabelText('Surface name'), {
+            target: { value: 'Practice layout' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Save copy' }));
+
+        await waitFor(() => {
+            expect(surfaceMocks.createSurface).toHaveBeenCalledTimes(1);
+        });
+        expect(surfaceMocks.createSurface).toHaveBeenCalledWith(expect.objectContaining({
+            name: 'Practice layout',
+            desktop_config: expect.objectContaining({
+                version: 1,
+                view_configs: expect.objectContaining({
+                    overview: expect.any(Object),
+                    scoped: expect.any(Object),
+                }),
+            }),
+            mobile_config: expect.objectContaining({
+                detail_panel: 'fullscreen',
+                view_configs: expect.objectContaining({
+                    overview: expect.any(Object),
+                    scoped: expect.any(Object),
+                }),
+            }),
+        }));
     });
 });
