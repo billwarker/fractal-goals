@@ -16,6 +16,24 @@ import {
 } from './sessionDetailMutationUtils';
 import notify from '../utils/notify';
 
+function cloneMetricRows(metrics = []) {
+    if (!Array.isArray(metrics)) return [];
+    return metrics.map((metric) => ({
+        metric_id: metric.metric_id || metric.metric_definition_id,
+        split_id: metric.split_id || metric.split_definition_id || null,
+        value: metric.value,
+    })).filter((metric) => metric.metric_id && metric.value !== undefined && metric.value !== null && metric.value !== '');
+}
+
+function cloneSetRows(sets = [], { preserveCompletion = true } = {}) {
+    if (!Array.isArray(sets)) return [];
+    return sets.map((set) => ({
+        instance_id: crypto.randomUUID(),
+        completed: preserveCompletion ? Boolean(set.completed) : false,
+        metrics: cloneMetricRows(set.metrics || []),
+    }));
+}
+
 export function useSessionDetailMutations({
     rootId,
     sessionId,
@@ -64,8 +82,12 @@ export function useSessionDetailMutations({
     }, [fractalTreeKey, goalsForSelectionKey, goalsKey, queryClient, rootId, sessionGoalsViewKey]);
 
     const addActivityMutation = useMutation({
-        mutationFn: (data) => fractalApi.addActivityToSession(rootId, sessionId, data),
-        onSuccess: (response) => {
+        mutationFn: (variables) => {
+            const data = { ...variables };
+            delete data.suppressToast;
+            return fractalApi.addActivityToSession(rootId, sessionId, data);
+        },
+        onSuccess: (response, variables) => {
             const createdInstance = response?.data;
             if (createdInstance) {
                 queryClient.setQueryData(sessionActivitiesKey, (previous = []) => {
@@ -77,7 +99,9 @@ export function useSessionDetailMutations({
             queryClient.invalidateQueries({ queryKey: sessionKey });
             queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
             invalidateSessionListQueries();
-            notify.success('Activity added');
+            if (!variables?.suppressToast) {
+                notify.success('Activity added');
+            }
         },
         onError: (error) => {
             const status = error?.response?.status;
@@ -527,6 +551,184 @@ export function useSessionDetailMutations({
         }
     }, [activities, addActivityMutation, queryClient, sessionGoalsViewKey, setShowActivitySelector, updateSessionDataDraft]);
 
+    const duplicateActivityInstance = useCallback(async (sectionIndex, sourceInstanceId, insertAfterIndex) => {
+        const cachedInstances = queryClient.getQueryData(sessionActivitiesKey);
+        const instanceSource = Array.isArray(cachedInstances) ? cachedInstances : activityInstances;
+        const sourceInstance = instanceSource.find((entry) => entry.id === sourceInstanceId);
+        if (!sourceInstance?.activity_definition_id) return null;
+
+        try {
+            const response = await addActivityMutation.mutateAsync({
+                activity_definition_id: sourceInstance.activity_definition_id,
+                section_index: sectionIndex,
+                suppressToast: true,
+            });
+            const newInstance = response.data;
+            if (!newInstance?.id) return newInstance || null;
+
+            updateSessionDataDraft((currentData) => {
+                if (!currentData?.sections?.[sectionIndex]) return currentData;
+                const updatedData = { ...currentData };
+                const sections = [...updatedData.sections];
+                const section = { ...sections[sectionIndex] };
+                const activityIds = [...(section.activity_ids || [])].filter((id) => id !== newInstance.id);
+                const sourceIndex = activityIds.indexOf(sourceInstanceId);
+                const insertionIndex = sourceIndex >= 0
+                    ? sourceIndex + 1
+                    : Math.min(Math.max((insertAfterIndex ?? activityIds.length - 1) + 1, 0), activityIds.length);
+                activityIds.splice(insertionIndex, 0, newInstance.id);
+                section.activity_ids = activityIds;
+                sections[sectionIndex] = section;
+                updatedData.sections = sections;
+                return updatedData;
+            });
+
+            const copiedSets = cloneSetRows(sourceInstance.sets || [], { preserveCompletion: false });
+            const copiedMetrics = cloneMetricRows(sourceInstance.metrics || sourceInstance.metric_values || []);
+
+            await updateInstanceMutation.mutateAsync({
+                instanceId: newInstance.id,
+                updates: {
+                    ...(copiedSets.length > 0 ? { sets: copiedSets } : {}),
+                    completed: false,
+                    time_start: null,
+                    time_stop: null,
+                    duration_seconds: null,
+                    target_duration_seconds: null,
+                },
+            });
+
+            if (copiedMetrics.length > 0) {
+                await updateInstanceMutation.mutateAsync({
+                    instanceId: newInstance.id,
+                    updates: { metrics: copiedMetrics },
+                });
+            }
+
+            notify.success('Activity instance duplicated');
+            return newInstance;
+        } catch (error) {
+            logError('Error duplicating activity instance:', error);
+            notify.error(`Failed to duplicate activity: ${formatError(error)}`);
+            throw error;
+        }
+    }, [
+        activityInstances,
+        addActivityMutation,
+        queryClient,
+        sessionActivitiesKey,
+        updateInstanceMutation,
+        updateSessionDataDraft,
+    ]);
+
+    const clearActivityInstanceValues = useCallback(async (instanceId) => {
+        const cachedInstances = queryClient.getQueryData(sessionActivitiesKey);
+        const instanceSource = Array.isArray(cachedInstances) ? cachedInstances : activityInstances;
+        const instance = instanceSource.find((entry) => entry.id === instanceId);
+        if (!instance) return null;
+
+        try {
+            if (Array.isArray(instance.sets) && instance.sets.length > 0) {
+                await updateInstanceMutation.mutateAsync({
+                    instanceId,
+                    updates: {
+                        sets: [],
+                        completed: false,
+                        time_start: null,
+                        time_stop: null,
+                        duration_seconds: null,
+                        target_duration_seconds: null,
+                    },
+                });
+            } else {
+                const flatMetrics = instance.metrics || instance.metric_values || [];
+                if (Array.isArray(flatMetrics) && flatMetrics.length > 0) {
+                    await updateInstanceMutation.mutateAsync({
+                        instanceId,
+                        updates: { metrics: [] },
+                    });
+                }
+                await updateInstanceMutation.mutateAsync({
+                    instanceId,
+                    updates: {
+                        completed: false,
+                        time_start: null,
+                        time_stop: null,
+                        duration_seconds: null,
+                        target_duration_seconds: null,
+                    },
+                });
+            }
+            notify.success('Activity values cleared');
+            return instanceId;
+        } catch (error) {
+            logError('Error clearing activity instance values:', error);
+            notify.error(`Failed to clear activity values: ${formatError(error)}`);
+            throw error;
+        }
+    }, [
+        activityInstances,
+        queryClient,
+        sessionActivitiesKey,
+        updateInstanceMutation,
+    ]);
+
+    const copyActivityValuesFromSource = useCallback(async (targetInstanceId, sourceInstance) => {
+        if (!targetInstanceId || !sourceInstance || targetInstanceId === sourceInstance.id) return null;
+
+        const cachedInstances = queryClient.getQueryData(sessionActivitiesKey);
+        const instanceSource = Array.isArray(cachedInstances) ? cachedInstances : activityInstances;
+        const targetInstance = instanceSource.find((entry) => entry.id === targetInstanceId);
+        if (!sourceInstance || !targetInstance) return null;
+        if (sourceInstance.activity_definition_id !== targetInstance.activity_definition_id) {
+            notify.error('Previous values can only be copied from the same activity');
+            return null;
+        }
+
+        const copiedSets = cloneSetRows(sourceInstance.sets || [], { preserveCompletion: true });
+        const copiedMetrics = cloneMetricRows(sourceInstance.metrics || sourceInstance.metric_values || []);
+
+        try {
+            if (copiedSets.length > 0 || Array.isArray(targetInstance.sets)) {
+                await updateInstanceMutation.mutateAsync({
+                    instanceId: targetInstanceId,
+                    updates: { sets: copiedSets },
+                });
+            }
+
+            await updateInstanceMutation.mutateAsync({
+                instanceId: targetInstanceId,
+                updates: { metrics: copiedMetrics },
+            });
+
+            notify.success('Copied values from previous instance');
+            return targetInstanceId;
+        } catch (error) {
+            logError('Error copying values from previous activity instance:', error);
+            notify.error(`Failed to copy previous values: ${formatError(error)}`);
+            throw error;
+        }
+    }, [
+        activityInstances,
+        queryClient,
+        sessionActivitiesKey,
+        updateInstanceMutation,
+    ]);
+
+    const copyActivityValuesFromInstance = useCallback(async (targetInstanceId, sourceInstanceId) => {
+        if (!targetInstanceId || !sourceInstanceId || targetInstanceId === sourceInstanceId) return null;
+
+        const cachedInstances = queryClient.getQueryData(sessionActivitiesKey);
+        const instanceSource = Array.isArray(cachedInstances) ? cachedInstances : activityInstances;
+        const sourceInstance = instanceSource.find((entry) => entry.id === sourceInstanceId);
+        return copyActivityValuesFromSource(targetInstanceId, sourceInstance);
+    }, [
+        activityInstances,
+        copyActivityValuesFromSource,
+        queryClient,
+        sessionActivitiesKey,
+    ]);
+
     const handleToggleSessionComplete = useCallback(async () => {
         if (!session) return;
         const newCompleted = !session.attributes.completed;
@@ -551,7 +753,7 @@ export function useSessionDetailMutations({
             logError('Failed to toggle session completion', error);
             notify.error(`Failed to update session completion: ${error?.response?.data?.error || error?.message || 'Unknown error'}`);
         }
-    }, [activityInstances, handleUpdateTimer, rootId, session, updateSession]);
+    }, [activityInstances, handleUpdateTimer, queryClient, session, sessionId, updateSession]);
 
     const calculateTotalDuration = useCallback(() => {
         return activityInstances.reduce((sum, instance) => sum + (instance.duration_seconds || 0), 0);
@@ -576,6 +778,10 @@ export function useSessionDetailMutations({
         removeActivity: removeActivityMutation.mutate,
         updateInstance: enqueueInstanceUpdate,
         updateTimer: handleUpdateTimer,
+        duplicateActivityInstance,
+        clearActivityInstanceValues,
+        copyActivityValuesFromSource,
+        copyActivityValuesFromInstance,
         createGoal,
         updateGoal: updateGoalMutation.mutateAsync,
         toggleGoalCompletion: toggleGoalCompletionMutation.mutateAsync,

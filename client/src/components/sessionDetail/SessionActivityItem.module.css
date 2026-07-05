@@ -66,6 +66,16 @@
     cursor: not-allowed;
 }
 
+.activitySessionIndex {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    padding-top: 4px;
+    min-width: 24px;
+}
+
 .dragHandle {
     cursor: grab;
     padding: 4px 8px;
@@ -97,6 +107,13 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
+}
+
+.activityHeaderActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
 }
 
 .activityLabel {
@@ -177,6 +194,15 @@
     background: var(--color-bg-card-hover);
     border-color: var(--color-border-hover);
     color: var(--color-text-primary);
+}
+
+.instanceOptionsWrapper {
+    position: relative;
+    display: inline-flex;
+}
+
+.instanceOptionsMenu {
+    min-width: 180px;
 }
 
 .actionStack {
@@ -293,6 +319,39 @@
     line-height: 1.2;
 }
 
+.timerLabelRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 14px;
+}
+
+.timeAdjustmentToggle {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 14px;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-family: var(--font-family-mono);
+    font-size: 10px;
+    line-height: 1;
+}
+
+.timeAdjustmentToggle:hover,
+.timeAdjustmentToggle:focus-visible,
+.timeAdjustmentToggle[aria-expanded="true"] {
+    border-color: var(--color-brand-primary);
+    color: var(--color-brand-primary);
+    outline: none;
+}
+
 .timerInput {
     padding: 4px 6px;
     background: var(--color-bg-input);
@@ -303,6 +362,67 @@
     width: 138px;
     font-family: var(--font-family-mono);
     min-width: 0;
+}
+
+.timeAdjustmentPanel {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 5px);
+    left: 0;
+    width: 176px;
+    padding: 6px 6px 7px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-secondary);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+.timeAdjustmentControls {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+}
+
+.timeAdjustmentInput {
+    min-width: 0;
+    flex: 1 1 auto;
+    padding: 4px 6px;
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-family: var(--font-family-mono);
+    font-size: 11px;
+}
+
+.timeAdjustmentApplyButton {
+    appearance: none;
+    flex: 0 0 auto;
+    padding: 4px 7px;
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    background: var(--color-bg-input);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+}
+
+.timeAdjustmentApplyButton:hover,
+.timeAdjustmentApplyButton:focus-visible {
+    border-color: var(--color-brand-primary);
+    color: var(--color-brand-primary);
+    outline: none;
+}
+
+.timeAdjustmentValidation {
+    margin-top: 5px;
+    padding-left: 2px;
+    color: color-mix(in srgb, var(--color-brand-danger) 78%, var(--color-text-secondary));
+    font-family: var(--font-family-mono);
+    font-size: 9px;
+    line-height: 1.25;
+    white-space: nowrap;
 }
 
 .timerInputError {

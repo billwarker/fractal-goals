@@ -12,6 +12,7 @@ const {
     addActivityToSession,
     startActivityTimer,
     updateActivityInstance,
+    updateActivityMetrics,
     toggleGoalCompletion,
     notify,
 } = vi.hoisted(() => ({
@@ -20,6 +21,7 @@ const {
     addActivityToSession: vi.fn(),
     startActivityTimer: vi.fn(),
     updateActivityInstance: vi.fn(),
+    updateActivityMetrics: vi.fn(),
     toggleGoalCompletion: vi.fn(),
     notify: {
         success: vi.fn(),
@@ -34,6 +36,7 @@ vi.mock('../../utils/api', () => ({
         addActivityToSession: (...args) => addActivityToSession(...args),
         startActivityTimer: (...args) => startActivityTimer(...args),
         updateActivityInstance: (...args) => updateActivityInstance(...args),
+        updateActivityMetrics: (...args) => updateActivityMetrics(...args),
         toggleGoalCompletion: (...args) => toggleGoalCompletion(...args),
     },
 }));
@@ -170,6 +173,233 @@ describe('useSessionDetailMutations', () => {
         ]);
         expect(draftState.sections[0].activity_ids).toEqual(['inst-1', 'inst-2']);
         expect(selectorState[0]).toBe(false);
+    });
+
+    it('duplicates an activity instance below the source with copied sets and reset completion state', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        queryClient.setQueryData(queryKeys.sessionActivities('root-1', 'session-1'), [
+            {
+                id: 'inst-1',
+                activity_definition_id: 'act-1',
+                completed: true,
+                time_start: '2026-01-01T00:00:00Z',
+                sets: [
+                    {
+                        instance_id: 'set-1',
+                        completed: true,
+                        metrics: [{ metric_id: 'metric-1', value: 8 }],
+                    },
+                ],
+            },
+            { id: 'inst-3', activity_definition_id: 'act-2' },
+        ]);
+
+        let draftState = {
+            sections: [{ activity_ids: ['inst-1', 'inst-3'] }]
+        };
+
+        const options = createBaseOptions(queryClient, {
+            activityInstances: queryClient.getQueryData(queryKeys.sessionActivities('root-1', 'session-1')),
+            updateSessionDataDraft: vi.fn((updater) => {
+                draftState = typeof updater === 'function' ? updater(draftState) : updater;
+            }),
+        });
+
+        addActivityToSession.mockResolvedValueOnce({
+            data: { id: 'inst-2', activity_definition_id: 'act-1' }
+        });
+        updateActivityInstance.mockResolvedValueOnce({
+            data: { id: 'inst-2', activity_definition_id: 'act-1', sets: [] }
+        });
+
+        const { result } = renderHook(
+            () => useSessionDetailMutations(options),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.duplicateActivityInstance(0, 'inst-1', 0);
+        });
+
+        expect(addActivityToSession).toHaveBeenCalledWith('root-1', 'session-1', {
+            activity_definition_id: 'act-1',
+            section_index: 0,
+        });
+        expect(updateActivityInstance).toHaveBeenCalledWith('root-1', 'inst-2', expect.objectContaining({
+            session_id: 'session-1',
+            activity_definition_id: 'act-1',
+            completed: false,
+            time_start: null,
+            time_stop: null,
+            duration_seconds: null,
+            target_duration_seconds: null,
+            sets: [
+                expect.objectContaining({
+                    completed: false,
+                    metrics: [{ metric_id: 'metric-1', split_id: null, value: 8 }],
+                }),
+            ],
+        }));
+        expect(draftState.sections[0].activity_ids).toEqual(['inst-1', 'inst-2', 'inst-3']);
+        expect(notify.success).toHaveBeenCalledWith('Activity instance duplicated');
+    });
+
+    it('clears flat metric values and timer/completion fields for an activity instance', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        queryClient.setQueryData(queryKeys.sessionActivities('root-1', 'session-1'), [
+            {
+                id: 'inst-1',
+                activity_definition_id: 'act-1',
+                completed: true,
+                time_start: '2026-01-01T00:00:00Z',
+                metrics: [{ metric_id: 'metric-1', value: 8 }],
+            },
+        ]);
+
+        updateActivityMetrics.mockResolvedValueOnce({
+            data: { id: 'inst-1', activity_definition_id: 'act-1', metrics: [] }
+        });
+        updateActivityInstance.mockResolvedValueOnce({
+            data: { id: 'inst-1', activity_definition_id: 'act-1', completed: false }
+        });
+
+        const { result } = renderHook(
+            () => useSessionDetailMutations(createBaseOptions(queryClient, {
+                activityInstances: queryClient.getQueryData(queryKeys.sessionActivities('root-1', 'session-1')),
+            })),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.clearActivityInstanceValues('inst-1');
+        });
+
+        expect(updateActivityMetrics).toHaveBeenCalledWith('root-1', 'session-1', 'inst-1', { metrics: [] });
+        expect(updateActivityInstance).toHaveBeenCalledWith('root-1', 'inst-1', expect.objectContaining({
+            session_id: 'session-1',
+            activity_definition_id: 'act-1',
+            completed: false,
+            time_start: null,
+            time_stop: null,
+            duration_seconds: null,
+            target_duration_seconds: null,
+        }));
+        expect(notify.success).toHaveBeenCalledWith('Activity values cleared');
+    });
+
+    it('copies exact set and metric values from a previous activity instance into the target instance', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        queryClient.setQueryData(queryKeys.sessionActivities('root-1', 'session-1'), [
+            {
+                id: 'source-inst',
+                activity_definition_id: 'act-1',
+                sets: [
+                    {
+                        instance_id: 'source-set-1',
+                        completed: true,
+                        metrics: [{ metric_id: 'metric-1', value: 8 }],
+                    },
+                    {
+                        instance_id: 'source-set-2',
+                        completed: false,
+                        metrics: [{ metric_id: 'metric-1', split_id: 'left', value: 5 }],
+                    },
+                ],
+                metrics: [],
+            },
+            {
+                id: 'target-inst',
+                activity_definition_id: 'act-1',
+                sets: [
+                    {
+                        instance_id: 'target-set-1',
+                        completed: false,
+                        metrics: [{ metric_id: 'metric-1', value: 1 }],
+                    },
+                ],
+                metrics: [{ metric_id: 'metric-1', value: 2 }],
+            },
+        ]);
+
+        updateActivityInstance.mockResolvedValueOnce({
+            data: { id: 'target-inst', activity_definition_id: 'act-1', sets: [] }
+        });
+        updateActivityMetrics.mockResolvedValueOnce({
+            data: { id: 'target-inst', activity_definition_id: 'act-1', metrics: [] }
+        });
+
+        const { result } = renderHook(
+            () => useSessionDetailMutations(createBaseOptions(queryClient, {
+                activityInstances: queryClient.getQueryData(queryKeys.sessionActivities('root-1', 'session-1')),
+            })),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.copyActivityValuesFromInstance('target-inst', 'source-inst');
+        });
+
+        expect(updateActivityInstance).toHaveBeenCalledWith('root-1', 'target-inst', expect.objectContaining({
+            session_id: 'session-1',
+            activity_definition_id: 'act-1',
+            sets: [
+                expect.objectContaining({
+                    completed: true,
+                    metrics: [{ metric_id: 'metric-1', split_id: null, value: 8 }],
+                }),
+                expect.objectContaining({
+                    completed: false,
+                    metrics: [{ metric_id: 'metric-1', split_id: 'left', value: 5 }],
+                }),
+            ],
+        }));
+        expect(updateActivityMetrics).toHaveBeenCalledWith('root-1', 'session-1', 'target-inst', { metrics: [] });
+        expect(notify.success).toHaveBeenCalledWith('Copied values from previous instance');
+    });
+
+    it('rejects copying values between different activity definitions', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        queryClient.setQueryData(queryKeys.sessionActivities('root-1', 'session-1'), [
+            { id: 'target-inst', activity_definition_id: 'act-1', sets: [], metrics: [] },
+            { id: 'source-inst', activity_definition_id: 'act-2', sets: [], metrics: [{ metric_id: 'metric-1', value: 8 }] },
+        ]);
+
+        const { result } = renderHook(
+            () => useSessionDetailMutations(createBaseOptions(queryClient, {
+                activityInstances: queryClient.getQueryData(queryKeys.sessionActivities('root-1', 'session-1')),
+            })),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        let copied;
+        await act(async () => {
+            copied = await result.current.copyActivityValuesFromInstance('target-inst', 'source-inst');
+        });
+
+        expect(copied).toBeNull();
+        expect(updateActivityInstance).not.toHaveBeenCalled();
+        expect(updateActivityMetrics).not.toHaveBeenCalled();
+        expect(notify.error).toHaveBeenCalledWith('Previous values can only be copied from the same activity');
     });
 
     it('updates goal caches immediately after editing a goal from session detail', async () => {

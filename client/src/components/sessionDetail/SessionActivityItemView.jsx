@@ -1,8 +1,10 @@
-import { logError } from '../../utils/logger';
-import { formatForInput, localToISO } from '../../utils/dateUtils';
+import { useEffect, useRef, useState } from 'react';
+import { applyRelativeTimeAdjustment, formatForInput, localToISO } from '../../utils/dateUtils';
+import { isTextEditingElement } from '../../hooks/useModalBackdropDismiss';
 import { formatAggValue } from '../../utils/progressAggregations';
 import { formatDuration } from '../../utils/sessionActivityMetrics';
 import ActivityCompletionButton from '../common/ActivityCompletionButton';
+import DropdownMenu, { DropdownMenuItem } from '../atoms/DropdownMenu';
 import Linkify from '../atoms/Linkify';
 import CloseIcon from '../atoms/CloseIcon';
 import { DeletedBadge } from '../ui/DeletedEntityFallback';
@@ -19,6 +21,7 @@ function SessionActivityItemView({
     onReorder,
     canMoveUp,
     canMoveDown,
+    sessionIndex,
     setSelectedSetIndex,
     onFocus,
     exercise,
@@ -29,6 +32,12 @@ function SessionActivityItemView({
     averageDuration,
     quickMode,
     onUpdate,
+    onDuplicate,
+    onClearValues,
+    onCopyPreviousValues,
+    showCopyPreviousValuesOption = false,
+    copyPreviousValuesDisabled = false,
+    copyPreviousValuesLabel = 'Copy values from previous instance',
     localStartTime,
     setStartTimeDraft,
     timezone,
@@ -76,6 +85,195 @@ function SessionActivityItemView({
     onDeleteNote,
     handleAddNote,
 }) {
+    const [isOptionsOpen, setIsOptionsOpen] = useState(false);
+    const [activeTimeAdjustment, setActiveTimeAdjustment] = useState(null);
+    const [timeInputErrors, setTimeInputErrors] = useState({ start: '', stop: '' });
+    const [timeAdjustmentDrafts, setTimeAdjustmentDrafts] = useState({ start: '', stop: '' });
+    const [timeAdjustmentErrors, setTimeAdjustmentErrors] = useState({ start: '', stop: '' });
+    const optionsRef = useRef(null);
+    const timeAdjustmentRef = useRef(null);
+    const hasInstanceOptions = Boolean(onDuplicate || showCopyPreviousValuesOption || onClearValues || onDelete);
+
+    useEffect(() => {
+        if (!isOptionsOpen) return undefined;
+
+        const handlePointerDown = (event) => {
+            if (optionsRef.current?.contains(event.target)) return;
+            setIsOptionsOpen(false);
+        };
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                setIsOptionsOpen(false);
+            }
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isOptionsOpen]);
+
+    useEffect(() => {
+        if (!activeTimeAdjustment) return undefined;
+
+        const handlePointerDown = (event) => {
+            if (timeAdjustmentRef.current?.contains(event.target)) return;
+
+            const activeElement = event.target?.ownerDocument?.activeElement;
+            if (
+                activeElement
+                && timeAdjustmentRef.current?.contains(activeElement)
+                && isTextEditingElement(activeElement)
+            ) {
+                activeElement.blur();
+                return;
+            }
+
+            setActiveTimeAdjustment(null);
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown);
+        };
+    }, [activeTimeAdjustment]);
+
+    const handleOptionAction = (event, action) => {
+        event.stopPropagation();
+        setIsOptionsOpen(false);
+        action?.();
+    };
+
+    const getTimerRangeError = (target, isoValue) => {
+        const candidateTime = new Date(isoValue).getTime();
+        if (!Number.isFinite(candidateTime)) return 'Use YYYY-MM-DD HH:MM:SS';
+
+        if (target === 'start' && localStopTime) {
+            try {
+                const stopTime = new Date(localToISO(localStopTime, timezone)).getTime();
+                if (Number.isFinite(stopTime) && candidateTime > stopTime) {
+                    return 'Start must be before stop';
+                }
+            } catch {
+                return '';
+            }
+        }
+
+        if (target === 'stop' && localStartTime) {
+            try {
+                const startTime = new Date(localToISO(localStartTime, timezone)).getTime();
+                if (Number.isFinite(startTime) && candidateTime < startTime) {
+                    return 'Stop must be after start';
+                }
+            } catch {
+                return '';
+            }
+        }
+
+        return '';
+    };
+
+    const handleCommitTimeInput = (event, target, field, setDraft) => {
+        if (event.target.value) {
+            try {
+                const isoValue = localToISO(event.target.value, timezone);
+                const rangeError = getTimerRangeError(target, isoValue);
+                if (rangeError) {
+                    setTimeInputErrors((current) => ({ ...current, [target]: rangeError }));
+                    return;
+                }
+                onUpdate(field, isoValue);
+                setDraft(null);
+                setTimeInputErrors((current) => ({ ...current, [target]: '' }));
+            } catch {
+                setTimeInputErrors((current) => ({
+                    ...current,
+                    [target]: 'Use YYYY-MM-DD HH:MM:SS',
+                }));
+            }
+        } else {
+            onUpdate(field, null);
+            setDraft(null);
+            setTimeInputErrors((current) => ({ ...current, [target]: '' }));
+        }
+    };
+
+    const handleTimeAdjustmentToggle = (event, target) => {
+        event.stopPropagation();
+        setActiveTimeAdjustment((current) => (current === target ? null : target));
+        setTimeAdjustmentErrors((current) => ({ ...current, [target]: '' }));
+    };
+
+    const handleApplyTimeAdjustment = (event, target, currentValue, field) => {
+        event.stopPropagation();
+        try {
+            const isoValue = applyRelativeTimeAdjustment(currentValue, timeAdjustmentDrafts[target], timezone);
+            const rangeError = getTimerRangeError(target, isoValue);
+            if (rangeError) {
+                setTimeAdjustmentErrors((current) => ({ ...current, [target]: rangeError }));
+                return;
+            }
+            onUpdate(field, isoValue);
+            setActiveTimeAdjustment(null);
+            setTimeAdjustmentDrafts((current) => ({ ...current, [target]: '' }));
+            setTimeAdjustmentErrors((current) => ({ ...current, [target]: '' }));
+        } catch (err) {
+            setTimeAdjustmentErrors((current) => ({
+                ...current,
+                [target]: err?.message || 'Use +10M, -2H, or +30S',
+            }));
+        }
+    };
+
+    const renderTimeAdjustment = (target, currentValue, field) => {
+        if (activeTimeAdjustment !== target) return null;
+
+        return (
+            <div
+                ref={timeAdjustmentRef}
+                className={styles.timeAdjustmentPanel}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div className={styles.timeAdjustmentControls}>
+                    <input
+                        type="text"
+                        inputMode="text"
+                        aria-label={`Relative ${target} adjustment`}
+                        placeholder="+10M"
+                        value={timeAdjustmentDrafts[target]}
+                        onChange={(event) => {
+                            setTimeAdjustmentDrafts((current) => ({ ...current, [target]: event.target.value }));
+                            setTimeAdjustmentErrors((current) => ({ ...current, [target]: '' }));
+                        }}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                                handleApplyTimeAdjustment(event, target, currentValue, field);
+                            }
+                            if (event.key === 'Escape') {
+                                event.stopPropagation();
+                                setActiveTimeAdjustment(null);
+                            }
+                        }}
+                        className={`${styles.timeAdjustmentInput} ${timeAdjustmentErrors[target] ? styles.timerInputError : ''}`}
+                    />
+                    <button
+                        type="button"
+                        className={styles.timeAdjustmentApplyButton}
+                        onClick={(event) => handleApplyTimeAdjustment(event, target, currentValue, field)}
+                    >
+                        Apply
+                    </button>
+                </div>
+                {timeAdjustmentErrors[target] && (
+                    <div className={styles.timeAdjustmentValidation}>{timeAdjustmentErrors[target]}</div>
+                )}
+            </div>
+        );
+    };
+
     return (
         <div
             onClick={handleActivityCardClick}
@@ -102,6 +300,11 @@ function SessionActivityItemView({
                             >
                                 ▼
                             </button>
+                            {sessionIndex != null && (
+                                <div className={styles.activitySessionIndex} title={`Activity ${sessionIndex} in this session`}>
+                                    #{sessionIndex}
+                                </div>
+                            )}
                         </div>
                     )}
                     <div
@@ -118,19 +321,78 @@ function SessionActivityItemView({
                                 {def.name}
                                 {!activityDefinition && <DeletedBadge />}
                             </span>
-                            {isSelected && onOpenActivityBuilder && activityDefinition?.id && (
-                                <button
-                                    type="button"
-                                    className={styles.editDefinitionButton}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        onOpenActivityBuilder(activityDefinition);
-                                    }}
-                                    title="Edit activity definition"
-                                    aria-label={`Edit ${def.name}`}
-                                >
-                                    ✎
-                                </button>
+                            {isSelected && (
+                                <div className={styles.activityHeaderActions}>
+                                    {onOpenActivityBuilder && activityDefinition?.id && (
+                                        <button
+                                            type="button"
+                                            className={styles.editDefinitionButton}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                onOpenActivityBuilder(activityDefinition);
+                                            }}
+                                            title="Edit activity definition"
+                                            aria-label={`Edit ${def.name}`}
+                                        >
+                                            ✎
+                                        </button>
+                                    )}
+                                    {hasInstanceOptions && (
+                                        <div className={styles.instanceOptionsWrapper} ref={optionsRef}>
+                                            <button
+                                                type="button"
+                                                className={styles.editDefinitionButton}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    setIsOptionsOpen((open) => !open);
+                                                }}
+                                                title="Activity options"
+                                                aria-label={`${def.name} options`}
+                                                aria-expanded={isOptionsOpen}
+                                                aria-haspopup="menu"
+                                            >
+                                                ···
+                                            </button>
+                                            {isOptionsOpen && (
+                                                <DropdownMenu
+                                                    className={styles.instanceOptionsMenu}
+                                                    aria-label={`${def.name} activity options`}
+                                                >
+                                                    {onDuplicate && (
+                                                        <DropdownMenuItem
+                                                            onClick={(event) => handleOptionAction(event, onDuplicate)}
+                                                        >
+                                                            Duplicate instance
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    {showCopyPreviousValuesOption && (
+                                                        <DropdownMenuItem
+                                                            disabled={copyPreviousValuesDisabled}
+                                                            onClick={(event) => handleOptionAction(event, onCopyPreviousValues)}
+                                                        >
+                                                            {copyPreviousValuesLabel}
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    {onClearValues && (
+                                                        <DropdownMenuItem
+                                                            onClick={(event) => handleOptionAction(event, onClearValues)}
+                                                        >
+                                                            Clear logged values
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    {onDelete && !quickMode && (
+                                                        <DropdownMenuItem
+                                                            danger
+                                                            onClick={(event) => handleOptionAction(event, onDelete)}
+                                                        >
+                                                            Delete from session
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                </DropdownMenu>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
                         {(groupLabel || averageDuration) && (
@@ -183,57 +445,73 @@ function SessionActivityItemView({
                                 <div className={styles.timerMetaColumn}>
                                     {/* DateTime Start Field */}
                                     <div className={styles.timerFieldContainer}>
-                                        <label className={styles.timerLabel}>Start</label>
+                                        <div className={styles.timerLabelRow}>
+                                            <label className={styles.timerLabel}>Start</label>
+                                            {isSelected && exercise.time_start && (
+                                                <button
+                                                    type="button"
+                                                    className={styles.timeAdjustmentToggle}
+                                                    onPointerDown={(event) => event.stopPropagation()}
+                                                    onClick={(event) => handleTimeAdjustmentToggle(event, 'start')}
+                                                    aria-expanded={activeTimeAdjustment === 'start'}
+                                                    aria-label="Adjust start time"
+                                                    title="Adjust start time"
+                                                >
+                                                    ±
+                                                </button>
+                                            )}
+                                        </div>
                                         <input
                                             type="text"
                                             placeholder="YYYY-MM-DD HH:MM:SS"
                                             value={localStartTime}
-                                            onChange={(e) => setStartTimeDraft(e.target.value)}
-                                            onBlur={(e) => {
-                                                if (e.target.value) {
-                                                    try {
-                                                        const isoValue = localToISO(e.target.value, timezone);
-                                                        onUpdate('time_start', isoValue);
-                                                        setStartTimeDraft(null);
-                                                    } catch (err) {
-                                                        logError('Invalid date format:', err);
-                                                        setStartTimeDraft(null);
-                                                    }
-                                                } else {
-                                                    onUpdate('time_start', null);
-                                                    setStartTimeDraft(null);
-                                                }
+                                            onChange={(e) => {
+                                                setStartTimeDraft(e.target.value);
+                                                setTimeInputErrors((current) => ({ ...current, start: '' }));
                                             }}
-                                            className={styles.timerInput}
+                                            onBlur={(e) => handleCommitTimeInput(e, 'start', 'time_start', setStartTimeDraft)}
+                                            className={`${styles.timerInput} ${timeInputErrors.start ? styles.timerInputError : ''}`}
                                         />
+                                        {timeInputErrors.start && (
+                                            <div className={styles.timerValidationError}>{timeInputErrors.start}</div>
+                                        )}
+                                        {renderTimeAdjustment('start', localStartTime, 'time_start')}
                                     </div>
 
                                     {/* DateTime Stop Field */}
                                     <div className={styles.timerFieldContainer}>
-                                        <label className={styles.timerLabel}>Stop</label>
+                                        <div className={styles.timerLabelRow}>
+                                            <label className={styles.timerLabel}>Stop</label>
+                                            {isSelected && exercise.time_stop && (
+                                                <button
+                                                    type="button"
+                                                    className={styles.timeAdjustmentToggle}
+                                                    onPointerDown={(event) => event.stopPropagation()}
+                                                    onClick={(event) => handleTimeAdjustmentToggle(event, 'stop')}
+                                                    aria-expanded={activeTimeAdjustment === 'stop'}
+                                                    aria-label="Adjust stop time"
+                                                    title="Adjust stop time"
+                                                >
+                                                    ±
+                                                </button>
+                                            )}
+                                        </div>
                                         <input
                                             type="text"
                                             placeholder="YYYY-MM-DD HH:MM:SS"
                                             value={localStopTime}
-                                            onChange={(e) => setStopTimeDraft(e.target.value)}
-                                            onBlur={(e) => {
-                                                if (e.target.value) {
-                                                    try {
-                                                        const isoValue = localToISO(e.target.value, timezone);
-                                                        onUpdate('time_stop', isoValue);
-                                                        setStopTimeDraft(null);
-                                                    } catch (err) {
-                                                        logError('Invalid date format:', err);
-                                                        setStopTimeDraft(null);
-                                                    }
-                                                } else {
-                                                    onUpdate('time_stop', null);
-                                                    setStopTimeDraft(null);
-                                                }
+                                            onChange={(e) => {
+                                                setStopTimeDraft(e.target.value);
+                                                setTimeInputErrors((current) => ({ ...current, stop: '' }));
                                             }}
+                                            onBlur={(e) => handleCommitTimeInput(e, 'stop', 'time_stop', setStopTimeDraft)}
                                             disabled={!exercise.time_start}
-                                            className={`${styles.timerInput} ${!exercise.time_start ? styles.timerInputDisabled : ''}`}
+                                            className={`${styles.timerInput} ${!exercise.time_start ? styles.timerInputDisabled : ''} ${timeInputErrors.stop ? styles.timerInputError : ''}`}
                                         />
+                                        {timeInputErrors.stop && (
+                                            <div className={styles.timerValidationError}>{timeInputErrors.stop}</div>
+                                        )}
+                                        {renderTimeAdjustment('stop', localStopTime, 'time_stop')}
                                     </div>
 
                                     {/* Duration Display / Pre-start target input */}

@@ -71,6 +71,109 @@ export function clampMetricValue(metricDef, value) {
     return nextValue;
 }
 
+export function evaluateArithmeticExpression(value) {
+    const input = String(value ?? '').trim();
+    if (!input) return null;
+    if (input.length > 80) return null;
+    if (!/^[\d+\-*/().\s]+$/.test(input)) return null;
+
+    let index = 0;
+
+    const peek = () => input[index];
+    const consumeWhitespace = () => {
+        while (/\s/.test(peek())) index += 1;
+    };
+    const consume = (char) => {
+        consumeWhitespace();
+        if (peek() !== char) return false;
+        index += 1;
+        return true;
+    };
+
+    const parseNumber = () => {
+        consumeWhitespace();
+        const start = index;
+        let hasDigit = false;
+        while (/\d/.test(peek())) {
+            hasDigit = true;
+            index += 1;
+        }
+        if (peek() === '.') {
+            index += 1;
+            while (/\d/.test(peek())) {
+                hasDigit = true;
+                index += 1;
+            }
+        }
+        if (!hasDigit) return null;
+        return Number(input.slice(start, index));
+    };
+
+    const parseFactor = () => {
+        consumeWhitespace();
+        if (consume('+')) return parseFactor();
+        if (consume('-')) {
+            const factor = parseFactor();
+            return factor == null ? null : -factor;
+        }
+        if (consume('(')) {
+            const expression = parseExpression();
+            if (expression == null || !consume(')')) return null;
+            return expression;
+        }
+        return parseNumber();
+    };
+
+    const parseTerm = () => {
+        let left = parseFactor();
+        if (left == null) return null;
+
+        while (true) {
+            consumeWhitespace();
+            if (consume('*')) {
+                const right = parseFactor();
+                if (right == null) return null;
+                left *= right;
+                continue;
+            }
+            if (consume('/')) {
+                const right = parseFactor();
+                if (right == null || right === 0) return null;
+                left /= right;
+                continue;
+            }
+            return left;
+        }
+    };
+
+    function parseExpression() {
+        let left = parseTerm();
+        if (left == null) return null;
+
+        while (true) {
+            consumeWhitespace();
+            if (consume('+')) {
+                const right = parseTerm();
+                if (right == null) return null;
+                left += right;
+                continue;
+            }
+            if (consume('-')) {
+                const right = parseTerm();
+                if (right == null) return null;
+                left -= right;
+                continue;
+            }
+            return left;
+        }
+    }
+
+    const result = parseExpression();
+    consumeWhitespace();
+    if (result == null || index !== input.length || !Number.isFinite(result)) return null;
+    return result;
+}
+
 export function normalizeMetricValueForStorage(metricDef, value) {
     const trimmed = String(value ?? '').trim();
     if (!trimmed) return '';
@@ -80,11 +183,19 @@ export function normalizeMetricValueForStorage(metricDef, value) {
         normalized = parseDurationMetricInput(trimmed);
         if (normalized == null) return trimmed;
     } else {
-        const numericValue = Number(trimmed);
-        if (Number.isNaN(numericValue)) return trimmed;
-        normalized = metricDef?.input_type === 'integer'
-            ? Math.trunc(numericValue)
-            : numericValue;
+        const isDecimalLiteral = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(trimmed);
+        const numericValue = isDecimalLiteral ? Number(trimmed) : NaN;
+        if (!Number.isFinite(numericValue)) {
+            const expressionValue = evaluateArithmeticExpression(trimmed);
+            if (expressionValue == null) return null;
+            normalized = metricDef?.input_type === 'integer'
+                ? Math.trunc(expressionValue)
+                : expressionValue;
+        } else {
+            normalized = metricDef?.input_type === 'integer'
+                ? Math.trunc(numericValue)
+                : numericValue;
+        }
     }
 
     const clamped = clampMetricValue(metricDef, normalized);
@@ -135,7 +246,8 @@ export function getMetricInputProps(metricDef) {
     }
 
     return {
-        type: 'number',
+        type: 'text',
+        inputMode: metricDef?.input_type === 'integer' ? 'numeric' : 'decimal',
         step: metricDef?.input_type === 'integer' ? 1 : 'any',
         min: metricDef?.min_value ?? undefined,
         max: metricDef?.max_value ?? undefined,

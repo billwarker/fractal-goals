@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import Badge from '../Badge';
 import CloseButton from '../CloseButton';
 import DisclosureButton from '../DisclosureButton';
+import DropdownMenu, { DropdownMenuItem } from '../DropdownMenu';
 import IconButton from '../IconButton';
 import Radio from '../Radio';
 import RemoveButton from '../RemoveButton';
@@ -73,5 +74,18 @@ describe('standardization atoms', () => {
 
         const trigger = screen.getByRole('button', { name: 'Hide details' });
         expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('renders shared dropdown menu items with danger affordances', () => {
+        render(
+            <DropdownMenu aria-label="Activity options">
+                <DropdownMenuItem>Duplicate instance</DropdownMenuItem>
+                <DropdownMenuItem danger>Delete from session</DropdownMenuItem>
+            </DropdownMenu>
+        );
+
+        expect(screen.getByRole('menu', { name: 'Activity options' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'Duplicate instance' })).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: 'Delete from session' }).className).toContain('danger');
     });
 });

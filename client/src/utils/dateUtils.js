@@ -382,6 +382,46 @@ export const formatForInput = (dateValue, timezone) => {
     return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
 };
 
+const parseLocalDateTimeParts = (localDateStr) => {
+    const match = String(localDateStr).trim().match(
+        /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2})(?::(\d{2})(?::(\d{2}))?)?)?$/
+    );
+    if (!match) {
+        throw new Error('Invalid local datetime format');
+    }
+
+    const [, year, month, day, hour = '00', minute = '00', second = '00'] = match;
+    const parts = {
+        year: Number(year),
+        month: Number(month),
+        day: Number(day),
+        hour: Number(hour),
+        minute: Number(minute),
+        second: Number(second),
+    };
+
+    const isValidRange = (
+        parts.month >= 1 && parts.month <= 12 &&
+        parts.day >= 1 && parts.day <= 31 &&
+        parts.hour >= 0 && parts.hour <= 23 &&
+        parts.minute >= 0 && parts.minute <= 59 &&
+        parts.second >= 0 && parts.second <= 59
+    );
+
+    const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+    const isValidDate = (
+        date.getUTCFullYear() === parts.year &&
+        date.getUTCMonth() === parts.month - 1 &&
+        date.getUTCDate() === parts.day
+    );
+
+    if (!isValidRange || !isValidDate) {
+        throw new Error('Invalid local datetime value');
+    }
+
+    return parts;
+};
+
 /**
  * Convert a local datetime string (YYYY-MM-DD HH:MM:SS) to ISO string
  * @param {string} localDateStr - Local datetime string
@@ -391,16 +431,14 @@ export const formatForInput = (dateValue, timezone) => {
 export const localToISO = (localDateStr, timezone) => {
     if (!localDateStr) return null;
 
-    // Parse the local string
-    const [datePart, timePart] = localDateStr.split(' ');
-    const [year, month, day] = datePart.split('-');
-    const timeComponents = (timePart || '00:00:00').split(':');
-    const hour = timeComponents[0] || '00';
-    const minute = timeComponents[1] || '00';
-    const second = timeComponents[2] || '00';
+    const { year, month, day, hour, minute, second } = parseLocalDateTimeParts(localDateStr);
 
     // Create a date string that will be interpreted in the specified timezone
-    const dateStr = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+    const dateStr = [
+        String(year).padStart(4, '0'),
+        String(month).padStart(2, '0'),
+        String(day).padStart(2, '0'),
+    ].join('-') + `T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
 
     // Use Intl to get the UTC offset for this timezone at this date
     const formatter = new Intl.DateTimeFormat('en-US', {
@@ -425,13 +463,38 @@ export const localToISO = (localDateStr, timezone) => {
     const localDay = parseInt(localParts.find(p => p.type === 'day').value);
     const localHour = parseInt(localParts.find(p => p.type === 'hour').value);
     const localMinute = parseInt(localParts.find(p => p.type === 'minute').value);
+    const localSecond = parseInt(localParts.find(p => p.type === 'second').value);
 
-    const localDate = new Date(Date.UTC(localYear, localMonth, localDay, localHour, localMinute));
-    const targetDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute), parseInt(second)));
+    const localDate = new Date(Date.UTC(localYear, localMonth, localDay, localHour, localMinute, localSecond));
+    const targetDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
 
     const offset = localDate.getTime() - utcDate.getTime();
     const adjustedDate = new Date(targetDate.getTime() - offset);
 
+    return adjustedDate.toISOString();
+};
+
+export const parseRelativeTimeAdjustment = (adjustmentCode) => {
+    const match = String(adjustmentCode).trim().match(/^([+-])\s*(\d+)\s*([HMS])$/i);
+    if (!match) {
+        throw new Error('Use +10M, -2H, or +30S');
+    }
+
+    const [, sign, amountValue, unitValue] = match;
+    const amount = Number(amountValue);
+    if (!Number.isSafeInteger(amount)) {
+        throw new Error('Invalid adjustment amount');
+    }
+
+    const unit = unitValue.toUpperCase();
+    const multiplier = unit === 'H' ? 3600 : unit === 'M' ? 60 : 1;
+    return (sign === '-' ? -1 : 1) * amount * multiplier;
+};
+
+export const applyRelativeTimeAdjustment = (localDateStr, adjustmentCode, timezone) => {
+    const isoValue = localToISO(localDateStr, timezone);
+    const adjustmentSeconds = parseRelativeTimeAdjustment(adjustmentCode);
+    const adjustedDate = new Date(new Date(isoValue).getTime() + adjustmentSeconds * 1000);
     return adjustedDate.toISOString();
 };
 

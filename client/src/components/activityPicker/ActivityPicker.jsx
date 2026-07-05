@@ -3,9 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import CloseButton from '../atoms/CloseButton';
 import {
     ROOT_KEY,
-    UNGROUPED_KEY,
     buildActivityPickerModel,
-    sortByOrderThenName,
 } from './activityPickerUtils';
 import styles from './ActivityPicker.module.css';
 
@@ -184,10 +182,8 @@ function ActivityPicker({
     const rootUngroupedActivities = !browseGroupId ? model.ungroupedActivities : [];
     const searchResults = useMemo(() => {
         if (!isSearching) return [];
-        return sortByOrderThenName(model.activities).filter((activity) => (
-            activity.name || ''
-        ).toLowerCase().includes(query));
-    }, [isSearching, model.activities, query]);
+        return model.searchActivities(query);
+    }, [isSearching, model, query]);
 
     const totalSelected = pendingActivityIds.size + pendingGroupIds.size;
     const selectedSummary = totalSelected > 0
@@ -243,7 +239,9 @@ function ActivityPicker({
 
     const renderActivity = (activity) => {
         const isSelected = pendingActivityIds.has(activity.id);
-        const group = activity.group_id ? model.groupMap[activity.group_id] : null;
+        const groupBreadcrumb = activity.group_id
+            ? model.getBreadcrumb(activity.group_id).map((item) => item.name).join(' / ')
+            : '';
         const activityActionLabel = isCopyMode
             ? `Copy ${activity.name}`
             : `${isSelected ? 'Deselect' : 'Select'} ${activity.name}`;
@@ -260,9 +258,9 @@ function ActivityPicker({
                 </span>
                 <span>
                     <span className={styles.activityName}>{isCopyMode ? `Copy ${activity.name}` : activity.name}</span>
-                    {(isSearching && group?.name) || activity.type ? (
+                    {(isSearching && groupBreadcrumb) || activity.type ? (
                         <span className={styles.activityMeta}>
-                            {isSearching && group?.name ? `${group.name}${activity.type ? ' / ' : ''}` : ''}
+                            {isSearching && groupBreadcrumb ? `${groupBreadcrumb}${activity.type ? ' / ' : ''}` : ''}
                             {activity.type || ''}
                         </span>
                     ) : null}

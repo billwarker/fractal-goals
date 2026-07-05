@@ -10,6 +10,7 @@ import styles from './SessionActivityItem.module.css';
 import { SummaryDelta } from './SessionActivityProgressSummary';
 import SessionActivityItemView from './SessionActivityItemView';
 import useMetricDrafts from './useMetricDrafts';
+import { useActivityHistory } from '../../hooks/useActivityHistory';
 import { useProgressComparison } from '../../hooks/useProgressComparison';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
 import { useEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
@@ -17,7 +18,6 @@ import {
     canComputeYield,
     computeAutoAggregations,
     filterTrackedMetricDefs,
-    formatAggValue,
     resolveAutoAggregationMode,
 } from '../../utils/progressAggregations';
 import { getAverageDurationStat } from '../../utils/durationStats';
@@ -50,6 +50,10 @@ function SessionActivityItem({
     canMoveUp,
     canMoveDown,
     showReorderButtons,
+    sessionIndex = null,
+    onDuplicate = null,
+    onClearValues = null,
+    onCopyPreviousValues = null,
     onNoteCreated,
     allNotes,
     onAddNote,
@@ -74,6 +78,7 @@ function SessionActivityItem({
         updateInstance,
         updateTimer,
         removeActivity,
+        copyActivityValuesFromSource,
     } = useActiveSessionActions();
 
     const activityDefinition = activityDefinitionProp
@@ -223,6 +228,17 @@ function SessionActivityItem({
     const hasSplits = def.has_splits && def.split_definitions && def.split_definitions.length > 0;
     // Check if metrics exist by looking at the definition, not just the flag
     const hasMetrics = def.metric_definitions && def.metric_definitions.length > 0;
+    const shouldLoadHistoricalPrevious = Boolean(isSelected && !onCopyPreviousValues && rootId && sessionId && def.id);
+    const { history: historicalActivityHistory, loading: historicalActivityHistoryLoading } = useActivityHistory(rootId, def.id, sessionId, {
+        limit: 1,
+        enabled: shouldLoadHistoricalPrevious,
+    });
+    const historicalPreviousInstance = shouldLoadHistoricalPrevious ? historicalActivityHistory[0] : null;
+    const handleCopyPreviousValues = onCopyPreviousValues
+        || (historicalPreviousInstance
+            ? () => copyActivityValuesFromSource(exercise.id, historicalPreviousInstance)
+            : null);
+    const showCopyPreviousValuesOption = Boolean(onCopyPreviousValues || shouldLoadHistoricalPrevious);
     const {
         getMetricValue,
         getSetMetricDisplayValue,
@@ -622,11 +638,13 @@ function SessionActivityItem({
 
     const commitSetMetricInput = (setIndex, metricDef, splitId = null, displayValue) => {
         const normalizedValue = normalizeMetricValueForStorage(metricDef, displayValue);
+        if (normalizedValue == null) return;
         commitSetMetricChange(setIndex, metricDef.id, splitId, normalizedValue);
     };
 
     const commitSingleMetricInput = (metricDef, splitId = null, displayValue) => {
         const normalizedValue = normalizeMetricValueForStorage(metricDef, displayValue);
+        if (normalizedValue == null) return;
         commitSingleMetricChange(metricDef.id, splitId, normalizedValue);
     };
 
@@ -694,7 +712,7 @@ function SessionActivityItem({
     // Handler for clicking on the activity panel (not a specific set)
     const handleActivityCardClick = (e) => {
         // Don't trigger for interactive elements
-        if (e.target.closest('input, button, textarea')) return;
+        if (e.target.closest('input, button, textarea, select, a, [role="menu"]')) return;
 
         // Clear set selection and focus on whole activity
         setSelectedSetIndex(null);
@@ -710,6 +728,7 @@ function SessionActivityItem({
             onReorder={onReorder}
             canMoveUp={canMoveUp}
             canMoveDown={canMoveDown}
+            sessionIndex={sessionIndex}
             setSelectedSetIndex={setSelectedSetIndex}
             onFocus={onFocus}
             exercise={exercise}
@@ -720,6 +739,14 @@ function SessionActivityItem({
             averageDuration={averageDuration}
             quickMode={quickMode}
             onUpdate={onUpdate}
+            onDuplicate={onDuplicate}
+            onClearValues={onClearValues}
+            onCopyPreviousValues={handleCopyPreviousValues}
+            showCopyPreviousValuesOption={showCopyPreviousValuesOption}
+            copyPreviousValuesDisabled={showCopyPreviousValuesOption && !handleCopyPreviousValues}
+            copyPreviousValuesLabel={historicalActivityHistoryLoading
+                ? 'Loading previous values...'
+                : 'Copy values from previous instance'}
             localStartTime={localStartTime}
             setStartTimeDraft={setStartTimeDraft}
             timezone={timezone}

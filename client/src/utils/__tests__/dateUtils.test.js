@@ -11,7 +11,9 @@ import {
     getDatePart,
     formatLiteralDate,
     formatForInput,
-    localToISO
+    localToISO,
+    parseRelativeTimeAdjustment,
+    applyRelativeTimeAdjustment
 } from '../dateUtils';
 
 afterEach(() => {
@@ -182,5 +184,33 @@ describe('midnight normalization', () => {
         mockMidnightAs24Hour();
 
         expect(localToISO('2026-01-01 00:00:00', 'UTC')).toBe('2026-01-01T00:00:00.000Z');
+    });
+});
+
+describe('local input conversion', () => {
+    it('preserves explicitly entered seconds when converting to ISO', () => {
+        expect(localToISO('2026-07-04 13:21:14', 'UTC')).toBe('2026-07-04T13:21:14.000Z');
+    });
+
+    it('defaults omitted seconds to zero rather than using the current clock second', () => {
+        expect(localToISO('2026-07-04 13:21', 'UTC')).toBe('2026-07-04T13:21:00.000Z');
+    });
+});
+
+describe('relative time adjustment parsing', () => {
+    it('parses hours, minutes, and seconds codes', () => {
+        expect(parseRelativeTimeAdjustment('+2H')).toBe(7200);
+        expect(parseRelativeTimeAdjustment('-10M')).toBe(-600);
+        expect(parseRelativeTimeAdjustment('+30S')).toBe(30);
+    });
+
+    it('applies relative adjustments to local datetime values', () => {
+        expect(applyRelativeTimeAdjustment('2026-07-04 13:21:14', '+10M', 'UTC')).toBe('2026-07-04T13:31:14.000Z');
+        expect(applyRelativeTimeAdjustment('2026-07-04 13:21:14', '-30S', 'UTC')).toBe('2026-07-04T13:20:44.000Z');
+    });
+
+    it('rejects invalid adjustment codes', () => {
+        expect(() => parseRelativeTimeAdjustment('10M')).toThrow('Use +10M, -2H, or +30S');
+        expect(() => parseRelativeTimeAdjustment('+1D')).toThrow('Use +10M, -2H, or +30S');
     });
 });

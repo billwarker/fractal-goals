@@ -12,6 +12,10 @@ export function sortByOrderThenName(items = []) {
     });
 }
 
+export function normalizeSearchText(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
 export function buildActivityPickerModel(activities = [], activityGroups = []) {
     const safeActivities = (Array.isArray(activities) ? activities : []).filter(Boolean);
     const safeGroups = (Array.isArray(activityGroups) ? activityGroups : []).filter(Boolean);
@@ -98,6 +102,38 @@ export function buildActivityPickerModel(activities = [], activityGroups = []) {
         return crumbs;
     };
 
+    const getGroupSearchText = (groupId) => {
+        const breadcrumb = getBreadcrumb(groupId);
+        return normalizeSearchText(breadcrumb.map((group) => group.name).join(' '));
+    };
+
+    const searchActivities = (rawQuery) => {
+        const query = normalizeSearchText(rawQuery);
+        if (!query) return [];
+
+        const matchedActivityIds = new Set();
+        normalizedGroups.forEach((group) => {
+            const groupSearchText = getGroupSearchText(group.id);
+            if (groupSearchText.includes(query)) {
+                getActivityIdsForGroup(group.id).forEach((activityId) => matchedActivityIds.add(activityId));
+            }
+        });
+
+        safeActivities.forEach((activity) => {
+            const activitySearchText = normalizeSearchText([
+                activity.name,
+                activity.type,
+                activity.group_id ? getGroupSearchText(activity.group_id) : '',
+            ].filter(Boolean).join(' '));
+
+            if (activitySearchText.includes(query)) {
+                matchedActivityIds.add(activity.id);
+            }
+        });
+
+        return sortByOrderThenName(safeActivities.filter((activity) => matchedActivityIds.has(activity.id)));
+    };
+
     return {
         activities: safeActivities,
         activityGroups: safeGroups,
@@ -110,5 +146,7 @@ export function buildActivityPickerModel(activities = [], activityGroups = []) {
         ungroupedActivities: activitiesByGroup[UNGROUPED_KEY] || [],
         getActivityIdsForGroup,
         getBreadcrumb,
+        getGroupSearchText,
+        searchActivities,
     };
 }

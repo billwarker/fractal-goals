@@ -6,6 +6,9 @@ import SessionSection from '../SessionSection';
 const {
     addActivity,
     removeActivity,
+    duplicateActivityInstance,
+    clearActivityInstanceValues,
+    copyActivityValuesFromInstance,
     moveActivity,
     reorderActivity,
     setDraggedItem,
@@ -14,6 +17,9 @@ const {
 } = vi.hoisted(() => ({
     addActivity: vi.fn(),
     removeActivity: vi.fn(),
+    duplicateActivityInstance: vi.fn(),
+    clearActivityInstanceValues: vi.fn(),
+    copyActivityValuesFromInstance: vi.fn(),
     moveActivity: vi.fn(),
     reorderActivity: vi.fn(),
     setDraggedItem: vi.fn(),
@@ -66,6 +72,9 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
     useActiveSessionActions: () => ({
         addActivity,
         removeActivity,
+        duplicateActivityInstance,
+        clearActivityInstanceValues,
+        copyActivityValuesFromInstance,
         moveActivity,
         reorderActivity,
     }),
@@ -76,8 +85,16 @@ vi.mock('../../../hooks/useIsMobile', () => ({
 }));
 
 vi.mock('../SessionActivityItem', () => ({
-    default: ({ onFocus, exercise }) => (
-        <div onClick={() => onFocus(exercise, null)}>session activity item</div>
+    default: ({ onFocus, exercise, sessionIndex, onDuplicate, onClearValues, onCopyPreviousValues }) => (
+        <div onClick={() => onFocus(exercise, null)}>
+            <span>session activity item</span>
+            <span>index {sessionIndex}</span>
+            <button type="button" onClick={onDuplicate}>duplicate item</button>
+            <button type="button" onClick={onClearValues}>clear item</button>
+            {onCopyPreviousValues && (
+                <button type="button" onClick={onCopyPreviousValues}>copy previous values</button>
+            )}
+        </div>
     ),
 }));
 
@@ -86,6 +103,7 @@ describe('SessionSection', () => {
         vi.clearAllMocks();
         sessionUiState.showActivitySelector = {};
         sessionDataState.activityInstances = [];
+        sessionDataState.localSessionData = null;
         sessionDataState.groupedActivities = {
             'group-1': [sessionDataState.activities[0]],
         };
@@ -211,5 +229,76 @@ describe('SessionSection', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '+ Add Activity' }));
         expect(onFocusActivity).not.toHaveBeenCalled();
+    });
+
+    it('passes session index and instance actions to activity items', () => {
+        sessionDataState.activityInstances = [
+            {
+                id: 'instance-1',
+                activity_definition_id: 'activity-1',
+            },
+        ];
+
+        render(
+            <SessionSection
+                section={{ name: 'Main Practice', activity_ids: ['instance-1'], estimated_duration_minutes: 10 }}
+                sectionIndex={0}
+                onFocusActivity={vi.fn()}
+                selectedActivityId="instance-1"
+                onOpenActivityBuilder={vi.fn()}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('index 1')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'duplicate item' }));
+        fireEvent.click(screen.getByRole('button', { name: 'clear item' }));
+
+        expect(duplicateActivityInstance).toHaveBeenCalledWith(0, 'instance-1', 0);
+        expect(clearActivityInstanceValues).toHaveBeenCalledWith('instance-1');
+    });
+
+    it('passes a copy-previous-values action when an earlier matching activity instance exists', () => {
+        sessionDataState.activityInstances = [
+            {
+                id: 'instance-1',
+                activity_definition_id: 'activity-1',
+            },
+            {
+                id: 'instance-2',
+                activity_definition_id: 'activity-1',
+            },
+        ];
+        sessionDataState.localSessionData = {
+            sections: [
+                { activity_ids: ['instance-1'] },
+                { activity_ids: ['instance-2'] },
+            ],
+        };
+
+        render(
+            <SessionSection
+                section={{ name: 'Second Practice', activity_ids: ['instance-2'], estimated_duration_minutes: 10 }}
+                sectionIndex={1}
+                onFocusActivity={vi.fn()}
+                selectedActivityId="instance-2"
+                onOpenActivityBuilder={vi.fn()}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'copy previous values' }));
+
+        expect(copyActivityValuesFromInstance).toHaveBeenCalledWith('instance-2', 'instance-1');
     });
 });

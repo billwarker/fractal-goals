@@ -53,4 +53,53 @@ describe('ActivitySelectorPanel', () => {
         expect(onSelectActivity).not.toHaveBeenCalled();
         expect(onClose).toHaveBeenCalled();
     });
+
+    it('searches by activity group name and returns activities inside that group', () => {
+        render(
+            <ActivitySelectorPanel
+                activities={[
+                    { id: 'activity-1', name: 'Rows', group_id: 'group-pull' },
+                    { id: 'activity-2', name: 'Push Ups', group_id: 'group-push' },
+                ]}
+                activityGroups={[
+                    { id: 'group-pull', name: 'Pull', parent_id: null },
+                    { id: 'group-push', name: 'Push', parent_id: null },
+                ]}
+                onClose={vi.fn()}
+                onSelectActivity={vi.fn()}
+            />
+        );
+
+        fireEvent.change(screen.getByPlaceholderText('Search activities...'), { target: { value: 'Pull' } });
+
+        expect(screen.getByText('Rows')).toBeInTheDocument();
+        expect(screen.queryByText('Push Ups')).not.toBeInTheDocument();
+    });
+
+    it('searches parent activity groups and deduplicates descendant results', () => {
+        render(
+            <ActivitySelectorPanel
+                activities={[
+                    { id: 'activity-1', name: 'Pull Basics', group_id: 'group-vertical' },
+                    { id: 'activity-2', name: 'Adv. Tuck FL Holds', group_id: 'group-horizontal' },
+                    { id: 'activity-3', name: 'Handstand Hold', group_id: 'group-handstand' },
+                ]}
+                activityGroups={[
+                    { id: 'group-pull', name: 'Pull', parent_id: null },
+                    { id: 'group-vertical', name: 'Vertical', parent_id: 'group-pull' },
+                    { id: 'group-horizontal', name: 'Horizontal', parent_id: 'group-pull' },
+                    { id: 'group-handstand', name: 'Handstand', parent_id: null },
+                ]}
+                onClose={vi.fn()}
+                onSelectActivity={vi.fn()}
+            />
+        );
+
+        fireEvent.change(screen.getByPlaceholderText('Search activities...'), { target: { value: 'Pull' } });
+
+        expect(screen.getByRole('button', { name: /Select Pull Basics/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Select Adv. Tuck FL Holds/ })).toBeInTheDocument();
+        expect(screen.queryByText('Handstand Hold')).not.toBeInTheDocument();
+        expect(screen.getAllByText('Pull Basics')).toHaveLength(1);
+    });
 });

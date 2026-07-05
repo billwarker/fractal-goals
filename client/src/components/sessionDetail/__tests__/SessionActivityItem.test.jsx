@@ -7,12 +7,16 @@ const {
     updateInstance,
     updateTimer,
     removeActivity,
+    copyActivityValuesFromSource,
     useProgressComparison,
+    useActivityHistory,
 } = vi.hoisted(() => ({
     updateInstance: vi.fn(() => Promise.resolve()),
     updateTimer: vi.fn(),
     removeActivity: vi.fn(),
+    copyActivityValuesFromSource: vi.fn(() => Promise.resolve()),
     useProgressComparison: vi.fn(() => ({ progressComparison: null })),
+    useActivityHistory: vi.fn(() => ({ history: [], loading: false, error: null })),
 }));
 
 vi.mock('../../../contexts/ActiveSessionContext', () => ({
@@ -36,7 +40,12 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
         updateInstance,
         updateTimer,
         removeActivity,
+        copyActivityValuesFromSource,
     })
+}));
+
+vi.mock('../../../hooks/useActivityHistory', () => ({
+    useActivityHistory: (...args) => useActivityHistory(...args),
 }));
 
 vi.mock('../../../hooks/useProgressComparison', () => ({
@@ -89,8 +98,11 @@ describe('SessionActivityItem metric and timer editing', () => {
         updateInstance.mockClear();
         updateTimer.mockClear();
         removeActivity.mockClear();
+        copyActivityValuesFromSource.mockClear();
         useProgressComparison.mockReset();
         useProgressComparison.mockReturnValue({ progressComparison: null });
+        useActivityHistory.mockReset();
+        useActivityHistory.mockReturnValue({ history: [], loading: false, error: null });
     });
 
     it('buffers single metric edits and commits on blur', async () => {
@@ -148,6 +160,249 @@ describe('SessionActivityItem metric and timer editing', () => {
         expect(updateInstance).toHaveBeenCalledWith('instance-2', {
             metrics: [{ metric_id: 'm1', value: '123' }]
         });
+    });
+
+    it('evaluates arithmetic metric drafts before saving', async () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-arithmetic',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [{ metric_id: 'm1', value: '5' }],
+                    time_start: null,
+                    time_stop: null,
+                    duration_seconds: 0
+                }}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [{ id: 'm1', name: 'Reps', unit: 'reps', input_type: 'integer' }],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        const input = screen.getByDisplayValue('5');
+        fireEvent.change(input, { target: { value: '5-2' } });
+        fireEvent.blur(input);
+
+        await waitFor(() => {
+            expect(updateInstance).toHaveBeenCalledWith('instance-arithmetic', {
+                metrics: [{ metric_id: 'm1', value: '3' }]
+            });
+        });
+    });
+
+    it('keeps invalid arithmetic drafts local instead of saving them', async () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-invalid-arithmetic',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [{ metric_id: 'm1', value: '5' }],
+                    time_start: null,
+                    time_stop: null,
+                    duration_seconds: 0
+                }}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [{ id: 'm1', name: 'Reps', unit: 'reps', input_type: 'number' }],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        const input = screen.getByDisplayValue('5');
+        fireEvent.change(input, { target: { value: '5 / 0' } });
+        fireEvent.blur(input);
+
+        await waitFor(() => {
+            expect(input).toHaveValue('5 / 0');
+        });
+        expect(updateInstance).not.toHaveBeenCalled();
+    });
+
+    it('shows the session index and runs activity option actions', () => {
+        const onDuplicate = vi.fn();
+        const onClearValues = vi.fn();
+        const onCopyPreviousValues = vi.fn();
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-options',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: null,
+                    time_stop: null,
+                    duration_seconds: 0
+                }}
+                onFocus={vi.fn()}
+                isSelected
+                onReorder={vi.fn()}
+                canMoveUp={true}
+                canMoveDown={true}
+                showReorderButtons
+                sessionIndex={3}
+                onDuplicate={onDuplicate}
+                onClearValues={onClearValues}
+                onCopyPreviousValues={onCopyPreviousValues}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenActivityBuilder={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        expect(screen.getByText('#3')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Pull Up options' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate instance' }));
+        expect(onDuplicate).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Pull Up options' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy values from previous instance' }));
+        expect(onCopyPreviousValues).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Pull Up options' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Clear logged values' }));
+        expect(onClearValues).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Pull Up options' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Delete from session' }));
+        expect(removeActivity).toHaveBeenCalledWith('instance-options');
+    });
+
+    it('shows copy previous values from historical activity history when there is no current-session previous instance', async () => {
+        const previousInstance = {
+            id: 'history-inst-1',
+            activity_definition_id: 'activity-1',
+            sets: [
+                {
+                    instance_id: 'history-set-1',
+                    completed: true,
+                    metrics: [{ metric_id: 'm1', value: 8 }],
+                },
+            ],
+        };
+        useActivityHistory.mockReturnValue({ history: [previousInstance], loading: false, error: null });
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-history-target',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: null,
+                    time_stop: null,
+                    duration_seconds: 0
+                }}
+                onFocus={vi.fn()}
+                isSelected
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons
+                sessionIndex={1}
+                onDuplicate={vi.fn()}
+                onClearValues={vi.fn()}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [{ id: 'm1', name: 'Reps', unit: 'reps' }],
+                    split_definitions: [],
+                    has_sets: true,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        expect(useActivityHistory).toHaveBeenCalledWith('root-1', 'activity-1', 'session-1', {
+            limit: 1,
+            enabled: true,
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Pull Up options' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Copy values from previous instance' }));
+
+        expect(copyActivityValuesFromSource).toHaveBeenCalledWith('instance-history-target', previousInstance);
     });
 
     it('applies metric defaults, presets, integer bounds, and duration formatting', async () => {
@@ -365,7 +620,7 @@ describe('SessionActivityItem metric and timer editing', () => {
         const [startInput] = screen.getAllByPlaceholderText('YYYY-MM-DD HH:MM:SS');
         expect(startInput).toHaveValue('2026-01-01 00:00:00');
 
-        fireEvent.change(startInput, { target: { value: '2026-01-01 01:15:00' } });
+        fireEvent.change(startInput, { target: { value: '2026-01-01 01:15' } });
         expect(updateInstance).not.toHaveBeenCalled();
         fireEvent.blur(startInput);
 
@@ -375,6 +630,380 @@ describe('SessionActivityItem metric and timer editing', () => {
         expect(updateInstance).toHaveBeenCalledWith('instance-3', {
             time_start: '2026-01-01T01:15:00.000Z'
         });
+    });
+
+    it('keeps invalid timer edits visible and does not save them', async () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-invalid-time',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: '2026-01-01T00:00:00.000Z',
+                    time_stop: null,
+                    duration_seconds: 0
+                }}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        const [startInput] = screen.getAllByPlaceholderText('YYYY-MM-DD HH:MM:SS');
+        fireEvent.change(startInput, { target: { value: '2026-99-99 10:00:00' } });
+        fireEvent.blur(startInput);
+
+        expect(updateInstance).not.toHaveBeenCalled();
+        expect(startInput).toHaveValue('2026-99-99 10:00:00');
+        expect(screen.getByText('Use YYYY-MM-DD HH:MM:SS')).toBeInTheDocument();
+    });
+
+    it('applies a relative adjustment to the start time from the header control', async () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-4',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: '2026-07-04T13:21:14.000Z',
+                    time_stop: '2026-07-04T13:40:14.000Z',
+                    duration_seconds: 1140
+                }}
+                onFocus={vi.fn()}
+                isSelected
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Adjust start time' }));
+        fireEvent.change(screen.getByRole('textbox', { name: 'Relative start adjustment' }), {
+            target: { value: '+10M' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+        await waitFor(() => {
+            expect(updateInstance).toHaveBeenCalledWith('instance-4', {
+                time_start: '2026-07-04T13:31:14.000Z',
+            });
+        });
+    });
+
+    it('prevents direct timer edits that would create a negative duration', () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-negative-direct',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: '2026-07-04T13:21:14.000Z',
+                    time_stop: '2026-07-04T13:30:14.000Z',
+                    duration_seconds: 540
+                }}
+                onFocus={vi.fn()}
+                isSelected
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        const [, stopInput] = screen.getAllByPlaceholderText('YYYY-MM-DD HH:MM:SS');
+        fireEvent.change(stopInput, { target: { value: '2026-07-04 13:11:34' } });
+        fireEvent.blur(stopInput);
+
+        expect(updateInstance).not.toHaveBeenCalled();
+        expect(stopInput).toHaveValue('2026-07-04 13:11:34');
+        expect(screen.getByText('Stop must be after start')).toBeInTheDocument();
+    });
+
+    it('applies a relative adjustment to the stop time from the header control', async () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-5',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: '2026-07-04T13:21:14.000Z',
+                    time_stop: '2026-07-04T13:30:14.000Z',
+                    duration_seconds: 540
+                }}
+                onFocus={vi.fn()}
+                isSelected
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Adjust stop time' }));
+        fireEvent.change(screen.getByRole('textbox', { name: 'Relative stop adjustment' }), {
+            target: { value: '-30S' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+        await waitFor(() => {
+            expect(updateInstance).toHaveBeenCalledWith('instance-5', {
+                time_stop: '2026-07-04T13:29:44.000Z',
+            });
+        });
+    });
+
+    it('prevents relative timer adjustments that would create a negative duration', () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-negative-relative',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: '2026-07-04T13:21:14.000Z',
+                    time_stop: '2026-07-04T13:30:14.000Z',
+                    duration_seconds: 540
+                }}
+                onFocus={vi.fn()}
+                isSelected
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Adjust stop time' }));
+        fireEvent.change(screen.getByRole('textbox', { name: 'Relative stop adjustment' }), {
+            target: { value: '-30M' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+        expect(updateInstance).not.toHaveBeenCalled();
+        expect(screen.getByText('Stop must be after start')).toBeInTheDocument();
+    });
+
+    it('blurs the relative adjustment input on first outside click and closes on the next one', () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-adjust-click-off',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: '2026-07-04T13:21:14.000Z',
+                    time_stop: '2026-07-04T13:30:14.000Z',
+                    duration_seconds: 540
+                }}
+                onFocus={vi.fn()}
+                isSelected
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Adjust stop time' }));
+        const adjustmentInput = screen.getByRole('textbox', { name: 'Relative stop adjustment' });
+        adjustmentInput.focus();
+        expect(adjustmentInput).toHaveFocus();
+
+        fireEvent.pointerDown(document.body);
+
+        expect(adjustmentInput).not.toHaveFocus();
+        expect(screen.getByRole('textbox', { name: 'Relative stop adjustment' })).toBeInTheDocument();
+
+        fireEvent.pointerDown(document.body);
+
+        expect(screen.queryByRole('textbox', { name: 'Relative stop adjustment' })).not.toBeInTheDocument();
+    });
+
+    it('hides relative timer adjustment controls when the activity is not selected', () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-hidden-adjust',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: '2026-07-04T13:21:14.000Z',
+                    time_stop: '2026-07-04T13:30:14.000Z',
+                    duration_seconds: 540
+                }}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        expect(screen.queryByRole('button', { name: 'Adjust start time' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Adjust stop time' })).not.toBeInTheDocument();
     });
 });
 

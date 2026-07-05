@@ -16,8 +16,8 @@ import { queryKeys } from './queryKeys';
  * @param {Object} options - {limit: number}
  */
 export function useActivityHistory(rootId, activityDefinitionId, excludeSessionId = null, options = {}) {
-    const { limit = 10 } = options;
-    const enabled = Boolean(rootId && activityDefinitionId);
+    const { limit = 10, enabled: enabledOption = true } = options;
+    const enabled = Boolean(enabledOption && rootId && activityDefinitionId);
     const query = useQuery({
         queryKey: queryKeys.activityHistory(rootId, activityDefinitionId, excludeSessionId, limit),
         enabled,

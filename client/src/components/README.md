@@ -8,6 +8,7 @@ Use these shared primitives before adding local UI controls:
 - `atoms/CloseButton.jsx` - dismissing dialogs, panels, sheets, and overlays.
 - `atoms/RemoveButton.jsx` - removing chips, rows, widgets, or collection items.
 - `atoms/DeleteButton.jsx` - labeled destructive delete actions.
+- `atoms/DropdownMenu.jsx` - compact anchored option menus and menu items.
 - `atoms/Badge.jsx` - badges, pills, chips, tags, compact status labels, and type labels.
 - `atoms/Input.jsx`, `atoms/Select.jsx`, `atoms/TextArea.jsx`, `atoms/Checkbox.jsx`, `atoms/Radio.jsx` - form controls.
 - `atoms/Tooltip.jsx` - hover/focus help for compact icon controls.

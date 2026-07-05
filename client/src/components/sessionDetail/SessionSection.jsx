@@ -34,6 +34,7 @@ const SessionSection = ({
         activities,
         activityGroups,
         instancesLoading,
+        localSessionData,
         session
     } = useActiveSessionData();
 
@@ -49,6 +50,9 @@ const SessionSection = ({
     const {
         addActivity,
         removeActivity,
+        duplicateActivityInstance,
+        clearActivityInstanceValues,
+        copyActivityValuesFromInstance,
         moveActivity,
         reorderActivity,
     } = useActiveSessionActions();
@@ -65,6 +69,23 @@ const SessionSection = ({
     const activityPositionById = useMemo(() => {
         return buildPositionMap(section.activity_ids || []);
     }, [section.activity_ids]);
+    const previousMatchingInstanceById = useMemo(() => {
+        const orderedIds = (localSessionData?.sections || [])
+            .flatMap((sessionSection) => sessionSection?.activity_ids || []);
+        const effectiveOrderedIds = orderedIds.length > 0 ? orderedIds : (section.activity_ids || []);
+        const latestByDefinitionId = new Map();
+        const previousByInstanceId = new Map();
+
+        effectiveOrderedIds.forEach((instanceId) => {
+            const instance = instanceById.get(instanceId);
+            const definitionId = instance?.activity_definition_id;
+            if (!definitionId) return;
+            previousByInstanceId.set(instanceId, latestByDefinitionId.get(definitionId) || null);
+            latestByDefinitionId.set(definitionId, instanceId);
+        });
+
+        return previousByInstanceId;
+    }, [instanceById, localSessionData?.sections, section.activity_ids]);
     const sectionAverage = useMemo(() => {
         const sectionStats = session?.stats?.template?.section_stats || {};
         const key = section?.template_section_id || section?.id || `legacy:${sectionIndex}:${String(section?.name || '').trim().toLowerCase()}`;
@@ -196,6 +217,7 @@ const SessionSection = ({
                     const definition = definitionById.get(instance.activity_definition_id);
                     const isDragging = draggedItem?.instanceId === instanceId;
                     const position = activityPositionById.get(instanceId) ?? -1;
+                    const previousMatchingInstanceId = previousMatchingInstanceById.get(instanceId) || null;
 
                     return (
                         <div
@@ -225,6 +247,12 @@ const SessionSection = ({
                                 canMoveUp={position > 0}
                                 canMoveDown={position >= 0 && position < section.activity_ids.length - 1}
                                 showReorderButtons={true}
+                                sessionIndex={position + 1}
+                                onDuplicate={() => duplicateActivityInstance(sectionIndex, instanceId, position)}
+                                onClearValues={() => clearActivityInstanceValues(instanceId)}
+                                onCopyPreviousValues={previousMatchingInstanceId
+                                    ? () => copyActivityValuesFromInstance(instanceId, previousMatchingInstanceId)
+                                    : null}
                                 onNoteCreated={onNoteCreated}
                                 allNotes={allNotes}
                                 onAddNote={onAddNote}
