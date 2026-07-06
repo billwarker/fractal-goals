@@ -10,7 +10,6 @@ import { PinIcon } from '../atoms/AppIcons';
 import CheckIcon from '../atoms/CheckIcon';
 import CloseIcon from '../atoms/CloseIcon';
 import GoalIcon from '../atoms/GoalIcon';
-import Linkify from '../atoms/Linkify';
 import MarkdownNoteContent from './MarkdownNoteContent';
 import styles from './NoteCard.module.css';
 
@@ -93,7 +92,8 @@ function NoteCard({
     const displayNoteTypeLabel = noteTypeVariant === 'metadata'
         ? formatMetadataNoteTypeLabel(resolvedNoteTypeLabel)
         : resolvedNoteTypeLabel;
-    const supportsMarkdown = resolvedNoteType === 'fractal_note';
+    // All note surfaces now render rich content (markdown + inline video embeds).
+    const supportsMarkdown = true;
     const setLabel = resolvedNoteType === 'activity_set_note' && note.set_index != null
         ? `Set #${note.set_index + 1}`
         : null;
@@ -430,13 +430,7 @@ function NoteCard({
                 ) : (
                     <div className={styles.content}>
                         {shouldShowRichContent ? (
-                            supportsMarkdown ? (
-                                <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
-                            ) : (
-                                <div className={`${styles.markdownContent} ${styles.plainContent}`}>
-                                    <Linkify>{note.content}</Linkify>
-                                </div>
-                            )
+                            <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
                         ) : (
                             <div className={`${styles.markdownContent} ${styles.previewContent}`}>
                                 {previewContent || ' '}

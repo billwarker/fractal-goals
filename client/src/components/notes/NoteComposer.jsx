@@ -53,7 +53,9 @@ function NoteComposer({
     const selectedGoalName = controlledGoalName !== undefined ? controlledGoalName : internalGoalName;
     const selectedActivityId = controlledActivityId !== undefined ? controlledActivityId : internalActivityId;
     const selectedActivityName = controlledActivityName !== undefined ? controlledActivityName : internalActivityName;
-    const supportsMarkdown = !selectedGoalId && !selectedActivityId && !prelinkedGoalId;
+    // All note surfaces support markdown + inline video embeds, so the
+    // Write/Preview toggle is always available regardless of goal/activity links.
+    const supportsMarkdown = true;
 
     const { data: treeData } = useFractalTree(rootId, { enabled: !prelinkedGoalId });
     const { activities: internalActivities = [] } = useActivities(rootId);
@@ -71,12 +73,6 @@ function NoteComposer({
             adjustHeight(textareaRef.current);
         }
     }, []);
-
-    useEffect(() => {
-        if (!supportsMarkdown && previewMode) {
-            setPreviewMode(false);
-        }
-    }, [previewMode, supportsMarkdown]);
 
     const handleActivitySelect = (activity) => {
         const next = selectedActivityId === activity.id ? null : activity.id;
@@ -172,7 +168,7 @@ function NoteComposer({
                             value={content}
                             onChange={(e) => { setContent(e.target.value); adjustHeight(e.target); }}
                             onKeyDown={handleKeyDown}
-                            placeholder={supportsMarkdown ? "Write a fractal note… (Markdown supported, ⌘Enter to submit)" : "Write a quick note… (⌘Enter to submit)"}
+                            placeholder="Write a note… (Markdown supported; paste a YouTube, Instagram, or Google Drive video link on its own line to embed it. ⌘Enter to submit)"
                             rows={4}
                         />
                     )}

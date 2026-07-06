@@ -45,6 +45,9 @@ function GoalCompletionModal({
                     placeholder="Capture what changed, what worked, or what to remember from completing this goal."
                     rows={4}
                 />
+                <p className={styles.completionNoteHint}>
+                    Paste a YouTube, Instagram, or Google Drive video link on its own line to embed it as evidence.
+                </p>
             </div>
 
             {/* Associated Programs */}
