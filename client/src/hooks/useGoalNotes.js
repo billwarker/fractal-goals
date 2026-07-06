@@ -45,6 +45,16 @@ export function useGoalNotes(rootId, goalId, { includeDescendants = false } = {}
         onError: () => notify.error('Failed to delete note'),
     });
 
+    const deleteGoalCompletionNotesMutation = useMutation({
+        mutationFn: async () => {
+            const res = await fractalNotesApi.getGoalNotes(rootId, goalId, { includeDescendants: false });
+            const completionNotes = (res.data || []).filter((note) => note.note_kind === 'goal_completion');
+            await Promise.all(completionNotes.map((note) => fractalNotesApi.deleteNote(rootId, note.id)));
+        },
+        onSuccess: () => { invalidate(); },
+        onError: () => notify.error('Failed to remove completion note'),
+    });
+
     const pinNoteMutation = useMutation({
         mutationFn: (noteId) => fractalNotesApi.pinNote(rootId, noteId),
         onSuccess: () => { invalidate(); },
@@ -64,6 +74,7 @@ export function useGoalNotes(rootId, goalId, { includeDescendants = false } = {}
         createNote: (data) => createNoteMutation.mutateAsync(data),
         updateNote: (noteId, content) => updateNoteMutation.mutateAsync({ noteId, content }),
         deleteNote: (note) => deleteNoteMutation.mutateAsync(note),
+        deleteGoalCompletionNotes: () => deleteGoalCompletionNotesMutation.mutateAsync(),
         pinNote: (noteId) => pinNoteMutation.mutateAsync(noteId),
         unpinNote: (noteId) => unpinNoteMutation.mutateAsync(noteId),
     };

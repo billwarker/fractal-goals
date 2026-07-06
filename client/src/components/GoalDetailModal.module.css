@@ -416,8 +416,7 @@
 
 
 .relevanceTextareaFilled {
-    border-color: var(--color-success);
-    /* #4caf50 */
+    border-color: var(--goal-edit-accent, var(--color-brand-primary));
 }
 
 /* Progress Measurement Section */
@@ -449,13 +448,12 @@
 
 .infoItem {
     padding: 6px 10px;
-    background: rgba(76, 175, 80, 0.1);
-    border: 1px solid rgba(76, 175, 80, 0.3);
+    background: color-mix(in srgb, var(--goal-edit-accent, var(--color-brand-primary)) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--goal-edit-accent, var(--color-brand-primary)) 55%, var(--color-border));
     border-radius: var(--radius-md);
     /* 6px */
     font-size: 11px;
-    color: var(--color-success);
-    /* #4caf50 */
+    color: color-mix(in srgb, var(--goal-edit-accent, var(--color-brand-primary)) 85%, var(--color-text-primary));
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);

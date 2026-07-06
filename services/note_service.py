@@ -545,6 +545,10 @@ class NoteService:
         activity_definition_id = data.get('activity_definition_id')
         context_type = data['context_type']
         context_id = data['context_id']
+        note_kind = data.get('note_kind')
+
+        if note_kind == 'goal_completion' and context_type != 'goal':
+            return None, "goal_completion notes must be attached to a goal", 400
 
         context_payload, context_error = self._validate_note_context(
             root_id=root_id,
@@ -588,6 +592,7 @@ class NoteService:
                 goal_id=goal_id,
                 set_index=data.get('set_index'),
                 content=content,
+                note_kind=note_kind,
             )
             self.db_session.add(note)
 
@@ -598,6 +603,7 @@ class NoteService:
             {
                 'note_id': note.id,
                 'note_content': note.content,
+                'note_kind': note.note_kind,
                 'context_type': note.context_type,
                 'context_id': note.context_id,
                 'root_id': root_id,

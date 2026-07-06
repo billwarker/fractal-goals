@@ -145,7 +145,10 @@ function GoalDetailModal({
     const goalId = mode === 'create' ? null : (goal?.attributes?.id || goal?.id);
     const queryRootId = readOnly ? null : rootId;
     const queryGoalId = readOnly ? null : goalId;
-    const { createNote: createGoalNote } = useGoalNotes(queryRootId, queryGoalId);
+    const {
+        createNote: createGoalNote,
+        deleteGoalCompletionNotes,
+    } = useGoalNotes(queryRootId, queryGoalId);
     const goalColor = getGoalColor(goalType);
     const goalSecondaryColor = getGoalSecondaryColor(goalType);
     const goalIsSmart = isSMART(goal);
@@ -189,6 +192,20 @@ function GoalDetailModal({
         mode,
         onClose,
         onToggleCompletion,
+        onBeforeCompletionConfirm: async ({ noteContent }) => {
+            const trimmedContent = noteContent?.trim();
+            if (!trimmedContent) return;
+            await createGoalNote({
+                content: trimmedContent,
+                context_type: 'goal',
+                context_id: goalId,
+                goal_id: goalId,
+                note_kind: 'goal_completion',
+            });
+        },
+        onBeforeUncompletionConfirm: async () => {
+            await deleteGoalCompletionNotes();
+        },
         resetForm,
     });
     const textColor = getGoalTextColor(goalType);
@@ -665,9 +682,11 @@ function GoalDetailModal({
             goalHeaderStickyOffset={goalHeaderStickyOffset}
             goalId={goalId}
             goalIsSmart={goalIsSmart}
-            goalSecondaryColor={goalSecondaryColor}
             goalStatus={goalStatus}
             goalType={goalType}
+            getGoalColor={getGoalColor}
+            getGoalIcon={getGoalIcon}
+            getGoalSecondaryColor={getGoalSecondaryColor}
             handleAddChildGoal={handleAddChildGoal}
             handleAddTargetFromActivities={handleAddTargetFromActivities}
             handleCancel={handleCancel}
@@ -699,7 +718,6 @@ function GoalDetailModal({
             mode={mode}
             name={name}
             needsLevelPicker={needsLevelPicker}
-            onClose={onClose}
             onDelete={onDelete}
             onGoalSelect={onGoalSelect}
             onMobileCollapse={onMobileCollapse}

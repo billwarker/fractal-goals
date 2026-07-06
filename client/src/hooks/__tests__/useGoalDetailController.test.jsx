@@ -25,8 +25,9 @@ describe('useGoalDetailController', () => {
         expect(onClose).toHaveBeenCalled();
     });
 
-    it('tracks optimistic completion state and notifies the toggle handler', () => {
+    it('tracks optimistic completion state and notifies the toggle handler', async () => {
         const onToggleCompletion = vi.fn();
+        const onBeforeCompletionConfirm = vi.fn(() => Promise.resolve());
 
         const { result } = renderHook(() => useGoalDetailController({
             goal: {
@@ -39,20 +40,26 @@ describe('useGoalDetailController', () => {
             isOpen: true,
             onClose: vi.fn(),
             onToggleCompletion,
+            onBeforeCompletionConfirm,
             resetForm: vi.fn(),
         }));
 
-        act(() => {
-            result.current.handleCompletionConfirm(new Date('2026-03-01T12:00:00Z'));
+        await act(async () => {
+            await result.current.handleCompletionConfirm(new Date('2026-03-01T12:00:00Z'), 'Done well');
         });
 
         expect(result.current.isCompleted).toBe(true);
         expect(result.current.localCompletedAt).toBe('2026-03-01T12:00:00.000Z');
+        expect(onBeforeCompletionConfirm).toHaveBeenCalledWith({
+            completionDate: new Date('2026-03-01T12:00:00Z'),
+            noteContent: 'Done well',
+        });
         expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', false);
     });
 
-    it('lets an explicit local uncomplete override stale completed props', () => {
+    it('lets an explicit local uncomplete override stale completed props', async () => {
         const onToggleCompletion = vi.fn();
+        const onBeforeUncompletionConfirm = vi.fn(() => Promise.resolve());
 
         const { result } = renderHook(() => useGoalDetailController({
             goal: {
@@ -65,15 +72,17 @@ describe('useGoalDetailController', () => {
             isOpen: true,
             onClose: vi.fn(),
             onToggleCompletion,
+            onBeforeUncompletionConfirm,
             resetForm: vi.fn(),
         }));
 
-        act(() => {
-            result.current.handleUncompletionConfirm();
+        await act(async () => {
+            await result.current.handleUncompletionConfirm();
         });
 
         expect(result.current.isCompleted).toBe(false);
         expect(result.current.localCompletedAt).toBe(null);
+        expect(onBeforeUncompletionConfirm).toHaveBeenCalled();
         expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', true);
     });
 

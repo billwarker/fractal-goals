@@ -1,71 +1,27 @@
 import React from 'react';
-import CheckIcon from '../atoms/CheckIcon';
 import {
     CalendarIcon,
     FolderIcon,
-    TargetIcon,
 } from '../atoms/AppIcons';
+import { getProgramColor } from '../../utils/programViewModel';
+import TargetCard from '../TargetCard';
 import styles from './GoalCompletionModal.module.css';
 
 function GoalCompletionModal({
-    goal,
-    goalType,
     programs = [],
-    treeData,
     targets = [],
     activityDefinitions = [],
-    onConfirm,
-    onCancel
+    completionDate = new Date(),
+    accentColor,
+    goalType,
+    completionNote = '',
+    onCompletionNoteChange,
 }) {
-    const completionDate = new Date();
-
-    // Find programs this goal belongs to (traverse up the tree to find program)
-    const findProgramsForGoal = () => {
-        if (!treeData) return [];
-
-        // For now, the root of the tree is typically the program
-        // We'll show the root as the associated program
-        const foundPrograms = [];
-        if (programs && programs.length > 0) {
-            foundPrograms.push(...programs);
-        } else if (treeData) {
-            // Fallback: use the root node name as the program
-            foundPrograms.push({ name: treeData.name || 'Current Program', id: treeData.id });
-        }
-        return foundPrograms;
-    };
-
-    const associatedPrograms = findProgramsForGoal();
-
     return (
-        <div className={styles.container}>
-            {/* Header */}
-            <div className={styles.header}>
-                <button
-                    onClick={onCancel}
-                    className={styles.backButton}
-                >
-                    ←
-                </button>
-                <h3 className={styles.title}>
-                    <CheckIcon size={18} />
-                    <span>Confirm Goal Completion</span>
-                </h3>
-            </div>
-
-            {/* Goal Name */}
-            <div className={styles.goalCard}>
-                <div className={styles.cardLabel}>
-                    Completing Goal:
-                </div>
-                <div className={styles.cardTitle}>
-                    {goal.name}
-                </div>
-                <div className={styles.cardType}>
-                    Type: {goalType}
-                </div>
-            </div>
-
+        <div
+            className={styles.container}
+            style={{ '--completion-confirm-accent': accentColor }}
+        >
             {/* Completion Date */}
             <div>
                 <label className={styles.sectionLabel}>
@@ -77,21 +33,39 @@ function GoalCompletionModal({
                 </div>
             </div>
 
+            <div>
+                <label className={styles.sectionLabel} htmlFor="goal-completion-note">
+                    Goal Completion Note (optional):
+                </label>
+                <textarea
+                    id="goal-completion-note"
+                    className={styles.completionNoteInput}
+                    value={completionNote}
+                    onChange={(event) => onCompletionNoteChange?.(event.target.value)}
+                    placeholder="Capture what changed, what worked, or what to remember from completing this goal."
+                    rows={4}
+                />
+            </div>
+
             {/* Associated Programs */}
             <div>
                 <label className={styles.sectionLabel}>
                     Programs that will log this completion:
                 </label>
-                {associatedPrograms.length === 0 ? (
+                {programs.length === 0 ? (
                     <div className={styles.emptyText}>
-                        No programs found
+                        No active programs will log this completion
                     </div>
                 ) : (
                     <div className={styles.listColumn}>
-                        {associatedPrograms.map((program, idx) => (
-                            <div key={idx} className={styles.listItem}>
+                        {programs.map((program, index) => (
+                            <div
+                                key={program.id || program.name}
+                                className={styles.listItem}
+                                style={{ '--program-accent': getProgramColor(program, index) }}
+                            >
                                 <FolderIcon size={16} className={styles.programIcon} />
-                                {program.name}
+                                <span className={styles.programName}>{program.name}</span>
                             </div>
                         ))}
                     </div>
@@ -109,48 +83,17 @@ function GoalCompletionModal({
                     </div>
                 ) : (
                     <div className={styles.listColumn}>
-                        {targets.map(target => {
-                            const activity = activityDefinitions.find(a => a.id === target.activity_id);
-                            return (
-                                <div key={target.id} className={styles.targetItem}>
-                                    <div className={styles.targetName}>
-                                        <TargetIcon size={16} />
-                                        <span>{target.name || activity?.name || 'Target'}</span>
-                                    </div>
-                                    {target.metrics && target.metrics.length > 0 && (
-                                        <div className={styles.metricList}>
-                                            {target.metrics.map(metric => {
-                                                const metricDef = activity?.metric_definitions?.find(m => m.id === metric.metric_id);
-                                                return (
-                                                    <span key={metric.metric_id} className={styles.metricBadge}>
-                                                        {metricDef?.name || 'Metric'}: {metric.value} {metricDef?.unit || ''}
-                                                    </span>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
+                        {targets.map(target => (
+                            <TargetCard
+                                key={target.id}
+                                target={target}
+                                activityDefinitions={activityDefinitions}
+                                isCompleted={false}
+                                goalType={goalType}
+                            />
+                        ))}
                     </div>
                 )}
-            </div>
-
-            {/* Actions */}
-            <div className={styles.actions}>
-                <button
-                    onClick={onCancel}
-                    className={styles.cancelButton}
-                >
-                    Cancel
-                </button>
-                <button
-                    onClick={() => onConfirm(completionDate)}
-                    className={styles.confirmButton}
-                >
-                    <CheckIcon size={16} />
-                    <span>Complete Goal</span>
-                </button>
             </div>
         </div>
     );

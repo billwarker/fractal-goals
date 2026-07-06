@@ -4,7 +4,16 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import GoalDetailModal from '../GoalDetailModal';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../../utils/navigationEvents';
 
-const { mockUseGoalForm, mockResetForm, mockNotify, mockGoalAssociations, mockGoalMetrics, mockGoalDurations } = vi.hoisted(() => ({
+const {
+    mockUseGoalForm,
+    mockResetForm,
+    mockNotify,
+    mockGoalAssociations,
+    mockGoalMetrics,
+    mockGoalDurations,
+    mockCreateGoalNote,
+    mockDeleteGoalCompletionNotes,
+} = vi.hoisted(() => ({
     mockUseGoalForm: vi.fn(),
     mockResetForm: vi.fn(),
     mockNotify: {
@@ -24,6 +33,8 @@ const { mockUseGoalForm, mockResetForm, mockNotify, mockGoalAssociations, mockGo
         isLoading: false,
         isFetching: false,
     },
+    mockCreateGoalNote: vi.fn(() => Promise.resolve()),
+    mockDeleteGoalCompletionNotes: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -42,9 +53,9 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('../../contexts/GoalLevelsContext', () => ({
     useGoalLevels: () => ({
-        getGoalColor: () => '#22d3ee',
+        getGoalColor: (type) => (type === 'Completed' ? '#10b981' : '#22d3ee'),
         getGoalSecondaryColor: () => '#0f172a',
-        getGoalTextColor: () => '#0f172a',
+        getGoalTextColor: (type) => (type === 'Completed' ? '#ffffff' : '#0f172a'),
         getGoalIcon: () => 'circle',
         getLevelByName: () => ({ icon: 'circle' }),
     }),
@@ -65,9 +76,10 @@ vi.mock('../../hooks/useGoalNotes', () => ({
         notes: [],
         isLoading: false,
         error: null,
-        createNote: vi.fn(() => Promise.resolve()),
+        createNote: mockCreateGoalNote,
         updateNote: vi.fn(() => Promise.resolve()),
         deleteNote: vi.fn(() => Promise.resolve()),
+        deleteGoalCompletionNotes: mockDeleteGoalCompletionNotes,
         pinNote: vi.fn(() => Promise.resolve()),
         unpinNote: vi.fn(() => Promise.resolve()),
     }),
@@ -93,11 +105,20 @@ vi.mock('../goals/goalDetailQueryUtils', () => ({
 }));
 
 vi.mock('../goals/GoalCompletionModal', () => ({
-    default: () => <div>completion modal</div>,
+    default: ({ accentColor, completionNote, onCompletionNoteChange }) => (
+        <div>
+            <div>completion modal:{accentColor}</div>
+            <textarea
+                aria-label="Goal Completion Note"
+                value={completionNote}
+                onChange={(event) => onCompletionNoteChange(event.target.value)}
+            />
+        </div>
+    ),
 }));
 
 vi.mock('../goals/GoalUncompletionModal', () => ({
-    default: () => <div>uncompletion modal</div>,
+    default: ({ accentColor }) => <div>uncompletion modal:{accentColor}</div>,
 }));
 
 vi.mock('../goals/GoalHeader', () => ({
@@ -363,7 +384,190 @@ describe('GoalDetailModal smoke coverage', () => {
         await waitFor(() => {
             expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
             expect(screen.getByText('goal options view')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toHaveStyle({
+                '--completion-accent': '#22d3ee',
+            });
         }, { timeout: 5000 });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+        await waitFor(() => {
+            expect(screen.getByText('view:Deep Work')).toBeInTheDocument();
+            expect(screen.queryByText('goal options view')).not.toBeInTheDocument();
+        }, { timeout: 5000 });
+    });
+
+    it('keeps the shared header visible and actions in the footer when confirming completion', async () => {
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    completed: false,
+                    attributes: {
+                        id: 'goal-1',
+                        type: 'ShortTermGoal',
+                        completed: false,
+                        allow_manual_completion: true,
+                    },
+                }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={vi.fn()}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root',
+                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
+                    children: [],
+                }}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Mark Complete' }));
+
+        await waitFor(() => {
+            expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
+            expect(screen.getByText('completion modal:#22d3ee')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Complete Goal' })).toHaveStyle({
+                '--completion-accent': '#22d3ee',
+            });
+        }, { timeout: 5000 });
+    });
+
+    it('creates a special goal completion note before completing the goal', async () => {
+        const onToggleCompletion = vi.fn(() => Promise.resolve());
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    completed: false,
+                    attributes: {
+                        id: 'goal-1',
+                        type: 'ShortTermGoal',
+                        completed: false,
+                        allow_manual_completion: true,
+                    },
+                }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={onToggleCompletion}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root',
+                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
+                    children: [],
+                }}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Mark Complete' }));
+        fireEvent.change(await screen.findByLabelText('Goal Completion Note'), {
+            target: { value: 'This milestone finally clicked.' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Complete Goal' }));
+
+        await waitFor(() => {
+            expect(mockCreateGoalNote).toHaveBeenCalledWith({
+                content: 'This milestone finally clicked.',
+                context_type: 'goal',
+                context_id: 'goal-1',
+                goal_id: 'goal-1',
+                note_kind: 'goal_completion',
+            });
+            expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', false);
+        });
+    });
+
+    it('keeps the shared header visible and actions in the footer when confirming uncompletion', async () => {
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    completed: true,
+                    completed_at: '2026-05-03T18:03:00Z',
+                    attributes: {
+                        id: 'goal-1',
+                        type: 'ShortTermGoal',
+                        completed: true,
+                        completed_at: '2026-05-03T18:03:00Z',
+                        allow_manual_completion: true,
+                    },
+                }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={vi.fn()}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root',
+                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
+                    children: [],
+                }}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Completed/ }));
+
+        await waitFor(() => {
+            expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
+            expect(screen.getByText('uncompletion modal:#22d3ee')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Mark Incomplete' })).toHaveStyle({
+                '--completion-accent': '#22d3ee',
+            });
+        }, { timeout: 5000 });
+    });
+
+    it('removes goal completion notes before marking the goal incomplete', async () => {
+        const onToggleCompletion = vi.fn(() => Promise.resolve());
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Deep Work',
+                    completed: true,
+                    completed_at: '2026-05-03T18:03:00Z',
+                    attributes: {
+                        id: 'goal-1',
+                        type: 'ShortTermGoal',
+                        completed: true,
+                        completed_at: '2026-05-03T18:03:00Z',
+                        allow_manual_completion: true,
+                    },
+                }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={onToggleCompletion}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                treeData={{
+                    id: 'root-1',
+                    name: 'Root',
+                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
+                    children: [],
+                }}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Completed/ }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Mark Incomplete' }));
+
+        await waitFor(() => {
+            expect(mockDeleteGoalCompletionNotes).toHaveBeenCalled();
+            expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', true);
+        });
     });
 
     it('keeps the shared header visible when switching to timeline view', async () => {

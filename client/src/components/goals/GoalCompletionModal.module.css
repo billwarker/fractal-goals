@@ -6,64 +6,6 @@
     gap: 16px;
 }
 
-/* Header */
-.header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--color-brand-success);
-}
-
-.backButton {
-    background: transparent;
-    border: none;
-    color: var(--color-text-muted);
-    font-size: 18px;
-    cursor: pointer;
-    padding: 0 4px;
-    transition: color 0.2s;
-}
-
-.backButton:hover {
-    color: var(--color-text-primary);
-}
-
-.title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0;
-    font-size: 16px;
-    color: var(--color-brand-success);
-}
-
-/* Goal Card */
-.goalCard {
-    padding: 14px;
-    background: var(--color-bg-card-alt);
-    border: 1px solid var(--color-brand-success);
-    border-radius: 6px;
-}
-
-.cardLabel {
-    font-size: 11px;
-    color: var(--color-brand-success);
-    margin-bottom: 4px;
-}
-
-.cardTitle {
-    font-size: 16px;
-    font-weight: bold;
-    color: var(--color-text-primary);
-}
-
-.cardType {
-    font-size: 12px;
-    color: var(--color-text-muted);
-    margin-top: 4px;
-}
-
 /* Info Box */
 .sectionLabel {
     display: block;
@@ -82,6 +24,29 @@
     border-radius: 4px;
     font-size: 14px;
     color: var(--color-text-primary);
+}
+
+.completionNoteInput {
+    width: 100%;
+    min-height: 104px;
+    resize: vertical;
+    padding: 12px;
+    background: var(--color-bg-surface);
+    border: 1px solid color-mix(in srgb, var(--completion-confirm-accent, var(--color-brand-primary)) 62%, var(--color-border));
+    border-radius: 4px;
+    color: var(--color-text-primary);
+    font: inherit;
+    line-height: 1.5;
+}
+
+.completionNoteInput:focus {
+    outline: none;
+    border-color: var(--completion-confirm-accent, var(--color-brand-primary));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--completion-confirm-accent, var(--color-brand-primary)) 35%, transparent);
+}
+
+.completionNoteInput::placeholder {
+    color: var(--color-text-muted);
 }
 
 /* Lists */
@@ -110,82 +75,10 @@
 }
 
 .programIcon {
-    color: var(--color-brand-success);
+    color: var(--program-accent, var(--completion-confirm-accent, var(--color-brand-success)));
 }
 
-/* Target Item */
-.targetItem {
-    padding: 10px 12px;
-    background: var(--color-bg-surface);
-    border: 1px solid var(--color-border-card);
-    border-radius: 4px;
-}
-
-.targetName {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
+.programName {
     font-weight: 500;
-    color: var(--color-text-primary);
-}
-
-.metricList {
-    display: flex;
-    gap: 8px;
-    margin-top: 6px;
-    flex-wrap: wrap;
-}
-
-.metricBadge {
-    padding: 2px 8px;
-    background: var(--color-bg-input);
-    border-radius: 4px;
-    font-size: 11px;
-    color: var(--color-text-secondary);
-}
-
-/* Actions */
-.actions {
-    display: flex;
-    gap: 10px;
-    padding-top: 12px;
-    border-top: 1px solid var(--color-border);
-    margin-top: 8px;
-}
-
-.cancelButton,
-.confirmButton {
-    flex: 1;
-    padding: 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
-}
-
-.cancelButton {
-    background: transparent;
-    border: 1px solid var(--color-border-btn);
-    color: var(--color-text-muted);
-}
-
-.cancelButton:hover {
-    background: var(--color-bg-hover);
-    color: var(--color-text-primary);
-}
-
-.confirmButton {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    background: var(--color-brand-success);
-    border: none;
-    color: white;
-    font-weight: bold;
-}
-
-.confirmButton:hover {
-    filter: brightness(1.1);
+    color: color-mix(in srgb, var(--program-accent, var(--completion-confirm-accent, var(--color-brand-success))) 82%, var(--color-text-primary));
 }

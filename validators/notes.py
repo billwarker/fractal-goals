@@ -19,6 +19,7 @@ class NoteCreateSchema(BaseModel):
     activity_definition_id: Optional[str] = None
     goal_id: Optional[str] = None
     set_index: Optional[int] = Field(None, ge=0)
+    note_kind: Optional[str] = Field(None, pattern=r'^(goal_completion)$')
 
     @field_validator('content')
     @classmethod
@@ -37,5 +38,4 @@ class NoteUpdateSchema(BaseModel):
         if v is None:
             return v
         return sanitize_note_content(v)
-
 

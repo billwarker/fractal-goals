@@ -37,7 +37,10 @@ function GoalEditForm({
         : 'Goal will be marked as complete when all child goals are completed (no child goals created yet).';
 
     return (
-        <div className={styles.editContainer}>
+        <div
+            className={styles.editContainer}
+            style={{ '--goal-edit-accent': goalColor }}
+        >
             <div className={styles.fieldGroup}>
                 <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
                     Name
@@ -81,10 +84,7 @@ function GoalEditForm({
                         onChange={(e) => setRelevanceStatement(e.target.value)}
                         rows={2}
                         placeholder={goalType === 'UltimateGoal' ? "Explain why this ultimate goal is important to you..." : "Explain how this goal contributes to your higher-level objective..."}
-                        className={styles.textarea}
-                        style={{
-                            border: relevanceStatement?.trim() ? '1px solid #4caf50' : null
-                        }}
+                        className={`${styles.textarea} ${relevanceStatement?.trim() ? styles.relevanceTextareaFilled : ''}`}
                     />
                 </div>
             )}

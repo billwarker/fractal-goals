@@ -895,7 +895,8 @@ def serialize_program_day(day):
 
 def serialize_note(note):
     """Serialize a Note object."""
-    resolved_note_type = derive_note_type(note.context_type, note.set_index)
+    note_kind = getattr(note, "note_kind", None)
+    resolved_note_type = derive_note_type(note.context_type, note.set_index, note_kind=note_kind)
     result = {
         "id": note.id,
         "context_type": note.context_type,
@@ -905,6 +906,7 @@ def serialize_note(note):
         "activity_definition_id": note.activity_definition_id,
         "set_index": note.set_index,
         "content": note.content,
+        "note_kind": note_kind,
         "note_type": resolved_note_type,
         "note_type_label": note_type_label(resolved_note_type),
         "created_at": format_utc(note.created_at),
@@ -916,8 +918,10 @@ def serialize_note(note):
     return result
 
 
-def derive_note_type(context_type, set_index=None):
+def derive_note_type(context_type, set_index=None, note_kind=None):
     """Derive a semantic note type from the stored note context."""
+    if context_type == "goal" and note_kind == "goal_completion":
+        return "goal_completion_note"
     if context_type == "root":
         return "fractal_note"
     if context_type == "goal":
@@ -942,6 +946,7 @@ def note_type_label(note_type):
         "activity_instance_note": "Activity Instance Note",
         "activity_set_note": "Activity Set Note",
         "activity_definition_note": "Activity Definition Note",
+        "goal_completion_note": "Goal Completion Note",
         "note": "Note",
     }
     return labels.get(note_type, "Note")

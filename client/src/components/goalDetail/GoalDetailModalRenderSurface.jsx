@@ -1,8 +1,9 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { prepareActivityDefinitionCopy } from '../../utils/activityBuilder';
+import { getProgramsAffectedByGoalCompletion } from '../../utils/goalCompletionPrograms';
 import { getTypeDisplayName } from '../../utils/goalHelpers';
 import notify from '../../utils/notify';
 import GoalCompletionModal from '../goals/GoalCompletionModal';
@@ -65,9 +66,11 @@ function GoalDetailModalRenderSurface({
     goalHeaderStickyOffset,
     goalId,
     goalIsSmart,
-    goalSecondaryColor,
     goalStatus,
     goalType,
+    getGoalColor,
+    getGoalIcon,
+    getGoalSecondaryColor,
     handleAddChildGoal,
     handleAddTargetFromActivities,
     handleCancel,
@@ -99,7 +102,6 @@ function GoalDetailModalRenderSurface({
     mode,
     name,
     needsLevelPicker,
-    onClose,
     onDelete,
     onGoalSelect,
     onMobileCollapse,
@@ -157,6 +159,43 @@ function GoalDetailModalRenderSurface({
     validChildTypes,
     viewState,
 }) {
+    // Intentionally refresh the preview timestamp when entering a new modal subview.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const completionPreviewDate = useMemo(() => new Date(), [viewState]);
+    const programsAffectedByCompletion = useMemo(() => (
+        getProgramsAffectedByGoalCompletion({
+            programs,
+            treeData,
+            goalId,
+            mode: 'complete',
+            referenceDate: completionPreviewDate,
+        })
+    ), [completionPreviewDate, goalId, programs, treeData]);
+    const programsAffectedByUncompletion = useMemo(() => (
+        getProgramsAffectedByGoalCompletion({
+            programs,
+            treeData,
+            goalId,
+            mode: 'uncomplete',
+            completedAt: localCompletedAt || goal?.attributes?.completed_at || goal?.completed_at,
+        })
+    ), [
+        goal?.attributes?.completed_at,
+        goal?.completed_at,
+        goalId,
+        localCompletedAt,
+        programs,
+        treeData,
+    ]);
+    const uncompletionCompletedAt = localCompletedAt || goal?.attributes?.completed_at || goal?.completed_at;
+    const [completionNoteDraft, setCompletionNoteDraft] = useState('');
+
+    useEffect(() => {
+        if (viewState !== 'complete-confirm') {
+            setCompletionNoteDraft('');
+        }
+    }, [viewState]);
+
     const renderLevelPicker = () => (
         <div className={styles.levelPickerContainer}>
             <div className={styles.levelPickerHeader}>
@@ -302,28 +341,25 @@ function GoalDetailModalRenderSurface({
     } else if (viewState === 'complete-confirm') {
         content = (
             <GoalCompletionModal
-                goal={goal}
-                goalType={goalType}
-                programs={programs}
-                treeData={treeData}
+                programs={programsAffectedByCompletion}
                 targets={targets}
                 activityDefinitions={activityDefinitions}
-                onConfirm={handleCompletionConfirm}
-                onCancel={() => setViewState('goal')}
+                completionDate={completionPreviewDate}
+                accentColor={goalColor}
+                goalType={goalType}
+                completionNote={completionNoteDraft}
+                onCompletionNoteChange={setCompletionNoteDraft}
             />
         );
     } else if (viewState === 'uncomplete-confirm') {
         content = (
             <GoalUncompletionModal
-                goal={goal}
-                goalType={goalType}
-                programs={programs}
-                treeData={treeData}
+                programs={programsAffectedByUncompletion}
                 targets={targets}
                 activityDefinitions={activityDefinitions}
-                completedAt={localCompletedAt}
-                onConfirm={handleUncompletionConfirm}
-                onCancel={() => setViewState('goal')}
+                completedAt={uncompletionCompletedAt}
+                accentColor={goalColor}
+                goalType={goalType}
             />
         );
     } else if (viewState === 'target-manager') {
@@ -512,7 +548,7 @@ function GoalDetailModalRenderSurface({
         content = renderGoalContent();
     }
 
-    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline' || viewState === 'goal-activities')
+    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline' || viewState === 'goal-activities' || viewState === 'complete-confirm' || viewState === 'uncomplete-confirm')
         && !(needsLevelPicker && selectedChildType === null);
     if (shouldShowPersistentHeader) {
         const headerTabs = mode !== 'create' ? (
@@ -582,6 +618,12 @@ function GoalDetailModalRenderSurface({
         && mode !== 'create'
         && !readOnly
         && Boolean(activitiesAssociateAction);
+    const showCompletionConfirmFooter = (viewState === 'complete-confirm' || viewState === 'uncomplete-confirm')
+        && mode !== 'create'
+        && !readOnly;
+    const showOptionsFooter = viewState === 'goal-options'
+        && mode !== 'create'
+        && !readOnly;
     const isTargetFlowActive = isTargetSelectionMode;
     const isAssociationFlowActive = isActivitiesAssociationMode;
     const footerContent = (
@@ -595,6 +637,13 @@ function GoalDetailModalRenderSurface({
             displayGoalColor={displayGoalColor}
             displayTextColor={displayTextColor}
             showActivitiesFooter={showActivitiesFooter}
+            showCompletionConfirmFooter={showCompletionConfirmFooter}
+            isUncompletionConfirm={viewState === 'uncomplete-confirm'}
+            completionConfirmAccentColor={goalColor}
+            completionConfirmTextColor={textColor}
+            onCancelCompletionConfirm={() => setViewState('goal')}
+            onConfirmCompletion={() => handleCompletionConfirm(completionPreviewDate, completionNoteDraft)}
+            onConfirmUncompletion={handleUncompletionConfirm}
             isTargetSelectionMode={isTargetSelectionMode}
             isAssociationFlowActive={isAssociationFlowActive}
             activityPickerFooterActions={activityPickerFooterActions}
@@ -602,6 +651,8 @@ function GoalDetailModalRenderSurface({
             handleCancelActivitiesFlow={handleCancelActivitiesFlow}
             activitiesAssociateAction={activitiesAssociateAction}
             handleAddTargetFromActivities={handleAddTargetFromActivities}
+            showOptionsFooter={showOptionsFooter}
+            onCancelOptions={() => handleGoalViewNavigation('goal')}
             showDetailFooter={showDetailFooter}
             handleEditDetails={handleEditDetails}
             handleGoalViewNavigation={handleGoalViewNavigation}

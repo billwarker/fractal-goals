@@ -25,6 +25,7 @@ class Note(Base):
     set_index = Column(Integer, nullable=True)
 
     content = Column(Text, nullable=False)
+    note_kind = Column(String, nullable=True, index=True)
     pinned_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=utc_now)

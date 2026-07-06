@@ -191,7 +191,28 @@ def test_derive_note_type_distinguishes_activity_set_notes():
     assert derive_note_type('activity_instance', None) == 'activity_instance_note'
     assert derive_note_type('activity_instance', 0) == 'activity_set_note'
     assert derive_note_type('goal', None) == 'goal_note'
+    assert derive_note_type('goal', None, note_kind='goal_completion') == 'goal_completion_note'
     assert derive_note_type('program', None) == 'program_note'
+
+
+def test_create_goal_completion_note(db_session, sample_goal_hierarchy, test_user):
+    root = sample_goal_hierarchy['ultimate']
+    goal = sample_goal_hierarchy['mid_term']
+    service = NoteService(db_session)
+
+    payload, error, status = service.create_note(root.id, test_user.id, {
+        'content': 'Wrapped this with a clean performance.',
+        'context_type': 'goal',
+        'context_id': goal.id,
+        'goal_id': goal.id,
+        'note_kind': 'goal_completion',
+    })
+
+    assert error is None
+    assert status == 201
+    assert payload['note_kind'] == 'goal_completion'
+    assert payload['note_type'] == 'goal_completion_note'
+    assert payload['note_type_label'] == 'Goal Completion Note'
 
 
 def test_create_program_note(db_session, sample_goal_hierarchy, test_user):

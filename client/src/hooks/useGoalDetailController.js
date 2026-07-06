@@ -20,6 +20,8 @@ export function useGoalDetailController({
     mode,
     onClose,
     onToggleCompletion,
+    onBeforeCompletionConfirm,
+    onBeforeUncompletionConfirm,
     resetForm,
 }) {
     const [controllerStateByKey, setControllerStateByKey] = useState({});
@@ -98,24 +100,26 @@ export function useGoalDetailController({
         });
     };
 
-    const handleCompletionConfirm = (completionDate) => {
+    const handleCompletionConfirm = async (completionDate, completionNoteContent = '') => {
+        await onBeforeCompletionConfirm?.({ completionDate, noteContent: completionNoteContent });
         updateControllerState((prev) => ({
             ...prev,
             localCompleted: true,
             localCompletedAt: completionDate.toISOString(),
             viewState: 'goal',
         }));
-        onToggleCompletion(goalId, false);
+        await onToggleCompletion?.(goalId, false);
     };
 
-    const handleUncompletionConfirm = () => {
+    const handleUncompletionConfirm = async () => {
+        await onBeforeUncompletionConfirm?.();
         updateControllerState((prev) => ({
             ...prev,
             localCompleted: false,
             localCompletedAt: null,
             viewState: 'goal',
         }));
-        onToggleCompletion(goalId, true);
+        await onToggleCompletion?.(goalId, true);
     };
 
     return {

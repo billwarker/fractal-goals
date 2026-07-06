@@ -10,6 +10,13 @@ function GoalDetailModalFooter({
     handleSave,
     displayGoalColor,
     displayTextColor,
+    showCompletionConfirmFooter,
+    isUncompletionConfirm,
+    completionConfirmAccentColor,
+    completionConfirmTextColor,
+    onCancelCompletionConfirm,
+    onConfirmCompletion,
+    onConfirmUncompletion,
     showActivitiesFooter,
     isTargetSelectionMode,
     isAssociationFlowActive,
@@ -18,6 +25,8 @@ function GoalDetailModalFooter({
     handleCancelActivitiesFlow,
     activitiesAssociateAction,
     handleAddTargetFromActivities,
+    showOptionsFooter,
+    onCancelOptions,
     showDetailFooter,
     handleEditDetails,
     handleGoalViewNavigation,
@@ -64,6 +73,33 @@ function GoalDetailModalFooter({
                     }}
                 >
                     {showCreateFooter ? 'Create' : 'Save'}
+                </button>
+            </div>
+        </div>
+    ) : showCompletionConfirmFooter ? (
+        <div className={styles.completionFooter}>
+            <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit}`}>
+                <button
+                    type="button"
+                    onClick={onCancelCompletionConfirm}
+                    className={styles.completionFooterButton}
+                    style={{
+                        '--completion-accent': completionConfirmAccentColor,
+                        '--completion-text': 'var(--color-text-primary)',
+                    }}
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    onClick={isUncompletionConfirm ? onConfirmUncompletion : onConfirmCompletion}
+                    className={`${styles.completionFooterButton} ${styles.editFooterSaveButton}`}
+                    style={{
+                        '--completion-accent': completionConfirmAccentColor,
+                        '--completion-text': completionConfirmTextColor,
+                    }}
+                >
+                    {isUncompletionConfirm ? 'Mark Incomplete' : 'Complete Goal'}
                 </button>
             </div>
         </div>
@@ -146,6 +182,22 @@ function GoalDetailModalFooter({
                     </button>
                 </div>
             )}
+        </div>
+    ) : showOptionsFooter ? (
+        <div className={styles.completionFooter}>
+            <div className={styles.completionFooterActions}>
+                <button
+                    type="button"
+                    onClick={onCancelOptions}
+                    className={styles.completionFooterButton}
+                    style={{
+                        '--completion-accent': displayGoalColor,
+                        '--completion-text': 'var(--color-text-primary)',
+                    }}
+                >
+                    Cancel
+                </button>
+            </div>
         </div>
     ) : showDetailFooter ? (
         <div className={styles.completionFooter}>

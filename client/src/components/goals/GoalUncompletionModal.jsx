@@ -4,64 +4,24 @@ import {
     AlertTriangleIcon,
     CalendarIcon,
     FolderIcon,
-    TargetIcon,
 } from '../atoms/AppIcons';
+import { getProgramColor } from '../../utils/programViewModel';
+import TargetCard from '../TargetCard';
 import styles from './GoalUncompletionModal.module.css';
 
 function GoalUncompletionModal({
-    goal,
-    goalType,
     programs = [],
-    treeData,
     targets = [],
     activityDefinitions = [],
-    onConfirm,
-    onCancel,
-    completedAt
+    completedAt,
+    accentColor,
+    goalType,
 }) {
-    // Find programs this goal belongs to
-    const findProgramsForGoal = () => {
-        if (!treeData) return [];
-        const foundPrograms = [];
-        if (programs && programs.length > 0) {
-            foundPrograms.push(...programs);
-        } else if (treeData) {
-            foundPrograms.push({ name: treeData.name || 'Current Program', id: treeData.id });
-        }
-        return foundPrograms;
-    };
-
-    const associatedPrograms = findProgramsForGoal();
-
     return (
-        <div className={styles.container}>
-            {/* Header */}
-            <div className={styles.header}>
-                <button
-                    onClick={onCancel}
-                    className={styles.backButton}
-                >
-                    ←
-                </button>
-                <h3 className={styles.title}>
-                    <AlertTriangleIcon size={18} />
-                    <span>Confirm Mark as Incomplete</span>
-                </h3>
-            </div>
-
-            {/* Goal Name */}
-            <div className={styles.goalCard}>
-                <div className={styles.eyebrow}>
-                    Marking as Incomplete:
-                </div>
-                <div className={styles.goalName}>
-                    {goal.name}
-                </div>
-                <div className={styles.mutedMeta}>
-                    Type: {goalType}
-                </div>
-            </div>
-
+        <div
+            className={styles.container}
+            style={{ '--completion-confirm-accent': accentColor }}
+        >
             {/* Originally Completed Date */}
             {completedAt && (
                 <div>
@@ -78,24 +38,28 @@ function GoalUncompletionModal({
             {/* Warning */}
             <div className={styles.warning}>
                 <AlertTriangleIcon size={16} />
-                <span>This will remove the completion status and completion date from this goal.</span>
+                <span>This will remove the completion status, completion date, and goal completion note from this goal.</span>
             </div>
 
             {/* Associated Programs */}
             <div>
                 <label className={styles.fieldLabel}>
-                    Programs that will update:
+                    Programs that will remove this completion:
                 </label>
-                {associatedPrograms.length === 0 ? (
+                {programs.length === 0 ? (
                     <div className={styles.emptyText}>
-                        No programs found
+                        No programs have this completion in their date window
                     </div>
                 ) : (
                     <div className={styles.list}>
-                        {associatedPrograms.map((program, idx) => (
-                            <div key={idx} className={styles.listItem}>
-                                <FolderIcon size={16} className={styles.warningIcon} />
-                                {program.name}
+                        {programs.map((program, index) => (
+                            <div
+                                key={program.id || program.name}
+                                className={styles.listItem}
+                                style={{ '--program-accent': getProgramColor(program, index) }}
+                            >
+                                <FolderIcon size={16} className={styles.programIcon} />
+                                <span className={styles.programName}>{program.name}</span>
                             </div>
                         ))}
                     </div>
@@ -113,35 +77,17 @@ function GoalUncompletionModal({
                     </div>
                 ) : (
                     <div className={styles.list}>
-                        {targets.map(target => {
-                            const activity = activityDefinitions.find(a => a.id === target.activity_id);
-                            return (
-                                <div key={target.id} className={styles.targetItem}>
-                                    <div className={styles.targetName}>
-                                        <TargetIcon size={16} />
-                                        <span>{target.name || activity?.name || 'Target'}</span>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                        {targets.map(target => (
+                            <TargetCard
+                                key={target.id}
+                                target={target}
+                                activityDefinitions={activityDefinitions}
+                                isCompleted={true}
+                                goalType={goalType}
+                            />
+                        ))}
                     </div>
                 )}
-            </div>
-
-            {/* Actions */}
-            <div className={styles.actions}>
-                <button
-                    onClick={onCancel}
-                    className={`${styles.button} ${styles.cancelButton}`}
-                >
-                    Cancel
-                </button>
-                <button
-                    onClick={onConfirm}
-                    className={`${styles.button} ${styles.confirmButton}`}
-                >
-                    Mark Incomplete
-                </button>
             </div>
         </div>
     );

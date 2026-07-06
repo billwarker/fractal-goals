@@ -41,6 +41,7 @@ vi.mock('../../hooks/useGoalNotes', () => ({
         createNote: vi.fn(() => Promise.resolve()),
         updateNote: vi.fn(() => Promise.resolve()),
         deleteNote: vi.fn(() => Promise.resolve()),
+        deleteGoalCompletionNotes: vi.fn(() => Promise.resolve()),
         pinNote: vi.fn(() => Promise.resolve()),
         unpinNote: vi.fn(() => Promise.resolve()),
     }),
