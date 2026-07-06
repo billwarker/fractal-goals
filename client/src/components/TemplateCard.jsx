@@ -1,6 +1,7 @@
 import React from 'react';
 
 import Linkify from './atoms/Linkify';
+import { ClockIcon } from './atoms/AppIcons';
 import DeleteButton from './atoms/DeleteButton';
 import SessionTemplateNameBadge from './common/SessionTemplateNameBadge';
 import SessionTemplateTypePill from './common/SessionTemplateTypePill';
@@ -68,7 +69,7 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate, onArchiveToggle
                         className={styles.stat}
                         title={`Based on ${averageDuration.sampleCount} completed sessions`}
                     >
-                        <span className={styles.durationIcon}>⏱</span>
+                        <ClockIcon size={14} className={styles.durationIcon} />
                         Avg {averageDuration.label}
                         <span className={styles.sampleHint}>({averageDuration.sampleCount})</span>
                     </span>

@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { CalendarIcon, ClipboardIcon } from '../atoms/AppIcons';
 import SelectableCard from '../common/SelectableCard';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
@@ -12,14 +13,14 @@ function SourceSelector({ sessionSource, onSelectSource, programName }) {
 
             <div className={styles.grid}>
                 <SourceCard
-                    icon="📅"
+                    icon={<CalendarIcon size={24} />}
                     title={programName ? `From ${programName}` : 'From Active Program'}
                     description="Select a day from your current training program"
                     isSelected={sessionSource === 'program'}
                     onClick={() => onSelectSource('program')}
                 />
                 <SourceCard
-                    icon="📋"
+                    icon={<ClipboardIcon size={24} />}
                     title="From Template"
                     description="Choose any template manually"
                     isSelected={sessionSource === 'template'}

@@ -172,6 +172,9 @@
 }
 
 .notes {
+    display: flex;
+    align-items: center;
+    gap: 5px;
     font-size: 11px;
     color: var(--color-brand-success);
     font-style: italic;

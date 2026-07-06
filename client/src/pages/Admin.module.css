@@ -495,6 +495,9 @@
 }
 
 .landingShowcaseCheck em {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     color: var(--color-brand-warning, #f59f4d);
     font-style: normal;
     font-size: var(--font-size-xs);

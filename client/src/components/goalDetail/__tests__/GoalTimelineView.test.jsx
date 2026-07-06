@@ -170,7 +170,7 @@ describe('GoalTimelineView', () => {
 
         const completedActivity = screen.getByText('Completed activity: Freestanding HSPU Eccentrics')
             .closest('div[class*="timelineCard"]');
-        expect(within(completedActivity).getByText('⏱ 5:36')).toBeInTheDocument();
+        expect(within(completedActivity).getByText('5:36')).toBeInTheDocument();
 
         const achievedTarget = screen.getByText('Achieved target: First clean rep')
             .closest('div[class*="card"]')

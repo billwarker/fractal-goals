@@ -3,6 +3,7 @@ import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
+import { AlertTriangleIcon } from '../atoms/AppIcons';
 
 const SessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }) => {
     const [selectedShortTermGoals, setSelectedShortTermGoals] = useState([]);
@@ -62,6 +63,9 @@ const SessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }) => {
 
                     {error && (
                         <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
                             background: 'rgba(211, 47, 47, 0.1)',
                             border: '1px solid #d32f2f',
                             color: '#ff5252',
@@ -69,7 +73,8 @@ const SessionModal = ({ isOpen, onClose, onSubmit, shortTermGoals = [] }) => {
                             borderRadius: '4px',
                             marginBottom: '20px'
                         }}>
-                            ⚠️ {error}
+                            <AlertTriangleIcon size={14} />
+                            <span>{error}</span>
                         </div>
                     )}
 

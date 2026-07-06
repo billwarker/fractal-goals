@@ -5,6 +5,7 @@ import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
+import { EditPencilIcon } from '../atoms/AppIcons';
 import CloseIcon from '../atoms/CloseIcon';
 import Input from '../atoms/Input';
 import Select from '../atoms/Select';
@@ -655,7 +656,7 @@ function TemplateBuilderModalContent({
                                                                     onClick={() => handleEditSection(sectionIndex)}
                                                                     title="Edit section"
                                                                 >
-                                                                    ✎
+                                                                    <EditPencilIcon size={14} />
                                                                 </Button>
                                                                 <Button
                                                                     size="sm"

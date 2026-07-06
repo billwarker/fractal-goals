@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isGoalAssociatedWithBlock } from '../../utils/programGoalAssociations';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
+import { FolderIcon } from '../atoms/AppIcons';
 import GoalSmartSection from './GoalSmartSection';
 import styles from '../GoalDetailModal.module.css';
 
@@ -77,7 +78,7 @@ function GoalViewMode({
                                     }}
                                     className={styles.programLink}
                                 >
-                                    <span style={{ fontSize: '14px' }}>📁</span>
+                                    <FolderIcon size={14} />
                                     <span style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{prog.name}</span>
                                 </div>
                             ))}

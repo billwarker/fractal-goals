@@ -36,7 +36,7 @@ export const DebugProvider = ({ children }) => {
                 e.preventDefault();
                 setDebugMode(prev => {
                     const newValue = !prev;
-                    console.log(`🐛 Debug mode ${newValue ? 'ENABLED' : 'DISABLED'}`);
+                    console.log(`Debug mode ${newValue ? 'ENABLED' : 'DISABLED'}`);
                     return newValue;
                 });
             }

@@ -4,6 +4,7 @@ import { isTextEditingElement } from '../../hooks/useModalBackdropDismiss';
 import { formatAggValue } from '../../utils/progressAggregations';
 import { formatDuration } from '../../utils/sessionActivityMetrics';
 import ActivityCompletionButton from '../common/ActivityCompletionButton';
+import { ChevronDownIcon, ChevronUpIcon, EditPencilIcon, PlayIcon } from '../atoms/AppIcons';
 import DropdownMenu, { DropdownMenuItem } from '../atoms/DropdownMenu';
 import Linkify from '../atoms/Linkify';
 import CloseIcon from '../atoms/CloseIcon';
@@ -290,7 +291,7 @@ function SessionActivityItemView({
                                 className={`${styles.reorderButton} ${!canMoveUp ? styles.reorderButtonDisabled : ''}`}
                                 title="Move up"
                             >
-                                ▲
+                                <ChevronUpIcon size={14} />
                             </button>
                             <button
                                 onClick={() => onReorder('down')}
@@ -298,7 +299,7 @@ function SessionActivityItemView({
                                 className={`${styles.reorderButton} ${!canMoveDown ? styles.reorderButtonDisabled : ''}`}
                                 title="Move down"
                             >
-                                ▼
+                                <ChevronDownIcon size={14} />
                             </button>
                             {sessionIndex != null && (
                                 <div className={styles.activitySessionIndex} title={`Activity ${sessionIndex} in this session`}>
@@ -334,7 +335,7 @@ function SessionActivityItemView({
                                             title="Edit activity definition"
                                             aria-label={`Edit ${def.name}`}
                                         >
-                                            ✎
+                                            <EditPencilIcon size={14} />
                                         </button>
                                     )}
                                     {hasInstanceOptions && (
@@ -573,7 +574,8 @@ function SessionActivityItemView({
                                                 className={styles.startButton}
                                                 title="Start timer"
                                             >
-                                                ▶ Start
+                                                <PlayIcon size={13} />
+                                                <span>Start</span>
                                             </button>
                                             <button
                                                 onClick={(e) => {

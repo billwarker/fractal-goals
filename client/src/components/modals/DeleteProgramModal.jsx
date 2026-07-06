@@ -5,6 +5,7 @@ import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import { Text } from '../atoms/Typography';
+import { AlertTriangleIcon } from '../atoms/AppIcons';
 import styles from './DeleteProgramModal.module.css';
 
 const DeleteProgramModal = ({ isOpen, onClose, onConfirm, programName, sessionCount, requireMatchingText }) => {
@@ -37,7 +38,7 @@ const DeleteProgramModal = ({ isOpen, onClose, onConfirm, programName, sessionCo
 
                     {sessionCount > 0 && (
                         <div className={styles.warningBox}>
-                            <span className={styles.warningIcon}>⚠️</span>
+                            <AlertTriangleIcon size={18} className={styles.warningIcon} />
                             <div>
                                 <div className={styles.warningTitle}>Warning</div>
                                 <div className={styles.warningText}>

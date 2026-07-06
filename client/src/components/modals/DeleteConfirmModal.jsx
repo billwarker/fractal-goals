@@ -5,6 +5,7 @@ import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import { Text } from '../atoms/Typography';
+import { AlertTriangleIcon } from '../atoms/AppIcons';
 
 const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requireMatchingText, confirmText = 'Delete', overlayClassName = '' }) => {
     const [matchingText, setMatchingText] = useState('');
@@ -50,6 +51,10 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requir
                     )}
 
                     <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
                         color: 'var(--color-brand-danger)',
                         fontSize: '12px',
                         marginTop: '15px',
@@ -59,7 +64,8 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requir
                         textAlign: 'center',
                         border: '1px solid rgba(255, 82, 82, 0.2)'
                     }}>
-                        ⚠️ This action cannot be undone.
+                        <AlertTriangleIcon size={14} />
+                        <span>This action cannot be undone.</span>
                     </div>
                 </div>
             </ModalBody>

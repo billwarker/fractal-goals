@@ -198,7 +198,7 @@ export default function FlowTreeOptionsPane({
                                             <option value="">Default</option>
                                             {surfaces.map((s) => (
                                                 <option key={s.id} value={s.id}>
-                                                    {s.name}{s.is_default ? ' ★' : ''}
+                                                    {s.name}{s.is_default ? ' (default)' : ''}
                                                 </option>
                                             ))}
                                         </select>

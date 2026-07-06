@@ -90,6 +90,9 @@
 /* Pencil edit button — mirrors the activity-definition edit button on session
    detail activity cards. */
 .headerIconButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     appearance: none;
     background: var(--color-bg-input);
     border: 1px solid var(--color-border);
@@ -137,6 +140,9 @@
 }
 
 .metaStalled {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     color: var(--color-brand-danger);
     font-weight: 600;
 }

@@ -6,6 +6,7 @@
  */
 
 import React, { memo, useMemo } from 'react';
+import { LightbulbIcon } from '../atoms/AppIcons';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import { formatShortDuration } from '../../hooks/useSessionDuration';
 import { resolveEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
@@ -501,7 +502,8 @@ const ActivityCard = memo(function ActivityCard({
                     {/* Notes */}
                     {activity.notes && (
                         <div className={styles.notes}>
-                            💡 {activity.notes}
+                            <LightbulbIcon size={14} />
+                            <span>{activity.notes}</span>
                         </div>
                     )}
                 </div>

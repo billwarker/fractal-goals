@@ -12,6 +12,7 @@ import { formatDateInTimezone } from '../../utils/dateUtils';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { getTemplateColor } from '../../utils/sessionRuntime';
 import { formatClockDuration } from '../../utils/sessionTime';
+import { NoteIcon } from '../atoms/AppIcons';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import './SessionCard.css';
 
@@ -90,7 +91,8 @@ function SessionCard({
                         label={statusLabel}
                     />
                     <span className="session-card-notes-count">
-                        📝 {notesCount}
+                        <NoteIcon size={14} />
+                        <span>{notesCount}</span>
                     </span>
                 </div>
             </div>

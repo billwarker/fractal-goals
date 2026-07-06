@@ -5,6 +5,7 @@ import { Line, Scatter } from 'react-chartjs-2';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import CloseButton from '../atoms/CloseButton';
 import DeleteButton from '../atoms/DeleteButton';
+import { AlertTriangleIcon, EditPencilIcon } from '../atoms/AppIcons';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 import { ActivityTimelineCard } from '../common/ActivityTimeline';
 import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../analytics/ChartJSWrapper';
@@ -137,7 +138,13 @@ function TargetMeta({ summary, now }) {
             <span className={statusClass}>{status}</span>
             <span className={styles.metaDot}>·</span>
             <span>{parts.join(' · ')}</span>
-            {stalled && <span className={styles.metaStalled}>· ⚠ Stalled</span>}
+            {stalled && (
+                <span className={styles.metaStalled}>
+                    <span className={styles.metaDot}>·</span>
+                    <AlertTriangleIcon size={13} />
+                    <span>Stalled</span>
+                </span>
+            )}
         </div>
     );
 }
@@ -488,7 +495,7 @@ function TargetAnalyticsModal({
                                     title="Edit target"
                                     aria-label="Edit target"
                                 >
-                                    ✎
+                                    <EditPencilIcon size={15} />
                                 </button>
                                 <DeleteButton onClick={() => setShowDeleteConfirm(true)} />
                             </div>

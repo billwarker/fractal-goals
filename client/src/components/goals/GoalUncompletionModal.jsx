@@ -1,5 +1,11 @@
 import React from 'react';
 
+import {
+    AlertTriangleIcon,
+    CalendarIcon,
+    FolderIcon,
+    TargetIcon,
+} from '../atoms/AppIcons';
 import styles from './GoalUncompletionModal.module.css';
 
 function GoalUncompletionModal({
@@ -38,7 +44,8 @@ function GoalUncompletionModal({
                     ←
                 </button>
                 <h3 className={styles.title}>
-                    ⚠ Confirm Mark as Incomplete
+                    <AlertTriangleIcon size={18} />
+                    <span>Confirm Mark as Incomplete</span>
                 </h3>
             </div>
 
@@ -62,14 +69,16 @@ function GoalUncompletionModal({
                         Was completed on:
                     </label>
                     <div className={styles.completedDate}>
-                        📅 {new Date(completedAt).toLocaleDateString()} at {new Date(completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <CalendarIcon size={16} />
+                        <span>{new Date(completedAt).toLocaleDateString()} at {new Date(completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                 </div>
             )}
 
             {/* Warning */}
             <div className={styles.warning}>
-                ⚠️ This will remove the completion status and completion date from this goal.
+                <AlertTriangleIcon size={16} />
+                <span>This will remove the completion status and completion date from this goal.</span>
             </div>
 
             {/* Associated Programs */}
@@ -85,7 +94,7 @@ function GoalUncompletionModal({
                     <div className={styles.list}>
                         {associatedPrograms.map((program, idx) => (
                             <div key={idx} className={styles.listItem}>
-                                <span className={styles.warningIcon}>📁</span>
+                                <FolderIcon size={16} className={styles.warningIcon} />
                                 {program.name}
                             </div>
                         ))}
@@ -109,7 +118,8 @@ function GoalUncompletionModal({
                             return (
                                 <div key={target.id} className={styles.targetItem}>
                                     <div className={styles.targetName}>
-                                        🎯 {target.name || activity?.name || 'Target'}
+                                        <TargetIcon size={16} />
+                                        <span>{target.name || activity?.name || 'Target'}</span>
                                     </div>
                                 </div>
                             );

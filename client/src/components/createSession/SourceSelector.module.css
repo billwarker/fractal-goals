@@ -14,7 +14,10 @@
 }
 
 .icon {
-    font-size: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-brand-primary);
 }
 
 .title {

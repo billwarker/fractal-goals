@@ -4,9 +4,10 @@
 
 import React, { useState } from 'react';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import { CalendarIcon, ChevronDownIcon, ChevronRightIcon } from '../atoms/AppIcons';
 import MarkdownNoteContent from '../notes/MarkdownNoteContent';
 
-function PreviousNotesSection({ notes, activityName }) {
+function PreviousNotesSection({ notes }) {
     const [isExpanded, setIsExpanded] = useState(true);
     const { timezone } = useTimezone();
 
@@ -21,7 +22,7 @@ function PreviousNotesSection({ notes, activityName }) {
                 year: 'numeric',
                 timeZone: timezone
             });
-        } catch (e) {
+        } catch {
             return 'Unknown date';
         }
     };
@@ -59,7 +60,7 @@ function PreviousNotesSection({ notes, activityName }) {
                 onClick={() => setIsExpanded(!isExpanded)}
             >
                 <span className="previous-notes-toggle">
-                    {isExpanded ? '▼' : '▶'}
+                    {isExpanded ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
                 </span>
                 <h4>Previous Sessions ({notes.length})</h4>
             </div>
@@ -69,7 +70,8 @@ function PreviousNotesSection({ notes, activityName }) {
                     {sessionGroups.map((group, idx) => (
                         <div key={idx} className="previous-session-group">
                             <div className="previous-session-date">
-                                📅 {formatSessionDate(group.sessionDate)}
+                                <CalendarIcon size={14} />
+                                <span>{formatSessionDate(group.sessionDate)}</span>
                                 <span className="previous-session-name">{group.sessionName}</span>
                             </div>
                                 <div className="previous-session-notes">

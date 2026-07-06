@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronDownIcon, ChevronRightIcon } from '../atoms/AppIcons';
 import GoalIcon from '../atoms/GoalIcon';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { parseTargets, formatTargetDescription } from '../../utils/goalUtils';
@@ -39,7 +40,9 @@ function GoalRow({
                         </span>
                     )}
                 </div>
-                <div className={styles.expandToggle}>{isExpanded ? '▼' : '▶'}</div>
+                <div className={styles.expandToggle}>
+                    {isExpanded ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
+                </div>
             </div>
 
             {isExpanded && (

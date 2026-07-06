@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
+import { ClockIcon } from '../atoms/AppIcons';
 import MarkdownNoteContent from '../notes/MarkdownNoteContent';
 import {
     canComputeYield,
@@ -284,7 +285,10 @@ export function ActivityTimelineCard({
                     <div className={styles.timelineCardHeader}>
                         <span className={styles.timelineCardDate}>{displayDate}</span>
                         {duration && (
-                            <span className={styles.timelineCardDuration}>⏱ {duration}</span>
+                            <span className={styles.timelineCardDuration}>
+                                <ClockIcon size={13} />
+                                <span>{duration}</span>
+                            </span>
                         )}
                     </div>
 
@@ -314,7 +318,10 @@ export function ActivityTimelineCard({
                             : (instance.name || instance.definition_name)}
                     </span>
                     {isGoalTimeline && duration && (
-                        <span className={styles.timelineCardTitleDuration}>⏱ {duration}</span>
+                        <span className={styles.timelineCardTitleDuration}>
+                            <ClockIcon size={13} />
+                            <span>{duration}</span>
+                        </span>
                     )}
                 </div>
             )}

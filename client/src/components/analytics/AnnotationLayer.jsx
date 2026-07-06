@@ -1,5 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 
+import { EditPencilIcon } from '../atoms/AppIcons';
+
 /**
  * AnnotationLayer - A wrapper component that adds annotation capabilities to visualizations.
  * 
@@ -184,7 +186,7 @@ function AnnotationLayer({
                 }}
                 title={enabled ? 'Exit annotation mode' : 'Enter annotation mode to add notes'}
             >
-                <span>✏️</span>
+                <EditPencilIcon size={14} />
                 <span>{enabled ? 'Done' : 'Annotate'}</span>
             </button>
 

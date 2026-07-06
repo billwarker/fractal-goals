@@ -10,6 +10,7 @@ import ManageMetricsModal from '../components/modals/ManageMetricsModal';
 
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import GroupBuilderModal from '../components/modals/GroupBuilderModal';
+import { InboxIcon } from '../components/atoms/AppIcons';
 import Linkify from '../components/atoms/Linkify';
 import PageHeader from '../components/layout/PageHeader';
 import headerStyles from '../components/layout/PageHeader.module.css';
@@ -526,7 +527,12 @@ function ManageActivities() {
                 >
                     {rootGroups.length > 0 && (
                         <h3 className={styles.ungroupedTitle}>
-                            {dragOverGroupId === 'ungrouped' ? '📥 Drop here to ungroup' : 'Ungrouped Activities'}
+                            {dragOverGroupId === 'ungrouped' ? (
+                                <>
+                                    <InboxIcon size={18} />
+                                    <span>Drop here to ungroup</span>
+                                </>
+                            ) : 'Ungrouped Activities'}
                         </h3>
                     )}
                     <div className={styles.grid} onDragEnd={handleDragEnd}>

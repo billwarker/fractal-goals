@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import useIsMobile from '../../hooks/useIsMobile';
+import { EditPencilIcon } from '../atoms/AppIcons';
 import CloseButton from '../atoms/CloseButton';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import styles from './AnnotationModal.module.css';
@@ -82,7 +83,10 @@ function AnnotationModal({
                 onClick={e => e.stopPropagation()}
             >
                 <div className={styles.header}>
-                    <h3 className={styles.title}>✏️ Add Annotation</h3>
+                    <h3 className={styles.title}>
+                        <EditPencilIcon size={18} />
+                        <span>Add Annotation</span>
+                    </h3>
                     <CloseButton
                         className={styles.closeBtn}
                         onClick={handleClose}

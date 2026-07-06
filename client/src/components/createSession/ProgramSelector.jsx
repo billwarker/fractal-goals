@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { CalendarIcon } from '../atoms/AppIcons';
 import Button from '../atoms/Button';
 import SelectableCard from '../common/SelectableCard';
 import StepContainer from '../common/StepContainer';
@@ -34,7 +35,9 @@ function ProgramSelector({
                             className={styles.card}
                         >
                             <div>
-                                <div className={styles.icon}>📅</div>
+                                <div className={styles.icon}>
+                                    <CalendarIcon size={24} />
+                                </div>
                                 <div className={styles.name}>{programName}</div>
                                 <div className={styles.meta}>
                                     {dayCount} active day{dayCount !== 1 ? 's' : ''} available

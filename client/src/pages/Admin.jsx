@@ -8,6 +8,7 @@ import {
 import BetaSignupsPanel from '../components/admin/BetaSignupsPanel';
 import TierQuotasPanel from '../components/admin/TierQuotasPanel';
 import { useAuth } from '../contexts/AuthContext';
+import { AlertTriangleIcon } from '../components/atoms/AppIcons';
 import CloseButton from '../components/atoms/CloseButton';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
 import { adminApi } from '../utils/api';
@@ -193,7 +194,10 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
                                         <span>
                                             {activity.name}
                                             {activity.associated_goal_count === 0 && (
-                                                <em title="No goal links: the inheritance demo would be empty"> ⚠ no goal links</em>
+                                                <em title="No goal links: the inheritance demo would be empty">
+                                                    <AlertTriangleIcon size={12} />
+                                                    <span>no goal links</span>
+                                                </em>
                                             )}
                                         </span>
                                     </label>

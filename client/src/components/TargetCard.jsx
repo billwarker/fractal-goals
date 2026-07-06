@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
+import { EditPencilIcon } from './atoms/AppIcons';
 import DeleteButton from './atoms/DeleteButton';
 import GoalIcon from './atoms/GoalIcon';
 import { DeletedEntityCard } from './ui/DeletedEntityFallback';
@@ -88,7 +89,7 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
                                 title="Edit target"
                                 aria-label="Edit target"
                             >
-                                ✎
+                                <EditPencilIcon size={14} />
                             </button>
                         )}
                         {onDelete && (

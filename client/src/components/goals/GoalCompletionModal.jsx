@@ -1,4 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import CheckIcon from '../atoms/CheckIcon';
+import {
+    CalendarIcon,
+    FolderIcon,
+    TargetIcon,
+} from '../atoms/AppIcons';
 import styles from './GoalCompletionModal.module.css';
 
 function GoalCompletionModal({
@@ -42,7 +48,8 @@ function GoalCompletionModal({
                     ←
                 </button>
                 <h3 className={styles.title}>
-                    ✓ Confirm Goal Completion
+                    <CheckIcon size={18} />
+                    <span>Confirm Goal Completion</span>
                 </h3>
             </div>
 
@@ -65,7 +72,8 @@ function GoalCompletionModal({
                     Will be marked as completed:
                 </label>
                 <div className={styles.infoBox}>
-                    📅 {completionDate.toLocaleDateString()} at {completionDate.toLocaleTimeString()}
+                    <CalendarIcon size={16} />
+                    <span>{completionDate.toLocaleDateString()} at {completionDate.toLocaleTimeString()}</span>
                 </div>
             </div>
 
@@ -82,7 +90,7 @@ function GoalCompletionModal({
                     <div className={styles.listColumn}>
                         {associatedPrograms.map((program, idx) => (
                             <div key={idx} className={styles.listItem}>
-                                <span className={styles.programIcon}>📁</span>
+                                <FolderIcon size={16} className={styles.programIcon} />
                                 {program.name}
                             </div>
                         ))}
@@ -106,7 +114,8 @@ function GoalCompletionModal({
                             return (
                                 <div key={target.id} className={styles.targetItem}>
                                     <div className={styles.targetName}>
-                                        🎯 {target.name || activity?.name || 'Target'}
+                                        <TargetIcon size={16} />
+                                        <span>{target.name || activity?.name || 'Target'}</span>
                                     </div>
                                     {target.metrics && target.metrics.length > 0 && (
                                         <div className={styles.metricList}>
@@ -139,7 +148,8 @@ function GoalCompletionModal({
                     onClick={() => onConfirm(completionDate)}
                     className={styles.confirmButton}
                 >
-                    ✓ Complete Goal
+                    <CheckIcon size={16} />
+                    <span>Complete Goal</span>
                 </button>
             </div>
         </div>

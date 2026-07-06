@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { SparkleIcon } from '../atoms/AppIcons';
 import Button from '../atoms/Button';
 import CloseIcon from '../atoms/CloseIcon';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
@@ -115,7 +116,10 @@ function ExistingGoalCheckbox({ goal, isSelected, onToggle }) {
 function NewGoalCard({ goal, onRemove }) {
     return (
         <div className={styles.newGoalCard}>
-            <span className={styles.newGoalBadge}>✨ New</span>
+            <span className={styles.newGoalBadge}>
+                <SparkleIcon size={13} />
+                <span>New</span>
+            </span>
             <div className={styles.goalContent}>
                 <div className={styles.newGoalName}>{goal.name}</div>
             </div>

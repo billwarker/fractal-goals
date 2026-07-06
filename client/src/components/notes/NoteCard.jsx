@@ -6,6 +6,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import { PinIcon } from '../atoms/AppIcons';
 import CheckIcon from '../atoms/CheckIcon';
 import CloseIcon from '../atoms/CloseIcon';
 import GoalIcon from '../atoms/GoalIcon';
@@ -300,7 +301,9 @@ function NoteCard({
             >
                 {/* Pin indicator */}
                 {note.is_pinned && (
-                    <span className={styles.pinnedIndicator} title="Pinned">📌</span>
+                    <span className={styles.pinnedIndicator} title="Pinned">
+                        <PinIcon size={14} />
+                    </span>
                 )}
 
                 {/* Options button — pinned to the card's top-right corner */}

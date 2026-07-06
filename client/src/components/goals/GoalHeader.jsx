@@ -1,6 +1,7 @@
 import React from 'react';
 import { getTypeDisplayName } from '../../utils/goalHelpers';
 import SMARTIndicator from '../SMARTIndicator';
+import { ChevronDownIcon } from '../atoms/AppIcons';
 import CloseButton from '../atoms/CloseButton';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../../utils/dateUtils';
@@ -73,7 +74,7 @@ function GoalHeader({
                             title="Collapse panel"
                             className={styles.collapseButton}
                         >
-                            ▼
+                            <ChevronDownIcon size={16} />
                         </button>
                     )}
                     {onClose && (

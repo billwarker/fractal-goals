@@ -13,7 +13,9 @@
 }
 
 .icon {
-    font-size: 32px;
+    display: flex;
+    align-items: center;
+    color: var(--color-brand-primary);
     margin-bottom: 6px;
 }
 
