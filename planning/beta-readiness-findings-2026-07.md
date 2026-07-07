@@ -23,6 +23,10 @@ verification, and a repeatable beta preflight gate are finished.
 - Transactional email is now a strong subsystem: provider-neutral service boundary, Resend transport,
   deterministic test transport, backend-owned templates, persisted delivery events, webhook
   verification, idempotent webhook storage, and no raw reset-token/invite-key/body/API-key logging.
+- Email-touching surfaces now have layered abuse controls: route-specific limits count malformed
+  password-reset and beta-signup payloads, password reset emails have a per-account cooldown, admin
+  beta invites have a per-signup resend cooldown, and Resend webhooks require valid signatures in
+  addition to request-rate limits.
 - Database posture is solid: Postgres-first configuration, SQLAlchemy models, Alembic migrations,
   and Cloud Build migration jobs are in place.
 - The app has meaningful automated coverage and quality tooling across backend, frontend, migrations,
@@ -136,8 +140,9 @@ their account email without a full verification lifecycle.
 
 ### 7. Observability is good but not yet S+ operational visibility
 
-Sentry, response-time logging, email delivery events, and explicit slow-request logs exist. The app
-does not yet have a metrics exporter or business counters for beta operations.
+Sentry, response-time logging, email delivery events, explicit slow-request logs, and rate-limit
+logs exist. The app does not yet have a metrics exporter or full business counters for beta
+operations.
 
 **Impact:** acceptable for small private beta, but support/debugging will lean on logs and database
 inspection.
@@ -145,7 +150,7 @@ inspection.
 **S+ acceptance:**
 
 - Add greppable counters/log events for auth failures, invite sends, password reset requests,
-  quota denials, 5xx responses, webhook failures, and beta signup lifecycle changes.
+  quota denials, 5xx responses, webhook failures, rate-limit hits, and beta signup lifecycle changes.
 - Later public launch should add metrics through Prometheus/OpenTelemetry or managed equivalents.
 
 ### 8. Billing and public SaaS systems remain deferred

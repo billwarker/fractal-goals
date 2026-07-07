@@ -86,6 +86,20 @@ def test_beta_signup_validates_required_fields(client):
     assert response.status_code == 400
 
 
+def test_beta_signup_rate_limit_counts_invalid_payloads(client):
+    responses = [
+        client.post(
+            '/api/public/beta-signups',
+            json={'email': 'not-an-email'},
+            environ_base={'REMOTE_ADDR': '198.51.100.20'},
+        )
+        for _ in range(13)
+    ]
+
+    assert [response.status_code for response in responses[:12]] == [400] * 12
+    assert responses[12].status_code == 429
+
+
 def _signed_resend_headers(body: bytes, secret: str, event_id: str = "evt_route_1"):
     timestamp = str(int(time.time()))
     secret_value = secret.split("_", 1)[1] if secret.startswith("whsec_") else secret

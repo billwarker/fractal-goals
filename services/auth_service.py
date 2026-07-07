@@ -46,6 +46,14 @@ class AuthService:
     def _public_password_reset_response() -> JsonDict:
         return {"message": "If that email belongs to an active account, a reset link has been sent."}
 
+    @staticmethod
+    def _as_aware_utc(value):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=datetime.timezone.utc)
+        return value.astimezone(datetime.timezone.utc)
+
     def get_current_user_for_token(self, token: str) -> ServiceResult[User]:
         try:
             data = jwt.decode(token, config.JWT_SECRET_KEY, algorithms=["HS256"])
@@ -99,6 +107,18 @@ class AuthService:
             return self._public_password_reset_response(), None, 200
 
         now = utc_now()
+        latest_reset_token = self.db_session.query(PasswordResetToken).filter(
+            PasswordResetToken.user_id == user.id,
+        ).order_by(PasswordResetToken.created_at.desc()).first()
+        latest_created_at = self._as_aware_utc(latest_reset_token.created_at) if latest_reset_token else None
+        cooldown_until = (
+            latest_created_at + datetime.timedelta(minutes=config.PASSWORD_RESET_EMAIL_COOLDOWN_MINUTES)
+            if latest_created_at else None
+        )
+        if cooldown_until and cooldown_until > now:
+            logger.info("Password reset email cooldown active for user_id=%s", user.id)
+            return self._public_password_reset_response(), None, 200
+
         raw_token = secrets.token_urlsafe(48)
         reset_token = PasswordResetToken(
             user_id=user.id,

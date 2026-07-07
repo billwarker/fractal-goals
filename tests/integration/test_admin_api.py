@@ -1262,6 +1262,24 @@ def test_admin_sends_beta_signup_invite(admin_client, db_session, sample_beta_si
 
 
 @pytest.mark.integration
+def test_admin_beta_signup_invite_cooldown_prevents_immediate_resend(admin_client, db_session, sample_beta_signups):
+    EmailService.clear_test_outbox()
+    target = sample_beta_signups[0]
+
+    first = admin_client.post(f'/api/admin/beta-signups/{target.id}/send-invite')
+    db_session.refresh(target)
+    first_invite_key_id = target.invite_key_id
+    second = admin_client.post(f'/api/admin/beta-signups/{target.id}/send-invite')
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert len(TEST_EMAIL_OUTBOX) == 1
+    db_session.refresh(target)
+    assert target.invite_key_id == first_invite_key_id
+    assert db_session.query(EmailDeliveryEvent).filter_by(beta_signup_id=target.id).count() == 1
+
+
+@pytest.mark.integration
 def test_failed_beta_signup_invite_does_not_mark_invited(admin_client, db_session, sample_beta_signups, monkeypatch):
     from config import Config
 

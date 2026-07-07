@@ -239,8 +239,8 @@ def login(validated_data):
 
 
 @auth_bp.route('/password/forgot', methods=['POST'])
-@validate_request(PasswordForgotSchema)
 @limiter.limit("5 per minute")
+@validate_request(PasswordForgotSchema)
 def forgot_password(validated_data):
     """Request a password reset email without revealing whether the account exists."""
     db_session = get_db_session()
@@ -259,8 +259,8 @@ def forgot_password(validated_data):
 
 
 @auth_bp.route('/password/reset', methods=['POST'])
-@validate_request(PasswordResetSchema)
 @limiter.limit("5 per minute")
+@validate_request(PasswordResetSchema)
 def reset_password(validated_data):
     """Complete a password reset using a single-use token."""
     db_session = get_db_session()

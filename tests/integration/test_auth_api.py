@@ -362,6 +362,52 @@ class TestPasswordResetEndpoint:
         )
         assert response.status_code == 400
 
+    def test_forgot_password_email_cooldown_suppresses_duplicate_send(self, client, db_session, test_user):
+        EmailService.clear_test_outbox()
+        first = client.post(
+            '/api/auth/password/forgot',
+            data=json.dumps({'email': test_user.email}),
+            content_type='application/json',
+            environ_base={'REMOTE_ADDR': '198.51.100.10'},
+        )
+        second = client.post(
+            '/api/auth/password/forgot',
+            data=json.dumps({'email': test_user.email}),
+            content_type='application/json',
+            environ_base={'REMOTE_ADDR': '198.51.100.10'},
+        )
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert len(TEST_EMAIL_OUTBOX) == 1
+        assert db_session.query(PasswordResetToken).filter_by(user_id=test_user.id).count() == 1
+
+    def test_forgot_password_rate_limit_counts_invalid_payloads(self, client):
+        responses = [
+            client.post(
+                '/api/auth/password/forgot',
+                json={'email': 'not-an-email'},
+                environ_base={'REMOTE_ADDR': '198.51.100.11'},
+            )
+            for _ in range(6)
+        ]
+
+        assert [response.status_code for response in responses[:5]] == [400, 400, 400, 400, 400]
+        assert responses[5].status_code == 429
+
+    def test_reset_password_rate_limit_counts_invalid_payloads(self, client):
+        responses = [
+            client.post(
+                '/api/auth/password/reset',
+                json={'token': 'short', 'new_password': 'weak'},
+                environ_base={'REMOTE_ADDR': '198.51.100.12'},
+            )
+            for _ in range(6)
+        ]
+
+        assert [response.status_code for response in responses[:5]] == [400, 400, 400, 400, 400]
+        assert responses[5].status_code == 429
+
 
 @pytest.mark.integration
 class TestMeEndpoint:

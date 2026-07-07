@@ -95,6 +95,8 @@ class Config:
     APP_BASE_URL = os.getenv('APP_BASE_URL', 'http://localhost:5173' if ENV in ('development', 'testing', 'local') else '')
     PUBLIC_MARKETING_URL = os.getenv('PUBLIC_MARKETING_URL', 'https://fractalgoals.com')
     PASSWORD_RESET_TOKEN_TTL_MINUTES = int(os.getenv('PASSWORD_RESET_TOKEN_TTL_MINUTES', '60'))
+    PASSWORD_RESET_EMAIL_COOLDOWN_MINUTES = int(os.getenv('PASSWORD_RESET_EMAIL_COOLDOWN_MINUTES', '5'))
+    BETA_INVITE_EMAIL_COOLDOWN_MINUTES = int(os.getenv('BETA_INVITE_EMAIL_COOLDOWN_MINUTES', '10'))
 
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')

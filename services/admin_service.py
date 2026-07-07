@@ -88,6 +88,14 @@ def generate_password(length: int = 14) -> str:
     return f"A1{password}"
 
 
+def as_aware_utc(value):
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=datetime.timezone.utc)
+    return value.astimezone(datetime.timezone.utc)
+
+
 class AdminService:
     def __init__(self, db_session):
         self.db_session = db_session
@@ -638,6 +646,15 @@ class AdminService:
             return None, "Beta signup request not found", 404
 
         now = utc_now()
+        last_sent_at = as_aware_utc(request.last_invite_email_sent_at)
+        cooldown_until = (
+            last_sent_at + datetime.timedelta(minutes=config.BETA_INVITE_EMAIL_COOLDOWN_MINUTES)
+            if last_sent_at else None
+        )
+        if cooldown_until and cooldown_until > now:
+            logger.info("Beta invite email cooldown active beta_signup_id=%s", request.id)
+            return None, "Beta invite email was sent recently. Please wait before resending.", 429
+
         previous_invite = self.db_session.get(SignupInviteKey, request.invite_key_id) if request.invite_key_id else None
         if previous_invite and not previous_invite.used_at and not previous_invite.revoked_at:
             previous_invite.revoked_at = now
