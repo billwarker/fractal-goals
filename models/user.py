@@ -87,5 +87,71 @@ class BetaSignupRequest(Base):
     note = Column(String(1000), nullable=True)
     status = Column(String(32), default='new', nullable=False, index=True)
     source = Column(String(80), default='landing_page', nullable=False)
+    invited_at = Column(DateTime, nullable=True)
+    invite_key_id = Column(String, ForeignKey('signup_invite_keys.id', ondelete='SET NULL'), nullable=True, index=True)
+    last_invite_email_sent_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    invite_key = relationship("SignupInviteKey", foreign_keys=[invite_key_id])
+
+
+class PasswordResetToken(Base):
+    """
+    Single-use password reset token storage. Raw tokens are emailed once and
+    never persisted; token_hash is enough to validate a later reset request.
+    """
+    __tablename__ = 'password_reset_tokens'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    used_at = Column(DateTime, nullable=True, index=True)
+    created_at = Column(DateTime, default=utc_now)
+
+    user = relationship("User")
+
+
+class EmailDeliveryEvent(Base):
+    """
+    Operator-facing audit trail for transactional email attempts. It stores
+    workflow metadata and provider ids/errors, not raw email bodies or secrets.
+    """
+    __tablename__ = 'email_delivery_events'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    provider = Column(String(32), nullable=False, index=True)
+    template_key = Column(String(80), nullable=False, index=True)
+    entity_type = Column(String(80), nullable=True, index=True)
+    entity_id = Column(String, nullable=True, index=True)
+    recipient_user_id = Column(String, ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    beta_signup_id = Column(String, ForeignKey('beta_signup_requests.id', ondelete='SET NULL'), nullable=True, index=True)
+    provider_message_id = Column(String(255), nullable=True)
+    idempotency_key = Column(String(255), nullable=True, index=True)
+    status = Column(String(32), default='pending', nullable=False, index=True)
+    error_summary = Column(String(500), nullable=True)
+    last_event_type = Column(String(80), nullable=True)
+    last_event_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utc_now)
+    sent_at = Column(DateTime, nullable=True)
+    delivered_at = Column(DateTime, nullable=True)
+
+    recipient_user = relationship("User", foreign_keys=[recipient_user_id])
+    beta_signup = relationship("BetaSignupRequest", foreign_keys=[beta_signup_id])
+
+
+class EmailWebhookEvent(Base):
+    """
+    Idempotency ledger for provider webhook callbacks. The payload is stored as
+    metadata for audit/debugging, but never includes app-generated raw secrets.
+    """
+    __tablename__ = 'email_webhook_events'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    provider = Column(String(32), nullable=False, index=True)
+    provider_event_id = Column(String(255), nullable=False, unique=True, index=True)
+    provider_message_id = Column(String(255), nullable=True, index=True)
+    event_type = Column(String(80), nullable=False, index=True)
+    payload = Column(JSON_TYPE, nullable=True)
+    created_at = Column(DateTime, default=utc_now)

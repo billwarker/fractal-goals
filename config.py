@@ -87,6 +87,15 @@ class Config:
     LANDING_EXAMPLES_STATIC_GCS_BUCKET = os.getenv('LANDING_EXAMPLES_STATIC_GCS_BUCKET', '')
     LANDING_EXAMPLES_STATIC_GCS_BLOB = os.getenv('LANDING_EXAMPLES_STATIC_GCS_BLOB', 'landing-examples.json')
 
+    # Email
+    EMAIL_PROVIDER = os.getenv('EMAIL_PROVIDER', 'test' if ENV in ('testing', 'local') else 'disabled')
+    RESEND_EMAIL_API_KEY = os.getenv('RESEND_EMAIL_API_KEY', '')
+    RESEND_WEBHOOK_SIGNING_SECRET = os.getenv('RESEND_WEBHOOK_SIGNING_SECRET', '')
+    EMAIL_FROM = os.getenv('EMAIL_FROM', 'Fractal Goals <support@fractalgoals.com>')
+    APP_BASE_URL = os.getenv('APP_BASE_URL', 'http://localhost:5173' if ENV in ('development', 'testing', 'local') else '')
+    PUBLIC_MARKETING_URL = os.getenv('PUBLIC_MARKETING_URL', 'https://fractalgoals.com')
+    PASSWORD_RESET_TOKEN_TTL_MINUTES = int(os.getenv('PASSWORD_RESET_TOKEN_TTL_MINUTES', '60'))
+
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     LOG_FILE = os.getenv('LOG_FILE', 'server.log')
@@ -166,6 +175,20 @@ class Config:
                         "CRITICAL: Private-beta in-memory rate limiting requires WEB_CONCURRENCY=1 "
                         "so rate-limit counters are not split across worker processes."
                     )
+
+            if cls.EMAIL_PROVIDER == 'resend':
+                if not cls.RESEND_EMAIL_API_KEY:
+                    raise ValueError(f"CRITICAL: RESEND_EMAIL_API_KEY must be set in {cls.ENV} when EMAIL_PROVIDER=resend")
+                if not cls.EMAIL_FROM:
+                    raise ValueError(f"CRITICAL: EMAIL_FROM must be set in {cls.ENV} when EMAIL_PROVIDER=resend")
+                if not cls.APP_BASE_URL:
+                    raise ValueError(f"CRITICAL: APP_BASE_URL must be set in {cls.ENV} when EMAIL_PROVIDER=resend")
+                if not cls.RESEND_WEBHOOK_SIGNING_SECRET:
+                    raise ValueError(
+                        f"CRITICAL: RESEND_WEBHOOK_SIGNING_SECRET must be set in {cls.ENV} when EMAIL_PROVIDER=resend"
+                    )
+            elif cls.EMAIL_PROVIDER not in ('disabled', 'test'):
+                raise ValueError("CRITICAL: EMAIL_PROVIDER must be one of disabled, test, or resend")
 
     @classmethod
     def get_database_url(cls):

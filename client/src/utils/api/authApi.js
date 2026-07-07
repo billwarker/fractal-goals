@@ -3,6 +3,8 @@ import { API_BASE, axios } from './core';
 export const authApi = {
     signup: (data) => axios.post(`${API_BASE}/auth/signup`, data),
     login: (data) => axios.post(`${API_BASE}/auth/login`, data),
+    forgotPassword: (data) => axios.post(`${API_BASE}/auth/password/forgot`, data),
+    resetPassword: (data) => axios.post(`${API_BASE}/auth/password/reset`, data),
     logout: () => axios.post(`${API_BASE}/auth/logout`, {}),
     refresh: (token) => axios.post(
         `${API_BASE}/auth/refresh`,

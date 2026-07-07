@@ -9,6 +9,7 @@ from blueprints.auth_api import token_required
 from services.admin_service import AdminService
 from services.feature_flag_service import FeatureFlagService
 from services.landing_publish_service import LandingPublishService
+from extensions import limiter
 from validators import (
     AdminBetaSignupStatusSchema,
     AdminFeatureFlagsUpdateSchema,
@@ -130,6 +131,27 @@ def update_beta_signup_status(current_user, signup_id, validated_data):
     except SQLAlchemyError:
         db_session.rollback()
         return internal_error(logger, "Error updating beta signup")
+    finally:
+        db_session.close()
+
+
+@admin_bp.route('/beta-signups/<signup_id>/send-invite', methods=['POST'])
+@token_required
+@limiter.limit("10 per minute")
+def send_beta_signup_invite(current_user, signup_id):
+    db_session = get_db_session()
+    try:
+        service, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+        payload, error, status = service.send_beta_signup_invite(signup_id, current_user)
+        if error:
+            return jsonify({"error": error}), status
+        logger.info("Admin user_id=%s sent_beta_invite beta_signup_id=%s", current_user.id, signup_id)
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        return internal_error(logger, "Error sending beta signup invite")
     finally:
         db_session.close()
 

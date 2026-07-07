@@ -17,6 +17,9 @@ class PublicService:
             "status": request.status,
             "created_at": format_utc(request.created_at),
             "updated_at": format_utc(request.updated_at),
+            "invited_at": format_utc(request.invited_at),
+            "invite_key_id": request.invite_key_id,
+            "last_invite_email_sent_at": format_utc(request.last_invite_email_sent_at),
         }
 
     def create_beta_signup_request(self, data):

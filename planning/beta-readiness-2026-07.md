@@ -36,20 +36,25 @@ budgets in place, zero TODO/FIXME markers in source.
 
 ## Phase 1 — MUST FIX before inviting users
 
-### WI-1 — Email transport service (foundation for WI-2)
+### WI-1 — Email transport service (foundation for WI-2) — IMPLEMENTED
 **Why:** Nothing in the backend can send email today (confirmed: no smtplib/SendGrid/SES/Resend).
 Every user-facing lifecycle flow depends on this. **No dependencies — start here.**
 
 - Add `services/email_service.py` with a provider-agnostic `send_email(to, subject, html, text)`
   interface and a single concrete transport. **Recommend Resend** (simplest API, generous free
-  tier) behind `EMAIL_PROVIDER` / `EMAIL_API_KEY` / `EMAIL_FROM` env vars in `config.py`.
+  tier) behind `EMAIL_PROVIDER` / `RESEND_EMAIL_API_KEY` / `EMAIL_FROM` env vars in `config.py`.
 - Dev/test transport = no-op logger that records sent messages (so tests assert on them);
-  production fails `check_production_security` when reset is enabled but `EMAIL_API_KEY` is unset.
+  production fails `check_production_security` when reset is enabled but `RESEND_EMAIL_API_KEY` is unset.
 - Add plain-text + minimal HTML templates under `services/email_templates/`.
 - **Acceptance:** unit test sends through the no-op transport and asserts recipient/subject/body;
-  `check_production_security` raises if prod + reset enabled + no `EMAIL_API_KEY`.
+  `check_production_security` raises if prod + reset enabled + no `RESEND_EMAIL_API_KEY`.
 
-### WI-2 — Self-service password reset (real email flow)
+Implemented with `services/email_service.py`, `EMAIL_PROVIDER=test|disabled|resend`,
+`RESEND_EMAIL_API_KEY`, `RESEND_WEBHOOK_SIGNING_SECRET`, backend-owned templates,
+`email_delivery_events` audit rows, and idempotent Resend webhook ingestion through
+`POST /api/public/webhooks/resend`.
+
+### WI-2 — Self-service password reset (real email flow) — IMPLEMENTED
 **Why:** #1 beta support-ticket generator. Invited users who forget their password are stuck
 today (admin-temp-password only, per index.md). **Depends on WI-1.**
 
@@ -65,6 +70,10 @@ today (admin-temp-password only, per index.md). **Depends on WI-1.**
 - **Acceptance:** integration test covers request → email-captured → reset → login-with-new-password;
   token single-use + expiry enforced; unknown email returns 200 without leaking existence.
 - **Split option:** WI-2a (backend + migration) and WI-2b (frontend) if handed to two agents.
+
+Implemented with hashed `password_reset_tokens`, enumeration-safe forgot/reset endpoints,
+a `/reset-password` frontend route, and integration coverage for success, single-use, expiry,
+and unknown-email behavior.
 
 ### WI-3 — DB-aware readiness probe
 **Why:** `/health` and `/api/healthz` return static JSON without touching Postgres, so Cloud Run
@@ -90,7 +99,7 @@ can route traffic to an instance that can't reach the DB.
 **Why:** One reviewed gate so nothing silent slips through.
 
 - `docs/planning/BETA_PREFLIGHT.md` covering: prod env vars set (JWT secret, CORS, cookie
-  secure/samesite, `EMAIL_API_KEY`), `check_production_security` passes, invite-key flow works
+  secure/samesite, `RESEND_EMAIL_API_KEY`, `RESEND_WEBHOOK_SIGNING_SECRET`), `check_production_security` passes, invite-key flow works
   end-to-end, quota/storage limits sane for beta tier, Sentry receiving from both ends, rate
   limits active, readiness probe wired, full test suite green.
 - **Acceptance:** checklist committed; a dry-run staging pass recorded against it.

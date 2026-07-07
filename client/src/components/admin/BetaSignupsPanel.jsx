@@ -41,6 +41,15 @@ export default function BetaSignupsPanel({ enabled }) {
         onError: (error) => notify.error(`Failed to update signup: ${formatError(error)}`),
     });
 
+    const inviteMutation = useMutation({
+        mutationFn: (id) => adminApi.sendBetaSignupInvite(id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ADMIN_BETA_SIGNUPS_KEY });
+            notify.success('Beta invite sent');
+        },
+        onError: (error) => notify.error(`Failed to send invite: ${formatError(error)}`),
+    });
+
     const requests = betaSignupsQuery.data?.requests || [];
     const counts = betaSignupsQuery.data?.status_counts || {};
 
@@ -119,6 +128,8 @@ export default function BetaSignupsPanel({ enabled }) {
                             <th>Status</th>
                             <th>Source</th>
                             <th>Requested</th>
+                            <th>Last Invite</th>
+                            <th>Email Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -140,7 +151,15 @@ export default function BetaSignupsPanel({ enabled }) {
                                 </td>
                                 <td>{request.source}</td>
                                 <td>{formatDate(request.created_at)}</td>
+                                <td>{formatDate(request.last_invite_email_sent_at)}</td>
+                                <td>{request.invite_email_status || '-'}</td>
                                 <td>
+                                    <button
+                                        onClick={() => inviteMutation.mutate(request.id)}
+                                        disabled={inviteMutation.isPending}
+                                    >
+                                        Send invite
+                                    </button>
                                     <button onClick={() => navigator.clipboard?.writeText(request.email)}>Copy email</button>
                                 </td>
                             </tr>

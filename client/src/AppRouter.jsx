@@ -29,6 +29,7 @@ const Analytics = lazyWithRetry(() => import('./pages/Analytics'), 'pages/Analyt
 const Logs = lazyWithRetry(() => import('./pages/Logs'), 'pages/Logs');
 const Notes = lazyWithRetry(() => import('./pages/Notes'), 'pages/Notes');
 const Admin = lazyWithRetry(() => import('./pages/Admin'), 'pages/Admin');
+const ResetPassword = lazyWithRetry(() => import('./pages/ResetPassword'), 'pages/ResetPassword');
 const SettingsModal = lazyWithRetry(() => import('./components/modals/SettingsModal'), 'components/modals/SettingsModal');
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 
@@ -416,6 +417,7 @@ function App() {
         if (showLandingPage || redirectDeprecatedLandingRoute) return 'Private Beta';
         if (pathname === '/') return 'Selection';
         if (pathname === '/admin') return 'Admin';
+        if (pathname === '/reset-password') return 'Reset Password';
         if (pathname.includes('/goals')) return 'Goals';
         if (pathname.includes('/programs')) return 'Programs';
         if (pathname.includes('/sessions')) return 'Sessions';
@@ -504,7 +506,7 @@ function App() {
     return (
         <HeaderProvider>
             <div className="app-container">
-                {!showSelectionPage && !showLandingPage && !redirectDeprecatedLandingRoute && location.pathname !== '/admin' && (
+                {!showSelectionPage && !showLandingPage && !redirectDeprecatedLandingRoute && location.pathname !== '/admin' && location.pathname !== '/reset-password' && (
                     <NavigationHeader
                         onOpenSettings={() => setIsSettingsOpen(true)}
                         onHeightChange={setNavHeight}
@@ -527,6 +529,12 @@ function App() {
                         <ComponentErrorBoundary>
                             <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
                                 <Admin />
+                            </Suspense>
+                        </ComponentErrorBoundary>
+                    ) : location.pathname === '/reset-password' ? (
+                        <ComponentErrorBoundary>
+                            <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                <ResetPassword />
                             </Suspense>
                         </ComponentErrorBoundary>
                     ) : (

@@ -15,7 +15,11 @@ Tests cover:
 
 import pytest
 import json
+from datetime import timedelta
+from urllib.parse import parse_qs, urlparse
+from models import PasswordResetToken, utc_now
 from services.admin_service import hash_invite_key
+from services.email_service import EmailService, TEST_EMAIL_OUTBOX
 from services.quota_service import TIER_DEFAULT_LIMITS_SETTING_KEY
 
 
@@ -280,6 +284,81 @@ class TestLoginEndpoint:
             '/api/auth/login',
             data=json.dumps({}),
             content_type='application/json'
+        )
+        assert response.status_code == 400
+
+
+@pytest.mark.integration
+class TestPasswordResetEndpoint:
+    def test_forgot_password_is_enumeration_safe_for_unknown_email(self, client, db_session):
+        EmailService.clear_test_outbox()
+        response = client.post(
+            '/api/auth/password/forgot',
+            data=json.dumps({'email': 'nobody@example.com'}),
+            content_type='application/json',
+        )
+
+        assert response.status_code == 200
+        assert TEST_EMAIL_OUTBOX == []
+        assert db_session.query(PasswordResetToken).count() == 0
+
+    def test_password_reset_flow(self, client, db_session, test_user):
+        EmailService.clear_test_outbox()
+        response = client.post(
+            '/api/auth/password/forgot',
+            data=json.dumps({'email': test_user.email}),
+            content_type='application/json',
+        )
+
+        assert response.status_code == 200
+        assert len(TEST_EMAIL_OUTBOX) == 1
+        reset_url = TEST_EMAIL_OUTBOX[0]['text'].splitlines()[3]
+        raw_token = parse_qs(urlparse(reset_url).query)['token'][0]
+        stored_token = db_session.query(PasswordResetToken).one()
+        assert stored_token.user_id == test_user.id
+        assert stored_token.token_hash != raw_token
+
+        reset_response = client.post(
+            '/api/auth/password/reset',
+            data=json.dumps({'token': raw_token, 'new_password': 'Newpassword456'}),
+            content_type='application/json',
+        )
+        assert reset_response.status_code == 200
+
+        db_session.refresh(stored_token)
+        assert stored_token.used_at is not None
+
+        reused_response = client.post(
+            '/api/auth/password/reset',
+            data=json.dumps({'token': raw_token, 'new_password': 'Anotherpass789'}),
+            content_type='application/json',
+        )
+        assert reused_response.status_code == 400
+
+        login_response = client.post(
+            '/api/auth/login',
+            data=json.dumps({'username_or_email': 'testuser', 'password': 'Newpassword456'}),
+            content_type='application/json',
+        )
+        assert login_response.status_code == 200
+
+    def test_password_reset_rejects_expired_token(self, client, db_session, test_user):
+        EmailService.clear_test_outbox()
+        client.post(
+            '/api/auth/password/forgot',
+            data=json.dumps({'email': test_user.email}),
+            content_type='application/json',
+        )
+        reset_url = TEST_EMAIL_OUTBOX[0]['text'].splitlines()[3]
+        raw_token = parse_qs(urlparse(reset_url).query)['token'][0]
+        stored_token = db_session.query(PasswordResetToken).one()
+        stored_token.expires_at = utc_now() - timedelta(minutes=1)
+        db_session.commit()
+
+        response = client.post(
+            '/api/auth/password/reset',
+            data=json.dumps({'token': raw_token, 'new_password': 'Newpassword456'}),
+            content_type='application/json',
         )
         assert response.status_code == 400
 

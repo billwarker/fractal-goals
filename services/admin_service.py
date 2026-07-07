@@ -4,6 +4,7 @@ import logging
 import secrets
 import string
 from copy import deepcopy
+from urllib.parse import quote
 
 from sqlalchemy import delete, func, or_
 from sqlalchemy.orm.attributes import flag_modified
@@ -22,6 +23,7 @@ from models import (
     AnalyticsDashboard,
     AppSetting,
     BetaSignupRequest,
+    EmailDeliveryEvent,
     EventLog,
     FractalMetricDefinition,
     Goal,
@@ -61,8 +63,11 @@ from services.quota_service import (
     TIER_DEFAULT_LIMITS_SETTING_KEY,
     QuotaService,
 )
+from services.email_service import EmailSendError, EmailService
+from services.email_templates import render_beta_invite_email
 from services.serializers import format_utc
 from services.service_types import JsonDict, ServiceResult
+from config import config
 
 logger = logging.getLogger(__name__)
 FORCE_PASSWORD_CHANGE_PREFERENCE = "admin_force_password_change"
@@ -578,8 +583,32 @@ class AdminService:
             status_counts[value] = int(count)
         status_counts["total"] = sum(status_counts[key] for key in self.BETA_SIGNUP_STATUSES)
 
+        latest_email_by_signup = {}
+        signup_ids = [request.id for request in requests]
+        if signup_ids:
+            events = (
+                self.db_session.query(EmailDeliveryEvent)
+                .filter(
+                    EmailDeliveryEvent.template_key == "beta_invite",
+                    EmailDeliveryEvent.beta_signup_id.in_(signup_ids),
+                )
+                .order_by(EmailDeliveryEvent.created_at.desc())
+                .all()
+            )
+            for event in events:
+                latest_email_by_signup.setdefault(event.beta_signup_id, event)
+
+        serialized_requests = []
+        for request in requests:
+            payload = PublicService.serialize_beta_signup(request)
+            latest_email = latest_email_by_signup.get(request.id)
+            payload["invite_email_status"] = latest_email.status if latest_email else None
+            payload["invite_email_last_event_type"] = latest_email.last_event_type if latest_email else None
+            payload["invite_email_last_event_at"] = format_utc(latest_email.last_event_at) if latest_email else None
+            serialized_requests.append(payload)
+
         return {
-            "requests": [PublicService.serialize_beta_signup(request) for request in requests],
+            "requests": serialized_requests,
             "total": total,
             "limit": limit,
             "offset": offset,
@@ -595,6 +624,66 @@ class AdminService:
         if request is None:
             return None, "Beta signup request not found", 404
         request.status = status
+        if status == "invited" and request.invited_at is None:
+            request.invited_at = utc_now()
+        self.db_session.commit()
+        self.db_session.refresh(request)
+        return {"request": PublicService.serialize_beta_signup(request)}, None, 200
+
+    def send_beta_signup_invite(self, signup_id: str, current_user: User) -> ServiceResult[JsonDict]:
+        from services.public_service import PublicService
+
+        request = self.db_session.get(BetaSignupRequest, signup_id)
+        if request is None:
+            return None, "Beta signup request not found", 404
+
+        now = utc_now()
+        previous_invite = self.db_session.get(SignupInviteKey, request.invite_key_id) if request.invite_key_id else None
+        if previous_invite and not previous_invite.used_at and not previous_invite.revoked_at:
+            previous_invite.revoked_at = now
+
+        raw_key = generate_secret("fg_invite")
+        invite = SignupInviteKey(
+            key_hash=hash_invite_key(raw_key),
+            label=f"Beta invite for {request.email}",
+            created_by_user_id=current_user.id,
+        )
+        self.db_session.add(invite)
+        self.db_session.flush()
+
+        signup_url = f"{config.APP_BASE_URL.rstrip('/')}/?invite_key={quote(raw_key)}"
+        rendered = render_beta_invite_email(signup_url, request.use_case)
+        try:
+            EmailService(self.db_session).send_email(
+                to=request.email,
+                subject=rendered["subject"],
+                html=rendered["html"],
+                text=rendered["text"],
+                template_key="beta_invite",
+                entity_type="beta_signup_request",
+                entity_id=request.id,
+                beta_signup_id=request.id,
+                idempotency_key=f"beta-invite:{request.id}:{invite.id}",
+            )
+        except EmailSendError as exc:
+            self.db_session.rollback()
+            self.db_session.add(EmailDeliveryEvent(
+                provider=config.EMAIL_PROVIDER or 'disabled',
+                template_key="beta_invite",
+                entity_type="beta_signup_request",
+                entity_id=request.id,
+                beta_signup_id=request.id,
+                status="failed",
+                error_summary=str(exc)[:500],
+            ))
+            self.db_session.commit()
+            logger.error("Beta invite email failed beta_signup_id=%s", request.id)
+            return None, "Failed to send beta invite email", 502
+
+        request.status = "invited"
+        request.invited_at = request.invited_at or now
+        request.invite_key_id = invite.id
+        request.last_invite_email_sent_at = now
         self.db_session.commit()
         self.db_session.refresh(request)
         return {"request": PublicService.serialize_beta_signup(request)}, None, 200

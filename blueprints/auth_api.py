@@ -5,7 +5,8 @@ import secrets
 import hmac
 from validators import (
     validate_request, UserSignupSchema, UserLoginSchema, UserPreferencesUpdateSchema,
-    UserPasswordUpdateSchema, UserEmailUpdateSchema, UserDeleteSchema, UserUsernameUpdateSchema
+    UserPasswordUpdateSchema, UserEmailUpdateSchema, UserDeleteSchema, UserUsernameUpdateSchema,
+    PasswordForgotSchema, PasswordResetSchema,
 )
 from services.serializers import serialize_user
 from services.auth_service import AuthService
@@ -233,6 +234,46 @@ def login(validated_data):
         db_session.rollback()
         logger.exception("Error during login")
         return internal_error(logger, "Error during login")
+    finally:
+        db_session.close()
+
+
+@auth_bp.route('/password/forgot', methods=['POST'])
+@validate_request(PasswordForgotSchema)
+@limiter.limit("5 per minute")
+def forgot_password(validated_data):
+    """Request a password reset email without revealing whether the account exists."""
+    db_session = get_db_session()
+    try:
+        service = AuthService(db_session)
+        payload, error, status = service.forgot_password(validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error requesting password reset")
+        return internal_error(logger, "Error requesting password reset")
+    finally:
+        db_session.close()
+
+
+@auth_bp.route('/password/reset', methods=['POST'])
+@validate_request(PasswordResetSchema)
+@limiter.limit("5 per minute")
+def reset_password(validated_data):
+    """Complete a password reset using a single-use token."""
+    db_session = get_db_session()
+    try:
+        service = AuthService(db_session)
+        payload, error, status = service.reset_password(validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error resetting password")
+        return internal_error(logger, "Error resetting password")
     finally:
         db_session.close()
 

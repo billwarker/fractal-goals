@@ -48,6 +48,31 @@ class UserLoginSchema(BaseModel):
     remember_me: bool = False
 
 
+class PasswordForgotSchema(BaseModel):
+    """Schema for requesting a password reset email."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
+    @field_validator('email')
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return sanitize_string(v).lower()
+
+
+class PasswordResetSchema(BaseModel):
+    """Schema for completing a password reset."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    token: str = Field(..., min_length=20, max_length=512)
+    new_password: str = Field(..., min_length=8)
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        return validate_strong_password(v)
+
+
 class BetaSignupRequestSchema(BaseModel):
     """Schema for public private-beta access requests."""
     model_config = ConfigDict(str_strip_whitespace=True)

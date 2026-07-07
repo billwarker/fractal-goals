@@ -67,7 +67,13 @@ const needsCsrfHeader = (config) => {
     const url = String(config.url || '');
     if (!MUTATING_METHODS.has(method)) return false;
     if (getHeader(config.headers, 'Authorization') || accessToken) return false;
-    if (url.includes('/auth/login') || url.includes('/auth/signup') || url.includes('/auth/refresh')) return false;
+    if (
+        url.includes('/auth/login')
+        || url.includes('/auth/signup')
+        || url.includes('/auth/refresh')
+        || url.includes('/auth/password/forgot')
+        || url.includes('/auth/password/reset')
+    ) return false;
     return true;
 };
 

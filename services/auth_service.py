@@ -1,11 +1,16 @@
 import datetime
+import hashlib
 import logging
+import secrets
+from urllib.parse import quote
 
 import jwt
 
 from account_tiers import DEFAULT_ACCOUNT_TIER
 from config import config
-from models import User
+from models import EmailDeliveryEvent, PasswordResetToken, User, utc_now
+from services.email_service import EmailSendError, EmailService
+from services.email_templates import render_password_reset_email
 from services.serializers import serialize_user
 from services.admin_service import AdminService
 from services.quota_service import DEFAULT_STORAGE_LIMIT_BYTES, QuotaService
@@ -32,6 +37,14 @@ class AuthService:
             (User.username == username_or_email) |
             (User.email == username_or_email)
         ).first()
+
+    @staticmethod
+    def _hash_token(raw_token: str) -> str:
+        return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _public_password_reset_response() -> JsonDict:
+        return {"message": "If that email belongs to an active account, a reset link has been sent."}
 
     def get_current_user_for_token(self, token: str) -> ServiceResult[User]:
         try:
@@ -78,6 +91,85 @@ class AuthService:
         self.db_session.refresh(new_user)
         logger.info("Signed up user_id=%s", new_user.id)
         return serialize_user(new_user), None, 201
+
+    def forgot_password(self, data) -> ServiceResult[JsonDict]:
+        email = data["email"].lower()
+        user = self.db_session.query(User).filter(User.email == email, User.is_active.is_(True)).first()
+        if not user:
+            return self._public_password_reset_response(), None, 200
+
+        now = utc_now()
+        raw_token = secrets.token_urlsafe(48)
+        reset_token = PasswordResetToken(
+            user_id=user.id,
+            token_hash=self._hash_token(raw_token),
+            expires_at=now + datetime.timedelta(minutes=config.PASSWORD_RESET_TOKEN_TTL_MINUTES),
+        )
+        self.db_session.query(PasswordResetToken).filter(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        ).update({"used_at": now}, synchronize_session=False)
+        self.db_session.add(reset_token)
+        self.db_session.flush()
+
+        reset_url = f"{config.APP_BASE_URL.rstrip('/')}/reset-password?token={quote(raw_token)}"
+        rendered = render_password_reset_email(reset_url)
+        try:
+            EmailService(self.db_session).send_email(
+                to=user.email,
+                subject=rendered["subject"],
+                html=rendered["html"],
+                text=rendered["text"],
+                template_key="password_reset",
+                entity_type="password_reset_token",
+                entity_id=reset_token.id,
+                recipient_user_id=user.id,
+                idempotency_key=f"password-reset:{reset_token.id}",
+            )
+        except EmailSendError as exc:
+            self.db_session.rollback()
+            self.db_session.add(EmailDeliveryEvent(
+                provider=config.EMAIL_PROVIDER or 'disabled',
+                template_key="password_reset",
+                entity_type="user",
+                entity_id=user.id,
+                recipient_user_id=user.id,
+                status="failed",
+                error_summary=str(exc)[:500],
+            ))
+            self.db_session.commit()
+            logger.error("Password reset email failed for user_id=%s", user.id)
+            return self._public_password_reset_response(), None, 200
+
+        self.db_session.commit()
+        logger.info("Password reset requested for user_id=%s", user.id)
+        return self._public_password_reset_response(), None, 200
+
+    def reset_password(self, data) -> ServiceResult[JsonDict]:
+        token_hash = self._hash_token(data["token"])
+        reset_token = self.db_session.query(PasswordResetToken).filter_by(token_hash=token_hash).first()
+        if not reset_token or reset_token.used_at is not None:
+            return None, "Invalid or expired reset token", 400
+
+        expires_at = reset_token.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=datetime.timezone.utc)
+        if expires_at < utc_now():
+            reset_token.used_at = utc_now()
+            self.db_session.commit()
+            return None, "Invalid or expired reset token", 400
+
+        user = self.db_session.get(User, reset_token.user_id)
+        if not user or not user.is_active:
+            return None, "Invalid or expired reset token", 400
+
+        user.set_password(data["new_password"])
+        user.failed_login_count = 0
+        user.locked_until = None
+        reset_token.used_at = utc_now()
+        self.db_session.commit()
+        logger.info("Password reset completed for user_id=%s", user.id)
+        return {"message": "Password reset successfully. Please log in with your new password."}, None, 200
 
     def refresh_token(self, token: str) -> ServiceResult[JsonDict]:
         try:

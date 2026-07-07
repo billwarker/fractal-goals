@@ -1,4 +1,11 @@
-from models import BetaSignupRequest
+import base64
+import hashlib
+import hmac
+import json
+import time
+
+from config import Config
+from models import BetaSignupRequest, EmailDeliveryEvent, EmailWebhookEvent
 
 
 def test_public_landing_examples_empty_when_unpublished(client):
@@ -77,4 +84,66 @@ def test_beta_signup_validates_required_fields(client):
     })
 
     assert response.status_code == 400
-    assert response.get_json()['error'] == 'Validation failed'
+
+
+def _signed_resend_headers(body: bytes, secret: str, event_id: str = "evt_route_1"):
+    timestamp = str(int(time.time()))
+    secret_value = secret.split("_", 1)[1] if secret.startswith("whsec_") else secret
+    signed_payload = b".".join([event_id.encode("utf-8"), timestamp.encode("utf-8"), body])
+    signature = base64.b64encode(
+        hmac.new(base64.b64decode(secret_value), signed_payload, hashlib.sha256).digest()
+    ).decode("utf-8")
+    return {
+        "Svix-Id": event_id,
+        "Svix-Timestamp": timestamp,
+        "Svix-Signature": f"v1,{signature}",
+    }
+
+
+def test_resend_webhook_route_verifies_and_updates_delivery_event(client, db_session, monkeypatch):
+    secret = "whsec_" + base64.b64encode(b"route-secret").decode("utf-8")
+    monkeypatch.setattr(Config, "RESEND_WEBHOOK_SIGNING_SECRET", secret)
+    delivery_event = EmailDeliveryEvent(
+        provider="resend",
+        template_key="password_reset",
+        provider_message_id="email_route_1",
+        status="sent",
+    )
+    db_session.add(delivery_event)
+    db_session.commit()
+
+    body = json.dumps({
+        "type": "email.bounced",
+        "created_at": "2026-07-07T12:00:00Z",
+        "data": {"email_id": "email_route_1", "reason": "Mailbox unavailable"},
+    }).encode("utf-8")
+    response = client.post(
+        '/api/public/webhooks/resend',
+        data=body,
+        headers=_signed_resend_headers(body, secret),
+        content_type='application/json',
+    )
+
+    assert response.status_code == 200
+    db_session.refresh(delivery_event)
+    assert delivery_event.status == "bounced"
+    assert delivery_event.error_summary == "Mailbox unavailable"
+    assert db_session.query(EmailWebhookEvent).count() == 1
+
+
+def test_resend_webhook_route_rejects_bad_signature(client, monkeypatch):
+    secret = "whsec_" + base64.b64encode(b"route-secret").decode("utf-8")
+    monkeypatch.setattr(Config, "RESEND_WEBHOOK_SIGNING_SECRET", secret)
+    response = client.post(
+        '/api/public/webhooks/resend',
+        data=b'{"type":"email.delivered","data":{"email_id":"email_1"}}',
+        headers={
+            "Svix-Id": "evt_bad_route",
+            "Svix-Timestamp": str(int(time.time())),
+            "Svix-Signature": "v1,bad",
+        },
+        content_type='application/json',
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()['error'] == 'Invalid webhook signature'

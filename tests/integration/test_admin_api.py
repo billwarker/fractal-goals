@@ -12,6 +12,7 @@ from models import (
     AnalyticsDashboard,
     AppSetting,
     BetaSignupRequest,
+    EmailDeliveryEvent,
     Goal,
     GoalLevel,
     MetricDefinition,
@@ -21,10 +22,12 @@ from models import (
     Program,
     Session,
     SessionTemplate,
+    SignupInviteKey,
     Target,
     User,
     activity_goal_associations,
 )
+from services.email_service import EmailService, TEST_EMAIL_OUTBOX
 
 
 def auth_headers_for(user):
@@ -1151,6 +1154,36 @@ def test_admin_lists_beta_signups_with_status_counts(admin_client, sample_beta_s
 
 
 @pytest.mark.integration
+def test_admin_beta_signups_include_latest_invite_email_status(admin_client, db_session, sample_beta_signups):
+    target = sample_beta_signups[0]
+    older = EmailDeliveryEvent(
+        provider='resend',
+        template_key='beta_invite',
+        beta_signup_id=target.id,
+        provider_message_id='email-old',
+        status='sent',
+        created_at=datetime(2026, 7, 7, 12, 0, 0),
+    )
+    latest = EmailDeliveryEvent(
+        provider='resend',
+        template_key='beta_invite',
+        beta_signup_id=target.id,
+        provider_message_id='email-new',
+        status='delivered',
+        last_event_type='email.delivered',
+        created_at=datetime(2026, 7, 7, 12, 1, 0),
+    )
+    db_session.add_all([older, latest])
+    db_session.commit()
+
+    response = admin_client.get('/api/admin/beta-signups')
+    assert response.status_code == 200
+    request = next(item for item in json.loads(response.data)['requests'] if item['id'] == target.id)
+    assert request['invite_email_status'] == 'delivered'
+    assert request['invite_email_last_event_type'] == 'email.delivered'
+
+
+@pytest.mark.integration
 def test_admin_filters_beta_signups_by_status(admin_client, sample_beta_signups):
     response = admin_client.get('/api/admin/beta-signups?status=new')
     assert response.status_code == 200
@@ -1182,6 +1215,7 @@ def test_admin_updates_beta_signup_status(admin_client, db_session, sample_beta_
     assert json.loads(response.data)['request']['status'] == 'invited'
     db_session.refresh(target)
     assert target.status == 'invited'
+    assert target.invited_at is not None
 
 
 @pytest.mark.integration
@@ -1193,6 +1227,56 @@ def test_admin_rejects_invalid_beta_signup_status(admin_client, sample_beta_sign
         content_type='application/json',
     )
     assert response.status_code == 400
+
+
+@pytest.mark.integration
+def test_non_admin_cannot_send_beta_signup_invite(authed_client, sample_beta_signups):
+    response = authed_client.post(f'/api/admin/beta-signups/{sample_beta_signups[0].id}/send-invite')
+    assert response.status_code == 403
+
+
+@pytest.mark.integration
+def test_admin_sends_beta_signup_invite(admin_client, db_session, sample_beta_signups):
+    EmailService.clear_test_outbox()
+    target = sample_beta_signups[0]
+
+    response = admin_client.post(f'/api/admin/beta-signups/{target.id}/send-invite')
+
+    assert response.status_code == 200
+    payload = json.loads(response.data)['request']
+    assert payload['status'] == 'invited'
+    assert payload['last_invite_email_sent_at'] is not None
+    assert len(TEST_EMAIL_OUTBOX) == 1
+    assert TEST_EMAIL_OUTBOX[0]['to'] == target.email
+    assert 'fg_invite_' in TEST_EMAIL_OUTBOX[0]['text']
+
+    db_session.refresh(target)
+    assert target.status == 'invited'
+    assert target.invite_key_id is not None
+    invite = db_session.get(SignupInviteKey, target.invite_key_id)
+    assert invite is not None
+    assert invite.key_hash not in TEST_EMAIL_OUTBOX[0]['text']
+    event = db_session.query(EmailDeliveryEvent).filter_by(beta_signup_id=target.id).one()
+    assert event.status == 'sent'
+    assert event.template_key == 'beta_invite'
+
+
+@pytest.mark.integration
+def test_failed_beta_signup_invite_does_not_mark_invited(admin_client, db_session, sample_beta_signups, monkeypatch):
+    from config import Config
+
+    target = sample_beta_signups[0]
+    monkeypatch.setattr(Config, "EMAIL_PROVIDER", "disabled")
+
+    response = admin_client.post(f'/api/admin/beta-signups/{target.id}/send-invite')
+
+    assert response.status_code == 502
+    db_session.refresh(target)
+    assert target.status == 'new'
+    assert target.invite_key_id is None
+    event = db_session.query(EmailDeliveryEvent).filter_by(beta_signup_id=target.id).one()
+    assert event.status == 'failed'
+    assert event.template_key == 'beta_invite'
 
 
 @pytest.mark.integration

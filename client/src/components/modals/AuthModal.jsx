@@ -8,6 +8,7 @@ import Button from '../atoms/Button';
 import Checkbox from '../atoms/Checkbox';
 import { Heading, Text } from '../atoms/Typography';
 import { useForm } from '../../hooks/useForm';
+import { authApi } from '../../utils/api';
 import styles from './AuthModal.module.css';
 import '../../App.css';
 import notify from '../../utils/notify';
@@ -21,6 +22,7 @@ function AuthModalInner({ onClose }) {
     const { login, signup, isAuthenticated } = useAuth();
     const [isLogin, setIsLogin] = useState(true);
     const [generalError, setGeneralError] = useState(null);
+    const [isForgotSubmitting, setForgotSubmitting] = useState(false);
 
     // Theme color (For consistent highlighting)
     const themeColor = 'var(--color-text-primary)';
@@ -64,6 +66,17 @@ function AuthModalInner({ onClose }) {
             onClose();
         }
     }, [isAuthenticated, onClose]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const inviteKey = new URLSearchParams(window.location.search).get('invite_key');
+        if (inviteKey) {
+            setIsLogin(false);
+            setFieldValue('inviteKey', inviteKey);
+        }
+        // Run only when the modal opens so invite links can prefill signup once.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const onSubmit = async (formValues) => {
         setGeneralError(null);
@@ -117,6 +130,25 @@ function AuthModalInner({ onClose }) {
         // Or we can resetForm?
         // resetForm(); // This might be annoying if user typed stuff.
         // Let's leave values, validation will re-run on next submit/touch.
+    };
+
+    const handleForgotPassword = async () => {
+        setGeneralError(null);
+        const email = values.usernameOrEmail.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            setGeneralError('Enter your email address above first.');
+            return;
+        }
+        setForgotSubmitting(true);
+        try {
+            await authApi.forgotPassword({ email });
+            notify.success('If that email belongs to an active account, a reset link has been sent.');
+        } catch (err) {
+            logError("Forgot password error:", err);
+            setGeneralError('Could not request a password reset. Please try again.');
+        } finally {
+            setForgotSubmitting(false);
+        }
     };
 
     return (
@@ -210,13 +242,23 @@ function AuthModalInner({ onClose }) {
                     </div>
 
                     {isLogin && (
-                        <Checkbox
-                            label="Remember me on this device"
-                            name="rememberMe"
-                            checked={Boolean(values.rememberMe)}
-                            onChange={handleChange}
-                            className={styles.rememberMe}
-                        />
+                        <>
+                            <Checkbox
+                                label="Remember me on this device"
+                                name="rememberMe"
+                                checked={Boolean(values.rememberMe)}
+                                onChange={handleChange}
+                                className={styles.rememberMe}
+                            />
+                            <button
+                                type="button"
+                                className={styles.toggleButton}
+                                onClick={handleForgotPassword}
+                                disabled={isForgotSubmitting}
+                            >
+                                {isForgotSubmitting ? 'Sending reset link...' : 'Forgot password?'}
+                            </button>
+                        </>
                     )}
 
                     {generalError && (

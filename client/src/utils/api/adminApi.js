@@ -31,5 +31,6 @@ export const adminApi = {
     revokeInviteKey: (inviteId) => axios.patch(`${API_BASE}/admin/invite-keys/${inviteId}/revoke`),
     getBetaSignups: (params = {}) => axios.get(`${API_BASE}/admin/beta-signups`, { params }),
     updateBetaSignupStatus: (signupId, data) => axios.patch(`${API_BASE}/admin/beta-signups/${signupId}`, data),
+    sendBetaSignupInvite: (signupId) => axios.post(`${API_BASE}/admin/beta-signups/${signupId}/send-invite`, {}),
     exportBetaSignupsCsv: (params = {}) => axios.get(`${API_BASE}/admin/beta-signups/export.csv`, { params, responseType: 'blob' }),
 };

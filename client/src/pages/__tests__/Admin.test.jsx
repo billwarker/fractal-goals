@@ -30,6 +30,7 @@ const {
     publishLandingExamples,
     getBetaSignups,
     updateBetaSignupStatus,
+    sendBetaSignupInvite,
 } = vi.hoisted(() => ({
     getSummary: vi.fn(),
     getUsers: vi.fn(),
@@ -55,6 +56,7 @@ const {
     publishLandingExamples: vi.fn(),
     getBetaSignups: vi.fn(),
     updateBetaSignupStatus: vi.fn(),
+    sendBetaSignupInvite: vi.fn(),
 }));
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -90,6 +92,7 @@ vi.mock('../../utils/api', () => ({
         publishLandingExamples: (...args) => publishLandingExamples(...args),
         getBetaSignups: (...args) => getBetaSignups(...args),
         updateBetaSignupStatus: (...args) => updateBetaSignupStatus(...args),
+        sendBetaSignupInvite: (...args) => sendBetaSignupInvite(...args),
         exportBetaSignupsCsv: vi.fn(),
         revokeInviteKey: vi.fn(),
     },
@@ -348,6 +351,7 @@ describe('Admin', () => {
                         status: 'new',
                         source: 'landing_page',
                         created_at: '2026-06-10T00:00:00Z',
+                        last_invite_email_sent_at: null,
                     },
                 ],
                 total: 1,
@@ -355,6 +359,7 @@ describe('Admin', () => {
             },
         });
         updateBetaSignupStatus.mockResolvedValue({ data: { request: { id: 'signup-1', status: 'invited' } } });
+        sendBetaSignupInvite.mockResolvedValue({ data: { request: { id: 'signup-1', status: 'invited' } } });
     });
 
     it('renders user entity metrics, storage, and invite key creation', async () => {
@@ -598,5 +603,8 @@ describe('Admin', () => {
         const statusSelect = screen.getByDisplayValue('new');
         fireEvent.change(statusSelect, { target: { value: 'invited' } });
         await waitFor(() => expect(updateBetaSignupStatus).toHaveBeenCalledWith('signup-1', { status: 'invited' }));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Send invite' }));
+        await waitFor(() => expect(sendBetaSignupInvite).toHaveBeenCalledWith('signup-1'));
     });
 });

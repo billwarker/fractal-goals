@@ -6,10 +6,12 @@ import AuthModal from '../AuthModal';
 const {
     login,
     signup,
+    forgotPassword,
     notify,
 } = vi.hoisted(() => ({
     login: vi.fn(),
     signup: vi.fn(),
+    forgotPassword: vi.fn(),
     notify: {
         success: vi.fn(),
     },
@@ -25,6 +27,12 @@ vi.mock('../../../contexts/AuthContext', () => ({
 
 vi.mock('../../../utils/notify', () => ({
     default: notify,
+}));
+
+vi.mock('../../../utils/api', () => ({
+    authApi: {
+        forgotPassword: (...args) => forgotPassword(...args),
+    },
 }));
 
 describe('AuthModal', () => {
@@ -51,5 +59,19 @@ describe('AuthModal', () => {
             expect(login).toHaveBeenCalledWith('testuser', 'Password123', { rememberMe: true });
         });
         expect(onClose).toHaveBeenCalled();
+    });
+
+    it('requests a password reset from the login email field', async () => {
+        forgotPassword.mockResolvedValue({ data: { message: 'sent' } });
+
+        render(<AuthModal isOpen={true} onClose={vi.fn()} />);
+
+        fireEvent.change(screen.getByLabelText('Username or Email'), {
+            target: { value: 'test@example.com' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }));
+
+        await waitFor(() => expect(forgotPassword).toHaveBeenCalledWith({ email: 'test@example.com' }));
+        expect(notify.success).toHaveBeenCalled();
     });
 });

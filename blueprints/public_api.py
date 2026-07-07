@@ -1,11 +1,12 @@
 import logging
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
 
 from blueprints.api_utils import get_db_session, internal_error
 from extensions import limiter
 from services.public_service import PublicService
+from services.email_service import EmailService, EmailWebhookVerificationError
 from validators import BetaSignupRequestSchema, validate_request
 
 
@@ -50,3 +51,26 @@ def create_beta_signup(validated_data):
     except SQLAlchemyError:
         db_session.rollback()
         return internal_error(logger, "Error creating beta signup request")
+    finally:
+        db_session.close()
+
+
+@public_bp.route('/webhooks/resend', methods=['POST'])
+@limiter.limit("120 per minute")
+def handle_resend_webhook():
+    db_session = get_db_session()
+    try:
+        payload = EmailService(db_session).process_resend_webhook(
+            body=request.get_data(cache=False),
+            headers={key.lower(): value for key, value in request.headers.items()},
+        )
+        return jsonify(payload), 200
+    except EmailWebhookVerificationError as exc:
+        db_session.rollback()
+        logger.warning("Rejected Resend webhook: %s", exc)
+        return jsonify({"error": "Invalid webhook signature"}), 400
+    except SQLAlchemyError:
+        db_session.rollback()
+        return internal_error(logger, "Error processing Resend webhook")
+    finally:
+        db_session.close()
