@@ -1,11 +1,11 @@
 import React from 'react';
 
 import {
-    AlertTriangleIcon,
     CalendarIcon,
     FolderIcon,
 } from '../atoms/AppIcons';
 import { getProgramColor } from '../../utils/programViewModel';
+import NoteCard from '../notes/NoteCard';
 import TargetCard from '../TargetCard';
 import styles from './GoalUncompletionModal.module.css';
 
@@ -16,6 +16,7 @@ function GoalUncompletionModal({
     completedAt,
     accentColor,
     goalType,
+    goalCompletionNote,
 }) {
     return (
         <div
@@ -34,12 +35,6 @@ function GoalUncompletionModal({
                     </div>
                 </div>
             )}
-
-            {/* Warning */}
-            <div className={styles.warning}>
-                <AlertTriangleIcon size={16} />
-                <span>This will remove the completion status, completion date, and goal completion note from this goal.</span>
-            </div>
 
             {/* Associated Programs */}
             <div>
@@ -86,6 +81,27 @@ function GoalUncompletionModal({
                                 goalType={goalType}
                             />
                         ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Goal Completion Note */}
+            <div>
+                <label className={styles.fieldLabel}>
+                    Goal Completion Note:
+                </label>
+                {goalCompletionNote ? (
+                    <NoteCard
+                        note={goalCompletionNote}
+                        compact
+                        variant="flat"
+                        showContext={false}
+                        showTypePill={false}
+                        noteTypeVariant="metadata"
+                    />
+                ) : (
+                    <div className={styles.emptyText}>
+                        No goal completion note exists for this completion
                     </div>
                 )}
             </div>

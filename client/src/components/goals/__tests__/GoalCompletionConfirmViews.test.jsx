@@ -13,6 +13,10 @@ vi.mock('../../../contexts/GoalLevelsContext', () => ({
     }),
 }));
 
+vi.mock('../../../contexts/TimezoneContext', () => ({
+    useTimezone: () => ({ timezone: 'UTC' }),
+}));
+
 vi.mock('../../atoms/GoalIcon', () => ({
     default: () => <span data-testid="target-card-icon" />,
 }));
@@ -73,22 +77,50 @@ describe('Goal completion confirmation views', () => {
     });
 
     it('renders target cards and highlights incomplete-view programs with the program color', () => {
-        render(
+        const { container } = render(
             <GoalUncompletionModal
                 programs={programs}
                 targets={targets}
                 activityDefinitions={activityDefinitions}
                 completedAt="2026-07-06T16:20:21"
-                accentColor="#b5179e"
+                accentColor="#2ecc71"
                 goalType="ImmediateGoal"
+                goalCompletionNote={{
+                    id: 'note-1',
+                    content: 'This performance finally felt stable.',
+                    context_type: 'goal',
+                    context_id: 'goal-1',
+                    goal_id: 'goal-1',
+                    note_kind: 'goal_completion',
+                    note_type: 'goal_completion_note',
+                    note_type_label: 'Goal Completion Note',
+                    created_at: '2026-07-06T16:22:00Z',
+                    goal_name: "She's Got It",
+                    goal_type: 'ImmediateGoal',
+                }}
             />
         );
 
         expect(screen.getByText('Performance and Submission')).toBeInTheDocument();
         expect(screen.getByText('Quality')).toBeInTheDocument();
         expect(screen.getByText('8 Rating')).toBeInTheDocument();
+        expect(screen.getByText('This performance finally felt stable.')).toBeInTheDocument();
+        expect(screen.queryByText(/This will remove the completion status/)).not.toBeInTheDocument();
 
         const programRow = screen.getByText('Enlightened and Healthy Guitar').closest('div');
         expect(programRow).toHaveStyle({ '--program-accent': '#d000a9' });
+        expect(container.firstElementChild).toHaveStyle({ '--completion-confirm-accent': '#2ecc71' });
+
+        const targetCard = container.querySelector('[style*="--target-card-accent"]');
+        expect(targetCard).toHaveStyle({ '--target-card-accent': '#2ecc71' });
+
+        const sectionLabels = screen.getAllByText(/Was completed on:|Programs that will remove this completion:|Targets that will be marked incomplete \(1\):|Goal Completion Note:/)
+            .map((node) => node.textContent);
+        expect(sectionLabels).toEqual([
+            'Was completed on:',
+            'Programs that will remove this completion:',
+            'Targets that will be marked incomplete (1):',
+            'Goal Completion Note:',
+        ]);
     });
 });

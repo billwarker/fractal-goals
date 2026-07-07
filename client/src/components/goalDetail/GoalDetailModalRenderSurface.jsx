@@ -61,6 +61,7 @@ function GoalDetailModalRenderSurface({
     fetchedMetrics,
     goal,
     goalColor,
+    goalCompletionNote,
     goalForSmart,
     goalHeaderRef,
     goalHeaderStickyOffset,
@@ -358,8 +359,9 @@ function GoalDetailModalRenderSurface({
                 targets={targets}
                 activityDefinitions={activityDefinitions}
                 completedAt={uncompletionCompletedAt}
-                accentColor={goalColor}
+                accentColor={completedColor}
                 goalType={goalType}
+                goalCompletionNote={goalCompletionNote}
             />
         );
     } else if (viewState === 'target-manager') {
@@ -624,6 +626,8 @@ function GoalDetailModalRenderSurface({
     const showOptionsFooter = viewState === 'goal-options'
         && mode !== 'create'
         && !readOnly;
+    const completionConfirmAccentColor = viewState === 'uncomplete-confirm' ? completedColor : goalColor;
+    const completionConfirmTextColor = viewState === 'uncomplete-confirm' ? completedTextColor : textColor;
     const isTargetFlowActive = isTargetSelectionMode;
     const isAssociationFlowActive = isActivitiesAssociationMode;
     const footerContent = (
@@ -639,8 +643,8 @@ function GoalDetailModalRenderSurface({
             showActivitiesFooter={showActivitiesFooter}
             showCompletionConfirmFooter={showCompletionConfirmFooter}
             isUncompletionConfirm={viewState === 'uncomplete-confirm'}
-            completionConfirmAccentColor={goalColor}
-            completionConfirmTextColor={textColor}
+            completionConfirmAccentColor={completionConfirmAccentColor}
+            completionConfirmTextColor={completionConfirmTextColor}
             onCancelCompletionConfirm={() => setViewState('goal')}
             onConfirmCompletion={() => handleCompletionConfirm(completionPreviewDate, completionNoteDraft)}
             onConfirmUncompletion={handleUncompletionConfirm}

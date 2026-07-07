@@ -48,6 +48,7 @@ function deriveNoteTypeLabel(note) {
     const labels = {
         fractal_note: 'Fractal Note',
         goal_note: 'Goal Note',
+        goal_completion_note: 'Goal Completion Note',
         session_note: 'Session Note',
         program_note: 'Program Note',
         activity_instance_note: 'Activity Instance Note',
@@ -89,6 +90,7 @@ function NoteCard({
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const resolvedNoteType = deriveNoteType(note);
     const resolvedNoteTypeLabel = deriveNoteTypeLabel(note);
+    const isGoalCompletionNote = resolvedNoteType === 'goal_completion_note';
     const displayNoteTypeLabel = noteTypeVariant === 'metadata'
         ? formatMetadataNoteTypeLabel(resolvedNoteTypeLabel)
         : resolvedNoteTypeLabel;
@@ -246,6 +248,7 @@ function NoteCard({
             case 'fractal_note':
                 return 'Fractal';
             case 'goal_note':
+            case 'goal_completion_note':
                 return note.goal_name || note.content || 'Goal';
             case 'session_note':
                 return note.session_template_name || note.session_name || 'Session';
@@ -345,12 +348,12 @@ function NoteCard({
                         <div className={styles.metaStack}>
                             <div className={styles.metaRow}>
                                 <div className={styles.contextSummary}>
-                                    {resolvedNoteType === 'goal_note' && note.goal_type ? (
+                                    {(resolvedNoteType === 'goal_note' || isGoalCompletionNote) && note.goal_type ? (
                                         <span className={styles.goalContext}>
                                             <GoalIcon
                                                 shape={getGoalIcon(note.goal_type)}
-                                                color={getGoalColor(note.goal_type)}
-                                                secondaryColor={getGoalSecondaryColor(note.goal_type)}
+                                                color={getGoalColor(isGoalCompletionNote ? 'Completed' : note.goal_type)}
+                                                secondaryColor={getGoalSecondaryColor(isGoalCompletionNote ? 'Completed' : note.goal_type)}
                                                 isSmart={Boolean(note.goal_is_smart)}
                                                 size={12}
                                             />

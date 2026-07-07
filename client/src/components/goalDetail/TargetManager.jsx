@@ -55,6 +55,7 @@ const TargetManager = ({
     hideBuilderHeader = false, // host renders its own header (e.g. analytics modal)
     stickyFooter = false, // pin the action footer to the bottom of the scroll area
     readOnly = false,
+    goalCompleted = false,
 }) => {
     // Edit/delete affordances on cards are available outside read-only contexts
     // (e.g. the public landing page), regardless of goal edit mode.
@@ -654,7 +655,7 @@ const TargetManager = ({
                         <div key={target.id || index} className={styles.targetWrapper}>
                             <TargetCard
                                 target={target}
-                                isCompleted={Boolean(target.completed)}
+                                isCompleted={Boolean(goalCompleted || target.completed)}
                                 activityDefinitions={activityDefinitions}
                                 onClick={onTargetClick ? () => onTargetClick(target) : undefined}
                                 onEdit={canEditTargets ? () => handleOpenEditTarget(target) : undefined}

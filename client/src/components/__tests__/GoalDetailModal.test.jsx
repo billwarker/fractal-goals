@@ -521,10 +521,10 @@ describe('GoalDetailModal smoke coverage', () => {
 
         await waitFor(() => {
             expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
-            expect(screen.getByText('uncompletion modal:#22d3ee')).toBeInTheDocument();
+            expect(screen.getByText('uncompletion modal:#10b981')).toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'Mark Incomplete' })).toHaveStyle({
-                '--completion-accent': '#22d3ee',
+                '--completion-accent': '#10b981',
             });
         }, { timeout: 5000 });
     });

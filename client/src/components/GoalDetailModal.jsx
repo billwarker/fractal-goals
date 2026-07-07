@@ -146,9 +146,13 @@ function GoalDetailModal({
     const queryRootId = readOnly ? null : rootId;
     const queryGoalId = readOnly ? null : goalId;
     const {
+        notes: goalNotes,
         createNote: createGoalNote,
         deleteGoalCompletionNotes,
     } = useGoalNotes(queryRootId, queryGoalId);
+    const goalCompletionNote = useMemo(() => (
+        (goalNotes || []).find((note) => note.note_kind === 'goal_completion') || null
+    ), [goalNotes]);
     const goalColor = getGoalColor(goalType);
     const goalSecondaryColor = getGoalSecondaryColor(goalType);
     const goalIsSmart = isSMART(goal);
@@ -677,6 +681,7 @@ function GoalDetailModal({
             fetchedMetrics={fetchedMetrics}
             goal={goal}
             goalColor={goalColor}
+            goalCompletionNote={goalCompletionNote}
             goalForSmart={goalForSmart}
             goalHeaderRef={goalHeaderRef}
             goalHeaderStickyOffset={goalHeaderStickyOffset}

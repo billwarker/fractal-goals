@@ -50,7 +50,7 @@ const metricActivity = {
 function setup(overrides = {}) {
     const setTargets = vi.fn();
     const onSaved = vi.fn();
-    renderWithProviders(
+    const renderResult = renderWithProviders(
         <TargetManager
             targets={[]}
             setTargets={setTargets}
@@ -67,7 +67,7 @@ function setup(overrides = {}) {
         />,
         RENDER_OPTIONS
     );
-    return { setTargets, onSaved };
+    return { setTargets, onSaved, ...renderResult };
 }
 
 describe('TargetManager builder', () => {
@@ -126,6 +126,23 @@ describe('TargetManager builder', () => {
         await waitFor(() => {
             expect(targetMutationMocks.deleteTarget).toHaveBeenCalledWith('target-1');
         });
+    });
+
+    it('uses completed-goal color for target cards when the owning goal is complete', () => {
+        const { container } = setup({
+            viewMode: 'list',
+            goalCompleted: true,
+            targets: [{
+                id: 'target-1',
+                activity_id: 'activity-1',
+                name: 'Form target',
+                type: 'threshold',
+                metrics: [{ metric_id: 'form', value: 8, operator: '>=' }],
+            }],
+        });
+
+        const targetCard = container.querySelector('[style*="--target-card-accent"]');
+        expect(targetCard).toHaveStyle({ '--target-card-accent': '#4caf50' });
     });
 
     it('confirms before deleting from the builder edit footer', async () => {
