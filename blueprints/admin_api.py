@@ -7,9 +7,11 @@ import logging
 from blueprints.api_utils import get_db_session, internal_error, parse_optional_pagination
 from blueprints.auth_api import token_required
 from services.admin_service import AdminService
+from services.feature_flag_service import FeatureFlagService
 from services.landing_publish_service import LandingPublishService
 from validators import (
     AdminBetaSignupStatusSchema,
+    AdminFeatureFlagsUpdateSchema,
     AdminInviteKeyCreateSchema,
     AdminLandingExamplesUpdateSchema,
     AdminTierQuotaUpdateSchema,
@@ -212,6 +214,47 @@ def update_tier_quotas(current_user, validated_data):
         db_session.rollback()
         logger.exception("Error updating tier quota settings")
         return internal_error(logger, "Error updating tier quota settings")
+    finally:
+        db_session.close()
+
+
+@admin_bp.route('/feature-flags', methods=['GET'])
+@token_required
+def get_admin_feature_flags(current_user):
+    db_session = get_db_session()
+    try:
+        _, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+        payload, error, status = FeatureFlagService(db_session).get_flags(include_definitions=True)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        logger.exception("Error fetching feature flags")
+        return internal_error(logger, "Error fetching feature flags")
+    finally:
+        db_session.close()
+
+
+@admin_bp.route('/feature-flags', methods=['PATCH'])
+@token_required
+@validate_request(AdminFeatureFlagsUpdateSchema)
+def update_admin_feature_flags(current_user, validated_data):
+    db_session = get_db_session()
+    try:
+        _, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+        payload, error, status = FeatureFlagService(db_session).update_flags(validated_data.get("flags") or {})
+        if error:
+            return jsonify({"error": error}), status
+        logger.info("Admin user_id=%s updated_feature_flags", current_user.id)
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error updating feature flags")
+        return internal_error(logger, "Error updating feature flags")
     finally:
         db_session.close()
 

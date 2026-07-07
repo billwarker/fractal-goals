@@ -25,6 +25,7 @@ import ProfileWindowLayout, {
 } from '../components/analytics/ProfileWindowLayout';
 import { useAnalyticsPageData } from '../hooks/useAnalyticsPageData';
 import { useAnalyticsViews } from '../hooks/useDashboardQueries';
+import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../hooks/useFeatureFlags';
 import { useDebug } from '../contexts/DebugContext';
 import '../App.css';
 import notify from '../utils/notify';
@@ -76,6 +77,8 @@ function Analytics() {
     const navigate = useNavigate();
     const isMobile = useIsMobile();
     const { debugMode } = useDebug();
+    const { flags } = useFeatureFlags();
+    const showSqlExplorer = isFeatureEnabled(flags, FEATURE_FLAGS.analyticsSqlExplorer);
     const {
         activities,
         activityGroups,
@@ -206,6 +209,13 @@ function Analytics() {
         resetToEmptyView();
         setIsHydrated(true);
     }, [resetToEmptyView, rootId]);
+
+    useEffect(() => {
+        if (!showSqlExplorer && activeMode === 'query') {
+            setActiveMode('dashboard');
+            setConsoleInitialSql('');
+        }
+    }, [activeMode, showSqlExplorer]);
 
     const createWindowStateUpdater = useCallback((windowId) => (updates) => {
         setWindowStates((previous) => ({
@@ -404,9 +414,10 @@ function Analytics() {
     }, [deleteAnalyticsView, handleSelectAnalyticsView, selectedViewId]);
 
     const handleOpenQueryConsole = useCallback((sql) => {
+        if (!showSqlExplorer) return;
         setConsoleInitialSql(sql || '');
         setActiveMode('query');
-    }, []);
+    }, [showSqlExplorer]);
 
     const renderWindow = useCallback((windowId, layoutControls = {}) => {
         const windowCount = countWindows(layout);
@@ -439,6 +450,7 @@ function Analytics() {
                     onGlobalDateRangeChange={handleDateRangeChange}
                     globalFilters={globalFilters}
                     onOpenQueryConsole={handleOpenQueryConsole}
+                    showQueryInspector={showSqlExplorer}
                 />
             </Suspense>
         );
@@ -453,6 +465,7 @@ function Analytics() {
         layout,
         selectedWindowId,
         sharedData,
+        showSqlExplorer,
         windowStates,
     ]);
 
@@ -475,9 +488,10 @@ function Analytics() {
                     onSaveView={handleSaveView}
                     isFiltersPaneOpen={isFiltersPaneOpen}
                     onToggleFiltersPane={() => setIsFiltersPaneOpen((current) => !current)}
+                    showQueryConsole={showSqlExplorer}
                 />
 
-                {activeMode === 'query' ? (
+                {activeMode === 'query' && showSqlExplorer ? (
                     <AnalyticsQueryConsole rootId={rootId} initialSql={consoleInitialSql} />
                 ) : (
                     <div className={styles.workspace} onMouseDown={handleWorkspaceMouseDown}>

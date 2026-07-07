@@ -14,7 +14,7 @@ function getErrorMessage(error, fallbackMessage) {
  * CRUD hook for user-configurable page surface layouts. Mirrors
  * useAnalyticsViews: query-first reads, mutations invalidate the family.
  */
-export function usePageSurfaces(rootId, page = 'goals') {
+export function usePageSurfaces(rootId, page = 'goals', options = {}) {
     const queryClient = useQueryClient();
     const queryKey = queryKeys.pageSurfaces(rootId, page);
 
@@ -24,7 +24,7 @@ export function usePageSurfaces(rootId, page = 'goals') {
             const response = await fractalApi.getPageSurfaces(rootId, page);
             return response.data?.data || [];
         },
-        enabled: Boolean(rootId),
+        enabled: Boolean(rootId) && options.enabled !== false,
         staleTime: 30 * 1000,
     });
 

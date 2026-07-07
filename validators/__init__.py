@@ -20,6 +20,7 @@ from .core import (
 )
 from .auth import (
     AdminBetaSignupStatusSchema,
+    AdminFeatureFlagsUpdateSchema,
     AdminInviteKeyCreateSchema,
     AdminLandingExamplesUpdateSchema,
     AdminTierQuotaUpdateSchema,
@@ -142,6 +143,7 @@ __all__ = [
     "ActivityReorderSchema",
     "ActivityTimerStartSchema",
     "AdminBetaSignupStatusSchema",
+    "AdminFeatureFlagsUpdateSchema",
     "AdminInviteKeyCreateSchema",
     "AdminLandingExamplesUpdateSchema",
     "AdminTierQuotaUpdateSchema",

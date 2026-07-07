@@ -11,6 +11,7 @@ function AnalyticsTopBar({
     onSaveView,
     isFiltersPaneOpen = false,
     onToggleFiltersPane,
+    showQueryConsole = true,
 }) {
     return (
         <div className={styles.topBar}>
@@ -31,26 +32,28 @@ function AnalyticsTopBar({
             </div>
 
             <div className={styles.rightActions}>
-                <div className={styles.modeSwitch} role="tablist" aria-label="Analytics page mode">
-                    <button
-                        type="button"
-                        role="tab"
-                        aria-selected={activeMode === 'dashboard'}
-                        className={`${styles.modeButton} ${activeMode === 'dashboard' ? styles.modeButtonActive : ''}`}
-                        onClick={() => onModeChange?.('dashboard')}
-                    >
-                        Dashboard
-                    </button>
-                    <button
-                        type="button"
-                        role="tab"
-                        aria-selected={activeMode === 'query'}
-                        className={`${styles.modeButton} ${activeMode === 'query' ? styles.modeButtonActive : ''}`}
-                        onClick={() => onModeChange?.('query')}
-                    >
-                        Query Console
-                    </button>
-                </div>
+                {showQueryConsole && (
+                    <div className={styles.modeSwitch} role="tablist" aria-label="Analytics page mode">
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={activeMode === 'dashboard'}
+                            className={`${styles.modeButton} ${activeMode === 'dashboard' ? styles.modeButtonActive : ''}`}
+                            onClick={() => onModeChange?.('dashboard')}
+                        >
+                            Dashboard
+                        </button>
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={activeMode === 'query'}
+                            className={`${styles.modeButton} ${activeMode === 'query' ? styles.modeButtonActive : ''}`}
+                            onClick={() => onModeChange?.('query')}
+                        >
+                            Query Console
+                        </button>
+                    </div>
+                )}
                 {activeMode === 'dashboard' && (
                     <Button variant="secondary" size="sm" onClick={onToggleFiltersPane}>
                         {isFiltersPaneOpen ? 'Hide Filters' : 'Show Filters'}

@@ -73,6 +73,68 @@
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
+.featureFlagsHeader {
+    margin-bottom: 18px;
+}
+
+.featureFlagsHeader h2 {
+    margin: 0 0 8px;
+    font-size: var(--font-size-xl);
+}
+
+.featureFlagsHeader p {
+    margin: 0;
+    color: var(--color-text-secondary);
+}
+
+.featureFlagList {
+    display: grid;
+    gap: 12px;
+    max-width: 980px;
+}
+
+.featureFlagItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    border-radius: var(--border-radius-lg);
+    padding: 18px;
+    box-shadow: var(--shadow-sm);
+}
+
+.featureFlagItem strong,
+.featureFlagItem span {
+    display: block;
+}
+
+.featureFlagItem strong {
+    margin-bottom: 6px;
+    color: var(--color-text-primary);
+}
+
+.featureFlagItem span {
+    color: var(--color-text-secondary);
+}
+
+.featureFlagSwitch {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 84px;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+}
+
+.featureFlagSwitch input {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--color-brand-primary);
+}
+
 .table .dangerButton {
     margin-top: 8px;
     border-color: rgba(239, 106, 106, 0.45);
@@ -110,6 +172,7 @@
 
 .tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 24px;
 }

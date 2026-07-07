@@ -177,6 +177,10 @@ class AdminTierQuotaUpdateSchema(BaseModel):
         return v
 
 
+class AdminFeatureFlagsUpdateSchema(BaseModel):
+    flags: Dict[str, bool]
+
+
 class LandingExampleShowcaseSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 

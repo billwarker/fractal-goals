@@ -13,6 +13,8 @@ const {
     createInviteKey,
     createUser,
     updateTierQuotas,
+    getFeatureFlags,
+    updateFeatureFlags,
     updateUser,
     softDeleteUser,
     hardDeleteUser,
@@ -36,6 +38,8 @@ const {
     createInviteKey: vi.fn(),
     createUser: vi.fn(),
     updateTierQuotas: vi.fn(),
+    getFeatureFlags: vi.fn(),
+    updateFeatureFlags: vi.fn(),
     updateUser: vi.fn(),
     softDeleteUser: vi.fn(),
     hardDeleteUser: vi.fn(),
@@ -69,6 +73,8 @@ vi.mock('../../utils/api', () => ({
         createInviteKey: (...args) => createInviteKey(...args),
         createUser: (...args) => createUser(...args),
         updateTierQuotas: (...args) => updateTierQuotas(...args),
+        getFeatureFlags: (...args) => getFeatureFlags(...args),
+        updateFeatureFlags: (...args) => updateFeatureFlags(...args),
         updateUser: (...args) => updateUser(...args),
         softDeleteUser: (...args) => softDeleteUser(...args),
         hardDeleteUser: (...args) => hardDeleteUser(...args),
@@ -238,6 +244,50 @@ describe('Admin', () => {
         createInviteKey.mockResolvedValue({ data: { id: 'key-1', key: 'fg_invite_secret', status: 'available' } });
         createUser.mockResolvedValue({ data: { temporary_password: 'A1createdPassword' } });
         updateTierQuotas.mockResolvedValue({ data: {} });
+        getFeatureFlags.mockResolvedValue({
+            data: {
+                flags: {
+                    goal_surface_configuration: false,
+                    analytics_sql_explorer: true,
+                },
+                definitions: [
+                    {
+                        key: 'goal_surface_configuration',
+                        label: 'Goal view configuration',
+                        description: 'Shows the configurable goal surface, layout picker, configure controls, and surface widgets.',
+                        enabled: false,
+                    },
+                    {
+                        key: 'analytics_sql_explorer',
+                        label: 'Analytics SQL explorer',
+                        description: 'Shows the analytics query console, SQL chart query inspector, and SQL authoring affordances.',
+                        enabled: true,
+                    },
+                ],
+            },
+        });
+        updateFeatureFlags.mockResolvedValue({
+            data: {
+                flags: {
+                    goal_surface_configuration: true,
+                    analytics_sql_explorer: true,
+                },
+                definitions: [
+                    {
+                        key: 'goal_surface_configuration',
+                        label: 'Goal view configuration',
+                        description: 'Shows the configurable goal surface, layout picker, configure controls, and surface widgets.',
+                        enabled: true,
+                    },
+                    {
+                        key: 'analytics_sql_explorer',
+                        label: 'Analytics SQL explorer',
+                        description: 'Shows the analytics query console, SQL chart query inspector, and SQL authoring affordances.',
+                        enabled: true,
+                    },
+                ],
+            },
+        });
         updateUser.mockResolvedValue({ data: {} });
         softDeleteUser.mockResolvedValue({ data: { message: 'User soft deleted' } });
         hardDeleteUser.mockResolvedValue({ data: { message: 'User hard deleted' } });
@@ -478,6 +528,20 @@ describe('Admin', () => {
             },
             storage_limit_bytes: 262144000,
             apply_existing_users: true,
+        }));
+    });
+
+    it('manages feature flags', async () => {
+        renderAdmin();
+
+        fireEvent.click(screen.getByText('feature flags'));
+        await waitFor(() => expect(screen.getByText('Goal view configuration')).toBeInTheDocument());
+
+        expect(screen.getByText('Analytics SQL explorer')).toBeInTheDocument();
+        fireEvent.click(screen.getByLabelText('Goal view configuration'));
+
+        await waitFor(() => expect(updateFeatureFlags).toHaveBeenCalledWith({
+            flags: { goal_surface_configuration: true },
         }));
     });
 

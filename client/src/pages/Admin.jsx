@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { AlertTriangleIcon } from '../components/atoms/AppIcons';
 import CloseButton from '../components/atoms/CloseButton';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
+import { queryKeys } from '../hooks/queryKeys';
 import { adminApi } from '../utils/api';
 import notify from '../utils/notify';
 import { formatError } from '../utils/mutationNotify';
@@ -21,6 +22,7 @@ const ADMIN_USERS_KEY = ['admin', 'users'];
 const ADMIN_SUMMARY_KEY = ['admin', 'summary'];
 const ADMIN_INVITES_KEY = ['admin', 'invite-keys'];
 const ADMIN_TIER_QUOTAS_KEY = ['admin', 'tier-quotas'];
+const ADMIN_FEATURE_FLAGS_KEY = ['admin', 'feature-flags'];
 const ADMIN_LANDING_EXAMPLES_KEY = ['admin', 'landing-examples'];
 const QUOTA_PLACEHOLDER = '{"goals": 100, "sessions": 500}';
 
@@ -495,6 +497,66 @@ function LandingExamplesPanel() {
                         ))}
                     </div>
                 </div>
+            </div>
+        </section>
+    );
+}
+
+function FeatureFlagsPanel() {
+    const queryClient = useQueryClient();
+    const featureFlagsQuery = useQuery({
+        queryKey: ADMIN_FEATURE_FLAGS_KEY,
+        queryFn: async () => (await adminApi.getFeatureFlags()).data,
+    });
+
+    const mutation = useMutation({
+        mutationFn: ({ key, enabled }) => adminApi.updateFeatureFlags({ flags: { [key]: enabled } }),
+        onSuccess: (res) => {
+            queryClient.setQueryData(ADMIN_FEATURE_FLAGS_KEY, res.data);
+            queryClient.setQueryData(queryKeys.featureFlags(), res.data.flags || {});
+            notify.success('Feature flag updated');
+        },
+        onError: (error) => notify.error(`Failed to update feature flag: ${formatError(error)}`),
+    });
+
+    if (featureFlagsQuery.isLoading) {
+        return <div className={styles.status}>Loading feature flags...</div>;
+    }
+
+    if (featureFlagsQuery.isError) {
+        return <div className={styles.status}>Failed to load feature flags.</div>;
+    }
+
+    const definitions = featureFlagsQuery.data?.definitions || [];
+
+    return (
+        <section className={styles.section}>
+            <div className={styles.featureFlagsHeader}>
+                <h2>Feature Flags</h2>
+                <p>Control access to experimental or high-complexity app surfaces.</p>
+            </div>
+            <div className={styles.featureFlagList}>
+                {definitions.map((flag) => (
+                    <div className={styles.featureFlagItem} key={flag.key}>
+                        <div>
+                            <strong>{flag.label}</strong>
+                            <span>{flag.description}</span>
+                        </div>
+                        <label className={styles.featureFlagSwitch}>
+                            <input
+                                type="checkbox"
+                                aria-label={flag.label}
+                                checked={Boolean(flag.enabled)}
+                                disabled={mutation.isPending}
+                                onChange={(event) => mutation.mutate({
+                                    key: flag.key,
+                                    enabled: event.target.checked,
+                                })}
+                            />
+                            <span>{flag.enabled ? 'On' : 'Off'}</span>
+                        </label>
+                    </div>
+                ))}
             </div>
         </section>
     );
@@ -990,7 +1052,7 @@ function Admin() {
             </header>
 
             <div className={styles.tabs}>
-                {['overview', 'users', 'beta signups', 'tier quotas', 'landing', 'invite keys'].map((item) => (
+                {['overview', 'users', 'beta signups', 'tier quotas', 'feature flags', 'landing', 'invite keys'].map((item) => (
                     <button
                         key={item}
                         className={tab === item ? styles.activeTab : ''}
@@ -1093,6 +1155,10 @@ function Admin() {
 
             {tab === 'tier quotas' && (
                 <TierQuotasPanel tierQuotasQuery={tierQuotasQuery} />
+            )}
+
+            {tab === 'feature flags' && (
+                <FeatureFlagsPanel />
             )}
 
             {tab === 'landing' && (

@@ -225,4 +225,32 @@ describe('ProfileWindow', () => {
         expect(sql).toHaveTextContent('ORDER BY completed_instances DESC, activity_name ASC');
         expect(sql).toHaveTextContent('LIMIT 8');
     });
+
+    it('hides chart SQL affordances when query inspection is disabled', () => {
+        render(
+            <ProfileWindow
+                data={{
+                    sessions: [],
+                    goalAnalytics: { goals: [], summary: {} },
+                    activities: [{ id: 'activity-1', name: 'Squat', group_id: 'group-1' }],
+                    activityGroups: [],
+                    activityInstances: { 'activity-1': [{ id: 'instance-1', completed: true }] },
+                    formatDuration: (seconds) => `${seconds}s`,
+                    rootId: null,
+                }}
+                windowState={{
+                    selectedCategory: 'activities',
+                    selectedVisualization: 'activityFrequency',
+                    visualizationState: { metric: 'instances', showGroups: false, limit: 8 },
+                    selectedActivity: null,
+                    selectedGoal: null,
+                }}
+                updateWindowState={vi.fn()}
+                showQueryInspector={false}
+            />
+        );
+
+        expect(screen.queryByRole('button', { name: 'Show chart query' })).not.toBeInTheDocument();
+        expect(screen.queryByText('Chart Query')).not.toBeInTheDocument();
+    });
 });

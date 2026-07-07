@@ -7,6 +7,7 @@ const navigate = vi.fn();
 const createAnalyticsView = vi.fn();
 const updateAnalyticsView = vi.fn();
 const deleteAnalyticsView = vi.fn();
+let analyticsSqlExplorerEnabled = true;
 
 vi.mock('react-router-dom', async (importOriginal) => {
     const actual = await importOriginal();
@@ -65,6 +66,20 @@ vi.mock('../../hooks/useAnalyticsEngine', () => ({
     }),
 }));
 
+vi.mock('../../hooks/useFeatureFlags', () => ({
+    FEATURE_FLAGS: {
+        analyticsSqlExplorer: 'analytics_sql_explorer',
+        goalSurfaceConfiguration: 'goal_surface_configuration',
+    },
+    useFeatureFlags: () => ({
+        flags: {
+            analytics_sql_explorer: analyticsSqlExplorerEnabled,
+            goal_surface_configuration: false,
+        },
+    }),
+    isFeatureEnabled: (flags, key) => flags?.[key] === true,
+}));
+
 vi.mock('../../components/analytics/ProfileWindow', () => ({
     default: () => <div>Analytics panel</div>,
 }));
@@ -72,6 +87,7 @@ vi.mock('../../components/analytics/ProfileWindow', () => ({
 describe('Analytics page', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        analyticsSqlExplorerEnabled = true;
         createAnalyticsView.mockResolvedValue({
             id: 'view-1',
             name: 'My Saved View',
@@ -185,5 +201,16 @@ describe('Analytics page', () => {
         expect(screen.queryByRole('button', { name: 'Saved Analytics' })).not.toBeInTheDocument();
         expect(screen.queryByText('Analytics panel')).not.toBeInTheDocument();
         expect(screen.queryByText('Loading analytics panel...')).not.toBeInTheDocument();
+    });
+
+    it('hides the query console mode when the SQL explorer flag is off', () => {
+        analyticsSqlExplorerEnabled = false;
+
+        render(<Analytics />);
+
+        expect(screen.queryByRole('tab', { name: 'Dashboard' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: 'Query Console' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+        expect(screen.queryByRole('region', { name: 'Analytics query console' })).not.toBeInTheDocument();
     });
 });

@@ -24,6 +24,7 @@ import {
     shouldIgnoreTypeToZoomKey,
 } from '../utils/typeToZoomInput';
 import { usePrograms } from '../hooks/useProgramQueries';
+import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../hooks/useFeatureFlags';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import PageSurface from '../components/surface/PageSurface';
@@ -130,6 +131,8 @@ function FractalGoals() {
     const { activities = EMPTY_ARRAY, isLoading: activitiesLoading } = useActivitiesQuery(rootId);
     const { activityGroups = EMPTY_ARRAY, isLoading: activityGroupsLoading } = useActivityGroups(rootId);
     const { debugMode } = useDebug();
+    const { flags } = useFeatureFlags();
+    const showSurfaceConfiguration = isFeatureEnabled(flags, FEATURE_FLAGS.goalSurfaceConfiguration);
     const isMobile = useIsMobile();
     const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
     const flowTreeSettingsStorageKey = useMemo(
@@ -153,7 +156,9 @@ function FractalGoals() {
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
 
     // --- Configurable page surface state ---
-    const { surfaces, createSurface, updateSurface, setDefaultSurface, deleteSurface } = usePageSurfaces(rootId, 'goals');
+    const { surfaces, createSurface, updateSurface, setDefaultSurface, deleteSurface } = usePageSurfaces(rootId, 'goals', {
+        enabled: showSurfaceConfiguration,
+    });
     const [activeSurfaceId, setActiveSurfaceId] = useState(null);
     const [workingConfig, setWorkingConfig] = useState(null);
     const [isConfigureMode, setIsConfigureMode] = useState(false);
@@ -341,6 +346,14 @@ function FractalGoals() {
         setIsSurfaceDirty(false);
         applySurfaceTreeView(effective, surfaceViewMode, targetIsMobile, options);
     }, [applySurfaceTreeView, isMobile, surfaceViewMode]);
+
+    useEffect(() => {
+        if (showSurfaceConfiguration) return;
+        setIsConfigureMode(false);
+        setSelectedPanelId(null);
+        setSurfacePointerCell(null);
+        loadSurfaceConfig(null, configViewportIsMobile);
+    }, [configViewportIsMobile, loadSurfaceConfig, showSurfaceConfiguration]);
 
     useEffect(() => {
         if (!rootId || workingConfig) return;
@@ -835,17 +848,17 @@ function FractalGoals() {
                         inactiveBranchTooltip={inactiveBranchTooltip}
                         hideInactiveTooltip={hideInactiveTooltip}
                         hideCompletedTooltip={hideCompletedTooltip}
-                        isConfigureMode={isConfigureMode}
-                        onToggleConfigureMode={handleEnterConfigureMode}
+                        isConfigureMode={showSurfaceConfiguration && isConfigureMode}
+                        onToggleConfigureMode={showSurfaceConfiguration ? handleEnterConfigureMode : null}
                         onCancelConfigureMode={handleCancelConfigureMode}
-                        surfaces={surfaces}
+                        surfaces={showSurfaceConfiguration ? surfaces : EMPTY_ARRAY}
                         activeSurfaceId={activeSurfaceId}
                         isSurfaceDirty={isSurfaceDirty}
-                        onSelectSurface={(id) => loadSurfaceConfig(
+                        onSelectSurface={showSurfaceConfiguration ? ((id) => loadSurfaceConfig(
                             surfaces.find((s) => s.id === id) || null,
                             configViewportIsMobile,
                             { respectStoredPreferences: false }
-                        )}
+                        )) : null}
                         onSaveSurface={handleSaveSurface}
                         onSaveSurfaceAs={handleSaveSurfaceAs}
                         onSetDefaultSurface={handleSetDefaultSurface}
@@ -875,7 +888,7 @@ function FractalGoals() {
                     <PageSurface
                         activeConfig={effectiveSurfaceConfig}
                         onConfigChange={handleSurfaceConfigChange}
-                        configureMode={isConfigureMode}
+                        configureMode={showSurfaceConfiguration && isConfigureMode}
                         viewMode={surfaceViewMode}
                         selectedPanelId={selectedPanelId}
                         onSelectedPanelIdChange={setSelectedPanelId}

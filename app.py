@@ -41,6 +41,7 @@ from blueprints.dashboards_api import dashboards_bp
 from blueprints.page_surface_api import page_surface_bp
 from blueprints.analytics_api import analytics_bp
 from blueprints.logs_api import logs_api
+from blueprints.feature_flags_api import feature_flags_bp
 from blueprints.auth_api import auth_bp
 from blueprints.admin_api import admin_bp
 from blueprints.public_api import public_bp
@@ -184,6 +185,7 @@ app.register_blueprint(dashboards_bp)
 app.register_blueprint(page_surface_bp)
 app.register_blueprint(analytics_bp)
 app.register_blueprint(logs_api)
+app.register_blueprint(feature_flags_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(public_bp)

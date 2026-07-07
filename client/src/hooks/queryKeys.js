@@ -14,6 +14,7 @@ export const queryKeys = {
     activityInstantiationSummary: (rootId) => ['activity-instantiation-summary', rootId],
     activityGroups: (rootId) => ['activity-groups', rootId],
     fractalMetrics: (rootId) => ['fractal-metrics', rootId],
+    featureFlags: () => ['feature-flags'],
     analyticsViews: (rootId) => ['analytics-views', rootId],
     analyticsCatalog: () => ['analytics-engine', 'catalog'],
     analyticsQueryProfiles: () => ['analytics-engine', 'query-profiles'],

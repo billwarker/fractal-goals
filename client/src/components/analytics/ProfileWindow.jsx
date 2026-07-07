@@ -61,6 +61,7 @@ function ProfileWindow({
     onGlobalDateRangeChange,
     globalFilters = null,
     onOpenQueryConsole = null,
+    showQueryInspector = true,
 }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const { sessions, goalAnalytics, activities, activityGroups, activityInstances, rootId } = data;
@@ -361,6 +362,7 @@ function ProfileWindow({
     ]);
 
     const queryExplanation = useMemo(() => {
+        if (!showQueryInspector) return null;
         if (!selectedVisualizationMeta) return null;
         return buildVisualizationQueryExplanation({
             selectedCategory,
@@ -389,6 +391,7 @@ function ProfileWindow({
         selectedCategory,
         selectedVisualization,
         selectedVisualizationMeta,
+        showQueryInspector,
         visualizationState,
     ]);
 
@@ -455,7 +458,7 @@ function ProfileWindow({
 
                 {/* Global Actions (Annotations, Split, Close) */}
                 <div className={styles.globalActions}>
-                    {selectedVisualizationMeta && (
+                    {showQueryInspector && selectedVisualizationMeta && (
                         <Button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -553,7 +556,7 @@ function ProfileWindow({
     );
 
     const renderQueryOverlay = () => {
-        if (!isQueryOverlayOpen || !queryExplanation) return null;
+        if (!showQueryInspector || !isQueryOverlayOpen || !queryExplanation) return null;
         return (
             <div className={styles.queryOverlay} onClick={(event) => event.stopPropagation()}>
                 <div className={styles.queryOverlayHeader}>
