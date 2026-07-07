@@ -592,7 +592,8 @@ Shared frontend infrastructure to know:
 - `tests/`: backend tests
 - `client/src/**/__tests__/` and `client/src/hooks/__tests__/`: frontend tests
 - `docs/architecture/`: ADRs
-- `docs/planning/`: roadmap and planning docs
+- `docs/planning/`: historical roadmap and planning docs
+- `planning/`: active implementation plans and readiness audits, including `planning/beta-readiness-2026-07.md` and `planning/beta-readiness-findings-2026-07.md`
 
 ## Testing And Quality
 
@@ -690,7 +691,7 @@ At a high level, the repo is in strong shape structurally:
 The main remaining work is no longer just incremental cleanup. The highest-leverage next phase is SaaS hardening and scale-readiness:
 
 - decompose large services and UI coordinators before they calcify
-- wire real billing, webhook, and email workflows into the quota/account layer
+- wire real billing and remaining email workflows into the quota/account layer
 - add async/background job execution for analytics, email, billing sync, and heavy recomputation
 - expand observability beyond exception capture into request, latency, quota, and business metrics
 - add admin/support tooling for paid-customer operations
