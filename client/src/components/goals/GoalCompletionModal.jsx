@@ -46,7 +46,7 @@ function GoalCompletionModal({
                     rows={4}
                 />
                 <p className={styles.completionNoteHint}>
-                    Paste a YouTube, Instagram, or Google Drive video link on its own line to embed it as evidence.
+                    Paste a YouTube, Instagram, Google Drive, or direct video link on its own line to embed it as evidence.
                 </p>
             </div>
 

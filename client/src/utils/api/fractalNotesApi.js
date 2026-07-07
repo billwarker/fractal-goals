@@ -14,6 +14,8 @@ export const fractalNotesApi = {
         axios.get(
             `${API_BASE}/${rootId}/activities/${activityId}/history${buildQueryString(options, { excludeSession: 'exclude_session' })}`
         ),
+    getInstagramOembed: (url) =>
+        axios.get(`${API_BASE}/oembed/instagram?url=${encodeURIComponent(url)}`),
     createNote: (rootId, data) => axios.post(`${API_BASE}/${rootId}/notes`, data),
     updateNote: (rootId, noteId, data) => axios.put(`${API_BASE}/${rootId}/notes/${noteId}`, data),
     deleteNote: (rootId, noteId) => axios.delete(`${API_BASE}/${rootId}/notes/${noteId}`),

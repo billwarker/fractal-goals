@@ -16,6 +16,7 @@ import CloseIcon from '../atoms/CloseIcon';
 import CreateNoteIcon from '../atoms/CreateNoteIcon';
 import GoalTreePicker from '../common/GoalTreePicker';
 import { markdownComponents } from './markdownComponents';
+import { parseVideoUrl } from '../../utils/videoEmbeds';
 import styles from './NoteComposer.module.css';
 
 function NoteComposer({
@@ -120,6 +121,33 @@ function NoteComposer({
         }
     };
 
+    // Paste-to-embed: when the clipboard holds a single recognized video URL,
+    // insert it on its own line (blank lines around it) so it satisfies the
+    // "own line" embed rule without the user needing to know it.
+    const handlePaste = (e) => {
+        const pasted = (e.clipboardData?.getData('text') || '').trim();
+        if (!pasted || /\s/.test(pasted) || !parseVideoUrl(pasted)) return;
+
+        const el = e.target;
+        const start = el.selectionStart ?? content.length;
+        const end = el.selectionEnd ?? content.length;
+        const before = content.slice(0, start);
+        const after = content.slice(end);
+
+        const prefix = before && !before.endsWith('\n\n') ? (before.endsWith('\n') ? '\n' : '\n\n') : '';
+        const suffix = after && !after.startsWith('\n\n') ? (after.startsWith('\n') ? '\n' : '\n\n') : '';
+        const insertion = `${prefix}${pasted}${suffix}`;
+        const next = before + insertion + after;
+
+        e.preventDefault();
+        setContent(next);
+        requestAnimationFrame(() => {
+            adjustHeight(el);
+            const caret = before.length + insertion.length;
+            el.setSelectionRange(caret, caret);
+        });
+    };
+
     const filteredActivities = internalActivities.filter(a =>
         !activitySearch || a.name.toLowerCase().includes(activitySearch.toLowerCase())
     );
@@ -168,7 +196,8 @@ function NoteComposer({
                             value={content}
                             onChange={(e) => { setContent(e.target.value); adjustHeight(e.target); }}
                             onKeyDown={handleKeyDown}
-                            placeholder="Write a note… (Markdown supported; paste a YouTube, Instagram, or Google Drive video link on its own line to embed it. ⌘Enter to submit)"
+                            onPaste={handlePaste}
+                            placeholder="Write a note… (Markdown supported; paste a YouTube, Instagram, Google Drive, or direct video link to embed it. ⌘Enter to submit)"
                             rows={4}
                         />
                     )}

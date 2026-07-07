@@ -42,7 +42,12 @@ class Config:
     PORT = int(os.getenv('FLASK_PORT', '8001'))
     MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', str(2 * 1024 * 1024)))
     SLOW_REQUEST_THRESHOLD_MS = int(os.getenv('SLOW_REQUEST_THRESHOLD_MS', '750'))
-    
+
+    # Optional Meta/Instagram oEmbed access token. When set, the notes oEmbed
+    # proxy returns official Instagram embed HTML; when unset, the frontend
+    # falls back to the plain /embed iframe. See services/oembed_service.py.
+    INSTAGRAM_OEMBED_TOKEN = os.getenv('INSTAGRAM_OEMBED_TOKEN', None)
+
     # Database Configuration
     # Use DATABASE_URL for local/test environments.
     # In production/staging, prefer SUPABASE_DATABASE_URL so deployment config

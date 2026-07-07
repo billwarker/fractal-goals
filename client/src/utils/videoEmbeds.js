@@ -35,6 +35,7 @@ const YOUTUBE_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 const INSTAGRAM_TYPES = new Set(['p', 'reel', 'reels', 'tv']);
 const INSTAGRAM_SHORTCODE_PATTERN = /^[A-Za-z0-9_-]+$/;
 const GOOGLE_DRIVE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+const NATIVE_VIDEO_EXTENSIONS = ['.mp4', '.webm', '.ogg', '.ogv', '.mov', '.m4v'];
 
 /**
  * Convert a YouTube `t`/`start` timestamp value into whole seconds.
@@ -80,12 +81,18 @@ function parseYoutube(url) {
     const start = parseYoutubeStart(
         url.searchParams.get('start') || url.searchParams.get('t')
     );
-    // youtube-nocookie is the privacy-enhanced embed host.
-    let embedUrl = `https://www.youtube-nocookie.com/embed/${id}`;
-    if (start) {
-        embedUrl += `?start=${start}`;
-    }
-    return { provider: 'youtube', id, embedUrl };
+    // youtube-nocookie is the privacy-enhanced embed host. Autoplay so the
+    // facade's play click flows straight into playback once the iframe mounts.
+    const params = new URLSearchParams({ autoplay: '1' });
+    if (start) params.set('start', String(start));
+    return {
+        provider: 'youtube',
+        kind: 'iframe',
+        id,
+        embedUrl: `https://www.youtube-nocookie.com/embed/${id}?${params.toString()}`,
+        // Lightweight poster so the facade renders without loading the player.
+        posterUrl: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+    };
 }
 
 function parseInstagram(url) {
@@ -101,8 +108,11 @@ function parseInstagram(url) {
     const normalizedType = type === 'reels' ? 'reel' : type;
     return {
         provider: 'instagram',
+        kind: 'iframe',
         id: shortcode,
         embedUrl: `https://www.instagram.com/${normalizedType}/${shortcode}/embed`,
+        // Canonical permalink the oEmbed proxy resolves against.
+        permalink: `https://www.instagram.com/${normalizedType}/${shortcode}/`,
     };
 }
 
@@ -132,15 +142,39 @@ function parseGoogleDrive(url) {
     // Google's sanctioned embed player for a Drive file.
     return {
         provider: 'googleDrive',
+        kind: 'iframe',
         id,
         embedUrl: `https://drive.google.com/file/d/${id}/preview`,
     };
 }
 
 /**
- * parseVideoUrl(url) → { provider, id, embedUrl } | null
- * Returns an embed descriptor for allowlisted YouTube/Instagram/Google Drive
- * URLs, else null.
+ * Recognize a direct video file (any https host) whose path ends in a known
+ * video extension. Rendered as a native <video> tag rather than an iframe, so
+ * it introduces no new framing surface and works for self-hosted / fully
+ * private (e.g. signed-URL) evidence.
+ */
+function parseNativeFile(url) {
+    // Native playback is https-only to avoid mixed-content on our https app.
+    if (url.protocol !== 'https:') return null;
+    const path = url.pathname.toLowerCase();
+    const hasVideoExt = NATIVE_VIDEO_EXTENSIONS.some((ext) => path.endsWith(ext));
+    if (!hasVideoExt) return null;
+
+    return {
+        provider: 'file',
+        kind: 'native',
+        src: url.href,
+    };
+}
+
+/**
+ * parseVideoUrl(url) → descriptor | null
+ *
+ * Descriptor always carries `provider`, `kind` ('iframe' | 'native'), and
+ * `sourceUrl` (the original link, for the fallback "open original" affordance).
+ * iframe descriptors add `embedUrl` (+ `posterUrl`/`permalink` where available);
+ * native descriptors add `src`. Non-allowlisted iframe hosts return null.
  */
 export function parseVideoUrl(rawUrl) {
     if (!rawUrl || typeof rawUrl !== 'string') return null;
@@ -155,16 +189,21 @@ export function parseVideoUrl(rawUrl) {
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
 
     const host = url.hostname.toLowerCase();
+    let descriptor = null;
     if (YOUTUBE_HOSTS.has(host)) {
-        return parseYoutube(url);
+        descriptor = parseYoutube(url);
+    } else if (INSTAGRAM_HOSTS.has(host)) {
+        descriptor = parseInstagram(url);
+    } else if (GOOGLE_DRIVE_HOSTS.has(host)) {
+        descriptor = parseGoogleDrive(url);
+    } else {
+        // Not an allowlisted embed host — the only remaining match is a direct
+        // video file, which plays via <video> (no iframe / framing surface).
+        descriptor = parseNativeFile(url);
     }
-    if (INSTAGRAM_HOSTS.has(host)) {
-        return parseInstagram(url);
-    }
-    if (GOOGLE_DRIVE_HOSTS.has(host)) {
-        return parseGoogleDrive(url);
-    }
-    return null;
+
+    if (!descriptor) return null;
+    return { ...descriptor, sourceUrl: rawUrl.trim() };
 }
 
 export default parseVideoUrl;

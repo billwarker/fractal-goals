@@ -11,8 +11,10 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from blueprints.api_utils import get_db_session, internal_error
 from blueprints.auth_api import token_required
+from extensions import limiter
 from models import get_engine, get_session
 from services.note_service import NoteService
+from services.oembed_service import get_instagram_oembed
 from validators import NoteCreateSchema, NoteUpdateSchema, validate_request
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,19 @@ notes_bp = Blueprint('notes', __name__, url_prefix='/api')
 def _with_note_service():
     db_session = get_db_session()
     return db_session, NoteService(db_session)
+
+
+@notes_bp.route('/oembed/instagram', methods=['GET'])
+@token_required
+@limiter.limit("60 per minute")
+def oembed_instagram(current_user):
+    """Resolve an Instagram permalink to official oEmbed HTML when a Meta token
+    is configured; otherwise report unconfigured so the client uses /embed."""
+    url = request.args.get('url', '')
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+    payload = get_instagram_oembed(url)
+    return jsonify(payload), 200
 
 
 @notes_bp.route('/<root_id>/sessions/<session_id>/notes', methods=['GET'])

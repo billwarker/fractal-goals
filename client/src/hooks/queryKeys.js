@@ -87,6 +87,7 @@ export const queryKeys = {
     goalNotesRoot: (rootId) => ['goal-notes', rootId],
     allNotes: (rootId, filters = {}) => ['all-notes', rootId, filters],
     allNotesRoot: (rootId) => ['all-notes', rootId],
+    instagramOembed: (permalink) => ['instagram-oembed', permalink],
     progressRoot: () => ['progress'],
     progressComparison: (instanceId) => ['progress', 'comparison', instanceId],
     progressHistory: (activityDefId, excludeSessionId = null) => ['progress', 'history', activityDefId, excludeSessionId],

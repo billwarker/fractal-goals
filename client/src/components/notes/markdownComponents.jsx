@@ -46,7 +46,7 @@ export const markdownComponents = {
     p({ node, children, ...props }) {
         const embed = extractSoleVideoLink(node);
         if (embed) {
-            return <VideoEmbed provider={embed.provider} embedUrl={embed.embedUrl} />;
+            return <VideoEmbed descriptor={embed} />;
         }
         return <p {...props}>{children}</p>;
     },
