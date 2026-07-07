@@ -490,6 +490,39 @@ describe('api core auth refresh behavior', () => {
         expect(calls.filter((call) => call.token !== 'all-mutators-token')).toEqual([]);
     });
 
+    it('does not fetch or attach CSRF tokens for public beta signup', async () => {
+        document.cookie = 'fractal_csrf_token=; Max-Age=0; path=/';
+        const { axios, API_BASE } = await import('../core');
+        const { publicApi } = await import('../publicApi');
+        const calls = [];
+        const originalAdapter = axios.defaults.adapter;
+
+        axios.defaults.adapter = async (config) => {
+            calls.push({
+                url: config.url,
+                token: config.headers?.get?.('X-CSRF-Token') || config.headers?.['X-CSRF-Token'],
+            });
+            return {
+                data: { created: true },
+                status: 201,
+                statusText: 'Created',
+                headers: {},
+                config,
+            };
+        };
+
+        try {
+            await publicApi.createBetaSignup({ email: 'will@example.com', use_case: 'Get strong' });
+        } finally {
+            axios.defaults.adapter = originalAdapter;
+        }
+
+        expect(calls).toEqual([{
+            url: `${API_BASE}/public/beta-signups`,
+            token: undefined,
+        }]);
+    });
+
     it('keeps app-surface mutating helpers on the expected protected endpoints', async () => {
         document.cookie = 'fractal_csrf_token=surface-token; path=/';
         const { axios, API_BASE } = await import('../core');

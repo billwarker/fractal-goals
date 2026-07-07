@@ -66,6 +66,7 @@ const needsCsrfHeader = (config) => {
     const method = String(config.method || 'get').toLowerCase();
     const url = String(config.url || '');
     if (!MUTATING_METHODS.has(method)) return false;
+    if (url.includes('/public/')) return false;
     if (getHeader(config.headers, 'Authorization') || accessToken) return false;
     if (
         url.includes('/auth/login')
@@ -172,7 +173,8 @@ axios.interceptors.response.use(
                 originalRequest?.url?.includes('/auth/refresh') ||
                 originalRequest?.url?.includes('/auth/login') ||
                 originalRequest?.url?.includes('/auth/me') ||
-                originalRequest?.url?.includes('/auth/csrf')
+                originalRequest?.url?.includes('/auth/csrf') ||
+                originalRequest?.url?.includes('/public/')
             ) {
                 return Promise.reject(error);
             }
