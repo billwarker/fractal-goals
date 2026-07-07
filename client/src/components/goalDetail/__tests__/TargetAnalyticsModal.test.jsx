@@ -147,6 +147,64 @@ describe('TargetAnalyticsModal', () => {
         expect(screen.getByLabelText('Secondary Metric')).toHaveValue('quality');
     });
 
+    it('does not present a partially met metric as target completion', () => {
+        mockData.current = {
+            ...baseAnalytics,
+            summary: {
+                ...baseAnalytics.summary,
+                completed: false,
+                completed_at: null,
+                conditions: [
+                    {
+                        ...baseAnalytics.summary.conditions[0],
+                        met_count: 1,
+                        first_met_at: '2026-06-17T12:00:00.000Z',
+                    },
+                    baseAnalytics.summary.conditions[1],
+                ],
+            },
+        };
+
+        setup();
+
+        expect(screen.getByText(/Not yet reached/i)).toBeInTheDocument();
+        expect(screen.queryByText(/First met/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Completed on/i)).not.toBeInTheDocument();
+    });
+
+    it('shows completed targets with a completed-on date', () => {
+        mockData.current = {
+            ...baseAnalytics,
+            summary: {
+                ...baseAnalytics.summary,
+                completed: true,
+                completed_at: '2026-06-17T12:00:00.000Z',
+            },
+        };
+
+        setup();
+
+        expect(screen.getByText(/Completed on .*2026/i)).toBeInTheDocument();
+        expect(screen.queryByText(/First met/i)).not.toBeInTheDocument();
+    });
+
+    it('does not mark completed targets as stalled when their last instance is old', () => {
+        mockData.current = {
+            ...baseAnalytics,
+            summary: {
+                ...baseAnalytics.summary,
+                completed: true,
+                completed_at: '2026-06-17T12:00:00.000Z',
+                last_instance_at: '2026-05-20T10:00:00.000Z',
+            },
+        };
+
+        setup();
+
+        expect(screen.getByText(/Completed on .*2026/i)).toBeInTheDocument();
+        expect(screen.queryByText('Stalled')).not.toBeInTheDocument();
+    });
+
     it('defaults to the trend chart and toggles to scatter', () => {
         setup();
         expect(screen.getByTestId('line-chart')).toBeInTheDocument();

@@ -117,24 +117,36 @@
 /* Minimal metadata line beneath the header */
 .meta {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 6px;
     margin-top: 8px;
     font-size: 12px;
     color: var(--color-text-muted);
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .metaDot {
+    flex: 0 0 auto;
     opacity: 0.5;
 }
 
+.metaDetails {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .metaStatusSuccess {
+    flex: 0 0 auto;
     color: var(--color-success);
     font-weight: 600;
 }
 
 .metaStatusPending {
+    flex: 0 0 auto;
     color: var(--color-text-secondary);
     font-weight: 600;
 }
@@ -142,6 +154,7 @@
 .metaStalled {
     display: inline-flex;
     align-items: center;
+    flex: 0 0 auto;
     gap: 4px;
     color: var(--color-brand-danger);
     font-weight: 600;

@@ -5,6 +5,7 @@ import { Line, Scatter } from 'react-chartjs-2';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import CloseButton from '../atoms/CloseButton';
 import DeleteButton from '../atoms/DeleteButton';
+import ChevronIcon from '../atoms/ChevronIcon';
 import { AlertTriangleIcon, EditPencilIcon } from '../atoms/AppIcons';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 import { ActivityTimelineCard } from '../common/ActivityTimeline';
@@ -104,27 +105,24 @@ function metricScaleDomain(metricDef, index, conditionByMetric) {
 }
 
 // Minimal one-line metadata beneath the header: creation, age, activity count,
-// and completion / first-met status.
+// and target completion status.
 function TargetMeta({ summary, now }) {
     if (!summary) return null;
     const created = summary.created_at ? new Date(summary.created_at) : null;
     const lastAt = summary.last_instance_at ? new Date(summary.last_instance_at) : null;
     const daysSinceLast = lastAt ? Math.floor((now - lastAt.getTime()) / 86400000) : null;
-    const stalled = daysSinceLast != null && daysSinceLast > 14;
+    const stalled = !summary.completed && daysSinceLast != null && daysSinceLast > 14;
 
     let status = null;
     let statusClass = styles.metaStatusPending;
     if (summary.completed && summary.completed_at) {
-        status = `✓ Achieved ${new Date(summary.completed_at).toLocaleDateString()}`;
+        status = `✓ Completed on ${new Date(summary.completed_at).toLocaleDateString()}`;
+        statusClass = styles.metaStatusSuccess;
+    } else if (summary.completed) {
+        status = '✓ Completed';
         statusClass = styles.metaStatusSuccess;
     } else {
-        const firstMet = (summary.conditions || []).find((c) => c.first_met_at);
-        if (firstMet) {
-            status = `✓ First met ${new Date(firstMet.first_met_at).toLocaleDateString()}`;
-            statusClass = styles.metaStatusSuccess;
-        } else {
-            status = 'Not yet reached';
-        }
+        status = 'Not yet reached';
     }
 
     const parts = [];
@@ -137,7 +135,7 @@ function TargetMeta({ summary, now }) {
         <div className={styles.meta}>
             <span className={statusClass}>{status}</span>
             <span className={styles.metaDot}>·</span>
-            <span>{parts.join(' · ')}</span>
+            <span className={styles.metaDetails}>{parts.join(' · ')}</span>
             {stalled && (
                 <span className={styles.metaStalled}>
                     <span className={styles.metaDot}>·</span>
@@ -522,7 +520,11 @@ function TargetAnalyticsModal({
                                     onClick={() => setGraphTypeMenuOpen((open) => !open)}
                                 >
                                     <span>{viewMode === 'scatter' ? 'Scatter' : 'Trend'}</span>
-                                    <span className={styles.graphTypeChevron} aria-hidden="true">⌄</span>
+                                    <ChevronIcon
+                                        className={styles.graphTypeChevron}
+                                        size={16}
+                                        direction="down"
+                                    />
                                 </button>
                                 {graphTypeMenuOpen && (
                                     <div className={styles.graphTypeMenu} role="listbox" aria-label="Graph Type">
