@@ -178,7 +178,7 @@ Analytics engine build-out:
 Remaining SaaS build-out to know:
 
 - Stripe/customer-portal/webhook integration is not yet wired as a full billing system.
-- Email verification, billing notices, quota warnings, marketing/bulk mail, and webhook ingestion are not yet present; password reset and beta invite email are the current transactional email workflows.
+- Email verification, billing notices, quota warnings, and marketing/bulk mail are not yet present; password reset and beta invite email are the current transactional email workflows, with Resend delivery webhook ingestion wired for those sends.
 - Admin force-password-change is currently an account marker, not an enforced login-time password-change gate.
 - Admin support access is explicit and scoped by `admin_user_id` plus `admin_mode=read_only|read_write`; it is not full impersonation.
 
