@@ -536,7 +536,7 @@ describe('SessionActivityItem metric and timer editing', () => {
         );
 
         expect(screen.queryByRole('button', { name: '7' })).not.toBeInTheDocument();
-        expect(screen.getByText('Allowed: 5, 7')).toBeInTheDocument();
+        expect(screen.queryByText('Allowed: 5, 7')).not.toBeInTheDocument();
 
         fireEvent.change(screen.getByDisplayValue('5'), { target: { value: '7' } });
         await waitFor(() => {
@@ -561,7 +561,7 @@ describe('SessionActivityItem metric and timer editing', () => {
         });
 
         updateInstance.mockClear();
-        expect(screen.getByText('Allowed: 00:30, 01:30')).toBeInTheDocument();
+        expect(screen.queryByText('Allowed: 00:30, 01:30')).not.toBeInTheDocument();
         const durationInput = screen.getAllByRole('combobox')[1];
         fireEvent.change(durationInput, { target: { value: '30' } });
         await waitFor(() => {

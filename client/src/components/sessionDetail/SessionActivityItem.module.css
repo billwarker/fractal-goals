@@ -671,13 +671,6 @@
     cursor: pointer;
 }
 
-.metricAllowedValues {
-    color: var(--color-text-muted);
-    font-size: 10px;
-    line-height: 1.25;
-    max-width: 180px;
-}
-
 .metricLabel {
     font-size: 11px;
     color: var(--color-text-muted);

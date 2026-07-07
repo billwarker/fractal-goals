@@ -56,7 +56,6 @@ function SessionGoalHierarchyPanel({
 
     const {
         sessionHierarchy,
-        activityHierarchy,
         targetCards,
         selectedActivityGoalIds,
         selectedActivityAncestorIds,
@@ -70,7 +69,7 @@ function SessionGoalHierarchyPanel({
         achievedTargetIds,
     });
 
-    const displayHierarchy = selectedActivity ? activityHierarchy : sessionHierarchy;
+    const displayHierarchy = sessionHierarchy;
     const hasActivityHighlight = selectedActivityGoalIds.size > 0;
 
     const getGoalBranchHighlightState = useCallback((goal) => {
@@ -151,14 +150,10 @@ function SessionGoalHierarchyPanel({
                     />
                     {displayHierarchy.length === 0 && (
                         <div className={styles.emptyState}>
-                            {selectedActivity
-                                ? 'No outstanding goals associated with this activity.'
-                                : 'No goals associated with this session.'}
+                            No goals associated with this session.
                             <br />
                             <small>
-                                {selectedActivity
-                                    ? 'Associate this activity with an outstanding goal to show it here.'
-                                    : 'Select an activity to add goals.'}
+                                Select an activity to add goals.
                             </small>
                         </div>
                     )}

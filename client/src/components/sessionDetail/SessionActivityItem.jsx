@@ -30,7 +30,6 @@ import {
     formatMetricValueForInput,
     formatAllowedMetricValueLabel,
     getAllowedMetricValues,
-    formatAllowedMetricValues,
     getMetricInputProps,
     formatInlineProgressValue,
     getBestSetIndexes,
@@ -660,7 +659,6 @@ function SessionActivityItem({
         isDraft = false,
     }) => {
         const allowedValues = getAllowedMetricValues(metricDef);
-        const allowedValuesText = formatAllowedMetricValues(metricDef);
         const displayValue = isDraft ? String(value ?? '') : formatMetricValueForInput(metricDef, value);
         const selectedAllowedValue = normalizeMetricValueForStorage(metricDef, value);
         return (
@@ -694,11 +692,6 @@ function SessionActivityItem({
                                 if (event.key === 'Enter') event.currentTarget.blur();
                             }}
                         />
-                    )}
-                    {allowedValuesText && (
-                        <div className={styles.metricAllowedValues}>
-                            Allowed: {allowedValuesText}
-                        </div>
                     )}
                 </div>
                 <span className={metaClassName}>

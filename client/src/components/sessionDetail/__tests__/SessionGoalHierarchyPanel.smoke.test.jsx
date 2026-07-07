@@ -138,7 +138,7 @@ describe('SessionGoalHierarchyPanel smoke', () => {
         expect(screen.queryByText('Session Focus')).not.toBeInTheDocument();
     });
 
-    it('shows the focused activity hierarchy when an activity is selected', async () => {
+    it('shows the full session hierarchy when an activity is selected', async () => {
         renderWithProviders(
             <SessionGoalHierarchyPanel
                 selectedActivity={{
@@ -192,7 +192,7 @@ describe('SessionGoalHierarchyPanel smoke', () => {
         expect(await screen.findByTestId('target-analytics-modal')).toHaveTextContent('Target 1');
     });
 
-    it('does not fall back to session hierarchy when focused activity has no eligible goals', async () => {
+    it('keeps the session hierarchy visible when focused activity has no eligible goals', async () => {
         activeSessionMock = {
             ...activeSessionMock,
             activityInstances: [
@@ -235,8 +235,8 @@ describe('SessionGoalHierarchyPanel smoke', () => {
         await waitFor(() => {
             expect(screen.getByText('Goals: Jamming')).toBeInTheDocument();
         });
-        expect(screen.getByText('No outstanding goals associated with this activity.')).toBeInTheDocument();
-        expect(screen.queryByText('STG')).not.toBeInTheDocument();
-        expect(screen.queryByText('IG')).not.toBeInTheDocument();
+        expect(screen.queryByText('No goals associated with this session.')).not.toBeInTheDocument();
+        expect(screen.getByText('STG')).toBeInTheDocument();
+        expect(screen.getByText('IG')).toBeInTheDocument();
     });
 });
