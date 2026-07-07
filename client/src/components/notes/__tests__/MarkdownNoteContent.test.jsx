@@ -54,9 +54,14 @@ describe('MarkdownNoteContent', () => {
         expect(screen.getByRole('button', { name: /play instagram/i })).toBeInTheDocument();
     });
 
-    it('renders a bare Google Drive file URL as an embed facade', () => {
-        render(<MarkdownNoteContent content="https://drive.google.com/file/d/1AbC_dEfG-hIjK/view?usp=sharing" />);
-        expect(screen.getByRole('button', { name: /play google drive/i })).toBeInTheDocument();
+    it('renders a bare Google Drive file URL as an immediate preview iframe', () => {
+        const { container } = render(
+            <MarkdownNoteContent content="https://drive.google.com/file/d/1AbC_dEfG-hIjK/view?usp=sharing" />
+        );
+
+        expect(screen.queryByRole('button', { name: /play google drive/i })).not.toBeInTheDocument();
+        expect(container.querySelector('iframe'))
+            .toHaveAttribute('src', 'https://drive.google.com/file/d/1AbC_dEfG-hIjK/preview');
     });
 
     it('renders a direct .mp4 link as a native <video>, not an iframe', () => {

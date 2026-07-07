@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { isGoalAssociatedWithBlock } from '../../utils/programGoalAssociations';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { FolderIcon } from '../atoms/AppIcons';
+import NoteCard from '../notes/NoteCard';
 import GoalSmartSection from './GoalSmartSection';
 import styles from '../GoalDetailModal.module.css';
 
@@ -29,6 +30,7 @@ function GoalViewMode({
     description,
     deadline,
     relevanceStatement,
+    goalCompletionNote,
     // Handlers
     onClose,
     onUpdate,
@@ -41,6 +43,22 @@ function GoalViewMode({
 
     return (
         <div className={styles.viewContainer}>
+            {goalCompletionNote && (
+                <section className={styles.goalCompletionNoteSection}>
+                    <label className={styles.label}>
+                        Goal Completion Note
+                    </label>
+                    <NoteCard
+                        note={goalCompletionNote}
+                        compact
+                        variant="flat"
+                        showContext={false}
+                        showTypePill={false}
+                        noteTypeVariant="metadata"
+                    />
+                </section>
+            )}
+
             <GoalSmartSection
                 goal={goal}
                 goalColor={goalColor}

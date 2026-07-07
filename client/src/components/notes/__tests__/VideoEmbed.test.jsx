@@ -40,6 +40,16 @@ describe('VideoEmbed', () => {
             .toHaveAttribute('href', 'https://drive.google.com/file/d/ABC/view');
     });
 
+    it('mounts Google Drive previews immediately so Drive can show its first frame', () => {
+        const descriptor = parseVideoUrl('https://drive.google.com/file/d/ABC/view');
+        const { container } = render(<VideoEmbed descriptor={descriptor} />);
+
+        expect(screen.queryByRole('button', { name: /play google drive/i })).not.toBeInTheDocument();
+        const iframe = container.querySelector('iframe');
+        expect(iframe).toHaveAttribute('src', 'https://drive.google.com/file/d/ABC/preview');
+        expect(iframe.getAttribute('sandbox')).toContain('allow-scripts');
+    });
+
     it('renders a native <video> for direct file descriptors', () => {
         const descriptor = parseVideoUrl('https://cdn.example.com/clip.mp4');
         const { container } = render(<VideoEmbed descriptor={descriptor} />);

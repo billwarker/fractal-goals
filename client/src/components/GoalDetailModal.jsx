@@ -145,14 +145,6 @@ function GoalDetailModal({
     const goalId = mode === 'create' ? null : (goal?.attributes?.id || goal?.id);
     const queryRootId = readOnly ? null : rootId;
     const queryGoalId = readOnly ? null : goalId;
-    const {
-        notes: goalNotes,
-        createNote: createGoalNote,
-        deleteGoalCompletionNotes,
-    } = useGoalNotes(queryRootId, queryGoalId);
-    const goalCompletionNote = useMemo(() => (
-        (goalNotes || []).find((note) => note.note_kind === 'goal_completion') || null
-    ), [goalNotes]);
     const goalColor = getGoalColor(goalType);
     const goalSecondaryColor = getGoalSecondaryColor(goalType);
     const goalIsSmart = isSMART(goal);
@@ -176,6 +168,17 @@ function GoalDetailModal({
             ? goal.attributes.notes
             : null
     ), [readOnly, goal?.attributes?.notes]);
+    const {
+        notes: goalNotes,
+        createNote: createGoalNote,
+        deleteGoalCompletionNotes,
+    } = useGoalNotes(queryRootId, queryGoalId);
+    const visibleGoalNotes = readOnly ? readOnlyNotes : goalNotes;
+    const goalCompletionNote = useMemo(() => (
+        (visibleGoalNotes || []).find((note) => (
+            note.note_kind === 'goal_completion' || note.note_type === 'goal_completion_note'
+        )) || null
+    ), [visibleGoalNotes]);
 
     const {
         isEditing,

@@ -128,6 +128,31 @@ function IframeEmbed({ descriptor, caption, ratioClass, title, posterUrl: poster
     );
 }
 
+function GoogleDriveEmbed({ descriptor, caption, title }) {
+    const [hasFailed, setHasFailed] = useState(false);
+
+    if (hasFailed) {
+        return <FailureCard provider={descriptor.provider} sourceUrl={descriptor.sourceUrl} />;
+    }
+
+    return (
+        <div className={[styles.embed, styles.landscape].join(' ')}>
+            <iframe
+                className={styles.frame}
+                src={descriptor.embedUrl}
+                title={title}
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+                sandbox={IFRAME_SANDBOX}
+                allow={IFRAME_ALLOW}
+                allowFullScreen
+                onError={() => setHasFailed(true)}
+            />
+            <EmbedFooter provider={descriptor.provider} sourceUrl={descriptor.sourceUrl} caption={caption} />
+        </div>
+    );
+}
+
 /**
  * Instagram: consult the oEmbed proxy for an official thumbnail (fixing the
  * guessed aspect ratio / fragile card), then play via the /embed iframe facade.
@@ -161,6 +186,10 @@ function VideoEmbed({ descriptor, caption }) {
 
     if (provider === 'instagram') {
         return <InstagramEmbed descriptor={descriptor} caption={caption} title={title} />;
+    }
+
+    if (provider === 'googleDrive') {
+        return <GoogleDriveEmbed descriptor={descriptor} caption={caption} title={title} />;
     }
 
     const ratioClass = provider === 'instagram' ? styles.instagram : styles.landscape;

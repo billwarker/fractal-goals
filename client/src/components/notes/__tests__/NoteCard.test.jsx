@@ -1,7 +1,17 @@
 import React from 'react';
-import { fireEvent, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import NoteCard from '../NoteCard';
+
+vi.mock('../../../contexts/GoalLevelsContext', () => ({
+    useGoalLevels: () => ({
+        getGoalColor: () => '#22d3ee',
+        getGoalSecondaryColor: () => '#0f172a',
+        getGoalIcon: () => 'circle',
+    }),
+}));
+
+const render = (ui) => renderWithProviders(ui, { withAuth: false, withGoalLevels: false });
 
 describe('NoteCard', () => {
     beforeEach(() => {
@@ -16,7 +26,7 @@ describe('NoteCard', () => {
     });
 
     it('renders markdown structure for timeline notes', () => {
-        renderWithProviders(
+        render(
             <NoteCard
                 note={{
                     id: 'note-1',
@@ -43,7 +53,7 @@ describe('NoteCard', () => {
     });
 
     it('does not offer pinning for activity set notes', () => {
-        renderWithProviders(
+        render(
             <NoteCard
                 note={{
                     id: 'note-2',
@@ -71,7 +81,7 @@ describe('NoteCard', () => {
     });
 
     it('shows the session template name in the header for session notes', () => {
-        renderWithProviders(
+        render(
             <NoteCard
                 note={{
                     id: 'note-3',
@@ -98,7 +108,7 @@ describe('NoteCard', () => {
     });
 
     it('removes the redundant trailing note word in metadata note type labels', () => {
-        renderWithProviders(
+        render(
             <NoteCard
                 note={{
                     id: 'note-5',
@@ -126,7 +136,7 @@ describe('NoteCard', () => {
     });
 
     it('renders links in plain goal note content', () => {
-        renderWithProviders(
+        render(
             <NoteCard
                 note={{
                     id: 'note-4',

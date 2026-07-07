@@ -320,6 +320,7 @@ function GoalDetailModalRenderSurface({
                         description={description}
                         deadline={deadline}
                         relevanceStatement={relevanceStatement}
+                        goalCompletionNote={goalCompletionNote}
                         setViewState={setViewState}
                         onClose={handleClose}
                         onGoalSelect={onGoalSelect}
