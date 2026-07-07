@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
-import { useTimezone } from '../contexts/TimezoneContext';
 import { useGoalAssociationMutations } from '../hooks/useGoalAssociationMutations';
 import useGoalDetailController from '../hooks/useGoalDetailController';
 import { useGoalForm } from '../hooks/useGoalForm';
@@ -13,7 +12,6 @@ import { flattenGoalTree, isExecutionGoalType } from '../utils/goalNodeModel';
 import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
 import { importWithRetry } from '../utils/lazyWithRetry';
-import { formatDateInTimezone } from '../utils/dateUtils';
 import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
 import { getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalDetailModalRenderSurface from './goalDetail/GoalDetailModalRenderSurface';
@@ -61,7 +59,6 @@ function GoalDetailModal({
     initialActivities = [], // Initial associated activities for create mode
     initialActivityGroups = [] // Initial associated groups for create mode
 }) {
-    const { timezone } = useTimezone();
     const {
         getGoalColor = () => '#4caf50',
         getGoalTextColor = () => '#ffffff',
@@ -467,20 +464,10 @@ function GoalDetailModal({
         const canToggleCompletion = !isPaused && Boolean(onToggleCompletion) && (isCompleted || canShowManual);
         const isTargetsAllowed = levelConfig.track_activities !== false;
         const isChildrenAllowed = !isExecutionGoalType(goalType);
-        const completedAt = localCompletedAt || goal?.attributes?.completed_at || goal?.completed_at;
-        const completedLabel = completedAt
-            ? `Completed on ${formatDateInTimezone(completedAt, timezone, {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-            })}`
-            : 'Completed';
         const label = isPaused
             ? 'Paused'
             : isCompleted
-                ? completedLabel
+                ? 'Mark Incomplete'
                 : canShowManual
                     ? 'Mark Complete'
                     : trackActivities && isTargetsAllowed && completedViaChildren && isChildrenAllowed
@@ -496,15 +483,11 @@ function GoalDetailModal({
         allowManualCompletion,
         completedViaChildren,
         goalType,
-        goal?.attributes?.completed_at,
-        goal?.completed_at,
         isCompleted,
         isPaused,
         levelConfig.allow_manual_completion,
         levelConfig.track_activities,
-        localCompletedAt,
         onToggleCompletion,
-        timezone,
         trackActivities,
     ]);
 

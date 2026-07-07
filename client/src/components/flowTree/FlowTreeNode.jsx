@@ -4,6 +4,7 @@ import AnimatedGoalIcon from '../atoms/AnimatedGoalIcon';
 import GoalIcon from '../atoms/GoalIcon';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { getAgeLabel } from '../../utils/goalTiming';
 import styles from '../../FlowTree.module.css';
 
 const hiddenHandleStyle = {
@@ -16,19 +17,6 @@ const hiddenHandleStyle = {
     background: 'transparent',
     pointerEvents: 'none',
 };
-
-function getAgeLabel(createdAt) {
-    if (!createdAt) return null;
-    const created = new Date(createdAt);
-    const now = new Date();
-    const diffMs = now - created;
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 7) return `${diffDays}d`;
-    if (diffDays < 30) return `${(diffDays / 7).toFixed(1)}w`;
-    if (diffDays < 365) return `${(diffDays / 30).toFixed(1)}m`;
-    return `${(diffDays / 365).toFixed(1)}y`;
-}
 
 function getDueTimeLabel(deadline) {
     if (!deadline) return null;

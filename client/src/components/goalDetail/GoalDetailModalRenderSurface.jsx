@@ -587,6 +587,8 @@ function GoalDetailModalRenderSurface({
                     onCollapse={onMobileCollapse}
                     deadline={deadline}
                     goalStatus={goalStatus}
+                    isCompleted={isCompleted}
+                    completedAt={localCompletedAt || goal?.attributes?.completed_at || goal?.completed_at}
                     headerTabs={headerTabs}
                     headerRef={goalHeaderRef}
                 />

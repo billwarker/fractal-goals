@@ -4,7 +4,8 @@ import SMARTIndicator from '../SMARTIndicator';
 import { ChevronDownIcon } from '../atoms/AppIcons';
 import CloseButton from '../atoms/CloseButton';
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { formatDateInTimezone } from '../../utils/dateUtils';
+import { formatDateInTimezone, formatLiteralDate } from '../../utils/dateUtils';
+import { getAgeLabel } from '../../utils/goalTiming';
 import styles from './GoalHeader.module.css';
 
 function GoalHeader({
@@ -20,10 +21,47 @@ function GoalHeader({
     deadline,
     isCompact = false, // Prop to control collapsed state
     goalStatus = 'active',
+    isCompleted = false,
+    completedAt = null,
     headerTabs = null,
     headerRef = null,
 }) {
     const { timezone } = useTimezone();
+    const createdAt = goal?.attributes?.created_at || goal?.created_at;
+    const displayedDeadline = deadline || goal?.attributes?.deadline || goal?.deadline;
+    const displayedCompletedAt = completedAt || goal?.attributes?.completed_at || goal?.completed_at;
+    const ageLabel = getAgeLabel(createdAt);
+    const completedDateLabel = displayedCompletedAt
+        ? formatDateInTimezone(displayedCompletedAt, timezone, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        })
+        : null;
+    const dueDateLabel = (() => {
+        const d = displayedDeadline;
+        if (!d) return null;
+        const rawDeadline = String(d);
+        // Deadlines are often YYYY-MM-DD. Formatting those as UTC can shift the
+        // displayed calendar date, so preserve their local date semantics.
+        if (rawDeadline.length === 10 && !rawDeadline.includes('T')) {
+            return formatLiteralDate(rawDeadline, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+            });
+        }
+        return formatDateInTimezone(d, timezone, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+        });
+    })();
+    const completionReplacesDue = isCompleted && completedDateLabel;
+    const terminalDateLabel = completionReplacesDue ? completedDateLabel : dueDateLabel;
+    const terminalDateTitle = completionReplacesDue ? 'Completed' : 'Due';
     const normalizedStatus = goalStatus === 'paused'
         ? 'paused'
         : goalStatus === 'inactive'
@@ -124,31 +162,29 @@ function GoalHeader({
                             </span>
                         )}
 
-                        {(mode !== 'create' && (goal?.attributes?.created_at || goal?.attributes?.deadline || deadline)) && (
+                        {(mode !== 'create' && (createdAt || terminalDateLabel)) && (
                             <div className={styles.dateRow}>
-                                {goal?.attributes?.created_at && (
+                                {createdAt && (
                                     <div className={styles.dateItem}>
                                         <span className={styles.dateLabel}>Created</span>
                                         <span className={styles.dateValue}>
-                                            {formatDateInTimezone(goal.attributes.created_at, timezone, { month: 'short', day: 'numeric', year: 'numeric', hour: undefined, minute: undefined })}
+                                            {formatDateInTimezone(createdAt, timezone, { month: 'short', day: 'numeric', year: 'numeric', hour: undefined, minute: undefined })}
                                         </span>
                                     </div>
                                 )}
-                                {(deadline || goal?.attributes?.deadline) && (
+                                {terminalDateLabel && (
                                     <div className={styles.dateItem}>
-                                        <span className={styles.dateLabel}>Due</span>
+                                        <span className={styles.dateLabel}>{terminalDateTitle}</span>
                                         <span className={styles.dateValue}>
-                                            {(() => {
-                                                const d = deadline || goal?.attributes?.deadline;
-                                                // Deadlines are often YYYY-MM-DD.
-                                                // If we use formatDateInTimezone on YYYY-MM-DD it treats it as UTC and shifts it.
-                                                // If it's YYYY-MM-DD we probably want to display it as is, or use the "local date" logic.
-                                                if (d && d.length === 10 && !d.includes('T')) {
-                                                    const [year, month, day] = d.split('-').map(Number);
-                                                    return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                                                }
-                                                return formatDateInTimezone(d, timezone, { month: 'short', day: 'numeric', year: 'numeric' });
-                                            })()}
+                                            {terminalDateLabel}
+                                        </span>
+                                    </div>
+                                )}
+                                {ageLabel && (
+                                    <div className={styles.dateItem}>
+                                        <span className={styles.dateLabel}>Age</span>
+                                        <span className={styles.dateValue}>
+                                            {ageLabel}
                                         </span>
                                     </div>
                                 )}

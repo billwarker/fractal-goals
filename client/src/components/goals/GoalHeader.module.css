@@ -124,8 +124,9 @@
 .dateRow {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 16px;
+    min-width: 0;
 }
 
 .dateItem {
@@ -133,6 +134,8 @@
     align-items: center;
     gap: 6px;
     font-size: 12px;
+    min-width: 0;
+    white-space: nowrap;
 }
 
 .dateLabel {

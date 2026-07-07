@@ -517,7 +517,7 @@ describe('GoalDetailModal smoke coverage', () => {
             />
         );
 
-        fireEvent.click(screen.getByRole('button', { name: /Completed/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Mark Incomplete' }));
 
         await waitFor(() => {
             expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
@@ -561,7 +561,7 @@ describe('GoalDetailModal smoke coverage', () => {
             />
         );
 
-        fireEvent.click(screen.getByRole('button', { name: /Completed/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Mark Incomplete' }));
         fireEvent.click(await screen.findByRole('button', { name: 'Mark Incomplete' }));
 
         await waitFor(() => {
