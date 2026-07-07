@@ -1,4 +1,9 @@
-import { buildDefinitionMap, buildInstanceMap, buildPositionMap } from '../sessionSection';
+import {
+    buildDefinitionMap,
+    buildInstanceMap,
+    buildPositionMap,
+    buildSessionPositionMap,
+} from '../sessionSection';
 
 describe('sessionSection map builders', () => {
     it('builds instance and definition lookup maps', () => {
@@ -13,5 +18,16 @@ describe('sessionSection map builders', () => {
         const positionMap = buildPositionMap(['x', 'y', 'z']);
         expect(positionMap.get('x')).toBe(0);
         expect(positionMap.get('z')).toBe(2);
+    });
+
+    it('builds session-wide positions across sections', () => {
+        const positionMap = buildSessionPositionMap([
+            { activity_ids: ['warmup'] },
+            { activity_ids: ['drill', 'song'] },
+        ]);
+
+        expect(positionMap.get('warmup')).toBe(0);
+        expect(positionMap.get('drill')).toBe(1);
+        expect(positionMap.get('song')).toBe(2);
     });
 });

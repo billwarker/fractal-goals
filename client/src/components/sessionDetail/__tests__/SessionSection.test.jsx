@@ -263,6 +263,43 @@ describe('SessionSection', () => {
         expect(clearActivityInstanceValues).toHaveBeenCalledWith('instance-1');
     });
 
+    it('numbers activity items by their session-wide position across sections', () => {
+        sessionDataState.activityInstances = [
+            {
+                id: 'instance-1',
+                activity_definition_id: 'activity-1',
+            },
+            {
+                id: 'instance-2',
+                activity_definition_id: 'activity-1',
+            },
+        ];
+        sessionDataState.localSessionData = {
+            sections: [
+                { activity_ids: ['instance-1'] },
+                { activity_ids: ['instance-2'] },
+            ],
+        };
+
+        render(
+            <SessionSection
+                section={{ name: 'Second Practice', activity_ids: ['instance-2'], estimated_duration_minutes: 10 }}
+                sectionIndex={1}
+                onFocusActivity={vi.fn()}
+                selectedActivityId="instance-2"
+                onOpenActivityBuilder={vi.fn()}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('index 2')).toBeInTheDocument();
+    });
+
     it('passes a copy-previous-values action when an earlier matching activity instance exists', () => {
         sessionDataState.activityInstances = [
             {

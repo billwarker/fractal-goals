@@ -12,7 +12,7 @@ import ActivitySelectorPanel from '../common/ActivitySelectorPanel';
 import { prepareActivityDefinitionCopy } from '../../utils/activityBuilder';
 import { getAverageDurationStat } from '../../utils/durationStats';
 import { calculateSectionDurationFromInstanceIds, formatClockDuration } from '../../utils/sessionTime';
-import { buildDefinitionMap, buildInstanceMap, buildPositionMap } from '../../utils/sessionSection';
+import { buildDefinitionMap, buildInstanceMap, buildPositionMap, buildSessionPositionMap } from '../../utils/sessionSection';
 
 const SessionSection = ({
     section,
@@ -69,6 +69,12 @@ const SessionSection = ({
     const activityPositionById = useMemo(() => {
         return buildPositionMap(section.activity_ids || []);
     }, [section.activity_ids]);
+    const sessionPositionById = useMemo(() => {
+        const sections = Array.isArray(localSessionData?.sections) && localSessionData.sections.length > 0
+            ? localSessionData.sections
+            : [section];
+        return buildSessionPositionMap(sections);
+    }, [localSessionData?.sections, section]);
     const previousMatchingInstanceById = useMemo(() => {
         const orderedIds = (localSessionData?.sections || [])
             .flatMap((sessionSection) => sessionSection?.activity_ids || []);
@@ -217,6 +223,7 @@ const SessionSection = ({
                     const definition = definitionById.get(instance.activity_definition_id);
                     const isDragging = draggedItem?.instanceId === instanceId;
                     const position = activityPositionById.get(instanceId) ?? -1;
+                    const sessionPosition = sessionPositionById.get(instanceId) ?? position;
                     const previousMatchingInstanceId = previousMatchingInstanceById.get(instanceId) || null;
 
                     return (
@@ -247,7 +254,7 @@ const SessionSection = ({
                                 canMoveUp={position > 0}
                                 canMoveDown={position >= 0 && position < section.activity_ids.length - 1}
                                 showReorderButtons={true}
-                                sessionIndex={position + 1}
+                                sessionIndex={sessionPosition >= 0 ? sessionPosition + 1 : null}
                                 onDuplicate={() => duplicateActivityInstance(sectionIndex, instanceId, position)}
                                 onClearValues={() => clearActivityInstanceValues(instanceId)}
                                 onCopyPreviousValues={previousMatchingInstanceId

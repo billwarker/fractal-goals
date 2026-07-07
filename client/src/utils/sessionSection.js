@@ -21,3 +21,17 @@ export function buildPositionMap(activityIds = []) {
     });
     return map;
 }
+
+export function buildSessionPositionMap(sections = []) {
+    const map = new Map();
+    let index = 0;
+
+    sections.forEach((section) => {
+        (section?.activity_ids || []).forEach((id) => {
+            map.set(id, index);
+            index += 1;
+        });
+    });
+
+    return map;
+}
