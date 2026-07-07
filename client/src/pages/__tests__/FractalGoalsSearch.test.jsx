@@ -122,6 +122,20 @@ vi.mock('../../hooks/usePageSurfaceQueries', () => ({
     }),
 }));
 
+vi.mock('../../hooks/useFeatureFlags', () => ({
+    FEATURE_FLAGS: {
+        goalSurfaceConfiguration: 'goal_surface_configuration',
+        analyticsSqlExplorer: 'analytics_sql_explorer',
+    },
+    useFeatureFlags: () => ({
+        flags: {
+            goal_surface_configuration: true,
+            analytics_sql_explorer: false,
+        },
+    }),
+    isFeatureEnabled: (flags, key) => flags?.[key] === true,
+}));
+
 vi.mock('../../hooks/useIsMobile', () => ({
     default: () => isMobileMock.value,
     getIsMobileViewport: () => isMobileMock.value,
