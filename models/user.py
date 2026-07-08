@@ -154,6 +154,9 @@ class EmailWebhookEvent(Base):
     metadata for audit/debugging, but never includes app-generated raw secrets.
     """
     __tablename__ = 'email_webhook_events'
+    __table_args__ = (
+        sa.Index('ix_email_webhook_events_created_at_id', 'created_at', 'id'),
+    )
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     provider = Column(String(32), nullable=False, index=True)

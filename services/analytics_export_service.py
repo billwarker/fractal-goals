@@ -14,7 +14,7 @@ from typing import Callable
 
 import sqlalchemy as sa
 
-from models import EmailDeliveryEvent, EventLog, ProductEvent, User, format_utc, utc_now
+from models import EmailDeliveryEvent, EmailWebhookEvent, EventLog, ProductEvent, User, format_utc, utc_now
 from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, get_app_setting, set_app_setting
 
 try:  # pragma: no cover - exercised by the real export entrypoint.
@@ -34,6 +34,7 @@ class IncrementalTableSpec:
     model: object
     cursor_column: object
     serializer: Callable[[object], dict]
+    schema: tuple[tuple[str, str], ...]
 
 
 def _format_dt(value):
@@ -57,10 +58,78 @@ def _json_value(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
 
 
-def _load_job_config(write_disposition):
+PRODUCT_EVENTS_SCHEMA = (
+    ("id", "STRING"),
+    ("user_id", "STRING"),
+    ("event_name", "STRING"),
+    ("path", "STRING"),
+    ("root_id", "STRING"),
+    ("properties_json", "STRING"),
+    ("client_ts", "TIMESTAMP"),
+    ("created_at", "TIMESTAMP"),
+)
+
+EVENT_LOGS_SCHEMA = (
+    ("id", "STRING"),
+    ("root_id", "STRING"),
+    ("event_type", "STRING"),
+    ("entity_type", "STRING"),
+    ("entity_id", "STRING"),
+    ("description", "STRING"),
+    ("payload_json", "STRING"),
+    ("source", "STRING"),
+    ("timestamp", "TIMESTAMP"),
+)
+
+EMAIL_DELIVERY_EVENTS_SCHEMA = (
+    ("id", "STRING"),
+    ("provider", "STRING"),
+    ("template_key", "STRING"),
+    ("entity_type", "STRING"),
+    ("entity_id", "STRING"),
+    ("recipient_user_id", "STRING"),
+    ("beta_signup_id", "STRING"),
+    ("provider_message_id", "STRING"),
+    ("idempotency_key", "STRING"),
+    ("status", "STRING"),
+    ("error_summary", "STRING"),
+    ("last_event_type", "STRING"),
+    ("last_event_at", "TIMESTAMP"),
+    ("created_at", "TIMESTAMP"),
+    ("sent_at", "TIMESTAMP"),
+    ("delivered_at", "TIMESTAMP"),
+)
+
+EMAIL_WEBHOOK_EVENTS_SCHEMA = (
+    ("id", "STRING"),
+    ("provider", "STRING"),
+    ("provider_event_id", "STRING"),
+    ("provider_message_id", "STRING"),
+    ("event_type", "STRING"),
+    ("payload_json", "STRING"),
+    ("created_at", "TIMESTAMP"),
+)
+
+USERS_SCHEMA = (
+    ("id", "STRING"),
+    ("username", "STRING"),
+    ("email", "STRING"),
+    ("role", "STRING"),
+    ("is_active", "BOOLEAN"),
+    ("membership_tier", "STRING"),
+    ("created_at", "TIMESTAMP"),
+    ("last_login_at", "TIMESTAMP"),
+)
+
+
+def _load_job_config(write_disposition, schema):
     if bigquery is None:
-        return {"write_disposition": write_disposition}
-    return bigquery.LoadJobConfig(write_disposition=write_disposition)
+        return {"write_disposition": write_disposition, "schema": list(schema)}
+    return bigquery.LoadJobConfig(
+        write_disposition=write_disposition,
+        create_disposition=bigquery.CreateDisposition.CREATE_IF_NEEDED,
+        schema=[bigquery.SchemaField(name, field_type) for name, field_type in schema],
+    )
 
 
 def _table_ref(dataset: str, table: str) -> str:
@@ -115,6 +184,18 @@ def _serialize_email_delivery_event(row: EmailDeliveryEvent) -> dict:
     }
 
 
+def _serialize_email_webhook_event(row: EmailWebhookEvent) -> dict:
+    return {
+        "id": row.id,
+        "provider": row.provider,
+        "provider_event_id": row.provider_event_id,
+        "provider_message_id": row.provider_message_id,
+        "event_type": row.event_type,
+        "payload_json": _json_value(row.payload),
+        "created_at": _format_dt(row.created_at),
+    }
+
+
 def _serialize_user(row: User) -> dict:
     return {
         "id": row.id,
@@ -129,48 +210,87 @@ def _serialize_user(row: User) -> dict:
 
 
 INCREMENTAL_TABLES = (
-    IncrementalTableSpec("product_events", ProductEvent, ProductEvent.created_at, _serialize_product_event),
-    IncrementalTableSpec("event_logs", EventLog, EventLog.timestamp, _serialize_event_log),
+    IncrementalTableSpec(
+        "product_events",
+        ProductEvent,
+        ProductEvent.created_at,
+        _serialize_product_event,
+        PRODUCT_EVENTS_SCHEMA,
+    ),
+    IncrementalTableSpec(
+        "event_logs",
+        EventLog,
+        EventLog.timestamp,
+        _serialize_event_log,
+        EVENT_LOGS_SCHEMA,
+    ),
     IncrementalTableSpec(
         "email_delivery_events",
         EmailDeliveryEvent,
         EmailDeliveryEvent.created_at,
         _serialize_email_delivery_event,
+        EMAIL_DELIVERY_EVENTS_SCHEMA,
+    ),
+    IncrementalTableSpec(
+        "email_webhook_events",
+        EmailWebhookEvent,
+        EmailWebhookEvent.created_at,
+        _serialize_email_webhook_event,
+        EMAIL_WEBHOOK_EVENTS_SCHEMA,
     ),
 )
 
 
 class AnalyticsExportService:
-    def __init__(self, db_session, bq_client, dataset=DEFAULT_DATASET, *, batch_size=DEFAULT_BATCH_SIZE):
+    def __init__(
+        self,
+        db_session,
+        bq_client,
+        dataset=DEFAULT_DATASET,
+        *,
+        batch_size=DEFAULT_BATCH_SIZE,
+        log=None,
+    ):
         self.db_session = db_session
         self.bq_client = bq_client
         self.dataset = dataset
         self.batch_size = batch_size
+        self.log = log
 
     def run_export(self, now=None):
         now = now or utc_now()
         cutoff = now - EXPORT_LAG
         state = self._state()
         run_counts = {}
+        self._emit(
+            f"Analytics export starting dataset={self.dataset} "
+            f"batch_size={self.batch_size} cutoff={_format_dt(cutoff)}"
+        )
 
         try:
             for spec in INCREMENTAL_TABLES:
+                self._emit(f"Exporting incremental table {spec.table}")
                 run_counts[spec.table] = self._export_incremental_table(spec, state, cutoff)
+                self._emit(f"Finished {spec.table}: rows={run_counts[spec.table]}")
 
+            self._emit("Exporting users dimension")
             run_counts["users"] = self._export_users()
+            self._emit(f"Finished users: rows={run_counts['users']}")
             state["last_run_at"] = _format_dt(now)
             state["last_run_status"] = "success"
             state["last_run_rows"] = run_counts
             state.pop("failed_table", None)
             set_app_setting(self.db_session, ANALYTICS_EXPORT_STATE_KEY, state)
             self.db_session.commit()
+            self._emit(f"Analytics export completed rows={run_counts}")
             return {"status": "success", "rows": run_counts, "state": state}
-        except Exception:
+        except Exception as exc:
             state["last_run_at"] = _format_dt(now)
             state["last_run_status"] = "failed"
             state["last_run_rows"] = run_counts
             set_app_setting(self.db_session, ANALYTICS_EXPORT_STATE_KEY, state)
             self.db_session.commit()
+            self._emit(f"Analytics export failed after rows={run_counts}: {exc}")
             raise
 
     def _state(self):
@@ -190,7 +310,11 @@ class AnalyticsExportService:
                 break
 
             payload = [spec.serializer(row) for row in rows]
-            self._load_rows(spec.table, payload, write_disposition="WRITE_APPEND")
+            self._emit(
+                f"Loading {len(payload)} rows to {spec.table} "
+                f"first_id={rows[0].id} last_id={rows[-1].id}"
+            )
+            self._load_rows(spec.table, payload, write_disposition="WRITE_APPEND", schema=spec.schema)
 
             last = rows[-1]
             table_state["last_ts"] = _format_dt(getattr(last, spec.cursor_column.key))
@@ -217,17 +341,29 @@ class AnalyticsExportService:
 
     def _export_users(self):
         rows = self.db_session.query(User).order_by(User.id.asc()).all()
-        self._load_rows("users", [_serialize_user(row) for row in rows], write_disposition="WRITE_TRUNCATE")
+        self._emit(f"Loading {len(rows)} rows to users")
+        self._load_rows(
+            "users",
+            [_serialize_user(row) for row in rows],
+            write_disposition="WRITE_TRUNCATE",
+            schema=USERS_SCHEMA,
+        )
         return len(rows)
 
-    def _load_rows(self, table, rows, *, write_disposition):
+    def _load_rows(self, table, rows, *, write_disposition, schema):
+        self._emit(f"Starting BigQuery load table={table} rows={len(rows)} disposition={write_disposition}")
         job = self.bq_client.load_table_from_json(
             rows,
             _table_ref(self.dataset, table),
-            job_config=_load_job_config(write_disposition),
+            job_config=_load_job_config(write_disposition, schema),
         )
         job.result()
+        self._emit(f"BigQuery load complete table={table} rows={len(rows)}")
+
+    def _emit(self, message: str):
+        if self.log:
+            self.log(message)
 
 
-def run_export(db_session, bq_client, dataset=DEFAULT_DATASET, now=None):
-    return AnalyticsExportService(db_session, bq_client, dataset).run_export(now=now)
+def run_export(db_session, bq_client, dataset=DEFAULT_DATASET, now=None, *, batch_size=DEFAULT_BATCH_SIZE, log=None):
+    return AnalyticsExportService(db_session, bq_client, dataset, batch_size=batch_size, log=log).run_export(now=now)

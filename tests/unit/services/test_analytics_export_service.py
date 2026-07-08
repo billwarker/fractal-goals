@@ -3,7 +3,7 @@ import uuid
 
 import pytest
 
-from models import EmailDeliveryEvent, EventLog, Goal, ProductEvent, User
+from models import EmailDeliveryEvent, EmailWebhookEvent, EventLog, Goal, ProductEvent, User
 from services.analytics_export_service import AnalyticsExportService
 from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, get_app_setting
 
@@ -29,6 +29,7 @@ class FakeBigQueryClient:
             "table": table,
             "rows": list(rows),
             "write_disposition": _write_disposition(job_config),
+            "schema": _schema_fields(job_config),
         })
         return FakeLoadJob(should_fail=table in self.fail_tables)
 
@@ -37,6 +38,19 @@ def _write_disposition(job_config):
     if isinstance(job_config, dict):
         return job_config.get("write_disposition")
     return getattr(job_config, "write_disposition", None)
+
+
+def _schema_fields(job_config):
+    schema = job_config.get("schema") if isinstance(job_config, dict) else getattr(job_config, "schema", None)
+    if not schema:
+        return []
+    fields = []
+    for field in schema:
+        if isinstance(field, tuple):
+            fields.append(field)
+        else:
+            fields.append((field.name, field.field_type))
+    return fields
 
 
 def _dt(minutes):
@@ -101,6 +115,15 @@ def _seed_export_rows(db_session, *, now):
             recipient_user_id=user.id,
             created_at=now - datetime.timedelta(hours=2),
         ),
+        EmailWebhookEvent(
+            id="webhook-old",
+            provider="resend",
+            provider_event_id="evt_123",
+            provider_message_id="msg_123",
+            event_type="email.delivered",
+            payload={"delivered": True},
+            created_at=now - datetime.timedelta(hours=2),
+        ),
     ])
     db_session.commit()
     return user, root
@@ -120,12 +143,14 @@ class TestAnalyticsExportService:
             "product_events": 1,
             "event_logs": 1,
             "email_delivery_events": 1,
+            "email_webhook_events": 1,
             "users": 1,
         }
         assert [(load["table"], load["write_disposition"]) for load in bq.loads] == [
             ("product_events", "WRITE_APPEND"),
             ("event_logs", "WRITE_APPEND"),
             ("email_delivery_events", "WRITE_APPEND"),
+            ("email_webhook_events", "WRITE_APPEND"),
             ("users", "WRITE_TRUNCATE"),
         ]
         state = get_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY)
@@ -133,6 +158,7 @@ class TestAnalyticsExportService:
         assert state["tables"]["product_events"]["last_id"] == "product-old"
         assert state["tables"]["event_logs"]["last_id"] == "event-old"
         assert state["tables"]["email_delivery_events"]["last_id"] == "email-old"
+        assert state["tables"]["email_webhook_events"]["last_id"] == "webhook-old"
 
     def test_incremental_second_run_exports_only_new_rows(self, db_session):
         now = _dt(0)
@@ -158,6 +184,7 @@ class TestAnalyticsExportService:
         assert [row["id"] for row in product_load["rows"]] == ["product-new"]
         assert result["rows"]["event_logs"] == 0
         assert result["rows"]["email_delivery_events"] == 0
+        assert result["rows"]["email_webhook_events"] == 0
 
     def test_lag_window_defers_recent_rows_then_picks_them_up(self, db_session):
         now = _dt(0)
@@ -208,6 +235,20 @@ class TestAnalyticsExportService:
         assert "password_hash" not in users_load["rows"][0]
         assert "preferences" not in users_load["rows"][0]
 
+    def test_loads_use_explicit_bigquery_schemas(self, db_session):
+        now = _dt(0)
+        _seed_export_rows(db_session, now=now)
+        bq = FakeBigQueryClient()
+
+        AnalyticsExportService(db_session, bq, "dataset").run_export(now=now)
+
+        schemas = {load["table"]: load["schema"] for load in bq.loads}
+        assert ("event_type", "STRING") in schemas["event_logs"]
+        assert ("timestamp", "TIMESTAMP") in schemas["event_logs"]
+        assert ("payload_json", "STRING") in schemas["email_webhook_events"]
+        assert ("created_at", "TIMESTAMP") in schemas["product_events"]
+        assert ("email", "STRING") in schemas["users"]
+
     def test_json_columns_are_serialized(self, db_session):
         now = _dt(0)
         _seed_export_rows(db_session, now=now)
@@ -217,5 +258,7 @@ class TestAnalyticsExportService:
 
         product_load = next(load for load in bq.loads if load["table"] == "product_events")
         event_load = next(load for load in bq.loads if load["table"] == "event_logs")
+        webhook_load = next(load for load in bq.loads if load["table"] == "email_webhook_events")
         assert product_load["rows"][0]["properties_json"] == '{"source":"test"}'
         assert event_load["rows"][0]["payload_json"] == '{"count":1}'
+        assert webhook_load["rows"][0]["payload_json"] == '{"delivered":true}'

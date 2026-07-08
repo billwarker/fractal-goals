@@ -9,12 +9,19 @@ environment on each deploy, but it does not execute the job.
 - `product_events`: incremental append by `(created_at, id)`.
 - `event_logs`: incremental append by `(timestamp, id)`.
 - `email_delivery_events`: incremental append by `(created_at, id)`.
+- `email_webhook_events`: incremental append by `(created_at, id)`.
 - `users`: full dimension refresh with `WRITE_TRUNCATE`.
 
 The users dimension includes only account analytics fields: `id`, `username`,
 `email`, `role`, `is_active`, `membership_tier`, `created_at`, and
 `last_login_at`. It intentionally excludes password hashes, preferences, quota
-overrides, and other private account internals.
+overrides, and other private account internals. The export job does not export
+Supabase platform metadata, auth schema internals, storage metadata, Postgres
+catalogs, or database storage-inspection rows.
+
+Every BigQuery load includes an explicit schema and uses `CREATE_IF_NEEDED`, so
+first-run backfills create `event_logs` and the other analytics tables even
+when the dataset starts empty.
 
 Incremental table watermarks live in `app_settings.analytics_export_state` and
 are advanced only after the matching BigQuery load job succeeds. Rows newer
@@ -40,10 +47,11 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:fractal-runtime@fractal-goals.iam.gserviceaccount.com" \
   --role="roles/bigquery.jobUser"
 
-bq add-iam-policy-binding \
-  --member="serviceAccount:fractal-runtime@fractal-goals.iam.gserviceaccount.com" \
-  --role="roles/bigquery.dataEditor" \
-  "$PROJECT_ID:fractal_analytics"
+bq query --use_legacy_sql=false "
+GRANT \`roles/bigquery.dataEditor\`
+ON SCHEMA \`$PROJECT_ID\`.fractal_analytics
+TO \"serviceAccount:fractal-runtime@fractal-goals.iam.gserviceaccount.com\";
+"
 ```
 
 3. Create the Cloud Run job once:
@@ -111,6 +119,14 @@ FROM (
   FROM `PROJECT_ID.fractal_analytics.email_delivery_events`
 )
 WHERE row_number = 1;
+
+CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.email_webhook_events_deduped` AS
+SELECT * EXCEPT(row_number)
+FROM (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY id ORDER BY created_at DESC) AS row_number
+  FROM `PROJECT_ID.fractal_analytics.email_webhook_events`
+)
+WHERE row_number = 1;
 ```
 
 Replace `PROJECT_ID` with the actual Google Cloud project id.
@@ -122,6 +138,13 @@ Run the job manually after deploy to backfill existing analytics:
 ```bash
 gcloud run jobs execute export-analytics --region=us-east1 --wait
 ```
+
+The job logs one line when each table starts, each BigQuery load begins and
+finishes, and the final per-table row counts. First runs can spend most of
+their wall time inside BigQuery `job.result()` calls; if logs stop after
+`Starting BigQuery load table=...`, check BigQuery job history for the matching
+load job. The default batch size is 5,000 rows and can be changed on the Cloud
+Run job with `ANALYTICS_EXPORT_BATCH_SIZE`.
 
 The Admin overview usage panel shows the last export status and per-table
 watermark from `app_settings.analytics_export_state`.
