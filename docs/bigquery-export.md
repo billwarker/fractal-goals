@@ -146,5 +146,11 @@ their wall time inside BigQuery `job.result()` calls; if logs stop after
 load job. The default batch size is 5,000 rows and can be changed on the Cloud
 Run job with `ANALYTICS_EXPORT_BATCH_SIZE`.
 
+If logs show the same `first_id`/`last_id` batch loading repeatedly, cancel the
+job and deploy the cursor fix before retrying. Repeated appends can hit
+BigQuery's per-table update quota with `Exceeded rate limits: too many table
+update operations`; wait for the quota window to clear, create/use the dedupe
+views above, then rerun the export.
+
 The Admin overview usage panel shows the last export status and per-table
 watermark from `app_settings.analytics_export_state`.

@@ -45,11 +45,20 @@ def _parse_dt(value):
     if not value:
         return None
     if isinstance(value, datetime.datetime):
-        return value
+        return _db_datetime(value)
     try:
-        return datetime.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return _db_datetime(datetime.datetime.fromisoformat(str(value).replace("Z", "+00:00")))
     except ValueError:
         return None
+
+
+def _db_datetime(value):
+    """Normalize cursor datetimes for DateTime columns stored without tzinfo."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(datetime.timezone.utc).replace(tzinfo=None)
 
 
 def _json_value(value):
@@ -309,6 +318,7 @@ class AnalyticsExportService:
             if not rows:
                 break
 
+            self._assert_batch_advances_cursor(spec, table_state, rows)
             payload = [spec.serializer(row) for row in rows]
             self._emit(
                 f"Loading {len(payload)} rows to {spec.table} "
@@ -330,7 +340,7 @@ class AnalyticsExportService:
         cursor_ts = _parse_dt(table_state.get("last_ts"))
         cursor_id = table_state.get("last_id")
 
-        query = self.db_session.query(spec.model).filter(spec.cursor_column < cutoff)
+        query = self.db_session.query(spec.model).filter(spec.cursor_column < _db_datetime(cutoff))
         if cursor_ts is not None and cursor_id:
             query = query.filter(sa.or_(
                 spec.cursor_column > cursor_ts,
@@ -338,6 +348,21 @@ class AnalyticsExportService:
             ))
 
         return query.order_by(spec.cursor_column.asc(), spec.model.id.asc()).limit(self.batch_size).all()
+
+    def _assert_batch_advances_cursor(self, spec: IncrementalTableSpec, table_state, rows):
+        cursor_ts = _parse_dt(table_state.get("last_ts"))
+        cursor_id = table_state.get("last_id")
+        if cursor_ts is None or not cursor_id:
+            return
+
+        first = rows[0]
+        first_tuple = (_db_datetime(getattr(first, spec.cursor_column.key)), first.id)
+        cursor_tuple = (cursor_ts, cursor_id)
+        if first_tuple <= cursor_tuple:
+            raise RuntimeError(
+                f"Analytics export cursor failed to advance for {spec.table}: "
+                f"cursor={cursor_tuple} first_row={first_tuple}"
+            )
 
     def _export_users(self):
         rows = self.db_session.query(User).order_by(User.id.asc()).all()

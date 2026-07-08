@@ -186,6 +186,39 @@ class TestAnalyticsExportService:
         assert result["rows"]["email_delivery_events"] == 0
         assert result["rows"]["email_webhook_events"] == 0
 
+    def test_same_timestamp_rows_advance_across_batches_once(self, db_session):
+        now = _dt(0)
+        user = _user(db_session)
+        timestamp = now - datetime.timedelta(hours=2)
+        db_session.add_all([
+            ProductEvent(
+                id=f"product-{index:03d}",
+                user_id=user.id,
+                event_name="page_view",
+                created_at=timestamp,
+            )
+            for index in range(7)
+        ])
+        db_session.commit()
+        bq = FakeBigQueryClient()
+
+        result = AnalyticsExportService(db_session, bq, "dataset", batch_size=3).run_export(now=now)
+
+        product_loads = [load for load in bq.loads if load["table"] == "product_events"]
+        assert result["rows"]["product_events"] == 7
+        assert [len(load["rows"]) for load in product_loads] == [3, 3, 1]
+        assert [
+            row["id"]
+            for load in product_loads
+            for row in load["rows"]
+        ] == [f"product-{index:03d}" for index in range(7)]
+
+        second = FakeBigQueryClient()
+        result = AnalyticsExportService(db_session, second, "dataset", batch_size=3).run_export(
+            now=now + datetime.timedelta(minutes=30),
+        )
+        assert result["rows"]["product_events"] == 0
+
     def test_lag_window_defers_recent_rows_then_picks_them_up(self, db_session):
         now = _dt(0)
         user = _user(db_session)
