@@ -39,6 +39,7 @@ describe('AuthModal', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         login.mockResolvedValue({ token: 'token-a', user: { id: 'user-a' } });
+        window.history.pushState({}, '', '/');
     });
 
     it('sends remember-me preference with login', async () => {
@@ -73,5 +74,15 @@ describe('AuthModal', () => {
 
         await waitFor(() => expect(forgotPassword).toHaveBeenCalledWith({ email: 'test@example.com' }));
         expect(notify.success).toHaveBeenCalled();
+    });
+
+    it('prefills invite key and email from invite links', async () => {
+        window.history.pushState({}, '', '/?invite_key=fg_invite_abc123&email=invitee%40example.com');
+
+        render(<AuthModal isOpen={true} onClose={vi.fn()} />);
+
+        expect(screen.getByLabelText('Invite Key')).toHaveValue('fg_invite_abc123');
+        expect(screen.getByLabelText('Email')).toHaveValue('invitee@example.com');
+        expect(screen.getByRole('heading', { name: 'CREATE AN ACCOUNT' })).toBeInTheDocument();
     });
 });

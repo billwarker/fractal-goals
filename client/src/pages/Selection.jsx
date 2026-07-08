@@ -36,7 +36,8 @@ function Selection() {
     const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const isMobile = useIsMobile();
     const userId = user?.id || null;
-    const authModalRequested = Boolean(location.state?.openAuthModal);
+    const inviteKeyFromUrl = new URLSearchParams(location.search || '').get('invite_key');
+    const authModalRequested = Boolean(location.state?.openAuthModal || inviteKeyFromUrl);
     const recentRootStorageKey = useMemo(
         () => userId ? `${RECENT_ROOT_STORAGE_PREFIX}:${userId}` : null,
         [userId]

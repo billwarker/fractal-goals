@@ -920,6 +920,7 @@ function Admin() {
     const [search, setSearch] = useState('');
     const [newKey, setNewKey] = useState(null);
     const [inviteLabel, setInviteLabel] = useState('');
+    const [inviteEmail, setInviteEmail] = useState('');
     const [createdPassword, setCreatedPassword] = useState(null);
     const [selectedUser, setSelectedUser] = useState(null);
     const [generatedUserPassword, setGeneratedUserPassword] = useState(null);
@@ -952,10 +953,11 @@ function Admin() {
     });
 
     const createInviteMutation = useMutation({
-        mutationFn: () => adminApi.createInviteKey({ label: inviteLabel }),
+        mutationFn: () => adminApi.createInviteKey({ label: inviteLabel, email: inviteEmail }),
         onSuccess: (res) => {
             setNewKey(res.data.key);
             setInviteLabel('');
+            setInviteEmail('');
             queryClient.invalidateQueries({ queryKey: ADMIN_INVITES_KEY });
             queryClient.invalidateQueries({ queryKey: ADMIN_SUMMARY_KEY });
         },
@@ -1169,11 +1171,19 @@ function Admin() {
                 <section className={styles.section}>
                     <div className={styles.inviteCreator}>
                         <input
+                            placeholder="Email"
+                            value={inviteEmail}
+                            onChange={(event) => setInviteEmail(event.target.value)}
+                        />
+                        <input
                             placeholder="Label"
                             value={inviteLabel}
                             onChange={(event) => setInviteLabel(event.target.value)}
                         />
-                        <button onClick={() => createInviteMutation.mutate()} disabled={createInviteMutation.isPending}>
+                        <button
+                            onClick={() => createInviteMutation.mutate()}
+                            disabled={createInviteMutation.isPending || !inviteEmail.trim()}
+                        >
                             Generate
                         </button>
                     </div>
@@ -1187,6 +1197,7 @@ function Admin() {
                         <thead>
                             <tr>
                                 <th>Label</th>
+                                <th>Email</th>
                                 <th>Status</th>
                                 <th>Created</th>
                                 <th>Used</th>
@@ -1197,6 +1208,7 @@ function Admin() {
                             {(invitesQuery.data || []).map((invite) => (
                                 <tr key={invite.id}>
                                     <td>{invite.label || 'Tester invite'}</td>
+                                    <td>{invite.assigned_email || 'Any email'}</td>
                                     <td>{invite.status}</td>
                                     <td>{formatDate(invite.created_at)}</td>
                                     <td>{formatDate(invite.used_at)}</td>

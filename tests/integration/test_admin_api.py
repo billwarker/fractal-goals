@@ -1,6 +1,7 @@
 import json
 import uuid
 from datetime import datetime
+from urllib.parse import parse_qs, urlparse
 
 import jwt
 import pytest
@@ -103,18 +104,20 @@ def test_non_admin_cannot_access_admin_api(authed_client):
 def test_admin_can_create_and_revoke_invite_key(admin_client):
     response = admin_client.post(
         '/api/admin/invite-keys',
-        data=json.dumps({'label': 'Tester wave'}),
+        data=json.dumps({'label': 'Tester wave', 'email': 'Tester@Example.com'}),
         content_type='application/json',
     )
     assert response.status_code == 201
     payload = json.loads(response.data)
     assert payload['key'].startswith('fg_invite_')
     assert payload['status'] == 'available'
+    assert payload['assigned_email'] == 'tester@example.com'
 
     list_response = admin_client.get('/api/admin/invite-keys')
     assert list_response.status_code == 200
     keys = json.loads(list_response.data)
     assert 'key' not in keys[0]
+    assert keys[0]['assigned_email'] == 'tester@example.com'
 
     revoke_response = admin_client.patch(f"/api/admin/invite-keys/{payload['id']}/revoke")
     assert revoke_response.status_code == 200
@@ -136,7 +139,7 @@ def test_signup_requires_and_consumes_invite_key(client, admin_client):
 
     invite_response = admin_client.post(
         '/api/admin/invite-keys',
-        data=json.dumps({'label': 'Signup key'}),
+        data=json.dumps({'label': 'Signup key', 'email': 'invited@example.com'}),
         content_type='application/json',
     )
     invite_key = json.loads(invite_response.data)['key']
@@ -163,6 +166,41 @@ def test_signup_requires_and_consumes_invite_key(client, admin_client):
         content_type='application/json',
     )
     assert reuse_response.status_code == 400
+
+
+@pytest.mark.integration
+def test_manual_invite_key_is_bound_to_assigned_email(client, admin_client):
+    invite_response = admin_client.post(
+        '/api/admin/invite-keys',
+        data=json.dumps({'label': 'Bound key', 'email': 'bound@example.com'}),
+        content_type='application/json',
+    )
+    invite_key = json.loads(invite_response.data)['key']
+
+    wrong_email_response = client.post(
+        '/api/auth/signup',
+        data=json.dumps({
+            'username': 'wrongbound',
+            'email': 'other@example.com',
+            'password': 'Password123',
+            'invite_key': invite_key,
+        }),
+        content_type='application/json',
+    )
+    assert wrong_email_response.status_code == 400
+    assert json.loads(wrong_email_response.data)['error'] == 'Invite key is assigned to a different email'
+
+    correct_email_response = client.post(
+        '/api/auth/signup',
+        data=json.dumps({
+            'username': 'rightbound',
+            'email': 'BOUND@example.com',
+            'password': 'Password123',
+            'invite_key': invite_key,
+        }),
+        content_type='application/json',
+    )
+    assert correct_email_response.status_code == 201
 
 
 @pytest.mark.integration
@@ -1249,6 +1287,9 @@ def test_admin_sends_beta_signup_invite(admin_client, db_session, sample_beta_si
     assert len(TEST_EMAIL_OUTBOX) == 1
     assert TEST_EMAIL_OUTBOX[0]['to'] == target.email
     assert 'fg_invite_' in TEST_EMAIL_OUTBOX[0]['text']
+    assert 'fg_invite_' in TEST_EMAIL_OUTBOX[0]['html']
+    assert f"email={target.email.replace('@', '%40')}" in TEST_EMAIL_OUTBOX[0]['text']
+    assert 'Signup is invite-only' in TEST_EMAIL_OUTBOX[0]['text']
 
     db_session.refresh(target)
     assert target.status == 'invited'
@@ -1259,6 +1300,47 @@ def test_admin_sends_beta_signup_invite(admin_client, db_session, sample_beta_si
     event = db_session.query(EmailDeliveryEvent).filter_by(beta_signup_id=target.id).one()
     assert event.status == 'sent'
     assert event.template_key == 'beta_invite'
+
+
+@pytest.mark.integration
+def test_beta_signup_invite_key_is_bound_to_signup_email(admin_client, client, db_session, sample_beta_signups):
+    EmailService.clear_test_outbox()
+    target = sample_beta_signups[0]
+
+    response = admin_client.post(f'/api/admin/beta-signups/{target.id}/send-invite')
+
+    assert response.status_code == 200
+    signup_url = TEST_EMAIL_OUTBOX[0]['text'].splitlines()[3]
+    params = parse_qs(urlparse(signup_url).query)
+    invite_key = params['invite_key'][0]
+    assert params['email'][0] == target.email
+
+    wrong_email_response = client.post(
+        '/api/auth/signup',
+        data=json.dumps({
+            'username': 'wrong-email',
+            'email': 'someone-else@example.com',
+            'password': 'Password123',
+            'invite_key': invite_key,
+        }),
+        content_type='application/json',
+    )
+    assert wrong_email_response.status_code == 400
+    assert json.loads(wrong_email_response.data)['error'] == 'Invite key is assigned to a different email'
+
+    correct_email_response = client.post(
+        '/api/auth/signup',
+        data=json.dumps({
+            'username': 'right-email',
+            'email': target.email.upper(),
+            'password': 'Password123',
+            'invite_key': invite_key,
+        }),
+        content_type='application/json',
+    )
+    assert correct_email_response.status_code == 201
+    created_user = db_session.query(User).filter_by(username='right-email').one()
+    assert created_user.email == target.email
 
 
 @pytest.mark.integration

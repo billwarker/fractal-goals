@@ -69,10 +69,15 @@ function AuthModalInner({ onClose }) {
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
-        const inviteKey = new URLSearchParams(window.location.search).get('invite_key');
+        const params = new URLSearchParams(window.location.search);
+        const inviteKey = params.get('invite_key');
+        const inviteEmail = params.get('email');
         if (inviteKey) {
             setIsLogin(false);
             setFieldValue('inviteKey', inviteKey);
+            if (inviteEmail) {
+                setFieldValue('email', inviteEmail);
+            }
         }
         // Run only when the modal opens so invite links can prefill signup once.
         // eslint-disable-next-line react-hooks/exhaustive-deps

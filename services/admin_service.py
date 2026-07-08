@@ -114,6 +114,7 @@ class AdminService:
         return {
             "id": invite.id,
             "label": invite.label,
+            "assigned_email": invite.assigned_email,
             "created_by_user_id": invite.created_by_user_id,
             "used_by_user_id": invite.used_by_user_id,
             "created_at": format_utc(invite.created_at),
@@ -159,7 +160,8 @@ class AdminService:
 
         invite = SignupInviteKey(
             key_hash=hash_invite_key(raw_key),
-            label=data.get("label"),
+            label=data.get("label") or f"Invite for {data['email']}",
+            assigned_email=data["email"],
             created_by_user_id=current_user.id,
             expires_at=expires_at,
         )
@@ -663,13 +665,14 @@ class AdminService:
         invite = SignupInviteKey(
             key_hash=hash_invite_key(raw_key),
             label=f"Beta invite for {request.email}",
+            assigned_email=request.email,
             created_by_user_id=current_user.id,
         )
         self.db_session.add(invite)
         self.db_session.flush()
 
-        signup_url = f"{config.APP_BASE_URL.rstrip('/')}/?invite_key={quote(raw_key)}"
-        rendered = render_beta_invite_email(signup_url, request.use_case)
+        signup_url = f"{config.APP_BASE_URL.rstrip('/')}/?invite_key={quote(raw_key)}&email={quote(request.email)}"
+        rendered = render_beta_invite_email(signup_url, request.use_case, invite_key=raw_key)
         try:
             EmailService(self.db_session).send_email(
                 to=request.email,

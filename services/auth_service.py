@@ -8,7 +8,7 @@ import jwt
 
 from account_tiers import DEFAULT_ACCOUNT_TIER
 from config import config
-from models import EmailDeliveryEvent, PasswordResetToken, User, utc_now
+from models import BetaSignupRequest, EmailDeliveryEvent, PasswordResetToken, User, utc_now
 from services.email_service import EmailSendError, EmailService
 from services.email_templates import render_password_reset_email
 from services.serializers import serialize_user
@@ -75,16 +75,24 @@ class AuthService:
         if invite_error:
             return None, invite_error, invite_status
 
+        email = data['email'].lower()
+        if invite.assigned_email and invite.assigned_email != email:
+            return None, "Invite key is assigned to a different email", 400
+
+        beta_signup = self.db_session.query(BetaSignupRequest).filter_by(invite_key_id=invite.id).first()
+        if not invite.assigned_email and beta_signup and beta_signup.email != email:
+            return None, "Invite key is assigned to a different email", 400
+
         existing_user = self.db_session.query(User).filter(
             (User.username == data['username']) |
-            (User.email == data['email'])
+            (User.email == email)
         ).first()
         if existing_user:
             return None, "Username or email already exists", 400
 
         new_user = User(
             username=data['username'],
-            email=data['email'],
+            email=email,
             storage_limit_bytes=(
                 QuotaService(self.db_session).get_tier_storage_limit_bytes(DEFAULT_ACCOUNT_TIER)
                 or DEFAULT_STORAGE_LIMIT_BYTES

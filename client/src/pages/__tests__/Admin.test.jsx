@@ -389,9 +389,14 @@ describe('Admin', () => {
         }));
 
         fireEvent.click(screen.getByText('invite keys'));
+        fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'invitee@example.com' } });
         fireEvent.change(screen.getByPlaceholderText('Label'), { target: { value: 'Wave 1' } });
         fireEvent.click(screen.getByText('Generate'));
 
+        await waitFor(() => expect(createInviteKey).toHaveBeenCalledWith({
+            email: 'invitee@example.com',
+            label: 'Wave 1',
+        }));
         await waitFor(() => expect(screen.getByText('fg_invite_secret')).toBeInTheDocument());
     });
 

@@ -15,6 +15,7 @@ const {
     deleteFractal,
     notify,
     mockAuthState,
+    authModalProps,
 } = vi.hoisted(() => ({
     mockNavigate: vi.fn(),
     mockLogout: vi.fn(),
@@ -25,6 +26,7 @@ const {
     mockAuthState: {
         user: { id: 'user-1', username: 'will' },
     },
+    authModalProps: [],
     notify: {
         success: vi.fn(),
         error: vi.fn(),
@@ -85,7 +87,10 @@ vi.mock('../../components/modals/GoalModal', () => ({
 }));
 
 vi.mock('../../components/modals/AuthModal', () => ({
-    default: () => null,
+    default: function AuthModal(props) {
+        authModalProps.push(props);
+        return props.isOpen ? <div data-testid="auth-modal" /> : null;
+    },
 }));
 
 vi.mock('../../components/atoms/GoalIcon', () => ({
@@ -120,10 +125,10 @@ function createQueryClient() {
     });
 }
 
-function renderSelection(queryClient) {
+function renderSelection(queryClient, initialEntries = ['/']) {
     return render(
         <QueryClientProvider client={queryClient}>
-            <MemoryRouter>
+            <MemoryRouter initialEntries={initialEntries}>
                 <Selection />
             </MemoryRouter>
         </QueryClientProvider>
@@ -154,6 +159,7 @@ describe('Selection', () => {
         });
         localStorageMock.clear();
         mockAuthState.user = { id: 'user-1', username: 'will' };
+        authModalProps.length = 0;
     });
 
     it('stores fractals under user-scoped query keys without per-root level fetches', async () => {
@@ -306,6 +312,16 @@ describe('Selection', () => {
         expect(alertSpy).not.toHaveBeenCalled();
 
         alertSpy.mockRestore();
+    });
+
+    it('opens auth modal automatically for invite links', async () => {
+        const queryClient = createQueryClient();
+        getAllFractals.mockResolvedValueOnce({ data: [] });
+
+        renderSelection(queryClient, ['/?invite_key=fg_invite_email_key']);
+
+        expect(await screen.findByTestId('auth-modal')).toBeInTheDocument();
+        expect(authModalProps.at(-1)?.isOpen).toBe(true);
     });
 
     it('uses notify instead of alert when fractal deletion fails', async () => {

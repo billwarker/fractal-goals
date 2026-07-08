@@ -280,8 +280,14 @@ class AdminLandingExamplesUpdateSchema(BaseModel):
 class AdminInviteKeyCreateSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
+    email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
     label: Optional[str] = Field(None, max_length=255)
     expires_at: Optional[str] = None
+
+    @field_validator('email')
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return sanitize_string(v).lower()
 
     @field_validator('label')
     @classmethod

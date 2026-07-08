@@ -58,6 +58,7 @@ class SignupInviteKey(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     key_hash = Column(String(64), unique=True, nullable=False, index=True)
     label = Column(String(255), nullable=True)
+    assigned_email = Column(String(120), nullable=True, index=True)
     created_by_user_id = Column(String, ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
     used_by_user_id = Column(String, ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
     created_at = Column(DateTime, default=utc_now)
