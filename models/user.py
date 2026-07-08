@@ -1,3 +1,4 @@
+import sqlalchemy as sa
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -120,6 +121,11 @@ class EmailDeliveryEvent(Base):
     workflow metadata and provider ids/errors, not raw email bodies or secrets.
     """
     __tablename__ = 'email_delivery_events'
+    __table_args__ = (
+        # Global time-window aggregation (admin email health) and BigQuery
+        # export keyset pagination.
+        sa.Index('ix_email_delivery_events_created_at_id', 'created_at', 'id'),
+    )
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     provider = Column(String(32), nullable=False, index=True)

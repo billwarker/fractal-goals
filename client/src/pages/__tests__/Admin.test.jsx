@@ -72,6 +72,8 @@ vi.mock('../../utils/api', () => ({
     adminApi: {
         getSummary: (...args) => getSummary(...args),
         getUsage: (...args) => getUsage(...args),
+        pruneUsage: vi.fn(),
+        updateUsageRetention: vi.fn(),
         getUsers: (...args) => getUsers(...args),
         getTierQuotas: (...args) => getTierQuotas(...args),
         getInviteKeys: (...args) => getInviteKeys(...args),
@@ -108,6 +110,21 @@ vi.mock('../../utils/notify', () => ({
     },
 }));
 
+vi.mock('react-chartjs-2', () => ({
+    Bar: () => <div data-testid="dau-bar-chart" />,
+}));
+
+vi.mock('../../components/analytics/ChartJSWrapper', () => ({
+    DISABLED_CHART_ANIMATION: { animation: false },
+    useChartThemeDefaults: () => ({
+        gridColor: '#333',
+        textColor: '#ccc',
+        primaryColor: '#4f9cf9',
+        secondaryColor: '#22c55e',
+        tooltipBg: '#111',
+    }),
+}));
+
 function renderAdmin() {
     const queryClient = new QueryClient({
         defaultOptions: {
@@ -139,13 +156,18 @@ describe('Admin', () => {
         });
         getUsage.mockResolvedValue({
             data: {
+                window: { start: '2026-06-08', end: '2026-07-07', days: 30 },
                 window_days: 30,
                 active_users: { dau: [{ date: '2026-07-07', count: 1 }], wau: 1, mau: 1 },
                 signups_by_day: [],
                 per_user: [],
+                events_breakdown: [],
                 top_events: [],
                 top_pages: [],
                 email_health: [],
+                storage: { tables: [] },
+                retention: { product_events_days: 180 },
+                export: { last_run_at: null, last_run_status: null, tables: {} },
             },
         });
         getUsers.mockResolvedValue({

@@ -214,18 +214,6 @@
     min-height: 86px;
 }
 
-.dauStrip {
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
-    height: 64px;
-}
-
-.dauStrip > div {
-    flex: 1;
-    min-width: 3px;
-}
-
 .summaryCard strong {
     font-size: var(--font-size-2xl);
     color: var(--color-text-primary);

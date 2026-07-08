@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import SidePaneHeader from '../common/SidePaneHeader';
 import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
 import ActivityFilterModal from '../common/ActivityFilterModal';
+import DateRangeFilter from '../common/DateRangeFilter';
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 import { hasActiveGlobalFilters, normalizeGlobalFilters, resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
 import { getVisualization } from './visualizations/registry';
@@ -12,44 +13,13 @@ import {
 } from './visualizations/state';
 import '../sessions/SessionsQuerySidebar.css';
 
-const DATE_PRESET_OPTIONS = [
-    { value: '7d', label: '7D', days: 7 },
-    { value: '30d', label: '30D', days: 30 },
-    { value: '90d', label: '90D', days: 90 },
-    { value: '6m', label: '6M', days: 182 },
-    { value: '1y', label: '1Y', days: 365 },
-    { value: 'all', label: 'All', days: null },
-    { value: 'custom', label: 'Custom', days: null },
-];
-
-function toISODate(date) {
-    return date.toISOString().split('T')[0];
-}
-
-function getMatchingPreset(dateRange) {
-    if (!dateRange?.start && !dateRange?.end) {
-        return 'all';
-    }
-    if (!dateRange?.start || !dateRange?.end) {
-        return 'custom';
-    }
-
-    const today = toISODate(new Date());
-    if (dateRange.end !== today) {
-        return 'custom';
-    }
-
-    for (const preset of DATE_PRESET_OPTIONS) {
-        if (!preset.days) continue;
-        const presetStart = new Date();
-        presetStart.setDate(presetStart.getDate() - preset.days);
-        if (dateRange.start === toISODate(presetStart)) {
-            return preset.value;
-        }
-    }
-
-    return 'custom';
-}
+const SIDEBAR_DATE_RANGE_CLASSES = {
+    chipGroup: 'sessions-query-chip-group',
+    chip: 'sessions-query-chip',
+    chipActive: 'active',
+    dateGrid: 'sessions-query-date-grid',
+    field: 'sessions-query-field',
+};
 
 function AnalyticsFiltersSidebar({
     filters,
@@ -73,11 +43,6 @@ function AnalyticsFiltersSidebar({
     const [isGlobalScopeCollapsed, setIsGlobalScopeCollapsed] = useState(false);
     const [isSelectedPanelCollapsed, setIsSelectedPanelCollapsed] = useState(false);
     const normalized = useMemo(() => normalizeGlobalFilters(filters), [filters]);
-    const derivedPreset = useMemo(() => getMatchingPreset(dateRange), [dateRange]);
-    const [isCustomPresetSelected, setIsCustomPresetSelected] = useState(derivedPreset === 'custom');
-    const selectedPreset = (!dateRange?.start && !dateRange?.end)
-        ? 'all'
-        : isCustomPresetSelected ? 'custom' : derivedPreset;
     const activeFilterCount = [
         Boolean(dateRange?.start || dateRange?.end),
         normalized.goals.goalIds.length > 0,
@@ -201,29 +166,6 @@ function AnalyticsFiltersSidebar({
     ), [profileActivities, activityInstances]);
     const SelectedControls = selectedVisualizationMeta?.Controls || null;
 
-    const handlePresetClick = (preset) => {
-        setIsCustomPresetSelected(preset.value === 'custom');
-        if (preset.value === 'all') {
-            onDateRangeChange?.({ start: null, end: null });
-            return;
-        }
-
-        if (preset.value === 'custom') {
-            if (!dateRange?.start && !dateRange?.end) {
-                const end = new Date();
-                const start = new Date();
-                start.setDate(start.getDate() - 30);
-                onDateRangeChange?.({ start: toISODate(start), end: toISODate(end) });
-            }
-            return;
-        }
-
-        const end = new Date();
-        const start = new Date();
-        start.setDate(start.getDate() - preset.days);
-        onDateRangeChange?.({ start: toISODate(start), end: toISODate(end) });
-    };
-
     return (
         <div className="sessions-query-sidebar">
             <SidePaneHeader
@@ -273,45 +215,11 @@ function AnalyticsFiltersSidebar({
                         <div className="sessions-query-sidebar-section-header">
                             <h4>Time Range</h4>
                         </div>
-                        <div className="sessions-query-chip-group">
-                            {DATE_PRESET_OPTIONS.map((option) => (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    className={`sessions-query-chip ${selectedPreset === option.value ? 'active' : ''}`}
-                                    onClick={() => handlePresetClick(option)}
-                                >
-                                    {option.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        {selectedPreset === 'custom' && (
-                            <div className="sessions-query-date-grid">
-                                <label className="sessions-query-field">
-                                    <span>Start</span>
-                                    <input
-                                        type="date"
-                                        value={dateRange?.start || ''}
-                                        onChange={(event) => onDateRangeChange?.({
-                                            ...dateRange,
-                                            start: event.target.value || null,
-                                        })}
-                                    />
-                                </label>
-                                <label className="sessions-query-field">
-                                    <span>End</span>
-                                    <input
-                                        type="date"
-                                        value={dateRange?.end || ''}
-                                        onChange={(event) => onDateRangeChange?.({
-                                            ...dateRange,
-                                            end: event.target.value || null,
-                                        })}
-                                    />
-                                </label>
-                            </div>
-                        )}
+                        <DateRangeFilter
+                            value={dateRange}
+                            onChange={(range) => onDateRangeChange?.(range)}
+                            classNames={SIDEBAR_DATE_RANGE_CLASSES}
+                        />
                     </section>
 
                     <section className="sessions-query-sidebar-section sessions-query-sidebar-section-compact">

@@ -82,8 +82,12 @@ class LogService:
 
         return payload, None, 200
 
-    def clear_logs(self, root_id, current_user_id) -> ServiceResult[JsonDict]:
-        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+    def clear_logs(self, root_id, current_user_id=None, *, require_owner=True) -> ServiceResult[JsonDict]:
+        root = validate_root_goal(
+            self.db_session,
+            root_id,
+            owner_id=current_user_id if require_owner else None,
+        )
         if not root:
             return None, "Fractal not found or access denied", 404
 

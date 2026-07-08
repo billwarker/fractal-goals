@@ -500,3 +500,32 @@ def _fake_db_session(instance):
             self.closed = True
 
     return _FakeSession(instance)
+
+
+@pytest.mark.unit
+class TestGoalCreationEventLogging:
+    def test_create_global_goal_emits_root_id_for_root_fractals(self, db_session, test_user, monkeypatch):
+        """Root-fractal creation must emit GOAL_CREATED with a truthy root_id.
+
+        services/event_logger.py silently drops events whose payload lacks a
+        truthy root_id, so if this invariant regresses, new fractals lose
+        their first goal.created audit row.
+        """
+        import services._goal_crud as goal_crud
+        from services.goal_service import GoalService, sync_goal_targets
+
+        emitted = []
+        monkeypatch.setattr(goal_crud.event_bus, "emit", lambda event: emitted.append(event))
+
+        service = GoalService(db_session, sync_targets=sync_goal_targets)
+        goal, error, status = service.create_global_goal(
+            test_user.id,
+            {"name": "Brand New Fractal", "type": "UltimateGoal"},
+        )
+
+        assert error is None
+        assert status == 201
+        created_events = [event for event in emitted if event.name == Events.GOAL_CREATED]
+        assert len(created_events) == 1
+        assert created_events[0].data["root_id"] == goal.id
+        assert created_events[0].data["root_id"] is not None

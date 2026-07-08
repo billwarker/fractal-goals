@@ -118,6 +118,9 @@ class EventLog(Base):
     __table_args__ = (
         sa.Index('ix_event_logs_root_timestamp_desc', 'root_id', sa.text('timestamp DESC')),
         sa.Index('ix_event_logs_root_event_type_timestamp_desc', 'root_id', 'event_type', sa.text('timestamp DESC')),
+        # Global time-window aggregation (admin usage) and BigQuery export
+        # keyset pagination.
+        sa.Index('ix_event_logs_timestamp_id', 'timestamp', 'id'),
     )
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))

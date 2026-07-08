@@ -2,7 +2,39 @@ from datetime import datetime, timezone
 
 import pytest
 
-from models import EventLog
+from models import EventLog, User
+
+
+@pytest.fixture
+def admin_user(db_session):
+    user = User(
+        username="logsadmin",
+        email="logsadmin@example.com",
+        role="admin",
+    )
+    user.set_password("Password123")
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
+@pytest.fixture
+def admin_client(client, admin_user):
+    from config import config
+    import jwt
+    import datetime
+
+    token = jwt.encode({
+        "user_id": admin_user.id,
+        "exp": datetime.datetime.now(timezone.utc) + datetime.timedelta(hours=24),
+    }, config.JWT_SECRET_KEY, algorithm="HS256")
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+    class AdminClient:
+        def delete(self, *args, **kwargs):
+            return client.delete(*args, headers=headers, **kwargs)
+
+    return AdminClient()
 
 
 @pytest.mark.integration
@@ -84,7 +116,7 @@ class TestLogsApi:
         assert "event_types" not in payload
         assert payload["pagination"]["total"] == 1
 
-    def test_clear_logs_removes_root_logs(self, authed_client, db_session, sample_ultimate_goal):
+    def test_clear_logs_requires_admin(self, authed_client, db_session, sample_ultimate_goal):
         root_id = sample_ultimate_goal.id
         db_session.add(
             EventLog(
@@ -96,6 +128,23 @@ class TestLogsApi:
         db_session.commit()
 
         response = authed_client.delete(f"/api/{root_id}/logs/clear")
+
+        assert response.status_code == 403
+        remaining = db_session.query(EventLog).filter_by(root_id=root_id).count()
+        assert remaining == 1
+
+    def test_admin_clear_logs_removes_root_logs(self, admin_client, db_session, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+        db_session.add(
+            EventLog(
+                root_id=root_id,
+                event_type="goal.deleted",
+                description="Deleted a goal",
+            )
+        )
+        db_session.commit()
+
+        response = admin_client.delete(f"/api/{root_id}/logs/clear")
 
         assert response.status_code == 200
         assert response.get_json()["retention_policy"] == "hard_delete"

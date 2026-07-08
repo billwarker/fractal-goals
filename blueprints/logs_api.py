@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from models import get_session
 from blueprints.api_utils import get_db_session, internal_error
 from services.log_service import LogService
+from services.admin_service import AdminService
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +60,17 @@ def get_logs(current_user, root_id):
 @token_required
 def clear_logs(current_user, root_id):
     """
-    Clear all logs for a specific fractal.
+    Clear all logs for a specific fractal. This is an admin-only retention
+    operation; ordinary owners can still read their own event log dataset, but
+    cannot delete platform telemetry history.
     """
     db_session = get_db_session()
     service = LogService(db_session)
     try:
-        payload, error, status = service.clear_logs(root_id, current_user.id)
+        error, status = AdminService(db_session).require_admin(current_user)
+        if error:
+            return jsonify({"error": error}), status
+        payload, error, status = service.clear_logs(root_id, require_owner=False)
         if error:
             return jsonify({"error": error}), status
         logger.info("Cleared logs for root %s", root_id)

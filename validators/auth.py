@@ -186,6 +186,11 @@ class AdminUserForcePasswordChangeSchema(BaseModel):
     force_password_change: bool = True
 
 
+class AdminUsageRetentionSchema(BaseModel):
+    """Retention policy for admin telemetry (product_events)."""
+    product_events_days: int = Field(..., ge=1, le=100000)
+
+
 class AdminTierQuotaUpdateSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 

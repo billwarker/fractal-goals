@@ -264,8 +264,9 @@ class QuotaService:
         for row in self.db_session.query(AnalyticsDashboard).filter(AnalyticsDashboard.root_id.in_(roots), AnalyticsDashboard.deleted_at.is_(None)).all():
             total += self._payload_size(row.name, row.layout)
 
-        for row in self.db_session.query(EventLog).filter(EventLog.root_id.in_(roots)).all():
-            total += self._payload_size(row.event_type, row.entity_type, row.description, row.payload, row.source)
+        # EventLog rows are intentionally excluded: event history is platform
+        # telemetry surfaced through the admin usage dashboard, not
+        # user-manageable content, so users do not pay storage quota for it.
 
         for row in self.db_session.query(Target).filter(Target.root_id.in_(roots), Target.deleted_at.is_(None)).all():
             total += self._payload_size(row.name, row.type, row.time_scope)

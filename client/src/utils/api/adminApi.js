@@ -4,6 +4,7 @@ export const adminApi = {
     getSummary: () => axios.get(`${API_BASE}/admin/summary`),
     getUsage: (params = {}) => axios.get(`${API_BASE}/admin/usage`, { params }),
     pruneUsage: (data = {}) => axios.post(`${API_BASE}/admin/usage/prune`, data),
+    updateUsageRetention: (data) => axios.patch(`${API_BASE}/admin/usage/retention`, data),
     getUsers: (params = {}) => axios.get(`${API_BASE}/admin/users`, { params }),
     getTierQuotas: () => axios.get(`${API_BASE}/admin/tier-quotas`),
     updateTierQuotas: (data) => axios.patch(`${API_BASE}/admin/tier-quotas`, data),

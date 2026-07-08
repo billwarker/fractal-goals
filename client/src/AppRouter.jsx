@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { HeaderProvider, useHeader } from './contexts/HeaderContext';
 import { useAuth } from './contexts/AuthContext';
 import { useRootGoal } from './hooks/useGoalQueries';
@@ -42,6 +42,17 @@ import { useGoalLevels } from './contexts/GoalLevelsContext';
 import { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } from './utils/marketingHost';
 
 export { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } from './utils/marketingHost';
+
+function RequireAdmin({ children }) {
+    const { user } = useAuth();
+    const { rootId } = useParams();
+
+    if (!user?.is_admin) {
+        return <Navigate to={rootId ? `/${rootId}/goals` : '/'} replace />;
+    }
+
+    return children;
+}
 
 function getFractalSwitchPath(pathname, nextRootId) {
     const pathParts = pathname.split('/').filter(Boolean);
@@ -212,8 +223,12 @@ function FractalSwitcher({
 export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
     const location = useLocation();
     const { headerActions } = useHeader();
+    const { user } = useAuth();
     const isMobile = useIsMobile();
     const navRef = useRef(null);
+    // Event logs are platform telemetry surfaced through the admin usage
+    // dashboard; the Logs page is admin-only.
+    const showLogsNav = Boolean(user?.is_admin);
 
     // Extract rootId from current path
     const pathParts = location.pathname.split('/');
@@ -314,13 +329,15 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                             </Link>
                         ))}
 
-                        <Link
-                            to={logsNavItem.path}
-                            className={`nav-text-link ${styles.mobileBtn} ${isActive(logsNavItem.path) ? 'active' : ''}`}
-                            onClick={handleRouteLinkClick}
-                        >
-                            {logsNavItem.label}
-                        </Link>
+                        {showLogsNav && (
+                            <Link
+                                to={logsNavItem.path}
+                                className={`nav-text-link ${styles.mobileBtn} ${isActive(logsNavItem.path) ? 'active' : ''}`}
+                                onClick={handleRouteLinkClick}
+                            >
+                                {logsNavItem.label}
+                            </Link>
+                        )}
 
                         <button className={`nav-text-link ${styles.mobileBtn}`} onClick={handleOpenSettings}>
                             SETTINGS
@@ -377,14 +394,18 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                         </>
                     )}
 
-                    <div className={`nav-separator ${styles.navSeparator}`}></div>
-                    <Link
-                        to={logsNavItem.path}
-                        className={`nav-text-link ${isActive(logsNavItem.path) ? 'active' : ''}`}
-                        onClick={handleRouteLinkClick}
-                    >
-                        {logsNavItem.label}
-                    </Link>
+                    {showLogsNav && (
+                        <>
+                            <div className={`nav-separator ${styles.navSeparator}`}></div>
+                            <Link
+                                to={logsNavItem.path}
+                                className={`nav-text-link ${isActive(logsNavItem.path) ? 'active' : ''}`}
+                                onClick={handleRouteLinkClick}
+                            >
+                                {logsNavItem.label}
+                            </Link>
+                        </>
+                    )}
 
                     <div className={`nav-separator ${styles.navSeparator}`}></div>
                     <button className="nav-text-link" onClick={handleOpenSettings}>
@@ -606,11 +627,13 @@ function App() {
                                 </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/logs" element={
-                                <ComponentErrorBoundary>
-                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
-                                        <Logs />
-                                    </Suspense>
-                                </ComponentErrorBoundary>
+                                <RequireAdmin>
+                                    <ComponentErrorBoundary>
+                                        <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                            <Logs />
+                                        </Suspense>
+                                    </ComponentErrorBoundary>
+                                </RequireAdmin>
                             } />
                             <Route path="/:rootId/session/:sessionId" element={
                                 <ComponentErrorBoundary>

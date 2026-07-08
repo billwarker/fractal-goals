@@ -1,25 +1,33 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import DateRangeFilter from '../common/DateRangeFilter';
+import DauBarChart from './DauBarChart';
+import EventsBreakdownTable from './EventsBreakdownTable';
+import UsageStoragePanel from './UsageStoragePanel';
 import { adminApi } from '../../utils/api';
+import { presetToRange } from '../../utils/dateRange';
 import styles from '../../pages/Admin.module.css';
 
-const WINDOW_OPTIONS = [7, 30, 90];
+const USAGE_PRESETS = ['7d', '30d', '90d', '6m', '1y', 'custom'];
 
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : 'Never');
 
 export default function UsagePanel({ enabled }) {
-    const [days, setDays] = useState(30);
+    const [dateRange, setDateRange] = useState(() => presetToRange('30d'));
 
+    const usageQueryKey = ['admin', 'usage', dateRange.start, dateRange.end];
     const usageQuery = useQuery({
-        queryKey: ['admin', 'usage', days],
-        queryFn: async () => (await adminApi.getUsage({ days })).data,
+        queryKey: usageQueryKey,
+        queryFn: async () => (await adminApi.getUsage({
+            ...(dateRange.start ? { start: dateRange.start } : {}),
+            ...(dateRange.end ? { end: dateRange.end } : {}),
+        })).data,
         enabled,
     });
 
     const data = usageQuery.data;
     const dau = data?.active_users?.dau || [];
-    const maxDau = Math.max(1, ...dau.map((day) => day.count));
     const perUser = data?.per_user || [];
     const topPages = data?.top_pages || [];
     const topEvents = data?.top_events || [];
@@ -27,17 +35,15 @@ export default function UsagePanel({ enabled }) {
 
     return (
         <section className={styles.section}>
-            <div className={styles.betaStatusFilters}>
-                {WINDOW_OPTIONS.map((option) => (
-                    <button
-                        key={option}
-                        className={days === option ? styles.activeTab : ''}
-                        onClick={() => setDays(option)}
-                    >
-                        {option} days
-                    </button>
-                ))}
-            </div>
+            <DateRangeFilter
+                value={dateRange}
+                onChange={setDateRange}
+                presets={USAGE_PRESETS}
+                classNames={{
+                    chipGroup: styles.betaStatusFilters,
+                    chipActive: styles.activeTab,
+                }}
+            />
 
             {usageQuery.isLoading && <p>Loading usage data...</p>}
             {usageQuery.isError && <p>Failed to load usage data.</p>}
@@ -64,22 +70,11 @@ export default function UsagePanel({ enabled }) {
                     </div>
 
                     <h3>Daily active users</h3>
-                    <div
-                        role="img"
-                        aria-label={`Daily active users over the last ${days} days`}
-                        className={styles.dauStrip}
-                    >
-                        {dau.map((day) => (
-                            <div
-                                key={day.date}
-                                title={`${day.date}: ${day.count} active`}
-                                style={{
-                                    height: `${Math.max(4, Math.round((day.count / maxDau) * 100))}%`,
-                                    background: day.count > 0 ? 'var(--color-brand-primary, #4a90d9)' : 'var(--color-grid, #333)',
-                                }}
-                            />
-                        ))}
-                    </div>
+                    <DauBarChart
+                        dau={dau}
+                        windowStart={data.window?.start}
+                        windowEnd={data.window?.end}
+                    />
 
                     <h3>Users</h3>
                     <table className={styles.table}>
@@ -91,6 +86,7 @@ export default function UsagePanel({ enabled }) {
                                 <th>Page Views</th>
                                 <th>Sessions Created</th>
                                 <th>Goals Created</th>
+                                <th>Total Events</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -102,10 +98,14 @@ export default function UsagePanel({ enabled }) {
                                     <td>{entry.page_views}</td>
                                     <td>{entry.sessions_created}</td>
                                     <td>{entry.goals_created}</td>
+                                    <td>{entry.total_events}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+
+                    <h3>Domain events</h3>
+                    <EventsBreakdownTable events={data.events_breakdown || []} />
 
                     <h3>Top pages</h3>
                     <table className={styles.table}>
@@ -152,6 +152,12 @@ export default function UsagePanel({ enabled }) {
                             )}
                         </tbody>
                     </table>
+
+                    <UsageStoragePanel
+                        storage={data.storage}
+                        retention={data.retention}
+                        exportState={data.export}
+                    />
                 </>
             )}
         </section>

@@ -6,10 +6,9 @@ import { formatDateInTimezone } from '../utils/dateUtils';
 import { useLogsData } from '../hooks/useLogsData';
 import useIsMobile from '../hooks/useIsMobile';
 import './Logs.css';
-import { logError } from '../utils/logger';
 
 /**
- * Logs Page - Standalone view for application event logs
+ * Logs Page - read-only admin view for application event logs.
  */
 function Logs() {
     const { rootId } = useParams();
@@ -37,19 +36,7 @@ function Logs() {
         eventTypes,
         isLoading: loading,
         refetch,
-        clearLogs
     } = useLogsData(rootId, { page, pageSize, eventType, startDate, endDate });
-
-    const handleClearLogs = async () => {
-        if (!window.confirm("Are you sure you want to clear all logs? This cannot be undone.")) return;
-
-        try {
-            await clearLogs();
-            setPage(1);
-        } catch (err) {
-            logError("Failed to clear logs:", err);
-        }
-    };
 
     const totalPages = Math.ceil(total / pageSize);
 
@@ -83,7 +70,6 @@ function Logs() {
                 </div>
                 <div className="logs-header-actions">
                     <button className="refresh-logs-btn" onClick={() => refetch()}>REFRESH</button>
-                    <button className="clear-logs-btn" onClick={handleClearLogs}>CLEAR ALL</button>
                 </div>
             </div>
 

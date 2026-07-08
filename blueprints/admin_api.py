@@ -17,6 +17,7 @@ from validators import (
     AdminInviteKeyCreateSchema,
     AdminLandingExamplesUpdateSchema,
     AdminTierQuotaUpdateSchema,
+    AdminUsageRetentionSchema,
     AdminUserCreateSchema,
     AdminUserForcePasswordChangeSchema,
     AdminUserQuotaUpdateSchema,
@@ -68,13 +69,35 @@ def get_admin_usage(current_user):
         if response:
             return response
         payload, error, status = AdminUsageService(db_session).usage_summary(
-            request.args.get('days', 30),
+            start=request.args.get('start'),
+            end=request.args.get('end'),
+            days=request.args.get('days'),
         )
         if error:
             return jsonify({"error": error}), status
         return jsonify(payload), status
     except SQLAlchemyError:
         return internal_error(logger, "Error fetching admin usage summary")
+    finally:
+        db_session.close()
+
+
+@admin_bp.route('/usage/retention', methods=['PATCH'])
+@token_required
+@validate_request(AdminUsageRetentionSchema)
+def update_admin_usage_retention(current_user, validated_data):
+    db_session = get_db_session()
+    try:
+        _, response = _admin_service_or_response(current_user, db_session)
+        if response:
+            return response
+        payload, error, status = AdminUsageService(db_session).update_retention(validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        return internal_error(logger, "Error updating telemetry retention")
     finally:
         db_session.close()
 
@@ -89,7 +112,7 @@ def prune_admin_usage(current_user):
             return response
         body = request.get_json(silent=True) or {}
         payload, error, status = AdminUsageService(db_session).prune_product_events(
-            body.get('older_than_days', 180),
+            body.get('older_than_days'),
         )
         if error:
             return jsonify({"error": error}), status

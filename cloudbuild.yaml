@@ -68,6 +68,23 @@ steps:
     ]
 
   # ==========================================
+  # 4b. Update Analytics Export Job
+  # ==========================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Update Analytics Export Job'
+    entrypoint: gcloud
+    args: [
+      'run', 'jobs', 'update', 'export-analytics',
+      '--image', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-backend:$BUILD_ID',
+      '--region', '$_REGION',
+      '--set-secrets', 'SUPABASE_DIRECT_DATABASE_URL=SUPABASE_DIRECT_DATABASE_URL:latest',
+      '--set-env-vars', 'FLASK_ENV=production,BIGQUERY_DATASET=$_BIGQUERY_DATASET',
+      '--command', 'python',
+      '--args', 'scripts/export_analytics_to_bigquery.py',
+      '--service-account', 'fractal-runtime@fractal-goals.iam.gserviceaccount.com'
+    ]
+
+  # ==========================================
   # 5. Deploy to Cloud Run (Backend)
   # ==========================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -115,6 +132,7 @@ substitutions:
   _LANDING_EXAMPLES_STATIC_URL: ''
   _LANDING_EXAMPLES_STATIC_GCS_BUCKET: ''
   _LANDING_EXAMPLES_STATIC_GCS_BLOB: 'landing-examples.json'
+  _BIGQUERY_DATASET: 'fractal_analytics'
 
 options:
   default_logs_bucket_behavior: REGIONAL_USER_OWNED_BUCKET

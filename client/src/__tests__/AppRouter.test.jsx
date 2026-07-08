@@ -9,6 +9,7 @@ const {
     getAllFractals,
     mockIsMobile,
     mockRootGoal,
+    mockUser,
 } = vi.hoisted(() => ({
     getAllFractals: vi.fn(),
     mockIsMobile: vi.fn(() => false),
@@ -18,6 +19,7 @@ const {
         type: 'UltimateGoal',
         is_smart: false,
     },
+    mockUser: { current: { id: 'user-1', is_admin: false } },
 }));
 
 vi.mock('../utils/api', () => ({
@@ -32,7 +34,7 @@ vi.mock('../hooks/useGoalQueries', () => ({
 
 vi.mock('../contexts/AuthContext', () => ({
     useAuth: () => ({
-        user: { id: 'user-1' },
+        user: mockUser.current,
         isAuthenticated: true,
     }),
 }));
@@ -98,6 +100,7 @@ describe('NavigationHeader', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockIsMobile.mockReturnValue(false);
+        mockUser.current = { id: 'user-1', is_admin: false };
         getAllFractals.mockResolvedValue({
             data: [
                 {
@@ -138,5 +141,19 @@ describe('NavigationHeader', () => {
         await waitFor(() => {
             expect(screen.getByTestId('location-path')).toHaveTextContent('/root-2/programs');
         });
+    });
+
+    it('hides the logs nav link from non-admin users', () => {
+        renderHeader('/root-1/goals');
+
+        expect(screen.queryByRole('link', { name: 'LOGS' })).not.toBeInTheDocument();
+    });
+
+    it('shows the logs nav link to admin users', () => {
+        mockUser.current = { id: 'admin-1', is_admin: true };
+
+        renderHeader('/root-1/goals');
+
+        expect(screen.getByRole('link', { name: 'LOGS' })).toHaveAttribute('href', '/root-1/logs');
     });
 });
