@@ -539,6 +539,7 @@ function GoalDetailModalRenderSurface({
                 <GoalTimelineView
                     rootId={rootId}
                     goalId={goalId}
+                    currentGoal={goal}
                     metrics={fetchedMetrics}
                     onTimeSpentClick={readOnly ? undefined : () => setIsTimeGraphOpen(true)}
                     readOnlyEntries={readOnlyTimelineEntries}

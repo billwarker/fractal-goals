@@ -6,7 +6,7 @@ import { queryKeys } from './queryKeys';
 export const DEFAULT_GOAL_TIMELINE_TYPES = [
     'activity',
     'target',
-    'child_goal',
+    'goal_lifecycle',
 ];
 
 export function useGoalTimeline(rootId, goalId, options = {}) {

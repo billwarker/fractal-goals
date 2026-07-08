@@ -6,6 +6,7 @@ from models import (
     ActivityGroup,
     ActivityInstance,
     Goal,
+    GoalPauseInterval,
     MetricDefinition,
     MetricValue,
     Target,
@@ -30,7 +31,11 @@ GOAL_TIMELINE_TYPES = {
     'activity',
     'target',
     'child_goal',
+    'goal_lifecycle',
 }
+
+LEGACY_CHILD_GOAL_TIMELINE_TYPE = 'child_goal'
+GOAL_LIFECYCLE_TIMELINE_TYPE = 'goal_lifecycle'
 
 
 class GoalTimelineService:
@@ -351,35 +356,105 @@ class GoalTimelineService:
                     payload=serialize_target(target),
                 )
 
-        if 'child_goal' in requested_types and include_children:
+        def append_goal_lifecycle_entries(goal_item, *, category, relationship):
+            append_entry(
+                f"{category}_created:{goal_item.id}",
+                'goal.created',
+                goal_item.created_at,
+                f"Created goal: {goal_item.name}",
+                category=category,
+                entity_id=goal_item.id,
+                entity_type='goal',
+                source_goal=goal_item,
+                relationship=relationship,
+                payload=serialize_timeline_goal(goal_item),
+            )
+            if goal_item.completed and goal_item.completed_at:
+                append_entry(
+                    f"{category}_completed:{goal_item.id}",
+                    'goal.completed',
+                    goal_item.completed_at,
+                    f"Completed goal: {goal_item.name}",
+                    category=category,
+                    entity_id=goal_item.id,
+                    entity_type='goal',
+                    source_goal=goal_item,
+                    relationship=relationship,
+                    payload=serialize_timeline_goal(goal_item),
+                )
+            elif goal_item.manually_uncompleted_at:
+                append_entry(
+                    f"{category}_uncompleted:{goal_item.id}",
+                    'goal.uncompleted',
+                    goal_item.manually_uncompleted_at,
+                    f"Uncompleted goal: {goal_item.name}",
+                    category=category,
+                    entity_id=goal_item.id,
+                    entity_type='goal',
+                    source_goal=goal_item,
+                    relationship=relationship,
+                    payload=serialize_timeline_goal(goal_item),
+                )
+
+        if GOAL_LIFECYCLE_TIMELINE_TYPE in requested_types:
+            lifecycle_goals = timeline_goals
+            for lifecycle_goal in lifecycle_goals:
+                relationship = 'self' if lifecycle_goal.id == goal.id else 'descendant'
+                append_goal_lifecycle_entries(
+                    lifecycle_goal,
+                    category=GOAL_LIFECYCLE_TIMELINE_TYPE,
+                    relationship=relationship,
+                )
+
+            pause_goal_ids = {item.id for item in lifecycle_goals}
+            if pause_goal_ids:
+                pause_intervals = self.db_session.query(GoalPauseInterval).filter(
+                    GoalPauseInterval.goal_id.in_(pause_goal_ids),
+                ).all()
+                for interval in pause_intervals:
+                    source_goal = goals_by_id.get(interval.goal_id)
+                    if not source_goal:
+                        continue
+                    relationship = 'self' if source_goal.id == goal.id else 'descendant'
+                    payload = {
+                        **serialize_timeline_goal(source_goal),
+                        'pause_interval_id': interval.id,
+                        'paused_at': format_utc(interval.paused_at),
+                        'resumed_at': format_utc(interval.resumed_at),
+                    }
+                    append_entry(
+                        f"{GOAL_LIFECYCLE_TIMELINE_TYPE}_paused:{interval.id}",
+                        'goal.paused',
+                        interval.paused_at,
+                        f"Paused goal: {source_goal.name}",
+                        category=GOAL_LIFECYCLE_TIMELINE_TYPE,
+                        entity_id=source_goal.id,
+                        entity_type='goal',
+                        source_goal=source_goal,
+                        relationship=relationship,
+                        payload=payload,
+                    )
+                    append_entry(
+                        f"{GOAL_LIFECYCLE_TIMELINE_TYPE}_resumed:{interval.id}",
+                        'goal.resumed',
+                        interval.resumed_at,
+                        f"Resumed goal: {source_goal.name}",
+                        category=GOAL_LIFECYCLE_TIMELINE_TYPE,
+                        entity_id=source_goal.id,
+                        entity_type='goal',
+                        source_goal=source_goal,
+                        relationship=relationship,
+                        payload=payload,
+                    )
+
+        if LEGACY_CHILD_GOAL_TIMELINE_TYPE in requested_types and include_children:
             for child in all_subtree_goals:
                 if child.id == goal.id:
                     continue
-                append_entry(
-                    f"child_goal_created:{child.id}",
-                    'goal.created',
-                    child.created_at,
-                    f"Created goal: {child.name}",
-                    category='child_goal',
-                    entity_id=child.id,
-                    entity_type='goal',
-                    source_goal=child,
+                append_goal_lifecycle_entries(
+                    child,
+                    category=LEGACY_CHILD_GOAL_TIMELINE_TYPE,
                     relationship='descendant',
-                    payload=serialize_timeline_goal(child),
-                )
-                if not child.completed or not child.completed_at:
-                    continue
-                append_entry(
-                    f"child_goal_completed:{child.id}",
-                    'goal.completed',
-                    child.completed_at,
-                    f"Completed goal: {child.name}",
-                    category='child_goal',
-                    entity_id=child.id,
-                    entity_type='goal',
-                    source_goal=child,
-                    relationship='descendant',
-                    payload=serialize_timeline_goal(child),
                 )
 
         entries.sort(key=lambda item: item['timestamp'] or '', reverse=True)

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from models import ActivityInstance, Session, Target, activity_goal_associations
+from models import ActivityInstance, GoalPauseInterval, Session, Target, activity_goal_associations
 
 
 @pytest.mark.integration
@@ -146,6 +146,76 @@ class TestGoalTimelineApi:
         assert {entry['type'] for entry in entries} == {'child_goal'}
         assert {'goal.created', 'goal.completed'} <= {entry['event_type'] for entry in entries}
 
+    def test_timeline_includes_self_goal_lifecycle_events(self, authed_client, db_session, sample_goal_hierarchy):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal = sample_goal_hierarchy['short_term']
+        goal.created_at = datetime(2026, 5, 1, 12, 0, tzinfo=timezone.utc)
+        goal.completed = True
+        goal.completed_at = datetime(2026, 5, 7, 18, 30, tzinfo=timezone.utc)
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/goals/{goal.id}/timeline?types=goal_lifecycle&include_children=false'
+        )
+
+        assert response.status_code == 200
+        entries = response.get_json()['entries']
+        assert {entry['type'] for entry in entries} == {'goal_lifecycle'}
+        self_events = {entry['event_type']: entry for entry in entries}
+        assert self_events['goal.created']['entity_id'] == goal.id
+        assert self_events['goal.created']['relationship'] == 'self'
+        assert self_events['goal.completed']['entity_id'] == goal.id
+        assert self_events['goal.completed']['relationship'] == 'self'
+
+    def test_timeline_includes_goal_pause_and_resume_events(self, authed_client, db_session, sample_goal_hierarchy):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        parent_goal = sample_goal_hierarchy['mid_term']
+        child_goal = sample_goal_hierarchy['short_term']
+        interval = GoalPauseInterval(
+            goal_id=child_goal.id,
+            root_id=root_id,
+            paused_at=datetime(2026, 5, 4, 9, 0, tzinfo=timezone.utc),
+            resumed_at=datetime(2026, 5, 5, 10, 15, tzinfo=timezone.utc),
+        )
+        db_session.add(interval)
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/goals/{parent_goal.id}/timeline?types=goal_lifecycle'
+        )
+
+        assert response.status_code == 200
+        entries = response.get_json()['entries']
+        paused = next(entry for entry in entries if entry['event_type'] == 'goal.paused')
+        resumed = next(entry for entry in entries if entry['event_type'] == 'goal.resumed')
+        assert paused['type'] == 'goal_lifecycle'
+        assert paused['entity_id'] == child_goal.id
+        assert paused['relationship'] == 'descendant'
+        assert paused['payload']['pause_interval_id'] == interval.id
+        assert resumed['entity_id'] == child_goal.id
+        assert resumed['payload']['pause_interval_id'] == interval.id
+
+    def test_timeline_includes_latest_manual_uncompletion(self, authed_client, db_session, sample_goal_hierarchy):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal = sample_goal_hierarchy['short_term']
+        goal.completed = False
+        goal.completed_at = None
+        goal.manually_uncompleted_at = datetime(2026, 5, 8, 14, 45, tzinfo=timezone.utc)
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/goals/{goal.id}/timeline?types=goal_lifecycle&include_children=false'
+        )
+
+        assert response.status_code == 200
+        entries = response.get_json()['entries']
+        assert any(
+            entry['event_type'] == 'goal.uncompleted'
+            and entry['entity_id'] == goal.id
+            and entry['relationship'] == 'self'
+            for entry in entries
+        )
+
     def test_timeline_can_exclude_children(self, authed_client, sample_goal_hierarchy):
         root_id = sample_goal_hierarchy['ultimate'].id
         response = authed_client.get(
@@ -154,3 +224,15 @@ class TestGoalTimelineApi:
 
         assert response.status_code == 200
         assert response.get_json()['entries'] == []
+
+    def test_goal_lifecycle_can_exclude_children(self, authed_client, sample_goal_hierarchy):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal_id = sample_goal_hierarchy['mid_term'].id
+        response = authed_client.get(
+            f'/api/{root_id}/goals/{goal_id}/timeline?types=goal_lifecycle&include_children=false'
+        )
+
+        assert response.status_code == 200
+        entries = response.get_json()['entries']
+        assert entries
+        assert {entry['entity_id'] for entry in entries} == {goal_id}

@@ -18,14 +18,14 @@ import styles from './GoalTimelineView.module.css';
 const FILTERS = [
     { type: 'activity', label: 'Activities' },
     { type: 'target', label: 'Targets' },
-    { type: 'child_goal', label: 'Child Goals' },
+    { type: 'goal_lifecycle', label: 'Goal Events' },
 ];
 
 function formatTimelineTitle(item) {
     const payload = item.payload || {};
     const activityName = payload.activity_name || payload.name || payload.definition_name;
     const targetName = payload.name || item.title?.replace(/^(Created|Achieved) target:\s*/i, '');
-    const goalName = payload.goal_name || item.title?.replace(/^(Created|Completed) goal:\s*/i, '');
+    const goalName = payload.goal_name || item.title?.replace(/^(Created|Completed|Uncompleted|Paused|Resumed) goal:\s*/i, '');
 
     switch (item.event_type) {
         case 'activity.completed':
@@ -42,13 +42,37 @@ function formatTimelineTitle(item) {
             return `Created goal: ${goalName || 'Goal'}`;
         case 'goal.completed':
             return `Completed goal: ${goalName || 'Goal'}`;
+        case 'goal.uncompleted':
+            return `Uncompleted goal: ${goalName || 'Goal'}`;
+        case 'goal.paused':
+            return `Paused goal: ${goalName || 'Goal'}`;
+        case 'goal.resumed':
+            return `Resumed goal: ${goalName || 'Goal'}`;
         default:
             return item.title || 'Timeline event';
     }
 }
 
 function isGoalLifecycleEvent(item) {
-    return item.event_type === 'goal.created' || item.event_type === 'goal.completed';
+    return [
+        'goal.created',
+        'goal.completed',
+        'goal.uncompleted',
+        'goal.paused',
+        'goal.resumed',
+    ].includes(item.event_type);
+}
+
+function getGoalLifecycleAction(item) {
+    switch (item.event_type) {
+        case 'goal.completed': return 'Completed';
+        case 'goal.uncompleted': return 'Uncompleted';
+        case 'goal.paused': return 'Paused';
+        case 'goal.resumed': return 'Resumed';
+        case 'goal.created':
+        default:
+            return 'Created';
+    }
 }
 
 function formatGoalLevelForTitle(levelName) {
@@ -65,6 +89,9 @@ function formatEventLabel(item) {
         case 'target.achieved': return 'Target achieved';
         case 'goal.created': return 'Goal created';
         case 'goal.completed': return 'Goal completed';
+        case 'goal.uncompleted': return 'Goal uncompleted';
+        case 'goal.paused': return 'Goal paused';
+        case 'goal.resumed': return 'Goal resumed';
         default: return 'Timeline event';
     }
 }
@@ -86,7 +113,22 @@ function formatContextText(item) {
     return null;
 }
 
-function normalizeTimelineEntry(item, goalLevelHelpers) {
+function getTimelineEntryGoalId(item) {
+    return item?.entity_type === 'goal'
+        ? item.entity_id
+        : item?.payload?.goal_id || item?.source_goal_id || null;
+}
+
+function goalIdMatches(left, right) {
+    if (left == null || right == null) return false;
+    return String(left) === String(right);
+}
+
+function getGoalIdentity(goal) {
+    return goal?.id || goal?.attributes?.id || null;
+}
+
+function normalizeTimelineEntry(item, goalLevelHelpers, currentGoal = null) {
     const payload = item.payload || {};
     const activityInstance = item.event_type === 'activity.completed'
         ? normalizeActivityTimelineInstance(item)
@@ -94,14 +136,29 @@ function normalizeTimelineEntry(item, goalLevelHelpers) {
     const metrics = Array.isArray(payload.metrics) ? payload.metrics : [];
     const visibleMetrics = metrics.map(formatMetricDisplayValue).filter(Boolean).slice(0, 4);
     const duration = payload.duration_seconds ? formatDurationSeconds(payload.duration_seconds) : null;
-    const goalLevel = item.type === 'child_goal' ? getTimelineGoalLevel(payload) : null;
-    const goalColor = goalLevel ? goalLevelHelpers.getGoalColor(goalLevel) : null;
+    const goalLevel = item.type === 'child_goal' || item.type === 'goal_lifecycle'
+        ? getTimelineGoalLevel(payload)
+        : null;
+    const matchingCurrentGoal = goalIdMatches(getTimelineEntryGoalId(item), getGoalIdentity(currentGoal))
+        ? currentGoal
+        : null;
+    const goalDisplayToken = goalLevel
+        ? goalLevel.level_name || goalLevel.type || goalLevel
+        : null;
+    const goalStyleSource = matchingCurrentGoal || goalDisplayToken;
+    const goalColor = goalStyleSource ? goalLevelHelpers.getGoalColor(goalStyleSource) : null;
+    const goalSecondaryColor = goalStyleSource ? goalLevelHelpers.getGoalSecondaryColor(goalStyleSource) : null;
+    const usesCompletedGoalPalette = item.event_type === 'goal.completed';
+    const iconColor = usesCompletedGoalPalette ? goalLevelHelpers.getGoalColor('Completed') : goalColor;
+    const iconSecondaryColor = usesCompletedGoalPalette
+        ? goalLevelHelpers.getGoalSecondaryColor('Completed')
+        : goalSecondaryColor;
 
     return {
         eventLabel: item.subtitle || (isGoalLifecycleEvent(item) ? '' : formatEventLabel(item)),
         title: formatTimelineTitle(item),
         goalTitle: isGoalLifecycleEvent(item) ? {
-            action: item.event_type === 'goal.completed' ? 'Completed' : 'Created',
+            action: getGoalLifecycleAction(item),
             level: formatGoalLevelForTitle(goalLevel?.level_name),
             name: payload.goal_name || 'Goal',
         } : null,
@@ -113,9 +170,9 @@ function normalizeTimelineEntry(item, goalLevelHelpers) {
         activityDef: payload.activity_definition || null,
         progressRecord: payload.progress_comparison || payload.progress_record || null,
         iconConfig: goalLevel ? {
-            shape: goalLevelHelpers.getGoalIcon(goalLevel),
-            color: goalColor,
-            secondaryColor: goalLevelHelpers.getGoalSecondaryColor(goalLevel),
+            shape: goalStyleSource ? goalLevelHelpers.getGoalIcon(goalStyleSource) : goalLevel.level?.icon || 'circle',
+            color: iconColor,
+            secondaryColor: iconSecondaryColor,
             isSmart: Boolean(goalLevel.is_smart),
         } : null,
         levelBadge: goalLevel?.level_name && !isGoalLifecycleEvent(item)
@@ -124,7 +181,7 @@ function normalizeTimelineEntry(item, goalLevelHelpers) {
     };
 }
 
-function GoalTimelineView({ rootId, goalId, metrics, onTimeSpentClick, readOnlyEntries = null }) {
+function GoalTimelineView({ rootId, goalId, currentGoal = null, metrics, onTimeSpentClick, readOnlyEntries = null }) {
     const { timezone } = useTimezone();
     const [selectedTypes, setSelectedTypes] = useState(DEFAULT_GOAL_TIMELINE_TYPES);
     const [includeChildren, setIncludeChildren] = useState(true);
@@ -213,7 +270,13 @@ function GoalTimelineView({ rootId, goalId, metrics, onTimeSpentClick, readOnlyE
             ) : (
                 <div className={styles.timeline}>
                     {entries.map((item) => (
-                        <TimelineItem key={item.id} item={item} rootId={rootId} timezone={timezone} />
+                        <TimelineItem
+                            key={item.id}
+                            item={item}
+                            rootId={rootId}
+                            timezone={timezone}
+                            currentGoal={currentGoal}
+                        />
                     ))}
                 </div>
             )}
@@ -221,10 +284,10 @@ function GoalTimelineView({ rootId, goalId, metrics, onTimeSpentClick, readOnlyE
     );
 }
 
-function TimelineItem({ item, rootId, timezone }) {
+function TimelineItem({ item, rootId, timezone, currentGoal = null }) {
     const { date, time } = formatDateTimeParts(item.timestamp, timezone);
     const goalLevelHelpers = useGoalLevels();
-    const card = normalizeTimelineEntry(item, goalLevelHelpers);
+    const card = normalizeTimelineEntry(item, goalLevelHelpers, currentGoal);
 
     if (card.activityInstance) {
         return (
