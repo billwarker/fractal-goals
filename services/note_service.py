@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import logging
 import uuid
 
-from sqlalchemy import or_
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import selectinload
 
 from models import (
@@ -12,6 +12,8 @@ from models import (
     Note,
     Program,
     Session,
+    activity_goal_associations,
+    goal_activity_group_associations,
     session_goals,
     validate_root_goal,
 )
@@ -333,7 +335,13 @@ class NoteService:
         return None, ("Unsupported note context_type", 400)
 
     def get_goal_notes(
-        self, root_id, goal_id, current_user_id, include_descendants=False
+        self,
+        root_id,
+        goal_id,
+        current_user_id,
+        include_descendants=False,
+        include_goal_notes=True,
+        include_activity_instance_notes=True,
     ) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
@@ -351,9 +359,43 @@ class NoteService:
         if include_descendants:
             goal_ids = self._collect_descendant_goal_ids(root_id, goal_id)
 
+        context_types = []
+        if include_goal_notes:
+            context_types.append('goal')
+        if include_activity_instance_notes:
+            context_types.append('activity_instance')
+        if not context_types:
+            return [], None, 200
+
+        note_scope_conditions = []
+        if include_goal_notes:
+            note_scope_conditions.append(and_(
+                Note.context_type == 'goal',
+                Note.goal_id.in_(goal_ids),
+            ))
+        if include_activity_instance_notes:
+            activity_note_conditions = [
+                and_(
+                    Note.context_type == 'activity_instance',
+                    Note.goal_id.in_(goal_ids),
+                )
+            ]
+            activity_definition_ids = self._collect_goal_activity_definition_ids(root_id, goal_ids)
+            if activity_definition_ids:
+                scoped_instance_ids = select(ActivityInstance.id).where(
+                    ActivityInstance.root_id == root_id,
+                    ActivityInstance.activity_definition_id.in_(activity_definition_ids),
+                    ActivityInstance.deleted_at.is_(None),
+                )
+                activity_note_conditions.append(and_(
+                    Note.context_type == 'activity_instance',
+                    Note.activity_instance_id.in_(scoped_instance_ids),
+                ))
+            note_scope_conditions.append(or_(*activity_note_conditions))
+
         notes = self.db_session.query(Note).filter(
             Note.root_id == root_id,
-            Note.goal_id.in_(goal_ids),
+            or_(*note_scope_conditions),
             Note.deleted_at.is_(None),
         ).options(
             selectinload(Note.session).selectinload(Session.template),
@@ -364,6 +406,38 @@ class NoteService:
             Note.created_at.desc(),
         ).all()
         return [serialize_note_display(note) for note in notes], None, 200
+
+    def _collect_goal_activity_definition_ids(self, root_id, goal_ids):
+        """Activity definitions associated directly or through groups to scoped goals."""
+        if not goal_ids:
+            return []
+
+        direct_rows = self.db_session.execute(
+            select(activity_goal_associations.c.activity_id).where(
+                activity_goal_associations.c.goal_id.in_(goal_ids),
+                activity_goal_associations.c.deleted_at.is_(None),
+            )
+        ).all()
+        activity_ids = {activity_id for (activity_id,) in direct_rows}
+
+        group_rows = self.db_session.execute(
+            select(goal_activity_group_associations.c.activity_group_id).where(
+                goal_activity_group_associations.c.goal_id.in_(goal_ids),
+                goal_activity_group_associations.c.deleted_at.is_(None),
+            )
+        ).all()
+        group_ids = {group_id for (group_id,) in group_rows}
+        if group_ids:
+            group_activity_rows = self.db_session.execute(
+                select(ActivityDefinition.id).where(
+                    ActivityDefinition.root_id == root_id,
+                    ActivityDefinition.group_id.in_(group_ids),
+                    ActivityDefinition.deleted_at.is_(None),
+                )
+            ).all()
+            activity_ids.update(activity_id for (activity_id,) in group_activity_rows)
+
+        return list(activity_ids)
 
     def _collect_descendant_goal_ids(self, root_id, goal_id):
         """BFS to collect all descendant goal IDs including the given goal_id."""

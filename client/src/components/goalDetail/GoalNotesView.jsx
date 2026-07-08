@@ -13,6 +13,8 @@ import styles from './GoalNotesView.module.css';
 
 function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = null }) {
     const [includeDescendants, setIncludeDescendants] = useState(false);
+    const [includeGoalNotes, setIncludeGoalNotes] = useState(true);
+    const [includeActivityInstanceNotes, setIncludeActivityInstanceNotes] = useState(true);
     const [composing, setComposing] = useState(false);
     const isReadOnly = Array.isArray(readOnlyNotes);
 
@@ -24,7 +26,11 @@ function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = n
         deleteNote,
         pinNote,
         unpinNote,
-    } = useGoalNotes(rootId, goalId, { includeDescendants });
+    } = useGoalNotes(rootId, goalId, {
+        includeDescendants,
+        includeGoalNotes,
+        includeActivityInstanceNotes,
+    });
 
     const notes = isReadOnly ? readOnlyNotes : fetchedNotes;
     const isLoading = isReadOnly ? false : fetchedLoading;
@@ -47,15 +53,35 @@ function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = n
             {/* Options row — hidden in read-only since descendants/composer can't fetch */}
             {!isReadOnly && (
             <div className={styles.optionsRow}>
-                <label className={styles.checkboxLabel}>
-                    <input
-                        type="checkbox"
-                        checked={includeDescendants}
-                        onChange={(e) => setIncludeDescendants(e.target.checked)}
-                        className={styles.checkbox}
-                    />
-                    Include descendant goal notes
-                </label>
+                <div className={styles.filters} aria-label="Note filters">
+                    <label className={`${styles.checkboxLabel} ${includeGoalNotes ? styles.checkboxLabelActive : ''}`}>
+                        <input
+                            type="checkbox"
+                            checked={includeGoalNotes}
+                            onChange={(e) => setIncludeGoalNotes(e.target.checked)}
+                            className={styles.checkbox}
+                        />
+                        Goal Notes
+                    </label>
+                    <label className={`${styles.checkboxLabel} ${includeActivityInstanceNotes ? styles.checkboxLabelActive : ''}`}>
+                        <input
+                            type="checkbox"
+                            checked={includeActivityInstanceNotes}
+                            onChange={(e) => setIncludeActivityInstanceNotes(e.target.checked)}
+                            className={styles.checkbox}
+                        />
+                        Activity Instance Notes
+                    </label>
+                    <label className={`${styles.checkboxLabel} ${includeDescendants ? styles.checkboxLabelActive : ''}`}>
+                        <input
+                            type="checkbox"
+                            checked={includeDescendants}
+                            onChange={(e) => setIncludeDescendants(e.target.checked)}
+                            className={styles.checkbox}
+                        />
+                        Include Children Data
+                    </label>
+                </div>
 
                 {!hideComposer && !composing && (
                     <Button

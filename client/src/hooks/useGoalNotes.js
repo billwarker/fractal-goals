@@ -8,14 +8,27 @@ import { fractalNotesApi } from '../utils/api/fractalNotesApi';
 import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
 
-export function useGoalNotes(rootId, goalId, { includeDescendants = false } = {}) {
+export function useGoalNotes(
+    rootId,
+    goalId,
+    {
+        includeDescendants = false,
+        includeGoalNotes = true,
+        includeActivityInstanceNotes = true,
+    } = {}
+) {
     const queryClient = useQueryClient();
-    const noteKey = queryKeys.goalNotes(rootId, goalId, includeDescendants);
+    const filters = {
+        includeDescendants,
+        includeGoalNotes,
+        includeActivityInstanceNotes,
+    };
+    const noteKey = queryKeys.goalNotes(rootId, goalId, filters);
 
     const { data: notes = [], isLoading, error } = useQuery({
         queryKey: noteKey,
         queryFn: async () => {
-            const res = await fractalNotesApi.getGoalNotes(rootId, goalId, { includeDescendants });
+            const res = await fractalNotesApi.getGoalNotes(rootId, goalId, filters);
             return res.data || [];
         },
         enabled: !!rootId && !!goalId,

@@ -20,7 +20,11 @@ export const fractalNotesApi = {
     updateNote: (rootId, noteId, data) => axios.put(`${API_BASE}/${rootId}/notes/${noteId}`, data),
     deleteNote: (rootId, noteId) => axios.delete(`${API_BASE}/${rootId}/notes/${noteId}`),
     getGoalNotes: (rootId, goalId, options = {}) =>
-        axios.get(`${API_BASE}/${rootId}/goals/${goalId}/notes${buildQueryString(options, { includeDescendants: 'include_descendants' })}`),
+        axios.get(`${API_BASE}/${rootId}/goals/${goalId}/notes${buildQueryString(options, {
+            includeDescendants: 'include_descendants',
+            includeGoalNotes: 'include_goal_notes',
+            includeActivityInstanceNotes: 'include_activity_instance_notes',
+        })}`),
     getAllNotes: (rootId, params = {}) => {
         const query = new URLSearchParams();
         if (params.context_types && params.context_types.length) query.set('context_types', params.context_types.join(','));

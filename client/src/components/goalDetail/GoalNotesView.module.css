@@ -15,6 +15,14 @@
     padding: 4px 0;
 }
 
+.filters {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    min-width: 0;
+}
+
 .checkboxLabel {
     display: flex;
     align-items: center;
@@ -23,6 +31,10 @@
     color: var(--color-text-secondary);
     cursor: pointer;
     user-select: none;
+}
+
+.checkboxLabelActive {
+    color: var(--color-text-primary);
 }
 
 .checkbox {

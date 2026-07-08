@@ -200,8 +200,15 @@ def get_goal_notes(current_user, root_id, goal_id):
     db_session, note_service = _with_note_service()
     try:
         include_descendants = request.args.get('include_descendants', 'false').lower() == 'true'
+        include_goal_notes = request.args.get('include_goal_notes', 'true').lower() == 'true'
+        include_activity_instance_notes = request.args.get('include_activity_instance_notes', 'true').lower() == 'true'
         payload, error, status = note_service.get_goal_notes(
-            root_id, goal_id, current_user.id, include_descendants=include_descendants
+            root_id,
+            goal_id,
+            current_user.id,
+            include_descendants=include_descendants,
+            include_goal_notes=include_goal_notes,
+            include_activity_instance_notes=include_activity_instance_notes,
         )
         if error:
             return jsonify({"error": error}), status

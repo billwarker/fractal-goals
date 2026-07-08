@@ -334,6 +334,8 @@ They support:
 - image notes
 - pinning and timeline-style browsing
 
+The goal detail Notes tab queries `GET /api/<root_id>/goals/<goal_id>/notes` and exposes three compact filters: `Goal Notes`, `Activity Instance Notes`, and `Include Children Data`. The children-data toggle expands the goal-id scope for both note types; the type checkboxes map to `include_goal_notes` and `include_activity_instance_notes` query params so the backend filters before serialization. Activity-instance notes are resolved from activity instances whose activity definition is associated to the scoped goals directly or through activity-group associations; legacy notes with a populated `goal_id` still count.
+
 Key backend pieces:
 
 - `services/note_service.py`

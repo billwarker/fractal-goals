@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from services.events import Events
-from models import Note, Program, SessionTemplate
+from models import Note, Program, SessionTemplate, activity_goal_associations
 
 
 @pytest.mark.integration
@@ -120,6 +120,73 @@ class TestNotesApiNanoValidation:
         assert list_response.status_code == 200
         notes = list_response.get_json()['notes']
         assert notes[0]['program_name'] == 'Program Notes API'
+
+    def test_goal_notes_endpoint_filters_goal_and_activity_instance_notes(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        sample_activity_instance,
+    ):
+        root = sample_goal_hierarchy['ultimate']
+        parent = sample_goal_hierarchy['mid_term']
+        child = sample_goal_hierarchy['short_term']
+        db_session.execute(
+            activity_goal_associations.insert().values(
+                activity_id=sample_activity_instance.activity_definition_id,
+                goal_id=child.id,
+            )
+        )
+        goal_note = Note(
+            id=str(uuid.uuid4()),
+            root_id=root.id,
+            context_type='goal',
+            context_id=parent.id,
+            goal_id=parent.id,
+            content='Parent goal note',
+        )
+        child_goal_note = Note(
+            id=str(uuid.uuid4()),
+            root_id=root.id,
+            context_type='goal',
+            context_id=child.id,
+            goal_id=child.id,
+            content='Child goal note',
+        )
+        activity_note = Note(
+            id=str(uuid.uuid4()),
+            root_id=root.id,
+            context_type='activity_instance',
+            context_id=sample_activity_instance.id,
+            activity_instance_id=sample_activity_instance.id,
+            session_id=sample_activity_instance.session_id,
+            activity_definition_id=sample_activity_instance.activity_definition_id,
+            content='Child activity instance note',
+        )
+        db_session.add_all([goal_note, child_goal_note, activity_note])
+        db_session.commit()
+
+        own_goal_only = authed_client.get(
+            f'/api/{root.id}/goals/{parent.id}/notes?include_goal_notes=true&include_activity_instance_notes=false'
+        )
+        assert own_goal_only.status_code == 200
+        assert [note['content'] for note in own_goal_only.get_json()] == ['Parent goal note']
+
+        descendant_activity_only = authed_client.get(
+            f'/api/{root.id}/goals/{parent.id}/notes'
+            '?include_descendants=true&include_goal_notes=false&include_activity_instance_notes=true'
+        )
+        assert descendant_activity_only.status_code == 200
+        activity_notes = descendant_activity_only.get_json()
+        assert [note['content'] for note in activity_notes] == ['Child activity instance note']
+        assert activity_notes[0]['note_type'] == 'activity_instance_note'
+
+        no_note_types = authed_client.get(
+            f'/api/{root.id}/goals/{parent.id}/notes'
+            '?include_descendants=true&include_goal_notes=false&include_activity_instance_notes=false'
+        )
+        assert no_note_types.status_code == 200
+        assert no_note_types.get_json() == []
 
     def test_create_note_rejects_quick_session(self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition):
         root_id = sample_ultimate_goal.id
