@@ -150,8 +150,19 @@
     color: var(--color-text-primary);
 }
 
+.sessionTemplateBadge {
+    max-width: min(260px, 100%);
+}
+
 .pastSessionName {
-    color: var(--color-text-muted);
+    display: inline-flex;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.pastSessionBadge {
+    min-height: 16px;
+    padding: 0 6px;
     font-size: 10px;
 }
 

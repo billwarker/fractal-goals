@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { ClockIcon } from '../atoms/AppIcons';
 import MarkdownNoteContent from '../notes/MarkdownNoteContent';
+import SessionTemplateNameBadge from './SessionTemplateNameBadge';
 import {
     canComputeYield,
     computeAutoAggregations,
@@ -159,6 +160,8 @@ export function ActivityTimelineCard({
     const displayTimestamp = timestamp || instance.session_date || instance.created_at;
     const displayDate = (formatDate || ((value) => defaultFormatDate(value, timezone)))(displayTimestamp);
     const displayTime = showTime ? formatTime(displayTimestamp, timezone) : null;
+    const sessionTemplateName = instance.session_template_name || instance.session_name;
+    const sessionTemplateColor = instance.session_template_color || instance.template_color;
 
     const progressComparisons = Array.isArray(progressRecord?.metric_comparisons)
         ? progressRecord.metric_comparisons
@@ -265,11 +268,21 @@ export function ActivityTimelineCard({
                                 className={styles.timelineCardSessionLink}
                                 title={`Open ${instance.session_name}`}
                             >
-                                {instance.session_name}
+                                <SessionTemplateNameBadge
+                                    name={sessionTemplateName}
+                                    color={sessionTemplateColor}
+                                    size="feed"
+                                    className={styles.timelineCardSessionBadge}
+                                />
                             </Link>
                         ) : (
                             <span className={styles.timelineCardSession}>
-                                {instance.session_name}
+                                <SessionTemplateNameBadge
+                                    name={sessionTemplateName}
+                                    color={sessionTemplateColor}
+                                    size="feed"
+                                    className={styles.timelineCardSessionBadge}
+                                />
                             </span>
                         )
                     ) : (
@@ -299,11 +312,21 @@ export function ActivityTimelineCard({
                                 className={styles.timelineCardSessionLink}
                                 title={`Open ${instance.session_name}`}
                             >
-                                {instance.session_name}
+                                <SessionTemplateNameBadge
+                                    name={sessionTemplateName}
+                                    color={sessionTemplateColor}
+                                    size="feed"
+                                    className={styles.timelineCardSessionBadge}
+                                />
                             </Link>
                         ) : (
                             <div className={styles.timelineCardSession}>
-                                {instance.session_name}
+                                <SessionTemplateNameBadge
+                                    name={sessionTemplateName}
+                                    color={sessionTemplateColor}
+                                    size="feed"
+                                    className={styles.timelineCardSessionBadge}
+                                />
                             </div>
                         )
                     )}

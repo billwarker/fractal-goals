@@ -14,6 +14,7 @@ import CardCornerActionButton from '../common/CardCornerActionButton';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import GoalNameBadge from '../common/GoalNameBadge';
 import MetaField from '../common/MetaField';
+import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
 import { useEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
@@ -250,29 +251,33 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 <div className={styles.topTitleBlock}>
                     <div className={styles.topTitleRow}>
                         {readOnly ? (
-                            <span
-                                className={`${styles.cardHeaderTitle} ${sessionData?.template_name ? styles.cardHeaderTitleTemplate : ''}`}
-                                style={sessionData?.template_name ? {
-                                    borderColor: templateColor,
-                                    color: templateColor,
-                                    background: `color-mix(in srgb, ${templateColor} 14%, transparent)`,
-                                } : undefined}
-                            >
-                                {session.name}
-                            </span>
+                            sessionData?.template_name ? (
+                                <SessionTemplateNameBadge
+                                    name={session.name}
+                                    color={templateColor}
+                                    size="lg"
+                                    className={`${styles.cardHeaderTitle} ${styles.cardHeaderTitleTemplate}`}
+                                />
+                            ) : (
+                                <span className={styles.cardHeaderTitle}>
+                                    {session.name}
+                                </span>
+                            )
                         ) : (
                             <Link
                                 to={quickSession
                                     ? `/${rootId}/sessions?quickSessionId=${session.id}`
                                     : `/${rootId}/session/${session.id}`}
-                                className={`${styles.cardHeaderTitle} ${sessionData?.template_name ? styles.cardHeaderTitleTemplate : ''}`}
-                                style={sessionData?.template_name ? {
-                                    borderColor: templateColor,
-                                    color: templateColor,
-                                    background: `color-mix(in srgb, ${templateColor} 14%, transparent)`,
-                                } : undefined}
+                                className={styles.cardHeaderTitleLink}
                             >
-                                {session.name}
+                                {sessionData?.template_name ? (
+                                    <SessionTemplateNameBadge
+                                        name={session.name}
+                                        color={templateColor}
+                                        size="lg"
+                                        className={`${styles.cardHeaderTitle} ${styles.cardHeaderTitleTemplate}`}
+                                    />
+                                ) : session.name}
                             </Link>
                         )}
                         <CompletionCheckBadge

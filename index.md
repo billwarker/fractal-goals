@@ -336,6 +336,8 @@ They support:
 
 The goal detail Notes tab queries `GET /api/<root_id>/goals/<goal_id>/notes` and exposes three compact filters: `Goal Notes`, `Activity Instance Notes`, and `Include Children Data`. The children-data toggle expands the goal-id scope for both note types; the type checkboxes map to `include_goal_notes` and `include_activity_instance_notes` query params so the backend filters before serialization. Activity-instance notes are resolved from activity instances whose activity definition is associated to the scoped goals directly or through activity-group associations; legacy notes with a populated `goal_id` still count.
 
+Timeline and notes feeds use the shared `SessionTemplateNameBadge` atom for session/template names. Feed surfaces pass the session template name and color when available and render the badge at the compact `feed` size so activity timeline cards and note headers match session-template styling without overwhelming the feed. Session-template name chips across manage templates, create-session flows, sessions, session detail, timelines, and notes should use this atom; its shared shape is a squared rounded rectangle rather than a pill.
+
 Key backend pieces:
 
 - `services/note_service.py`

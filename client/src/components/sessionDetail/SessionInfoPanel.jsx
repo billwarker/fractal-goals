@@ -13,6 +13,7 @@ import DisclosureButton from '../atoms/DisclosureButton';
 import EditIcon from '../atoms/EditIcon';
 import { Heading } from '../atoms/Typography';
 import Input from '../atoms/Input';
+import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import { formatClockDuration } from '../../utils/sessionTime';
 import { getTemplateColor } from '../../utils/sessionRuntime';
 
@@ -95,16 +96,12 @@ function SessionInfoPanel() {
             <div className={styles.sessionInfoTitle}>
                 <Heading level={2}>
                     {templateColor ? (
-                        <span
+                        <SessionTemplateNameBadge
+                            name={session.name}
+                            color={templateColor}
+                            size="lg"
                             className={styles.templateBadge}
-                            style={{
-                                borderColor: templateColor,
-                                color: templateColor,
-                                background: `color-mix(in srgb, ${templateColor} 14%, transparent)`,
-                            }}
-                        >
-                            {session.name}
-                        </span>
+                        />
                     ) : session.name}
                 </Heading>
                 <DisclosureButton

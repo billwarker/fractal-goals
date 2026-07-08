@@ -104,8 +104,16 @@
 }
 
 .timelineCardSessionLink:hover {
-    color: var(--color-brand-primary);
-    text-decoration: underline;
+    text-decoration: none;
+}
+
+.timelineCardSessionBadge {
+    max-width: min(260px, 100%);
+    vertical-align: middle;
+}
+
+.timelineCardSessionLink:hover .timelineCardSessionBadge {
+    filter: brightness(1.12);
 }
 
 .timelineCardSessionLink:focus-visible {

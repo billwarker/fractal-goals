@@ -80,11 +80,6 @@
 }
 
 .templateNameBadge {
-    font-size: 14px;
-    color: var(--color-text-secondary);
-    background: var(--color-bg-card-alt);
-    padding: 4px 10px;
-    border-radius: 4px;
     max-width: 50%;
 }
 

@@ -969,6 +969,11 @@ def serialize_note_display(note):
         if not template_name and getattr(getattr(note.session, "template", None), "name", None):
             template_name = note.session.template.name
         result["session_template_name"] = template_name or note.session.name
+        template_color = session_data.get("template_color")
+        if not template_color and getattr(getattr(note.session, "template", None), "template_data", None):
+            template_color = get_template_color(note.session.template.template_data or {})
+        if template_color:
+            result["session_template_color"] = template_color
 
     display_goal = note.goal
     if display_goal:

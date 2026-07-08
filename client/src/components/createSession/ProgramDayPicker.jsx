@@ -193,9 +193,12 @@ function SessionList({ sessions, selectedSession, onSelectSession }) {
                             className={`${styles.sessionRow} ${isSessionSelected ? styles.sessionRowSelected : ''}`}
                         >
                             <div>
-                                <div className={`${styles.sessionRowTitle} ${isSessionSelected ? styles.sessionRowTitleSelected : ''}`}>
-                                    {session.template_name}
-                                </div>
+                                <SessionTemplateNameBadge
+                                    name={session.template_name}
+                                    color={session.template_color}
+                                    size="sm"
+                                    className={`${styles.sessionRowTitle} ${isSessionSelected ? styles.sessionRowTitleSelected : ''}`}
+                                />
                                 {session.template_description && (
                                     <div className={styles.sessionRowDescription}>
                                         {session.template_description}

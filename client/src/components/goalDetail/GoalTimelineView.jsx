@@ -402,6 +402,8 @@ function normalizeActivityTimelineInstance(item) {
                 ? payload.metrics
                 : [],
         session_name: payload.session_name || item.subtitle,
+        session_template_name: payload.session_template_name || payload.session_name || item.subtitle,
+        session_template_color: payload.session_template_color || payload.template_color,
         session_date: payload.session_date || payload.created_at || item.timestamp,
         notes,
     };

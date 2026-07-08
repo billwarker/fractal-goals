@@ -10,6 +10,7 @@ from models import (
     MetricDefinition,
     MetricValue,
     Target,
+    Session,
     activity_goal_associations,
     goal_activity_group_associations,
     validate_root_goal,
@@ -24,6 +25,7 @@ from services.serializers import (
     serialize_split_definition,
     serialize_target,
 )
+from services.session_runtime import get_session_runtime_data, get_template_color
 from services.service_types import JsonDict, ServiceResult
 
 
@@ -228,7 +230,7 @@ class GoalTimelineService:
                 selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.split_definitions),
                 selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
                 selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
-                selectinload(ActivityInstance.session),
+                selectinload(ActivityInstance.session).selectinload(Session.template),
             ).filter(
                 ActivityInstance.root_id == root_id,
                 ActivityInstance.activity_definition_id.in_(list(activity_contexts.keys())),
@@ -248,6 +250,16 @@ class GoalTimelineService:
                     continue
                 serialized = serialize_activity_instance(instance)
                 session = instance.session
+                session_template_name = None
+                session_template_color = None
+                if session:
+                    session_data = get_session_runtime_data(session)
+                    session_template_name = session_data.get('template_name')
+                    session_template_color = get_template_color(session_data)
+                    if not session_template_name and getattr(session, 'template', None):
+                        session_template_name = session.template.name
+                    if not session_template_color and getattr(session, 'template', None):
+                        session_template_color = get_template_color(session.template.template_data or {})
                 append_entry(
                     f"activity_completed:{instance.id}",
                     'activity.completed',
@@ -262,6 +274,8 @@ class GoalTimelineService:
                         **serialized,
                         'activity_definition': serialize_timeline_activity_definition(instance.definition),
                         'session_name': session.name if session else None,
+                        'session_template_name': session_template_name or (session.name if session else None),
+                        'session_template_color': session_template_color,
                         'session_date': format_utc((session.session_start or session.created_at) if session else None),
                     },
                 )

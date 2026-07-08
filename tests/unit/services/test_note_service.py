@@ -335,6 +335,7 @@ def test_get_session_notes_includes_session_template_name(
     session.attributes = json.dumps({
         'session_data': {
             'template_name': 'Standard Practice Session',
+            'template_color': '#123456',
         },
     })
 
@@ -359,6 +360,7 @@ def test_get_session_notes_includes_session_template_name(
     assert error is None
     assert status == 200
     assert payload[0]['session_template_name'] == 'Standard Practice Session'
+    assert payload[0]['session_template_color'] == '#123456'
 
 
 def test_get_all_notes_filters_regular_goal_notes_by_goal_id(

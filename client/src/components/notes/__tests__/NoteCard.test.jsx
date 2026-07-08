@@ -93,6 +93,7 @@ describe('NoteCard', () => {
                     session_id: 'session-1',
                     session_name: 'Session',
                     session_template_name: 'Standard Practice Session',
+                    session_template_color: '#16a34a',
                     note_type: 'session_note',
                     note_type_label: 'Session Note',
                     set_index: null,
@@ -104,7 +105,39 @@ describe('NoteCard', () => {
         );
 
         expect(screen.getByText('Session Note')).toBeInTheDocument();
-        expect(screen.getByText('Standard Practice Session')).toBeInTheDocument();
+        expect(screen.getByText('Standard Practice Session')).toHaveStyle({ color: '#16a34a' });
+    });
+
+    it('uses the session template badge for activity note session context', () => {
+        render(
+            <NoteCard
+                note={{
+                    id: 'note-6',
+                    content: 'Activity-linked note',
+                    created_at: '2026-04-04T13:37:00Z',
+                    updated_at: '2026-04-04T13:37:00Z',
+                    context_type: 'activity_instance',
+                    context_id: 'instance-1',
+                    activity_instance_id: 'instance-1',
+                    activity_definition_id: 'activity-1',
+                    activity_definition_name: 'Playthrough',
+                    session_id: 'session-1',
+                    session_name: 'Logged Session',
+                    session_template_name: 'Hand Healthy Repertoire',
+                    session_template_color: '#22c55e',
+                    note_type: 'activity_instance_note',
+                    note_type_label: 'Activity Instance Note',
+                    set_index: null,
+                    goal_id: null,
+                    pinned_at: null,
+                    is_pinned: false,
+                }}
+                showContext
+            />,
+        );
+
+        expect(screen.getByText('Playthrough')).toBeInTheDocument();
+        expect(screen.getByText('Hand Healthy Repertoire')).toHaveStyle({ color: '#22c55e' });
     });
 
     it('removes the redundant trailing note word in metadata note type labels', () => {

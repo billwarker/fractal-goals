@@ -10,6 +10,7 @@ import { PinIcon } from '../atoms/AppIcons';
 import CheckIcon from '../atoms/CheckIcon';
 import CloseIcon from '../atoms/CloseIcon';
 import GoalIcon from '../atoms/GoalIcon';
+import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import MarkdownNoteContent from './MarkdownNoteContent';
 import styles from './NoteCard.module.css';
 
@@ -99,6 +100,16 @@ function NoteCard({
     const setLabel = resolvedNoteType === 'activity_set_note' && note.set_index != null
         ? `Set #${note.set_index + 1}`
         : null;
+    const sessionTemplateName = note.session_template_name || note.session_name || 'Session';
+    const sessionTemplateColor = note.session_template_color || note.template_color;
+    const renderSessionTemplateBadge = (className = styles.sessionTemplateBadge) => (
+        <SessionTemplateNameBadge
+            name={sessionTemplateName}
+            color={sessionTemplateColor}
+            size="feed"
+            className={className}
+        />
+    );
 
     const adjustHeight = (el) => {
         if (!el) return;
@@ -215,7 +226,7 @@ function NoteCard({
         <span className={styles.timestamp}>
             {formatDate(note.created_at)}
             {note.isPast && note.session_name && resolvedNoteType !== 'session_note' && (
-                <span className={styles.pastSessionName}> ({note.session_name})</span>
+                <span className={styles.pastSessionName}>{renderSessionTemplateBadge(styles.pastSessionBadge)}</span>
             )}
         </span>
     );
@@ -263,20 +274,23 @@ function NoteCard({
                 return 'Note';
         }
     })();
-
     const secondaryContextBadges = [];
     if (showContext && resolvedNoteType !== 'fractal_note') {
         if (resolvedNoteType !== 'goal_note' && note.goal_name) {
-            secondaryContextBadges.push(note.goal_name);
+            secondaryContextBadges.push({ type: 'text', label: note.goal_name });
         }
         if (resolvedNoteType !== 'activity_instance_note' && resolvedNoteType !== 'activity_definition_note' && resolvedNoteType !== 'activity_set_note' && note.activity_definition_name) {
-            secondaryContextBadges.push(note.activity_definition_name);
+            secondaryContextBadges.push({ type: 'text', label: note.activity_definition_name });
         }
         if (resolvedNoteType !== 'session_note' && note.session_name) {
-            secondaryContextBadges.push(note.session_name);
+            secondaryContextBadges.push({
+                type: 'session',
+                label: note.session_template_name || note.session_name,
+                color: note.session_template_color || note.template_color,
+            });
         }
         if (!secondaryContextBadges.length && note.context_type === 'root') {
-            secondaryContextBadges.push('Fractal');
+            secondaryContextBadges.push({ type: 'text', label: 'Fractal' });
         }
     }
 
@@ -359,6 +373,8 @@ function NoteCard({
                                             />
                                             <span className={styles.contextPrimary}>{primaryContextLabel}</span>
                                         </span>
+                                    ) : resolvedNoteType === 'session_note' ? (
+                                        renderSessionTemplateBadge()
                                     ) : (
                                         <span className={styles.contextPrimary}>{primaryContextLabel}</span>
                                     )}
@@ -367,7 +383,17 @@ function NoteCard({
                             {secondaryContextBadges.length > 0 && (
                                 <div className={styles.contextBadges}>
                                     {secondaryContextBadges.map((badge, index) => (
-                                        <span key={`${badge}-${index}`} className={styles.contextBadge}>{badge}</span>
+                                        badge.type === 'session' ? (
+                                            <SessionTemplateNameBadge
+                                                key={`${badge.label}-${index}`}
+                                                name={badge.label}
+                                                color={badge.color}
+                                                size="feed"
+                                                className={styles.sessionTemplateBadge}
+                                            />
+                                        ) : (
+                                            <span key={`${badge.label}-${index}`} className={styles.contextBadge}>{badge.label}</span>
+                                        )
                                     ))}
                                 </div>
                             )}

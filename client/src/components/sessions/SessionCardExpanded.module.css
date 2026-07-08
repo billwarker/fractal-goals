@@ -47,11 +47,26 @@
     text-underline-offset: 3px;
 }
 
+.cardHeaderTitleLink {
+    display: inline-flex;
+    max-width: 100%;
+    min-width: 0;
+    color: inherit;
+    text-decoration: none;
+}
+
+.cardHeaderTitleLink:hover,
+.cardHeaderTitleLink:focus-visible {
+    text-decoration: none;
+}
+
+.cardHeaderTitleLink:hover .cardHeaderTitleTemplate,
+.cardHeaderTitleLink:focus-visible .cardHeaderTitleTemplate {
+    filter: brightness(1.12);
+}
+
 .cardHeaderTitleTemplate {
     max-width: 100%;
-    padding: 4px 10px;
-    border-radius: 8px;
-    border: 1px solid;
     line-height: 1.3;
 }
 

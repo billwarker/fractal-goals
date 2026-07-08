@@ -83,6 +83,8 @@ describe('GoalTimelineView', () => {
                     id: 'instance-1',
                     session_id: 'session-1',
                     session_name: 'Upper Body Day 2',
+                    session_template_name: 'Strength Template',
+                    session_template_color: '#22c55e',
                     name: 'Freestanding HSPU Eccentrics',
                     duration_seconds: 336,
                     metric_values: [],
@@ -318,6 +320,7 @@ describe('GoalTimelineView', () => {
         const completedActivity = screen.getByText('Completed activity: Freestanding HSPU Eccentrics')
             .closest('div[class*="timelineCard"]');
         expect(within(completedActivity).getByText('5:36')).toBeInTheDocument();
+        expect(screen.getByText('Strength Template')).toHaveStyle({ color: '#22c55e' });
 
         const achievedTarget = screen.getByText('Achieved target: First clean rep')
             .closest('div[class*="card"]')

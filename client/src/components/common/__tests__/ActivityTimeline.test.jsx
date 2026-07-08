@@ -11,6 +11,7 @@ describe('ActivityTimelineCard', () => {
                     id: 'instance-1',
                     session_id: 'session-1',
                     session_name: 'Standard Practice Session',
+                    session_template_color: '#22c55e',
                     session_date: '2026-05-11T12:00:00.000Z',
                     name: 'Blues Chug',
                     metric_values: [],
@@ -29,8 +30,10 @@ describe('ActivityTimelineCard', () => {
             }
         );
 
-        expect(screen.getByRole('link', { name: 'Standard Practice Session' }))
-            .toHaveAttribute('href', '/root-1/session/session-1?activityInstanceId=instance-1');
+        const sessionLink = screen.getByRole('link', { name: 'Standard Practice Session' });
+        const sessionBadge = screen.getByText('Standard Practice Session');
+        expect(sessionLink).toHaveAttribute('href', '/root-1/session/session-1?activityInstanceId=instance-1');
+        expect(sessionBadge).toHaveStyle({ color: '#22c55e' });
         expect(screen.getByText('Blues Chug')).toBeInTheDocument();
     });
 

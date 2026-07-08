@@ -14,6 +14,7 @@ import { getTemplateColor } from '../../utils/sessionRuntime';
 import { formatClockDuration } from '../../utils/sessionTime';
 import { NoteIcon } from '../atoms/AppIcons';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
+import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import './SessionCard.css';
 
 function SessionCard({
@@ -103,16 +104,12 @@ function SessionCard({
 
             {/* Template Name */}
             {sessionData.template_name && (
-                <div
+                <SessionTemplateNameBadge
+                    name={sessionData.template_name}
+                    color={templateColor}
+                    size="md"
                     className="session-card-template"
-                    style={{
-                        borderColor: templateColor,
-                        color: templateColor,
-                        background: `color-mix(in srgb, ${templateColor} 14%, transparent)`,
-                    }}
-                >
-                    {sessionData.template_name}
-                </div>
+                />
             )}
 
             {/* Associated Goals */}
