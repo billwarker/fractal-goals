@@ -3,9 +3,10 @@ import { fractalApi } from './api/fractalApi';
 import { globalApi } from './api/globalApi';
 import { adminApi } from './api/adminApi';
 import { publicApi } from './api/publicApi';
+import { telemetryApi } from './api/telemetryApi';
 
 export { API_BASE, axios, setAccessToken, clearAccessToken } from './api/core';
-export { authApi, fractalApi, globalApi, adminApi, publicApi };
+export { authApi, fractalApi, globalApi, adminApi, publicApi, telemetryApi };
 
 export default {
     global: globalApi,
@@ -13,4 +14,5 @@ export default {
     auth: authApi,
     admin: adminApi,
     public: publicApi,
+    telemetry: telemetryApi,
 };

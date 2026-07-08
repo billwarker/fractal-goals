@@ -18,7 +18,8 @@ from services.completion_handlers import (
 )
 from services.events import Event, Events
 from services.programs import ProgramService
-from services.session_service import SessionService, _parse_iso_datetime_strict
+from services.session_lifecycle_service import _parse_iso_datetime_strict
+from services.session_service import SessionService
 
 
 @pytest.mark.unit
@@ -236,7 +237,7 @@ class TestSessionServicePublicFlows:
     ):
         service = SessionService(db_session)
         emitted = []
-        monkeypatch.setattr("services.session_service.event_bus.emit", lambda event: emitted.append(event.name))
+        monkeypatch.setattr("services.session_lifecycle_service.event_bus.emit", lambda event: emitted.append(event.name))
 
         payload, error, status = service.update_session(
             sample_ultimate_goal.id,
@@ -278,7 +279,10 @@ class TestSessionServicePublicFlows:
 
 @pytest.mark.unit
 class TestProgramServicePublicFlows:
-    def test_create_program_deactivates_existing_active_program(self, db_session, sample_ultimate_goal):
+    def test_create_program_links_selected_goals_without_touching_other_programs(self, db_session, sample_ultimate_goal):
+        # Programs no longer enforce a single-active-program invariant: the
+        # calendar-first programs page supports multiple concurrent programs,
+        # so creating a program must leave existing programs untouched.
         existing = Program(
             root_id=sample_ultimate_goal.id,
             name="Existing",
@@ -309,8 +313,8 @@ class TestProgramServicePublicFlows:
 
         existing_refreshed = db_session.query(Program).filter_by(id=existing.id).first()
         new_refreshed = db_session.query(Program).filter_by(id=created["id"]).first()
-        assert existing_refreshed.is_active is False
-        assert new_refreshed.is_active is True
+        assert existing_refreshed.is_active is True
+        assert new_refreshed is not None
 
         linked_rows = db_session.execute(
             program_goals.select().where(program_goals.c.program_id == new_refreshed.id)
@@ -318,7 +322,7 @@ class TestProgramServicePublicFlows:
         assert len(linked_rows) == 1
         assert linked_rows[0].goal_id == selected_goal.id
 
-    def test_update_program_activates_target_and_deactivates_others(self, db_session, sample_ultimate_goal):
+    def test_update_program_does_not_deactivate_other_programs(self, db_session, sample_ultimate_goal):
         program_a = Program(
             root_id=sample_ultimate_goal.id,
             name="Program A",
@@ -344,15 +348,15 @@ class TestProgramServicePublicFlows:
             db_session,
             sample_ultimate_goal.id,
             program_b.id,
-            {"is_active": True},
+            {"name": "Program B Renamed"},
         )
         db_session.commit()
 
         assert updated is not None
         refreshed_a = db_session.query(Program).filter_by(id=program_a.id).first()
         refreshed_b = db_session.query(Program).filter_by(id=program_b.id).first()
-        assert refreshed_a.is_active is False
-        assert refreshed_b.is_active is True
+        assert refreshed_a.is_active is True
+        assert refreshed_b.name == "Program B Renamed"
 
 
 @pytest.mark.unit

@@ -1389,3 +1389,39 @@ def test_admin_exports_beta_signups_csv(admin_client, sample_beta_signups):
     assert body.splitlines()[0] == 'email,goal,status,source,created_at,updated_at,note'
     assert 'new@test.example' in body
     assert 'Learn jazz guitar' in body
+
+
+@pytest.mark.integration
+def test_temporary_password_forces_change_before_api_access(admin_client, client, db_session, test_user):
+    """Full lifecycle: temp password -> gated API access -> change -> unblocked."""
+    temp_response = admin_client.post(f'/api/admin/users/{test_user.id}/temporary-password')
+    assert temp_response.status_code == 200
+    temp_password = json.loads(temp_response.data)['temporary_password']
+
+    login_response = client.post(
+        '/api/auth/login',
+        data=json.dumps({'username_or_email': 'testuser', 'password': temp_password}),
+        content_type='application/json',
+    )
+    assert login_response.status_code == 200
+    login_payload = json.loads(login_response.data)
+    assert login_payload['user']['must_change_password'] is True
+    user_headers = {
+        'Authorization': f"Bearer {login_payload['token']}",
+        'Content-Type': 'application/json',
+    }
+
+    gated_response = client.get('/api/auth/account/usage', headers=user_headers)
+    assert gated_response.status_code == 403
+    assert json.loads(gated_response.data)['code'] == 'password_change_required'
+
+    change_response = client.put(
+        '/api/auth/account/password',
+        data=json.dumps({'current_password': temp_password, 'new_password': 'Newpassword456'}),
+        content_type='application/json',
+        headers=user_headers,
+    )
+    assert change_response.status_code == 200
+
+    unblocked_response = client.get('/api/auth/account/usage', headers=user_headers)
+    assert unblocked_response.status_code == 200

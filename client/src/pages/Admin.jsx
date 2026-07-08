@@ -7,6 +7,7 @@ import {
 } from '../constants/accountTiers';
 import BetaSignupsPanel from '../components/admin/BetaSignupsPanel';
 import TierQuotasPanel from '../components/admin/TierQuotasPanel';
+import UsagePanel from '../components/admin/UsagePanel';
 import { useAuth } from '../contexts/AuthContext';
 import { AlertTriangleIcon } from '../components/atoms/AppIcons';
 import CloseButton from '../components/atoms/CloseButton';
@@ -1066,16 +1067,19 @@ function Admin() {
             </div>
 
             {tab === 'overview' && (
-                <section className={styles.section}>
-                    <div className={styles.summaryGrid}>
-                        {summaryCards.map(([label, value]) => (
-                            <div key={label} className={styles.summaryCard}>
-                                <span>{label}</span>
-                                <strong>{value}</strong>
-                            </div>
-                        ))}
-                    </div>
-                </section>
+                <>
+                    <section className={styles.section}>
+                        <div className={styles.summaryGrid}>
+                            {summaryCards.map(([label, value]) => (
+                                <div key={label} className={styles.summaryCard}>
+                                    <span>{label}</span>
+                                    <strong>{value}</strong>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                    <UsagePanel enabled={Boolean(user?.is_admin) && tab === 'overview'} />
+                </>
             )}
 
             {tab === 'users' && (

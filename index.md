@@ -26,6 +26,7 @@ The codebase is now organized around two main ideas:
 - Frontend: Vite + React on port `5173`
 - Database: PostgreSQL only
 - Schema management: Alembic migrations
+- Health endpoints live in `blueprints/health_api.py`: `/health` and `/api/healthz` are static liveness checks, `/api/readyz` is a database-aware readiness check (`SELECT 1`, 503 on DB failure). All three are rate-limit exempt; Cloud Run uses `/api/readyz` as the startup probe and `/api/healthz` as the liveness probe (`cloudbuild.yaml`).
 
 Development note:
 
@@ -142,6 +143,13 @@ Key frontend pieces:
 - `client/src/components/modals/AuthModal.jsx`
 - `client/src/components/modals/SettingsModal.jsx`
 
+Observability and usage analytics:
+
+- `services/ops_log.py` emits greppable one-line `ops_event=<name> key=value` events on the `fractal.ops` logger for auth login failures, password reset lifecycle, invite sends/failures, beta signup lifecycle, quota denials, Resend webhook rejections, rate-limit hits (via the JSON `@app.errorhandler(429)` in `blueprints/error_handlers.py`), and 5xx responses. The module docstring is the grep contract.
+- First-party product telemetry: the frontend (`client/src/utils/telemetry.js`, `usePageViewTelemetry` in the app shell) batches allowlisted events (`page_view`, `settings_opened`) to `POST /api/telemetry/events` (`blueprints/telemetry_api.py` → `services/telemetry_service.py`), stored in `product_events` with normalized low-cardinality paths (`/:rootId/goals`). Telemetry is authenticated-only, honors Do Not Track, and is fire-and-forget. The server-side event-name allowlist in `services/telemetry_service.py` is the cardinality contract.
+- Admin usage dashboard: rendered inside the Admin `overview` tab below the summary cards (`client/src/components/admin/UsagePanel.jsx`) backed by `GET /api/admin/usage?days=N` (`services/admin_usage_service.py`) aggregates DAU/WAU/MAU (product_events with `last_login_at` fallback), per-user activity (page views plus sessions/goals created via `event_logs` joined to `goals.owner_id`), top pages/events, and email delivery health; `POST /api/admin/usage/prune` deletes old telemetry rows.
+- Operational docs: `docs/architecture/BACKUP_RESTORE_RUNBOOK.md` (Supabase backup posture, RPO/RTO, restore procedures, pre-migration snapshot, verification log) and `docs/planning/BETA_PREFLIGHT.md` (the repeatable release gate run before each beta invite wave).
+
 Performance and production-hardening notes:
 
 - Backend responses include `X-Response-Time-Ms`; slow requests are logged using `SLOW_REQUEST_THRESHOLD_MS`.
@@ -178,8 +186,8 @@ Analytics engine build-out:
 Remaining SaaS build-out to know:
 
 - Stripe/customer-portal/webhook integration is not yet wired as a full billing system.
-- Email verification, billing notices, quota warnings, and marketing/bulk mail are not yet present; password reset and beta invite email are the current transactional email workflows, with Resend delivery webhook ingestion wired for those sends.
-- Admin force-password-change is currently an account marker, not an enforced login-time password-change gate.
+- Email verification, billing notices, quota warnings, and marketing/bulk mail are not yet present; password reset, beta invite, and password/email-change security notices are the current transactional email workflows, with Resend delivery webhook ingestion wired for those sends. Security notices are best-effort sends after commit; email-change notices go to the OLD address.
+- Admin force-password-change is enforced: `token_required` returns `403 password_change_required` for non-exempt routes while the `admin_force_password_change` preference (shared helpers in `services/account_flags.py`) is set, `serialize_user` exposes top-level `must_change_password`, the frontend shows a blocking `ForcePasswordChangeModal`, and both self-service password-change paths clear the flag.
 - Admin support access is explicit and scoped by `admin_user_id` plus `admin_mode=read_only|read_write`; it is not full impersonation.
 
 ## Core Domain Areas

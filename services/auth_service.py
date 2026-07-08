@@ -9,8 +9,10 @@ import jwt
 from account_tiers import DEFAULT_ACCOUNT_TIER
 from config import config
 from models import BetaSignupRequest, EmailDeliveryEvent, PasswordResetToken, User, utc_now
+from services.account_flags import clear_force_password_change
 from services.email_service import EmailSendError, EmailService
-from services.email_templates import render_password_reset_email
+from services.ops_log import log_ops_event
+from services.email_templates import render_password_changed_email, render_password_reset_email
 from services.serializers import serialize_user
 from services.admin_service import AdminService
 from services.quota_service import DEFAULT_STORAGE_LIMIT_BYTES, QuotaService
@@ -171,6 +173,7 @@ class AuthService:
 
         self.db_session.commit()
         logger.info("Password reset requested for user_id=%s", user.id)
+        log_ops_event("auth.password_reset_requested", user_id=user.id)
         return self._public_password_reset_response(), None, 200
 
     def reset_password(self, data) -> ServiceResult[JsonDict]:
@@ -194,10 +197,38 @@ class AuthService:
         user.set_password(data["new_password"])
         user.failed_login_count = 0
         user.locked_until = None
+        clear_force_password_change(user)
         reset_token.used_at = utc_now()
         self.db_session.commit()
         logger.info("Password reset completed for user_id=%s", user.id)
+        log_ops_event("auth.password_reset_completed", user_id=user.id)
+        self._send_password_changed_notice(user)
         return {"message": "Password reset successfully. Please log in with your new password."}, None, 200
+
+    def _send_password_changed_notice(self, user):
+        """Best-effort security notification; must never fail the reset."""
+        if (config.EMAIL_PROVIDER or 'disabled') == 'disabled':
+            return
+        rendered = render_password_changed_email()
+        try:
+            EmailService(self.db_session).send_email(
+                to=user.email,
+                subject=rendered["subject"],
+                html=rendered["html"],
+                text=rendered["text"],
+                template_key="password_changed_notice",
+                entity_type="user",
+                entity_id=user.id,
+                recipient_user_id=user.id,
+            )
+            self.db_session.commit()
+        except EmailSendError:
+            # send_email already marked the delivery event failed; keep it.
+            self.db_session.commit()
+            logger.warning("Password changed notice email failed for user_id=%s", user.id)
+        except Exception:
+            self.db_session.rollback()
+            logger.exception("Password changed notice email errored for user_id=%s", user.id)
 
     def refresh_token(self, token: str) -> ServiceResult[JsonDict]:
         try:
@@ -233,10 +264,12 @@ class AuthService:
         user = self._find_user_for_login(data['username_or_email'])
         if not user:
             logger.warning("Failed login: unknown identifier=%s", data['username_or_email'])
+            log_ops_event("auth.login_failed", level="warning", reason="unknown_user")
             return None, "Invalid username or password", 401
 
         if not user.is_active:
             logger.warning("Rejected login for disabled user_id=%s", user.id)
+            log_ops_event("auth.login_failed", level="warning", reason="disabled", user_id=user.id)
             return None, "User account is disabled", 403
 
         if user.locked_until:
@@ -247,6 +280,7 @@ class AuthService:
             if locked_until > now:
                 minutes_left = int((locked_until - now).total_seconds() / 60) + 1
                 logger.warning("Rejected login for locked user_id=%s", user.id)
+                log_ops_event("auth.login_failed", level="warning", reason="locked", user_id=user.id)
                 return None, f"Account temporarily locked. Try again in {minutes_left} minutes.", 403
 
         if not user.check_password(data['password']):
@@ -259,6 +293,13 @@ class AuthService:
                 user.id,
                 user.failed_login_count,
                 user.locked_until,
+            )
+            log_ops_event(
+                "auth.login_failed",
+                level="warning",
+                reason="bad_password",
+                user_id=user.id,
+                failed_count=user.failed_login_count,
             )
             return None, "Invalid username or password", 401
 

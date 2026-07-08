@@ -5,6 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from blueprints.api_utils import get_db_session, internal_error
 from extensions import limiter
+from services.ops_log import log_ops_event
 from services.public_service import PublicService
 from services.email_service import EmailService, EmailWebhookVerificationError
 from validators import BetaSignupRequestSchema, validate_request
@@ -68,9 +69,11 @@ def handle_resend_webhook():
     except EmailWebhookVerificationError as exc:
         db_session.rollback()
         logger.warning("Rejected Resend webhook: %s", exc)
+        log_ops_event("email.webhook_rejected", level="warning", provider="resend")
         return jsonify({"error": "Invalid webhook signature"}), 400
     except SQLAlchemyError:
         db_session.rollback()
+        log_ops_event("email.webhook_error", level="error", provider="resend")
         return internal_error(logger, "Error processing Resend webhook")
     finally:
         db_session.close()

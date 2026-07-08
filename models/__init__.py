@@ -25,6 +25,7 @@ from .program import (
     program_day_templates, program_goals, program_block_goals
 )
 from .common import AnalyticsDashboard, AnalyticsQueryProfile, AppSetting, Note, EventLog, PageSurfaceLayout
+from .product_event import ProductEvent
 
 # Legacy ALIASES for backward compatibility (Optional)
 PracticeSession = Session

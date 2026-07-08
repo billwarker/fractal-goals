@@ -1,5 +1,6 @@
 from models import AppSetting, BetaSignupRequest, format_utc
 from services.landing_publish_service import LANDING_EXAMPLE_CACHE_KEY
+from services.ops_log import log_ops_event
 
 
 class PublicService:
@@ -45,6 +46,9 @@ class PublicService:
 
         self.db_session.commit()
         self.db_session.refresh(request)
+
+        if created:
+            log_ops_event("beta.signup_created", beta_signup_id=request.id, email=request.email)
 
         return {
             "request": self.serialize_beta_signup(request),

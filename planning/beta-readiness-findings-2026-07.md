@@ -181,17 +181,22 @@ The current production profile uses `RATELIMIT_STORAGE_URI=memory://`,
 
 ## Readiness Matrix
 
+Updated 2026-07-07 after the S-rank hardening pass (see Addendum below).
+Grades marked "S pending ops proof" have all code/docs landed; the grade
+converts to S when the operator completes the corresponding
+`docs/planning/BETA_PREFLIGHT.md` items in production.
+
 | Area | Current Grade | Beta Interpretation |
 | --- | --- | --- |
-| Core architecture | A | Strong enough for beta |
-| Auth and account security | A- | Strong, with force-password-change enforcement still missing |
-| Email lifecycle | A / S- | Strong after Resend work; deploy wiring and verification remain |
-| Beta signup/admin ops | A- | Strong, with preflight still needed |
-| Data safety | C+ | Backup/restore verification is the major gap |
-| Deployment health | C+ | Static health exists; DB-aware readiness is missing |
-| Observability | B | Good enough for small beta; not full S+ ops |
-| Billing/public SaaS | Deferred | Not required for free private beta |
-| Documentation | B+ | Mostly strong; beta runbooks/checklists still missing |
+| Core architecture | S | Hardened request pipeline: JSON 429 handler, 5xx ops events, DB-aware readiness, ops-log seam — all inside existing patterns |
+| Auth and account security | S | Force-password-change enforced end-to-end (login flag, API gate, blocking modal, clear-on-change) plus password/email-change security notice emails |
+| Email lifecycle | S pending ops proof | Invite-email binding landed (45a98d1); security notices added; deploy wiring tracked — remaining proof is the preflight Resend dry run |
+| Beta signup/admin ops | S | Signup lifecycle ops events, invite send/failure events, email-health panel, usage dashboard, committed preflight gate |
+| Data safety | S pending ops proof | BACKUP_RESTORE_RUNBOOK.md committed with RPO/RTO, restore procedures, mandatory pre-migration snapshot; needs the operator's backup verification + drill row |
+| Deployment health | S pending ops proof | /api/readyz (SELECT 1, 503 on DB failure, limiter-exempt) with tests; Cloud Run startup/liveness probes in cloudbuild.yaml; needs one deploy to confirm probes green |
+| Observability | S | Greppable ops_event log contract, JSON+logged 429s, 5xx events, first-party product telemetry (product_events), admin usage dashboard (DAU/WAU/MAU, per-user, top pages, email health) |
+| Billing/public SaaS | Deferred | Not required for free private beta (explicitly skipped) |
+| Documentation | S | Runbook + preflight committed alongside existing ADRs/index; index.md updated |
 
 ## Recommended S+ Beta Sequence
 
@@ -215,6 +220,41 @@ new users are invited.
 Distance to S+: **moderate and concrete**. The remaining work is small compared with the already
 landed account, admin, and email infrastructure, but it is high leverage because it turns a strong
 application into an actually operable beta.
+
+## Addendum — 2026-07-07 S-Rank Hardening Pass
+
+Implemented per `planning/beta-readiness-s-rank-plan-2026-07.md`:
+
+1. **Deployment health**: `blueprints/health_api.py` adds `GET /api/readyz`
+   (DB `SELECT 1`, 503 on failure, no error leakage); all health routes are
+   `@limiter.exempt`; `cloudbuild.yaml` wires `--startup-probe` (readyz) and
+   `--liveness-probe` (healthz); `tests/integration/test_health_api.py`.
+2. **Auth**: force-password-change enforced in `token_required` (evaluated on
+   the authenticated account before the admin-support id swap; exempt: me,
+   csrf, password change), `must_change_password` in `serialize_user`, flag
+   cleared by both self-service change paths (`services/account_flags.py`),
+   blocking `ForcePasswordChangeModal` in the app shell; security notice
+   emails on password change (both paths) and email change (to the OLD
+   address) via `services/email_templates/security_notice.py`.
+3. **Ops log events**: `services/ops_log.py` (`ops_event=` grep contract) with
+   call sites in auth, admin invite send, beta signup lifecycle, quota denials,
+   Resend webhook rejection, JSON 429 handler (`blueprints/error_handlers.py`),
+   and 5xx after-request logging.
+4. **Product telemetry**: `product_events` table (migration `4c5d6e7f8a9b`),
+   allowlisted batched `POST /api/telemetry/events`, frontend beacon
+   (`client/src/utils/telemetry.js` + `usePageViewTelemetry`, DNT-aware,
+   normalized paths), retention prune.
+5. **Admin usage dashboard**: `services/admin_usage_service.py`,
+   `GET /api/admin/usage` + prune endpoint, rendered in the Admin `overview`
+   tab with DAU strip, per-user activity, top pages/events, email delivery
+   health.
+6. **Data safety / docs**: `docs/architecture/BACKUP_RESTORE_RUNBOOK.md` and
+   `docs/planning/BETA_PREFLIGHT.md`; automated pre-migration Cloud Build dump
+   documented but deferred (manual snapshot is a mandatory preflight step).
+
+Remaining to convert "S pending ops proof" to S: run the preflight against
+production (probes green, Resend dry run with webhook confirmation, backup
+verification + restore drill rows).
 
 ## Suggested Commit Message
 

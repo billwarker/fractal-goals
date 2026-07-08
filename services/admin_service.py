@@ -65,12 +65,14 @@ from services.quota_service import (
 )
 from services.email_service import EmailSendError, EmailService
 from services.email_templates import render_beta_invite_email
+from services.ops_log import log_ops_event
 from services.serializers import format_utc
 from services.service_types import JsonDict, ServiceResult
 from config import config
 
 logger = logging.getLogger(__name__)
-FORCE_PASSWORD_CHANGE_PREFERENCE = "admin_force_password_change"
+# Shared with auth/user services; re-exported here for existing imports.
+from services.account_flags import FORCE_PASSWORD_CHANGE_PREFERENCE
 
 
 def hash_invite_key(raw_key: str) -> str:
@@ -633,11 +635,20 @@ class AdminService:
         request = self.db_session.get(BetaSignupRequest, signup_id)
         if request is None:
             return None, "Beta signup request not found", 404
+        previous_status = request.status
         request.status = status
         if status == "invited" and request.invited_at is None:
             request.invited_at = utc_now()
         self.db_session.commit()
         self.db_session.refresh(request)
+        if previous_status != status:
+            log_ops_event(
+                "beta.signup_status_changed",
+                beta_signup_id=request.id,
+                email=request.email,
+                from_status=previous_status,
+                to_status=status,
+            )
         return {"request": PublicService.serialize_beta_signup(request)}, None, 200
 
     def send_beta_signup_invite(self, signup_id: str, current_user: User) -> ServiceResult[JsonDict]:
@@ -698,6 +709,12 @@ class AdminService:
             ))
             self.db_session.commit()
             logger.error("Beta invite email failed beta_signup_id=%s", request.id)
+            log_ops_event(
+                "email.invite_failed",
+                level="error",
+                beta_signup_id=request.id,
+                email=request.email,
+            )
             return None, "Failed to send beta invite email", 502
 
         request.status = "invited"
@@ -706,6 +723,11 @@ class AdminService:
         request.last_invite_email_sent_at = now
         self.db_session.commit()
         self.db_session.refresh(request)
+        log_ops_event(
+            "email.invite_sent",
+            beta_signup_id=request.id,
+            email=request.email,
+        )
         return {"request": PublicService.serialize_beta_signup(request)}, None, 200
 
     def iter_beta_signups_for_export(self, status: str = "", search: str = ""):

@@ -2,6 +2,8 @@ import { API_BASE, axios } from './core';
 
 export const adminApi = {
     getSummary: () => axios.get(`${API_BASE}/admin/summary`),
+    getUsage: (params = {}) => axios.get(`${API_BASE}/admin/usage`, { params }),
+    pruneUsage: (data = {}) => axios.post(`${API_BASE}/admin/usage/prune`, data),
     getUsers: (params = {}) => axios.get(`${API_BASE}/admin/users`, { params }),
     getTierQuotas: () => axios.get(`${API_BASE}/admin/tier-quotas`),
     updateTierQuotas: (data) => axios.patch(`${API_BASE}/admin/tier-quotas`, data),

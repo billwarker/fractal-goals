@@ -31,9 +31,12 @@ const Notes = lazyWithRetry(() => import('./pages/Notes'), 'pages/Notes');
 const Admin = lazyWithRetry(() => import('./pages/Admin'), 'pages/Admin');
 const ResetPassword = lazyWithRetry(() => import('./pages/ResetPassword'), 'pages/ResetPassword');
 const SettingsModal = lazyWithRetry(() => import('./components/modals/SettingsModal'), 'components/modals/SettingsModal');
+const ForcePasswordChangeModal = lazyWithRetry(() => import('./components/modals/ForcePasswordChangeModal'), 'components/modals/ForcePasswordChangeModal');
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 
 import { usePageTitle } from './hooks/usePageTitle';
+import { usePageViewTelemetry } from './hooks/usePageViewTelemetry';
+import { trackEvent } from './utils/telemetry';
 import { dismissGoalDetailsForNavigation } from './utils/navigationEvents';
 import { useGoalLevels } from './contexts/GoalLevelsContext';
 import { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } from './utils/marketingHost';
@@ -400,6 +403,8 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
 
 function App() {
     const location = useLocation();
+    const { user, isAuthenticated } = useAuth();
+    const mustChangePassword = Boolean(isAuthenticated && user?.must_change_password);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
     const [navHeight, setNavHeight] = useState(() => (location.pathname === '/' ? 0 : (isMobile ? 56 : 60)));
@@ -431,6 +436,7 @@ function App() {
     };
 
     usePageTitle(getPageTitle(location.pathname));
+    usePageViewTelemetry();
 
     const allowZoom = shouldAllowZoom({
         isMobile,
@@ -506,9 +512,17 @@ function App() {
     return (
         <HeaderProvider>
             <div className="app-container">
+                {mustChangePassword && (
+                    <Suspense fallback={null}>
+                        <ForcePasswordChangeModal />
+                    </Suspense>
+                )}
                 {!showSelectionPage && !showLandingPage && !redirectDeprecatedLandingRoute && location.pathname !== '/admin' && location.pathname !== '/reset-password' && (
                     <NavigationHeader
-                        onOpenSettings={() => setIsSettingsOpen(true)}
+                        onOpenSettings={() => {
+                            trackEvent('settings_opened');
+                            setIsSettingsOpen(true);
+                        }}
                         onHeightChange={setNavHeight}
                     />
                 )}

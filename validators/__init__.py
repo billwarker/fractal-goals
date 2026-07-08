@@ -127,6 +127,10 @@ from .programs import (
     ProgramUpdateSchema,
     VALID_DAYS_OF_WEEK,
 )
+from .telemetry import (
+    TelemetryEventSchema,
+    TelemetryEventsSchema,
+)
 from .templates import (
     SessionTemplateCreateSchema,
     SessionTemplateFromSessionSchema,
@@ -218,6 +222,8 @@ __all__ = [
     "SessionUpdateSchema",
     "SplitDefinitionSchema",
     "TargetSchema",
+    "TelemetryEventSchema",
+    "TelemetryEventsSchema",
     "TimerActivityInstanceManualUpdateSchema",
     "UserDeleteSchema",
     "UserEmailUpdateSchema",

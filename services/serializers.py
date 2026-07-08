@@ -4,6 +4,7 @@ import json
 
 from account_tiers import DEFAULT_ACCOUNT_TIER
 from models import _safe_load_json
+from .account_flags import must_change_password as _must_change_password
 from .goal_type_utils import get_canonical_goal_type
 from .goal_domain_rules import goal_uses_child_completion
 from .session_runtime import get_template_color, get_template_session_type
@@ -703,6 +704,7 @@ def serialize_user(user):
         "role": getattr(user, "role", "user") or "user",
         "is_admin": bool(getattr(user, "is_admin", False)),
         "preferences": _safe_load_json(user.preferences, {}),
+        "must_change_password": _must_change_password(user),
         "membership_tier": getattr(user, "membership_tier", DEFAULT_ACCOUNT_TIER) or DEFAULT_ACCOUNT_TIER,
         "subscription_status": getattr(user, "subscription_status", "none") or "none",
         "paid_amount_cad_cents": getattr(user, "paid_amount_cad_cents", None),

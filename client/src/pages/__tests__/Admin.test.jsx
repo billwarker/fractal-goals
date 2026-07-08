@@ -7,6 +7,7 @@ import Admin from '../Admin';
 
 const {
     getSummary,
+    getUsage,
     getUsers,
     getTierQuotas,
     getInviteKeys,
@@ -33,6 +34,7 @@ const {
     sendBetaSignupInvite,
 } = vi.hoisted(() => ({
     getSummary: vi.fn(),
+    getUsage: vi.fn(),
     getUsers: vi.fn(),
     getTierQuotas: vi.fn(),
     getInviteKeys: vi.fn(),
@@ -69,6 +71,7 @@ vi.mock('../../contexts/AuthContext', () => ({
 vi.mock('../../utils/api', () => ({
     adminApi: {
         getSummary: (...args) => getSummary(...args),
+        getUsage: (...args) => getUsage(...args),
         getUsers: (...args) => getUsers(...args),
         getTierQuotas: (...args) => getTierQuotas(...args),
         getInviteKeys: (...args) => getInviteKeys(...args),
@@ -132,6 +135,17 @@ describe('Admin', () => {
                 total_sessions: 3,
                 storage_bytes: 2048,
                 invite_keys: { available: 2 },
+            },
+        });
+        getUsage.mockResolvedValue({
+            data: {
+                window_days: 30,
+                active_users: { dau: [{ date: '2026-07-07', count: 1 }], wau: 1, mau: 1 },
+                signups_by_day: [],
+                per_user: [],
+                top_events: [],
+                top_pages: [],
+                email_health: [],
             },
         });
         getUsers.mockResolvedValue({

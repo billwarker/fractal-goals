@@ -909,3 +909,116 @@ class TestUsernameUpdateEndpoint:
             content_type='application/json'
         )
         assert response.status_code == 400
+
+
+@pytest.mark.integration
+class TestForcePasswordChangeEnforcement:
+    """Admin-forced password change must gate API access until resolved."""
+
+    def _force_password_change(self, db_session, user):
+        from sqlalchemy.orm.attributes import flag_modified
+        from services.account_flags import FORCE_PASSWORD_CHANGE_PREFERENCE
+
+        preferences = dict(user.preferences or {})
+        preferences[FORCE_PASSWORD_CHANGE_PREFERENCE] = True
+        user.preferences = preferences
+        flag_modified(user, 'preferences')
+        db_session.commit()
+
+    def test_login_reports_must_change_password(self, client, db_session, test_user):
+        self._force_password_change(db_session, test_user)
+
+        response = client.post(
+            '/api/auth/login',
+            data=json.dumps({'username_or_email': 'testuser', 'password': 'Password123'}),
+            content_type='application/json',
+        )
+
+        assert response.status_code == 200
+        assert json.loads(response.data)['user']['must_change_password'] is True
+
+    def test_gated_endpoint_returns_password_change_required(self, authed_client, db_session, test_user):
+        self._force_password_change(db_session, test_user)
+
+        response = authed_client.get('/api/auth/account/usage')
+
+        assert response.status_code == 403
+        data = json.loads(response.data)
+        assert data['code'] == 'password_change_required'
+
+    def test_me_endpoint_stays_accessible_with_flag(self, authed_client, db_session, test_user):
+        self._force_password_change(db_session, test_user)
+
+        response = authed_client.get('/api/auth/me')
+
+        assert response.status_code == 200
+        assert json.loads(response.data)['must_change_password'] is True
+
+    def test_password_change_clears_flag_and_unblocks(self, authed_client, db_session, test_user):
+        EmailService.clear_test_outbox()
+        self._force_password_change(db_session, test_user)
+
+        change_response = authed_client.put(
+            '/api/auth/account/password',
+            data=json.dumps({'current_password': 'Password123', 'new_password': 'Newpassword456'}),
+            content_type='application/json',
+        )
+        assert change_response.status_code == 200
+
+        unblocked_response = authed_client.get('/api/auth/account/usage')
+        assert unblocked_response.status_code == 200
+
+        me_response = authed_client.get('/api/auth/me')
+        assert json.loads(me_response.data)['must_change_password'] is False
+
+        notices = [email for email in TEST_EMAIL_OUTBOX if email['template_key'] == 'password_changed_notice']
+        assert len(notices) == 1
+        assert notices[0]['to'] == test_user.email
+
+    def test_password_reset_clears_flag(self, client, db_session, test_user):
+        EmailService.clear_test_outbox()
+        self._force_password_change(db_session, test_user)
+
+        client.post(
+            '/api/auth/password/forgot',
+            data=json.dumps({'email': test_user.email}),
+            content_type='application/json',
+        )
+        reset_url = TEST_EMAIL_OUTBOX[0]['text'].splitlines()[3]
+        raw_token = parse_qs(urlparse(reset_url).query)['token'][0]
+
+        reset_response = client.post(
+            '/api/auth/password/reset',
+            data=json.dumps({'token': raw_token, 'new_password': 'Newpassword456'}),
+            content_type='application/json',
+        )
+        assert reset_response.status_code == 200
+
+        db_session.expire_all()
+        from services.account_flags import must_change_password
+        from models import User
+        refreshed = db_session.get(User, test_user.id)
+        assert must_change_password(refreshed) is False
+
+        notices = [email for email in TEST_EMAIL_OUTBOX if email['template_key'] == 'password_changed_notice']
+        assert len(notices) == 1
+        assert notices[0]['to'] == test_user.email
+
+
+@pytest.mark.integration
+class TestSecurityNoticeEmails:
+    def test_email_change_notifies_old_address(self, authed_client, test_user):
+        EmailService.clear_test_outbox()
+        old_email = test_user.email
+
+        response = authed_client.put(
+            '/api/auth/account/email',
+            data=json.dumps({'email': 'brand-new@example.com', 'password': 'Password123'}),
+            content_type='application/json',
+        )
+        assert response.status_code == 200
+
+        notices = [email for email in TEST_EMAIL_OUTBOX if email['template_key'] == 'email_changed_notice']
+        assert len(notices) == 1
+        assert notices[0]['to'] == old_email
+        assert 'brand-new@example.com' in notices[0]['text']

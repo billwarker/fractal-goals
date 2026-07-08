@@ -33,6 +33,7 @@ from models import (
     Target,
     User,
 )
+from services.ops_log import log_ops_event
 from services.service_types import JsonDict, ServiceResult
 
 
@@ -432,6 +433,15 @@ class QuotaService:
                 "requested": estimated_bytes,
             }, None, 200
 
+        log_ops_event(
+            "quota.denied",
+            level="warning",
+            user_id=user_id,
+            resource="storage",
+            current=current,
+            limit=int(limit),
+            requested=estimated_bytes,
+        )
         return None, {
             "error": "Storage quota reached",
             "resource": "storage",
@@ -468,6 +478,15 @@ class QuotaService:
             }, None, 200
 
         label = RESOURCE_LABELS.get(resource, resource.replace("_", " "))
+        log_ops_event(
+            "quota.denied",
+            level="warning",
+            user_id=user_id,
+            resource=resource,
+            current=current,
+            limit=limit,
+            requested=increment,
+        )
         return None, {
             "error": f"{label.capitalize()} quota reached",
             "resource": resource,

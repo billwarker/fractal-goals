@@ -8,6 +8,7 @@ from validators import (
     UserPasswordUpdateSchema, UserEmailUpdateSchema, UserDeleteSchema, UserUsernameUpdateSchema,
     PasswordForgotSchema, PasswordResetSchema,
 )
+from services.account_flags import must_change_password
 from services.serializers import serialize_user
 from services.auth_service import AuthService
 from services.user_service import UserService
@@ -20,6 +21,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
+
+# Endpoints a user may still call while an admin-forced password change is
+# pending: enough to stay authenticated and complete the change, nothing else.
+FORCE_PASSWORD_CHANGE_EXEMPT_ENDPOINTS = frozenset({
+    'auth.get_me',
+    'auth.get_csrf_token',
+    'auth.update_password',
+})
 
 
 def _issue_csrf_token():
@@ -128,6 +137,18 @@ def token_required(f):
             current_user, error, status = service.get_current_user_for_token(token)
             if error:
                 return jsonify({'error': error}), status
+            # Enforced on the authenticated account before the admin-support
+            # id swap below, so a forced admin cannot sidestep the gate via
+            # impersonation and an impersonated user's flag cannot lock out
+            # the admin.
+            if (
+                request.endpoint not in FORCE_PASSWORD_CHANGE_EXEMPT_ENDPOINTS
+                and must_change_password(current_user)
+            ):
+                return jsonify({
+                    'error': 'Password change required',
+                    'code': 'password_change_required',
+                }), 403
             root_id = kwargs.get('root_id')
             admin_user_id = request.args.get('admin_user_id')
             admin_mode = request.args.get('admin_mode')

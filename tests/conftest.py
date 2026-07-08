@@ -49,6 +49,8 @@ from blueprints.auth_api import auth_bp
 from blueprints.admin_api import admin_bp
 from blueprints.goal_levels_api import goal_levels_bp
 from blueprints.public_api import public_bp
+from blueprints.health_api import health_bp
+from blueprints.telemetry_api import telemetry_bp
 from services.completion_handlers import clear_achievement_context, clear_live_progress
 
 
@@ -90,7 +92,12 @@ def app():
     test_app.register_blueprint(admin_bp)
     test_app.register_blueprint(goal_levels_bp)
     test_app.register_blueprint(public_bp)
-    
+    test_app.register_blueprint(health_bp)
+    test_app.register_blueprint(telemetry_bp)
+
+    from blueprints.error_handlers import register_error_handlers
+    register_error_handlers(test_app)
+
     # Initialize Limiter
     from extensions import limiter
     limiter.init_app(test_app)

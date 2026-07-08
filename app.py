@@ -46,9 +46,13 @@ from blueprints.auth_api import auth_bp
 from blueprints.admin_api import admin_bp
 from blueprints.public_api import public_bp
 from blueprints.pages import pages_bp
+from blueprints.health_api import health_bp
+from blueprints.telemetry_api import telemetry_bp
+from blueprints.error_handlers import register_error_handlers
 from services.completion_handlers import clear_achievement_context, clear_live_progress
 from services import init_services
 from services.db_migration_service import apply_startup_migrations
+from services.ops_log import log_ops_event
 
 # Print configuration on startup
 config.print_config()
@@ -190,6 +194,9 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(public_bp)
 app.register_blueprint(pages_bp)
+app.register_blueprint(health_bp)
+app.register_blueprint(telemetry_bp)
+register_error_handlers(app)
 
 # Initialize services (event bus, completion handlers, etc.)
 init_services()
@@ -237,6 +244,14 @@ def add_cache_headers(response):
                 response.status_code,
                 elapsed_ms,
             )
+    if response.status_code >= 500:
+        log_ops_event(
+            "http.server_error",
+            level="error",
+            method=request.method,
+            path=request.path,
+            status=response.status_code,
+        )
     # Favor correctness for authenticated API data over intermediary/browser
     # caching, while preserving explicit public cache policies such as the
     # landing examples snapshot.
@@ -244,26 +259,6 @@ def add_cache_headers(response):
         response.headers['Cache-Control'] = 'no-store'
     return response
 
-
-
-@app.route('/health')
-def health_check():
-    """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "message": "Fractal Goals Flask Server",
-        "environment": config.ENV,
-        "database_type": config.get_database_provider(),
-    }
-
-
-@app.route('/api/healthz')
-def api_healthz():
-    """Lightweight API health check that does not touch auth or the database."""
-    return {
-        "status": "ok",
-        "environment": config.ENV,
-    }
 
 
 if __name__ == '__main__':
