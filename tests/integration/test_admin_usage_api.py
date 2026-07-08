@@ -223,6 +223,14 @@ class TestAdminUsageEndpoint:
         assert tables['event_logs']['rows'] == 3
         assert tables['product_events']['oldest'] is not None
         assert tables['product_events']['bytes'] > 0
+        database_storage = payload['storage']['database']
+        assert database_storage['total_bytes'] > 0
+        assert database_storage['relation_bytes'] > 0
+        assert database_storage['other_bytes'] >= 0
+        assert any(
+            relation['schema'] == 'public' and relation['table'] == 'event_logs'
+            for relation in database_storage['relations']
+        )
 
         assert payload['retention'] == {'product_events_days': 180}
         assert payload['export'] == {'last_run_at': None, 'last_run_status': None, 'tables': {}}

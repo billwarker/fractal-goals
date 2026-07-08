@@ -76,6 +76,22 @@ const USAGE_FIXTURE = {
         { template_key: 'beta_invite', status: 'delivered', count: 4 },
     ],
     storage: {
+        database: {
+            total_bytes: 23173504,
+            relation_bytes: 11534336,
+            other_bytes: 11639168,
+            relations: [
+                {
+                    schema: 'public',
+                    table: 'event_logs',
+                    estimated_rows: 900,
+                    total_bytes: 2998272,
+                    table_bytes: 1892352,
+                    index_bytes: 1064960,
+                    toast_bytes: 40960,
+                },
+            ],
+        },
         tables: [
             { table: 'product_events', rows: 120, bytes: 65536, oldest: '2026-06-01T00:00:00Z', newest: '2026-07-07T00:00:00Z' },
             { table: 'event_logs', rows: 900, bytes: 262144, oldest: '2026-05-01T00:00:00Z', newest: '2026-07-07T00:00:00Z' },
@@ -138,6 +154,7 @@ describe('UsagePanel', () => {
         expect(screen.getByText('note.created')).toBeInTheDocument();
         expect(screen.getByText('/:rootId/goals')).toBeInTheDocument();
         expect(screen.getByText('beta_invite')).toBeInTheDocument();
+        expect(screen.getByText('public.event_logs')).toBeInTheDocument();
         expect(screen.getByText('product_events')).toBeInTheDocument();
         expect(screen.getByText(/Never exported/)).toBeInTheDocument();
         expect(screen.getByText('21')).toBeInTheDocument();

@@ -17,8 +17,8 @@ const formatBytes = (bytes) => {
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : '—');
 
 /**
- * Storage management for the event/telemetry tables: table sizes, telemetry
- * retention policy, prune action, and the BigQuery export state.
+ * Storage management for database/event tables, telemetry retention policy,
+ * prune action, and the BigQuery export state.
  */
 function UsageStoragePanel({ storage, retention, exportState }) {
     const queryClient = useQueryClient();
@@ -58,10 +58,48 @@ function UsageStoragePanel({ storage, retention, exportState }) {
     };
 
     const tables = storage?.tables || [];
+    const databaseStorage = storage?.database || {};
+    const databaseRelations = databaseStorage.relations || [];
     const exportTables = exportState?.tables || {};
 
     return (
         <>
+            <h3>Database storage breakdown</h3>
+            <p>
+                Total database storage: {formatBytes(databaseStorage.total_bytes)}.
+                {' '}Non-system relations: {formatBytes(databaseStorage.relation_bytes)}.
+                {' '}System catalogs, internal objects, and free space: {formatBytes(databaseStorage.other_bytes)}.
+            </p>
+            <table className={styles.table}>
+                <thead>
+                    <tr>
+                        <th>Relation</th>
+                        <th>Est. rows</th>
+                        <th>Total</th>
+                        <th>Table</th>
+                        <th>Indexes</th>
+                        <th>TOAST</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {databaseRelations.slice(0, 25).map((relation) => (
+                        <tr key={`${relation.schema}.${relation.table}`}>
+                            <td>{relation.schema}.{relation.table}</td>
+                            <td>{relation.estimated_rows}</td>
+                            <td>{formatBytes(relation.total_bytes)}</td>
+                            <td>{formatBytes(relation.table_bytes)}</td>
+                            <td>{formatBytes(relation.index_bytes)}</td>
+                            <td>{formatBytes(relation.toast_bytes)}</td>
+                        </tr>
+                    ))}
+                    {!databaseRelations.length && (
+                        <tr>
+                            <td colSpan="6">Database storage breakdown unavailable for this environment.</td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+
             <h3>Event storage</h3>
             <table className={styles.table}>
                 <thead>

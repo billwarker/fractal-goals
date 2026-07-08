@@ -363,7 +363,8 @@ class AdminUsageService:
                 "newest": format_utc(row[2]),
                 "bytes": self._table_bytes(table_name),
             })
-        return {"tables": tables}
+        database = self._database_storage_breakdown()
+        return {"tables": tables, "database": database}
 
     def _table_bytes(self, table_name: str):
         """Total on-disk relation size; None when unavailable (non-Postgres)."""
@@ -378,3 +379,56 @@ class AdminUsageService:
         except Exception:
             logger.warning("Failed to read relation size for %s", table_name, exc_info=True)
             return None
+
+    def _database_storage_breakdown(self):
+        """Database-wide storage accounting for the Admin storage explanation."""
+        if self.db_session.get_bind().dialect.name != "postgresql":
+            return {"total_bytes": None, "relation_bytes": None, "other_bytes": None, "relations": []}
+
+        try:
+            total_bytes = int(self.db_session.execute(
+                sa.text("SELECT pg_database_size(current_database())"),
+            ).scalar() or 0)
+            rows = self.db_session.execute(sa.text("""
+                SELECT
+                    n.nspname AS schema,
+                    c.relname AS table_name,
+                    GREATEST(c.reltuples::bigint, 0) AS estimated_rows,
+                    pg_total_relation_size(c.oid) AS total_bytes,
+                    pg_relation_size(c.oid) AS table_bytes,
+                    pg_indexes_size(c.oid) AS index_bytes,
+                    GREATEST(
+                        pg_total_relation_size(c.oid)
+                        - pg_relation_size(c.oid)
+                        - pg_indexes_size(c.oid),
+                        0
+                    ) AS toast_bytes
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE c.relkind IN ('r', 'p', 'm')
+                  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                ORDER BY pg_total_relation_size(c.oid) DESC, n.nspname, c.relname
+            """)).mappings().all()
+        except Exception:
+            logger.warning("Failed to read database storage breakdown", exc_info=True)
+            return {"total_bytes": None, "relation_bytes": None, "other_bytes": None, "relations": []}
+
+        relations = [
+            {
+                "schema": row["schema"],
+                "table": row["table_name"],
+                "estimated_rows": int(row["estimated_rows"] or 0),
+                "total_bytes": int(row["total_bytes"] or 0),
+                "table_bytes": int(row["table_bytes"] or 0),
+                "index_bytes": int(row["index_bytes"] or 0),
+                "toast_bytes": int(row["toast_bytes"] or 0),
+            }
+            for row in rows
+        ]
+        relation_bytes = sum(row["total_bytes"] for row in relations)
+        return {
+            "total_bytes": total_bytes,
+            "relation_bytes": relation_bytes,
+            "other_bytes": max(total_bytes - relation_bytes, 0),
+            "relations": relations,
+        }

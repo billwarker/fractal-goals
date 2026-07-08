@@ -20,6 +20,22 @@ vi.mock('../../../utils/api', () => ({
 vi.mock('../../../utils/notify', () => ({ default: notify }));
 
 const STORAGE = {
+    database: {
+        total_bytes: 23173504,
+        relation_bytes: 11534336,
+        other_bytes: 11639168,
+        relations: [
+            {
+                schema: 'public',
+                table: 'event_logs',
+                estimated_rows: 2306,
+                total_bytes: 2998272,
+                table_bytes: 1892352,
+                index_bytes: 1064960,
+                toast_bytes: 40960,
+            },
+        ],
+    },
     tables: [
         { table: 'product_events', rows: 120, bytes: 65536, oldest: '2026-06-01T00:00:00Z', newest: '2026-07-07T00:00:00Z' },
         { table: 'event_logs', rows: 900, bytes: null, oldest: null, newest: null },
@@ -53,6 +69,9 @@ describe('UsageStoragePanel', () => {
     it('renders table stats with human-readable and missing sizes', () => {
         renderPanel();
 
+        expect(screen.getByText('Database storage breakdown')).toBeInTheDocument();
+        expect(screen.getByText('public.event_logs')).toBeInTheDocument();
+        expect(screen.getByText(/Total database storage: 22.1 MB/)).toBeInTheDocument();
         expect(screen.getByText('product_events')).toBeInTheDocument();
         expect(screen.getByText('64.0 KB')).toBeInTheDocument();
         expect(screen.getByText('n/a')).toBeInTheDocument();
