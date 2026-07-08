@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlparse
 
 import jwt
 import pytest
+from sqlalchemy import text
 
 from config import config
 from models import (
@@ -98,6 +99,16 @@ def admin_client(client, admin_user):
 def test_non_admin_cannot_access_admin_api(authed_client):
     response = authed_client.get('/api/admin/summary')
     assert response.status_code == 403
+
+
+@pytest.mark.integration
+def test_admin_summary_reports_total_database_storage(admin_client, db_session):
+    response = admin_client.get('/api/admin/summary')
+
+    assert response.status_code == 200
+    payload = json.loads(response.data)
+    database_bytes = int(db_session.execute(text("SELECT pg_database_size(current_database())")).scalar() or 0)
+    assert payload["storage_bytes"] == database_bytes
 
 
 @pytest.mark.integration

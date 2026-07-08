@@ -6,7 +6,8 @@ import string
 from copy import deepcopy
 from urllib.parse import quote
 
-from sqlalchemy import delete, func, or_
+from sqlalchemy import delete, func, or_, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm.attributes import flag_modified
 
 from account_tiers import (
@@ -742,10 +743,7 @@ class AdminService:
             Goal.parent_id.is_(None), Goal.deleted_at.is_(None)
         ).scalar() or 0)
         total_sessions = int(self.db_session.query(func.count(Session.id)).filter(Session.deleted_at.is_(None)).scalar() or 0)
-        total_storage = sum(
-            self.quota_service.get_storage_usage_bytes(user.id)
-            for user in self.db_session.query(User).all()
-        )
+        total_storage = self._database_storage_bytes()
         invite_counts = {
             "available": 0,
             "used": 0,
@@ -766,3 +764,20 @@ class AdminService:
             "recent_signups": [self.serialize_admin_user(user) for user in recent_users],
             "recent_logins": [self.serialize_admin_user(user) for user in recent_logins],
         }, None, 200
+
+    def _database_storage_bytes(self) -> int:
+        try:
+            total = self.db_session.execute(text("SELECT pg_database_size(current_database())")).scalar()
+            return int(total or 0)
+        except SQLAlchemyError:
+            logger.warning(
+                "Could not fetch PostgreSQL database size for admin summary; falling back to quota-accounted storage.",
+                exc_info=True,
+            )
+            return self._quota_accounted_storage_bytes()
+
+    def _quota_accounted_storage_bytes(self) -> int:
+        return sum(
+            self.quota_service.get_storage_usage_bytes(user.id)
+            for user in self.db_session.query(User).all()
+        )

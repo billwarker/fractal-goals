@@ -1036,7 +1036,7 @@ function Admin() {
             ['Active Users', summary.active_users || 0],
             ['Fractals', summary.total_fractals || 0],
             ['Sessions', summary.total_sessions || 0],
-            ['Storage', formatBytes(summary.storage_bytes || 0)],
+            ['DB Storage', formatBytes(summary.storage_bytes || 0)],
             ['Invite Keys', summary.invite_keys?.available || 0],
         ];
     }, [summaryQuery.data]);
