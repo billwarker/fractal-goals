@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from models import ActivityInstance, GoalPauseInterval, Session, Target, activity_goal_associations
+from models import ActivityInstance, GoalLevel, GoalPauseInterval, Session, Target, activity_goal_associations
 
 
 @pytest.mark.integration
@@ -194,6 +194,60 @@ class TestGoalTimelineApi:
         assert paused['payload']['pause_interval_id'] == interval.id
         assert resumed['entity_id'] == child_goal.id
         assert resumed['payload']['pause_interval_id'] == interval.id
+
+    def test_descendant_lifecycle_uses_effective_child_goal_level_style(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        test_user,
+    ):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        parent_goal = sample_goal_hierarchy['mid_term']
+        child_goal = sample_goal_hierarchy['short_term']
+        system_short_level = GoalLevel(
+            id=str(uuid.uuid4()),
+            name='Short Term Goal',
+            rank=3,
+            color='#111111',
+            secondary_color='#222222',
+            icon='circle',
+        )
+        root_short_level = GoalLevel(
+            id=str(uuid.uuid4()),
+            name='Short Term Goal',
+            rank=3,
+            color='#00a8c8',
+            secondary_color='#003947',
+            icon='hexagon',
+            owner_id=test_user.id,
+            root_id=root_id,
+        )
+        child_goal.level_id = system_short_level.id
+        child_goal.description = 'Specific child goal'
+        child_goal.relevance_statement = 'Relevant child goal'
+        child_goal.track_activities = False
+        child_goal.completed = False
+        child_goal.manually_uncompleted_at = datetime(2026, 7, 7, 13, 1, tzinfo=timezone.utc)
+        db_session.add_all([system_short_level, root_short_level])
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/goals/{parent_goal.id}/timeline?types=goal_lifecycle'
+        )
+
+        assert response.status_code == 200
+        entries = response.get_json()['entries']
+        uncompleted = next(entry for entry in entries if entry['event_type'] == 'goal.uncompleted')
+        assert uncompleted['entity_id'] == child_goal.id
+        assert uncompleted['relationship'] == 'descendant'
+        assert uncompleted['payload']['level_name'] == 'Short Term Goal'
+        assert uncompleted['payload']['level_style_source'] == 'effective'
+        assert uncompleted['payload']['level']['icon'] == 'hexagon'
+        assert uncompleted['payload']['level']['color'] == '#00a8c8'
+        assert uncompleted['payload']['level']['secondary_color'] == '#003947'
+        assert uncompleted['payload']['level_characteristics']['icon'] == 'hexagon'
+        assert uncompleted['payload']['is_smart'] is True
 
     def test_timeline_includes_latest_manual_uncompletion(self, authed_client, db_session, sample_goal_hierarchy):
         root_id = sample_goal_hierarchy['ultimate'].id

@@ -338,6 +338,8 @@ The goal detail Notes tab queries `GET /api/<root_id>/goals/<goal_id>/notes` and
 
 Timeline and notes feeds use the shared `SessionTemplateNameBadge` atom for session/template names. Feed surfaces pass the session template name and color when available and render the badge at the compact `feed` size so activity timeline cards and note headers match session-template styling without overwhelming the feed. Session-template name chips across manage templates, create-session flows, sessions, session detail, timelines, and notes should use this atom; its shared shape is a squared rounded rectangle rather than a pill.
 
+Goal lifecycle timeline rows render goal icons through `GoalIcon` and should resolve icon shape, primary color, secondary color, and SMART detailing from the freshest available goal style. The backend timeline service serializes lifecycle goal payloads with effective level styling using the same system → user-global → root-specific override precedence as goal-level APIs, and marks those payloads with `level_style_source: effective`. For the currently open goal, the frontend can still prefer the modal goal object, including `level`, `level_characteristics`, `attributes.level`, or `attributes.level_characteristics`.
+
 Key backend pieces:
 
 - `services/note_service.py`

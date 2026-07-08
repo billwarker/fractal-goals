@@ -6,6 +6,7 @@ from models import (
     ActivityGroup,
     ActivityInstance,
     Goal,
+    GoalLevel,
     GoalPauseInterval,
     MetricDefinition,
     MetricValue,
@@ -61,6 +62,31 @@ class GoalTimelineService:
             stack.extend(child for child in (current.children or []) if not child.deleted_at)
         return result
 
+    def _get_effective_levels_by_name(self, current_user_id, root_id):
+        system_levels = self.db_session.query(GoalLevel).filter(
+            GoalLevel.owner_id == None,
+            GoalLevel.deleted_at == None,
+        ).all()
+        user_global_levels = self.db_session.query(GoalLevel).filter(
+            GoalLevel.owner_id == current_user_id,
+            GoalLevel.root_id == None,
+            GoalLevel.deleted_at == None,
+        ).all()
+        root_levels = self.db_session.query(GoalLevel).filter(
+            GoalLevel.owner_id == current_user_id,
+            GoalLevel.root_id == root_id,
+            GoalLevel.deleted_at == None,
+        ).all()
+
+        levels_by_name = {}
+        for level in system_levels:
+            levels_by_name[level.name] = level
+        for level in user_global_levels:
+            levels_by_name[level.name] = level
+        for level in root_levels:
+            levels_by_name[level.name] = level
+        return levels_by_name
+
     def get_goal_timeline(
         self,
         root_id,
@@ -79,6 +105,7 @@ class GoalTimelineService:
         goal = goals_by_id.get(goal_id)
         if not goal:
             return None, "Goal not found", 404
+        effective_levels_by_name = self._get_effective_levels_by_name(current_user_id, root_id)
 
         limit = max(1, min(int(limit or 50), 200))
         if types is None:
@@ -133,20 +160,26 @@ class GoalTimelineService:
 
         def serialize_timeline_goal(goal_item):
             level = getattr(goal_item, 'level', None)
+            level_name = getattr(level, 'name', None)
+            effective_level = effective_levels_by_name.get(level_name) if level_name else None
+            display_level = effective_level or level
+            level_payload = {
+                'id': getattr(display_level, 'id', None),
+                'name': getattr(display_level, 'name', level_name),
+                'color': getattr(display_level, 'color', None),
+                'secondary_color': getattr(display_level, 'secondary_color', None),
+                'icon': getattr(display_level, 'icon', None),
+            } if display_level else None
             return {
                 'goal_id': goal_item.id,
                 'goal_name': goal_item.name,
                 'type': get_canonical_goal_type(goal_item),
                 'level_id': goal_item.level_id,
-                'level_name': getattr(level, 'name', None) if level else None,
+                'level_name': level_name,
                 'is_smart': all(calculate_smart_status(goal_item).values()),
-                'level': {
-                    'id': getattr(level, 'id', None),
-                    'name': getattr(level, 'name', None),
-                    'color': getattr(level, 'color', None),
-                    'secondary_color': getattr(level, 'secondary_color', None),
-                    'icon': getattr(level, 'icon', None),
-                } if level else None,
+                'level': level_payload,
+                'level_characteristics': level_payload,
+                'level_style_source': 'effective' if effective_level else 'goal',
             }
 
         def serialize_timeline_activity_definition(activity):

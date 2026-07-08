@@ -128,6 +128,75 @@ function getGoalIdentity(goal) {
     return goal?.id || goal?.attributes?.id || null;
 }
 
+function getGoalStyleLevel(goal) {
+    if (!goal) return null;
+    return goal.level || goal.level_characteristics || goal.attributes?.level || goal.attributes?.level_characteristics || null;
+}
+
+function getGoalLevelName(goal) {
+    return goal?.level_name
+        || goal?.level?.name
+        || goal?.level_characteristics?.name
+        || goal?.attributes?.level_name
+        || goal?.attributes?.type
+        || goal?.type
+        || null;
+}
+
+function isSmartGoal(goal) {
+    if (!goal) return false;
+    if (goal.is_smart != null) return Boolean(goal.is_smart);
+    if (goal.attributes?.is_smart != null) return Boolean(goal.attributes.is_smart);
+    const smartStatus = goal.smart_status || goal.attributes?.smart_status;
+    if (smartStatus && typeof smartStatus === 'object') {
+        return Object.values(smartStatus).every(Boolean);
+    }
+    return false;
+}
+
+function resolveGoalIconConfig({
+    item,
+    goalLevel,
+    goalLevelHelpers,
+    matchingCurrentGoal,
+}) {
+    if (!goalLevel) return null;
+
+    const levelName = goalLevel.level_name || goalLevel.type || goalLevel.level?.name || null;
+    const styleGoal = matchingCurrentGoal || {
+        id: goalLevel.id,
+        name: goalLevel.name,
+        type: goalLevel.type,
+        level_id: goalLevel.level_id,
+        level_name: levelName,
+        level: goalLevel.level,
+        is_smart: goalLevel.is_smart,
+    };
+    const styleLevel = getGoalStyleLevel(styleGoal) || goalLevel.level || null;
+    const helperSource = matchingCurrentGoal || levelName || goalLevel.type || styleGoal;
+    const helperShape = goalLevelHelpers.getGoalIcon(helperSource);
+    const shouldTrustPayloadLevel = goalLevel.level_style_source === 'effective';
+    const rawShape = matchingCurrentGoal || shouldTrustPayloadLevel
+        ? (styleLevel?.icon || helperShape || 'circle')
+        : (helperShape || styleLevel?.icon || 'circle');
+    const rawColor = matchingCurrentGoal || shouldTrustPayloadLevel
+        ? (styleLevel?.color || goalLevelHelpers.getGoalColor(helperSource))
+        : goalLevelHelpers.getGoalColor(helperSource);
+    const rawSecondaryColor = matchingCurrentGoal || shouldTrustPayloadLevel
+        ? (styleLevel?.secondary_color || goalLevelHelpers.getGoalSecondaryColor(helperSource))
+        : goalLevelHelpers.getGoalSecondaryColor(helperSource);
+    const usesCompletedGoalPalette = item.event_type === 'goal.completed';
+
+    return {
+        shape: rawShape,
+        color: usesCompletedGoalPalette ? goalLevelHelpers.getGoalColor('Completed') : rawColor,
+        secondaryColor: usesCompletedGoalPalette
+            ? goalLevelHelpers.getGoalSecondaryColor('Completed')
+            : rawSecondaryColor,
+        isSmart: isSmartGoal(styleGoal) || Boolean(goalLevel.is_smart),
+    };
+}
+
 function normalizeTimelineEntry(item, goalLevelHelpers, currentGoal = null) {
     const payload = item.payload || {};
     const activityInstance = item.event_type === 'activity.completed'
@@ -142,17 +211,8 @@ function normalizeTimelineEntry(item, goalLevelHelpers, currentGoal = null) {
     const matchingCurrentGoal = goalIdMatches(getTimelineEntryGoalId(item), getGoalIdentity(currentGoal))
         ? currentGoal
         : null;
-    const goalDisplayToken = goalLevel
-        ? goalLevel.level_name || goalLevel.type || goalLevel
-        : null;
-    const goalStyleSource = matchingCurrentGoal || goalDisplayToken;
+    const goalStyleSource = matchingCurrentGoal || goalLevel?.level_name || goalLevel?.type || goalLevel;
     const goalColor = goalStyleSource ? goalLevelHelpers.getGoalColor(goalStyleSource) : null;
-    const goalSecondaryColor = goalStyleSource ? goalLevelHelpers.getGoalSecondaryColor(goalStyleSource) : null;
-    const usesCompletedGoalPalette = item.event_type === 'goal.completed';
-    const iconColor = usesCompletedGoalPalette ? goalLevelHelpers.getGoalColor('Completed') : goalColor;
-    const iconSecondaryColor = usesCompletedGoalPalette
-        ? goalLevelHelpers.getGoalSecondaryColor('Completed')
-        : goalSecondaryColor;
 
     return {
         eventLabel: item.subtitle || (isGoalLifecycleEvent(item) ? '' : formatEventLabel(item)),
@@ -169,12 +229,12 @@ function normalizeTimelineEntry(item, goalLevelHelpers, currentGoal = null) {
         activityInstance,
         activityDef: payload.activity_definition || null,
         progressRecord: payload.progress_comparison || payload.progress_record || null,
-        iconConfig: goalLevel ? {
-            shape: goalStyleSource ? goalLevelHelpers.getGoalIcon(goalStyleSource) : goalLevel.level?.icon || 'circle',
-            color: iconColor,
-            secondaryColor: iconSecondaryColor,
-            isSmart: Boolean(goalLevel.is_smart),
-        } : null,
+        iconConfig: resolveGoalIconConfig({
+            item,
+            goalLevel,
+            goalLevelHelpers,
+            matchingCurrentGoal,
+        }),
         levelBadge: goalLevel?.level_name && !isGoalLifecycleEvent(item)
             ? { label: goalLevel.level_name, color: goalColor }
             : null,
@@ -416,9 +476,11 @@ function getTimelineGoalLevel(payload) {
         name: payload.goal_name,
         type: payload.type,
         level_id: payload.level_id || level?.id,
-        level_name: payload.level_name || level?.name,
+        level_name: payload.level_name || level?.name || getGoalLevelName(payload),
         is_smart: Boolean(payload.is_smart),
         level,
+        level_characteristics: payload.level_characteristics || null,
+        level_style_source: payload.level_style_source || null,
     };
 }
 

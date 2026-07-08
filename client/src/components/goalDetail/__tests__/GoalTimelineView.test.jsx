@@ -214,14 +214,22 @@ describe('GoalTimelineView', () => {
                     goal_id: 'goal-3',
                     goal_name: 'Get the Right Lean Forward Freestanding',
                     level_name: 'Immediate Goal',
+                    level_style_source: 'effective',
                     level: {
                         id: 'level-immediate',
                         name: 'Immediate Goal',
-                        color: '#stale-immediate',
-                        secondary_color: '#stale-immediate-secondary',
-                        icon: 'circle',
+                        color: '#00a8c8',
+                        secondary_color: '#003947',
+                        icon: 'hexagon',
                     },
-                    is_smart: false,
+                    level_characteristics: {
+                        id: 'level-immediate',
+                        name: 'Immediate Goal',
+                        color: '#00a8c8',
+                        secondary_color: '#003947',
+                        icon: 'hexagon',
+                    },
+                    is_smart: true,
                 },
             },
             {
@@ -262,7 +270,8 @@ describe('GoalTimelineView', () => {
                 currentGoal={{
                     id: 'goal-1',
                     name: 'Get the Right Lean Forward Freestanding',
-                    level: {
+                    is_smart: true,
+                    level_characteristics: {
                         id: 'current-immediate',
                         name: 'Immediate Goal',
                         color: '#ffc400',
@@ -309,6 +318,7 @@ describe('GoalTimelineView', () => {
         expect(completedGoalIcon).toHaveAttribute('data-shape', 'triangle');
         expect(completedGoalIcon).toHaveAttribute('data-color', '#10b981');
         expect(completedGoalIcon).toHaveAttribute('data-secondary-color', '#064e3b');
+        expect(completedGoalIcon).toHaveAttribute('data-smart', 'true');
 
         const createdGoal = screen.getByText('Created Short Term goal:')
             .closest('div[class*="item"]');
@@ -316,6 +326,23 @@ describe('GoalTimelineView', () => {
         expect(createdGoalIcon).toHaveAttribute('data-shape', 'hexagon');
         expect(createdGoalIcon).toHaveAttribute('data-color', '#8b6fff');
         expect(createdGoalIcon).toHaveAttribute('data-secondary-color', '#181329');
+        expect(createdGoalIcon).toHaveAttribute('data-smart', 'false');
+
+        const pausedGoal = screen.getByText('Paused Short Term goal:')
+            .closest('div[class*="item"]');
+        const pausedGoalIcon = within(pausedGoal).getByTestId('goal-icon');
+        expect(pausedGoalIcon).toHaveAttribute('data-shape', 'triangle');
+        expect(pausedGoalIcon).toHaveAttribute('data-color', '#ffc400');
+        expect(pausedGoalIcon).toHaveAttribute('data-secondary-color', '#4a3900');
+        expect(pausedGoalIcon).toHaveAttribute('data-smart', 'true');
+
+        const uncompletedGoal = screen.getByText('Uncompleted Immediate goal:')
+            .closest('div[class*="item"]');
+        const uncompletedGoalIcon = within(uncompletedGoal).getByTestId('goal-icon');
+        expect(uncompletedGoalIcon).toHaveAttribute('data-shape', 'hexagon');
+        expect(uncompletedGoalIcon).toHaveAttribute('data-color', '#00a8c8');
+        expect(uncompletedGoalIcon).toHaveAttribute('data-secondary-color', '#003947');
+        expect(uncompletedGoalIcon).toHaveAttribute('data-smart', 'true');
 
         const completedActivity = screen.getByText('Completed activity: Freestanding HSPU Eccentrics')
             .closest('div[class*="timelineCard"]');
