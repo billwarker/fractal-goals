@@ -99,7 +99,7 @@ function SessionInfoPanel() {
                         <SessionTemplateNameBadge
                             name={session.name}
                             color={templateColor}
-                            size="lg"
+                            size="xl"
                             className={styles.templateBadge}
                         />
                     ) : session.name}

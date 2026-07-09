@@ -26,7 +26,7 @@ function SessionTemplateNameBadge({
                 background: `color-mix(in srgb, ${resolvedColor} 14%, transparent)`,
             }}
         >
-            {resolvedName}
+            <span className={styles.label}>{resolvedName}</span>
         </span>
     );
 }
