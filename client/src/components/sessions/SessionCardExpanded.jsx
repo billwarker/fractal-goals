@@ -256,6 +256,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                                     name={session.name}
                                     color={templateColor}
                                     size="lg"
+                                    wrap
                                     className={`${styles.cardHeaderTitle} ${styles.cardHeaderTitleTemplate}`}
                                 />
                             ) : (

@@ -100,6 +100,7 @@ function SessionInfoPanel() {
                             name={session.name}
                             color={templateColor}
                             size="xl"
+                            wrap
                             className={styles.templateBadge}
                         />
                     ) : session.name}

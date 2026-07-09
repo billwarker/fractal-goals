@@ -108,6 +108,7 @@ function SessionCard({
                     name={sessionData.template_name}
                     color={templateColor}
                     size="md"
+                    wrap
                     className="session-card-template"
                 />
             )}
