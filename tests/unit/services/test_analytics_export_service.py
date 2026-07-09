@@ -219,6 +219,41 @@ class TestAnalyticsExportService:
         )
         assert result["rows"]["product_events"] == 0
 
+    def test_subsecond_timestamp_cursor_does_not_reexport_tail_row(self, db_session):
+        # Regression: event_logs timestamps carry microseconds. If the watermark
+        # is truncated to whole seconds, `cursor_column > cursor` keeps matching
+        # the tail row every batch, re-exporting it forever until the job times
+        # out. The cursor must round-trip at full precision.
+        now = _dt(0)
+        user = _user(db_session)
+        root = _root(db_session, user)
+        base = now - datetime.timedelta(hours=2)
+        db_session.add_all([
+            EventLog(
+                id=f"event-{index:03d}",
+                root_id=root.id,
+                event_type="session.created",
+                payload={"count": index},
+                # Same whole second, distinct microseconds.
+                timestamp=base.replace(microsecond=100_000 + index * 100_000),
+            )
+            for index in range(3)
+        ])
+        db_session.commit()
+
+        first = FakeBigQueryClient()
+        result = AnalyticsExportService(db_session, first, "dataset").run_export(now=now)
+        assert result["rows"]["event_logs"] == 3
+
+        # Second run with no new rows must export nothing (cursor advanced past
+        # the sub-second tail instead of re-selecting it).
+        second = FakeBigQueryClient()
+        result = AnalyticsExportService(db_session, second, "dataset").run_export(
+            now=now + datetime.timedelta(minutes=30),
+        )
+        assert result["rows"]["event_logs"] == 0
+        assert not any(load["table"] == "event_logs" for load in second.loads)
+
     def test_lag_window_defers_recent_rows_then_picks_them_up(self, db_session):
         now = _dt(0)
         user = _user(db_session)

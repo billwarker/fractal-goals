@@ -41,6 +41,22 @@ def _format_dt(value):
     return format_utc(value) if value is not None else None
 
 
+def _format_cursor(value):
+    """Serialize a keyset cursor timestamp at full precision.
+
+    Unlike ``_format_dt`` (which truncates to whole seconds for BigQuery
+    payloads), the incremental watermark must retain sub-second precision.
+    Truncating here re-selects the tail row every batch because the stored
+    cursor sorts *before* the real microsecond timestamp, so ``cursor_column >
+    cursor`` keeps matching it, looping until the job times out.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.isoformat() + "Z"
+    return value.astimezone(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def _parse_dt(value):
     if not value:
         return None
@@ -327,7 +343,7 @@ class AnalyticsExportService:
             self._load_rows(spec.table, payload, write_disposition="WRITE_APPEND", schema=spec.schema)
 
             last = rows[-1]
-            table_state["last_ts"] = _format_dt(getattr(last, spec.cursor_column.key))
+            table_state["last_ts"] = _format_cursor(getattr(last, spec.cursor_column.key))
             table_state["last_id"] = last.id
             total += len(rows)
             table_state["last_run_rows"] = total
