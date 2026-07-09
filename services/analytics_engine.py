@@ -1117,6 +1117,9 @@ class AnalyticsEngineService:
         bind = self.db_session.get_bind()
         if bind is not None and bind.dialect.name == "postgresql":
             self.db_session.execute(text("SET LOCAL statement_timeout = :timeout_ms"), {"timeout_ms": RAW_SQL_TIMEOUT_MS})
+            # Defense-in-depth: enforce read-only at the database level so a query
+            # that slips past the mutation-keyword rejection still cannot write.
+            self.db_session.execute(text("SET LOCAL default_transaction_read_only = on"))
 
         result = self.db_session.execute(text(final_sql))
         rows = result.mappings().all()

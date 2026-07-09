@@ -4,6 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from blueprints.api_utils import get_db_session, internal_error
 from blueprints.auth_api import token_required
+from extensions import limiter
 from services.analytics_engine import AnalyticsEngineService
 from validators import (
     AnalyticsQueryProfileCreateSchema,
@@ -36,6 +37,7 @@ def get_analytics_catalog(current_user):
 
 
 @analytics_bp.route('/api/analytics/query/run', methods=['POST'])
+@limiter.limit("20 per minute")
 @token_required
 @validate_request(AnalyticsQueryRunSchema)
 def run_analytics_query(current_user, validated_data):
