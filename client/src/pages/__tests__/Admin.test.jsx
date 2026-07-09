@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
 import Admin from '../Admin';
+import notify from '../../utils/notify';
 
 const {
     getSummary,
@@ -454,7 +455,10 @@ describe('Admin', () => {
         expect(screen.getByText('Generate Temporary Password')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Access' }));
         expect(screen.getByText('Suspend Account')).toBeInTheDocument();
-        expect(screen.getByText('Unlock Account')).toBeInTheDocument();
+        expect(screen.getByText('Account status')).toBeInTheDocument();
+        expect(screen.getByText('Login lock')).toBeInTheDocument();
+        expect(screen.getByText('Not locked')).toBeInTheDocument();
+        expect(screen.getByText('Clear Login Lock')).toBeInTheDocument();
         expect(screen.getByText('Force Password Change')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: 'Account' }));
@@ -485,11 +489,62 @@ describe('Admin', () => {
         expect(screen.getByDisplayValue(/"goals": 77/)).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: 'Access' }));
+        updateUserStatus.mockResolvedValueOnce({
+            data: {
+                id: 'user-1',
+                username: 'tester',
+                email: 'tester@example.com',
+                role: 'user',
+                is_active: false,
+                membership_tier: 'free',
+                failed_login_count: 2,
+                locked_until: null,
+                force_password_change: false,
+                quota_overrides: {},
+                tier_default_limits: {},
+                storage: {},
+                limits: {},
+                usage: {},
+                resources: [],
+                labels: {},
+                fractals: [],
+            },
+        });
         fireEvent.click(screen.getByText('Suspend Account'));
         await waitFor(() => expect(updateUserStatus).toHaveBeenCalledWith('user-1', { is_active: false }));
+        await waitFor(() => expect(notify.success).toHaveBeenCalledWith('User account suspended. They cannot log in.'));
+        expect(screen.getByText('Admin access state: this account is suspended and cannot sign in.')).toBeInTheDocument();
+        expect(screen.getByText('Reactivate Account')).toBeInTheDocument();
 
-        fireEvent.click(screen.getByText('Unlock Account'));
+        updateUserStatus.mockResolvedValueOnce({
+            data: {
+                id: 'user-1',
+                username: 'tester',
+                email: 'tester@example.com',
+                role: 'user',
+                is_active: true,
+                membership_tier: 'free',
+                failed_login_count: 2,
+                locked_until: null,
+                force_password_change: false,
+                quota_overrides: {},
+                tier_default_limits: {},
+                storage: {},
+                limits: {},
+                usage: {},
+                resources: [],
+                labels: {},
+                fractals: [],
+            },
+        });
+        fireEvent.click(screen.getByText('Reactivate Account'));
+        await waitFor(() => expect(updateUserStatus).toHaveBeenCalledWith('user-1', { is_active: true }));
+        await waitFor(() => expect(notify.success).toHaveBeenCalledWith('User account reactivated. They can log in again.'));
+        expect(screen.getByText('Admin access state: this account is allowed to sign in.')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByText('Clear Login Lock'));
         await waitFor(() => expect(unlockUser).toHaveBeenCalledWith('user-1'));
+        await waitFor(() => expect(notify.success).toHaveBeenCalledWith('Login lock cleared'));
 
         fireEvent.click(screen.getByText('Force Password Change'));
         await waitFor(() => expect(forcePasswordChange).toHaveBeenCalledWith('user-1', { force_password_change: true }));

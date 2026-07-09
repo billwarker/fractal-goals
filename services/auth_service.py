@@ -67,6 +67,8 @@ class AuthService:
         current_user = self.db_session.query(User).filter_by(id=data['user_id']).first()
         if not current_user:
             return None, 'User not found', 401
+        if not current_user.is_active:
+            return None, 'User account is suspended', 403
 
         logger.debug("Resolved auth token for user_id=%s", current_user.id)
         self.db_session.expunge(current_user)
@@ -251,7 +253,7 @@ class AuthService:
 
         user = self.db_session.query(User).filter_by(id=data['user_id']).first()
         if not user or not user.is_active:
-            return None, 'User invalid or disabled', 401
+            return None, 'User account is suspended', 403
 
         logger.info("Refreshed auth token for user_id=%s", user.id)
         return {
@@ -270,7 +272,7 @@ class AuthService:
         if not user.is_active:
             logger.warning("Rejected login for disabled user_id=%s", user.id)
             log_ops_event("auth.login_failed", level="warning", reason="disabled", user_id=user.id)
-            return None, "User account is disabled", 403
+            return None, "User account is suspended", 403
 
         if user.locked_until:
             now = datetime.datetime.now(datetime.timezone.utc)

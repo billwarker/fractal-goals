@@ -112,7 +112,7 @@ Current SaaS/account pieces:
 - membership tiers and quota limits for free/paid/legacy users
 - per-user app-data storage limits and usage reporting
 - quota usage reporting in account settings
-- admin user management, invite-key generation, support access into user fractals, and grouped admin user actions for tier/quota updates, temporary passwords, suspend/reactivate, unlock, role changes, soft delete, and hard delete
+- admin user management, invite-key generation, support access into user fractals, and grouped admin user actions for tier/quota updates, temporary passwords, suspend/reactivate, clearing login locks, role changes, soft delete, and hard delete; suspension is the admin-controlled `User.is_active=false` account state and blocks both new logins and existing token-authenticated access, while login locks are automatic failed-login lockouts tracked through `failed_login_count` / `locked_until`
 - admin quota editing consumes backend-owned tier default metadata so reset-to-default behavior stays aligned with quota enforcement
 - admin tier quota management persists default free/paid resource quotas and storage limits in `app_settings`; changes can apply to existing tier users or preserve existing users for new-user-only rollout
 - admin feature flag management persists rollout switches in `app_settings`; new flags should be added through `services/feature_flag_service.py` definitions and exposed in the Admin `feature flags` tab

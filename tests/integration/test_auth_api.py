@@ -276,7 +276,27 @@ class TestLoginEndpoint:
         )
         assert response.status_code == 403
         data = json.loads(response.data)
-        assert 'disabled' in data['error'].lower() or 'inactive' in data['error'].lower()
+        assert 'suspended' in data['error'].lower()
+
+    def test_suspended_user_token_cannot_access_me(self, client, db_session, test_user):
+        """Suspension invalidates existing authenticated access."""
+        response = client.post(
+            '/api/auth/login',
+            data=json.dumps({
+                'username_or_email': 'testuser',
+                'password': 'Password123',
+            }),
+            content_type='application/json',
+        )
+        assert response.status_code == 200
+
+        test_user.is_active = False
+        db_session.commit()
+
+        me_response = client.get('/api/auth/me')
+        assert me_response.status_code == 403
+        data = json.loads(me_response.data)
+        assert 'suspended' in data['error'].lower()
 
     def test_login_empty_body(self, client):
         """Test login without JSON payload fails."""

@@ -28,6 +28,9 @@ const ADMIN_LANDING_EXAMPLES_KEY = ['admin', 'landing-examples'];
 const QUOTA_PLACEHOLDER = '{"goals": 100, "sessions": 500}';
 
 const formatDate = (value) => value ? new Date(value).toLocaleString() : 'Never';
+const formatLockStatus = (user) => user?.locked_until
+    ? `Locked until ${formatDate(user.locked_until)}`
+    : 'Not locked';
 const formatBytes = (bytes) => {
     if (bytes === null || bytes === undefined) return 'unlimited';
     const units = ['B', 'KB', 'MB', 'GB'];
@@ -38,6 +41,27 @@ const formatBytes = (bytes) => {
         index += 1;
     }
     return `${value.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+};
+const getAccountStatusLabel = (user) => (user?.is_active ? 'Active' : 'Suspended');
+const getUserActionSuccessMessage = (action, data = {}) => {
+    if (action === 'status') {
+        return data.is_active
+            ? 'User account reactivated. They can log in again.'
+            : 'User account suspended. They cannot log in.';
+    }
+    if (action === 'unlock') return 'Login lock cleared';
+    if (action === 'forcePasswordChange') {
+        return data.force_password_change
+            ? 'User must change their password at next sign-in'
+            : 'Password change requirement cleared';
+    }
+    if (action === 'temporaryPassword') return 'Temporary password generated';
+    if (action === 'tier') return 'User tier updated';
+    if (action === 'quota') return 'User quota updated';
+    if (action === 'role') return 'User role updated';
+    if (action === 'softDelete') return 'User soft deleted';
+    if (action === 'hardDelete') return 'User hard deleted';
+    return 'User action completed';
 };
 const formatQuotaJson = (value) => JSON.stringify(value || {}, null, 2);
 const getTierDefaultQuotas = (user, tier) => {
@@ -580,8 +604,11 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
         setQuotaDraft(formatQuotaJson(user.limits || user.quota_overrides || {}));
         setSoftConfirm('');
         setHardConfirm('');
-        setActiveTab('account');
     }, [user]);
+
+    React.useEffect(() => {
+        if (isOpen && user?.id) setActiveTab('account');
+    }, [isOpen, user?.id]);
 
     React.useEffect(() => {
         if (!isOpen) return undefined;
@@ -649,7 +676,7 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
                         </div>
                         <div className={styles.actionsUserSummary}>
                             <strong>{user.email}</strong>
-                            <span>{user.is_active ? 'Active' : 'Suspended'} · {user.membership_tier}</span>
+                            <span>{getAccountStatusLabel(user)} · {user.membership_tier}</span>
                         </div>
                     </aside>
 
@@ -729,9 +756,36 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
                         {activeTab === 'access' && (
                             <section className={styles.actionsTabContent}>
                                 <h3 className={styles.actionsSectionTitle}>Access</h3>
-                                <p className={styles.actionsDescription}>
-                                    Status: {user.is_active ? 'Active' : 'Suspended'} · Failed logins: {user.failed_login_count || 0}
-                                </p>
+                                <div className={styles.accountStatusPanel}>
+                                    <div className={styles.accessStatusRow}>
+                                        <span>Account status</span>
+                                        <strong
+                                            className={`${styles.accountStatusBadge} ${
+                                                user.is_active ? styles.accountStatusActive : styles.accountStatusSuspended
+                                            }`}
+                                        >
+                                            {getAccountStatusLabel(user)}
+                                        </strong>
+                                        <p>
+                                            {user.is_active
+                                                ? 'Admin access state: this account is allowed to sign in.'
+                                                : 'Admin access state: this account is suspended and cannot sign in.'}
+                                        </p>
+                                    </div>
+                                    <div className={styles.accessStatusRow}>
+                                        <span>Login lock</span>
+                                        <strong
+                                            className={`${styles.accountStatusBadge} ${
+                                                user.locked_until ? styles.accountStatusLocked : styles.accountStatusNeutral
+                                            }`}
+                                        >
+                                            {formatLockStatus(user)}
+                                        </strong>
+                                        <p>
+                                            Security lockout from failed password attempts. Failed logins: {user.failed_login_count || 0}
+                                        </p>
+                                    </div>
+                                </div>
                                 <div className={styles.actionsButtonStack}>
                                     <button
                                         onClick={() => onAction('status', { is_active: !user.is_active })}
@@ -739,7 +793,7 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
                                     >
                                         {user.is_active ? 'Suspend Account' : 'Reactivate Account'}
                                     </button>
-                                    <button onClick={() => onAction('unlock')} disabled={isPending}>Unlock Account</button>
+                                    <button onClick={() => onAction('unlock')} disabled={isPending}>Clear Login Lock</button>
                                     <button
                                         onClick={() => onAction('forcePasswordChange', { force_password_change: !user.force_password_change })}
                                         disabled={isPending}
@@ -843,7 +897,7 @@ function UserRow({ user, onActions }) {
                     <div className={styles.muted}>{user.email}</div>
                 </td>
                 <td>{user.role}</td>
-                <td>{user.is_active ? 'Active' : 'Disabled'}</td>
+                <td>{getAccountStatusLabel(user)}</td>
                 <td>{formatDate(user.created_at)}</td>
                 <td>{formatDate(user.last_login_at)}</td>
                 <td>{user.membership_tier}</td>
@@ -1016,10 +1070,12 @@ function Admin() {
             }
             if (variables.action === 'softDelete' || variables.action === 'hardDelete') {
                 setSelectedUser(null);
+            } else if (res?.data?.id) {
+                setSelectedUser(res.data);
             }
             queryClient.invalidateQueries({ queryKey: ADMIN_USERS_KEY });
             queryClient.invalidateQueries({ queryKey: ADMIN_SUMMARY_KEY });
-            notify.success('User action completed');
+            notify.success(getUserActionSuccessMessage(variables.action, variables.data));
         },
         onError: (error) => notify.error(`Failed to update user: ${formatError(error)}`),
     });
