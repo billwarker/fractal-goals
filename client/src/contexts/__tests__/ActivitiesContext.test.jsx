@@ -7,6 +7,7 @@ import { queryKeys } from '../../hooks/queryKeys';
 import { ActivitiesProvider, useActivities } from '../ActivitiesContext';
 
 const {
+    createActivity,
     updateActivity,
     createActivityGroup,
     updateActivityGroup,
@@ -15,6 +16,7 @@ const {
     setActivityGroupGoals,
     notify,
 } = vi.hoisted(() => ({
+    createActivity: vi.fn(),
     updateActivity: vi.fn(),
     createActivityGroup: vi.fn(),
     updateActivityGroup: vi.fn(),
@@ -29,6 +31,7 @@ const {
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
+        createActivity: (...args) => createActivity(...args),
         updateActivity: (...args) => updateActivity(...args),
         createActivityGroup: (...args) => createActivityGroup(...args),
         updateActivityGroup: (...args) => updateActivityGroup(...args),
@@ -62,6 +65,19 @@ describe('ActivitiesContext', () => {
 
     afterEach(() => {
         consoleErrorSpy.mockRestore();
+    });
+
+    it('refreshes server-derived onboarding progress after activity creation', async () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+        const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+        createActivity.mockResolvedValueOnce({ data: { id: 'activity-1', name: 'Strength' } });
+        const { result } = renderHook(() => useActivities(), { wrapper: createWrapper(queryClient) });
+
+        await act(async () => {
+            await result.current.createActivity('root-1', { name: 'Strength', metrics: [{ name: 'Reps' }] });
+        });
+
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.onboardingRoot() });
     });
 
     it('shows activity group create/update/delete success and error toasts', async () => {

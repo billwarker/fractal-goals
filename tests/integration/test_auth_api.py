@@ -512,6 +512,62 @@ class TestPreferencesEndpoint:
         assert 'id' in data  # User object returned
         assert 'preferences' in data  # Preferences field exists
 
+    def test_onboarding_state_uses_optimistic_revision(self, authed_client):
+        initial = authed_client.get('/api/auth/onboarding')
+        assert initial.status_code == 200
+        assert initial.get_json()['revision'] == 0
+
+        updated = authed_client.patch('/api/auth/onboarding', json={
+            'revision': 0,
+            'status': 'active',
+            'visited': ['analytics'],
+        })
+        assert updated.status_code == 200
+        assert updated.get_json()['revision'] == 1
+
+        stale = authed_client.patch('/api/auth/onboarding', json={
+            'revision': 0,
+            'status': 'dismissed',
+        })
+        assert stale.status_code == 409
+        assert stale.get_json()['current']['revision'] == 1
+
+    def test_onboarding_state_is_isolated_per_new_fractal(self, authed_client, db_session, test_user):
+        test_user.membership_tier = 'paid'
+        db_session.commit()
+        first = authed_client.post('/api/fractals', json={'name': 'First guided fractal'})
+        second = authed_client.post('/api/fractals', json={'name': 'Second guided fractal'})
+        assert first.status_code == 201
+        assert second.status_code == 201
+        first_id = first.get_json()['id']
+        second_id = second.get_json()['id']
+
+        first_state = authed_client.get('/api/auth/onboarding', query_string={'root_id': first_id})
+        second_state = authed_client.get('/api/auth/onboarding', query_string={'root_id': second_id})
+        assert first_state.status_code == 200
+        assert second_state.status_code == 200
+        assert first_state.get_json()['status'] == 'active'
+        assert second_state.get_json()['status'] == 'active'
+
+        dismissed = authed_client.patch('/api/auth/onboarding', json={
+            'root_id': first_id,
+            'revision': 0,
+            'status': 'dismissed',
+        })
+        assert dismissed.status_code == 200
+        assert dismissed.get_json()['status'] == 'dismissed'
+
+        unchanged_second = authed_client.get('/api/auth/onboarding', query_string={'root_id': second_id})
+        assert unchanged_second.get_json()['status'] == 'active'
+        assert unchanged_second.get_json()['revision'] == 0
+
+        deleted = authed_client.delete(f'/api/fractals/{first_id}')
+        assert deleted.status_code == 200
+        db_session.refresh(test_user)
+        root_states = test_user.preferences.get('onboarding_by_root', {})
+        assert first_id not in root_states
+        assert second_id in root_states
+
     def test_cookie_authenticated_write_requires_csrf(self, client, test_user):
         response = client.post(
             '/api/auth/login',

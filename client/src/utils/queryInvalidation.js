@@ -13,3 +13,7 @@ export function invalidateSessionLists(queryClient, rootId, queryKeys, options =
         queryKeys.sessionsPaginated(rootId),
     ], options);
 }
+
+export function invalidateOnboardingProgress(queryClient, queryKeys) {
+    return queryClient.invalidateQueries({ queryKey: queryKeys.onboardingRoot() });
+}

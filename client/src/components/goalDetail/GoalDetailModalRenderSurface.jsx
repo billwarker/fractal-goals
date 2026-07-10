@@ -1,20 +1,21 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { prepareActivityDefinitionCopy } from '../../utils/activityBuilder';
 import { getProgramsAffectedByGoalCompletion } from '../../utils/goalCompletionPrograms';
 import { getTypeDisplayName } from '../../utils/goalHelpers';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import notify from '../../utils/notify';
-import GoalCompletionModal from '../goals/GoalCompletionModal';
-import GoalUncompletionModal from '../goals/GoalUncompletionModal';
-import GoalHeader from '../goals/GoalHeader';
-import GoalViewMode from '../goals/GoalViewMode';
-import GoalEditForm from '../goals/GoalEditForm';
 import CloseButton from '../atoms/CloseButton';
 import GoalIcon from '../atoms/GoalIcon';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import ViewToggleTabs from '../common/ViewToggleTabs';
+import GoalCompletionModal from '../goals/GoalCompletionModal';
+import GoalEditForm from '../goals/GoalEditForm';
+import GoalHeader from '../goals/GoalHeader';
+import GoalUncompletionModal from '../goals/GoalUncompletionModal';
+import GoalViewMode from '../goals/GoalViewMode';
+import SmartBadgeOnboardingTooltip from '../onboarding/SmartBadgeOnboardingTooltip';
 import GoalDetailModalFooter from './GoalDetailModalFooter';
 import GraphProfileLoadingFallback from './GraphProfileLoadingFallback';
 import styles from '../GoalDetailModal.module.css';
@@ -27,7 +28,6 @@ const TargetAnalyticsModal = lazyWithRetry(() => import('./TargetAnalyticsModal'
 const GoalOptionsView = lazyWithRetry(() => import('../goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./GoalNotesView'), 'components/goalDetail/GoalNotesView');
 const GoalTimelineView = lazyWithRetry(() => import('./GoalTimelineView'), 'components/goalDetail/GoalTimelineView');
-
 function GoalDetailModalRenderSurface({
     activeAnalyticsTarget,
     activitiesAssociateAction,
@@ -190,7 +190,6 @@ function GoalDetailModalRenderSurface({
     ]);
     const uncompletionCompletedAt = localCompletedAt || goal?.attributes?.completed_at || goal?.completed_at;
     const [completionNoteDraft, setCompletionNoteDraft] = useState('');
-
     useEffect(() => {
         if (viewState !== 'complete-confirm') {
             setCompletionNoteDraft('');
@@ -732,8 +731,6 @@ function GoalDetailModalRenderSurface({
             />
         </Suspense>
     ) : null;
-
-
     const targetAnalyticsModal = activeAnalyticsTarget ? (
         <Suspense fallback={null}>
             <TargetAnalyticsModal
@@ -829,6 +826,7 @@ function GoalDetailModalRenderSurface({
                     </div>
                 )}
             </div>
+            <SmartBadgeOnboardingTooltip visible={mode === 'create' && viewState === 'goal'} />
             {activityBuilderModal}
         </ModalBackdrop>
     );

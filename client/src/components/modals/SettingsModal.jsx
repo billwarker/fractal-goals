@@ -7,7 +7,7 @@ import { authApi, fractalApi, globalApi } from '../../utils/api';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import GoalCharacteristicsSettings from '../GoalCharacteristicsSettings';
-import CloseButton from '../atoms/CloseButton';
+import Modal from '../atoms/Modal';
 import useIsMobile from '../../hooks/useIsMobile';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
 import {
@@ -21,6 +21,8 @@ import {
     toggleQuotaRootId,
 } from './settingsModalUtils';
 import styles from './SettingsModal.module.css';
+import { useOptionalOnboarding } from '../../contexts/OnboardingContext';
+import OnboardingSettingsPanel from '../onboarding/OnboardingSettingsPanel';
 
 const SettingsModalInner = ({ onClose }) => {
     const {
@@ -36,6 +38,7 @@ const SettingsModalInner = ({ onClose }) => {
     const { logout, user } = useAuth();
     const { activeRootId } = useGoals();
     const isMobile = useIsMobile();
+    const onboarding = useOptionalOnboarding();
     const [availableTimezones] = useState(getAvailableTimezones);
     const [recomputeLoading, setRecomputeLoading] = useState(false);
     const [accountUsage, setAccountUsage] = useState(null);
@@ -215,18 +218,7 @@ const SettingsModalInner = ({ onClose }) => {
     };
 
     return (
-        <div className={`${styles.overlay} ${isMobile ? styles.overlayMobile : styles.overlayDesktop}`}>
-            <div className={`${styles.modal} ${isMobile ? styles.modalMobile : styles.modalDesktop}`}>
-                {/* Header */}
-                <div className={`${styles.header} ${isMobile ? styles.headerMobile : styles.headerDesktop}`}>
-                    <h2 className={`${styles.title} ${isMobile ? styles.titleMobile : styles.titleDesktop}`}>Settings</h2>
-                    <CloseButton
-                        onClick={onClose}
-                        className={`${styles.closeButton} ${isMobile ? styles.closeButtonMobile : styles.closeButtonDesktop}`}
-                        aria-label="Close settings"
-                    />
-                </div>
-
+        <Modal isOpen onClose={onClose} title="Settings" size="lg" className={styles.modalShell}>
                 <div className={`${styles.body} ${isMobile ? styles.bodyMobile : styles.bodyDesktop}`}>
                     {/* Sidebar */}
                     <div className={`${styles.sidebar} ${isMobile ? styles.sidebarMobile : styles.sidebarDesktop}`}>
@@ -249,6 +241,9 @@ const SettingsModalInner = ({ onClose }) => {
                             >
                                 Account
                             </div>
+                            {onboarding?.enabled && (
+                                <div onClick={() => setActiveTab('getting-started')} className={`${styles.tab} ${isMobile ? styles.tabMobile : styles.tabDesktop} ${activeTab === 'getting-started' ? styles.tabActive : styles.tabInactive}`}>Getting Started</div>
+                            )}
                         </div>
 
                         {/* Legal Footer in Sidebar */}
@@ -349,7 +344,7 @@ const SettingsModalInner = ({ onClose }) => {
                                         </h3>
                                         <div className={styles.sectionContentStack}>
                                             <div className={styles.themeRow}>
-                                                <label htmlFor="active-goal-window-days" className={styles.checkboxLabel} style={{ marginBottom: 4 }}>
+                                                <label htmlFor="active-goal-window-days" className={`${styles.checkboxLabel} ${styles.labelSpacing}`}>
                                                     Active goal window
                                                     <span className={styles.checkboxDescription}>
                                                         Goals show as active when contributed activity was completed within this many days
@@ -393,7 +388,7 @@ const SettingsModalInner = ({ onClose }) => {
                                             </div>
 
                                             <div className={styles.themeRow}>
-                                                <label className={styles.checkboxLabel} style={{ marginBottom: 4 }}>
+                                                <label className={`${styles.checkboxLabel} ${styles.labelSpacing}`}>
                                                     Delta display format
                                                     <span className={styles.checkboxDescription}>
                                                         How instance-to-instance progress changes are shown
@@ -424,7 +419,7 @@ const SettingsModalInner = ({ onClose }) => {
                                                 >
                                                     {recomputeLoading ? 'Recalculating…' : 'Recalculate All Progress'}
                                                 </button>
-                                                <span className={styles.checkboxDescription} style={{ marginTop: 4 }}>
+                                                <span className={`${styles.checkboxDescription} ${styles.descriptionSpacing}`}>
                                                     Rebuilds all progress records from scratch using current activity data
                                                 </span>
                                             </div>
@@ -442,6 +437,12 @@ const SettingsModalInner = ({ onClose }) => {
                                     </h3>
                                     <GoalCharacteristicsSettings scope={activeRootId || 'default'} />
                                 </section>
+                            </div>
+                        )}
+
+                        {activeTab === 'getting-started' && onboarding && (
+                            <div className={styles.tabContent}>
+                                <OnboardingSettingsPanel onboarding={onboarding} />
                             </div>
                         )}
 
@@ -625,8 +626,7 @@ const SettingsModalInner = ({ onClose }) => {
                         )}
                     </div>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 };
 

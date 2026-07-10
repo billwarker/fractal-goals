@@ -324,6 +324,6 @@ describe('FlowTree', () => {
         );
 
         expect(screen.getByTestId('node-count')).toHaveTextContent('0');
-        expect(screen.getByRole('status')).toHaveTextContent('No active goals exist');
+        expect(screen.getByRole('status')).toHaveTextContent('No active goals in this view');
     });
 });

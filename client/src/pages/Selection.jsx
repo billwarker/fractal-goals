@@ -15,6 +15,9 @@ import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import useIsMobile from '../hooks/useIsMobile';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
+import GettingStartedChecklist from '../components/onboarding/GettingStartedChecklist';
+import EmptyState from '../components/common/EmptyState';
+import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 
 /**
  * Selection Page - Fractal Goal Selection
@@ -33,6 +36,7 @@ function Selection() {
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
     const { user, logout, isAuthenticated, loading: authLoading } = useAuth();
+    const onboarding = useOptionalOnboarding();
     const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const isMobile = useIsMobile();
     const userId = user?.id || null;
@@ -67,10 +71,13 @@ function Selection() {
             const res = await globalApi.createFractal(data);
             return res.data;
         },
-        onSuccess: async () => {
+        onSuccess: async (createdFractal) => {
             await queryClient.invalidateQueries({ queryKey: queryKeys.fractals(userId) });
             setCreateModalOpen(false);
             notify.success('Fractal created');
+            if (createdFractal?.id) {
+                handleSelectRoot(createdFractal.id);
+            }
         },
         onError: (error) => {
             notify.error(`Failed to create fractal: ${formatError(error)}`);
@@ -223,7 +230,7 @@ function Selection() {
     }
 
     return (
-        <div className={styles.container}>
+        <div className={`${styles.container} page-reveal`}>
             {isAuthenticated && user?.is_admin && (
                 <button
                     onClick={() => navigate('/admin')}
@@ -286,6 +293,19 @@ function Selection() {
             </div>
 
             {/* Fractal Grid */}
+            {isAuthenticated && fractals.length === 0 && onboarding?.enabled && (
+                <EmptyState
+                    title="Deliberate practice starts with a structure."
+                    description="Create a fractal for the outcome you care about. You can refine it as your practice develops."
+                    actionLabel="Create your first fractal"
+                    onAction={() => {
+                        onboarding.resume();
+                        setCreateModalOpen(true);
+                    }}
+                >
+                    <GettingStartedChecklist inline />
+                </EmptyState>
+            )}
             <div className={styles.grid}>
                 {isAuthenticated && fractals.map(fractal => (
                     (() => {
@@ -299,6 +319,14 @@ function Selection() {
                                 key={fractal.id}
                                 className={styles.card}
                                 onClick={() => handleSelectRoot(fractal.id)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                        event.preventDefault();
+                                        handleSelectRoot(fractal.id);
+                                    }
+                                }}
                             >
                                 <div className={styles.cardContent}>
                                     <h3 className={styles.cardTitle}>{fractal.name}</h3>
@@ -335,7 +363,7 @@ function Selection() {
                 ))}
 
                 {isAuthenticated && (
-                    <div className={`${styles.card} ${styles.addCard}`} onClick={() => setCreateModalOpen(true)}>
+                    <div className={`${styles.card} ${styles.addCard}`} onClick={() => setCreateModalOpen(true)} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setCreateModalOpen(true); } }}>
                         <div className={styles.cardContent}>
                             <div className={styles.addIcon}>+</div>
                             <h3 className={styles.cardTitle}>New Fractal</h3>

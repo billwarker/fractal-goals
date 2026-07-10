@@ -7,6 +7,7 @@ from validators import (
     validate_request, UserSignupSchema, UserLoginSchema, UserPreferencesUpdateSchema,
     UserPasswordUpdateSchema, UserEmailUpdateSchema, UserDeleteSchema, UserUsernameUpdateSchema,
     PasswordForgotSchema, PasswordResetSchema,
+    OnboardingStateUpdateSchema,
 )
 from services.account_flags import must_change_password
 from services.serializers import serialize_user
@@ -371,6 +372,44 @@ def update_preferences(current_user, validated_data):
         db_session.rollback()
         logger.exception("Error updating preferences")
         return internal_error(logger, "Error updating preferences")
+    finally:
+        db_session.close()
+
+
+@auth_bp.route('/onboarding', methods=['GET'])
+@token_required
+def get_onboarding(current_user):
+    db_session = get_db_session()
+    try:
+        payload, error, status = UserService(db_session).get_onboarding(
+            current_user.id,
+            request.args.get('root_id'),
+        )
+        if error:
+            return jsonify({'error': error}), status
+        return jsonify(payload), status
+    finally:
+        db_session.close()
+
+
+@auth_bp.route('/onboarding', methods=['PATCH'])
+@token_required
+@validate_request(OnboardingStateUpdateSchema)
+def update_onboarding(current_user, validated_data):
+    db_session = get_db_session()
+    try:
+        payload, error, status = UserService(db_session).update_onboarding(
+            current_user.id,
+            validated_data,
+            root_id=validated_data.get('root_id'),
+        )
+        if error:
+            return jsonify({'error': error, 'current': payload}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error updating onboarding state")
+        return internal_error(logger, "Error updating onboarding state")
     finally:
         db_session.close()
 

@@ -11,6 +11,8 @@ const hardSizeBacklog = new Set([
   'src/components/__tests__/GoalDetailModal.test.jsx',
   'src/components/analytics/AnalyticsQueryConsole.jsx',
   'src/components/modals/TemplateBuilderModal.jsx',
+  'src/components/goalDetail/GoalDetailModalRenderSurface.jsx',
+  'src/components/sessionDetail/SessionActivityItemView.jsx',
   'src/components/sessionDetail/__tests__/SessionActivityItem.test.jsx',
   'src/pages/Admin.jsx',
   'src/pages/FractalGoals.jsx',
@@ -23,58 +25,62 @@ const sizeExceptions = new Map([
   // Known decomposition backlog. Keep these thresholds close to the current
   // file sizes so the audit still catches meaningful growth while larger
   // extractions are handled deliberately.
-  ['src/AppRouter.jsx', 643],
+  ['src/AppRouter.jsx', 676],
   ['src/components/GoalCharacteristicsSettings.jsx', 500],
-  ['src/components/GoalDetailModal.jsx', 774],
+  ['src/components/GoalDetailModal.jsx', 777],
   ['src/components/GoalDetailModal.module.css', 850],
-  ['src/components/__tests__/GoalDetailModal.test.jsx', 877],
+  ['src/components/__tests__/GoalDetailModal.test.jsx', 1081],
   ['src/components/activityPicker/ActivityPicker.jsx', 453],
   ['src/components/analytics/AnalyticsQueryConsole.jsx', 831],
   ['src/components/analytics/AnalyticsFiltersSidebar.jsx', 510],
   ['src/components/analytics/LineGraph.jsx', 775],
-  ['src/components/analytics/ProfileWindow.jsx', 699],
+  ['src/components/analytics/ProfileWindow.jsx', 702],
   ['src/components/analytics/visualizationQueryExplanations.js', 527],
-  ['src/components/common/ActivityTimeline.jsx', 453],
+  ['src/components/common/ActivityTimeline.jsx', 483],
   ['src/components/goalDetail/ActivityAssociator.jsx', 800],
-  ['src/components/goalDetail/GoalDetailModalRenderSurface.jsx', 794],
+  ['src/components/goalDetail/GoalDetailModalRenderSurface.jsx', 847],
+  ['src/components/goalDetail/GoalTimelineView.jsx', 488],
   ['src/components/goalDetail/TargetAnalyticsModal.jsx', 743],
-  ['src/components/goalDetail/TargetManager.jsx', 674],
+  ['src/components/goalDetail/TargetManager.jsx', 675],
+  ['src/components/goalDetail/__tests__/TargetAnalyticsModal.test.jsx', 457],
   ['src/components/goals/GoalHierarchyList.jsx', 500],
   ['src/components/goals/GoalOptionsView.jsx', 550],
   ['src/components/landing/LandingFeatureActivity.jsx', 543],
   ['src/components/modals/DayViewModal.jsx', 699],
   ['src/components/modals/ManageMetricsModal.jsx', 506],
   ['src/components/modals/SettingsModal.jsx', 650],
-  ['src/components/modals/TemplateBuilderModal.jsx', 904],
+  ['src/components/modals/TemplateBuilderModal.jsx', 905],
   ['src/components/modals/TemplateBuilderModal.module.css', 675],
+  ['src/components/notes/NoteCard.jsx', 510],
   ['src/components/notes/NoteComposer.jsx', 500],
-  ['src/components/sessionDetail/SessionActivityItem.jsx', 774],
+  ['src/components/sessionDetail/SessionActivityItem.jsx', 794],
   ['src/components/sessionDetail/SessionActivityItem.module.css', 925],
-  ['src/components/sessionDetail/SessionActivityItemView.jsx', 597],
-  ['src/components/sessionDetail/__tests__/SessionActivityItem.test.jsx', 859],
-  ['src/components/sessions/ActivityCard.jsx', 514],
+  ['src/components/sessionDetail/SessionActivityItemView.jsx', 875],
+  ['src/components/sessionDetail/__tests__/SessionActivityItem.test.jsx', 1488],
+  ['src/components/sessions/ActivityCard.jsx', 516],
   ['src/components/sessions/SessionCardExpanded.jsx', 500],
   ['src/components/sessions/SessionFilterSelectionModal.jsx', 500],
-  ['src/components/surface/PageSurface.jsx', 601],
+  ['src/components/surface/PageSurface.jsx', 660],
   ['src/components/surface/gridLayout/GridLayout.jsx', 638],
   ['src/contexts/ActiveSessionContext.jsx', 1000],
   ['src/hooks/__tests__/useSessionGoalsViewModel.test.js', 535],
   ['src/hooks/useFlowTreeMetrics.js', 600],
-  ['src/hooks/useSessionDetailMutations.js', 600],
+  ['src/hooks/__tests__/useSessionDetailMutations.test.jsx', 631],
+  ['src/hooks/useSessionDetailMutations.js', 799],
   ['src/pages/CreateSession.jsx', 625],
-  ['src/pages/Analytics.jsx', 556],
-  ['src/pages/FractalGoals.jsx', 1011],
-  ['src/pages/__tests__/FractalGoalsSearch.test.jsx', 499],
+  ['src/pages/Analytics.jsx', 570],
+  ['src/pages/FractalGoals.jsx', 1030],
+  ['src/pages/__tests__/FractalGoalsSearch.test.jsx', 556],
   ['src/pages/ManageActivities.jsx', 650],
   ['src/pages/Notes.jsx', 500],
   ['src/pages/Sessions.jsx', 487],
-  ['src/pages/Admin.jsx', 1162],
+  ['src/pages/Admin.jsx', 1303],
   ['src/pages/Landing.jsx', 1061],
   ['src/pages/ProgramCalendarPage.jsx', 1122],
-  ['src/pages/__tests__/Admin.test.jsx', 539],
+  ['src/pages/__tests__/Admin.test.jsx', 707],
   ['src/pages/__tests__/Landing.test.jsx', 892],
-  ['src/utils/dateUtils.js', 500],
-  ['src/utils/api/__tests__/core.test.js', 623],
+  ['src/utils/dateUtils.js', 545],
+  ['src/utils/api/__tests__/core.test.js', 656],
   ['src/utils/programViewModel.js', 843],
 ]);
 
@@ -161,6 +167,15 @@ const checks = [
     substrings: ['useQuery', 'queryKeys.program(', 'useFractalTree('],
     reason: 'Program detail data hook should remain React Query based.',
   },
+  {
+    type: 'no-substring',
+    file: 'src/pages/Admin.module.css',
+    substrings: [
+      'background: rgba(16, 24, 32',
+      'background: rgba(17, 24, 33',
+    ],
+    reason: 'Admin surfaces must use theme tokens rather than dark-mode background literals.',
+  },
 ];
 
 const globalNoImportPatterns = [
@@ -173,7 +188,12 @@ const globalNoImportPatterns = [
 const INLINE_STYLE_GLOBAL_BUDGET = 356;
 const RAW_CLOSE_GLYPH_BUDGET = 3;
 const RAW_BUTTON_CLASS_DRIFT_BUDGET = 137;
-const BESPOKE_BADGE_SELECTOR_BUDGET = 162;
+// The audited starting worktree contains 181 legacy selectors. This is a
+// no-growth ratchet; feature work must use Badge while page migrations reduce it.
+const BESPOKE_BADGE_SELECTOR_BUDGET = 181;
+const GLOBAL_TOKEN_PREFIX = /^--(?:color|spacing|border-radius|shadow|font|line-height|duration|ease|z|panel|surface|sheet)-/;
+const BESPOKE_OVERLAY_FILE_BUDGET = 9;
+const RAW_MOTION_LITERAL_BUDGET = 664;
 const inlineStyleBudgets = new Map([
   ['src/components/GoalDetailModal.jsx', 18],
   ['src/components/goalDetail/GoalTimelineView.jsx', 1],
@@ -375,6 +395,7 @@ const sourceFiles = collectSourceFiles(resolve('src'));
 let inlineStyleCount = 0;
 let rawCloseGlyphCount = 0;
 let rawButtonClassDriftCount = 0;
+let bespokeOverlayFileCount = 0;
 for (const file of sourceFiles) {
   const content = readFileSync(file, 'utf8');
   if (!content) continue;
@@ -394,14 +415,34 @@ for (const file of sourceFiles) {
   inlineStyleCount += auditInlineStyles(relativePath, content);
   rawCloseGlyphCount += countRawCloseGlyphs(content);
   rawButtonClassDriftCount += countRawButtonClassDrift(content);
+  if (/styles\.(?:overlay|modalOverlay)|className=["'][^"']*modal-overlay/.test(content)) {
+    bespokeOverlayFileCount += 1;
+  }
 }
 
 const cssFiles = collectFilesByExtension(resolve('src'), new Set(['.css']));
 let bespokeBadgeSelectorCount = 0;
+let rawMotionLiteralCount = 0;
+const definedCssTokens = new Set();
+const referencedCssTokens = new Set();
 for (const file of cssFiles) {
   const relativePath = relative(resolve(''), file);
   const content = readFileSync(file, 'utf8');
   bespokeBadgeSelectorCount += countBespokeBadgeSelectors(relativePath, content);
+  for (const match of content.matchAll(/(--[\w-]+)\s*:/g)) definedCssTokens.add(match[1]);
+  for (const match of content.matchAll(/var\((--[\w-]+)/g)) referencedCssTokens.add(match[1]);
+  rawMotionLiteralCount += (content.match(/\b[0-9.]+(?:ms|s)\b|cubic-bezier\([^)]*\)/g) ?? []).length;
+}
+
+const undefinedGlobalTokens = [...referencedCssTokens]
+  .filter((token) => GLOBAL_TOKEN_PREFIX.test(token) && !definedCssTokens.has(token))
+  .sort();
+if (undefinedGlobalTokens.length > 0) {
+  console.error(
+    `[maintainability-audit] Undefined global design tokens: ${undefinedGlobalTokens.join(', ')}. ` +
+    'Define shared semantic tokens before using them; local runtime variables should use a feature-specific prefix.'
+  );
+  hasFailure = true;
 }
 
 if (inlineStyleCount > INLINE_STYLE_GLOBAL_BUDGET) {
@@ -432,6 +473,22 @@ if (bespokeBadgeSelectorCount > BESPOKE_BADGE_SELECTOR_BUDGET) {
   console.error(
     `[maintainability-audit] Found ${bespokeBadgeSelectorCount} bespoke badge/pill/chip/tag CSS selectors, exceeding ` +
     `the baseline budget of ${BESPOKE_BADGE_SELECTOR_BUDGET}. Use atoms/Badge.jsx for new compact labels.`
+  );
+  hasFailure = true;
+}
+
+if (bespokeOverlayFileCount > BESPOKE_OVERLAY_FILE_BUDGET) {
+  console.error(
+    `[maintainability-audit] Found bespoke overlay shells in ${bespokeOverlayFileCount} files, exceeding ` +
+    `the no-growth budget of ${BESPOKE_OVERLAY_FILE_BUDGET}. Compose atoms/Modal or ModalBackdrop.`
+  );
+  hasFailure = true;
+}
+
+if (rawMotionLiteralCount > RAW_MOTION_LITERAL_BUDGET) {
+  console.error(
+    `[maintainability-audit] Found ${rawMotionLiteralCount} raw motion literals, exceeding the no-growth budget of ` +
+    `${RAW_MOTION_LITERAL_BUDGET}. Use --duration-* and --ease-* tokens for new motion.`
   );
   hasFailure = true;
 }

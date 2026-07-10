@@ -29,7 +29,7 @@
     width: 14px;
     height: 14px;
     cursor: pointer;
-    accent-color: var(--color-accent, #6c8ebf);
+    accent-color: var(--color-brand-primary);
     flex-shrink: 0;
 }
 
@@ -131,7 +131,7 @@
 }
 
 .lineageBtn:hover {
-    border-color: var(--color-accent, #6c8ebf);
+    border-color: var(--color-brand-primary);
     color: var(--color-text-primary);
     background: var(--color-bg-hover);
 }

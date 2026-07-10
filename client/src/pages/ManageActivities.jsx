@@ -19,6 +19,7 @@ import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
 import { buildGroupReorderPayload } from '../utils/manageActivities';
 import styles from './ManageActivities.module.css'; // Import CSS Module
 import { logError } from '../utils/logger';
+import EmptyState from '../components/common/EmptyState';
 
 /**
  * Manage Activities Page - Grid view of activity tiles with modal builder
@@ -337,7 +338,7 @@ function ManageActivities() {
     };
 
     if (activitiesLoading || activityGroupsLoading) {
-        return <div style={{ padding: '40px', textAlign: 'center', color: 'white' }}>Loading activities...</div>;
+        return <div className={styles.loadingState}>Loading activities...</div>;
     }
 
     // Recursive Group Renderer
@@ -567,17 +568,12 @@ function ManageActivities() {
 
                 {/* Empty State (No activities and no groups) */}
                 {!filteredActivityView.hasSearch && (Array.isArray(activities) ? activities.length : 0) === 0 && rootGroups.length === 0 && (
-                    <div className={styles.emptyState}>
-                        <p className={styles.emptyStateText}>
-                            No activities defined yet
-                        </p>
-                        <button
-                            onClick={handleCreateClick}
-                            className={styles.createFirstBtn}
-                        >
-                            + Create Activity
-                        </button>
-                    </div>
+                    <EmptyState
+                        title="Define the practice that moves a goal"
+                        description="Activities describe what you do. Add a metric when you want sessions to produce measurable evidence."
+                        actionLabel="Create your first activity"
+                        onAction={handleCreateClick}
+                    />
                 )}
             </div>
 

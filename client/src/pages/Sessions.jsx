@@ -312,7 +312,7 @@ function Sessions() {
     }, [queryClient, rootId, sessionToDelete]);
 
     return (
-        <div className={styles.pageContainer}>
+        <div className={`${styles.pageContainer} page-reveal`}>
             <div className={styles.leftPanel}>
                 <PageHeader
                     title="Sessions"

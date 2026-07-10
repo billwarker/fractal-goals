@@ -272,12 +272,13 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                                 className={styles.cardHeaderTitleLink}
                             >
                                 {sessionData?.template_name ? (
-                                    <SessionTemplateNameBadge
-                                        name={session.name}
-                                        color={templateColor}
-                                        size="lg"
-                                        className={`${styles.cardHeaderTitle} ${styles.cardHeaderTitleTemplate}`}
-                                    />
+                                <SessionTemplateNameBadge
+                                    name={session.name}
+                                    color={templateColor}
+                                    size="lg"
+                                    wrap
+                                    className={`${styles.cardHeaderTitle} ${styles.cardHeaderTitleTemplate}`}
+                                />
                                 ) : session.name}
                             </Link>
                         )}

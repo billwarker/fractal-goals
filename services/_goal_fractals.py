@@ -13,6 +13,9 @@ from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
 from services.view_serializers import serialize_fractal_summary, serialize_goal_selection_item
 from services.serializers import serialize_goal
+from services.events import Event, Events, event_bus
+from services.template_service import seed_default_template
+from services.user_service import UserService
 
 
 
@@ -94,8 +97,28 @@ class _GoalFractalsMixin:
             owner_id=current_user_id,
         )
         self.db_session.add(new_fractal)
+        self.db_session.flush()
+        # A fractal root scopes itself and every descendant. Assign this only
+        # after flush because SQLAlchemy generates the root UUID at that point.
+        new_fractal.root_id = new_fractal.id
+        UserService(self.db_session).initialize_onboarding_for_root(current_user_id, new_fractal.id)
+        starter_template = seed_default_template(
+            self.db_session,
+            new_fractal.id,
+            current_user_id,
+        )
         self.db_session.commit()
         self.db_session.refresh(new_fractal)
+        if starter_template is not None:
+            event_bus.emit(Event(
+                Events.SESSION_TEMPLATE_CREATED,
+                {
+                    'template_id': starter_template.id,
+                    'name': starter_template.name,
+                    'root_id': new_fractal.id,
+                },
+                source='goal_service.create_fractal',
+            ))
         return new_fractal, None, 201
 
     def delete_fractal(self, root_id, current_user_id) -> ServiceResult[JsonDict]:
@@ -106,6 +129,7 @@ class _GoalFractalsMixin:
         deleted_at = datetime.now(timezone.utc)
         self._soft_delete_root_entities(root_id, deleted_at)
         self._soft_delete_goal_subtree(root, deleted_at)
+        UserService(self.db_session).remove_onboarding_for_root(current_user_id, root_id)
         self.db_session.commit()
         return {"status": "success", "message": "Fractal deleted"}, None, 200
 

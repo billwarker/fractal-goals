@@ -35,7 +35,6 @@ function GoalEditForm({
     const completedViaChildrenInfo = hasChildGoals
         ? 'Goal will be marked as complete when all child goals are completed.'
         : 'Goal will be marked as complete when all child goals are completed (no child goals created yet).';
-
     return (
         <div
             className={styles.editContainer}

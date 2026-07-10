@@ -99,4 +99,11 @@ describe('GoalHeader', () => {
 
         expect(screen.getByText(/Jul 6, 2026, 5:12 PM/)).toBeInTheDocument();
     });
+
+    it('keeps the SMART badge visible while creating a goal', () => {
+        renderHeader({ props: { mode: 'create' } });
+
+        expect(screen.getByText('SMART')).toBeInTheDocument();
+        expect(screen.getByText('SMART').closest('[data-onboarding-target="smart-badge"]')).toBeInTheDocument();
+    });
 });

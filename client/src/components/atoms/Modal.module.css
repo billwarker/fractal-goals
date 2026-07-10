@@ -8,8 +8,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 3200;
-    animation: fadeIn 0.2s ease-out;
+    z-index: var(--z-modal);
+    animation: fadeIn var(--duration-base) var(--ease-out);
 }
 
 .container {
@@ -17,7 +17,7 @@
     max-height: 90vh;
     display: flex;
     flex-direction: column;
-    animation: scaleIn 0.2s ease-out;
+    animation: scaleIn var(--duration-base) var(--ease-emphasized);
 }
 
 .content {
@@ -107,12 +107,12 @@
 
 @keyframes scaleIn {
     from {
-        transform: scale(0.95);
+        transform: translateY(4px);
         opacity: 0;
     }
 
     to {
-        transform: scale(1);
+        transform: translateY(0);
         opacity: 1;
     }
 }

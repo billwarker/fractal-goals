@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useForm } from '../../hooks/useForm';
+import { authApi } from '../../utils/api';
+import { logError } from '../../utils/logger';
+import notify from '../../utils/notify';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Input from '../atoms/Input';
 import Button from '../atoms/Button';
 import { Text } from '../atoms/Typography';
-import { useForm } from '../../hooks/useForm';
-import { authApi } from '../../utils/api';
 import styles from './AuthModal.module.css';
-import notify from '../../utils/notify';
-import { logError } from '../../utils/logger';
 
 /**
  * Blocking modal shown when an admin has required a password change.

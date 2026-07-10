@@ -1,0 +1,1123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A visual Fractal Goals design specification comparing 35 candidate goal icons in their basic and animated SMART forms.">
+<title>Goal Icon Expansion Spec · Fractal Goals</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg-app: #121419;
+    --bg-elevated: #171d24;
+    --bg-card: #1c242e;
+    --bg-tile: #101820;
+    --border: #304052;
+    --border-hover: #46607a;
+    --text-1: #e6edf5;
+    --text-2: #bcc9d8;
+    --text-3: #8ea0b7;
+    --grid-dot: rgba(166, 182, 201, 0.16);
+    --accent: #4f9cf9;
+    --icon-bg: var(--bg-tile);
+    --chip-bg: rgba(79, 156, 249, 0.12);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      color-scheme: light;
+      --bg-app: #f4f7fb;
+      --bg-elevated: #ffffff;
+      --bg-card: #ffffff;
+      --bg-tile: #f9fbfe;
+      --border: #ced8e5;
+      --border-hover: #9db2c8;
+      --text-1: #0f1f33;
+      --text-2: #334b66;
+      --text-3: #6f87a0;
+      --grid-dot: rgba(82, 113, 145, 0.2);
+    }
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg-app: #f4f7fb;
+    --bg-elevated: #ffffff;
+    --bg-card: #ffffff;
+    --bg-tile: #f9fbfe;
+    --border: #ced8e5;
+    --border-hover: #9db2c8;
+    --text-1: #0f1f33;
+    --text-2: #334b66;
+    --text-3: #6f87a0;
+    --grid-dot: rgba(82, 113, 145, 0.2);
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg-app: #121419;
+    --bg-elevated: #171d24;
+    --bg-card: #1c242e;
+    --bg-tile: #101820;
+    --border: #304052;
+    --border-hover: #46607a;
+    --text-1: #e6edf5;
+    --text-2: #bcc9d8;
+    --text-3: #8ea0b7;
+    --grid-dot: rgba(166, 182, 201, 0.16);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg-app);
+    color: var(--text-1);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  .mono {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 28px 96px; }
+
+  /* ---------- Header ---------- */
+  header { padding: 56px 0 8px; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  .intro { max-width: 68ch; color: var(--text-2); margin: 0 0 8px; }
+  .intro strong { color: var(--text-1); font-weight: 600; }
+
+  /* ---------- Anatomy legend ---------- */
+  .anatomy {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 26px 0 0;
+  }
+  .anatomy-item {
+    flex: 1 1 260px;
+    max-width: 420px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .anatomy-item svg { flex: none; margin-top: 2px; }
+  .anatomy-item h3 { margin: 0 0 4px; font-size: 14px; font-weight: 650; }
+  .anatomy-item p { margin: 0; font-size: 13px; color: var(--text-3); }
+
+  /* ---------- Controls ---------- */
+  .controls {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 18px;
+    padding: 12px 16px;
+    margin: 32px -16px 8px;
+    background: color-mix(in srgb, var(--bg-app) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .controls .label {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .swatches { display: flex; gap: 8px; }
+  .swatch {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    padding: 0;
+    outline-offset: 2px;
+  }
+  .swatch[aria-pressed="true"] { border-color: var(--text-1); }
+  .swatch:focus-visible { outline: 2px solid var(--accent); }
+  .motion-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); user-select: none; }
+  .motion-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+  .count { margin-left: auto; font-size: 12px; color: var(--text-3); }
+
+  /* ---------- Current set strip ---------- */
+  .current {
+    margin-top: 36px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px 18px;
+  }
+  .current h2 { margin: 0 0 4px; font-size: 15px; font-weight: 650; }
+  .current > p { margin: 0 0 16px; font-size: 13px; color: var(--text-3); max-width: 80ch; }
+  .current-row {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+  .current-cell {
+    flex: none;
+    text-align: center;
+    background: var(--bg-tile);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px 8px;
+  }
+  .current-cell .pair { display: flex; gap: 10px; align-items: center; justify-content: center; }
+  .current-cell .name {
+    display: block;
+    margin-top: 8px;
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10px;
+    color: var(--text-3);
+    letter-spacing: 0.04em;
+  }
+
+  /* ---------- Sections & cards ---------- */
+  section { margin-top: 52px; }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; }
+  .sec-head h2 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+  .sec-head .n {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--accent);
+  }
+  .sec-head p { margin: 0 0 0 auto; font-size: 13px; color: var(--text-3); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .card:hover { border-color: var(--border-hover); }
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .card-head h3 { margin: 0; font-size: 15px; font-weight: 650; }
+  .slug {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--accent);
+    background: var(--chip-bg);
+    border-radius: 5px;
+    padding: 2px 7px;
+    white-space: nowrap;
+  }
+  .tiles { display: flex; gap: 10px; }
+  .tile {
+    flex: 1;
+    background: var(--bg-tile);
+    background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+    background-size: 14px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 8px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .tile .t-label {
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .tile.smart .t-label { color: var(--accent); }
+  .mini {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  .mini .mini-icons { display: flex; gap: 6px; align-items: center; }
+  .note { margin: 0; font-size: 13px; color: var(--text-2); }
+  .loop-idea { margin: 0; font-size: 12.5px; color: var(--text-3); }
+  .loop-idea b {
+    color: var(--text-2);
+    font-weight: 600;
+    font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  footer { margin-top: 64px; font-size: 12.5px; color: var(--text-3); max-width: 80ch; }
+  footer code { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; color: var(--text-2); }
+
+  /* ---------- Icon engine ---------- */
+  svg.goal-icon { display: block; overflow: visible; }
+  .ringwrap { display: none; }
+  svg.frozen .animwrap,  body.no-motion .animwrap  { display: none; }
+  svg.frozen .ringwrap,  body.no-motion .ringwrap  { display: revert; }
+  svg.frozen .dash, body.no-motion .dash { animation: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animwrap { display: none; }
+    .ringwrap { display: revert; }
+    .dash { animation: none; }
+  }
+
+  /* ---------- Loop keyframes (one per effect family) ---------- */
+  @keyframes gi-ripple {
+    0%   { transform: scale(0.01); stroke-width: 1px;  opacity: 0; }
+    10%  { stroke-width: 5px;  opacity: 1; }
+    85%  { stroke-width: 16px; opacity: 1; }
+    100% { transform: scale(1.1); stroke-width: 20px; opacity: 0; }
+  }
+  @keyframes gi-spin    { to { transform: rotate(360deg); } }
+  @keyframes gi-chase   { to { stroke-dashoffset: -100; } }
+  @keyframes gi-draw {
+    0%  { stroke-dashoffset: 100; opacity: 1; }
+    55% { stroke-dashoffset: 0;   opacity: 1; }
+    85% { stroke-dashoffset: 0;   opacity: 1; }
+    100%{ stroke-dashoffset: 0;   opacity: 0; }
+  }
+  @keyframes gi-snap {
+    0%  { transform: scale(0.2);  opacity: 0; }
+    10% { opacity: 1; }
+    55% { transform: scale(0.9); }
+    68% { transform: scale(0.66); }
+    78% { transform: scale(0.8); }
+    88% { transform: scale(0.72); opacity: 1; }
+    100%{ transform: scale(0.72); opacity: 0; }
+  }
+  @keyframes gi-rx { 0%, 100% { rx: 6px; } 50% { rx: 26px; } }
+  @keyframes gi-rise {
+    0%  { transform: translateY(24px);  opacity: 0; }
+    18% { opacity: 1; }
+    75% { transform: translateY(-16px); opacity: 1; }
+    100%{ transform: translateY(-24px); opacity: 0; }
+  }
+  @keyframes gi-up {
+    0%  { transform: translateY(26px);  opacity: 0; }
+    20% { opacity: 1; }
+    78% { opacity: 0.9; }
+    100%{ transform: translateY(-46px); opacity: 0; }
+  }
+  @keyframes gi-glide  { to { transform: translateX(24px); } }
+  @keyframes gi-sway   { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+  @keyframes gi-wobble { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+  @keyframes gi-wobble-rev { 0%, 100% { transform: rotate(8deg); } 50% { transform: rotate(-8deg); } }
+  @keyframes gi-twinkle {
+    0%, 100% { transform: scale(0.4) rotate(45deg);  opacity: 0; }
+    18%      { transform: scale(0.95) rotate(45deg); opacity: 1; }
+    36%      { transform: scale(0.45) rotate(45deg); opacity: 0; }
+  }
+  @keyframes gi-blink { 0% { opacity: 0; } 10%, 24% { opacity: 1; } 36%, 100% { opacity: 0; } }
+  @keyframes gi-ratchet {
+    0%, 16%  { transform: rotate(0deg); }
+    25%, 41% { transform: rotate(45deg); }
+    50%, 66% { transform: rotate(90deg); }
+    75%, 91% { transform: rotate(135deg); }
+    100%     { transform: rotate(180deg); }
+  }
+  @keyframes gi-gauge {
+    0%  { transform: scaleY(0); opacity: 1; }
+    55% { transform: scaleY(1); }
+    62% { opacity: 1; }
+    68% { opacity: 0.35; }
+    74% { opacity: 1; }
+    88% { opacity: 1; }
+    100%{ transform: scaleY(1); opacity: 0; }
+  }
+  @keyframes gi-driftx { 0%, 100% { transform: translateX(-12px); } 50% { transform: translateX(12px); } }
+  @keyframes gi-flutter { 0%, 100% { transform: skewY(0); } 25% { transform: skewY(3.5deg); } 75% { transform: skewY(-3.5deg); } }
+  @keyframes gi-drain { 0% { transform: scaleY(1); } 88%, 100% { transform: scaleY(0); } }
+  @keyframes gi-fillup { 0% { transform: scaleY(0.04); } 88%, 100% { transform: scaleY(1); } }
+  @keyframes gi-fall { to { stroke-dashoffset: -36; } }
+  @keyframes gi-flick {
+    0%, 100% { transform: scale(0.62, 0.6); }
+    20%      { transform: scale(0.57, 0.66); }
+    45%      { transform: scale(0.66, 0.57); }
+    70%      { transform: scale(0.59, 0.64); }
+  }
+  @keyframes gi-ember { 0%, 100% { opacity: 0.9; } 30% { opacity: 0.5; } 55% { opacity: 1; } 80% { opacity: 0.65; } }
+  @keyframes gi-beat {
+    0%, 48%, 100% { transform: scale(1); }
+    8%  { transform: scale(1.12); }
+    16% { transform: scale(1); }
+    26% { transform: scale(1.08); }
+    34% { transform: scale(1); }
+  }
+  @keyframes gi-leafpulse { 0%, 100% { transform: scale(0.82); } 50% { transform: scale(1.02); } }
+  @keyframes gi-sheen  { 0% { transform: translateX(-60px); } 55%, 100% { transform: translateX(80px); } }
+  @keyframes gi-streak { 0% { transform: translateX(-70px); } 45%, 100% { transform: translateX(85px); } }
+  @keyframes gi-flip {
+    0%  { transform: translateX(-22px) skewX(-10deg); opacity: 0; }
+    18% { opacity: 1; }
+    82% { opacity: 1; }
+    100%{ transform: translateX(24px) skewX(10deg); opacity: 0; }
+  }
+  @keyframes gi-nudge { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(var(--nx, 0px), var(--ny, 0px)); } }
+  @keyframes gi-glow { 0%, 100% { opacity: 0.08; } 40%, 68% { opacity: 1; } }
+
+  /* ---------- Loop classes ---------- */
+  .rip          { animation: gi-ripple 2.5s linear infinite; will-change: transform, stroke-width, opacity; }
+  .dash         { animation: gi-chase 3.2s linear infinite; }
+  .a-chase      { animation: gi-chase 2.6s linear infinite; }
+  .a-chase-fast { animation: gi-chase 1.8s linear infinite; }
+  .a-spin       { animation: gi-spin 8s linear infinite; }
+  .a-spin-slow  { animation: gi-spin 10s linear infinite; }
+  .a-spin-med   { animation: gi-spin 9s linear infinite; }
+  .a-orbit      { animation: gi-spin 6s linear infinite; }
+  .a-draw       { animation: gi-draw 4s linear infinite; }
+  .a-snap       { animation: gi-snap 2s cubic-bezier(0.3, 0, 0.4, 1) infinite; }
+  .a-rx         { animation: gi-rx 2.6s ease-in-out infinite; }
+  .a-rise       { animation: gi-rise 4s linear infinite; }
+  .a-up         { animation: gi-up 4s linear infinite; }
+  .a-ghost      { animation: gi-up 2.8s linear infinite; }
+  .a-glide      { animation: gi-glide 1.6s linear infinite; }
+  .a-sway       { animation: gi-sway 3.4s ease-in-out infinite; }
+  .a-wobble     { animation: gi-wobble 3s ease-in-out infinite; }
+  .a-wobble-rev { animation: gi-wobble-rev 3s ease-in-out infinite; }
+  .a-twinkle    { animation: gi-twinkle 2.4s linear infinite; }
+  .a-blink      { animation: gi-blink 2.8s linear infinite; }
+  .a-blink-slow { animation: gi-blink 3.6s linear infinite; }
+  .a-ratchet    { animation: gi-ratchet 4s linear infinite; }
+  .a-gauge      { animation: gi-gauge 3.2s linear infinite; }
+  .a-drift      { animation: gi-driftx 5s ease-in-out infinite; }
+  .a-flutter    { animation: gi-flutter 2s ease-in-out infinite; }
+  .a-flutter-slow { animation: gi-flutter 2.2s ease-in-out infinite; }
+  .a-drain      { animation: gi-drain 5.5s linear infinite; }
+  .a-fillup     { animation: gi-fillup 5.5s linear infinite; }
+  .a-fall       { animation: gi-fall 0.9s linear infinite; }
+  .a-flick      { animation: gi-flick 1.3s linear infinite, gi-ember 2.1s linear infinite; }
+  .a-beat       { animation: gi-beat 1.7s linear infinite; }
+  .a-leaf       { animation: gi-leafpulse 2.4s ease-in-out infinite; }
+  .a-sheen      { animation: gi-sheen 2.8s ease-in-out infinite; }
+  .a-streak     { animation: gi-streak 2.4s ease-in-out infinite; }
+  .a-flip       { animation: gi-flip 3s linear infinite; }
+  .a-nudge      { animation: gi-nudge 2s ease-in-out infinite; }
+  .a-glow       { animation: gi-glow 4s ease-in-out infinite; }
+
+  @media (max-width: 560px) {
+    .wrap { padding: 0 16px 72px; }
+    .grid { grid-template-columns: 1fr; }
+    .controls { margin: 24px 0 8px; }
+    .sec-head p { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Fractal Goals &middot; Design Spec &middot; July 2026</p>
+    <h1>Goal icon expansion — 35 candidate shapes</h1>
+    <p class="intro">
+      Every goal icon in the app has two forms. <strong>Basic</strong> is the solid shape:
+      a single fill of the goal color with a crisp outline, legible at node size.
+      <strong>SMART</strong> is the same geometry brought to life: secondary-color detailing
+      masked inside the silhouette, a looping animation on top, and a solid core dot —
+      the shape "activates" when a goal is fully specified.
+    </p>
+    <p class="intro">
+      Every SMART preview below runs its <strong>own bespoke loop</strong>, in the spirit of the
+      circle's rotating globe, the square's fractal zoom, and the triangle's triforce fill —
+      perimeter traces, ratchets, drains, glints, sheens, heartbeats. The effect and its timing
+      are specified on each card.
+    </p>
+
+    <div class="anatomy">
+      <div class="anatomy-item" id="anat-basic"></div>
+      <div class="anatomy-item" id="anat-smart"></div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <span class="label">Goal color</span>
+    <div class="swatches" id="swatches" role="group" aria-label="Preview accent color"></div>
+    <label class="motion-toggle">
+      <input type="checkbox" id="motionToggle" checked>
+      Loop animation
+    </label>
+    <span class="count" id="countLabel"></span>
+  </div>
+
+  <div class="current">
+    <h2>Current set — for reference</h2>
+    <p>
+      The eight shipped shapes from <span class="mono">ICON_SHAPES</span> +
+      <span class="mono">GoalIcon.jsx</span>. In the app, circle, square, triangle, and the
+      twelve-point star carry bespoke loops (globe meridians, fractal zoom, triforce fill,
+      counter-rotating squares); the rest currently use the generic ripple tunnel shown here.
+    </p>
+    <div class="current-row" id="currentRow"></div>
+  </div>
+
+  <div id="sections"></div>
+
+  <footer>
+    <p>
+      <strong>Adding a shape:</strong> each candidate needs (1) a <code>full</code> geometry in the
+      100&times;100 viewBox added to <code>GoalIcon.jsx</code> and <code>AnimatedGoalIcon.jsx</code>,
+      (2) an entry in <code>ICON_SHAPES</code> in <code>goalCharacteristics.js</code> using the slug shown
+      on its card, and (3) its bespoke SMART loop ported into <code>AnimatedGoalIcon.jsx</code> — every
+      loop on this sheet is plain CSS keyframes on masked SVG groups, the same technique the component
+      already uses, so each one ports directly. Until a loop is ported, the generic ripple tunnel applies
+      automatically. All previews inherit the palette from <code>design-tokens.css</code>, so both themes
+      are covered, and reduced-motion falls back to the static concentric detailing.
+    </p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var S = 'var(--icon-bg)'; // secondary detailing color, matches app usage
+
+  /* ---------- Geometry helpers (100x100 viewBox) ---------- */
+  var pt = function (r, a, cx, cy) {
+    cx = cx == null ? 50 : cx; cy = cy == null ? 50 : cy;
+    return (cx + r * Math.cos(a)).toFixed(1) + ' ' + (cy + r * Math.sin(a)).toFixed(1);
+  };
+  var polyPts = function (n, r, rot, cx, cy) {
+    rot = rot == null ? -Math.PI / 2 : rot;
+    var pts = [];
+    for (var i = 0; i < n; i++) pts.push(pt(r, rot + (i * 2 * Math.PI) / n, cx, cy));
+    return pts.join(' ');
+  };
+  var starPts = function (n, ro, ri, rot, cx, cy) {
+    rot = rot == null ? -Math.PI / 2 : rot;
+    var pts = [];
+    for (var i = 0; i < n; i++) {
+      var a = rot + (i * 2 * Math.PI) / n;
+      pts.push(pt(ro, a, cx, cy));
+      pts.push(pt(ri, a + Math.PI / n, cx, cy));
+    }
+    return pts.join(' ');
+  };
+  var polygon = function (n, r, rot) { return '<polygon points="' + polyPts(n, r, rot) + '"/>'; };
+  var starShape = function (n, ro, ri) { return '<polygon points="' + starPts(n, ro, ri) + '"/>'; };
+
+  var gearShape = function () {
+    var n = 8, ro = 47, ri = 34, w = Math.PI / n, d = '';
+    for (var i = 0; i < n; i++) {
+      var a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+      d += (i === 0 ? 'M' : 'L') + pt(ri, a - w * 0.5) +
+           ' L' + pt(ro, a - w * 0.28) +
+           ' L' + pt(ro, a + w * 0.28) +
+           ' L' + pt(ri, a + w * 0.5) + ' ';
+    }
+    d += 'Z M61 50 a11 11 0 1 0 -22 0 a11 11 0 1 0 22 0 Z';
+    return '<path d="' + d + '" fill-rule="evenodd"/>';
+  };
+  var pinwheelShape = function () {
+    var out = '';
+    for (var k = 0; k < 4; k++) {
+      out += '<path d="M50 50 C46 20 60 4 90 8 C86 36 72 47 50 50 Z" transform="rotate(' + (k * 90) + ' 50 50)"/>';
+    }
+    return out + '<circle cx="50" cy="50" r="9"/>';
+  };
+  var sunShape = function () {
+    var rays = '';
+    for (var k = 0; k < 8; k++) {
+      rays += '<rect x="46.5" y="3" width="7" height="15" rx="3.5" transform="rotate(' + (k * 45) + ' 50 50)"/>';
+    }
+    return '<circle cx="50" cy="50" r="24"/>' + rays;
+  };
+  var cloverShape = function () {
+    return '<circle cx="50" cy="29" r="21"/><circle cx="30" cy="64" r="21"/>' +
+      '<circle cx="70" cy="64" r="21"/><circle cx="50" cy="52" r="16"/>';
+  };
+  var pennantShape = function () {
+    return '<rect x="14" y="4" width="9" height="92" rx="3"/><path d="M23 8 L90 26 L23 46 Z"/>';
+  };
+
+  /* ---------- Detail-markup helpers ---------- */
+  var org = function (x, y) {
+    x = x == null ? 50 : x; y = y == null ? 50 : y;
+    return 'transform-origin:' + x + 'px ' + y + 'px;transform-box:view-box;';
+  };
+  // Scaled stroke copy of the full silhouette in the secondary color.
+  var ringCopy = function (full, scale, sw, ox, oy) {
+    return '<g fill="none" stroke="' + S + '" stroke-width="' + sw + '" style="' +
+      org(ox, oy) + 'transform:scale(' + scale + ')">' + full + '</g>';
+  };
+  var rippleLayers = function (full, ox, oy) {
+    var out = '';
+    for (var i = 0; i < 3; i++) {
+      out += '<g class="rip" style="' + org(ox, oy) + 'animation-delay:' + (-(2.5 * i) / 3).toFixed(2) + 's">' +
+        '<g fill="none" stroke="' + S + '">' + full + '</g></g>';
+    }
+    return out;
+  };
+
+  /* ---------- Shape catalogue: each smart() is a bespoke loop ---------- */
+  var SECTIONS = [
+    {
+      title: 'Geometric primitives',
+      blurb: 'Same family as circle / square / hexagon — quiet, scalable, level-agnostic.',
+      shapes: [
+        {
+          name: 'Pentagon', slug: 'pentagon', full: polygon(5, 47),
+          note: 'Five-sided sibling of the hexagon; reads distinctly at node size.',
+          loop: 'A bright segment traces the perimeter clockwise (2.6s, linear).',
+          smart: function () {
+            return '<polygon points="' + polyPts(5, 32) + '" pathLength="100" fill="none" stroke="' + S +
+              '" stroke-width="7" stroke-linejoin="round" stroke-dasharray="28 72" class="a-chase"/>';
+          }
+        },
+        {
+          name: 'Heptagon', slug: 'heptagon', full: polygon(7, 47),
+          note: 'Softer than the hexagon, rounder than the pentagon — a good mid-tier level shape.',
+          loop: 'The inner detailing ring rotates continuously (9s per turn).',
+          smart: function (sh) {
+            return '<g class="a-spin-med" style="' + org() + '">' + ringCopy(sh.full, 0.62, 10) + '</g>';
+          }
+        },
+        {
+          name: 'Octagon', slug: 'octagon', full: polygon(8, 48),
+          note: 'Firm, stop-sign confidence; suits guardrail or constraint-style goals.',
+          loop: 'A ring expands with an eased overshoot, snaps back, and dissolves (2s).',
+          smart: function (sh) {
+            return '<g class="a-snap" style="' + org() + '"><g fill="none" stroke="' + S +
+              '" stroke-width="8">' + sh.full + '</g></g>';
+          }
+        },
+        {
+          name: 'Squircle', slug: 'squircle', full: '<rect x="8" y="8" width="84" height="84" rx="30"/>',
+          note: 'Friendlier square; pairs well with app-surface goals and UI-flavored work.',
+          loop: 'The inner ring’s corner radius breathes between square and round (2.6s).',
+          smart: function () {
+            return '<rect x="26" y="26" width="48" height="48" rx="6" fill="none" stroke="' + S +
+              '" stroke-width="7" class="a-rx"/>';
+          }
+        },
+        {
+          name: 'Arch', slug: 'arch', full: '<path d="M6 78 A44 44 0 0 1 94 78 Z"/>', origin: [50, 60],
+          note: 'Doorway / threshold metaphor — good for milestone or transition goals.',
+          loop: 'A sun disc rises through the doorway and fades at the crown (4s).',
+          smart: function () {
+            return '<line x1="10" y1="72" x2="90" y2="72" stroke="' + S + '" stroke-width="5"/>' +
+              '<g class="a-rise" style="' + org(50, 60) + '"><circle cx="50" cy="62" r="11" fill="' + S + '"/></g>';
+          }
+        },
+        {
+          name: 'Trapezoid', slug: 'trapezoid', full: '<path d="M28 16 L72 16 L94 84 L6 84 Z"/>',
+          note: 'A plinth or podium base; grounded, supports "foundation" goals.',
+          loop: 'Strata lines rise from the base and dissolve near the top (staggered, 4s).',
+          smart: function () {
+            var out = '';
+            for (var i = 0; i < 3; i++) {
+              out += '<g class="a-up" style="' + org() + 'animation-delay:' + (-i * 1.33).toFixed(2) + 's">' +
+                '<line x1="8" y1="74" x2="92" y2="74" stroke="' + S + '" stroke-width="6"/></g>';
+            }
+            return out;
+          }
+        },
+        {
+          name: 'Parallelogram', slug: 'parallelogram', full: '<path d="M32 14 L96 14 L68 86 L4 86 Z"/>',
+          note: 'Forward-leaning square: momentum without an explicit arrow.',
+          loop: 'Diagonal stripes glide along the slant in a seamless loop (1.6s).',
+          smart: function () {
+            var lines = '';
+            for (var x0 = -4; x0 <= 116; x0 += 24) {
+              lines += '<line x1="' + x0 + '" y1="14" x2="' + (x0 - 28) + '" y2="86" stroke="' + S + '" stroke-width="6"/>';
+            }
+            return '<g class="a-glide" style="' + org() + '">' + lines + '</g>';
+          }
+        },
+        {
+          name: 'Kite', slug: 'kite', full: '<path d="M50 3 L84 40 L50 97 L16 40 Z"/>', origin: [50, 44],
+          note: 'Elongated diamond with lift; distinct from the existing diamond at a glance.',
+          loop: 'The inner frame sways ±6° from the top point, like holding wind (3.4s).',
+          smart: function (sh) {
+            return '<g class="a-sway" style="' + org(50, 3) + '">' + ringCopy(sh.full, 0.6, 9, 50, 44) + '</g>';
+          }
+        }
+      ]
+    },
+    {
+      title: 'Stars & bursts',
+      blurb: 'Extends the star family between the 5-point star and the twelve-point star.',
+      shapes: [
+        {
+          name: 'Sparkle', slug: 'four-point-star', full: starShape(4, 48, 13),
+          note: 'Four-point glint; light and celebratory, ideal for quick-win goals.',
+          loop: 'A center glint flashes at 45° while a spark blinks on the upper arm (2.4s).',
+          smart: function () {
+            return '<g class="a-twinkle" style="' + org() + '"><polygon points="' + starPts(4, 20, 6) +
+              '" fill="' + S + '"/></g>' +
+              '<circle cx="50" cy="22" r="3" fill="' + S + '" class="a-blink" style="animation-delay:-1.2s"/>';
+          }
+        },
+        {
+          name: 'Six-point star', slug: 'six-point-star', full: starShape(6, 47, 25),
+          note: 'Balanced star that stays crisp small; sits neatly between star and burst.',
+          loop: 'Its two triangles counter-rotate ±8° and return (3s, eased).',
+          smart: function () {
+            return '<g class="a-wobble" style="' + org() + '"><polygon points="' + polyPts(3, 28) +
+              '" fill="none" stroke="' + S + '" stroke-width="7"/></g>' +
+              '<g class="a-wobble-rev" style="' + org() + '"><polygon points="' + polyPts(3, 28, Math.PI / 2) +
+              '" fill="none" stroke="' + S + '" stroke-width="7"/></g>';
+          }
+        },
+        {
+          name: 'Eight-point star', slug: 'eight-point-star', full: starShape(8, 47, 31),
+          note: 'Compass-rose weight; suits direction-setting or planning goals.',
+          loop: 'Point markers illuminate in turn around the compass (2.8s cycle).',
+          smart: function () {
+            var out = '<circle cx="50" cy="50" r="14" fill="none" stroke="' + S + '" stroke-width="5"/>';
+            for (var k = 0; k < 8; k++) {
+              var a = (k * Math.PI) / 4 - Math.PI / 2;
+              out += '<circle cx="' + (50 + 34 * Math.cos(a)).toFixed(1) + '" cy="' + (50 + 34 * Math.sin(a)).toFixed(1) +
+                '" r="4" fill="' + S + '" class="a-blink" style="animation-delay:' + (k * 0.35).toFixed(2) + 's"/>';
+            }
+            return out;
+          }
+        },
+        {
+          name: 'Sunburst seal', slug: 'sunburst', full: starShape(16, 47, 39),
+          note: 'Certificate-seal silhouette — a natural fit for completed-achievement states.',
+          loop: 'A highlight orbits the scalloped rim (6s per turn).',
+          smart: function (sh) {
+            return ringCopy(sh.full, 0.58, 6) +
+              '<g class="a-orbit" style="' + org() + '"><circle cx="50" cy="16" r="5.5" fill="' + S + '"/></g>';
+          }
+        },
+        {
+          name: 'Pinwheel', slug: 'pinwheel', full: pinwheelShape(),
+          note: 'Four curved blades; playful energy for habit or streak goals.',
+          loop: 'The inner blades spin continuously (8s per turn).',
+          smart: function (sh) {
+            return '<g class="a-spin" style="' + org() + '">' + ringCopy(sh.full, 0.72, 6) + '</g>';
+          }
+        },
+        {
+          name: 'Gear', slug: 'gear', full: gearShape(),
+          note: 'Process and systems; ideal for operational or maintenance goals.',
+          loop: 'Ratchet motion — advance 45°, settle, advance (4s, seamless at 180°).',
+          smart: function (sh) {
+            return '<g class="a-ratchet" style="' + org() + '">' + ringCopy(sh.full, 0.62, 8) + '</g>';
+          }
+        }
+      ]
+    },
+    {
+      title: 'Direction & momentum',
+      blurb: 'Shapes that point somewhere — progress made visible in the silhouette itself.',
+      shapes: [
+        {
+          name: 'Chevron', slug: 'chevron', full: '<path d="M50 16 L94 60 L77 77 L50 50 L23 77 L6 60 Z"/>',
+          note: 'Single upward chevron: ascent without the literalism of an arrow.',
+          loop: 'Ghost chevrons rise through the shape and fade out the top (2.8s, staggered).',
+          smart: function (sh) {
+            var out = '';
+            for (var i = 0; i < 2; i++) {
+              out += '<g class="a-ghost" style="' + org() + 'animation-delay:' + (-1.4 * i) + 's">' +
+                ringCopy(sh.full, 0.7, 8) + '</g>';
+            }
+            return out;
+          }
+        },
+        {
+          name: 'Arrow', slug: 'arrow', full: '<path d="M50 4 L89 45 L64 45 L64 96 L36 96 L36 45 L11 45 Z"/>',
+          note: 'The most literal "goal" shape; strongest for immediate-level goals.',
+          loop: 'The shaft gauge fills bottom-to-top, flashes full, and resets (3.2s).',
+          smart: function () {
+            return '<g class="a-gauge" style="' + org(50, 96) + '">' +
+              '<rect x="38" y="40" width="24" height="56" fill="' + S + '"/></g>';
+          }
+        },
+        {
+          name: 'Summit', slug: 'summit', full: '<path d="M4 88 L36 24 L52 54 L66 30 L96 88 Z"/>', origin: [50, 62],
+          note: 'Twin peaks — long-horizon aspiration; a natural Ultimate-level candidate.',
+          loop: 'Dashed contour mist drifts back and forth across the peaks (5s, staggered).',
+          smart: function () {
+            var out = '';
+            var ys = [48, 62, 76];
+            for (var i = 0; i < ys.length; i++) {
+              out += '<g class="a-drift" style="' + org(50, 62) + 'animation-delay:' + (-i * 1.6).toFixed(1) + 's">' +
+                '<line x1="2" y1="' + ys[i] + '" x2="98" y2="' + ys[i] + '" stroke="' + S +
+                '" stroke-width="4" stroke-dasharray="10 8"/></g>';
+            }
+            return out;
+          }
+        },
+        {
+          name: 'Bolt', slug: 'bolt', full: '<path d="M59 3 L18 57 L43 57 L38 97 L82 41 L56 41 Z"/>',
+          note: 'Energy and decisiveness; good for sprint-style or breakthrough goals.',
+          loop: 'A charge travels the zigzag from top to tip (1.8s, linear).',
+          smart: function () {
+            return '<path d="M56 8 L31 53 L46 53 L41 90" pathLength="100" fill="none" stroke="' + S +
+              '" stroke-width="7" stroke-linecap="round" stroke-dasharray="20 80" class="a-chase-fast"/>';
+          }
+        },
+        {
+          name: 'Pennant', slug: 'pennant', full: pennantShape(), origin: [40, 40],
+          note: 'Planted flag — claiming a target. Reads clearly even at 16px.',
+          loop: 'The flag flutters around the pole with a soft skew wave (2s).',
+          smart: function () {
+            return '<line x1="18.5" y1="8" x2="18.5" y2="92" stroke="' + S + '" stroke-width="3"/>' +
+              '<g class="a-flutter" style="' + org(23, 27) + '">' +
+              '<path d="M30 15 L74 26 L30 39 Z" fill="none" stroke="' + S + '" stroke-width="6"/></g>';
+          }
+        },
+        {
+          name: 'Hourglass', slug: 'hourglass', full: '<path d="M16 6 L84 6 L60 50 L84 94 L16 94 L40 50 Z"/>',
+          note: 'Deadline made visible; strong candidate for time-boxed goals.',
+          loop: 'The top chamber drains as the bottom fills, sand streaming between (5.5s).',
+          smart: function () {
+            return '<g class="a-drain" style="' + org(50, 13) + '">' +
+              '<polygon points="27 13 73 13 50 46" fill="' + S + '"/></g>' +
+              '<line x1="50" y1="46" x2="50" y2="90" stroke="' + S +
+              '" stroke-width="3" stroke-dasharray="3 9" class="a-fall"/>' +
+              '<g class="a-fillup" style="' + org(50, 91) + '">' +
+              '<polygon points="50 54 76 91 24 91" fill="' + S + '"/></g>';
+          }
+        }
+      ]
+    },
+    {
+      title: 'Nature & metaphor',
+      blurb: 'Growth metaphors — warmer shapes for personal and practice goals.',
+      shapes: [
+        {
+          name: 'Droplet', slug: 'droplet',
+          full: '<path d="M50 4 C61 26 88 45 88 65 C88 83 71 96 50 96 C29 96 12 83 12 65 C12 45 39 26 50 4 Z"/>',
+          origin: [50, 58],
+          note: 'Consistency — drop by drop. Suits recurring practice goals.',
+          loop: 'Keeps the classic ripple tunnel — rings radiate from the core, like a drop landing (2.5s).',
+          smart: function (sh) { return rippleLayers(sh.full, 50, 58); }
+        },
+        {
+          name: 'Leaf', slug: 'leaf', full: '<path d="M86 8 C46 10 12 40 14 88 C62 90 90 56 86 8 Z"/>',
+          note: 'Organic growth; pairs naturally with long-term development goals.',
+          loop: 'The midrib and veins draw themselves in, hold, and fade (4s).',
+          smart: function () {
+            var vein = function (d, delay) {
+              return '<path d="' + d + '" pathLength="100" fill="none" stroke="' + S +
+                '" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="100" class="a-draw" style="animation-delay:' +
+                delay + 's"/>';
+            };
+            return vein('M82 12 C60 28 34 54 18 84', 0) +
+              vein('M58 36 C50 40 44 42 36 42', -3.4) +
+              vein('M42 56 C38 62 36 68 36 74', -3.0);
+          }
+        },
+        {
+          name: 'Flame', slug: 'flame',
+          full: '<path d="M52 3 C56 22 76 33 76 58 C76 80 65 96 50 96 C35 96 24 80 24 58 C24 48 29 40 35 32 C36 44 41 51 47 49 C53 47 49 20 52 3 Z"/>',
+          origin: [50, 60],
+          note: 'Streaks and motivation; the obvious pick for daily-habit goals.',
+          loop: 'The inner tongue flickers — scale jitter and brightness running out of phase (1.3s / 2.1s).',
+          smart: function (sh) {
+            return '<g class="a-flick" style="' + org(50, 94) + '"><g fill="' + S + '">' + sh.full + '</g></g>';
+          }
+        },
+        {
+          name: 'Heart', slug: 'heart',
+          full: '<path d="M50 91 C22 68 8 51 8 33 C8 18 19 8 32 8 C41 8 48 13 50 21 C52 13 59 8 68 8 C81 8 92 18 92 33 C92 51 78 68 50 91 Z"/>',
+          origin: [50, 46],
+          note: 'Wellbeing and relationship goals; softens an otherwise geometric set.',
+          loop: 'A heartbeat: two quick pulses of the inner ring, then rest (1.7s, ~70 bpm feel).',
+          smart: function (sh) {
+            return '<g class="a-beat" style="' + org(50, 46) + '">' + ringCopy(sh.full, 0.62, 10, 50, 46) + '</g>';
+          }
+        },
+        {
+          name: 'Crescent', slug: 'crescent', full: '<path d="M62 6 A45 45 0 1 0 62 94 A46 46 0 0 1 62 6 Z"/>',
+          origin: [40, 50],
+          note: 'Rest and recovery goals — the counterpart to the flame.',
+          loop: 'Star glints blink one by one inside the dark limb (3.6s cycle).',
+          smart: function () {
+            var glint = function (cx, cy, r, delay) {
+              return '<polygon points="' + starPts(4, r, r * 0.36, undefined, cx, cy) + '" fill="' + S +
+                '" class="a-blink-slow" style="animation-delay:' + delay + 's"/>';
+            };
+            return glint(34, 26, 7, 0) + glint(25, 51, 5.5, 0.9) + glint(34, 76, 7, 1.8);
+          }
+        },
+        {
+          name: 'Sun', slug: 'sun', full: sunShape(),
+          note: 'Morning-routine and energy goals; instantly readable silhouette.',
+          loop: 'A tick ring rotates slowly through the rays, like a sundial (10s per turn).',
+          smart: function () {
+            var ticks = '';
+            for (var k = 0; k < 8; k++) {
+              var a = (k * Math.PI) / 4 + Math.PI / 8;
+              ticks += '<line x1="' + (50 + 28 * Math.cos(a)).toFixed(1) + '" y1="' + (50 + 28 * Math.sin(a)).toFixed(1) +
+                '" x2="' + (50 + 40 * Math.cos(a)).toFixed(1) + '" y2="' + (50 + 40 * Math.sin(a)).toFixed(1) +
+                '" stroke="' + S + '" stroke-width="4" stroke-linecap="round"/>';
+            }
+            return '<circle cx="50" cy="50" r="15" fill="none" stroke="' + S + '" stroke-width="5"/>' +
+              '<g class="a-spin-slow" style="' + org() + '">' + ticks + '</g>';
+          }
+        },
+        {
+          name: 'Clover', slug: 'clover', full: cloverShape(),
+          note: 'Trefoil of overlapping circles — three sub-goals fused into one.',
+          loop: 'Each leaf inflates slightly in turn, circling the trefoil (2.4s).',
+          smart: function () {
+            var leaves = [[50, 29], [30, 64], [70, 64]];
+            var out = '';
+            for (var i = 0; i < 3; i++) {
+              out += '<circle cx="' + leaves[i][0] + '" cy="' + leaves[i][1] + '" r="13" fill="none" stroke="' + S +
+                '" stroke-width="6" class="a-leaf" style="' + org(leaves[i][0], leaves[i][1]) +
+                'animation-delay:' + (-i * 0.8).toFixed(1) + 's"/>';
+            }
+            return out;
+          }
+        }
+      ]
+    },
+    {
+      title: 'Achievement & objects',
+      blurb: 'Reward-flavored shapes for completion states and headline goals.',
+      shapes: [
+        {
+          name: 'Shield', slug: 'shield', full: '<path d="M50 4 L89 17 C89 50 81 77 50 96 C19 77 11 50 11 17 Z"/>',
+          note: 'Protection and discipline; good for "defend the streak" style goals.',
+          loop: 'A diagonal sheen sweeps across the face, like light on metal (2.8s, then rests).',
+          smart: function (sh) {
+            return ringCopy(sh.full, 0.62, 8) +
+              '<g style="' + org() + 'transform:rotate(22deg)"><g class="a-sheen">' +
+              '<rect x="36" y="-20" width="13" height="140" fill="' + S + '"/></g></g>';
+          }
+        },
+        {
+          name: 'Crown', slug: 'crown', full: '<path d="M12 80 L12 34 L33 51 L50 14 L67 51 L88 34 L88 80 Z"/>',
+          origin: [50, 55],
+          note: 'Top-of-tree material — a strong Ultimate-level marker.',
+          loop: 'Three jewels light up left to right along the band (2.8s cycle).',
+          smart: function () {
+            var out = '<line x1="18" y1="71" x2="82" y2="71" stroke="' + S + '" stroke-width="4"/>';
+            var xs = [30, 50, 70];
+            for (var i = 0; i < 3; i++) {
+              out += '<circle cx="' + xs[i] + '" cy="' + (i === 1 ? 58 : 63) + '" r="4.5" fill="' + S +
+                '" class="a-blink" style="animation-delay:' + (i * 0.35).toFixed(2) + 's"/>';
+            }
+            return out;
+          }
+        },
+        {
+          name: 'Gem', slug: 'gem', full: '<path d="M29 8 L71 8 L94 33 L50 96 L6 33 Z"/>', origin: [50, 42],
+          note: 'Faceted diamond-cut; a premium alternative to the flat diamond.',
+          loop: 'Static facet lines with a thin glint streak sweeping the table (2.4s, then rests).',
+          smart: function () {
+            return '<path d="M6 33 L94 33 M29 8 L38 33 M71 8 L62 33 M38 33 L50 96 M62 33 L50 96" fill="none" stroke="' +
+              S + '" stroke-width="4"/>' +
+              '<g style="' + org(50, 42) + 'transform:rotate(-18deg)"><g class="a-streak">' +
+              '<rect x="44" y="-20" width="6" height="140" fill="' + S + '"/></g></g>';
+          }
+        },
+        {
+          name: 'Bookmark', slug: 'bookmark', full: '<path d="M26 4 L74 4 L74 96 L50 75 L26 96 Z"/>',
+          note: 'Saved-for-later goals; also suits learning and reading targets.',
+          loop: 'A page edge flips across the face, left to right (3s).',
+          smart: function (sh) {
+            return ringCopy(sh.full, 0.62, 8) +
+              '<g class="a-flip" style="' + org() + '">' +
+              '<line x1="50" y1="12" x2="50" y2="68" stroke="' + S + '" stroke-width="5" stroke-linecap="round"/></g>';
+          }
+        },
+        {
+          name: 'Ribbon', slug: 'ribbon',
+          full: '<circle cx="50" cy="36" r="30"/><path d="M32 60 L20 95 L36 86 L44 97 L47 66 Z"/><path d="M68 60 L80 95 L64 86 L56 97 L53 66 Z"/>',
+          origin: [50, 40],
+          note: 'Award rosette with tails — the celebration state for finished goals.',
+          loop: 'The medallion ring spins while the tails flutter (6s / 2.2s).',
+          smart: function () {
+            return '<g class="a-orbit" style="' + org(50, 36) + '">' +
+              '<circle cx="50" cy="36" r="19" pathLength="100" fill="none" stroke="' + S +
+              '" stroke-width="6" stroke-dasharray="72 28" stroke-linecap="round"/></g>' +
+              '<g class="a-flutter-slow" style="' + org(50, 60) + '">' +
+              '<path d="M40 68 L34 88 M60 68 L66 88" fill="none" stroke="' + S +
+              '" stroke-width="5" stroke-linecap="round"/></g>';
+          }
+        },
+        {
+          name: 'Plus', slug: 'plus',
+          full: '<path d="M37 6 L63 6 L63 37 L94 37 L94 63 L63 63 L63 94 L37 94 L37 63 L6 63 L6 37 L37 37 Z"/>',
+          note: 'Health and improvement goals; reads as "add / gain" at any size.',
+          loop: 'All four arm caps extend outward a few px and relax together (2s, eased).',
+          smart: function () {
+            var bar = function (x1, y1, x2, y2, nx, ny) {
+              return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + S +
+                '" stroke-width="5" stroke-linecap="round" class="a-nudge" style="--nx:' + nx + 'px;--ny:' + ny + 'px"/>';
+            };
+            return '<circle cx="50" cy="50" r="7" fill="none" stroke="' + S + '" stroke-width="5"/>' +
+              bar(43, 15, 57, 15, 0, -5) + bar(43, 85, 57, 85, 0, 5) +
+              bar(15, 43, 15, 57, -5, 0) + bar(85, 43, 85, 57, 5, 0);
+          }
+        },
+        {
+          name: 'House', slug: 'house', full: '<path d="M50 5 L95 45 L83 45 L83 95 L17 95 L17 45 L5 45 Z"/>',
+          note: 'Home, family, and foundation goals; the roofline keeps it iconic.',
+          loop: 'The window glows warm, holds, and dims — no motion, pure light (4s).',
+          smart: function () {
+            return '<line x1="17" y1="45" x2="83" y2="45" stroke="' + S + '" stroke-width="4"/>' +
+              '<rect x="42" y="56" width="16" height="16" rx="2" fill="' + S + '" class="a-glow"/>';
+          }
+        },
+        {
+          name: 'Infinity', slug: 'infinity', stroke: true,
+          full: '<path d="M28 36 C10 36 10 64 28 64 C46 64 54 36 72 36 C90 36 90 64 72 64 C54 64 46 36 28 36" pathLength="100"/>',
+          note: 'Stroke-based like the check; for ongoing, never-"done" practice goals.',
+          loop: 'A bright dash chases the figure-eight continuously (3.2s, linear).'
+        }
+      ]
+    }
+  ];
+
+  var EXISTING = [
+    { name: 'circle', full: '<circle cx="50" cy="50" r="45"/>' },
+    { name: 'square', full: '<rect x="5" y="5" width="90" height="90"/>' },
+    { name: 'triangle', full: '<path d="M50 5 L95 85 L5 85 Z"/>', origin: [50, 58] },
+    { name: 'diamond', full: '<path d="M50 5 L95 50 L50 95 L5 50 Z"/>' },
+    { name: 'hexagon', full: '<path d="M50 5 L93.3 30 L93.3 70 L50 95 L6.7 70 L6.7 30 Z"/>' },
+    { name: 'star', full: '<path d="M50 5 L64.5 35 L97 40 L73.5 63 L79 95 L50 80 L21 95 L26.5 63 L3 40 L35.5 35 Z"/>' },
+    { name: 'twelve-point-star',
+      full: '<rect x="20" y="20" width="60" height="60"/><rect x="20" y="20" width="60" height="60" transform="rotate(30 50 50)"/><rect x="20" y="20" width="60" height="60" transform="rotate(60 50 50)"/>' },
+    { name: 'check', stroke: true,
+      full: '<path d="M20 50 L40 70 L80 30" pathLength="100" stroke-linecap="round" stroke-linejoin="round"/>' }
+  ];
+
+  /* ---------- Icon builder (mirrors GoalIcon / AnimatedGoalIcon) ---------- */
+  var uid = 0;
+  function iconSVG(shape, mode, size, frozen) {
+    var o = shape.origin || [50, 50];
+    var oStr = org(o[0], o[1]);
+    var open = '<svg class="goal-icon' + (frozen ? ' frozen' : '') + '" viewBox="0 0 100 100" width="' +
+      size + '" height="' + size + '" aria-hidden="true">';
+
+    if (shape.stroke) {
+      var sBase = '<g fill="none" stroke="var(--accent)" stroke-width="11" stroke-linecap="round">' + shape.full + '</g>';
+      if (mode === 'basic') return open + sBase + '</svg>';
+      var dash = '<g class="dash" fill="none" stroke="' + S + '" stroke-width="4" ' +
+        'stroke-linecap="round" stroke-dasharray="14 20">' + shape.full + '</g>';
+      return open + sBase + dash + '</svg>';
+    }
+
+    var base = '<g fill="var(--accent)">' + shape.full + '</g>';
+    var outline = '<g fill="none" stroke="var(--accent)" stroke-width="4">' + shape.full + '</g>';
+    if (mode === 'basic') return open + base + outline + '</svg>';
+
+    var id = 'gm' + (uid++);
+    var mask = '<defs><mask id="' + id + '"><g fill="#fff">' + shape.full + '</g></mask></defs>';
+    var detail = shape.smart ? shape.smart(shape) : rippleLayers(shape.full, o[0], o[1]);
+    var ring = '<g fill="none" stroke="' + S + '" stroke-width="12" style="' + oStr +
+      'transform:scale(.62)">' + shape.full + '</g>';
+    var core = '<g style="' + oStr + 'transform:scale(.18)"><g fill="var(--accent)">' + shape.full + '</g></g>';
+
+    return open + mask + base +
+      '<g mask="url(#' + id + ')" class="animwrap">' + detail + '</g>' +
+      '<g mask="url(#' + id + ')" class="ringwrap">' + ring + '</g>' +
+      core + outline + '</svg>';
+  }
+
+  /* ---------- Render: anatomy ---------- */
+  var hexFull = '<path d="M50 5 L93.3 30 L93.3 70 L50 95 L6.7 70 L6.7 30 Z"/>';
+  document.getElementById('anat-basic').innerHTML =
+    iconSVG({ full: hexFull }, 'basic', 64) +
+    '<div><h3>Basic form</h3><p>Solid fill of the goal color with a 4px outline. Used everywhere a goal is not yet SMART.</p></div>';
+  document.getElementById('anat-smart').innerHTML =
+    iconSVG({ full: hexFull }, 'smart', 64) +
+    '<div><h3>SMART form</h3><p>Secondary-color detailing masked inside the silhouette, a shape-specific loop on top, and an 18%-scale core dot.</p></div>';
+
+  /* ---------- Render: current set ---------- */
+  document.getElementById('currentRow').innerHTML = EXISTING.map(function (s) {
+    return '<div class="current-cell"><div class="pair">' +
+      iconSVG(s, 'basic', 34) + iconSVG(s, 'smart', 34) +
+      '</div><span class="name">' + s.name + '</span></div>';
+  }).join('');
+
+  /* ---------- Render: candidate sections ---------- */
+  var total = 0;
+  document.getElementById('sections').innerHTML = SECTIONS.map(function (sec) {
+    var cards = sec.shapes.map(function (s) {
+      total++;
+      return '<article class="card">' +
+        '<div class="card-head"><h3>' + s.name + '</h3><span class="slug">' + s.slug + '</span></div>' +
+        '<div class="tiles">' +
+          '<div class="tile"><span class="t-label">Basic</span>' + iconSVG(s, 'basic', 84) + '</div>' +
+          '<div class="tile smart"><span class="t-label">Smart</span>' + iconSVG(s, 'smart', 84) + '</div>' +
+        '</div>' +
+        '<div class="mini"><span>at 20px</span><span class="mini-icons">' +
+          iconSVG(s, 'basic', 20) + iconSVG(s, 'smart', 20, true) +
+        '</span></div>' +
+        '<p class="note">' + s.note + '</p>' +
+        '<p class="loop-idea"><b>Loop</b> &mdash; ' + s.loop + '</p>' +
+      '</article>';
+    }).join('');
+    return '<section><div class="sec-head"><h2>' + sec.title + '</h2>' +
+      '<span class="n">' + sec.shapes.length + ' shapes</span>' +
+      '<p>' + sec.blurb + '</p></div>' +
+      '<div class="grid">' + cards + '</div></section>';
+  }).join('');
+
+  document.getElementById('countLabel').textContent =
+    total + ' candidates · ' + EXISTING.length + ' shipped';
+
+  /* ---------- Controls ---------- */
+  var COLORS = [
+    { name: 'Primary blue', value: '#4f9cf9' },
+    { name: 'Success green', value: '#3bc57c' },
+    { name: 'Sets orange', value: '#f59f4d' },
+    { name: 'Splits purple', value: '#8b6fff' },
+    { name: 'Danger red', value: '#ef6a6a' },
+    { name: 'Program cyan', value: '#2ec4e0' }
+  ];
+  var swatchWrap = document.getElementById('swatches');
+  COLORS.forEach(function (c, i) {
+    var b = document.createElement('button');
+    b.className = 'swatch';
+    b.type = 'button';
+    b.style.background = c.value;
+    b.title = c.name;
+    b.setAttribute('aria-label', c.name);
+    b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+    b.addEventListener('click', function () {
+      document.documentElement.style.setProperty('--accent', c.value);
+      document.documentElement.style.setProperty('--chip-bg',
+        'color-mix(in srgb, ' + c.value + ' 14%, transparent)');
+      swatchWrap.querySelectorAll('.swatch').forEach(function (s) {
+        s.setAttribute('aria-pressed', s === b ? 'true' : 'false');
+      });
+    });
+    swatchWrap.appendChild(b);
+  });
+
+  var toggle = document.getElementById('motionToggle');
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    toggle.checked = false;
+    document.body.classList.add('no-motion');
+  }
+  toggle.addEventListener('change', function () {
+    document.body.classList.toggle('no-motion', !toggle.checked);
+  });
+})();
+</script>
+</body>
+</html>

@@ -2,6 +2,7 @@ import { Handle, Position } from 'reactflow';
 
 import AnimatedGoalIcon from '../atoms/AnimatedGoalIcon';
 import GoalIcon from '../atoms/GoalIcon';
+import Hint from '../onboarding/Hint';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getAgeLabel } from '../../utils/goalTiming';
@@ -88,7 +89,7 @@ function AddChildButton({ data, as = 'div' }) {
     if (!data.onAddChild || !data.childTypeName) return null;
     const Component = as;
 
-    return (
+    const button = (
         <Component
             className={styles.addChildButton}
             onClick={(event) => {
@@ -99,6 +100,8 @@ function AddChildButton({ data, as = 'div' }) {
             + Add {data.childTypeName}
         </Component>
     );
+    const isRootGoal = !data.goal?.parent_id && !data.goal?.attributes?.parent_id;
+    return isRootGoal ? <Hint id="break-down-goal" title="Break it down" description="Add one to three smaller goals beneath your ultimate goal. You can refine the structure later.">{button}</Hint> : button;
 }
 
 export default function FlowTreeNode({ data }) {
@@ -127,7 +130,7 @@ export default function FlowTreeNode({ data }) {
         : { shape: config.icon, color: fillColor, secondaryColor: smartRingFillColor, isSmart: isSmartGoal, size: iconSize };
 
     return (
-        <div className={`${styles.nodeContainer} ${isHierarchyLayout ? styles.nodeContainerHierarchy : ''}`}>
+        <div className={`${styles.nodeContainer} ${isHierarchyLayout ? styles.nodeContainerHierarchy : ''}`} data-has-evidence={data.hasEvidence ? 'true' : 'false'}>
             <div
                 className={styles.nodeCircleWrapper}
                 onClick={data.onClick}

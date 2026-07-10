@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
+import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
 import { queryKeys } from './queryKeys';
 
 export function useActivities(rootId, options = {}) {
@@ -40,8 +41,9 @@ export function useCreateActivity(rootId) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (payload) => fractalApi.createActivity(rootId, payload),
-        onSuccess: () => {
+        onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) });
+            await invalidateOnboardingProgress(queryClient, queryKeys);
         }
     });
 }
@@ -50,8 +52,9 @@ export function useDeleteActivity(rootId) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (activityId) => fractalApi.deleteActivity(rootId, activityId),
-        onSuccess: () => {
+        onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) });
+            await invalidateOnboardingProgress(queryClient, queryKeys);
         }
     });
 }

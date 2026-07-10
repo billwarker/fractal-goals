@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 
 const checks = [
   {
-    file: 'src/App.css',
+    file: 'src/app-shell-and-session.css',
     patterns: [/\.top-nav-links/, /\.page-container/, /@media\s*\(max-width:\s*768px\)/],
   },
   {
@@ -13,6 +13,10 @@ const checks = [
   {
     file: 'src/pages/Sessions.module.css',
     patterns: [/\.pageContainer/, /\.rightPanel/, /@media\s*\(max-width:\s*768px\)/],
+  },
+  {
+    file: 'src/components/sessions/SessionCardExpanded.module.css',
+    patterns: [/\.cardHeaderTitleLink/, /width:\s*100%/, /\.cardHeaderTitleTemplate/, /min-width:\s*0/],
   },
   {
     file: 'src/pages/Logs.css',

@@ -20,11 +20,13 @@ import CloseButton from '../components/atoms/CloseButton';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
 import ActivityFilterModal from '../components/common/ActivityFilterModal';
 import GoalTreePicker from '../components/common/GoalTreePicker';
+import EmptyState from '../components/common/EmptyState';
 import SidePaneHeader from '../components/common/SidePaneHeader';
 import SidePaneHeaderButton from '../components/common/SidePaneHeaderButton';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
+import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 import styles from './Notes.module.css';
 
 const NOTE_TYPE_OPTIONS = [
@@ -84,6 +86,7 @@ function GoalPickerModal({ rootId, selectedGoalId, onSelect, onClose }) {
 
 function Notes() {
     const { rootId } = useParams();
+    const onboarding = useOptionalOnboarding();
     const navigate = useNavigate();
     const isMobile = useIsMobile();
     const { activities = [] } = useActivities(rootId);
@@ -243,6 +246,10 @@ function Notes() {
                     </>
                 )}
             />
+
+            {onboarding?.enabled && onboarding.state?.status === 'active' && !onboarding.state?.steps?.first_session && (
+                <EmptyState compact className={styles.onboardingEmptyState} title="Notes preserve the context numbers miss" description="Complete a session, then capture what changed, what worked, and what to adjust next time." />
+            )}
 
             <div className={styles.timelineArea}>
                 {composing ? (
@@ -423,7 +430,7 @@ function Notes() {
     );
 
     return (
-        <div className={styles.pageContainer}>
+        <div className={`${styles.pageContainer} page-reveal`}>
             {leftColumn}
             {rightColumn}
 

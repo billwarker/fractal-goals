@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 const ThemeContext = createContext();
 
@@ -26,6 +26,7 @@ export function adjustBrightness(hex, percent) {
 }
 
 export const ThemeProvider = ({ children }) => {
+    const followsSystemTheme = useRef(!localStorage.getItem('theme'));
     // --- Light/Dark Mode ---
     const [theme, setTheme] = useState(() => {
         const savedTheme = localStorage.getItem('theme');
@@ -41,15 +42,24 @@ export const ThemeProvider = ({ children }) => {
     });
 
     useEffect(() => {
-        localStorage.setItem('theme', theme);
+        if (!followsSystemTheme.current) localStorage.setItem('theme', theme);
         document.documentElement.setAttribute('data-theme', theme);
     }, [theme]);
+
+    useEffect(() => {
+        if (!followsSystemTheme.current || !window.matchMedia) return undefined;
+        const media = window.matchMedia('(prefers-color-scheme: light)');
+        const handleChange = (event) => setTheme(event.matches ? 'light' : 'dark');
+        media.addEventListener('change', handleChange);
+        return () => media.removeEventListener('change', handleChange);
+    }, []);
 
     useEffect(() => {
         localStorage.setItem('animatedIcons', String(animatedIcons));
     }, [animatedIcons]);
 
     const toggleTheme = () => {
+        followsSystemTheme.current = false;
         setTheme(prev => prev === 'dark' ? 'light' : 'dark');
     };
 

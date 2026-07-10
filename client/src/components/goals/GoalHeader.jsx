@@ -140,14 +140,13 @@ function GoalHeader({
                             {getTypeDisplayName(goalType)}
                         </div>
 
-                        {/* Only show SMART indicator in non-create mode, or if we have enough data */}
-                        {mode !== 'create' && (
+                        <span className={styles.smartBadgeTarget} data-onboarding-target="smart-badge">
                             <SMARTIndicator
                                 goal={goal}
                                 goalType={goalType}
                                 color={goalColor}
                             />
-                        )}
+                        </span>
                         {mode !== 'create' && (
                             <>
                                 <span className={styles.statusBadge}>

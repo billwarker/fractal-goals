@@ -35,7 +35,7 @@ class TestFractalEndpoints:
         assert isinstance(data, list)
         assert len(data) == 0
     
-    def test_create_fractal(self, authed_client):
+    def test_create_fractal(self, authed_client, db_session):
         """Test creating a new fractal."""
         payload = {
             'name': 'Test Fractal',
@@ -51,6 +51,17 @@ class TestFractalEndpoints:
         assert data['name'] == 'Test Fractal'
         assert data['attributes']['type'] == 'UltimateGoal'
         assert 'id' in data
+
+        created_root = db_session.query(Goal).filter_by(id=data['id']).one()
+        assert created_root.root_id == created_root.id
+
+        starter = db_session.query(SessionTemplate).filter_by(root_id=data['id']).one()
+        assert starter.name == 'Simple Empty Template'
+        assert starter.description == 'A blank one-section session. Start here, add activities as you go.'
+        assert json.loads(starter.template_data) == {
+            'session_type': 'normal',
+            'sections': [{'name': 'Main', 'activities': []}],
+        }
     
     def test_list_fractals_with_data(self, authed_client, sample_ultimate_goal):
         """Test listing fractals when they exist."""
@@ -98,6 +109,29 @@ class TestFractalEndpoints:
         """Test deleting a fractal that doesn't exist."""
         response = authed_client.delete('/api/fractals/nonexistent-id')
         assert response.status_code == 404
+
+    def test_delete_legacy_fractal_without_root_id(
+        self,
+        authed_client,
+        db_session,
+        sample_ultimate_goal,
+    ):
+        """Deletion remains durable for roots created without a self root_id."""
+        sample_ultimate_goal.root_id = None
+        db_session.commit()
+
+        response = authed_client.delete(f'/api/fractals/{sample_ultimate_goal.id}')
+
+        assert response.status_code == 200
+        db_session.expire_all()
+        deleted_root = db_session.query(Goal).filter_by(id=sample_ultimate_goal.id).one()
+        assert deleted_root.deleted_at is not None
+
+        response = authed_client.get('/api/fractals')
+        assert not any(
+            fractal['id'] == sample_ultimate_goal.id
+            for fractal in json.loads(response.data)
+        )
 
 
 @pytest.mark.integration

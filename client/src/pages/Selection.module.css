@@ -3,18 +3,7 @@
 .container {
     padding-bottom: 60px;
     min-height: 100%;
-    animation: fadeIn 0.8s ease-out;
     position: relative;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
 }
 
 .loadingContainer {
@@ -80,14 +69,14 @@
     background: transparent;
     border: 1px solid var(--color-border);
     padding: 6px 20px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--border-radius-sm);
     color: var(--color-text-primary);
     cursor: pointer;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 1.5px;
     text-transform: uppercase;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+    transition: background var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
 }
 
 .logoutBtn:hover {
@@ -101,16 +90,16 @@
     right: 24px;
     z-index: 20;
     background: transparent;
-    border: 1px solid var(--color-accent, #4f9cff);
+    border: 1px solid var(--color-brand-primary);
     padding: 8px 20px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--border-radius-sm);
     color: var(--color-text-primary);
     cursor: pointer;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 1.5px;
     text-transform: uppercase;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+    transition: background var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
 }
 
 .adminTopButton:hover {
@@ -126,7 +115,7 @@
     letter-spacing: 1.5px;
     cursor: pointer;
     text-transform: uppercase;
-    transition: color 0.2s ease;
+    transition: color var(--duration-base) var(--ease-standard);
     z-index: 10;
 }
 
@@ -153,10 +142,10 @@
     text-align: center;
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
-    border-radius: 12px;
+    border-radius: var(--border-radius-lg);
     aspect-ratio: 1;
     padding: 20px;
-    transition: background 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), border-color 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    transition: background var(--duration-slow) var(--ease-standard), border-color var(--duration-slow) var(--ease-standard), transform var(--duration-slow) var(--ease-standard), box-shadow var(--duration-slow) var(--ease-standard);
     cursor: pointer;
 }
 
@@ -166,6 +155,9 @@
     border-color: var(--color-border-hover);
     background: var(--color-bg-card-hover);
 }
+
+.card:active { transform: translateY(-2px) scale(.99); }
+.card:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 3px; }
 
 .addCard {
     background: var(--color-bg-card-alt);

@@ -91,7 +91,7 @@
 }
 
 .noteCard.pinned {
-    border-left: 2px solid var(--color-accent, #6c8ebf);
+    border-left: 2px solid var(--color-brand-primary);
     padding-left: 10px;
 }
 
@@ -497,7 +497,7 @@
 
 .editTextarea:focus {
     outline: none;
-    border-color: var(--color-accent, #6c8ebf);
+    border-color: var(--color-brand-primary);
 }
 
 .editActions {

@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 ALLOWED_EVENTS = frozenset({
     "page_view",
     "settings_opened",
+    "onboarding_started",
+    "onboarding_step_completed",
+    "onboarding_completed",
+    "onboarding_dismissed",
 })
 
 MAX_BATCH_SIZE = 20

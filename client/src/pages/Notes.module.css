@@ -42,7 +42,7 @@
 }
 
 .composeBtn {
-    background: var(--color-accent, #6c8ebf);
+    background: var(--color-brand-primary);
     color: #fff;
     border: none;
     border-radius: 6px;
@@ -326,7 +326,7 @@
 }
 
 .clearSelectionBtn:hover {
-    border-color: var(--color-accent, #6c8ebf);
+    border-color: var(--color-brand-primary);
     color: var(--color-text-primary);
 }
 
@@ -358,11 +358,11 @@
 }
 
 .activityGroupCard:hover {
-    border-color: var(--color-accent, #6c8ebf);
+    border-color: var(--color-brand-primary);
 }
 
 .activityGroupCardChecked {
-    border-color: var(--color-accent, #6c8ebf);
+    border-color: var(--color-brand-primary);
     background: var(--color-bg-selected, rgba(108,142,191,0.08));
 }
 
@@ -379,7 +379,7 @@
 .activityGroupCardCheckbox input {
     width: 14px;
     height: 14px;
-    accent-color: var(--color-accent, #6c8ebf);
+    accent-color: var(--color-brand-primary);
     cursor: pointer;
 }
 
@@ -444,7 +444,7 @@
 .activityCheckRow input {
     width: 14px;
     height: 14px;
-    accent-color: var(--color-accent, #6c8ebf);
+    accent-color: var(--color-brand-primary);
     cursor: pointer;
     flex-shrink: 0;
 }
@@ -483,7 +483,7 @@
 }
 
 .modalClearBtn:hover:not(:disabled) {
-    border-color: var(--color-accent, #6c8ebf);
+    border-color: var(--color-brand-primary);
     color: var(--color-text-primary);
 }
 
@@ -493,7 +493,7 @@
 }
 
 .modalApplyBtn {
-    background: var(--color-accent, #6c8ebf);
+    background: var(--color-brand-primary);
     border: none;
     color: #fff;
     font-size: 12px;
@@ -671,3 +671,4 @@
         overflow-y: auto;
     }
 }
+.onboardingEmptyState { margin: var(--spacing-md); border: 1px solid var(--color-border); border-radius: var(--border-radius-lg); background: var(--color-bg-card-alt); }

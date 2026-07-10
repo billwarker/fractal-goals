@@ -22,7 +22,7 @@
     min-height: 34px;
     padding: 6px 10px;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--border-radius-sm);
     background: var(--color-bg-card-alt);
     color: var(--color-text-primary);
     font: inherit;
@@ -164,7 +164,7 @@
 .levelBadge {
     padding: 3px 6px;
     border: 1px solid color-mix(in srgb, var(--timeline-goal-color, var(--color-border-hover)) 72%, transparent);
-    border-radius: var(--radius-sm);
+    border-radius: var(--border-radius-sm);
     color: var(--timeline-goal-color, var(--color-text-muted));
     font-size: 11px;
     font-weight: 700;
@@ -181,7 +181,7 @@
 .metricPill {
     padding: 3px 6px;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--border-radius-sm);
     color: var(--color-text-secondary);
     background: var(--color-bg-input);
     font-size: 11px;
@@ -190,7 +190,7 @@
 .state {
     padding: 18px 12px;
     border: 1px dashed var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--border-radius-md);
     color: var(--color-text-secondary);
     text-align: center;
     font-size: 13px;

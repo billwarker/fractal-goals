@@ -77,7 +77,11 @@ class _GoalHelpersMixin:
             Goal.root_id == root_scope_id,
             Goal.deleted_at.is_(None),
         ).all()
+        # The explicitly validated starting goal is always part of its own
+        # subtree. This also keeps legacy goals with a missing root_id
+        # deletable instead of turning the operation into a successful no-op.
         goals_by_id = {item.id: item for item in active_goals}
+        goals_by_id[goal.id] = goal
         children_by_parent: dict[str | None, list[Goal]] = {}
         for item in active_goals:
             children_by_parent.setdefault(item.parent_id, []).append(item)

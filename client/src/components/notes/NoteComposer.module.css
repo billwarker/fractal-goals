@@ -68,7 +68,7 @@
 
 .textarea:focus {
     outline: none;
-    border-color: var(--color-accent, #6c8ebf);
+    border-color: var(--color-brand-primary);
 }
 
 .previewPane {
@@ -145,7 +145,7 @@
 }
 
 .submitBtn {
-    background: var(--color-accent, #6c8ebf);
+    background: var(--color-brand-primary);
     color: #fff;
     border: none;
     border-radius: 6px;
@@ -216,7 +216,7 @@
 
 .linkTabActive {
     color: var(--color-text-primary);
-    border-bottom-color: var(--color-accent, #6c8ebf);
+    border-bottom-color: var(--color-brand-primary);
 }
 
 .linkPanelContent {
@@ -305,7 +305,7 @@
 
 .activitySearch:focus {
     outline: none;
-    border-color: var(--color-accent, #6c8ebf);
+    border-color: var(--color-brand-primary);
 }
 
 .activityItem {
@@ -406,7 +406,7 @@
 }
 
 .activityGroupRow:hover {
-    border-color: var(--color-accent, #6c8ebf);
+    border-color: var(--color-brand-primary);
 }
 
 .activityGroupMeta {
@@ -447,7 +447,7 @@
 .activityCheckRow input {
     width: 14px;
     height: 14px;
-    accent-color: var(--color-accent, #6c8ebf);
+    accent-color: var(--color-brand-primary);
     cursor: pointer;
     flex-shrink: 0;
 }

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 
 import EmptyState from '../common/EmptyState';
@@ -10,6 +11,49 @@ import StepHeader from './StepHeader';
 import { isQuickSession } from '../../utils/sessionRuntime';
 import { formatLastUsed, getAverageDurationStat, getTemplateSortTimestamp } from '../../utils/durationStats';
 import styles from './TemplatePicker.module.css';
+import { fractalApi } from '../../utils/api';
+import { queryKeys } from '../../hooks/queryKeys';
+import { formatError } from '../../utils/mutationNotify';
+import notify from '../../utils/notify';
+import Hint from '../onboarding/Hint';
+
+const STARTER_TEMPLATE = {
+    name: 'Simple Empty Template',
+    description: 'A blank one-section session. Start here, add activities as you go.',
+    template_data: {
+        session_type: 'normal',
+        sections: [{ name: 'Main', activities: [] }],
+    },
+};
+
+function StarterTemplateEmptyState({ rootId, onSelectTemplate }) {
+    const queryClient = useQueryClient();
+    const createStarterTemplate = useMutation({
+        mutationFn: async () => {
+            const response = await fractalApi.createSessionTemplate(rootId, STARTER_TEMPLATE);
+            return response.data;
+        },
+        onSuccess: (template) => {
+            queryClient.setQueryData(queryKeys.sessionTemplates(rootId), (current = []) => [
+                ...current,
+                template,
+            ]);
+            onSelectTemplate(template);
+            notify.success('Starter template created');
+        },
+        onError: (error) => notify.error(`Failed to create starter template: ${formatError(error)}`),
+    });
+
+    return (
+        <Hint id="starter-template" title="Start simple" description="This blank template removes setup work. Add activities during the session when you need them.">
+            <EmptyState
+                description="Sessions need a template. Start with a blank section and add activities when you are ready."
+                actionLabel={createStarterTemplate.isPending ? 'Creating…' : 'Create a starter template'}
+                onAction={() => createStarterTemplate.mutate()}
+            />
+        </Hint>
+    );
+}
 
 function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate }) {
     const navigate = useNavigate();
@@ -73,11 +117,7 @@ function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate 
             <StepHeader stepNumber={1} title="Select a Template" />
 
             {templates.length === 0 ? (
-                <EmptyState
-                    description="No templates available."
-                    actionLabel="Create a Template"
-                    onAction={() => navigate(`/${rootId}/manage-session-templates`)}
-                />
+                <StarterTemplateEmptyState rootId={rootId} onSelectTemplate={onSelectTemplate} />
             ) : (
                 <div className={styles.templateSections}>
                     {activeTemplates.length > 0 ? (

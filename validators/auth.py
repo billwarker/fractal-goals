@@ -305,6 +305,27 @@ class UserPreferencesUpdateSchema(BaseModel):
     preferences: Dict[str, Any] = Field(...)
 
 
+class OnboardingStateUpdateSchema(BaseModel):
+    """Concurrency-safe update for user-controlled onboarding presentation state."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    revision: int = Field(..., ge=0)
+    root_id: Optional[str] = Field(None, max_length=64)
+    status: Optional[str] = Field(None, pattern=r'^(active|dismissed|completed)$')
+    hints_dismissed: Optional[List[str]] = Field(None, max_length=64)
+    visited: Optional[List[str]] = Field(None, max_length=16)
+    celebrated_first_session: Optional[bool] = None
+    restart: bool = False
+
+    @field_validator('hints_dismissed', 'visited')
+    @classmethod
+    def clean_onboarding_keys(cls, values: Optional[List[str]]) -> Optional[List[str]]:
+        if values is None:
+            return None
+        cleaned = [sanitize_string(value) for value in values if value and value.strip()]
+        return list(dict.fromkeys(cleaned))
+
+
 class UserPasswordUpdateSchema(BaseModel):
     """Schema for updating password."""
     model_config = ConfigDict(str_strip_whitespace=True)

@@ -9,6 +9,12 @@ from services.service_types import JsonDict, ServiceResult
 FEATURE_FLAGS_SETTING_KEY = "feature_flags"
 
 FEATURE_FLAG_DEFINITIONS: dict[str, JsonDict] = {
+    "onboarding_v1": {
+        "key": "onboarding_v1",
+        "label": "First-run onboarding",
+        "description": "Shows the Getting Started journey and contextual onboarding guidance.",
+        "default_enabled": False,
+    },
     "goal_surface_configuration": {
         "key": "goal_surface_configuration",
         "label": "Goal view configuration",

@@ -6,11 +6,13 @@ import { queryKeys } from './queryKeys';
 export const FEATURE_FLAGS = {
     goalSurfaceConfiguration: 'goal_surface_configuration',
     analyticsSqlExplorer: 'analytics_sql_explorer',
+    onboarding: 'onboarding_v1',
 };
 
 const DEFAULT_FLAGS = {
     [FEATURE_FLAGS.goalSurfaceConfiguration]: false,
     [FEATURE_FLAGS.analyticsSqlExplorer]: false,
+    [FEATURE_FLAGS.onboarding]: false,
 };
 
 export function normalizeFeatureFlags(flags) {
@@ -20,7 +22,7 @@ export function normalizeFeatureFlags(flags) {
     };
 }
 
-export function useFeatureFlags() {
+export function useFeatureFlags({ enabled = true } = {}) {
     const query = useQuery({
         queryKey: queryKeys.featureFlags(),
         queryFn: async () => {
@@ -28,6 +30,7 @@ export function useFeatureFlags() {
             return normalizeFeatureFlags(response.data?.flags);
         },
         staleTime: 60 * 1000,
+        enabled,
     });
 
     return {

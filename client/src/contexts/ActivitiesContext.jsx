@@ -4,6 +4,7 @@ import { fractalApi } from '../utils/api';
 import { withNotify } from '../utils/mutationNotify';
 import { queryKeys } from '../hooks/queryKeys';
 import { logError } from '../utils/logger';
+import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
 
 const ActivitiesContext = createContext();
 
@@ -21,6 +22,7 @@ export function ActivitiesProvider({ children }) {
                 next.push(created);
                 return next;
             });
+            await invalidateOnboardingProgress(queryClient, queryKeys);
             return created;
         },
         {
@@ -45,6 +47,7 @@ export function ActivitiesProvider({ children }) {
             await queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivitiesRoot(rootId) });
             await queryClient.invalidateQueries({ queryKey: queryKeys.sessionGoalsViewRoot(rootId) });
             await queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(rootId) });
+            await invalidateOnboardingProgress(queryClient, queryKeys);
             return updated;
         },
         {
@@ -74,6 +77,7 @@ export function ActivitiesProvider({ children }) {
                 if (!Array.isArray(prev)) return prev;
                 return prev.filter((item) => item.id !== activityId);
             });
+            await invalidateOnboardingProgress(queryClient, queryKeys);
             return deletedActivity;
         },
         {

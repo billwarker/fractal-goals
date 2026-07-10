@@ -811,7 +811,7 @@ function FractalGoals() {
         }, FLOWTREE_SCOPE_TRANSITION_MS);
     };
     return (
-        <div className="fractal-page-container" style={{
+        <div className={`fractal-page-container ${location.state?.onboardingJustLit ? 'onboarding-evidence-lit' : ''}`} style={{
             height: '100%',
             width: '100%',
             display: 'flex',
@@ -832,7 +832,7 @@ function FractalGoals() {
                         flex: 1,
                         minWidth: 0,
                         height: '100%',
-                        border: debugMode ? '4px solid red' : 'none',
+                        border: debugMode ? '2px solid var(--color-brand-danger)' : 'none',
                         boxSizing: 'border-box',
                         position: 'relative'
                     }}

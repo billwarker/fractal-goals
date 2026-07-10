@@ -1,6 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
 import AnalyticsFiltersSidebar from '../components/analytics/AnalyticsFiltersSidebar';
 import AnalyticsQueryConsole from '../components/analytics/AnalyticsQueryConsole';
@@ -31,12 +30,11 @@ import '../App.css';
 import notify from '../utils/notify';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
+import AnalyticsOnboardingState from '../components/onboarding/AnalyticsOnboardingState';
 import styles from './Analytics.module.css';
-
 const AnalyticsViewNameModal = lazy(() => import('../components/analytics/AnalyticsViewNameModal'));
 const AnalyticsViewsModal = lazy(() => import('../components/analytics/AnalyticsViewsModal'));
 const ProfileWindow = lazy(() => import('../components/analytics/ProfileWindow'));
-
 const MAX_WINDOWS = 4;
 const FILTER_PANE_COLUMNS = 16;
 const DEFAULT_LAYOUT = { type: 'grid', panels: [{ id: 'window-1', x: 0, y: 0, w: 96, h: 48 }] };
@@ -490,6 +488,8 @@ function Analytics() {
                     onToggleFiltersPane={() => setIsFiltersPaneOpen((current) => !current)}
                     showQueryConsole={showSqlExplorer}
                 />
+
+                <AnalyticsOnboardingState rootId={rootId} />
 
                 {activeMode === 'query' && showSqlExplorer ? (
                     <AnalyticsQueryConsole rootId={rootId} initialSql={consoleInitialSql} />

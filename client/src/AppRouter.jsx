@@ -9,6 +9,7 @@ import { lazyWithRetry } from './utils/lazyWithRetry';
 import { getViewportMetaContent, shouldAllowZoom } from './utils/viewportMeta';
 import styles from './AppRouter.module.css';
 import './App.css';
+import './app-shell-and-session.css';
 import GoalIcon from './components/atoms/GoalIcon';
 import { globalApi } from './utils/api';
 import { queryKeys } from './hooks/queryKeys';
@@ -40,6 +41,7 @@ import { trackEvent } from './utils/telemetry';
 import { dismissGoalDetailsForNavigation } from './utils/navigationEvents';
 import { useGoalLevels } from './contexts/GoalLevelsContext';
 import { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } from './utils/marketingHost';
+import GettingStartedChecklist from './components/onboarding/GettingStartedChecklist';
 
 export { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } from './utils/marketingHost';
 
@@ -300,9 +302,10 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
 
     if (isMobile) {
         return (
-            <div className="top-nav-links" ref={navRef}>
-                <div className={styles.mobileNav}>
-                    <div className={styles.mobileControlsRow}>
+            <>
+                <div className="top-nav-links" ref={navRef}>
+                    <div className={styles.mobileNav}>
+                        <div className={styles.mobileControlsRow}>
                         <FractalSwitcher
                             rootId={rootId}
                             rootGoal={rootGoal}
@@ -318,37 +321,20 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                             + ADD SESSION
                         </Link>
 
-                        {primaryNavItems.map(item => (
-                            <Link
-                                key={item.path}
-                                to={item.path}
-                                className={`nav-text-link ${styles.mobileBtn} ${isActive(item.path) ? 'active' : ''}`}
-                                onClick={handleRouteLinkClick}
-                            >
-                                {item.label}
-                            </Link>
-                        ))}
-
-                        {showLogsNav && (
-                            <Link
-                                to={logsNavItem.path}
-                                className={`nav-text-link ${styles.mobileBtn} ${isActive(logsNavItem.path) ? 'active' : ''}`}
-                                onClick={handleRouteLinkClick}
-                            >
-                                {logsNavItem.label}
-                            </Link>
-                        )}
-
                         <button className={`nav-text-link ${styles.mobileBtn}`} onClick={handleOpenSettings}>
-                            SETTINGS
+                            SET
                         </button>
-
-                        <Link className={`nav-text-link home-link ${styles.mobileBtn}`} to="/" onClick={handleRouteLinkClick}>
-                            EXIT
-                        </Link>
+                        </div>
                     </div>
                 </div>
-            </div>
+                <nav className={styles.mobileBottomNav} aria-label="Primary">
+                    {primaryNavItems.map(item => (
+                        <Link key={item.path} to={item.path} aria-current={isActive(item.path) ? 'page' : undefined} className={isActive(item.path) ? styles.mobileBottomActive : ''} onClick={handleRouteLinkClick}>
+                            {item.label}
+                        </Link>
+                    ))}
+                </nav>
+            </>
         );
     }
 
@@ -674,6 +660,8 @@ function App() {
                         <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
                     )}
                 </Suspense>
+
+                {!showSelectionPage && !showLandingPage && isAuthenticated && <GettingStartedChecklist />}
 
                 {/* Environment Indicator */}
                 <div className={`env-indicator ${import.meta.env.VITE_ENV || 'development'}`}>

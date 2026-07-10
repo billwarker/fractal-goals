@@ -40,6 +40,23 @@
   --color-brand-danger-hover: #dc5151;
   --color-brand-secondary: #f59f4d;
   --color-brand-secondary-hover: #e88d32;
+  --color-brand-dark: #2563a6;
+  --color-brand-warning: var(--color-brand-secondary);
+  --color-brand-accent: var(--color-mode-splits);
+
+  /* Semantic tints */
+  --color-brand-primary-soft: color-mix(in srgb, var(--color-brand-primary) 14%, transparent);
+  --color-brand-primary-muted: color-mix(in srgb, var(--color-brand-primary) 26%, transparent);
+  --color-brand-success-soft: color-mix(in srgb, var(--color-brand-success) 14%, transparent);
+  --color-brand-danger-soft: color-mix(in srgb, var(--color-brand-danger) 14%, transparent);
+  --color-brand-warning-soft: color-mix(in srgb, var(--color-warning) 14%, transparent);
+  --color-brand-accent-soft: color-mix(in srgb, var(--color-brand-accent) 14%, transparent);
+  --color-brand-success-muted: color-mix(in srgb, var(--color-brand-success) 26%, transparent);
+  --color-brand-danger-muted: color-mix(in srgb, var(--color-brand-danger) 26%, transparent);
+  --color-brand-warning-muted: color-mix(in srgb, var(--color-brand-warning) 26%, transparent);
+  --color-brand-accent-muted: color-mix(in srgb, var(--color-brand-accent) 26%, transparent);
+  --color-bg-selected: var(--color-brand-primary-soft);
+
 
   /* Activity mode / log event type colors */
   --color-mode-sets: #f59f4d;        /* orange — sets-based activity */
@@ -61,6 +78,21 @@
   --color-error: var(--color-brand-danger);
   --color-focus-ring: rgba(79, 156, 249, 0.45);
   --color-checkbox-accent: #2baa68;
+  --color-danger: var(--color-brand-danger);
+  --color-primary: var(--color-brand-primary);
+  --color-link: var(--color-brand-primary);
+  --color-text: var(--color-text-primary);
+  --color-text-tertiary: var(--color-text-muted);
+  --color-bg-body: var(--color-bg-app);
+  --color-bg-page: var(--color-bg-app);
+  --color-bg-primary: var(--color-bg-elevated);
+  --color-bg-modal: var(--color-bg-elevated);
+  --color-bg-subtle: var(--color-bg-card-alt);
+  --color-bg-input-focus: var(--color-bg-input);
+  --color-surface-muted: var(--color-bg-card-alt);
+  --color-border-input: var(--color-border);
+  --color-border-active: var(--color-brand-primary);
+  --color-active-branch-line: var(--color-brand-primary);
 
   /* Goal gradient intensity. Dark mode can handle stronger fills. */
   --goal-gradient-primary-weight: 100%;
@@ -84,6 +116,27 @@
   --border-radius-lg: 12px;
   --border-radius-xl: 16px;
   --border-radius-full: 50%;
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1.2);
+
+  /* Layering and layout */
+  --z-nav: 100;
+  --z-dropdown: 500;
+  --z-sheet: 900;
+  --z-modal: 1000;
+  --z-modal-2: 2000;
+  --z-modal-3: 3300;
+  --z-modal-4: 3500;
+  --z-toast: 4000;
+  --z-tooltip: 4500;
+  --panel-width-details: 390px;
+  --surface-grid-size: 20px;
+  --sheet-radius: var(--border-radius-xl);
 
   --text-shadow-default: 0 1px 3px rgba(0, 0, 0, 0.8);
 
@@ -97,6 +150,8 @@
   --font-family-display: "DM Serif Display", Georgia, "Times New Roman", serif;
   --font-family-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, Consolas, monospace;
   --font-family-config: var(--font-family-mono);
+  --font-family-base: var(--font-family);
+  --font-family-monospace: var(--font-family-mono);
 
   /* Type scale — fixed rem-based for dense app UI */
   --font-size-2xs: 0.6875rem; /* 11px */
@@ -118,6 +173,7 @@
   /* Font weights */
   --font-weight-light: 300;
   --font-weight-regular: 400;
+  --font-weight-normal: var(--font-weight-regular);
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
 
@@ -177,53 +233,4 @@
   --goal-gradient-secondary-weight: 58%;
   --goal-gradient-border-weight: 58%;
   --goal-gradient-inner-weight: 14%;
-}
-
-/*
- * Auto-detect system light/dark preference when no [data-theme] is explicitly set.
- * If the user or app sets [data-theme="light"] or [data-theme="dark"], that takes
- * precedence. This media query only fires when neither attribute is present.
- */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) {
-    color-scheme: light;
-    --color-bg-app: #f4f7fb;
-    --color-bg-elevated: #ffffff;
-    --color-bg-card: #ffffff;
-    --color-bg-card-alt: #f8fafc;
-    --color-bg-card-hover: #eef4fb;
-    --color-bg-sidebar: #ffffff;
-    --color-bg-node: #bfdbfe;
-    --color-bg-header: #ffffff;
-    --color-bg-input: #f9fbfe;
-    --color-border: #ced8e5;
-    --color-border-card: #ced8e5;
-    --color-border-btn: #111827;
-    --color-border-hover: #9db2c8;
-    --color-connection-line: #7a8ea5;
-    --color-grid: rgba(82, 113, 145, 0.14);
-    --color-overlay: rgba(0, 0, 0, 0.4);
-    --color-bg-surface: #ffffff;
-    --color-bg-secondary: #f8fbff;
-    --color-bg-hover: rgba(79, 156, 249, 0.08);
-    --color-text-disabled: rgba(0, 0, 0, 0.38);
-    --color-bg-tooltip: rgba(255, 255, 255, 0.95);
-    --color-text-primary: #0f1f33;
-    --color-text-secondary: #334b66;
-    --color-text-muted: #6f87a0;
-    --color-text-inverse: #ffffff;
-    --text-shadow-default: none;
-    --shadow-sm: 0 4px 10px rgba(52, 73, 94, 0.08);
-    --shadow-md: 0 12px 26px rgba(52, 73, 94, 0.12);
-    --shadow-lg: 0 20px 42px rgba(52, 73, 94, 0.16);
-    --shadow-xl: 0 32px 64px rgba(52, 73, 94, 0.22);
-    --color-success: var(--color-brand-success);
-    --color-error: var(--color-brand-danger);
-    --color-focus-ring: rgba(61, 130, 219, 0.32);
-    --color-checkbox-accent: #3bc57c;
-    --goal-gradient-primary-weight: 82%;
-    --goal-gradient-secondary-weight: 58%;
-    --goal-gradient-border-weight: 58%;
-    --goal-gradient-inner-weight: 14%;
-  }
 }

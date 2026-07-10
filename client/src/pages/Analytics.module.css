@@ -39,7 +39,7 @@
 }
 
 .gridSurfaceDebug {
-    outline: 4px solid red;
+    outline: 2px solid var(--color-brand-danger);
     outline-offset: -4px;
 }
 
@@ -91,3 +91,4 @@
         z-index: 500;
     }
 }
+.onboardingEmptyState { margin: var(--spacing-md); border: 1px solid var(--color-border); border-radius: var(--border-radius-lg); background: var(--color-bg-card-alt); }

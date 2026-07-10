@@ -18,6 +18,7 @@ import useIsMobile from './hooks/useIsMobile';
 import './FlowTree.css';
 import 'reactflow/dist/style.css';
 import styles from './FlowTree.module.css';
+import EmptyState from './components/common/EmptyState';
 
 const nodeTypes = {
     custom: FlowTreeNode,
@@ -383,9 +384,11 @@ const FlowTree = React.forwardRef(({
             </ReactFlow>
 
             {showNoActiveGoalsMessage && (
-                <div className={styles.emptyState} role="status">
-                    No active goals exist
-                </div>
+                <EmptyState
+                    className={styles.emptyState}
+                    title="No active goals in this view"
+                    description="Show inactive goals or add a smaller goal beneath your ultimate goal to keep building the tree."
+                />
             )}
 
             {viewSettings.showMetricsOverlay && graphMetrics && (

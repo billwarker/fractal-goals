@@ -1,10 +1,48 @@
 import models
 from datetime import date, timedelta
+from datetime import datetime, timezone
 
-from models import Program, ProgramBlock, ProgramDay
+from models import Program, ProgramBlock, ProgramDay, SessionTemplate
 from services.events import Events
 from services.serializers import serialize_session_template
-from services.template_service import TemplateService
+from services.template_service import TemplateService, seed_default_template
+from services.user_service import UserService
+
+
+def test_seed_default_template_skips_when_template_quota_is_full(
+    db_session,
+    sample_ultimate_goal,
+    test_user,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        'services.template_service.QuotaService.check_available',
+        lambda *_args, **_kwargs: (None, 'quota full', 403),
+    )
+    before = db_session.query(SessionTemplate).filter_by(root_id=sample_ultimate_goal.id).count()
+
+    seeded = seed_default_template(db_session, sample_ultimate_goal.id, test_user.id)
+
+    assert seeded is None
+    assert db_session.query(SessionTemplate).filter_by(root_id=sample_ultimate_goal.id).count() == before
+
+
+def test_onboarding_derives_smart_completion_from_goal_fields(
+    db_session,
+    sample_ultimate_goal,
+    test_user,
+):
+    sample_ultimate_goal.description = 'A specific outcome'
+    sample_ultimate_goal.relevance_statement = 'It supports my long-term direction'
+    sample_ultimate_goal.deadline = datetime.now(timezone.utc)
+    sample_ultimate_goal.track_activities = False
+    db_session.commit()
+
+    payload, error, status = UserService(db_session).get_onboarding(test_user.id)
+
+    assert error is None
+    assert status == 200
+    assert payload['steps']['make_goal_smart'] is True
 
 
 def test_delete_template_emits_deleted_event(db_session, sample_ultimate_goal, sample_session_template, test_user, monkeypatch):

@@ -17,6 +17,46 @@ from services.service_types import JsonList, ServiceResult
 from validators import validate_session_template_data
 
 
+STARTER_TEMPLATE_NAME = "Simple Empty Template"
+STARTER_TEMPLATE_DESCRIPTION = "A blank one-section session. Start here, add activities as you go."
+STARTER_TEMPLATE_DATA = {
+    "session_type": "normal",
+    "sections": [{"name": "Main", "activities": []}],
+}
+
+
+def seed_default_template(db_session, root_id, current_user_id):
+    """Stage the default template when quota permits; caller owns the transaction."""
+    _, quota_error, _ = QuotaService(db_session).check_available(
+        current_user_id,
+        "session_templates",
+    )
+    if quota_error:
+        return None
+
+    template_data = validate_session_template_data(STARTER_TEMPLATE_DATA)
+    _, storage_error, _ = QuotaService(db_session).check_storage_available(
+        current_user_id,
+        QuotaService._payload_size(
+            STARTER_TEMPLATE_NAME,
+            STARTER_TEMPLATE_DESCRIPTION,
+            template_data,
+        ),
+    )
+    if storage_error:
+        return None
+
+    template = SessionTemplate(
+        id=str(uuid.uuid4()),
+        name=STARTER_TEMPLATE_NAME,
+        description=STARTER_TEMPLATE_DESCRIPTION,
+        root_id=root_id,
+        template_data=json.dumps(template_data),
+    )
+    db_session.add(template)
+    return template
+
+
 class TemplateService:
     def __init__(self, db_session):
         self.db_session = db_session

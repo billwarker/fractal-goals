@@ -6,6 +6,7 @@ import Button from '../atoms/Button';
 import Checkbox from '../atoms/Checkbox';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 import Input from '../atoms/Input';
+import Hint from '../onboarding/Hint';
 import Select from '../atoms/Select';
 import TextArea from '../atoms/TextArea';
 import { buildActivityPayload } from '../../utils/activityBuilder';
@@ -346,14 +347,9 @@ function ActivityBuilderForm({
                     )}
 
                     {hasMetrics && (
-                        <ActivityMetricsSection
-                            rootId={rootId}
-                            metrics={metrics}
-                            hasSets={hasSets}
-                            onAddMetric={handleAddMetric}
-                            onRemoveMetric={handleRemoveMetric}
-                            onMetricChange={handleMetricChange}
-                        />
+                        <Hint id="activity-metrics" title="Metrics create evidence" description="Choose a number you can record consistently. Session values become progress evidence for associated goals.">
+                            <ActivityMetricsSection rootId={rootId} metrics={metrics} hasSets={hasSets} onAddMetric={handleAddMetric} onRemoveMetric={handleRemoveMetric} onMetricChange={handleMetricChange} />
+                        </Hint>
                     )}
 
                     <div className={styles.actionsRow}>

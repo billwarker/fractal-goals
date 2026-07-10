@@ -1,6 +1,7 @@
 import React, { Suspense, useEffect, useMemo, useReducer, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 
+import EmptyState from '../components/common/EmptyState';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import ProgramBlockView from '../components/programs/ProgramBlockView';
@@ -758,7 +759,7 @@ function ProgramCalendarPage() {
     );
 
     return (
-        <div className={styles.container}>
+        <div className={`${styles.container} page-reveal`}>
             <div className={`${styles.workspace} ${!isSidePaneVisible ? styles.workspaceNoSidePane : ''}`}>
                 <div className={`${styles.mainColumn} ${viewMode === 'blocks' ? styles.mainColumnBlocksMode : ''}`}>
                     <PageHeader
@@ -863,12 +864,7 @@ function ProgramCalendarPage() {
                         </button>
 
                         {programs.length === 0 ? (
-                            <div className={styles.programPickerEmpty}>
-                                <p>No programs yet.</p>
-                                <button className={styles.primaryButton} onClick={handleCreateProgramOption}>
-                                    Create a New Program
-                                </button>
-                            </div>
+                            <EmptyState title="Turn intent into a schedule" description="Programs connect goals, templates, and dates into a practice rhythm you can follow." actionLabel="Create a new program" onAction={handleCreateProgramOption} />
                         ) : (
                             <>
                                 <div className={styles.programPickerControls}>

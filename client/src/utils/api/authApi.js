@@ -15,6 +15,10 @@ export const authApi = {
     getMe: () => axios.get(`${API_BASE}/auth/me`),
     getAccountUsage: (params = {}) => axios.get(`${API_BASE}/auth/account/usage`, { params }),
     updatePreferences: (data) => axios.patch(`${API_BASE}/auth/preferences`, data),
+    getOnboarding: (rootId = null) => axios.get(`${API_BASE}/auth/onboarding`, {
+        params: rootId ? { root_id: rootId } : {},
+    }),
+    updateOnboarding: (data) => axios.patch(`${API_BASE}/auth/onboarding`, data),
     updatePassword: (data) => axios.put(`${API_BASE}/auth/account/password`, data),
     updateEmail: (data) => axios.put(`${API_BASE}/auth/account/email`, data),
     updateUsername: (data) => axios.put(`${API_BASE}/auth/account/username`, data),

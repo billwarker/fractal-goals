@@ -299,6 +299,7 @@ export const buildGraphPresentation = ({
         const data = {
             ...node.data,
             layoutMode,
+            hasEvidence: effectiveEvidenceGoalIds.has(node.id),
         };
         if (!style) return { ...node, data };
         return { ...node, data, style };

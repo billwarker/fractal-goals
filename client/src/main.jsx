@@ -18,6 +18,7 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 }
 import AppRouter from './AppRouter.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
+import { OnboardingProvider } from './contexts/OnboardingContext.jsx'
 import { ActivitiesProvider } from './contexts/ActivitiesContext.jsx'
 import { GoalsProvider } from './contexts/GoalsContext.jsx'
 import { GoalLevelsProvider } from './contexts/GoalLevelsContext.jsx'
@@ -98,15 +99,17 @@ createRoot(document.getElementById('root')).render(
             />
             <TimezoneProvider>
               <AuthProvider>
-                <GoalLevelsProvider>
-                  <GoalsProvider>
-                    <ThemeProvider>
-                      <ActivitiesProvider>
-                        <AppRouter />
-                      </ActivitiesProvider>
-                    </ThemeProvider>
-                  </GoalsProvider>
-                </GoalLevelsProvider>
+                <OnboardingProvider>
+                  <GoalLevelsProvider>
+                    <GoalsProvider>
+                      <ThemeProvider>
+                        <ActivitiesProvider>
+                          <AppRouter />
+                        </ActivitiesProvider>
+                      </ThemeProvider>
+                    </GoalsProvider>
+                  </GoalLevelsProvider>
+                </OnboardingProvider>
               </AuthProvider>
             </TimezoneProvider>
           </DebugProvider>

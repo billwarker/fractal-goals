@@ -18,10 +18,11 @@ function GoalUncompletionModal({
     goalType,
     goalCompletionNote,
 }) {
+    const completionStyle = { '--completion-confirm-accent': accentColor };
     return (
         <div
             className={styles.container}
-            style={{ '--completion-confirm-accent': accentColor }}
+            style={completionStyle}
         >
             {/* Originally Completed Date */}
             {completedAt && (
@@ -47,16 +48,19 @@ function GoalUncompletionModal({
                     </div>
                 ) : (
                     <div className={styles.list}>
-                        {programs.map((program, index) => (
+                        {programs.map((program, index) => {
+                            const programStyle = { '--program-accent': getProgramColor(program, index) };
+                            return (
                             <div
                                 key={program.id || program.name}
                                 className={styles.listItem}
-                                style={{ '--program-accent': getProgramColor(program, index) }}
+                                style={programStyle}
                             >
                                 <FolderIcon size={16} className={styles.programIcon} />
                                 <span className={styles.programName}>{program.name}</span>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

@@ -53,6 +53,7 @@
     min-width: 0;
     color: inherit;
     text-decoration: none;
+    width: 100%;
 }
 
 .cardHeaderTitleLink:hover,
@@ -68,6 +69,7 @@
 .cardHeaderTitleTemplate {
     max-width: 100%;
     line-height: 1.3;
+    min-width: 0;
 }
 
 .cardDescription {
@@ -85,7 +87,10 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
 }
+
+.topTitleRow > :first-child { min-width: 0; }
 
 .metaItem {
     min-width: 0;

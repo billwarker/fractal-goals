@@ -17,6 +17,8 @@ import { isQuickSession } from '../utils/sessionRuntime';
 
 // Context
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
+import FirstSessionCelebration from '../components/onboarding/FirstSessionCelebration';
+import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 
 /**
  * Session Detail Page Wrapper
@@ -39,6 +41,7 @@ function SessionDetailContent() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const isMobile = useIsMobile();
+    const onboarding = useOptionalOnboarding();
     const appliedActivityTargetRef = useRef(null);
     const {
         session,
@@ -89,6 +92,11 @@ function SessionDetailContent() {
         isSavingTemplate,
         isDuplicatingSession,
     } = useSessionDetailController({ rootId, sessionId, navigate, isMobile });
+    const isCompleted = Boolean(session?.attributes?.completed);
+
+    useEffect(() => {
+        if (isCompleted && onboarding?.enabled) onboarding.refresh();
+    }, [isCompleted, onboarding]);
 
     const targetActivityInstanceId = searchParams.get('activityInstanceId');
 
@@ -203,11 +211,11 @@ function SessionDetailContent() {
     }
 
     const totalDuration = calculateTotalDuration();
-    const isCompleted = Boolean(session?.attributes?.completed);
     const selectedModeLabel = sidePaneMode.charAt(0).toUpperCase() + sidePaneMode.slice(1);
 
     return (
         <div className={styles.sessionDetailContainer}>
+            <FirstSessionCelebration />
             <div className={styles.sessionMainContent}>
                 {isMobile && (
                     <SessionDetailMobileChrome
