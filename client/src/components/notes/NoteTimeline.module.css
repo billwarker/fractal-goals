@@ -4,6 +4,85 @@
     gap: 6px;
 }
 
+.continuousTimeline {
+    gap: 0;
+    position: relative;
+}
+
+.dateNotes {
+    position: relative;
+    margin-left: 7px;
+    border-left: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
+}
+
+.sessionGroup {
+    position: relative;
+    margin: 2px 0 8px 12px;
+    border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--color-bg-surface) 45%, transparent);
+    overflow: visible;
+}
+
+.sessionHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 8px 12px;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 68%, transparent);
+}
+
+.sessionMarker {
+    position: absolute;
+    top: 17px;
+    left: -18px;
+    width: 9px;
+    height: 9px;
+    box-sizing: border-box;
+    border: 2px solid var(--color-bg-surface);
+    border-radius: 50%;
+    background: var(--color-text-muted);
+    box-shadow: 0 0 0 1px var(--color-border);
+}
+
+.sessionBadge {
+    min-width: 0;
+    max-width: min(100%, 420px);
+}
+
+.sessionCount {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--color-text-muted);
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+.sessionNotes {
+    min-width: 0;
+}
+
+.standaloneNote {
+    position: relative;
+    margin-left: 12px;
+}
+
+.standaloneNote::before {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    top: 20px;
+    left: -17px;
+    width: 7px;
+    height: 7px;
+    box-sizing: border-box;
+    border: 2px solid var(--color-bg-surface);
+    border-radius: 50%;
+    background: var(--color-text-muted);
+    box-shadow: 0 0 0 1px var(--color-border);
+}
+
 .emptyState {
     color: var(--color-text-muted);
     font-size: 14px;
@@ -36,6 +115,57 @@
     letter-spacing: 0.04em;
     border-top: 1px solid var(--color-border);
     margin-top: 4px;
+}
+
+.continuousTimeline .dateHeader {
+    position: relative;
+    z-index: 2;
+    padding: 16px 0 8px;
+    border-top: 0;
+    background: var(--color-bg-primary, transparent);
+    font-size: 12px;
+}
+
+.continuousTimeline .pinnedSection {
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 10px;
+}
+
+@media (max-width: 640px) {
+    .dateNotes {
+        margin-left: 4px;
+    }
+
+    .sessionGroup,
+    .standaloneNote {
+        margin-left: 10px;
+    }
+
+    .sessionMarker {
+        left: -15px;
+    }
+
+    .standaloneNote::before {
+        left: -14px;
+    }
+
+    .sessionHeader {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        padding: 8px 10px;
+    }
+
+    .sessionBadge {
+        width: auto;
+        max-width: calc(100% - 8px);
+    }
+
+    .sessionCount {
+        width: 100%;
+        margin-left: 0;
+        padding-left: 1px;
+    }
 }
 
 .dateGroup:first-child .dateHeader {

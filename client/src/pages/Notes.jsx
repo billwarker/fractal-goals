@@ -276,6 +276,7 @@ function Notes() {
                         onUnpin={unpinNote}
                         showContext={true}
                         noteTypeVariant="metadata"
+                        presentation="timeline"
                         groupByDate={true}
                         hasMore={hasMore}
                         onLoadMore={loadNextPage}

@@ -5,6 +5,7 @@
     border-radius: 8px;
     overflow: hidden;
     background: var(--color-surface-muted, rgba(0, 0, 0, 0.06));
+    max-width: var(--note-video-max-width, 100%);
 }
 
 .embed:last-child {

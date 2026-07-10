@@ -20,6 +20,57 @@
     padding: 10px 0;
 }
 
+/* Continuous feed variant — the timeline owns grouping and separators. */
+.noteCard.timeline {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 14px 38px 16px 22px;
+    contain-intrinsic-size: 150px;
+    container-type: inline-size;
+}
+
+.noteCard.timeline .topRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+}
+
+.noteCard.timeline .metaStack,
+.noteCard.timeline .metaRow,
+.noteCard.timeline .contextSummary,
+.noteCard.timeline .goalContext {
+    max-width: 100%;
+}
+
+.noteCard.timeline .headerActions {
+    min-width: 0;
+    padding-top: 1px;
+}
+
+.noteCard.timeline::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 22px;
+    height: 1px;
+    background: color-mix(in srgb, var(--color-border) 72%, transparent);
+}
+
+.noteCard.timeline:last-child::after {
+    display: none;
+}
+
+.noteCard.timeline:hover,
+.noteCard.timeline.selected {
+    background: color-mix(in srgb, var(--color-bg-hover) 58%, transparent);
+}
+
+.noteCard.timeline.pinned {
+    padding-left: 22px;
+}
+
 .noteCard:not(.flat):hover {
     border-color: var(--color-border-hover, var(--color-border));
 }
@@ -150,6 +201,14 @@
     color: var(--color-text-primary);
 }
 
+.noteKindPrefix {
+    flex-shrink: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+}
+
 .sessionTemplateBadge {
     max-width: min(260px, 100%);
 }
@@ -176,6 +235,11 @@
 
 .noteCard.flat .optionsWrapper {
     right: 0;
+}
+
+.noteCard.timeline .optionsWrapper {
+    top: 13px;
+    right: 6px;
 }
 
 /* Set label shown on minimal (session-detail) activity set notes */
@@ -356,6 +420,52 @@
 
 .noteCard.compact .contextPrimary {
     font-size: 12px;
+}
+
+@container (max-width: 760px) {
+    .noteCard.timeline .topRow {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 7px;
+        padding-right: 0;
+        margin-bottom: 9px;
+    }
+
+    .noteCard.timeline .headerActions {
+        min-width: 0;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .noteCard.timeline .metaStack,
+    .noteCard.timeline .contextSummary,
+    .noteCard.timeline .goalContext {
+        width: 100%;
+    }
+
+    .noteCard.timeline .contextPrimary {
+        max-width: 100%;
+    }
+
+    .noteCard.timeline .sessionTemplateBadge {
+        width: fit-content;
+        max-width: 100%;
+    }
+
+    .noteCard.timeline .timestamp,
+    .noteCard.timeline .noteTypeText,
+    .noteCard.timeline .metaSep {
+        font-size: 10px;
+    }
+}
+
+@media (max-width: 640px) {
+    .noteCard.timeline {
+        padding: 13px 34px 15px 16px;
+    }
+
+    .noteCard.timeline::after {
+        left: 16px;
+    }
 }
 
 .completedContent .markdownContent {

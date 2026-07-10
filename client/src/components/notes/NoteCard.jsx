@@ -64,6 +64,10 @@ function formatMetadataNoteTypeLabel(label) {
     return label.replace(/\s+Note$/i, '');
 }
 
+const NOTE_KIND_LABELS = {
+    goal_completion: 'Goal Completion',
+};
+
 function NoteCard({
     note,
     onEdit,
@@ -75,6 +79,9 @@ function NoteCard({
     compact = false,
     minimal = false,
     variant = 'card',
+    compactMedia = false,
+    suppressSessionContext = false,
+    timestampDisplay = 'dateTime',
     showTypePill = true,
     noteTypeVariant = 'pill',
     isSelected = false,
@@ -92,6 +99,8 @@ function NoteCard({
     const resolvedNoteType = deriveNoteType(note);
     const resolvedNoteTypeLabel = deriveNoteTypeLabel(note);
     const isGoalCompletionNote = resolvedNoteType === 'goal_completion_note';
+    const noteKindLabel = NOTE_KIND_LABELS[note.note_kind]
+        || (isGoalCompletionNote ? NOTE_KIND_LABELS.goal_completion : null);
     const displayNoteTypeLabel = noteTypeVariant === 'metadata'
         ? formatMetadataNoteTypeLabel(resolvedNoteTypeLabel)
         : resolvedNoteTypeLabel;
@@ -150,6 +159,7 @@ function NoteCard({
                 hour12: true,
                 timeZone: timezone,
             });
+            if (timestampDisplay === 'time') return timeStr;
             if (isToday) return timeStr;
             return date.toLocaleDateString('en-US', {
                 month: 'short',
@@ -259,10 +269,13 @@ function NoteCard({
             case 'fractal_note':
                 return 'Fractal';
             case 'goal_note':
+                return note.goal_name || note.content || 'Goal';
             case 'goal_completion_note':
                 return note.goal_name || note.content || 'Goal';
             case 'session_note':
-                return note.session_template_name || note.session_name || 'Session';
+                return suppressSessionContext
+                    ? 'Session note'
+                    : note.session_template_name || note.session_name || 'Session';
             case 'program_note':
                 return note.program_name || 'Program';
             case 'activity_set_note':
@@ -276,13 +289,13 @@ function NoteCard({
     })();
     const secondaryContextBadges = [];
     if (showContext && resolvedNoteType !== 'fractal_note') {
-        if (resolvedNoteType !== 'goal_note' && note.goal_name) {
+        if (resolvedNoteType !== 'goal_note' && resolvedNoteType !== 'goal_completion_note' && note.goal_name) {
             secondaryContextBadges.push({ type: 'text', label: note.goal_name });
         }
         if (resolvedNoteType !== 'activity_instance_note' && resolvedNoteType !== 'activity_definition_note' && resolvedNoteType !== 'activity_set_note' && note.activity_definition_name) {
             secondaryContextBadges.push({ type: 'text', label: note.activity_definition_name });
         }
-        if (resolvedNoteType !== 'session_note' && note.session_name) {
+        if (!suppressSessionContext && resolvedNoteType !== 'session_note' && note.session_name) {
             secondaryContextBadges.push({
                 type: 'session',
                 label: note.session_template_name || note.session_name,
@@ -305,6 +318,7 @@ function NoteCard({
                 className={[
                     styles.noteCard,
                     variant === 'flat' ? styles.flat : '',
+                    variant === 'timeline' ? styles.timeline : '',
                     compact ? styles.compact : '',
                     isSelected ? styles.selected : '',
                     note.isPast ? styles.pastNote : '',
@@ -364,16 +378,32 @@ function NoteCard({
                                 <div className={styles.contextSummary}>
                                     {(resolvedNoteType === 'goal_note' || isGoalCompletionNote) && note.goal_type ? (
                                         <span className={styles.goalContext}>
-                                            <GoalIcon
-                                                shape={getGoalIcon(note.goal_type)}
-                                                color={getGoalColor(isGoalCompletionNote ? 'Completed' : note.goal_type)}
-                                                secondaryColor={getGoalSecondaryColor(isGoalCompletionNote ? 'Completed' : note.goal_type)}
-                                                isSmart={Boolean(note.goal_is_smart)}
-                                                size={12}
-                                            />
-                                            <span className={styles.contextPrimary}>{primaryContextLabel}</span>
+                                            {isGoalCompletionNote ? (
+                                                <>
+                                                    <span className={styles.noteKindPrefix}>{noteKindLabel}:</span>
+                                                    <GoalIcon
+                                                        shape={getGoalIcon(note.goal_type)}
+                                                        color={getGoalColor('Completed')}
+                                                        secondaryColor={getGoalSecondaryColor('Completed')}
+                                                        isSmart={Boolean(note.goal_is_smart)}
+                                                        size={12}
+                                                    />
+                                                    <span className={styles.contextPrimary}>{primaryContextLabel}</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className={styles.contextPrimary}>{primaryContextLabel}</span>
+                                                    <GoalIcon
+                                                        shape={getGoalIcon(note.goal_type)}
+                                                        color={getGoalColor(note.goal_type)}
+                                                        secondaryColor={getGoalSecondaryColor(note.goal_type)}
+                                                        isSmart={Boolean(note.goal_is_smart)}
+                                                        size={12}
+                                                    />
+                                                </>
+                                            )}
                                         </span>
-                                    ) : resolvedNoteType === 'session_note' ? (
+                                    ) : resolvedNoteType === 'session_note' && !suppressSessionContext ? (
                                         renderSessionTemplateBadge()
                                     ) : (
                                         <span className={styles.contextPrimary}>{primaryContextLabel}</span>
@@ -403,7 +433,7 @@ function NoteCard({
                     <div className={styles.headerActions}>
                         {!minimal && noteTypeVariant === 'metadata' && (
                             <>
-                                {showTypePill && (
+                                {showTypePill && !noteKindLabel && (
                                     <>
                                         <span className={styles.noteTypeText}>{displayNoteTypeLabel}</span>
                                         <span className={styles.metaSep} aria-hidden="true">·</span>
@@ -414,7 +444,7 @@ function NoteCard({
                         )}
                         {!minimal && noteTypeVariant !== 'metadata' && (
                             <>
-                                {showTypePill && (
+                                {showTypePill && !noteKindLabel && (
                                     <span className={styles.noteTypePill}>
                                         {displayNoteTypeLabel}
                                     </span>
@@ -459,7 +489,11 @@ function NoteCard({
                 ) : (
                     <div className={styles.content}>
                         {shouldShowRichContent ? (
-                            <MarkdownNoteContent content={note.content} className={styles.markdownContent} />
+                            <MarkdownNoteContent
+                                content={note.content}
+                                className={styles.markdownContent}
+                                compactMedia={compactMedia}
+                            />
                         ) : (
                             <div className={`${styles.markdownContent} ${styles.previewContent}`}>
                                 {previewContent || ' '}

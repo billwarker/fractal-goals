@@ -124,6 +124,7 @@ function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = n
                         groupByDate={true}
                         showContext={includeDescendants}
                         showTypePill={false}
+                        presentation="timeline"
                         emptyMessage="No notes on this goal yet."
                     />
                 )}

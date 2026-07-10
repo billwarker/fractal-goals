@@ -168,6 +168,37 @@ describe('NoteCard', () => {
         expect(screen.queryByText('Activity Definition Note')).not.toBeInTheDocument();
     });
 
+    it('folds a goal completion kind into the note name without redundant metadata or context', () => {
+        render(
+            <NoteCard
+                note={{
+                    id: 'note-completion',
+                    content: 'Finished with a final performance.',
+                    created_at: '2026-07-06T21:12:00Z',
+                    context_type: 'goal',
+                    context_id: 'goal-1',
+                    note_kind: 'goal_completion',
+                    note_type: 'goal_completion_note',
+                    note_type_label: 'Goal Completion Note',
+                    goal_id: 'goal-1',
+                    goal_name: "She's Got It – Performance Piece",
+                    goal_type: 'short_term',
+                    is_pinned: false,
+                }}
+                showContext
+                noteTypeVariant="metadata"
+            />,
+        );
+
+        const completionKind = screen.getByText('Goal Completion:');
+        const completionIcon = completionKind.nextElementSibling;
+        const completionName = screen.getByText("She's Got It – Performance Piece");
+        expect(completionIcon).toBeTruthy();
+        expect(completionIcon.tagName.toLowerCase()).toBe('svg');
+        expect(completionIcon.nextElementSibling).toBe(completionName);
+        expect(screen.queryByText('Goal Completion')).not.toBeInTheDocument();
+    });
+
     it('renders links in plain goal note content', () => {
         render(
             <NoteCard

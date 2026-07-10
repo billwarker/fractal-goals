@@ -4,6 +4,16 @@
     overflow-wrap: anywhere;
 }
 
+.compactMedia {
+    --note-video-max-width: 680px;
+}
+
+@media (max-width: 768px) {
+    .compactMedia {
+        --note-video-max-width: 100%;
+    }
+}
+
 .markdown :where(p, ul, ol, blockquote, pre) {
     margin: 0 0 0.5rem;
 }
