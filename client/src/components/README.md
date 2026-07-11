@@ -10,6 +10,7 @@ Use these shared primitives before adding local UI controls:
 - `atoms/DeleteButton.jsx` - labeled destructive delete actions.
 - `atoms/DropdownMenu.jsx` - compact anchored option menus and menu items.
 - `atoms/Badge.jsx` - badges, pills, chips, tags, compact status labels, and type labels.
+- `atoms/SmartBadge.jsx` - the SMART-letters pill; `SMARTIndicator.jsx` wraps it with per-goal criterion status.
 - `atoms/Input.jsx`, `atoms/Select.jsx`, `atoms/TextArea.jsx`, `atoms/Checkbox.jsx`, `atoms/Radio.jsx` - form controls.
 - `atoms/Tooltip.jsx` - hover/focus help for compact icon controls.
 - `atoms/Spinner.jsx` - the only spinner animation primitive.

@@ -212,6 +212,8 @@ Remaining SaaS build-out to know:
 
 ### Goals
 
+New-fractal onboarding on the selection page uses a compact responsive two-column modal: concise outcome fields on the left and a large-icon vertical goal-level hierarchy on the right, with Create anchored beneath the hierarchy. Only name and goal type are required; description, relevance, and deadline are optional. The goal-type control uses distinct system-default icons (twelve-point star, hexagon, diamond, and circle), hover/focus guidance about each level's scope and time horizon, and always-visible side-by-side Primary Color and Secondary Color (SMART ring fill) controls. Clicking a large icon opens the canonical seven-shape visual tray used by Goal Characteristics. A compact utility toolbar randomizes coordinated colors or distinct icons; its SMART Preview hover/focus state swaps all four icons to the animated SMART renderer. All four level styles are persisted atomically as fractal-scoped overrides.
+
 Goals are the core domain object. The app supports a 5-level hierarchy:
 
 - `UltimateGoal`

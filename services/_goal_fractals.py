@@ -9,6 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 
 from models import Goal, GoalLevel, validate_root_goal
+from validators.core import parse_date_string
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
 from services.view_serializers import serialize_fractal_summary, serialize_goal_selection_item
@@ -82,17 +83,55 @@ class _GoalFractalsMixin:
         if storage_error:
             return None, storage_error, storage_status
 
-        level = self.db_session.query(GoalLevel).filter_by(name="Ultimate Goal").first()
-        if not level:
-            level = GoalLevel(name="Ultimate Goal", rank=0)
-            self.db_session.add(level)
-            self.db_session.flush()
+        level_name_by_type = {
+            "UltimateGoal": "Ultimate Goal",
+            "LongTermGoal": "Long Term Goal",
+            "MidTermGoal": "Mid Term Goal",
+            "ShortTermGoal": "Short Term Goal",
+        }
+        selected_type = data.get('type') or "UltimateGoal"
+        level_styles = data.get('level_styles') or {}
+        scoped_levels = {}
+        for goal_type, level_name in level_name_by_type.items():
+            source = self.db_session.query(GoalLevel).filter_by(
+                name=level_name, owner_id=current_user_id, root_id=None, deleted_at=None,
+            ).first() or self.db_session.query(GoalLevel).filter_by(
+                name=level_name, owner_id=None, deleted_at=None,
+            ).first()
+            if not source:
+                source = GoalLevel(name=level_name, rank=list(level_name_by_type).index(goal_type))
+                self.db_session.add(source)
+                self.db_session.flush()
+
+            if level_styles:
+                style = level_styles[goal_type]
+                scoped = GoalLevel(
+                    name=source.name, rank=source.rank, color=style['color'],
+                    secondary_color=style['secondary_color'], icon=style['icon'], owner_id=current_user_id,
+                    allow_manual_completion=source.allow_manual_completion,
+                    track_activities=source.track_activities, requires_smart=source.requires_smart,
+                    deadline_min_value=source.deadline_min_value, deadline_min_unit=source.deadline_min_unit,
+                    deadline_max_value=source.deadline_max_value, deadline_max_unit=source.deadline_max_unit,
+                    max_children=source.max_children,
+                    auto_complete_when_children_done=source.auto_complete_when_children_done,
+                    can_have_targets=source.can_have_targets, description_required=source.description_required,
+                    default_deadline_offset_value=source.default_deadline_offset_value,
+                    default_deadline_offset_unit=source.default_deadline_offset_unit,
+                    sort_children_by=source.sort_children_by,
+                )
+                self.db_session.add(scoped)
+                scoped_levels[goal_type] = scoped
+            else:
+                scoped_levels[goal_type] = source
+        self.db_session.flush()
+        level = scoped_levels[selected_type]
 
         new_fractal = Goal(
             level_id=level.id,
             name=data['name'],
             description=data.get('description', ''),
             relevance_statement=data.get('relevance_statement'),
+            deadline=parse_date_string(data['deadline']) if data.get('deadline') else None,
             parent_id=None,
             owner_id=current_user_id,
         )
@@ -101,6 +140,9 @@ class _GoalFractalsMixin:
         # A fractal root scopes itself and every descendant. Assign this only
         # after flush because SQLAlchemy generates the root UUID at that point.
         new_fractal.root_id = new_fractal.id
+        if level_styles:
+            for scoped_level in scoped_levels.values():
+                scoped_level.root_id = new_fractal.id
         UserService(self.db_session).initialize_onboarding_for_root(current_user_id, new_fractal.id)
         starter_template = seed_default_template(
             self.db_session,

@@ -3,6 +3,7 @@
 Re-exported by the validators package __init__, so existing
 `from validators import <Schema>` imports keep working.
 """
+import re
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from .core import (
@@ -277,6 +278,8 @@ class FractalCreateSchema(BaseModel):
     type: Optional[str] = Field('UltimateGoal')
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     relevance_statement: Optional[str] = Field(None, max_length=MAX_RELEVANCE_LENGTH)
+    deadline: Optional[str] = None
+    level_styles: Optional[Dict[str, Dict[str, Any]]] = None
     
     @field_validator('name')
     @classmethod
@@ -299,4 +302,32 @@ class FractalCreateSchema(BaseModel):
             raise ValueError(f"Invalid root goal type. Must be one of: {', '.join(VALID_ROOT_GOAL_TYPES)}")
         return v
 
+    @field_validator('deadline')
+    @classmethod
+    def validate_deadline(cls, v: Optional[str]) -> Optional[str]:
+        if not v:
+            return None
+        parse_date_string(v)
+        return v
 
+    @field_validator('level_styles')
+    @classmethod
+    def validate_level_styles(cls, v: Optional[Dict[str, Dict[str, Any]]]) -> Optional[Dict[str, Dict[str, Any]]]:
+        if v is None:
+            return None
+        if set(v) != set(VALID_ROOT_GOAL_TYPES):
+            raise ValueError('level_styles must contain exactly the four root goal types')
+        valid_icons = {'circle', 'square', 'triangle', 'star', 'hexagon', 'diamond', 'twelve-point-star'}
+        normalized = {}
+        for goal_type, style in v.items():
+            if set(style) != {'color', 'secondary_color', 'icon'}:
+                raise ValueError('Each level style requires color, secondary_color, and icon')
+            if not isinstance(style['color'], str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', style['color']):
+                raise ValueError('Each primary color must be a six-digit hex color')
+            secondary = style['secondary_color']
+            if secondary is not None and (not isinstance(secondary, str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', secondary)):
+                raise ValueError('Each secondary color must be null or a six-digit hex color')
+            if style['icon'] not in valid_icons:
+                raise ValueError('Unsupported goal level icon')
+            normalized[goal_type] = {'color': style['color'].lower(), 'secondary_color': secondary.lower() if secondary else None, 'icon': style['icon']}
+        return normalized

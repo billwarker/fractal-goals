@@ -62,7 +62,7 @@
 }
 
 .form {
-    padding: 24px 20px;
+    padding: 0;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -71,17 +71,69 @@
 .formGroup {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 8px;
+    flex: 1;
+}
+
+.fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.85fr);
+    gap: 14px 22px;
+    align-items: start;
+}
+
+.formColumn {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
 .label {
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 0;
     font-size: 11px;
     font-weight: bold;
-    text-transform: uppercase;
-    /* Color handled inline for dynamic goal types */
+    color: var(--color-text-primary);
+    font-size: 13px;
 }
+
+.optionalLabel { margin-left: 6px; color: var(--color-text-muted); font-size: 10px; font-weight: 500; }
+
+.typeAndColorRow {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    grid-column: 2;
+    grid-row: 1;
+    padding: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: var(--color-bg-card-alt);
+}
+
+.utilityRow {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    order: -1;
+}
+
+.randomizeButton { flex: 1; min-height: 30px; white-space: nowrap; padding-inline: 8px; font-size: 11px; }
+
+.smartPreviewWrap { display: inline-flex; align-items: center; margin-left: auto; }
+.smartPreviewButton {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+}
+.smartPreviewButton:hover { background: var(--color-bg-hover); }
+.smartPreviewButton:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
 .descriptionLabel {
     font-size: 11px;
@@ -90,19 +142,171 @@
     font-style: italic;
 }
 
-.select {
-    width: 100%;
-    padding: 10px;
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    color: var(--color-text-primary);
-    font-size: 14px;
+.goalTypePicker {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
 }
 
-.select:focus {
-    outline: none;
-    border-color: var(--color-brand-primary);
+.goalTypeOption {
+    position: relative;
+    min-width: 0;
+    padding: 8px 12px 8px 8px;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--color-text-primary);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 10px;
+    text-align: left;
+    transition: background var(--duration-base) var(--ease-standard), opacity var(--duration-base) var(--ease-standard), filter var(--duration-base) var(--ease-standard);
+    cursor: pointer;
+}
+
+/* FlowTree-style connector running through the icon column: same token and
+   stroke width as .react-flow__edge-path. Each trigger draws a stub from its
+   own icon center up/down past the 30px row gap (8px padding + 14px gap +
+   8px padding); adjacent stubs overlap into one continuous line, and the
+   icon shapes render above it so nodes sit on the line like the FlowTree. */
+.iconPickerTrigger::before,
+.iconPickerTrigger::after {
+    content: '';
+    position: absolute;
+    left: 31.5px;
+    width: 1px;
+    background: var(--color-connection-line);
+    z-index: 0;
+}
+.iconPickerTrigger::before { top: -30px; height: calc(50% + 30px); }
+.iconPickerTrigger::after { top: 50%; height: calc(50% + 30px); }
+.goalTypeOption:first-child .iconPickerTrigger::before,
+.goalTypeOption:last-child .iconPickerTrigger::after { content: none; }
+/* The open shape tray sits between this icon and the next; stop the downward
+   stub so the line does not draw across the tray. */
+.goalTypeOptionTrayOpen .iconPickerTrigger::after { content: none; }
+.iconPickerTrigger > * { position: relative; z-index: 1; }
+
+.goalTypeOptionAboveRoot {
+    opacity: 0.4;
+    filter: grayscale(0.6);
+}
+.goalTypeOptionAboveRoot:hover { opacity: 0.75; filter: grayscale(0.25); }
+
+.goalTypeChoice {
+    display: contents;
+    cursor: pointer;
+}
+
+.iconPickerTrigger {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    cursor: pointer;
+}
+.iconPickerTrigger:focus-visible { outline: 2px solid var(--color-focus-ring); }
+
+.swatches {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.swatchInput {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+}
+.swatchInput:hover, .swatchInput:focus-visible { border-color: var(--color-border-hover); box-shadow: 0 0 0 2px var(--color-bg-hover); }
+.swatchInput::-webkit-color-swatch-wrapper { padding: 3px; }
+.swatchInput::-webkit-color-swatch { border: none; border-radius: 50%; }
+.swatchInput::-moz-color-swatch { border: none; border-radius: 50%; }
+.swatchInputSecondary { width: 20px; height: 20px; }
+.swatchInputSecondary::-webkit-color-swatch-wrapper { padding: 2px; }
+
+.shapeTray {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    animation: shapeTrayIn var(--duration-base) var(--ease-standard);
+}
+
+@keyframes shapeTrayIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .shapeTray { animation: none; }
+}
+
+.shapeTrayOption {
+    min-height: 38px;
+    display: grid;
+    place-items: center;
+    padding: 5px 0;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-surface);
+    cursor: pointer;
+    transition: background var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
+}
+.shapeTrayOption:hover, .shapeTrayOption:focus-visible { background: var(--color-bg-hover); }
+.shapeTrayOptionSelected { border-color: var(--level-color); box-shadow: inset 0 0 0 1px var(--level-color); }
+
+.goalTypeOption:hover { background: var(--color-bg-hover); }
+.goalTypeOptionSelected .goalTypeName {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--level-color) 40%, transparent);
+}
+.goalTypeOption:focus-within { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
+.goalTypeName {
+    justify-self: start;
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 750;
+    line-height: 1.2;
+}
+
+.goalTypeGuidance {
+    min-height: 28px;
+    margin: 0;
+    padding: 6px 9px;
+    border-left: 3px solid var(--color-border-hover);
+    border-radius: 0 6px 6px 0;
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-secondary);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.rootActions { display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: 2px; }
+
+.visuallyHidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .readOnlyType {
@@ -140,4 +344,12 @@
     justify-content: flex-end;
     gap: 10px;
     background: var(--color-bg-surface);
+}
+
+@media (max-width: 768px) {
+    .fields { display: flex; flex-direction: column; }
+    .formColumn { width: 100%; order: 1; }
+    .typeAndColorRow { width: 100%; order: 2; }
+    .utilityRow { flex-wrap: wrap; }
+    .rootActions { position: sticky; bottom: 0; padding-top: 8px; background: var(--color-bg-card-alt); }
 }

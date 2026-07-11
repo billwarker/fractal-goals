@@ -62,6 +62,44 @@ class TestFractalEndpoints:
             'session_type': 'normal',
             'sections': [{'name': 'Main', 'activities': []}],
         }
+
+    def test_create_fractal_persists_type_deadline_and_all_scoped_level_colors(self, authed_client, db_session, test_user):
+        level_styles = {
+            'UltimateGoal': {'color': '#123abc', 'secondary_color': None, 'icon': 'twelve-point-star'},
+            'LongTermGoal': {'color': '#234bcd', 'secondary_color': '#112233', 'icon': 'hexagon'},
+            'MidTermGoal': {'color': '#345cde', 'secondary_color': None, 'icon': 'diamond'},
+            'ShortTermGoal': {'color': '#456def', 'secondary_color': None, 'icon': 'circle'},
+        }
+        response = authed_client.post('/api/fractals', json={
+            'name': 'Colored horizon', 'type': 'LongTermGoal',
+            'deadline': '2030-06-15', 'level_styles': level_styles,
+        })
+
+        assert response.status_code == 201
+        root = db_session.query(Goal).filter_by(id=response.get_json()['id']).one()
+        assert root.level.name == 'Long Term Goal'
+        assert root.level.color == '#234bcd'
+        assert root.level.secondary_color == '#112233'
+        assert root.level.icon == 'hexagon'
+        assert root.level.owner_id == test_user.id
+        assert root.level.root_id == root.id
+        assert root.deadline.date().isoformat() == '2030-06-15'
+        scoped_levels = db_session.query(GoalLevel).filter_by(owner_id=test_user.id, root_id=root.id).all()
+        assert {level.name: level.color for level in scoped_levels} == {
+            'Ultimate Goal': '#123abc', 'Long Term Goal': '#234bcd',
+            'Mid Term Goal': '#345cde', 'Short Term Goal': '#456def',
+        }
+
+    def test_create_fractal_rejects_invalid_level_color(self, authed_client):
+        response = authed_client.post('/api/fractals', json={
+            'name': 'Invalid color', 'level_styles': {
+                'UltimateGoal': {'color': 'red', 'secondary_color': None, 'icon': 'star'},
+                'LongTermGoal': {'color': '#234bcd', 'secondary_color': None, 'icon': 'hexagon'},
+                'MidTermGoal': {'color': '#345cde', 'secondary_color': None, 'icon': 'diamond'},
+                'ShortTermGoal': {'color': '#456def', 'secondary_color': None, 'icon': 'circle'},
+            },
+        })
+        assert response.status_code == 400
     
     def test_list_fractals_with_data(self, authed_client, sample_ultimate_goal):
         """Test listing fractals when they exist."""
