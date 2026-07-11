@@ -508,7 +508,7 @@ class GoalTargetService:
             root_id, goal, goals_by_id, target.activity_id, effective_start, effective_end
         )
 
-        summary = self._build_target_summary(target, serialized_instances)
+        summary = self._build_target_summary(target, serialized_instances, activity_def)
 
         return {
             'target': serialize_target(target),
@@ -558,23 +558,62 @@ class GoalTargetService:
             return None
         return value.astimezone(timezone.utc) if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
-    def _build_target_summary(self, target, serialized_instances) -> JsonDict:
+    def _build_target_summary(self, target, serialized_instances, activity_def=None) -> JsonDict:
         """Per-condition progress aggregates over the contributing instances."""
         now = datetime.now(timezone.utc)
         created_at = self._as_utc(target.created_at)
 
-        def instance_values_for_metric(instance, metric_id):
-            values = []
-            for metric in (instance.get('metrics') or instance.get('metric_values') or []):
-                mid = metric.get('metric_id') or metric.get('metric_definition_id')
-                if mid == metric_id and metric.get('value') is not None:
-                    values.append(metric)
-            for instance_set in (instance.get('sets') or []):
-                for metric in (instance_set.get('metrics') or []):
-                    mid = metric.get('metric_id') or metric.get('metric_definition_id')
-                    if mid == metric_id and metric.get('value') is not None:
-                        values.append(metric)
-            return values
+        metric_defs = [metric for metric in (getattr(activity_def, 'metric_definitions', None) or []) if not metric.deleted_at]
+
+        def coerce_numeric(value):
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        def instance_metric_tuple(instance):
+            sets = instance.get('sets') or []
+            if sets and metric_defs:
+                anchor = next((metric for metric in metric_defs if metric.is_best_set_metric), metric_defs[0])
+                ranked_defs = [anchor, *(metric for metric in metric_defs if metric.id != anchor.id)]
+                best_values = None
+                best_metrics = None
+                for instance_set in sets:
+                    metrics = {
+                        metric.get('metric_id') or metric.get('metric_definition_id'): coerce_numeric(metric.get('value'))
+                        for metric in (instance_set.get('metrics') or [])
+                    }
+                    values = [metrics.get(metric.id) for metric in ranked_defs]
+                    if values[0] is None:
+                        continue
+                    is_better = best_values is None
+                    if best_values is not None:
+                        for metric_def, candidate, incumbent in zip(ranked_defs, values, best_values):
+                            if candidate == incumbent:
+                                continue
+                            if candidate is None:
+                                break
+                            if incumbent is None:
+                                is_better = True
+                                break
+                            higher_is_better = metric_def.higher_is_better is not False
+                            is_better = candidate > incumbent if higher_is_better else candidate < incumbent
+                            break
+                    if is_better:
+                        best_values = values
+                        best_metrics = metrics
+                if best_metrics is not None:
+                    return best_metrics
+
+            return {
+                metric.get('metric_id') or metric.get('metric_definition_id'): coerce_numeric(metric.get('value'))
+                for metric in (instance.get('metrics') or instance.get('metric_values') or [])
+            }
+
+        instance_tuples = [
+            (instance, instance_metric_tuple(instance))
+            for instance in serialized_instances
+        ]
 
         conditions = []
         for condition in (target.metric_conditions or []):
@@ -589,28 +628,17 @@ class GoalTargetService:
             first_met_at = None
             first_met_session_id = None
 
-            for instance in serialized_instances:
-                metric_values = instance_values_for_metric(instance, metric_id)
-                if not metric_values:
+            for instance, metric_tuple in instance_tuples:
+                candidate = metric_tuple.get(metric_id)
+                if candidate is None:
                     continue
-                numeric_values = []
-                for metric in metric_values:
-                    try:
-                        numeric_values.append(float(metric['value']))
-                    except (TypeError, ValueError):
-                        continue
-                if not numeric_values:
-                    continue
-                candidate = max(numeric_values) if higher_is_better else min(numeric_values)
                 if best_value is None or (
                     candidate > best_value if higher_is_better else candidate < best_value
                 ):
                     best_value = candidate
                     best_instance_id = instance.get('id')
 
-                instance_met = any(
-                    check_metric_value(target_value, value, operator) for value in numeric_values
-                )
+                instance_met = check_metric_value(target_value, candidate, operator)
                 if instance_met:
                     met_count += 1
                     if first_met_at is None:

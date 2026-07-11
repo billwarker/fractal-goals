@@ -345,6 +345,36 @@ describe('TargetAnalyticsModal', () => {
         expect(dataset.data.map((point) => point.densityCount)).toEqual([2, 2, 1]);
     });
 
+    it('plots a coherent best-set tuple instead of independent per-metric maxima', () => {
+        mockData.current = {
+            ...baseAnalytics,
+            activity_definition: {
+                ...baseAnalytics.activity_definition,
+                metric_definitions: [
+                    { ...baseAnalytics.activity_definition.metric_definitions[0], is_best_set_metric: true },
+                    baseAnalytics.activity_definition.metric_definitions[1],
+                ],
+            },
+            instances: [{
+                ...baseAnalytics.instances[0],
+                metrics: [],
+                sets: [
+                    { metrics: [{ metric_definition_id: 'speed', value: 50 }, { metric_definition_id: 'quality', value: 8 }] },
+                    { metrics: [{ metric_definition_id: 'speed', value: 80 }, { metric_definition_id: 'quality', value: 5 }] },
+                ],
+            }],
+        };
+
+        setup();
+        const lineProps = chartMocks.line.mock.calls.at(-1)[0];
+        expect(lineProps.data.datasets.map((dataset) => dataset.data)).toEqual([[80], [5]]);
+
+        switchGraphType('Scatter');
+        const scatterPoint = chartMocks.scatter.mock.calls.at(-1)[0].data.datasets[0].data[0];
+        expect(scatterPoint).toMatchObject({ x: 80, y: 5 });
+        expect(scatterPoint).not.toMatchObject({ x: 80, y: 8 });
+    });
+
     it('shows an empty state when there are no instances', () => {
         mockData.current = { ...baseAnalytics, instances: [], summary: { ...baseAnalytics.summary, total_count: 0 } };
         setup();

@@ -14,6 +14,7 @@ import { withScatterPointDensity } from '../analytics/scatterPointProfile';
 import { useTargetAnalytics, useGoalActivityInstances } from '../../hooks/useTargetQueries';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
+import { computeAutoAggregations } from '../../utils/progressAggregations';
 import { themedTooltipOptions, thresholdLineAnnotations } from './targetAnalyticsChartOptions';
 import styles from './TargetAnalyticsModal.module.css';
 
@@ -46,25 +47,26 @@ function coerceNumber(value) {
     return Number.isFinite(numeric) ? numeric : null;
 }
 
-// Resolve the representative value of a metric on an instance (max for
-// higher-is-better metrics, min otherwise), reading direct metrics and sets.
-function resolveMetricValue(instance, metricId, higherIsBetter) {
-    const collected = [];
-    const lists = [instance?.metrics || instance?.metric_values || []];
-    for (const set of (instance?.sets || [])) {
-        lists.push(set?.metrics || []);
-    }
-    for (const list of lists) {
-        for (const metric of list) {
-            const mid = metric?.metric_id || metric?.metric_definition_id;
-            if (mid === metricId) {
-                const numeric = coerceNumber(metric.value);
-                if (numeric != null) collected.push(numeric);
-            }
+// Project one coherent metric tuple per instance. Set-based activities must use
+// every value from the same canonical best set; combining per-metric maxima can
+// manufacture a performance that never occurred. Direct metrics are only the
+// fallback for instances without a usable set.
+function resolveInstanceMetricTuple(instance, metricDefinitions) {
+    const sets = instance?.sets || [];
+    if (sets.length) {
+        const { best_set_index: bestSetIndex } = computeAutoAggregations(sets, metricDefinitions);
+        if (bestSetIndex != null) {
+            return new Map((sets[bestSetIndex]?.metrics || []).map((metric) => [
+                metric?.metric_id || metric?.metric_definition_id,
+                coerceNumber(metric?.value),
+            ]));
         }
     }
-    if (!collected.length) return null;
-    return higherIsBetter ? Math.max(...collected) : Math.min(...collected);
+
+    return new Map((instance?.metrics || instance?.metric_values || []).map((metric) => [
+        metric?.metric_id || metric?.metric_definition_id,
+        coerceNumber(metric?.value),
+    ]));
 }
 
 function operatorIsHigherBetter(operator = '>=') {
@@ -263,6 +265,12 @@ function TargetAnalyticsModal({
         [isBuilding, previewData, data]
     );
     const summary = isBuilding ? null : data?.summary;
+    const metricTuplesByInstanceId = useMemo(() => new Map(
+        instances.map((instance) => [
+            instance.id,
+            resolveInstanceMetricTuple(instance, metricDefinitions),
+        ])
+    ), [instances, metricDefinitions]);
 
     const updateMetricSlot = (slotIndex, metricId) => {
         const currentPrimary = effectiveMetricIds[0] || metricDefinitions[0]?.id || '';
@@ -290,9 +298,7 @@ function TargetAnalyticsModal({
         );
         const labels = sorted.map(formatLabel);
         const datasets = selectedMetricDefs.map((metricDef, index) => {
-            const condition = conditionByMetric.get(metricDef.id);
-            const higherIsBetter = condition ? operatorIsHigherBetter(condition.operator) : true;
-            const data = sorted.map((inst) => resolveMetricValue(inst, metricDef.id, higherIsBetter));
+            const data = sorted.map((inst) => metricTuplesByInstanceId.get(inst.id)?.get(metricDef.id) ?? null);
             return {
                 type: 'line',
                 label: metricDef.name,
@@ -315,7 +321,7 @@ function TargetAnalyticsModal({
             };
         });
         return { labels, datasets, sorted };
-    }, [instances, selectedMetricDefs, conditionByMetric, selectedInstanceId]);
+    }, [instances, selectedMetricDefs, metricTuplesByInstanceId, selectedInstanceId]);
 
     const trendOptions = useMemo(() => ({
         responsive: true,
@@ -369,13 +375,11 @@ function TargetAnalyticsModal({
         if (!xDef) return null;
         const xCond = conditionByMetric.get(xDef.id);
         const yCond = yDef ? conditionByMetric.get(yDef.id) : null;
-        const xHib = xCond ? operatorIsHigherBetter(xCond.operator) : true;
-        const yHib = yCond ? operatorIsHigherBetter(yCond.operator) : true;
-
         const points = [];
         instances.forEach((inst, idx) => {
-            const x = resolveMetricValue(inst, xDef.id, xHib);
-            const y = yDef ? resolveMetricValue(inst, yDef.id, yHib) : idx + 1;
+            const tuple = metricTuplesByInstanceId.get(inst.id);
+            const x = tuple?.get(xDef.id) ?? null;
+            const y = yDef ? (tuple?.get(yDef.id) ?? null) : idx + 1;
             if (x == null || y == null) return;
             points.push({ x, y, instanceId: inst.id, label: inst.session_name || formatLabel(inst, idx) });
         });
@@ -411,7 +415,7 @@ function TargetAnalyticsModal({
         }
 
         return { datasets, xDef, yDef };
-    }, [instances, selectedMetricDefs, conditionByMetric, selectedInstanceId, completedColor]);
+    }, [instances, selectedMetricDefs, conditionByMetric, metricTuplesByInstanceId, selectedInstanceId, completedColor]);
 
     const scatterOptions = useMemo(() => {
         if (!scatterData) return {};
