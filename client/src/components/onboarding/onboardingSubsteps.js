@@ -16,7 +16,7 @@ export const ONBOARDING_SUBSTEPS = {
     ],
     make_goal_smart: [
         tracked('specific', 'Specific', 'Add a clear description of the result.'),
-        tracked('measurable', 'Measurable', 'Add a target or configure completion through child goals.'),
+        tracked('measurable', 'Measurable', 'Open the goal detail modal and go to Activities › Add Target, then select an activity to create a target against. Alternatively, set the goal to complete once its children are complete.'),
         tracked('achievable', 'Achievable', 'Associate an activity or activity group, or use child completion.'),
         tracked('relevant', 'Relevant', 'Explain how the goal supports its parent or why the ultimate goal matters.'),
         tracked('time_bound', 'Time-bound', 'Set a deadline.'),

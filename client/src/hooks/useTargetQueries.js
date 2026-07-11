@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
+import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
 import { queryKeys } from './queryKeys';
 
 /**
@@ -63,6 +64,9 @@ export function useTargetMutations(rootId, goalId) {
             targetId
                 ? queryClient.invalidateQueries({ queryKey: queryKeys.targetAnalyticsRoot(rootId, targetId) })
                 : Promise.resolve(),
+            // Adding/removing a target can flip the "Measurable" SMART criterion,
+            // which drives the onboarding checklist's make-goal-SMART step.
+            invalidateOnboardingProgress(queryClient, queryKeys),
         ]);
     }, [goalId, queryClient, rootId]);
 
