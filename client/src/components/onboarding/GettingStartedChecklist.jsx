@@ -137,26 +137,22 @@ export default function GettingStartedChecklist({ inline = false }) {
                 <div className={styles.detailBody}>
                     <div className={styles.detailHeader}>
                         <div className={styles.detailHeading}>
-                            <span aria-label={`Step ${currentStep.number}`}>{currentStep.number}</span>
-                            <h2>{currentStep.title}</h2>
+                            <h2><span className={styles.stepLabel}>Step {currentStep.number}:</span> {currentStep.title}</h2>
                         </div>
-                        <p>{currentStep.blurb}</p>
                     </div>
                     <ol className={styles.substeps}>
                         {currentStep.substeps.map((substep, index) => {
                             const letter = String.fromCharCode(97 + index);
-                            const status = substep.kind === 'info' ? 'Guide' : substep.done ? 'Complete' : substep.kind === 'optional' ? 'Optional' : 'To do';
                             const content = (
                                 <>
-                                    <strong><span className={styles.substepNumber}>{currentStep.number}{letter}</span>{substep.title}</strong>
+                                    <strong><span className={styles.substepNumber}>{letter}</span>{substep.title}</strong>
                                     <p>{substep.description}</p>
-                                    <span className={styles.substepStatus}>{status}</span>
                                 </>
                             );
                             return (
                                 <li key={substep.id}>
                                     {substep.kind === 'info'
-                                        ? <><div>{content}</div><span className={styles.guideMarker} aria-label="Informational guidance">Guide</span></>
+                                        ? <div>{content}</div>
                                         : (
                                             <button type="button" className={styles.substepAction} aria-label={`Go to ${substep.title}`} onClick={() => navigate(currentStep.path)}>
                                                 <span className={styles.substepContent}>{content}</span>

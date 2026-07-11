@@ -77,6 +77,10 @@ export const getTypeDisplayName = (type) => {
     return names[type] || type;
 };
 
+// Short level word without the trailing "Goal" (e.g. "Ultimate", "Long Term"),
+// suitable for phrasing like "your Ultimate goal".
+export const getLevelWord = (type) => getTypeDisplayName(type).replace(/\s*Goal$/, '');
+
 export const calculateGoalAge = (createdAt) => {
     if (!createdAt) return null;
 

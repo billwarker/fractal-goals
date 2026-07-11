@@ -6,6 +6,7 @@ import { buildOnboardingSteps } from '../components/onboarding/onboardingSteps';
 import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../hooks/useFeatureFlags';
 import { queryKeys } from '../hooks/queryKeys';
 import { authApi } from '../utils/api';
+import { getLevelWord } from '../utils/goalHelpers';
 import { trackEvent } from '../utils/telemetry';
 import { useAuth } from './AuthContext';
 
@@ -33,6 +34,13 @@ export function OnboardingProvider({ children }) {
         queryFn: async () => (await authApi.getOnboarding(rootId)).data,
         enabled: Boolean(enabled && user?.id),
         staleTime: 15_000,
+    });
+    // Observe the user's fractal summaries cache (owned by Selection/app header)
+    // reactively so the root's level word is available once loaded, without
+    // triggering a fetch of our own.
+    const fractalsQuery = useQuery({
+        queryKey: queryKeys.fractals(user?.id),
+        enabled: false,
     });
     const state = query.data || null;
     const previousStepsRef = useRef(null);
@@ -95,7 +103,16 @@ export function OnboardingProvider({ children }) {
         previousStepsRef.current = state.steps;
     }, [enabled, state?.status, state?.steps]);
 
-    const steps = useMemo(() => buildOnboardingSteps(state, rootId), [rootId, state]);
+    const rootLevelWord = useMemo(() => {
+        if (!rootId) return undefined;
+        const fractals = fractalsQuery.data;
+        const root = Array.isArray(fractals) ? fractals.find((f) => f.id === rootId) : null;
+        return root?.type ? getLevelWord(root.type).toLowerCase() : undefined;
+    }, [fractalsQuery.data, rootId]);
+    const steps = useMemo(
+        () => buildOnboardingSteps(state, rootId, { level: rootLevelWord }),
+        [rootId, state, rootLevelWord],
+    );
     const completedCount = steps.filter((step) => step.done).length;
     const value = useMemo(() => ({
         enabled, state, steps, completedCount, rootId,

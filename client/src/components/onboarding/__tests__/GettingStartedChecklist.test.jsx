@@ -39,7 +39,7 @@ describe('GettingStartedChecklist', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Next checklist item' }));
 
         fireEvent.click(screen.getByRole('button', { name: 'Go' }));
-        expect(screen.getByText('2a')).toBeInTheDocument();
+        expect(screen.getByText('a')).toBeInTheDocument();
         expect(screen.getByLabelText('Record values: incomplete')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Go to Record values' }));
         expect(screen.getByTestId('location')).toHaveTextContent('/root-1/create-session');
@@ -49,7 +49,7 @@ describe('GettingStartedChecklist', () => {
         expect(dismiss).not.toHaveBeenCalled();
 
         fireEvent.click(screen.getByRole('button', { name: 'Open detailed onboarding guide' }));
-        expect(screen.getByText('2a')).toBeInTheDocument();
+        expect(screen.getByText('a')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Dismiss onboarding' }));
         fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
         expect(dismiss).toHaveBeenCalled();

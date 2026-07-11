@@ -104,14 +104,6 @@ class UserService:
         ).filter(Goal.root_id == root_id, Goal.deleted_at.is_(None)).all()
         root = next((goal for goal in goals if goal.id == root_id), None)
         children = [goal for goal in goals if goal.parent_id is not None]
-        goal_ids = {goal.id for goal in goals}
-        deepest_level = 0
-        for goal in children:
-            depth, current = 0, goal
-            while current and current.parent_id in goal_ids and depth < 20:
-                depth += 1
-                current = next((item for item in goals if item.id == current.parent_id), None)
-            deepest_level = max(deepest_level, depth)
 
         best_smart_goal = None
         best_smart_status = {key: False for key in ('specific', 'measurable', 'achievable', 'relevant', 'time_bound')}
@@ -154,10 +146,6 @@ class UserService:
         return {
             'break_it_down': {
                 'supporting_goal': bool(children),
-                'describe_result': any(goal.description and goal.description.strip() for goal in children),
-                'connect_to_parent': any(goal.relevance_statement and goal.relevance_statement.strip() for goal in children),
-                'visible_next_action': deepest_level >= 2,
-                'keep_tree_focused': None,
             },
             'make_goal_smart': {
                 **best_smart_status,
@@ -165,12 +153,12 @@ class UserService:
                 'goal_id': best_smart_goal.id if best_smart_goal else None,
             },
             'create_activity_metric': {
+                'go_to_manage_activities': None,
                 'create_activity': bool(activities),
-                'choose_structure': bool(activities),
-                'add_metric': bool(metrics),
-                'interpret_progress': any(activity.track_progress is not None or activity.delta_display_mode for activity in activities),
                 'associate_goal': any(activity.associated_goals for activity in activities) or any(group.associated_goals for group in activity_groups),
-                'check_unit': None,
+                'create_activity_group': None,
+                'add_metric': bool(metrics),
+                'refine_metrics': None,
             },
             'first_session': {
                 'choose_template': any(session.template_id for session in sessions),

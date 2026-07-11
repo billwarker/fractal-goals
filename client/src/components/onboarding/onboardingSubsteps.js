@@ -4,11 +4,15 @@ const info = (id, title, description) => ({ id, title, description, kind: 'info'
 
 export const ONBOARDING_SUBSTEPS = {
     break_it_down: [
-        tracked('supporting_goal', 'Add a major supporting goal', 'Create the first smaller result beneath your ultimate goal.'),
-        tracked('describe_result', 'Describe the result', 'Explain what success for the supporting goal looks like.'),
-        tracked('connect_to_parent', 'Connect it to the parent', 'State how the smaller goal contributes to the higher outcome.'),
-        optional('visible_next_action', 'Make the next action visible', 'Continue one branch until it can guide near-term practice.'),
-        info('keep_tree_focused', 'Keep the tree focused', 'Use a few meaningful children instead of exhaustively planning everything.'),
+        tracked('supporting_goal', 'Add a supporting child goal', 'Create a smaller goal that will help you achieve your {level} goal.'),
+    ],
+    create_activity_metric: [
+        info('go_to_manage_activities', 'Go to Sessions › Manage Activities', 'Open the activity manager to define the practice you want to record.'),
+        tracked('create_activity', 'Create an activity', 'Name the repeatable practice action.'),
+        tracked('associate_goal', 'Associate it to a goal', 'Activities can be directly associated to goals, and parents will inherit the activities of their children.'),
+        info('create_activity_group', 'Create an activity group and add your activity to it', 'Activity groups help you organize activities of the same type (e.g. warm ups).'),
+        optional('add_metric', 'Define metrics', 'Create up to 3 metrics that help you measure your performance on this activity.'),
+        info('refine_metrics', 'Refine your metrics', 'Go to Manage Metrics, where you can refine how these metrics are tracked.'),
     ],
     make_goal_smart: [
         tracked('specific', 'Specific', 'Add a clear description of the result.'),
@@ -17,14 +21,6 @@ export const ONBOARDING_SUBSTEPS = {
         tracked('relevant', 'Relevant', 'Explain how the goal supports its parent or why the ultimate goal matters.'),
         tracked('time_bound', 'Time-bound', 'Set a deadline.'),
         info('review_badge', 'Review the badge', 'Each highlighted letter in the goal header represents a SMART criterion you have met.'),
-    ],
-    create_activity_metric: [
-        tracked('create_activity', 'Create the activity', 'Name the repeatable practice action.'),
-        tracked('choose_structure', 'Choose its structure', 'Decide whether it uses normal metrics, sets, or splits.'),
-        tracked('add_metric', 'Add a metric', 'Define a value such as repetitions, accuracy, duration, rating, or weight.'),
-        optional('interpret_progress', 'Choose how progress is interpreted', 'Configure progress tracking, best-set behavior, or delta display when useful.'),
-        tracked('associate_goal', 'Associate it with a goal', 'Connect the activity to the goal it provides evidence for.'),
-        info('check_unit', 'Check the recording unit', 'Use a metric name and unit that will be clear during a session.'),
     ],
     first_session: [
         tracked('choose_template', 'Choose a template', 'Use the Simple Empty Template or another session template.'),
@@ -52,10 +48,12 @@ export const ONBOARDING_SUBSTEPS = {
     ],
 };
 
-export function buildSubsteps(stepId, facts = {}) {
+export function buildSubsteps(stepId, facts = {}, { level } = {}) {
+    const levelText = level || 'ultimate';
     return (ONBOARDING_SUBSTEPS[stepId] || []).map((substep, index) => ({
         ...substep,
         label: `${index + 1}`,
+        description: substep.description.replace('{level}', levelText),
         done: facts[substep.id] === true,
     }));
 }

@@ -586,8 +586,9 @@ class TestPreferencesEndpoint:
         assert response.status_code == 200
         facts = response.get_json()['substeps']['create_activity_metric']
         assert facts['create_activity'] is True
-        assert facts['choose_structure'] is True
         assert facts['add_metric'] is True
+        assert 'choose_structure' not in facts
+        assert facts['go_to_manage_activities'] is None
 
     def test_cookie_authenticated_write_requires_csrf(self, client, test_user):
         response = client.post(
