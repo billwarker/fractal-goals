@@ -548,6 +548,9 @@ class TestPreferencesEndpoint:
         assert second_state.status_code == 200
         assert first_state.get_json()['status'] == 'active'
         assert second_state.get_json()['status'] == 'active'
+        assert first_state.get_json()['version'] == 2
+        assert first_state.get_json()['substeps']['create_fractal']['name_outcome'] is True
+        assert first_state.get_json()['substeps']['make_goal_smart']['specific'] is False
 
         dismissed = authed_client.patch('/api/auth/onboarding', json={
             'root_id': first_id,
@@ -567,6 +570,23 @@ class TestPreferencesEndpoint:
         root_states = test_user.preferences.get('onboarding_by_root', {})
         assert first_id not in root_states
         assert second_id in root_states
+
+    def test_onboarding_substeps_derive_activity_and_metric_facts(
+        self,
+        authed_client,
+        sample_ultimate_goal,
+        sample_activity_definition,
+    ):
+        response = authed_client.get(
+            '/api/auth/onboarding',
+            query_string={'root_id': sample_ultimate_goal.id},
+        )
+
+        assert response.status_code == 200
+        facts = response.get_json()['substeps']['create_activity_metric']
+        assert facts['create_activity'] is True
+        assert facts['choose_structure'] is True
+        assert facts['add_metric'] is True
 
     def test_cookie_authenticated_write_requires_csrf(self, client, test_user):
         response = client.post(

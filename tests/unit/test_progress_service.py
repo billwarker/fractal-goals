@@ -103,6 +103,46 @@ def _build_instance(db_session, *, root_id, session_id, activity_id, created_at,
 
 @pytest.mark.unit
 class TestProgressService:
+    def test_best_set_breaks_anchor_ties_with_secondary_metrics(self, db_session, sample_ultimate_goal):
+        activity, metrics = _build_activity_with_metrics(
+            db_session,
+            sample_ultimate_goal.id,
+            metric_specs=[
+                {
+                    'name': 'Playback Speed',
+                    'unit': '%',
+                    'is_multiplicative': False,
+                    'is_best_set_metric': True,
+                },
+                {'name': 'Quality', 'unit': 'Rating', 'is_multiplicative': False},
+            ],
+        )
+        session = _build_session(
+            db_session,
+            sample_ultimate_goal.id,
+            'Tie-break Session',
+            datetime(2026, 7, 10, tzinfo=timezone.utc),
+        )
+        instance = _build_instance(
+            db_session,
+            root_id=sample_ultimate_goal.id,
+            session_id=session.id,
+            activity_id=activity.id,
+            created_at=datetime(2026, 7, 10, 10, 0, tzinfo=timezone.utc),
+            values={},
+            data={
+                'sets': [
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 70}, {'metric_id': metrics[1].id, 'value': 5}]},
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 70}, {'metric_id': metrics[1].id, 'value': 6}]},
+                ],
+            },
+        )
+
+        result = ProgressService(db_session)._compute_auto_aggregations(instance, metrics)
+
+        assert result['best_set_index'] == 1
+        assert result['best_set_values'][metrics[1].id] == 6.0
+
     def test_auto_adds_yield_comparison_for_multiple_multiplicative_metrics(self, db_session, sample_ultimate_goal):
         activity, metrics = _build_activity_with_metrics(
             db_session,

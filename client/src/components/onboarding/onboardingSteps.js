@@ -9,9 +9,12 @@ export const ONBOARDING_STEPS = [
 ];
 
 export function buildOnboardingSteps(state, rootId) {
-    return ONBOARDING_STEPS.map((step) => ({
+    return ONBOARDING_STEPS.map((step, index) => ({
         ...step,
+        number: index + 1,
         done: Boolean(state?.steps?.[step.id]),
         path: step.path(rootId),
+        substeps: buildSubsteps(step.id, state?.substeps?.[step.id]),
     }));
 }
+import { buildSubsteps } from './onboardingSubsteps';

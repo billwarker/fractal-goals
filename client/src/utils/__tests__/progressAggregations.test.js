@@ -93,4 +93,31 @@ describe('progressAggregations', () => {
         expect(result.additive_totals).toEqual({ distance: 24 });
         expect(result.best_set_values).toEqual({ distance: 24, reps: 5 });
     });
+
+    it('breaks anchor ties with the remaining metrics in definition order', () => {
+        const metricDefs = [
+            { id: 'speed', is_best_set_metric: true, higher_is_better: true },
+            { id: 'quality', higher_is_better: true },
+        ];
+        const sets = [
+            { metrics: [{ metric_id: 'speed', value: 70 }, { metric_id: 'quality', value: 5 }] },
+            { metrics: [{ metric_id: 'speed', value: 70 }, { metric_id: 'quality', value: 6 }] },
+        ];
+
+        expect(computeAutoAggregations(sets, metricDefs).best_set_index).toBe(1);
+    });
+
+    it('respects lower-is-better secondary metrics and prefers present tie-break values', () => {
+        const metricDefs = [
+            { id: 'score', is_best_set_metric: true, higher_is_better: true },
+            { id: 'errors', higher_is_better: false },
+        ];
+        const sets = [
+            { metrics: [{ metric_id: 'score', value: 8 }] },
+            { metrics: [{ metric_id: 'score', value: 8 }, { metric_id: 'errors', value: 2 }] },
+            { metrics: [{ metric_id: 'score', value: 8 }, { metric_id: 'errors', value: 3 }] },
+        ];
+
+        expect(computeAutoAggregations(sets, metricDefs).best_set_index).toBe(1);
+    });
 });

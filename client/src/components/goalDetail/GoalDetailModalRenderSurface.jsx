@@ -15,7 +15,6 @@ import GoalEditForm from '../goals/GoalEditForm';
 import GoalHeader from '../goals/GoalHeader';
 import GoalUncompletionModal from '../goals/GoalUncompletionModal';
 import GoalViewMode from '../goals/GoalViewMode';
-import SmartBadgeOnboardingTooltip from '../onboarding/SmartBadgeOnboardingTooltip';
 import GoalDetailModalFooter from './GoalDetailModalFooter';
 import GraphProfileLoadingFallback from './GraphProfileLoadingFallback';
 import styles from '../GoalDetailModal.module.css';
@@ -826,7 +825,6 @@ function GoalDetailModalRenderSurface({
                     </div>
                 )}
             </div>
-            <SmartBadgeOnboardingTooltip visible={mode === 'create' && viewState === 'goal'} />
             {activityBuilderModal}
         </ModalBackdrop>
     );

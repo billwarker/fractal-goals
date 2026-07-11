@@ -61,9 +61,6 @@ export function OnboardingProvider({ children }) {
         trackEvent('onboarding_started');
     }, [update]);
     const restart = useCallback(() => update({ restart: true }), [update]);
-    const dismissHint = useCallback((hintId) => update({
-        hints_dismissed: [...new Set([...(state?.hints_dismissed || []), hintId])],
-    }), [state?.hints_dismissed, update]);
     const markVisited = useCallback((key) => update({
         visited: [...new Set([...(state?.visited || []), key])],
     }), [state?.visited, update]);
@@ -77,7 +74,7 @@ export function OnboardingProvider({ children }) {
     useEffect(() => {
         if (!enabled || state?.status !== 'active') return;
         const section = location.pathname.split('/').filter(Boolean)[1];
-        if (section === 'analytics' || section === 'notes') {
+        if (section === 'analytics' || section === 'notes' || section === 'programs') {
             if (!state.visited?.includes(section)) markVisited(section);
         }
     }, [enabled, location.pathname, markVisited, state?.status, state?.visited]);
@@ -103,11 +100,10 @@ export function OnboardingProvider({ children }) {
     const value = useMemo(() => ({
         enabled, state, steps, completedCount, rootId,
         isLoading: query.isLoading, isSaving: mutation.isPending,
-        dismiss, resume, restart, dismissHint, markVisited,
+        dismiss, resume, restart, markVisited,
         update,
-        isHintVisible: (hintId) => enabled && state?.status === 'active' && !state?.hints_dismissed?.includes(hintId),
         refresh: query.refetch,
-    }), [completedCount, dismiss, dismissHint, enabled, markVisited, mutation.isPending, query.isLoading, query.refetch, restart, resume, rootId, state, steps]);
+    }), [completedCount, dismiss, enabled, markVisited, mutation.isPending, query.isLoading, query.refetch, restart, resume, rootId, state, steps, update]);
 
     return <OnboardingContext.Provider value={value}>{children}</OnboardingContext.Provider>;
 }

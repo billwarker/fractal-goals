@@ -1,4 +1,0 @@
-.anchor { position: relative; }
-.hint { margin-top: var(--spacing-sm); padding: var(--spacing-md); border-left: 3px solid var(--color-brand-primary); border-radius: var(--border-radius-md); background: var(--color-bg-elevated); box-shadow: var(--shadow-md); color: var(--color-text-primary); animation: onboardingHintIn var(--duration-base) var(--ease-out); }
-.hint p { margin: var(--spacing-xs) 0 var(--spacing-sm); color: var(--color-text-secondary); font-size: var(--font-size-sm); }
-@keyframes onboardingHintIn { from { opacity: 0; transform: translateY(4px); } }

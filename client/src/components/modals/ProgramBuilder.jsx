@@ -11,7 +11,6 @@ import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
-import Hint from '../onboarding/Hint';
 import styles from './ProgramBuilder.module.css';
 
 function buildInitialProgramData(initialData, initialStartDate = '', initialEndDate = '') {
@@ -165,7 +164,6 @@ function ProgramBuilderInner({
                         />
                     </div>
 
-                        <Hint id="program-goals-rhythm" title="Connect a goal and a rhythm" description="Select the goal this program supports, then choose the date window. You can shape individual days after creation.">
                         <div className={styles.field}>
                             <label className={styles.label}>Target Goals * (Select at least one)</label>
                             <div className={styles.goalPickerSummary}>
@@ -197,7 +195,6 @@ function ProgramBuilderInner({
                             )}
                             {errors.goals && <div className={styles.errorText}>{errors.goals}</div>}
                         </div>
-                        </Hint>
 
                     <div className={styles.field}>
                         <label className={styles.colorLabel}>

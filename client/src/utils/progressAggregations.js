@@ -12,6 +12,45 @@ function coerceNumeric(value) {
     return Number.isNaN(n) ? null : n;
 }
 
+function findBestSetIndex(sets, metricDefs, primaryDef) {
+    if (!primaryDef) return null;
+
+    const rankedDefs = [primaryDef, ...metricDefs.filter((md) => md.id !== primaryDef.id)];
+    let bestIndex = null;
+    let bestValues = null;
+
+    for (let si = 0; si < sets.length; si++) {
+        const valuesByMetric = new Map(
+            (sets[si].metrics || []).map((metric) => [
+                metric.metric_id || metric.metric_definition_id,
+                coerceNumeric(metric.value),
+            ])
+        );
+        const values = rankedDefs.map((md) => valuesByMetric.get(md.id) ?? null);
+        if (values[0] === null) continue;
+
+        let isBetter = bestValues === null;
+        if (bestValues !== null) {
+            for (let mi = 0; mi < rankedDefs.length; mi++) {
+                const candidate = values[mi];
+                const incumbent = bestValues[mi];
+                if (candidate === incumbent) continue;
+                if (candidate === null) break;
+                if (incumbent === null) { isBetter = true; break; }
+                isBetter = rankedDefs[mi].higher_is_better !== false
+                    ? candidate > incumbent
+                    : candidate < incumbent;
+                break;
+            }
+        }
+        if (isBetter) {
+            bestIndex = si;
+            bestValues = values;
+        }
+    }
+    return bestIndex;
+}
+
 export function filterTrackedMetricDefs(metricDefs) {
     return (metricDefs || []).filter((md) => md?.track_progress !== false);
 }
@@ -109,29 +148,7 @@ export function computeAutoAggregations(sets, metricDefs) {
     const anchorDef = metricDefs.find((md) => md.is_best_set_metric) || null;
 
     if (anchorDef) {
-        // Best set by anchor metric value, respecting higher_is_better
-        const higherIsBetter = anchorDef.higher_is_better !== false;
-        let bestIndex = null;
-        let bestVal = null;
-        for (let si = 0; si < sets.length; si++) {
-            const s = sets[si];
-            for (const m of (s.metrics || [])) {
-                const mid = m.metric_id || m.metric_definition_id;
-                if (mid === anchorDef.id) {
-                    const v = coerceNumeric(m.value);
-                    if (v === null) continue;
-                    if (
-                        bestVal === null
-                        || (higherIsBetter && v > bestVal)
-                        || (!higherIsBetter && v < bestVal)
-                    ) {
-                        bestVal = v;
-                        bestIndex = si;
-                    }
-                }
-            }
-        }
-        result.best_set_index = bestIndex;
+        result.best_set_index = findBestSetIndex(sets, metricDefs, anchorDef);
     } else if (hasYield && result.yield_per_set.length > 0) {
         // Best set = highest yield set
         const best = result.yield_per_set.reduce((a, b) => b.yield > a.yield ? b : a);
@@ -140,28 +157,7 @@ export function computeAutoAggregations(sets, metricDefs) {
     } else if (metricDefs.length > 0) {
         // Single/non-multiplicative: best by first metric's higher_is_better
         const primary = metricDefs[0];
-        const higherIsBetter = primary.higher_is_better !== false;
-        let bestIndex = null;
-        let bestVal = null;
-        for (let si = 0; si < sets.length; si++) {
-            const s = sets[si];
-            for (const m of (s.metrics || [])) {
-                const mid = m.metric_id || m.metric_definition_id;
-                if (mid === primary.id) {
-                    const v = coerceNumeric(m.value);
-                    if (v === null) continue;
-                    if (
-                        bestVal === null
-                        || (higherIsBetter && v > bestVal)
-                        || (!higherIsBetter && v < bestVal)
-                    ) {
-                        bestVal = v;
-                        bestIndex = si;
-                    }
-                }
-            }
-        }
-        result.best_set_index = bestIndex;
+        result.best_set_index = findBestSetIndex(sets, metricDefs, primary);
     }
 
     // Populate best_set_values

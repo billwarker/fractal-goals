@@ -229,23 +229,37 @@ class ProgressService:
         if anchor is None:
             return None
 
-        higher_is_better = self._resolve_higher_is_better(anchor)
+        ranked_defs = [anchor, *(md for md in metric_defs if md.id != anchor.id)]
         best_index = None
-        best_val = None
+        best_values = None
         for set_index, s in enumerate(sets):
-            for m in s.get('metrics', []):
-                mid = resolve_metric_id(m)
-                if mid == anchor.id:
-                    v = self._coerce_numeric(m.get('value'))
-                    if v is None:
+            values_by_metric = {
+                resolve_metric_id(m): self._coerce_numeric(m.get('value'))
+                for m in s.get('metrics', [])
+            }
+            values = [values_by_metric.get(md.id) for md in ranked_defs]
+            if values[0] is None:
+                continue
+
+            is_better = best_values is None
+            if best_values is not None:
+                for metric_def, candidate, incumbent in zip(ranked_defs, values, best_values):
+                    if candidate == incumbent:
                         continue
-                    if (
-                        best_val is None
-                        or (higher_is_better and v > best_val)
-                        or (not higher_is_better and v < best_val)
-                    ):
-                        best_val = v
-                        best_index = set_index
+                    if candidate is None:
+                        break
+                    if incumbent is None:
+                        is_better = True
+                        break
+                    is_better = (
+                        candidate > incumbent
+                        if self._resolve_higher_is_better(metric_def)
+                        else candidate < incumbent
+                    )
+                    break
+            if is_better:
+                best_values = values
+                best_index = set_index
         return best_index
 
     def _build_best_set_comparison(
@@ -538,25 +552,7 @@ class ProgressService:
             anchor = next((md for md in metric_defs if md.is_best_set_metric), None)
 
             if anchor is not None:
-                # Best set by anchor metric value (respects higher_is_better)
-                higher_is_better = self._resolve_higher_is_better(anchor)
-                best_index = None
-                best_val = None
-                for set_index, s in enumerate(sets):
-                    for m in s.get('metrics', []):
-                        mid = resolve_metric_id(m)
-                        if mid == anchor.id:
-                            v = self._coerce_numeric(m.get('value'))
-                            if v is None:
-                                continue
-                            if (
-                                best_val is None
-                                or (higher_is_better and v > best_val)
-                                or (not higher_is_better and v < best_val)
-                            ):
-                                best_val = v
-                                best_index = set_index
-                result['best_set_index'] = best_index
+                result['best_set_index'] = self._find_best_set_index(instance, metric_defs)
             elif has_yield and result['yield_per_set']:
                 # Best set = highest yield set
                 best = max(result['yield_per_set'], key=lambda x: x['yield'])
@@ -566,24 +562,7 @@ class ProgressService:
             elif metric_defs:
                 # Single/non-multiplicative: best by first metric's higher_is_better
                 primary = metric_defs[0]
-                higher_is_better = self._resolve_higher_is_better(primary)
-                best_index = None
-                best_val = None
-                for set_index, s in enumerate(sets):
-                    for m in s.get('metrics', []):
-                        mid = resolve_metric_id(m)
-                        if mid == primary.id:
-                            v = self._coerce_numeric(m.get('value'))
-                            if v is None:
-                                continue
-                            if (
-                                best_val is None
-                                or (higher_is_better and v > best_val)
-                                or (not higher_is_better and v < best_val)
-                            ):
-                                best_val = v
-                                best_index = set_index
-                result['best_set_index'] = best_index
+                result['best_set_index'] = self._find_best_set_index(instance, metric_defs)
 
             # Populate best_set_values
             if result['best_set_index'] is not None and result['best_set_index'] < len(sets):

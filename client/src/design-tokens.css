@@ -176,6 +176,7 @@
   --font-weight-normal: var(--font-weight-regular);
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
+  --font-weight-bold: 700;
 
   /* Breakpoints */
   --breakpoint-sm: 640px;

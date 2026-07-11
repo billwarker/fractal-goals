@@ -3,9 +3,10 @@ import { buildOnboardingSteps } from '../onboardingSteps';
 
 describe('buildOnboardingSteps', () => {
     it('maps server completion facts and root-aware destinations', () => {
-        const steps = buildOnboardingSteps({ steps: { create_fractal: true, first_session: false } }, 'root-1');
+        const steps = buildOnboardingSteps({ steps: { create_fractal: true, first_session: false }, substeps: { create_fractal: { name_outcome: true } } }, 'root-1');
         expect(steps).toHaveLength(7);
         expect(steps[0]).toMatchObject({ id: 'create_fractal', done: true, path: '/' });
+        expect(steps[0].substeps[0]).toMatchObject({ id: 'name_outcome', done: true, kind: 'tracked' });
         expect(steps.find((step) => step.id === 'first_session')).toMatchObject({
             done: false,
             path: '/root-1/create-session',

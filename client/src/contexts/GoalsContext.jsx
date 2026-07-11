@@ -4,6 +4,7 @@ import { fractalApi } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
 import { queryKeys } from '../hooks/queryKeys';
+import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
 
 const GoalsContext = createContext();
 
@@ -61,8 +62,9 @@ export function GoalsProvider({ children }) {
             const res = await fractalApi.createGoal(rootId, goalData);
             return res.data;
         },
-        onSuccess: (_, variables) => {
+        onSuccess: async (_, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
+            await invalidateOnboardingProgress(queryClient, queryKeys);
             notify.success('Goal created');
         },
         onError: (error) => {
@@ -75,8 +77,9 @@ export function GoalsProvider({ children }) {
             const res = await fractalApi.updateGoal(rootId, goalId, updates);
             return res.data;
         },
-        onSuccess: (_, variables) => {
+        onSuccess: async (_, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
+            await invalidateOnboardingProgress(queryClient, queryKeys);
         },
         onError: (error) => {
             notify.error(`Failed to update goal: ${formatError(error)}`);
@@ -88,11 +91,12 @@ export function GoalsProvider({ children }) {
             const res = await fractalApi.deleteGoal(rootId, goalId);
             return res.data;
         },
-        onSuccess: (_, variables) => {
+        onSuccess: async (_, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivitiesRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionNotesRoot(variables.rootId) });
+            await invalidateOnboardingProgress(queryClient, queryKeys);
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionGoalsViewRoot(variables.rootId) });
             notify.success('Goal deleted');
         },

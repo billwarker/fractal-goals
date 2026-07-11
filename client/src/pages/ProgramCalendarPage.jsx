@@ -11,6 +11,7 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/atoms/Modal';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
+import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 import { useGoals } from '../contexts/GoalsContext';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -35,7 +36,6 @@ const ProgramDayModal = lazyWithRetry(() => import('../components/modals/Program
 const AttachGoalModal = lazyWithRetry(() => import('../components/modals/AttachGoalModal'), 'components/modals/AttachGoalModal');
 const DayViewModal = lazyWithRetry(() => import('../components/modals/DayViewModal'), 'components/modals/DayViewModal');
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
-
 function getDatePart(dateValue) {
     if (!dateValue) return null;
     return String(dateValue).split('T')[0];
@@ -100,6 +100,7 @@ function shiftDatePart(dateValue, dayOffset) {
 }
 
 function ProgramCalendarPage() {
+    const onboarding = useOptionalOnboarding();
     const { rootId, programId } = useParams();
     const location = useLocation();
     const isMobile = useIsMobile();
@@ -569,6 +570,7 @@ function ProgramCalendarPage() {
     function handleProgramBlockSaveSuccess() {
         dispatchCalendarContext({ type: 'clear_pending_block_selection' });
         handleBlockSaveSuccess();
+        onboarding?.refresh();
     }
 
     const handleSaveProgram = async (programData) => {
@@ -628,6 +630,7 @@ function ProgramCalendarPage() {
         }
         await refetchPrograms();
         await refreshData?.();
+        await onboarding?.refresh();
     };
 
     const requestDeleteProgram = async (program) => {
@@ -655,6 +658,7 @@ function ProgramCalendarPage() {
                 });
             }
             await refetchPrograms();
+            await onboarding?.refresh();
         } catch (error) {
             notify.error(`Failed to delete program: ${error.response?.data?.error || error.message}`);
         }

@@ -15,7 +15,6 @@ import { fractalApi } from '../../utils/api';
 import { queryKeys } from '../../hooks/queryKeys';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
-import Hint from '../onboarding/Hint';
 
 const STARTER_TEMPLATE = {
     name: 'Simple Empty Template',
@@ -45,13 +44,11 @@ function StarterTemplateEmptyState({ rootId, onSelectTemplate }) {
     });
 
     return (
-        <Hint id="starter-template" title="Start simple" description="This blank template removes setup work. Add activities during the session when you need them.">
-            <EmptyState
-                description="Sessions need a template. Start with a blank section and add activities when you are ready."
-                actionLabel={createStarterTemplate.isPending ? 'Creating…' : 'Create a starter template'}
-                onAction={() => createStarterTemplate.mutate()}
-            />
-        </Hint>
+        <EmptyState
+            description="Sessions need a template. Start with a blank section and add activities when you are ready."
+            actionLabel={createStarterTemplate.isPending ? 'Creating…' : 'Create a starter template'}
+            onAction={() => createStarterTemplate.mutate()}
+        />
     );
 }
 

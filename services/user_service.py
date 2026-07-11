@@ -7,7 +7,7 @@ from sqlalchemy.orm.attributes import flag_modified
 import models
 from config import config
 from models import User
-from models import ActivityDefinition, Goal, MetricDefinition, Program, Session
+from models import ActivityDefinition, ActivityGroup, ActivityInstance, Goal, MetricDefinition, MetricValue, Program, ProgramBlock, ProgramDay, Session
 from services.account_flags import clear_force_password_change
 from services.email_service import EmailSendError, EmailService
 from services.email_templates import render_email_changed_email, render_password_changed_email
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 ONBOARDING_PREFERENCE_KEY = "onboarding"
 ONBOARDING_ROOTS_PREFERENCE_KEY = "onboarding_by_root"
-ONBOARDING_VERSION = 1
+ONBOARDING_VERSION = 2
 
 
 class UserService:
@@ -94,6 +94,117 @@ class UserService:
             "make_goal_smart": has_smart_goal,
         }
 
+    def _onboarding_substeps(self, root_id: str | None, state: JsonDict) -> JsonDict:
+        if not root_id:
+            return {}
+
+        goals = self.db_session.query(Goal).options(
+            selectinload(Goal.targets_rel),
+            selectinload(Goal.associated_activities),
+            selectinload(Goal.associated_activity_groups),
+        ).filter(Goal.root_id == root_id, Goal.deleted_at.is_(None)).all()
+        root = next((goal for goal in goals if goal.id == root_id), None)
+        children = [goal for goal in goals if goal.parent_id is not None]
+        goal_ids = {goal.id for goal in goals}
+        deepest_level = 0
+        for goal in children:
+            depth, current = 0, goal
+            while current and current.parent_id in goal_ids and depth < 20:
+                depth += 1
+                current = next((item for item in goals if item.id == current.parent_id), None)
+            deepest_level = max(deepest_level, depth)
+
+        best_smart_goal = None
+        best_smart_status = {key: False for key in ('specific', 'measurable', 'achievable', 'relevant', 'time_bound')}
+        for goal in goals:
+            status = calculate_smart_status(goal)
+            if sum(status.values()) > sum(best_smart_status.values()):
+                best_smart_goal, best_smart_status = goal, status
+
+        activities = self.db_session.query(ActivityDefinition).options(
+            selectinload(ActivityDefinition.metric_definitions),
+            selectinload(ActivityDefinition.associated_goals),
+        ).filter(ActivityDefinition.root_id == root_id, ActivityDefinition.deleted_at.is_(None)).all()
+        metrics = [
+            metric for activity in activities for metric in (activity.metric_definitions or [])
+            if metric.deleted_at is None and metric.is_active
+        ]
+        activity_groups = self.db_session.query(ActivityGroup).options(
+            selectinload(ActivityGroup.associated_goals),
+        ).filter(ActivityGroup.root_id == root_id, ActivityGroup.deleted_at.is_(None)).all()
+        instances = self.db_session.query(ActivityInstance).filter(
+            ActivityInstance.root_id == root_id,
+            ActivityInstance.deleted_at.is_(None),
+        ).all()
+        instance_ids = [instance.id for instance in instances]
+        has_metric_values = bool(instance_ids) and self.db_session.query(MetricValue.id).filter(
+            MetricValue.activity_instance_id.in_(instance_ids)
+        ).first() is not None
+        sessions = self.db_session.query(Session).filter(
+            Session.root_id == root_id,
+            Session.deleted_at.is_(None),
+        ).all()
+        programs = self.db_session.query(Program).options(
+            selectinload(Program.goals),
+            selectinload(Program.blocks).selectinload(ProgramBlock.days).selectinload(ProgramDay.templates),
+        ).filter(Program.root_id == root_id).all()
+        has_program_days = any(block.days for program in programs for block in (program.blocks or []))
+        has_program_templates = any(day.templates for program in programs for block in (program.blocks or []) for day in (block.days or []))
+        visited = set(state.get('visited') or [])
+
+        return {
+            'create_fractal': {
+                'name_outcome': bool(root and root.name and root.name.strip()),
+                'explain_relevance': bool(root and root.relevance_statement and root.relevance_statement.strip()),
+                'initial_horizon': bool(root and root.deadline),
+                'review_starting_point': None,
+            },
+            'break_it_down': {
+                'supporting_goal': bool(children),
+                'describe_result': any(goal.description and goal.description.strip() for goal in children),
+                'connect_to_parent': any(goal.relevance_statement and goal.relevance_statement.strip() for goal in children),
+                'visible_next_action': deepest_level >= 2,
+                'keep_tree_focused': None,
+            },
+            'make_goal_smart': {
+                **best_smart_status,
+                'review_badge': None,
+                'goal_id': best_smart_goal.id if best_smart_goal else None,
+            },
+            'create_activity_metric': {
+                'create_activity': bool(activities),
+                'choose_structure': bool(activities),
+                'add_metric': bool(metrics),
+                'interpret_progress': any(activity.track_progress is not None or activity.delta_display_mode for activity in activities),
+                'associate_goal': any(activity.associated_goals for activity in activities) or any(group.associated_goals for group in activity_groups),
+                'check_unit': None,
+            },
+            'first_session': {
+                'choose_template': any(session.template_id for session in sessions),
+                'add_activity': bool(instances),
+                'record_values': has_metric_values or any(bool(instance.data) for instance in instances),
+                'add_context': any(instance.notes and instance.notes.strip() for instance in instances),
+                'complete_session': any(session.completed for session in sessions),
+                'see_evidence': any(session.completed for session in sessions),
+            },
+            'schedule_program': {
+                'choose_goal': any(program.goals for program in programs),
+                'date_range': any(program.start_date and program.end_date for program in programs),
+                'practice_rhythm': has_program_days,
+                'connect_templates': has_program_templates,
+                'review_calendar': 'programs' in visited,
+                'adjust_before_committing': None,
+            },
+            'see_progress': {
+                'open_analytics': 'analytics' in visited,
+                'inspect_evidence': None,
+                'review_notes': 'notes' in visited,
+                'compare_evidence': None,
+                'make_adjustment': None,
+                'continue_without_guide': None,
+            },
+        }
+
     @staticmethod
     def _normalize_onboarding_state(raw) -> JsonDict:
         state = raw if isinstance(raw, dict) else {}
@@ -101,7 +212,6 @@ class UserService:
             "version": ONBOARDING_VERSION,
             "revision": int(state.get("revision") or 0),
             "status": state.get("status") if state.get("status") in {"active", "dismissed", "completed"} else None,
-            "hints_dismissed": list(dict.fromkeys(state.get("hints_dismissed") or [])),
             "visited": list(dict.fromkeys(state.get("visited") or [])),
             "celebrated_first_session": bool(state.get("celebrated_first_session")),
         }
@@ -153,7 +263,8 @@ class UserService:
         }
         if all(completed.values()):
             effective_status = "completed"
-        return {**state, "root_id": root_id, "persisted": isinstance(raw_state, dict), "status": effective_status, "steps": completed}, None, 200
+        substeps = self._onboarding_substeps(root_id, state)
+        return {**state, "root_id": root_id, "persisted": isinstance(raw_state, dict), "status": effective_status, "steps": completed, "substeps": substeps}, None, 200
 
     def update_onboarding(self, user_id: str, data, *, root_id: str | None = None) -> ServiceResult[JsonDict]:
         user = self._get_user(user_id)
@@ -181,7 +292,7 @@ class UserService:
             })
         else:
             next_state = dict(current)
-            for key in ("status", "hints_dismissed", "visited", "celebrated_first_session"):
+            for key in ("status", "visited", "celebrated_first_session"):
                 if data.get(key) is not None:
                     next_state[key] = data[key]
         next_state["revision"] = current["revision"] + 1
