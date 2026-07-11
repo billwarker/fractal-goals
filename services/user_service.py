@@ -57,7 +57,7 @@ class UserService:
         root_ids = [row[0] for row in roots_query.all()]
         if not root_ids:
             return {
-                "create_fractal": False, "break_it_down": False,
+                "break_it_down": False,
                 "make_goal_smart": False,
                 "create_activity_metric": False, "first_session": False,
                 "schedule_program": False,
@@ -86,7 +86,6 @@ class UserService:
         ).all()
         has_smart_goal = any(all(calculate_smart_status(goal).values()) for goal in candidate_goals)
         return {
-            "create_fractal": True,
             "break_it_down": has_child,
             "create_activity_metric": has_activity_metric,
             "first_session": has_session,
@@ -153,12 +152,6 @@ class UserService:
         visited = set(state.get('visited') or [])
 
         return {
-            'create_fractal': {
-                'name_outcome': bool(root and root.name and root.name.strip()),
-                'explain_relevance': bool(root and root.relevance_statement and root.relevance_statement.strip()),
-                'initial_horizon': bool(root and root.deadline),
-                'review_starting_point': None,
-            },
             'break_it_down': {
                 'supporting_goal': bool(children),
                 'describe_result': any(goal.description and goal.description.strip() for goal in children),
@@ -255,7 +248,7 @@ class UserService:
         raw_state = root_states.get(root_id) if root_id else preferences.get(ONBOARDING_PREFERENCE_KEY)
         state = self._normalize_onboarding_state(raw_state)
         progress = self._onboarding_progress(user_id, root_id)
-        returning_user = state["status"] is None and progress["create_fractal"]
+        returning_user = state["status"] is None and not isinstance(raw_state, dict) and any(progress.values())
         effective_status = state["status"] or ("dismissed" if returning_user else "active")
         completed = {
             **progress,

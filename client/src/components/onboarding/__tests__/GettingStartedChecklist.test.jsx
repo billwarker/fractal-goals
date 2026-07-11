@@ -13,7 +13,7 @@ vi.mock('../../../contexts/OnboardingContext', () => ({
         dismiss,
         rootId: 'root-1',
         steps: [
-            { id: 'create_fractal', number: 1, title: 'Create your fractal', blurb: 'Done', done: true, path: '/', substeps: [] },
+            { id: 'break_it_down', number: 1, title: 'Break it down', blurb: 'Done', done: true, path: '/root-1/goals', substeps: [] },
             { id: 'first_session', number: 2, title: 'Run your first session', blurb: 'Record evidence', done: false, path: '/root-1/create-session', substeps: [{ id: 'record', title: 'Record values', description: 'Add evidence.', kind: 'tracked', done: false }] },
         ],
     }),
@@ -30,11 +30,11 @@ describe('GettingStartedChecklist', () => {
         render(<MemoryRouter><GettingStartedChecklist /><LocationProbe /></MemoryRouter>);
         expect(screen.getByText('1/2')).toBeInTheDocument();
         expect(screen.getByText('Run your first session')).toBeInTheDocument();
-        expect(screen.queryByText('Create your fractal')).not.toBeInTheDocument();
+        expect(screen.queryByText('Break it down')).not.toBeInTheDocument();
         expect(screen.getByText('Step 2 of 2')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: 'Previous checklist item' }));
-        expect(screen.getByText('Create your fractal')).toBeInTheDocument();
+        expect(screen.getByText('Break it down')).toBeInTheDocument();
         expect(screen.queryByText('Run your first session')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Next checklist item' }));
 

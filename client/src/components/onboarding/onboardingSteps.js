@@ -1,5 +1,4 @@
 export const ONBOARDING_STEPS = [
-    { id: 'create_fractal', title: 'Create your fractal', blurb: 'Name the outcome your practice serves.', path: () => '/' },
     { id: 'break_it_down', title: 'Break it down', blurb: 'Add a smaller goal beneath your ultimate goal.', path: (rootId) => `/${rootId}/goals` },
     { id: 'make_goal_smart', title: 'Make one goal SMART', blurb: 'Give one goal a clear result, measure, and timeframe.', path: (rootId) => `/${rootId}/goals` },
     { id: 'create_activity_metric', title: 'Create an activity and metric', blurb: 'Define the practice and evidence you want to record.', path: (rootId) => `/${rootId}/manage-activities` },

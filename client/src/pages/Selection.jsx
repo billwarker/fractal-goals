@@ -15,9 +15,6 @@ import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import useIsMobile from '../hooks/useIsMobile';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
-import GettingStartedChecklist from '../components/onboarding/GettingStartedChecklist';
-import EmptyState from '../components/common/EmptyState';
-import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 
 /**
  * Selection Page - Fractal Goal Selection
@@ -36,7 +33,6 @@ function Selection() {
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
     const { user, logout, isAuthenticated, loading: authLoading } = useAuth();
-    const onboarding = useOptionalOnboarding();
     const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const isMobile = useIsMobile();
     const userId = user?.id || null;
@@ -293,19 +289,6 @@ function Selection() {
             </div>
 
             {/* Fractal Grid */}
-            {isAuthenticated && fractals.length === 0 && onboarding?.enabled && (
-                <EmptyState
-                    title="Deliberate practice starts with a structure."
-                    description="Create a fractal for the outcome you care about. You can refine it as your practice develops."
-                    actionLabel="Create your first fractal"
-                    onAction={() => {
-                        onboarding.resume();
-                        setCreateModalOpen(true);
-                    }}
-                >
-                    <GettingStartedChecklist inline />
-                </EmptyState>
-            )}
             <div className={styles.grid}>
                 {isAuthenticated && fractals.map(fractal => (
                     (() => {

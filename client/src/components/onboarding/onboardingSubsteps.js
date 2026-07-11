@@ -3,12 +3,6 @@ const optional = (id, title, description) => ({ id, title, description, kind: 'o
 const info = (id, title, description) => ({ id, title, description, kind: 'info' });
 
 export const ONBOARDING_SUBSTEPS = {
-    create_fractal: [
-        tracked('name_outcome', 'Name the outcome', 'Write the long-term result this fractal serves.'),
-        tracked('explain_relevance', 'Explain why it matters', 'Describe why this outcome deserves sustained practice.'),
-        optional('initial_horizon', 'Set an initial horizon', 'Add a deadline when the outcome has a meaningful time boundary.'),
-        info('review_starting_point', 'Review the starting point', 'Prefer an outcome such as “Become a tournament-level chess player” over an activity such as “Practice chess.”'),
-    ],
     break_it_down: [
         tracked('supporting_goal', 'Add a major supporting goal', 'Create the first smaller result beneath your ultimate goal.'),
         tracked('describe_result', 'Describe the result', 'Explain what success for the supporting goal looks like.'),

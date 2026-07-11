@@ -16,7 +16,8 @@
       "Bash(dig +short fractalgoals.com AAAA)",
       "Bash(dig +short www.fractalgoals.com)",
       "Bash(dig +short my.fractalgoals.com)",
-      "Bash(dig +short fractalgoals.com NS)"
+      "Bash(dig +short fractalgoals.com NS)",
+      "Bash(npx eslint *)"
     ]
   }
 }

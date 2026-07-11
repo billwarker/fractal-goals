@@ -549,7 +549,8 @@ class TestPreferencesEndpoint:
         assert first_state.get_json()['status'] == 'active'
         assert second_state.get_json()['status'] == 'active'
         assert first_state.get_json()['version'] == 2
-        assert first_state.get_json()['substeps']['create_fractal']['name_outcome'] is True
+        assert 'create_fractal' not in first_state.get_json()['substeps']
+        assert 'create_fractal' not in first_state.get_json()['steps']
         assert first_state.get_json()['substeps']['make_goal_smart']['specific'] is False
 
         dismissed = authed_client.patch('/api/auth/onboarding', json={
