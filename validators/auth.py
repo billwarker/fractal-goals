@@ -314,7 +314,6 @@ class OnboardingStateUpdateSchema(BaseModel):
     status: Optional[str] = Field(None, pattern=r'^(active|dismissed|completed)$')
     hints_dismissed: Optional[List[str]] = Field(None, max_length=64)
     visited: Optional[List[str]] = Field(None, max_length=16)
-    celebrated_first_session: Optional[bool] = None
     restart: bool = False
 
     @field_validator('hints_dismissed', 'visited')

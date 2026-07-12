@@ -811,7 +811,7 @@ function FractalGoals() {
         }, FLOWTREE_SCOPE_TRANSITION_MS);
     };
     return (
-        <div className={`fractal-page-container ${location.state?.onboardingJustLit ? 'onboarding-evidence-lit' : ''}`} style={{
+        <div className="fractal-page-container" style={{
             height: '100%',
             width: '100%',
             display: 'flex',

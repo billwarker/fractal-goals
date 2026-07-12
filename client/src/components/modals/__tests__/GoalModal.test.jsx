@@ -20,6 +20,7 @@ vi.mock('../../../contexts/GoalLevelsContext', () => ({
 
 describe('GoalModal', () => {
     it('renders optional onboarding fields and submits independently editable level colors', () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.25);
         const onSubmit = vi.fn();
         render(<GoalModal isOpen={true} onClose={vi.fn()} onSubmit={onSubmit} parent={null} />);
 
@@ -41,19 +42,36 @@ describe('GoalModal', () => {
         expect(screen.getByRole('heading', { name: 'Create New Fractal' })).toBeInTheDocument();
         fireEvent.change(screen.getByLabelText('Name (Required)'), { target: { value: 'New Fractal' } });
         expect(screen.getByRole('heading', { name: 'Create: New Fractal' })).toBeInTheDocument();
+        const initialStyles = {
+            UltimateGoal: {
+                color: screen.getByLabelText('Ultimate color').value,
+                secondary_color: screen.getByLabelText('Ultimate secondary color').value,
+            },
+            LongTermGoal: {
+                color: screen.getByLabelText('Long Term color').value,
+                secondary_color: screen.getByLabelText('Long Term secondary color').value,
+            },
+            MidTermGoal: {
+                color: screen.getByLabelText('Medium Term color').value,
+                secondary_color: screen.getByLabelText('Medium Term secondary color').value,
+            },
+        };
         fireEvent.change(screen.getByLabelText('Ultimate color'), { target: { value: '#123456' } });
         fireEvent.click(screen.getByRole('radio', { name: /Medium Term/ }));
         fireEvent.click(screen.getByRole('button', { name: 'Create this Fractal Goal' }));
 
-        expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
-            name: 'New Fractal', type: 'MidTermGoal', deadline: null,
-            level_styles: {
-                UltimateGoal: { color: '#123456', secondary_color: '#d7f5df', icon: 'twelve-point-star' },
-                LongTermGoal: { color: '#4caf50', secondary_color: '#d7f5df', icon: 'hexagon' },
-                MidTermGoal: { color: '#4caf50', secondary_color: '#d7f5df', icon: 'diamond' },
-                ShortTermGoal: { color: '#4caf50', secondary_color: '#d7f5df', icon: 'circle' },
-            },
+        const payload = onSubmit.mock.calls[0][0];
+        expect(payload).toEqual(expect.objectContaining({ name: 'New Fractal', type: 'MidTermGoal', deadline: null }));
+        expect(payload.level_styles.UltimateGoal).toEqual(expect.objectContaining({
+            color: '#123456', secondary_color: initialStyles.UltimateGoal.secondary_color,
         }));
+        expect(payload.level_styles.LongTermGoal).toEqual(expect.objectContaining(initialStyles.LongTermGoal));
+        expect(payload.level_styles.MidTermGoal).toEqual(expect.objectContaining(initialStyles.MidTermGoal));
+        expect(Object.values(payload.level_styles).every(({ color, secondary_color: secondary }) => (
+            /^#[0-9a-f]{6}$/i.test(color) && /^#[0-9a-f]{6}$/i.test(secondary)
+        ))).toBe(true);
+        expect(new Set(Object.values(payload.level_styles).map(({ icon }) => icon))).toHaveLength(4);
+        vi.restoreAllMocks();
     });
 
     it('shows secondary colors and supports visual icon selection plus icon randomization', () => {

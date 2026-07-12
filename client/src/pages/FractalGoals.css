@@ -524,13 +524,3 @@
     }
 
 }
-.onboarding-evidence-lit [data-has-evidence="true"] { animation: onboardingEvidenceLit var(--duration-slow) var(--ease-emphasized) 2 alternate; }
-
-@keyframes onboardingEvidenceLit {
-    from { filter: drop-shadow(0 0 0 transparent); }
-    to { filter: drop-shadow(0 0 10px var(--color-brand-success-muted)); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .onboarding-evidence-lit [data-has-evidence="true"] { animation: none; filter: drop-shadow(0 0 6px var(--color-brand-success-muted)); }
-}

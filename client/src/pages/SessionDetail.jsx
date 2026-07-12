@@ -17,7 +17,6 @@ import { isQuickSession } from '../utils/sessionRuntime';
 
 // Context
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
-import FirstSessionCelebration from '../components/onboarding/FirstSessionCelebration';
 import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 
 /**
@@ -215,7 +214,6 @@ function SessionDetailContent() {
 
     return (
         <div className={styles.sessionDetailContainer}>
-            <FirstSessionCelebration />
             <div className={styles.sessionMainContent}>
                 {isMobile && (
                     <SessionDetailMobileChrome

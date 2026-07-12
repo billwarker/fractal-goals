@@ -225,7 +225,7 @@ function ProgramCalendarPage() {
         closeUnscheduleConfirm,
         handleUnscheduleSuccess,
         handleAddChildGoal,
-    } = useProgramDetailController({ goals: displayGoals });
+    } = useProgramDetailController({ goals: displayGoals, onDayViewOpen: () => onboarding?.enabled && !onboarding.state?.visited?.includes('calendar_day_modal') && onboarding.markVisited('calendar_day_modal') });
 
     useEffect(() => {
         if (!rootId || location.pathname.startsWith(`/${rootId}/programs`)) return;

@@ -9,10 +9,10 @@ import Input from '../atoms/Input';
 import Button from '../atoms/Button';
 import GoalIcon from '../atoms/GoalIcon';
 import AnimatedGoalIcon from '../atoms/AnimatedGoalIcon';
-import Tooltip from '../atoms/Tooltip';
 import SmartBadge from '../atoms/SmartBadge';
 import notify from '../../utils/notify';
 import { ICON_SHAPES } from '../../utils/goalCharacteristics';
+import { createRandomLevelColors, createRandomLevelIcons } from '../../utils/goalLevelRandomization';
 import styles from './GoalModal.module.css';
 
 const ROOT_GOAL_OPTIONS = [
@@ -29,43 +29,14 @@ const HIDDEN_STYLED_LEVELS = [
 ];
 const STYLED_LEVELS = [...ROOT_GOAL_OPTIONS, ...HIDDEN_STYLED_LEVELS];
 
-function hslToHex(hue, saturation, lightness) {
-    const saturationRatio = saturation / 100;
-    const lightnessRatio = lightness / 100;
-    const chroma = (1 - Math.abs((2 * lightnessRatio) - 1)) * saturationRatio;
-    const segment = hue / 60;
-    const secondComponent = chroma * (1 - Math.abs((segment % 2) - 1));
-    const [red, green, blue] = segment < 1 ? [chroma, secondComponent, 0]
-        : segment < 2 ? [secondComponent, chroma, 0]
-            : segment < 3 ? [0, chroma, secondComponent]
-                : segment < 4 ? [0, secondComponent, chroma]
-                    : segment < 5 ? [secondComponent, 0, chroma]
-                        : [chroma, 0, secondComponent];
-    const match = lightnessRatio - (chroma / 2);
-    return `#${[red, green, blue].map((channel) => Math.round((channel + match) * 255).toString(16).padStart(2, '0')).join('')}`;
-}
-
-function createRandomLevelColors() {
-    const startingHue = Math.floor(Math.random() * 360);
-    return Object.fromEntries(STYLED_LEVELS.map((option, index) => {
-        const hue = (startingHue + (index * 83)) % 360;
-        const saturation = 62 + ((index % 2) * 8);
-        const lightness = 42 + ((index % 3) * 5);
-        return [option.type, {
-            color: hslToHex(hue, saturation, lightness),
-            // Complementary hue with flipped lightness keeps the SMART ring fill readable against the primary.
-            secondary_color: hslToHex((hue + 180) % 360, Math.min(saturation + 8, 90), lightness >= 47 ? 26 : 80),
-        }];
-    }));
-}
-
-function createRandomLevelIcons() {
-    const icons = ICON_SHAPES.map((shape) => shape.value);
-    for (let index = icons.length - 1; index > 0; index -= 1) {
-        const swapIndex = Math.floor(Math.random() * (index + 1));
-        [icons[index], icons[swapIndex]] = [icons[swapIndex], icons[index]];
-    }
-    return Object.fromEntries(STYLED_LEVELS.map((option, index) => [option.type, icons[index]]));
+function createInitialLevelStyles(parent, getGoalColor, getGoalSecondaryColor) {
+    const colors = parent ? null : createRandomLevelColors(STYLED_LEVELS);
+    const icons = parent ? null : createRandomLevelIcons(STYLED_LEVELS);
+    return Object.fromEntries(STYLED_LEVELS.map((option) => [option.type, {
+        color: colors?.[option.type]?.color || getGoalColor(option.type),
+        secondary_color: colors?.[option.type]?.secondary_color || getGoalSecondaryColor(option.type),
+        icon: icons?.[option.type] || option.icon,
+    }]));
 }
 
 function getDefaultDeadline(getLevelCharacteristics, levelType) {
@@ -127,10 +98,8 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
     const [previewSmart, setPreviewSmart] = useState(false);
     const [openIconPickerType, setOpenIconPickerType] = useState(null);
     const iconPickerRef = useRef(null);
-    const [levelStyles, setLevelStyles] = useState(() => Object.fromEntries(
-        STYLED_LEVELS.map((option) => [option.type, {
-            color: getGoalColor(option.type), secondary_color: getGoalSecondaryColor(option.type), icon: option.icon,
-        }])
+    const [levelStyles, setLevelStyles] = useState(() => (
+        createInitialLevelStyles(parent, getGoalColor, getGoalSecondaryColor)
     ));
     const [targets] = useState([]);
 
@@ -287,17 +256,13 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
                                                     }}>{option.label} Goal</span>
                                                 </label>
                                                 <div className={styles.swatches}>
-                                                    <Tooltip label="Primary color">
-                                                        <input type="color" value={levelStyles[option.type].color}
-                                                            onChange={(event) => handleLevelColorChange(option.type, event.target.value)}
-                                                            className={styles.swatchInput} aria-label={`${option.label} color`} />
-                                                    </Tooltip>
-                                                    <Tooltip label="Secondary color · SMART ring fill">
-                                                        <input type="color" value={levelStyles[option.type].secondary_color}
-                                                            onChange={(event) => updateLevelStyle(option.type, { secondary_color: event.target.value })}
-                                                            className={`${styles.swatchInput} ${styles.swatchInputSecondary}`}
-                                                            aria-label={`${option.label} secondary color`} />
-                                                    </Tooltip>
+                                                    <input type="color" value={levelStyles[option.type].color}
+                                                        onChange={(event) => handleLevelColorChange(option.type, event.target.value)}
+                                                        className={styles.swatchInput} aria-label={`${option.label} color`} />
+                                                    <input type="color" value={levelStyles[option.type].secondary_color}
+                                                        onChange={(event) => updateLevelStyle(option.type, { secondary_color: event.target.value })}
+                                                        className={`${styles.swatchInput} ${styles.swatchInputSecondary}`}
+                                                        aria-label={`${option.label} secondary color`} />
                                                 </div>
                                                 {openIconPickerType === option.type && (
                                                     <div className={styles.shapeTray} role="listbox" aria-label={`${option.label} icon choices`}>
@@ -323,26 +288,24 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
                       {!parent && (
                         <div className={styles.utilityRow}>
                             <Button type="button" size="sm" variant="secondary" onClick={() => {
-                                const colors = createRandomLevelColors();
+                                const colors = createRandomLevelColors(STYLED_LEVELS);
                                 setLevelStyles((current) => Object.fromEntries(Object.entries(current).map(([type, style]) => [type, { ...style, ...colors[type] }])));
                             }}
                                 className={styles.randomizeButton} aria-label="Randomize all goal level colors">
                                 Shuffle Colors
                             </Button>
                             <Button type="button" size="sm" variant="secondary" onClick={() => {
-                                const icons = createRandomLevelIcons();
+                                const icons = createRandomLevelIcons(STYLED_LEVELS);
                                 setLevelStyles((current) => Object.fromEntries(Object.entries(current).map(([type, style]) => [type, { ...style, icon: icons[type] }])));
                             }} className={styles.randomizeButton} aria-label="Randomize all goal level icons">
                                 Shuffle Icons
                             </Button>
-                            <Tooltip label="Hover to preview SMART goal styling" className={styles.smartPreviewWrap}>
-                                <button type="button"
-                                    onMouseEnter={() => setPreviewSmart(true)} onMouseLeave={() => setPreviewSmart(false)}
-                                    onFocus={() => setPreviewSmart(true)} onBlur={() => setPreviewSmart(false)}
-                                    className={styles.smartPreviewButton} aria-label="Preview SMART goal styling">
-                                    <SmartBadge color={levelStyles[goalType].color} />
-                                </button>
-                            </Tooltip>
+                            <button type="button"
+                                onMouseEnter={() => setPreviewSmart(true)} onMouseLeave={() => setPreviewSmart(false)}
+                                onFocus={() => setPreviewSmart(true)} onBlur={() => setPreviewSmart(false)}
+                                className={styles.smartPreviewButton} aria-label="Preview SMART goal styling">
+                                <SmartBadge color={levelStyles[goalType].color} />
+                            </button>
                         </div>
                       )}
                       {!parent && (

@@ -13,7 +13,7 @@ import { useAuth } from './AuthContext';
 const OnboardingContext = createContext(null);
 const FRACTAL_ROUTE_SECTIONS = new Set([
     'analytics', 'create-session', 'goals', 'logs', 'manage-activities',
-    'notes', 'programs', 'sessions', 'templates',
+    'manage-session-templates', 'notes', 'programs', 'session', 'sessions',
 ]);
 
 export function getOnboardingRootId(pathname) {

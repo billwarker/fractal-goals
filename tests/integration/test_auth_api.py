@@ -17,7 +17,7 @@ import pytest
 import json
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
-from models import PasswordResetToken, utc_now
+from models import PasswordResetToken, Program, ProgramBlock, ProgramDay, utc_now
 from services.admin_service import hash_invite_key
 from services.email_service import EmailService, TEST_EMAIL_OUTBOX
 from services.quota_service import TIER_DEFAULT_LIMITS_SETTING_KEY
@@ -590,6 +590,38 @@ class TestPreferencesEndpoint:
         assert facts['add_metric'] is True
         assert 'choose_structure' not in facts
         assert facts['go_to_manage_activities'] is None
+
+    def test_onboarding_substeps_derive_program_milestones(
+        self,
+        authed_client,
+        db_session,
+        sample_ultimate_goal,
+    ):
+        program = Program(
+            root_id=sample_ultimate_goal.id,
+            name='Launch plan',
+            start_date=datetime.now(timezone.utc),
+            end_date=datetime.now(timezone.utc) + timedelta(days=30),
+            weekly_schedule={},
+        )
+        block = ProgramBlock(program=program, name='Foundation')
+        day = ProgramDay(block=block, name='Day 1', is_completed=True)
+        db_session.add_all([program, block, day])
+        db_session.commit()
+
+        response = authed_client.get(
+            '/api/auth/onboarding',
+            query_string={'root_id': sample_ultimate_goal.id},
+        )
+
+        assert response.status_code == 200
+        facts = response.get_json()['substeps']['schedule_program']
+        assert facts == {
+            'program_created': True,
+            'program_block_created': True,
+            'program_day_completed': True,
+            'calendar_day_modal_opened': False,
+        }
 
     def test_onboarding_achievements_persist_after_qualifying_records_are_removed(
         self,

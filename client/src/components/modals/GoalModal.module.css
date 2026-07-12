@@ -122,10 +122,10 @@
 
 .randomizeButton { flex: 1; min-height: 30px; white-space: nowrap; padding-inline: 8px; font-size: 11px; }
 
-.smartPreviewWrap { display: inline-flex; align-items: center; margin-left: auto; }
 .smartPreviewButton {
     display: inline-flex;
     align-items: center;
+    margin-left: auto;
     padding: 2px;
     border: 0;
     border-radius: 999px;

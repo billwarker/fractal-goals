@@ -146,13 +146,17 @@ class UserService:
             selectinload(Program.goals),
             selectinload(Program.blocks).selectinload(ProgramBlock.days).selectinload(ProgramDay.templates),
         ).filter(Program.root_id == root_id).all()
-        has_program_days = any(block.days for program in programs for block in (program.blocks or []))
-        has_program_templates = any(day.templates for program in programs for block in (program.blocks or []) for day in (block.days or []))
+        program_blocks = [block for program in programs for block in (program.blocks or [])]
+        program_days = [day for block in program_blocks for day in (block.days or [])]
         visited = set(state.get('visited') or [])
 
         return {
             'break_it_down': {
-                'supporting_goal': bool(children),
+                'goal_detail_modal_opened': 'goal_detail_modal' in visited,
+                'goal_timeline_viewed': 'goal_timeline' in visited,
+                'goal_activities_viewed': 'goal_activities' in visited,
+                'goal_notes_viewed': 'goal_notes' in visited,
+                'child_goal_created': bool(children),
             },
             'make_goal_smart': {
                 **best_smart_status,
@@ -176,12 +180,10 @@ class UserService:
                 'complete_session': any(session.completed for session in sessions),
             },
             'schedule_program': {
-                'choose_goal': any(program.goals for program in programs),
-                'date_range': any(program.start_date and program.end_date for program in programs),
-                'practice_rhythm': has_program_days,
-                'connect_templates': has_program_templates,
-                'review_calendar': 'programs' in visited,
-                'adjust_before_committing': None,
+                'program_created': bool(programs),
+                'program_block_created': bool(program_blocks),
+                'program_day_completed': any(day.is_completed for day in program_days),
+                'calendar_day_modal_opened': 'calendar_day_modal' in visited,
             },
             'see_progress': {
                 'open_analytics': 'analytics' in visited,
@@ -197,12 +199,15 @@ class UserService:
     def _normalize_onboarding_state(raw) -> JsonDict:
         state = raw if isinstance(raw, dict) else {}
         completed_substeps = state.get("completed_substeps") or {}
+        if 'supporting_goal' in completed_substeps.get('break_it_down', []):
+            completed_substeps = {**completed_substeps, 'break_it_down': [
+                *completed_substeps['break_it_down'], 'child_goal_created',
+            ]}
         return {
             "version": ONBOARDING_VERSION,
             "revision": int(state.get("revision") or 0),
             "status": state.get("status") if state.get("status") in {"active", "dismissed", "completed"} else None,
             "visited": list(dict.fromkeys(state.get("visited") or [])),
-            "celebrated_first_session": bool(state.get("celebrated_first_session")),
             "completed_steps": list(dict.fromkeys(state.get("completed_steps") or [])),
             "completed_substeps": {
                 step_id: list(dict.fromkeys(substep_ids or []))
@@ -328,13 +333,12 @@ class UserService:
         if data.get("restart"):
             next_state = self._normalize_onboarding_state({
                 "status": "active",
-                "celebrated_first_session": current["celebrated_first_session"],
                 "completed_steps": current["completed_steps"],
                 "completed_substeps": current["completed_substeps"],
             })
         else:
             next_state = dict(current)
-            for key in ("status", "visited", "celebrated_first_session"):
+            for key in ("status", "visited"):
                 if data.get(key) is not None:
                     next_state[key] = data[key]
         next_state["revision"] = current["revision"] + 1

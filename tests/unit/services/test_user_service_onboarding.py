@@ -1,6 +1,17 @@
 from services.user_service import UserService
 
 
+def test_normalize_onboarding_state_migrates_supporting_goal_achievement():
+    state = UserService._normalize_onboarding_state({
+        'completed_substeps': {'break_it_down': ['supporting_goal']},
+    })
+
+    assert state['completed_substeps']['break_it_down'] == [
+        'supporting_goal',
+        'child_goal_created',
+    ]
+
+
 def test_merge_persisted_onboarding_achievements_is_monotonic():
     state = UserService._normalize_onboarding_state({
         'status': 'active',

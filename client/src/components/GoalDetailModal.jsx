@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
-
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useGoalAssociationMutations } from '../hooks/useGoalAssociationMutations';
 import useGoalDetailController from '../hooks/useGoalDetailController';
 import { useGoalForm } from '../hooks/useGoalForm';
+import useGoalDetailOnboardingVisits from '../hooks/useGoalDetailOnboardingVisits';
 import { useGoalNotes } from '../hooks/useGoalNotes';
 import { useGoalAssociations, useGoalDailyDurations, useGoalMetrics } from '../hooks/useGoalQueries';
 import { getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
@@ -16,11 +16,9 @@ import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
 import { getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalDetailModalRenderSurface from './goalDetail/GoalDetailModalRenderSurface';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
-
 import { logError } from '../utils/logger';
 
 const loadGraphProfileModal = () => import('./analytics/graphs/GraphProfileModal');
-
 /**
  * GoalDetailModal Component
  * 
@@ -140,6 +138,7 @@ function GoalDetailModal({
         ? (selectedChildType || defaultChildType)
         : (goal?.attributes?.type || goal?.type);
     const goalId = mode === 'create' ? null : (goal?.attributes?.id || goal?.id);
+    const markOnboardingView = useGoalDetailOnboardingVisits({ displayMode, goalId, isOpen, mode, readOnly, rootId });
     const queryRootId = readOnly ? null : rootId;
     const queryGoalId = readOnly ? null : goalId;
     const goalColor = getGoalColor(goalType);
@@ -590,6 +589,7 @@ function GoalDetailModal({
             setActivityPickerFooterActions(null);
         }
         setViewState(nextViewState);
+        markOnboardingView(nextViewState);
     };
 
     const canAddChildGoal = !readOnly && Boolean(onAddChild && childType && goalType !== 'ImmediateGoal' && !isCompleted);

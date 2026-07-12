@@ -4,7 +4,11 @@ const info = (id, title, description) => ({ id, title, description, kind: 'info'
 
 export const ONBOARDING_SUBSTEPS = {
     break_it_down: [
-        tracked('supporting_goal', 'Add a supporting child goal', 'Create a smaller goal that will help you achieve your {level} goal.'),
+        tracked('goal_detail_modal_opened', 'Open the Goal Detail Modal', 'The Goal Detail Modal is the home for all information about your goals. You can edit their attributes using the Edit or Options buttons in the footer.'),
+        tracked('goal_timeline_viewed', 'Visit your Goal Timeline', 'The timelines pane will show all work you put towards your goals: completing activities, associating activities, creating targets and achieving targets, and more'),
+        tracked('goal_activities_viewed', "Visit your Goal's Activities", "Once you create activities to define how you'll progress towards your goals, you can associate them to your goals. You can then create targets against those activities, giving your goal real conditions for success. You can create and associate activities from this modal, or by visiting Sessions > Manage Activities."),
+        tracked('goal_notes_viewed', "Visit your Goal's Notes", 'You can keep track of any thoughts or notes about your goal here. Notes made on activities associated to your goals will also show up here too. Great for collecting links and online videos.'),
+        tracked('child_goal_created', 'Create a Child Goal', 'Break your goal down into smaller pieces, giving you a path towards completing your {level} goal.'),
     ],
     create_activity_metric: [
         info('go_to_manage_activities', 'Go to Sessions › Manage Activities', 'Open the activity manager to define the practice you want to record.'),
@@ -31,12 +35,10 @@ export const ONBOARDING_SUBSTEPS = {
         tracked('complete_session', 'Complete the session', 'Once you’ve completed all your work, click the Complete button on the sidepane to finish the session.'),
     ],
     schedule_program: [
-        tracked('choose_goal', 'Choose the program’s goal', 'Select what the program is intended to advance.'),
-        tracked('date_range', 'Define the date range', 'Set the program’s start and end dates.'),
-        tracked('practice_rhythm', 'Add the practice rhythm', 'Create scheduled days or blocks for practice.'),
-        tracked('connect_templates', 'Connect session templates', 'Attach the templates needed for scheduled practice.'),
-        optional('review_calendar', 'Review the calendar', 'Verify that the intended rhythm appears on the calendar.'),
-        info('adjust_before_committing', 'Adjust before committing', 'Check workload and spacing; the first schedule does not need to be permanent.'),
+        tracked('program_created', 'Create a Program', "Give your program a name, choose which goals you're planning to achieve, and give it start/end dates"),
+        tracked('program_block_created', 'Define Program Blocks', 'Split your program into smaller block periods, where you can target specific goals or have a phased approach'),
+        tracked('program_day_completed', 'Create Program Days', 'Within a block, you can define program days, with specific session templates or conditions for a successful day'),
+        tracked('calendar_day_modal_opened', 'Review the Calendar', 'Click twice on a calendar day to open the Calendar Day modal: from here you can schedule specific program days or goal deadlines.'),
     ],
     see_progress: [
         tracked('open_analytics', 'Open Analytics', 'Identify a useful effort or progress view.'),

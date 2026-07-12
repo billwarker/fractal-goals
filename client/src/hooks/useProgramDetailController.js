@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { subtractDaysToDateString } from '../utils/dateUtils';
 
-export function useProgramDetailController({ goals = [] }) {
+export function useProgramDetailController({ goals = [], onDayViewOpen }) {
     const [showEditBuilder, setShowEditBuilder] = useState(false);
     const [viewMode, setViewMode] = useState('calendar');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -57,7 +57,8 @@ export function useProgramDetailController({ goals = [] }) {
 
         setSelectedDate(selectInfo.startStr);
         setShowDayViewModal(true);
-    }, [blockCreationMode]);
+        onDayViewOpen?.();
+    }, [blockCreationMode, onDayViewOpen]);
 
     const handleDateClick = useCallback((clickInfo) => {
         if (blockCreationMode) {
@@ -73,7 +74,8 @@ export function useProgramDetailController({ goals = [] }) {
 
         setSelectedDate(clickInfo.dateStr);
         setShowDayViewModal(true);
-    }, [blockCreationMode]);
+        onDayViewOpen?.();
+    }, [blockCreationMode, onDayViewOpen]);
 
     const handleAddBlockClick = useCallback((initialBlockData = null) => {
         setBlockModalData({
