@@ -15,12 +15,13 @@ Tests cover:
 
 import pytest
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
 from models import PasswordResetToken, utc_now
 from services.admin_service import hash_invite_key
 from services.email_service import EmailService, TEST_EMAIL_OUTBOX
 from services.quota_service import TIER_DEFAULT_LIMITS_SETTING_KEY
+from services.user_service import UserService
 
 
 def create_invite_key(db_session, raw_key='fg_invite_test'):
@@ -548,7 +549,7 @@ class TestPreferencesEndpoint:
         assert second_state.status_code == 200
         assert first_state.get_json()['status'] == 'active'
         assert second_state.get_json()['status'] == 'active'
-        assert first_state.get_json()['version'] == 2
+        assert first_state.get_json()['version'] == 3
         assert 'create_fractal' not in first_state.get_json()['substeps']
         assert 'create_fractal' not in first_state.get_json()['steps']
         assert first_state.get_json()['substeps']['make_goal_smart']['specific'] is False
@@ -589,6 +590,47 @@ class TestPreferencesEndpoint:
         assert facts['add_metric'] is True
         assert 'choose_structure' not in facts
         assert facts['go_to_manage_activities'] is None
+
+    def test_onboarding_achievements_persist_after_qualifying_records_are_removed(
+        self,
+        authed_client,
+        db_session,
+        test_user,
+        sample_ultimate_goal,
+        sample_activity_definition,
+    ):
+        root_id = sample_ultimate_goal.id
+        test_user.preferences = {
+            **(test_user.preferences or {}),
+            'onboarding_by_root': {
+                root_id: UserService._normalize_onboarding_state({'status': 'active'}),
+            },
+        }
+        db_session.commit()
+
+        observed = authed_client.get('/api/auth/onboarding', query_string={'root_id': root_id})
+        assert observed.status_code == 200
+        assert observed.get_json()['substeps']['create_activity_metric']['create_activity'] is True
+
+        sample_activity_definition.deleted_at = datetime.now(timezone.utc)
+        db_session.commit()
+
+        persisted = authed_client.get('/api/auth/onboarding', query_string={'root_id': root_id})
+        assert persisted.status_code == 200
+        assert persisted.get_json()['substeps']['create_activity_metric']['create_activity'] is True
+
+        db_session.refresh(test_user)
+        root_state = test_user.preferences['onboarding_by_root'][root_id]
+        assert 'create_activity' in root_state['completed_substeps']['create_activity_metric']
+
+        restarted = authed_client.patch('/api/auth/onboarding', json={
+            'root_id': root_id,
+            'revision': root_state['revision'],
+            'restart': True,
+        })
+        assert restarted.status_code == 200
+        assert restarted.get_json()['status'] == 'active'
+        assert restarted.get_json()['substeps']['create_activity_metric']['create_activity'] is True
 
     def test_cookie_authenticated_write_requires_csrf(self, client, test_user):
         response = client.post(

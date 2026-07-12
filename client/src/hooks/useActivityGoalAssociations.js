@@ -5,6 +5,7 @@ import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
 import { mergeUniqueIds } from '../utils/sessionGoalScope';
+import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
 import { logError } from '../utils/logger';
 
 export function normalizeGoalIds(goalIds) {
@@ -66,6 +67,9 @@ export function invalidateActivityGoalAssociationQueries(queryClient, {
         queryClient.invalidateQueries({ queryKey: queryKeys.goalsForSelection(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsEvidenceGoalsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsFlowtreeMetricsRoot(rootId) }),
+        // Activity-centric association flows (including session detail) bypass the
+        // goal-detail batch helper but change Achievable and "Associate it to a goal".
+        invalidateOnboardingProgress(queryClient, queryKeys),
     ];
 
     if (sessionId) {

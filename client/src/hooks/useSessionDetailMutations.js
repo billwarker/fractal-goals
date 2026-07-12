@@ -6,7 +6,7 @@ import { createAutoSaveQueue } from '../utils/autoSaveQueue';
 import { formatError } from '../utils/mutationNotify';
 import { applyOptimisticQueryUpdate } from '../utils/optimisticQuery';
 import { fractalApi } from '../utils/api';
-import { invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
+import { invalidateOnboardingProgress, invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
 import { mergeUniqueIds } from '../utils/sessionGoalScope';
 import { queryKeys } from './queryKeys';
 import {
@@ -60,6 +60,9 @@ export function useSessionDetailMutations({
 
     const invalidateSessionListQueries = useCallback(() => {
         invalidateSessionLists(queryClient, rootId, queryKeys);
+        // Session/activity-instance changes drive the onboarding "Run your first
+        // session" step (create session, add/complete instance, complete session).
+        invalidateOnboardingProgress(queryClient, queryKeys);
     }, [queryClient, rootId]);
 
     const invalidateFlowTreeActivityEvidence = useCallback(() => {

@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from '../hooks/queryKeys';
+import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
 import { getLocalISOString } from '../utils/dateUtils';
 import { useCreateSessionPageData } from '../hooks/useCreateSessionPageData';
 import notify from '../utils/notify';
@@ -371,6 +372,8 @@ function CreateSession() {
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsSearch(rootId), refetchType: 'inactive' });
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsHeatmap(rootId), refetchType: 'inactive' });
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId), refetchType: 'inactive' });
+        // Advances the onboarding "Create your first session" step.
+        invalidateOnboardingProgress(queryClient, queryKeys);
     };
 
     const createSessionFromTemplate = async (template) => {

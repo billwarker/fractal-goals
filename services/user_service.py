@@ -7,11 +7,12 @@ from sqlalchemy.orm.attributes import flag_modified
 import models
 from config import config
 from models import User
-from models import ActivityDefinition, ActivityGroup, ActivityInstance, Goal, MetricDefinition, MetricValue, Program, ProgramBlock, ProgramDay, Session
+from models import ActivityDefinition, ActivityGroup, ActivityInstance, Goal, MetricDefinition, MetricValue, Program, ProgramBlock, ProgramDay, Session, SessionTemplate
 from services.account_flags import clear_force_password_change
 from services.email_service import EmailSendError, EmailService
 from services.email_templates import render_email_changed_email, render_password_changed_email
 from services.serializers import calculate_smart_status, serialize_user
+from services.template_service import STARTER_TEMPLATE_NAME
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, ServiceResult
 
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 ONBOARDING_PREFERENCE_KEY = "onboarding"
 ONBOARDING_ROOTS_PREFERENCE_KEY = "onboarding_by_root"
-ONBOARDING_VERSION = 2
+ONBOARDING_VERSION = 3
 
 
 class UserService:
@@ -102,7 +103,6 @@ class UserService:
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups),
         ).filter(Goal.root_id == root_id, Goal.deleted_at.is_(None)).all()
-        root = next((goal for goal in goals if goal.id == root_id), None)
         children = [goal for goal in goals if goal.parent_id is not None]
 
         best_smart_goal = None
@@ -135,6 +135,13 @@ class UserService:
             Session.root_id == root_id,
             Session.deleted_at.is_(None),
         ).all()
+        # New fractals are auto-seeded with the starter template, so "created a
+        # template" means a user-authored (non-starter) template exists.
+        has_custom_template = self.db_session.query(SessionTemplate.id).filter(
+            SessionTemplate.root_id == root_id,
+            SessionTemplate.deleted_at.is_(None),
+            SessionTemplate.name != STARTER_TEMPLATE_NAME,
+        ).first() is not None
         programs = self.db_session.query(Program).options(
             selectinload(Program.goals),
             selectinload(Program.blocks).selectinload(ProgramBlock.days).selectinload(ProgramDay.templates),
@@ -161,12 +168,12 @@ class UserService:
                 'refine_metrics': None,
             },
             'first_session': {
-                'choose_template': any(session.template_id for session in sessions),
+                'create_template': has_custom_template,
+                'create_session': bool(sessions),
                 'add_activity': bool(instances),
                 'record_values': has_metric_values or any(bool(instance.data) for instance in instances),
-                'add_context': any(instance.notes and instance.notes.strip() for instance in instances),
+                'complete_instance': any(instance.completed for instance in instances),
                 'complete_session': any(session.completed for session in sessions),
-                'see_evidence': any(session.completed for session in sessions),
             },
             'schedule_program': {
                 'choose_goal': any(program.goals for program in programs),
@@ -189,13 +196,57 @@ class UserService:
     @staticmethod
     def _normalize_onboarding_state(raw) -> JsonDict:
         state = raw if isinstance(raw, dict) else {}
+        completed_substeps = state.get("completed_substeps") or {}
         return {
             "version": ONBOARDING_VERSION,
             "revision": int(state.get("revision") or 0),
             "status": state.get("status") if state.get("status") in {"active", "dismissed", "completed"} else None,
             "visited": list(dict.fromkeys(state.get("visited") or [])),
             "celebrated_first_session": bool(state.get("celebrated_first_session")),
+            "completed_steps": list(dict.fromkeys(state.get("completed_steps") or [])),
+            "completed_substeps": {
+                step_id: list(dict.fromkeys(substep_ids or []))
+                for step_id, substep_ids in completed_substeps.items()
+                if isinstance(step_id, str) and isinstance(substep_ids, list)
+            } if isinstance(completed_substeps, dict) else {},
         }
+
+    @staticmethod
+    def _merge_persisted_onboarding_achievements(state: JsonDict, progress: JsonDict, substeps: JsonDict):
+        """Make observed onboarding achievements monotonic within a fractal."""
+        completed_steps = set(state.get("completed_steps") or [])
+        completed_steps.update(step_id for step_id, done in progress.items() if done is True)
+
+        completed_substeps = {
+            step_id: set(substep_ids)
+            for step_id, substep_ids in (state.get("completed_substeps") or {}).items()
+        }
+        for step_id, facts in substeps.items():
+            achieved = completed_substeps.setdefault(step_id, set())
+            achieved.update(fact_id for fact_id, done in facts.items() if done is True)
+
+        merged_progress = {
+            step_id: done is True or step_id in completed_steps
+            for step_id, done in progress.items()
+        }
+        merged_substeps = {
+            step_id: {
+                fact_id: (done is True or fact_id in completed_substeps.get(step_id, set()))
+                if isinstance(done, bool) else done
+                for fact_id, done in facts.items()
+            }
+            for step_id, facts in substeps.items()
+        }
+        persisted = {
+            **state,
+            "completed_steps": sorted(completed_steps),
+            "completed_substeps": {
+                step_id: sorted(fact_ids)
+                for step_id, fact_ids in completed_substeps.items()
+                if fact_ids
+            },
+        }
+        return persisted, merged_progress, merged_substeps
 
     def initialize_onboarding_for_root(self, user_id: str, root_id: str) -> None:
         user = self._get_user(user_id)
@@ -238,13 +289,21 @@ class UserService:
         progress = self._onboarding_progress(user_id, root_id)
         returning_user = state["status"] is None and not isinstance(raw_state, dict) and any(progress.values())
         effective_status = state["status"] or ("dismissed" if returning_user else "active")
+        substeps = self._onboarding_substeps(root_id, state)
+        state, progress, substeps = self._merge_persisted_onboarding_achievements(state, progress, substeps)
+        if root_id and isinstance(raw_state, dict) and state != self._normalize_onboarding_state(raw_state):
+            root_states = dict(root_states)
+            root_states[root_id] = state
+            preferences[ONBOARDING_ROOTS_PREFERENCE_KEY] = root_states
+            user.preferences = preferences
+            flag_modified(user, 'preferences')
+            self.db_session.commit()
         completed = {
             **progress,
             "see_progress": all(key in state["visited"] for key in ("analytics", "notes")),
         }
         if all(completed.values()):
             effective_status = "completed"
-        substeps = self._onboarding_substeps(root_id, state)
         return {**state, "root_id": root_id, "persisted": isinstance(raw_state, dict), "status": effective_status, "steps": completed, "substeps": substeps}, None, 200
 
     def update_onboarding(self, user_id: str, data, *, root_id: str | None = None) -> ServiceResult[JsonDict]:
@@ -270,6 +329,8 @@ class UserService:
             next_state = self._normalize_onboarding_state({
                 "status": "active",
                 "celebrated_first_session": current["celebrated_first_session"],
+                "completed_steps": current["completed_steps"],
+                "completed_substeps": current["completed_substeps"],
             })
         else:
             next_state = dict(current)

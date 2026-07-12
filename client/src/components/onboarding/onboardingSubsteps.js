@@ -23,12 +23,12 @@ export const ONBOARDING_SUBSTEPS = {
         info('review_badge', 'Review the badge', 'Each highlighted letter in the goal header represents a SMART criterion you have met.'),
     ],
     first_session: [
-        tracked('choose_template', 'Choose a template', 'Use the Simple Empty Template or another session template.'),
-        tracked('add_activity', 'Add the activity', 'Include an activity that carries the metric you want to record.'),
-        tracked('record_values', 'Record real values', 'Enter at least one metric value, set, or split result.'),
-        optional('add_context', 'Add context if useful', 'Capture a note about what changed, worked, or needs adjustment.'),
-        tracked('complete_session', 'Complete the session', 'Finish the session so its data becomes durable evidence.'),
-        tracked('see_evidence', 'See the evidence light up', 'Return to the goal tree to see which goals received evidence.'),
+        optional('create_template', 'Create a session template', 'Go to Sessions › Manage Session Templates › Create Template. Session templates let you customize your sessions, breaking them into sections and pre-populating those sections with activities.'),
+        tracked('create_session', 'Create your first session', 'Click + Add Session, select a session template, then press Create Session to get started.'),
+        tracked('add_activity', 'Add activity instances', 'Click + Add Activities on your session to create an activity instance from your bank of activities. Once you’ve added an activity, click Start to begin running a timer as you do the activity.'),
+        optional('record_values', 'Track your sets and metric values', 'If your activity has sets or metrics, you can track them here.'),
+        tracked('complete_instance', 'Complete your activity instance', 'Hit the Complete button to stop the timer and track your work evidence on the activity. This evidence is automatically tracked on all associated goals.'),
+        tracked('complete_session', 'Complete the session', 'Once you’ve completed all your work, click the Complete button on the sidepane to finish the session.'),
     ],
     schedule_program: [
         tracked('choose_goal', 'Choose the program’s goal', 'Select what the program is intended to advance.'),

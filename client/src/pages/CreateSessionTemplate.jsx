@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from '../hooks/queryKeys';
+import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
 import { useActivities, useActivityGroups } from '../hooks/useActivityQueries';
 import { useSessionTemplates } from '../hooks/useSessionTemplateQueries';
 import notify from '../utils/notify';
@@ -80,6 +81,7 @@ function CreateSessionTemplate() {
         },
         onSuccess: async (_, variables) => {
             await queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
+            await invalidateOnboardingProgress(queryClient, queryKeys);
             setShowBuilder(false);
             setEditingTemplate(null);
             setError(null);
@@ -93,6 +95,7 @@ function CreateSessionTemplate() {
         },
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
+            await invalidateOnboardingProgress(queryClient, queryKeys);
             setTemplateToDelete(null);
             setError(null);
         },
