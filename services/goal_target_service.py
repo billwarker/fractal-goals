@@ -596,7 +596,10 @@ class GoalTargetService:
                             if incumbent is None:
                                 is_better = True
                                 break
-                            higher_is_better = metric_def.higher_is_better is not False
+                            fractal_metric = getattr(metric_def, 'fractal_metric', None)
+                            higher_is_better = (
+                                getattr(fractal_metric, 'higher_is_better', None) is not False
+                            )
                             is_better = candidate > incumbent if higher_is_better else candidate < incumbent
                             break
                     if is_better:

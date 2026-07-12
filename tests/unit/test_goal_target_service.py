@@ -9,10 +9,12 @@ from services.goal_target_service import GoalTargetService
 @pytest.mark.unit
 def test_target_summary_preserves_canonical_best_set_tuple():
     speed = SimpleNamespace(
-        id='speed', deleted_at=None, is_best_set_metric=True, higher_is_better=True,
+        id='speed', deleted_at=None, is_best_set_metric=True,
+        fractal_metric=SimpleNamespace(higher_is_better=True),
     )
     quality = SimpleNamespace(
-        id='quality', deleted_at=None, is_best_set_metric=False, higher_is_better=True,
+        id='quality', deleted_at=None, is_best_set_metric=False,
+        fractal_metric=SimpleNamespace(higher_is_better=True),
     )
     conditions = [
         SimpleNamespace(metric_definition_id='speed', operator='>=', target_value=100, metric=speed),
@@ -49,10 +51,12 @@ def test_target_summary_preserves_canonical_best_set_tuple():
 @pytest.mark.unit
 def test_target_summary_best_set_respects_lower_is_better_anchor():
     duration = SimpleNamespace(
-        id='duration', deleted_at=None, is_best_set_metric=True, higher_is_better=False,
+        id='duration', deleted_at=None, is_best_set_metric=True,
+        fractal_metric=SimpleNamespace(higher_is_better=False),
     )
     quality = SimpleNamespace(
-        id='quality', deleted_at=None, is_best_set_metric=False, higher_is_better=True,
+        id='quality', deleted_at=None, is_best_set_metric=False,
+        fractal_metric=SimpleNamespace(higher_is_better=True),
     )
     target = SimpleNamespace(
         created_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
