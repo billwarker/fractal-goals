@@ -79,4 +79,43 @@ describe('GoalViewMode', () => {
             .toBeTruthy();
         expect(screen.getByText('This clicked at full speed.')).toBeInTheDocument();
     });
+
+    it.each([
+        {
+            name: 'goal-level activity tracking is disabled',
+            trackActivities: false,
+            levelConfig: { track_activities: true },
+        },
+        {
+            name: 'the goal level does not support activity tracking',
+            trackActivities: true,
+            levelConfig: { track_activities: false },
+        },
+    ])('keeps persisted targets visible when $name', async ({ trackActivities, levelConfig }) => {
+        renderWithProviders(
+            <GoalViewMode
+                mode="edit"
+                goal={{ id: 'goal-1', type: 'LongTermGoal', attributes: { id: 'goal-1', type: 'LongTermGoal' } }}
+                goalId="goal-1"
+                rootId="root-1"
+                goalType="LongTermGoal"
+                goalColor="#22d3ee"
+                levelConfig={levelConfig}
+                trackActivities={trackActivities}
+                displayMode="modal"
+                programs={[]}
+                targets={[{ id: 'target-1', name: 'Clean Front Lever' }]}
+                associatedActivities={[]}
+                activityDefinitions={[]}
+                name="Have a Clean 5 Second Front Lever"
+                description=""
+                relevanceStatement=""
+                setTargets={vi.fn()}
+                readOnly
+            />,
+            RENDER_OPTIONS
+        );
+
+        expect(await screen.findByText('Targets')).toBeInTheDocument();
+    });
 });

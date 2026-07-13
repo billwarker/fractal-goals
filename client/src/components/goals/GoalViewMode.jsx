@@ -40,6 +40,8 @@ function GoalViewMode({
     readOnly = false,
 }) {
     const navigate = useNavigate();
+    const hasTargets = Array.isArray(targets) && targets.length > 0;
+    const canTrackActivities = trackActivities && levelConfig.track_activities !== false;
 
     return (
         <div className={styles.viewContainer}>
@@ -106,7 +108,7 @@ function GoalViewMode({
             })()}
 
             {/* Targets Section - View Mode (Read-only) */}
-            {trackActivities && levelConfig.track_activities !== false && (
+            {(hasTargets || canTrackActivities) && (
                 <Suspense fallback={null}>
                     <TargetManager
                         targets={targets}
