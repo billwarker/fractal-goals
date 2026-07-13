@@ -82,7 +82,7 @@ export function OnboardingProvider({ children }) {
     useEffect(() => {
         if (!enabled || state?.status !== 'active') return;
         const section = location.pathname.split('/').filter(Boolean)[1];
-        if (section === 'analytics' || section === 'notes' || section === 'programs') {
+        if (section === 'programs') {
             if (!state.visited?.includes(section)) markVisited(section);
         }
     }, [enabled, location.pathname, markVisited, state?.status, state?.visited]);

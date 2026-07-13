@@ -40,14 +40,6 @@ export const ONBOARDING_SUBSTEPS = {
         tracked('program_day_completed', 'Create Program Days', 'Within a block, you can define program days, with specific session templates or conditions for a successful day'),
         tracked('calendar_day_modal_opened', 'Review the Calendar', 'Click twice on a calendar day to open the Calendar Day modal: from here you can schedule specific program days or goal deadlines.'),
     ],
-    see_progress: [
-        tracked('open_analytics', 'Open Analytics', 'Identify a useful effort or progress view.'),
-        info('inspect_evidence', 'Inspect goal evidence', 'Notice which goals are receiving evidence in the tree.'),
-        tracked('review_notes', 'Review Notes', 'See how qualitative context complements metrics.'),
-        info('compare_evidence', 'Compare intention with evidence', 'Check whether recorded activity is supporting the intended goal.'),
-        info('make_adjustment', 'Make one adjustment', 'Refine a goal, activity, metric, template, or program based on what you learned.'),
-        info('continue_without_guide', 'Continue without the guide', 'Dismiss onboarding when you are ready; it can be restored from Settings.'),
-    ],
 };
 
 export function buildSubsteps(stepId, facts = {}, { level } = {}) {

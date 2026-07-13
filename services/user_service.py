@@ -185,14 +185,6 @@ class UserService:
                 'program_day_completed': any(day.is_completed for day in program_days),
                 'calendar_day_modal_opened': 'calendar_day_modal' in visited,
             },
-            'see_progress': {
-                'open_analytics': 'analytics' in visited,
-                'inspect_evidence': None,
-                'review_notes': 'notes' in visited,
-                'compare_evidence': None,
-                'make_adjustment': None,
-                'continue_without_guide': None,
-            },
         }
 
     @staticmethod
@@ -303,10 +295,7 @@ class UserService:
             user.preferences = preferences
             flag_modified(user, 'preferences')
             self.db_session.commit()
-        completed = {
-            **progress,
-            "see_progress": all(key in state["visited"] for key in ("analytics", "notes")),
-        }
+        completed = progress
         if all(completed.values()):
             effective_status = "completed"
         return {**state, "root_id": root_id, "persisted": isinstance(raw_state, dict), "status": effective_status, "steps": completed, "substeps": substeps}, None, 200

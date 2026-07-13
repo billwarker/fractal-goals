@@ -4,7 +4,7 @@ import { buildOnboardingSteps } from '../onboardingSteps';
 describe('buildOnboardingSteps', () => {
     it('maps server completion facts and root-aware destinations', () => {
         const steps = buildOnboardingSteps({ steps: { break_it_down: true, first_session: false }, substeps: { break_it_down: { goal_detail_modal_opened: true } } }, 'root-1');
-        expect(steps).toHaveLength(6);
+        expect(steps).toHaveLength(5);
         expect(steps[0]).toMatchObject({ id: 'break_it_down', done: true, path: '/root-1/goals' });
         expect(steps[1]).toMatchObject({ id: 'create_activity_metric', number: 2, title: 'Create an activity' });
         expect(steps[2]).toMatchObject({ id: 'make_goal_smart', number: 3 });
@@ -14,6 +14,7 @@ describe('buildOnboardingSteps', () => {
             done: false,
             path: '/root-1/create-session',
         });
+        expect(steps.find((step) => step.id === 'see_progress')).toBeUndefined();
     });
 
     it('interpolates the root level word into substep copy', () => {

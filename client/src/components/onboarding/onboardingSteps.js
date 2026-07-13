@@ -6,7 +6,6 @@ export const ONBOARDING_STEPS = [
     { id: 'make_goal_smart', title: 'Make one goal SMART', blurb: 'Give one goal a clear result, measure, and timeframe.', path: (rootId) => `/${rootId}/goals` },
     { id: 'first_session', title: 'Run your first session', blurb: 'Complete a session to light up evidence in your tree.', path: (rootId) => `/${rootId}/create-session` },
     { id: 'schedule_program', title: 'Schedule a program', blurb: 'Turn your practice into a repeatable rhythm.', path: (rootId) => `/${rootId}/programs` },
-    { id: 'see_progress', title: 'See your progress', blurb: 'Visit Analytics and Notes to review evidence and context.', path: (rootId) => `/${rootId}/analytics` },
 ];
 
 export function buildOnboardingSteps(state, rootId, { level } = {}) {
