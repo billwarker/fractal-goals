@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "node scripts/run-vitest-with-timeout.mjs",
+    "test:related": "node scripts/run-vitest-with-timeout.mjs --related",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {

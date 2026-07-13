@@ -44,6 +44,7 @@ usage() {
     echo "  coverage      Run tests with detailed coverage report"
     echo "  doctor        Check local test environment without running the full suite"
     echo "  verify        Run cheap repo verification checks"
+    echo "  verify-fast   Run checks scoped to staged files (used by pre-commit)"
     echo "  install-hooks Install repo-tracked git hooks into .git/hooks"
     echo "  db-up         Start local Postgres test database with Docker Compose"
     echo "  db-down       Stop local Postgres containers"
@@ -174,6 +175,10 @@ frontend_vitest() {
     (cd "$CLIENT_DIR" && "$NPM_BIN" run test:run -- "$@")
 }
 
+frontend_vitest_related() {
+    (cd "$CLIENT_DIR" && "$NPM_BIN" run test:related -- "$@")
+}
+
 frontend_npm_script() {
     local script=$1
     shift || true
@@ -219,6 +224,46 @@ run_verify() {
     ensure_frontend_tools
     bash -n "$ROOT_DIR/run-tests.sh"
     frontend_vitest --reporter=dot
+    frontend_npm_script check:responsive
+}
+
+# Pre-commit path: only verify what the staged changes can affect.
+# Note: vitest related runs against the working tree, not the staged index
+# (same limitation as the full verify run).
+run_verify_fast() {
+    print_message "$GREEN" "Running staged-change verification..."
+    bash -n "$ROOT_DIR/run-tests.sh"
+
+    local staged_client_files=()
+    while IFS= read -r file; do
+        case "$file" in
+            client/*) staged_client_files+=("$file") ;;
+        esac
+    done < <(cd "$ROOT_DIR" && git diff --cached --name-only --diff-filter=ACMR)
+
+    if [ ${#staged_client_files[@]} -eq 0 ]; then
+        print_message "$YELLOW" "No client changes staged; skipping frontend tests."
+        return 0
+    fi
+
+    ensure_frontend_tools
+
+    local related_targets=()
+    local file
+    for file in "${staged_client_files[@]}"; do
+        case "$file" in
+            client/src/*.js|client/src/*.jsx)
+                related_targets+=("${file#client/}")
+                ;;
+        esac
+    done
+
+    if [ ${#related_targets[@]} -gt 0 ]; then
+        frontend_vitest_related "${related_targets[@]}"
+    else
+        print_message "$YELLOW" "No staged client source files map to tests; skipping vitest."
+    fi
+
     frontend_npm_script check:responsive
 }
 
@@ -415,6 +460,9 @@ main() {
             ;;
         verify)
             run_verify
+            ;;
+        verify-fast)
+            run_verify_fast
             ;;
         install-hooks)
             run_install_hooks

@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
 
-// The full suite runs ~115s on a warm machine, so a 120s ceiling tripped on
-// normal timing variance. 240s leaves headroom while still catching real hangs.
+// With 4 parallel workers the full suite runs ~45-85s depending on machine
+// load. 180s leaves headroom while still catching real hangs.
 // Override with VITEST_WALL_TIMEOUT_MS when needed.
-const DEFAULT_TIMEOUT_MS = 240_000;
+const DEFAULT_TIMEOUT_MS = 180_000;
 const timeoutMs = Number.parseInt(process.env.VITEST_WALL_TIMEOUT_MS || '', 10) || DEFAULT_TIMEOUT_MS;
 
 // `--related <files...>` runs only tests importing the given source files
