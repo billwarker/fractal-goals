@@ -124,12 +124,29 @@ describe('NavigationHeader', () => {
     it('opens a fractal dropdown from the root icon and name', async () => {
         renderHeader('/root-1/goals');
 
-        fireEvent.click(screen.getByRole('button', { name: /switch fractal.*first root/i }));
+        const trigger = screen.getByRole('button', { name: /switch fractal.*first root/i });
+        trigger.getBoundingClientRect = () => ({ left: 24, bottom: 52 });
+        fireEvent.click(trigger);
 
         expect(await screen.findByRole('menu', { name: /available fractals/i })).toBeInTheDocument();
         expect(await screen.findByRole('menuitem', { name: /second root/i })).toBeInTheDocument();
         expect(screen.queryByRole('menuitem', { name: /first root/i })).not.toBeInTheDocument();
         expect(screen.queryByText('Current')).not.toBeInTheDocument();
+        const menu = screen.getByRole('menu', { name: /available fractals/i });
+        expect(menu.parentElement).toBe(document.body);
+        expect(menu).toHaveStyle({ left: '24px', top: '60px' });
+    });
+
+    it('keeps the portaled menu open when interacting inside it and closes it outside', async () => {
+        renderHeader('/root-1/goals');
+
+        fireEvent.click(screen.getByRole('button', { name: /switch fractal.*first root/i }));
+        const menu = await screen.findByRole('menu', { name: /available fractals/i });
+        fireEvent.mouseDown(menu);
+        expect(menu).toBeInTheDocument();
+
+        fireEvent.mouseDown(document.body);
+        expect(screen.queryByRole('menu', { name: /available fractals/i })).not.toBeInTheDocument();
     });
 
     it('switches roots from the dropdown while preserving the current nav section', async () => {

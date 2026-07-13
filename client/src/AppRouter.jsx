@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Routes, Route, Navigate, Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { HeaderProvider, useHeader } from './contexts/HeaderContext';
@@ -100,7 +101,9 @@ function FractalSwitcher({
     const { user, isAuthenticated } = useAuth();
     const goalLevels = useGoalLevels();
     const [isOpen, setIsOpen] = useState(false);
+    const [menuPosition, setMenuPosition] = useState(null);
     const switcherRef = useRef(null);
+    const menuRef = useRef(null);
     const userId = user?.id || null;
 
     const fractalsQuery = useQuery({
@@ -121,12 +124,23 @@ function FractalSwitcher({
     const currentFractal = fractals.find((fractal) => fractal.id === rootId) || null;
     const currentDisplay = getFractalDisplay(currentFractal, rootGoal, goalLevels);
     const menuId = `fractal-switcher-menu-${rootId}`;
+    const updateMenuPosition = useCallback(() => {
+        const trigger = switcherRef.current?.querySelector('button');
+        if (!trigger) return;
+
+        const rect = trigger.getBoundingClientRect();
+        const viewportWidth = window.visualViewport?.width || window.innerWidth;
+        const edge = isMobile ? 12 : 16;
+        const width = Math.min(420, Math.max(0, viewportWidth - (edge * 2)));
+        const left = Math.min(Math.max(rect.left, edge), Math.max(edge, viewportWidth - width - edge));
+        setMenuPosition({ left, top: rect.bottom + 8, width });
+    }, [isMobile]);
 
     useEffect(() => {
         if (!isOpen) return undefined;
 
         const handlePointerDown = (event) => {
-            if (switcherRef.current && !switcherRef.current.contains(event.target)) {
+            if (!switcherRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) {
                 setIsOpen(false);
             }
         };
@@ -143,6 +157,21 @@ function FractalSwitcher({
             document.removeEventListener('keydown', handleKeyDown);
         };
     }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return undefined;
+        const viewport = window.visualViewport;
+        window.addEventListener('resize', updateMenuPosition);
+        window.addEventListener('scroll', updateMenuPosition, true);
+        viewport?.addEventListener('resize', updateMenuPosition);
+        viewport?.addEventListener('scroll', updateMenuPosition);
+        return () => {
+            window.removeEventListener('resize', updateMenuPosition);
+            window.removeEventListener('scroll', updateMenuPosition, true);
+            viewport?.removeEventListener('resize', updateMenuPosition);
+            viewport?.removeEventListener('scroll', updateMenuPosition);
+        };
+    }, [isOpen, updateMenuPosition]);
 
     useEffect(() => {
         setIsOpen(false);
@@ -167,7 +196,13 @@ function FractalSwitcher({
                 aria-expanded={isOpen}
                 aria-controls={menuId}
                 aria-label={`Switch fractal. Current fractal: ${currentDisplay.name}`}
-                onClick={() => setIsOpen((value) => !value)}
+                onClick={() => setIsOpen((value) => {
+                    if (!value) {
+                        updateMenuPosition();
+                        onSwitch();
+                    }
+                    return !value;
+                })}
             >
                 {currentDisplay.type && (
                     <GoalIcon
@@ -185,8 +220,15 @@ function FractalSwitcher({
                 <span className={styles.fractalSwitcherChevron} aria-hidden="true">▾</span>
             </button>
 
-            {isOpen && (
-                <div className={styles.fractalSwitcherMenu} id={menuId} role="menu" aria-label="Available fractals">
+            {isOpen && menuPosition && createPortal(
+                <div
+                    className={`${styles.fractalSwitcherMenu} ${styles.fractalSwitcherMenuPortal}`}
+                    id={menuId}
+                    ref={menuRef}
+                    role="menu"
+                    aria-label="Available fractals"
+                    style={menuPosition}
+                >
                     {fractalsQuery.isLoading && (
                         <div className={styles.fractalSwitcherStatus}>Loading fractals...</div>
                     )}
@@ -217,7 +259,8 @@ function FractalSwitcher({
                             </button>
                         );
                     })}
-                </div>
+                </div>,
+                document.body,
             )}
         </div>
     );
