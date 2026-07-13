@@ -162,11 +162,44 @@ def test_active_session_includes_paused_state(
     persisted.is_paused = True
     db_session.commit()
 
-    active, active_error, active_status = session_service.get_active_session(test_user.id)
+    active, active_error, active_status = session_service.get_active_session(
+        sample_ultimate_goal.id,
+        test_user.id,
+    )
     assert active_error is None
     assert active_status == 200
     assert active['id'] == created['id']
     assert active['is_paused'] is True
+
+
+def test_active_session_limit_is_scoped_per_root(
+    db_session, session_service, sample_ultimate_goal, test_user
+):
+    other_root_id = str(uuid4())
+    db_session.add(Goal(
+        id=other_root_id,
+        root_id=other_root_id,
+        owner_id=test_user.id,
+        name='Other fractal',
+    ))
+    db_session.commit()
+
+    first, first_error, first_status = session_service.create_session(
+        sample_ultimate_goal.id,
+        test_user.id,
+        {'name': 'First root session'},
+    )
+    second, second_error, second_status = session_service.create_session(
+        other_root_id,
+        test_user.id,
+        {'name': 'Second root session'},
+    )
+
+    assert first_error is None
+    assert first_status == 201
+    assert second_error is None
+    assert second_status == 201
+    assert first['root_id'] != second['root_id']
 
 def test_create_session_success(db_session, session_service, sample_goal_hierarchy, test_user, sample_activity_definition):
     # Setup data with a template-like structure involving an activity

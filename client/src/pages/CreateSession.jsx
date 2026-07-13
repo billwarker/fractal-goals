@@ -235,7 +235,7 @@ function CreateSession() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { user } = useAuth();
-    const { data: existingActiveSession, isFetched: activeSessionFetched } = useActiveSession(user?.id);
+    const { data: existingActiveSession, isFetched: activeSessionFetched } = useActiveSession(user?.id, rootId);
     // Selection state
     const [selectedProgram, setSelectedProgram] = useState(null);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -389,7 +389,7 @@ function CreateSession() {
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsSearch(rootId), refetchType: 'inactive' });
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsHeatmap(rootId), refetchType: 'inactive' });
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId), refetchType: 'inactive' });
-        queryClient.invalidateQueries({ queryKey: queryKeys.activeSession() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.activeSessionRoot() });
         // Advances the onboarding "Create your first session" step.
         invalidateOnboardingProgress(queryClient, queryKeys);
     };

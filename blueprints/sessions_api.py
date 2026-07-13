@@ -73,19 +73,19 @@ def _parse_window_days(default=None):
 
 def _is_active_session_constraint_error(error):
     constraint_name = getattr(getattr(error, 'orig', None), 'diag', None)
-    if constraint_name and getattr(constraint_name, 'constraint_name', None) == 'uq_sessions_one_active_per_owner':
+    if constraint_name and getattr(constraint_name, 'constraint_name', None) == 'uq_sessions_one_active_per_owner_root':
         return True
-    return 'uq_sessions_one_active_per_owner' in str(error)
+    return 'uq_sessions_one_active_per_owner_root' in str(error)
 
 
-@sessions_bp.route('/sessions/active', methods=['GET'])
+@sessions_bp.route('/<root_id>/sessions/active', methods=['GET'])
 @token_required
-def get_active_session_endpoint(current_user):
-    """Return the authenticated user's single unfinished session, if any."""
+def get_active_session_endpoint(current_user, root_id):
+    """Return the user's unfinished session in the requested fractal, if any."""
     db_session = get_db_session()
     service = SessionService(db_session)
     try:
-        result, error, status = service.get_active_session(current_user.id)
+        result, error, status = service.get_active_session(root_id, current_user.id)
         if error:
             return jsonify(error if isinstance(error, dict) else {'error': error}), status
         return jsonify({'active_session': result})
@@ -275,7 +275,7 @@ def create_fractal_session(current_user, root_id, validated_data):
     except IntegrityError as exc:
         db_session.rollback()
         if _is_active_session_constraint_error(exc):
-            active_session, _, _ = service.get_active_session(current_user.id)
+            active_session, _, _ = service.get_active_session(root_id, current_user.id)
             return jsonify({
                 'error': 'A session is already in progress',
                 'code': 'active_session_exists',
@@ -331,7 +331,7 @@ def update_session(current_user, root_id, session_id, validated_data):
     except IntegrityError as exc:
         db_session.rollback()
         if _is_active_session_constraint_error(exc):
-            active_session, _, _ = service.get_active_session(current_user.id)
+            active_session, _, _ = service.get_active_session(root_id, current_user.id)
             return jsonify({
                 'error': 'A session is already in progress',
                 'code': 'active_session_exists',

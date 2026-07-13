@@ -6,7 +6,7 @@ import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import styles from '../../AppRouter.module.css';
 
 function NavigationSessionAction({ rootId, userId, isMobile = false, onClick }) {
-    const { data: activeSession } = useActiveSession(userId);
+    const { data: activeSession } = useActiveSession(userId, rootId);
     const activePath = activeSession?.id && activeSession?.root_id
         ? `/${activeSession.root_id}/session/${activeSession.id}`
         : null;

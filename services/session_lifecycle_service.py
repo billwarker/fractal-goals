@@ -68,17 +68,22 @@ class SessionLifecycleService:
         session._activity_duration_stats = computed.get("activity_durations") or {}
         self.db_session.commit()
 
-    def get_active_session(self, current_user_id) -> ServiceResult[JsonDict]:
+    def get_active_session(self, root_id, current_user_id) -> ServiceResult[JsonDict]:
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
         session = self.db_session.query(Session).filter(
             Session.owner_id == current_user_id,
+            Session.root_id == root_id,
             Session.completed.is_not(True),
             Session.deleted_at.is_(None),
         ).order_by(Session.created_at.asc()).first()
         return (serialize_session(session) if session else None), None, 200
 
-    def _active_session_conflict(self, current_user_id, *, exclude_session_id=None):
+    def _active_session_conflict(self, root_id, current_user_id, *, exclude_session_id=None):
         query = self.db_session.query(Session).filter(
             Session.owner_id == current_user_id,
+            Session.root_id == root_id,
             Session.completed.is_not(True),
             Session.deleted_at.is_(None),
         )
@@ -198,7 +203,7 @@ class SessionLifecycleService:
             return None, "Fractal not found or access denied", 404
 
         if reserve_active_slot:
-            conflict = self._active_session_conflict(current_user_id)
+            conflict = self._active_session_conflict(root_id, current_user_id)
             if conflict:
                 return None, conflict, 409
 
@@ -650,6 +655,7 @@ class SessionLifecycleService:
         if 'completed' in data:
             if not data['completed'] and session.completed:
                 conflict = self._active_session_conflict(
+                    root_id,
                     current_user_id,
                     exclude_session_id=session.id,
                 )

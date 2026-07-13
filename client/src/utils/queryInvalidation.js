@@ -8,7 +8,7 @@ export function invalidateQueryKeys(queryClient, queryKeys, options = {}) {
 
 export function invalidateSessionLists(queryClient, rootId, queryKeys, options = {}) {
     invalidateQueryKeys(queryClient, [
-        queryKeys.activeSession(),
+        queryKeys.activeSessionRoot(),
         queryKeys.sessions(rootId),
         queryKeys.sessionsAll(rootId),
         queryKeys.sessionsPaginated(rootId),

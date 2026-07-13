@@ -299,7 +299,7 @@ function Sessions() {
             setSessionToDelete(null);
 
             queryClient.removeQueries({ queryKey: queryKeys.session(rootId, sessionToDelete.id) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.activeSession() });
+            queryClient.invalidateQueries({ queryKey: queryKeys.activeSessionRoot() });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.activityHistoryRoot(rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.progressRoot() });

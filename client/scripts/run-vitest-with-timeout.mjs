@@ -5,7 +5,13 @@ import { spawn } from 'node:child_process';
 // Override with VITEST_WALL_TIMEOUT_MS when needed.
 const DEFAULT_TIMEOUT_MS = 240_000;
 const timeoutMs = Number.parseInt(process.env.VITEST_WALL_TIMEOUT_MS || '', 10) || DEFAULT_TIMEOUT_MS;
-const args = ['vitest', 'run', ...process.argv.slice(2)];
+
+// `--related <files...>` runs only tests importing the given source files
+// (vitest related); anything else falls through to a full `vitest run`.
+const cliArgs = process.argv.slice(2);
+const args = cliArgs[0] === '--related'
+    ? ['vitest', 'related', '--run', ...cliArgs.slice(1)]
+    : ['vitest', 'run', ...cliArgs];
 
 const child = spawn('npx', args, {
     stdio: 'inherit',

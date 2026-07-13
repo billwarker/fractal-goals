@@ -34,7 +34,7 @@ def upgrade():
             SELECT
                 id,
                 ROW_NUMBER() OVER (
-                    PARTITION BY owner_id
+                    PARTITION BY owner_id, root_id
                     ORDER BY COALESCE(updated_at, created_at) DESC NULLS LAST, id DESC
                 ) AS active_rank
             FROM sessions
@@ -56,15 +56,15 @@ def upgrade():
     op.alter_column('sessions', 'owner_id', nullable=False)
     op.create_index('ix_sessions_owner_id', 'sessions', ['owner_id'])
     op.create_index(
-        'uq_sessions_one_active_per_owner',
+        'uq_sessions_one_active_per_owner_root',
         'sessions',
-        ['owner_id'],
+        ['owner_id', 'root_id'],
         unique=True,
         postgresql_where=sa.text('completed IS NOT TRUE AND deleted_at IS NULL'),
     )
 
 
 def downgrade():
-    op.drop_index('uq_sessions_one_active_per_owner', table_name='sessions')
+    op.drop_index('uq_sessions_one_active_per_owner_root', table_name='sessions')
     op.drop_index('ix_sessions_owner_id', table_name='sessions')
     op.drop_column('sessions', 'owner_id')

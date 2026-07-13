@@ -53,7 +53,7 @@ class TestSessionListEndpoints:
         db_session.add(active_session)
         db_session.commit()
 
-        response = authed_client.get('/api/sessions/active')
+        response = authed_client.get(f'/api/{sample_ultimate_goal.id}/sessions/active')
 
         assert response.status_code == 200
         payload = response.get_json()['active_session']

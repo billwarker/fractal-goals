@@ -17,14 +17,14 @@ export function useSessions(rootId) {
     });
 }
 
-export function useActiveSession(userId) {
+export function useActiveSession(userId, rootId) {
     return useQuery({
-        queryKey: queryKeys.activeSession(userId),
+        queryKey: queryKeys.activeSession(userId, rootId),
         queryFn: async () => {
-            const res = await fractalApi.getActiveSession();
+            const res = await fractalApi.getActiveSession(rootId);
             return res.data?.active_session || null;
         },
-        enabled: Boolean(userId),
+        enabled: Boolean(userId && rootId),
         staleTime: 15 * 1000,
     });
 }
