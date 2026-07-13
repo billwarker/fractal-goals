@@ -60,8 +60,6 @@ export function useSessionDetailMutations({
 
     const invalidateSessionListQueries = useCallback(() => {
         invalidateSessionLists(queryClient, rootId, queryKeys);
-        // Session/activity-instance changes drive the onboarding "Run your first
-        // session" step (create session, add/complete instance, complete session).
         invalidateOnboardingProgress(queryClient, queryKeys);
     }, [queryClient, rootId]);
 
@@ -797,5 +795,4 @@ export function useSessionDetailMutations({
         calculateTotalDuration,
     };
 }
-
 export default useSessionDetailMutations;

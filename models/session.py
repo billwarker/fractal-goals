@@ -11,6 +11,7 @@ class Session(Base):
     __tablename__ = 'sessions'
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    owner_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, index=True)
     root_id = Column(String, ForeignKey('goals.id'), nullable=False, index=True)
     name = Column(String, nullable=False)
     description = Column(String, default='')

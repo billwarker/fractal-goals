@@ -1,6 +1,7 @@
 import { API_BASE, axios, buildQueryString } from './core';
 
 export const fractalSessionsApi = {
+    getActiveSession: () => axios.get(`${API_BASE}/sessions/active`),
     getSessions: (rootId, options = {}) =>
         axios.get(`${API_BASE}/${rootId}/sessions${buildQueryString(options)}`),
     getSessionAnalyticsSummary: (rootId, options = {}) =>

@@ -123,6 +123,51 @@ def test_create_session_empty_data(db_session, session_service, sample_ultimate_
     assert status_code == 201
     assert result['name'] == 'Untitled Session'
 
+
+def test_create_session_rejects_second_active_session(
+    db_session, session_service, sample_ultimate_goal, test_user
+):
+    first, first_error, first_status = session_service.create_session(
+        sample_ultimate_goal.id,
+        test_user.id,
+        {'name': 'First active session'},
+    )
+    assert first_error is None
+    assert first_status == 201
+
+    second, second_error, second_status = session_service.create_session(
+        sample_ultimate_goal.id,
+        test_user.id,
+        {'name': 'Second active session'},
+    )
+
+    assert second is None
+    assert second_status == 409
+    assert second_error['code'] == 'active_session_exists'
+    assert second_error['active_session']['id'] == first['id']
+
+
+def test_active_session_includes_paused_state(
+    db_session, session_service, sample_ultimate_goal, test_user
+):
+    created, error, status = session_service.create_session(
+        sample_ultimate_goal.id,
+        test_user.id,
+        {'name': 'Paused active session'},
+    )
+    assert error is None
+    assert status == 201
+
+    persisted = get_session_by_id(db_session, created['id'])
+    persisted.is_paused = True
+    db_session.commit()
+
+    active, active_error, active_status = session_service.get_active_session(test_user.id)
+    assert active_error is None
+    assert active_status == 200
+    assert active['id'] == created['id']
+    assert active['is_paused'] is True
+
 def test_create_session_success(db_session, session_service, sample_goal_hierarchy, test_user, sample_activity_definition):
     # Setup data with a template-like structure involving an activity
     data = {

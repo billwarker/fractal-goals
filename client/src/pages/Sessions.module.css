@@ -112,7 +112,12 @@
     border-radius: var(--border-radius-md);
     overflow: hidden;
     cursor: pointer;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+    transition:
+        background var(--duration-base) var(--ease-standard),
+        border-color var(--duration-base) var(--ease-standard),
+        color var(--duration-base) var(--ease-standard),
+        opacity var(--duration-base) var(--ease-standard),
+        transform var(--duration-base) var(--ease-standard);
 }
 
 .sessionCardSelected {
@@ -235,17 +240,6 @@
     gap: 12px;
     flex-wrap: wrap;
     margin-top: 4px;
-}
-
-.metricBadge {
-    display: flex;
-    gap: 4px;
-    font-size: 13px;
-    /* Removed background, border, padding to match set metrics style */
-}
-
-.metricBadgeLabel {
-    color: var(--color-text-muted);
 }
 
 .description {

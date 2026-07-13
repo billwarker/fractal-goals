@@ -17,6 +17,18 @@ export function useSessions(rootId) {
     });
 }
 
+export function useActiveSession(userId) {
+    return useQuery({
+        queryKey: queryKeys.activeSession(userId),
+        queryFn: async () => {
+            const res = await fractalApi.getActiveSession();
+            return res.data?.active_session || null;
+        },
+        enabled: Boolean(userId),
+        staleTime: 15 * 1000,
+    });
+}
+
 export function useActivityInstantiationSummary(rootId) {
     const isReady = Boolean(rootId);
 

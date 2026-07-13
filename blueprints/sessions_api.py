@@ -3,7 +3,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 import models
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from models import (
     get_session,
 )
@@ -69,6 +69,32 @@ def _parse_window_days(default=None):
         return int(raw_days)
     except (TypeError, ValueError):
         return default
+
+
+def _is_active_session_constraint_error(error):
+    constraint_name = getattr(getattr(error, 'orig', None), 'diag', None)
+    if constraint_name and getattr(constraint_name, 'constraint_name', None) == 'uq_sessions_one_active_per_owner':
+        return True
+    return 'uq_sessions_one_active_per_owner' in str(error)
+
+
+@sessions_bp.route('/sessions/active', methods=['GET'])
+@token_required
+def get_active_session_endpoint(current_user):
+    """Return the authenticated user's single unfinished session, if any."""
+    db_session = get_db_session()
+    service = SessionService(db_session)
+    try:
+        result, error, status = service.get_active_session(current_user.id)
+        if error:
+            return jsonify(error if isinstance(error, dict) else {'error': error}), status
+        return jsonify({'active_session': result})
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error getting active session")
+        return internal_error(logger, "Error getting active session")
+    finally:
+        db_session.close()
 
 @sessions_bp.route('/practice-sessions', methods=['GET'])
 @token_required
@@ -244,8 +270,18 @@ def create_fractal_session(current_user, root_id, validated_data):
     try:
         result, error, status = service.create_session(root_id, current_user.id, validated_data)
         if error:
-            return jsonify({"error": error}), status
+            return jsonify(error if isinstance(error, dict) else {"error": error}), status
         return jsonify(result), status
+    except IntegrityError as exc:
+        db_session.rollback()
+        if _is_active_session_constraint_error(exc):
+            active_session, _, _ = service.get_active_session(current_user.id)
+            return jsonify({
+                'error': 'A session is already in progress',
+                'code': 'active_session_exists',
+                'active_session': active_session,
+            }), 409
+        raise
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error creating session")
@@ -264,7 +300,7 @@ def complete_quick_session(current_user, root_id, validated_data):
     try:
         result, error, status = service.create_completed_quick_session(root_id, current_user.id, validated_data)
         if error:
-            return jsonify({"error": error}), status
+            return jsonify(error if isinstance(error, dict) else {"error": error}), status
         return jsonify(result), status
     except SQLAlchemyError:
         db_session.rollback()
@@ -290,8 +326,18 @@ def update_session(current_user, root_id, session_id, validated_data):
             complete_unstarted_instances=False,
         )
         if error:
-            return jsonify({"error": error}), status
+            return jsonify(error if isinstance(error, dict) else {"error": error}), status
         return jsonify(result), status
+    except IntegrityError as exc:
+        db_session.rollback()
+        if _is_active_session_constraint_error(exc):
+            active_session, _, _ = service.get_active_session(current_user.id)
+            return jsonify({
+                'error': 'A session is already in progress',
+                'code': 'active_session_exists',
+                'active_session': active_session,
+            }), 409
+        raise
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error updating session")

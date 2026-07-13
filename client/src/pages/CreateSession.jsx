@@ -20,6 +20,8 @@ import LoadingState from '../components/common/LoadingState';
 import StepContainer from '../components/common/StepContainer';
 import { QuickSessionWorkspace } from '../components/sessionDetail';
 import { ActiveSessionProvider, QueuedQuickSessionProvider } from '../contexts/ActiveSessionContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useActiveSession } from '../hooks/useSessionQueries';
 import { isQuickSession } from '../utils/sessionRuntime';
 import PageHeader from '../components/layout/PageHeader';
 import headerStyles from '../components/layout/PageHeader.module.css';
@@ -232,6 +234,8 @@ function CreateSession() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const { user } = useAuth();
+    const { data: existingActiveSession, isFetched: activeSessionFetched } = useActiveSession(user?.id);
     // Selection state
     const [selectedProgram, setSelectedProgram] = useState(null);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -257,6 +261,19 @@ function CreateSession() {
             navigate('/');
         }
     }, [rootId, navigate]);
+
+    useEffect(() => {
+        if (
+            activeSessionFetched
+            && existingActiveSession?.id
+            && existingActiveSession?.root_id
+        ) {
+            navigate(
+                `/${existingActiveSession.root_id}/session/${existingActiveSession.id}`,
+                { replace: true },
+            );
+        }
+    }, [activeSessionFetched, existingActiveSession, navigate]);
 
     const programNames = Object.keys(programsByName);
     const defaultProgram = programNames.length === 1 ? programNames[0] : null;
@@ -372,6 +389,7 @@ function CreateSession() {
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsSearch(rootId), refetchType: 'inactive' });
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsHeatmap(rootId), refetchType: 'inactive' });
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId), refetchType: 'inactive' });
+        queryClient.invalidateQueries({ queryKey: queryKeys.activeSession() });
         // Advances the onboarding "Create your first session" step.
         invalidateOnboardingProgress(queryClient, queryKeys);
     };
@@ -405,6 +423,10 @@ function CreateSession() {
             logError('Error creating session:', err);
             const errorMessage = err.response?.data?.error || err.message;
             notify.error('Error creating session: ' + errorMessage);
+            const existingSession = err.response?.data?.active_session;
+            if (err.response?.status === 409 && existingSession?.id && existingSession?.root_id) {
+                navigate(`/${existingSession.root_id}/session/${existingSession.id}`, { replace: true });
+            }
             return null;
         } finally {
             setCreating(false);

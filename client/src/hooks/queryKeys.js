@@ -78,6 +78,7 @@ export const queryKeys = {
     previousSessionNotes: (rootId, sessionId) => ['previous-session-notes', rootId, sessionId],
     activityDefinitionNotes: (rootId, activityDefinitionId) => ['activity-definition-notes', rootId, activityDefinitionId],
     sessions: (rootId) => ['sessions', rootId],
+    activeSession: (userId = null) => userId ? ['sessions', 'active', userId] : ['sessions', 'active'],
     sessionsAll: (rootId) => ['sessions', rootId, 'all'],
     sessionsEvidenceGoalsRoot: (rootId) => ['sessions', rootId, 'evidence-goals'],
     sessionsEvidenceGoals: (rootId, days) => ['sessions', rootId, 'evidence-goals', days],

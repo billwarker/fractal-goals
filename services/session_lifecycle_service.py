@@ -68,6 +68,31 @@ class SessionLifecycleService:
         session._activity_duration_stats = computed.get("activity_durations") or {}
         self.db_session.commit()
 
+    def get_active_session(self, current_user_id) -> ServiceResult[JsonDict]:
+        session = self.db_session.query(Session).filter(
+            Session.owner_id == current_user_id,
+            Session.completed.is_not(True),
+            Session.deleted_at.is_(None),
+        ).order_by(Session.created_at.asc()).first()
+        return (serialize_session(session) if session else None), None, 200
+
+    def _active_session_conflict(self, current_user_id, *, exclude_session_id=None):
+        query = self.db_session.query(Session).filter(
+            Session.owner_id == current_user_id,
+            Session.completed.is_not(True),
+            Session.deleted_at.is_(None),
+        )
+        if exclude_session_id:
+            query = query.filter(Session.id != exclude_session_id)
+        active = query.order_by(Session.created_at.asc()).first()
+        if not active:
+            return None
+        return {
+            'error': 'A session is already in progress',
+            'code': 'active_session_exists',
+            'active_session': serialize_session(active),
+        }
+
     @staticmethod
     def _extract_activity_definition_id(raw_item) -> str | None:
         return extract_activity_definition_id(raw_item)
@@ -158,11 +183,24 @@ class SessionLifecycleService:
 
         return self.create_session(root_id, current_user_id, duplicate_payload)
 
-    def create_session(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
+    def create_session(
+        self,
+        root_id,
+        current_user_id,
+        data,
+        *,
+        reserve_active_slot=True,
+        initially_completed=False,
+    ) -> ServiceResult[JsonDict]:
         data = normalize_session_payload(data)
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
+
+        if reserve_active_slot:
+            conflict = self._active_session_conflict(current_user_id)
+            if conflict:
+                return None, conflict, 409
 
         quota_service = QuotaService(self.db_session)
         _, quota_error, quota_status = quota_service.check_available(current_user_id, "sessions")
@@ -186,7 +224,10 @@ class SessionLifecycleService:
         new_session = Session(
             name=data.get('name', 'Untitled Session'),
             description=data.get('description', ''),
+            owner_id=current_user_id,
             root_id=root_id,
+            completed=initially_completed,
+            completed_at=datetime.now(timezone.utc) if initially_completed else None,
             duration_minutes=int(data['duration_minutes']) if data.get('duration_minutes') is not None else None,
             session_start=s_start,
             session_end=s_end,
@@ -483,7 +524,13 @@ class SessionLifecycleService:
 
     def create_completed_quick_session(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         create_payload = {key: value for key, value in data.items() if key != 'activity_instances'}
-        created_session, error, status = self.create_session(root_id, current_user_id, create_payload)
+        created_session, error, status = self.create_session(
+            root_id,
+            current_user_id,
+            create_payload,
+            reserve_active_slot=False,
+            initially_completed=True,
+        )
         if error:
             return None, error, status
 
@@ -601,6 +648,13 @@ class SessionLifecycleService:
             session.duration_minutes = data['duration_minutes']
 
         if 'completed' in data:
+            if not data['completed'] and session.completed:
+                conflict = self._active_session_conflict(
+                    current_user_id,
+                    exclude_session_id=session.id,
+                )
+                if conflict:
+                    return None, conflict, 409
             session.completed = data['completed']
             if data['completed']:
                 completion_time = datetime.now(timezone.utc)

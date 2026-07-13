@@ -43,6 +43,8 @@ import { dismissGoalDetailsForNavigation } from './utils/navigationEvents';
 import { useGoalLevels } from './contexts/GoalLevelsContext';
 import { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } from './utils/marketingHost';
 import GettingStartedChecklist from './components/onboarding/GettingStartedChecklist';
+import NavigationSessionAction from './components/layout/NavigationSessionAction';
+import { getFractalDisplay, getFractalSwitchPath } from './utils/fractalNavigation';
 
 export { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } from './utils/marketingHost';
 
@@ -55,38 +57,6 @@ function RequireAdmin({ children }) {
     }
 
     return children;
-}
-
-function getFractalSwitchPath(pathname, nextRootId) {
-    const pathParts = pathname.split('/').filter(Boolean);
-    const section = pathParts[1];
-    const knownSection = {
-        analytics: 'analytics',
-        'create-session': 'create-session',
-        goals: 'goals',
-        logs: 'logs',
-        notes: 'notes',
-        programs: 'programs',
-        session: 'sessions',
-        sessions: 'sessions',
-    }[section] || 'goals';
-
-    return `/${nextRootId}/${knownSection}`;
-}
-
-function getFractalDisplay(fractal, rootGoal, goalLevels) {
-    const level = fractal?.display_level || null;
-    const type = fractal?.type || rootGoal?.attributes?.type || rootGoal?.type;
-    const isSmart = Boolean(fractal?.is_smart ?? fractal?.attributes?.is_smart ?? rootGoal?.attributes?.is_smart ?? rootGoal?.is_smart);
-
-    return {
-        name: fractal?.name || rootGoal?.name || 'Fractal Goals',
-        shape: level?.icon || (type ? goalLevels.getGoalIcon(type) : null) || 'circle',
-        color: level?.color || (type ? goalLevels.getGoalColor(type) : null),
-        secondaryColor: level?.secondary_color || (type ? goalLevels.getGoalSecondaryColor(type) : null),
-        isSmart,
-        type,
-    };
 }
 
 function FractalSwitcher({
@@ -277,7 +247,6 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
     // dashboard; the Logs page is admin-only.
     const showLogsNav = Boolean(user?.is_admin);
 
-    // Extract rootId from current path
     const pathParts = location.pathname.split('/');
     const rootId = pathParts[1]; // First part after /
 
@@ -287,7 +256,6 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
     );
 
     const { data: rootGoal } = useRootGoal(rootId, { enabled: isFractalRoute });
-
     useEffect(() => {
         if (typeof onHeightChange !== 'function') {
             return undefined;
@@ -357,13 +325,7 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                             isMobile
                             onSwitch={handleSwitchFractal}
                         />
-                        <Link
-                            to={`/${rootId}/create-session`}
-                            className={`${styles.addSessionBtn} ${styles.mobileBtn} ${styles.mobileTopAddBtn}`}
-                            onClick={handleRouteLinkClick}
-                        >
-                            + ADD SESSION
-                        </Link>
+                        <NavigationSessionAction rootId={rootId} userId={user?.id} isMobile onClick={handleRouteLinkClick} />
                         <nav className={styles.mobilePrimaryNav} aria-label="Primary">
                             {primaryNavItems.map(item => (
                                 <Link key={item.path} to={item.path} aria-current={isActive(item.path) ? 'page' : undefined} className={isActive(item.path) ? styles.mobilePrimaryActive : ''} onClick={handleRouteLinkClick}>
@@ -395,13 +357,7 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                         onSwitch={handleSwitchFractal}
                     />
 
-                    <Link
-                        to={`/${rootId}/create-session`}
-                        className={styles.addSessionBtn}
-                        onClick={handleRouteLinkClick}
-                    >
-                        + ADD SESSION
-                    </Link>
+                    <NavigationSessionAction rootId={rootId} userId={user?.id} onClick={handleRouteLinkClick} />
 
                     {primaryNavItems.map(item => (
                         <Link
@@ -708,7 +664,6 @@ function App() {
 
                 {!showSelectionPage && !showLandingPage && isAuthenticated && <GettingStartedChecklist />}
 
-                {/* Environment Indicator */}
                 <div className={`env-indicator ${import.meta.env.VITE_ENV || 'development'}`}>
                     {import.meta.env.VITE_ENV || 'development'}
                 </div>

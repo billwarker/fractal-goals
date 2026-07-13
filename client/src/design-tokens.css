@@ -34,6 +34,16 @@
   /* Branding */
   --color-brand-primary: #4f9cf9;
   --color-brand-primary-hover: #3c89e8;
+  --color-session-active-bg: color-mix(in srgb, var(--color-brand-dark) 72%, var(--color-brand-primary));
+  --color-session-active-bg-hover: color-mix(in srgb, var(--color-brand-dark) 62%, var(--color-brand-primary));
+  --color-session-active-text: #ffffff;
+  --color-session-active-border: color-mix(in srgb, white 18%, transparent);
+  --color-session-active-indicator: #ffffff;
+  --color-session-paused-bg: color-mix(in srgb, var(--color-warning) 42%, var(--color-bg-header));
+  --color-session-paused-bg-hover: color-mix(in srgb, var(--color-warning) 50%, var(--color-bg-header));
+  --color-session-paused-text: #ffffff;
+  --color-session-paused-border: color-mix(in srgb, var(--color-warning) 54%, var(--color-border));
+  --color-session-paused-indicator: color-mix(in srgb, var(--color-warning) 72%, white);
   --color-brand-success: #3bc57c;
   --color-brand-success-hover: #2baa68;
   --color-brand-danger: #ef6a6a;
@@ -208,6 +218,16 @@
   --color-bg-hover: rgba(79, 156, 249, 0.08);
   --color-text-disabled: rgba(0, 0, 0, 0.38);
   --color-bg-tooltip: rgba(255, 255, 255, 0.95);
+  --color-session-active-bg: color-mix(in srgb, var(--color-brand-primary) 14%, var(--color-bg-header));
+  --color-session-active-bg-hover: color-mix(in srgb, var(--color-brand-primary) 21%, var(--color-bg-header));
+  --color-session-active-text: var(--color-brand-dark);
+  --color-session-active-border: color-mix(in srgb, var(--color-brand-primary) 52%, var(--color-border));
+  --color-session-active-indicator: var(--color-brand-primary-hover);
+  --color-session-paused-bg: color-mix(in srgb, var(--color-warning) 14%, var(--color-bg-header));
+  --color-session-paused-bg-hover: color-mix(in srgb, var(--color-warning) 21%, var(--color-bg-header));
+  --color-session-paused-text: color-mix(in srgb, var(--color-warning) 48%, #713400);
+  --color-session-paused-border: color-mix(in srgb, var(--color-warning) 52%, var(--color-border));
+  --color-session-paused-indicator: color-mix(in srgb, var(--color-warning) 58%, #8a4300);
 
   /* Text Colors */
   --color-text-primary: #0f1f33;

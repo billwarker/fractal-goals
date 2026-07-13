@@ -411,6 +411,9 @@ class SessionService:
     def duplicate_session(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:
         return self._session_lifecycle_service().duplicate_session(root_id, session_id, current_user_id)
 
+    def get_active_session(self, current_user_id) -> ServiceResult[JsonDict]:
+        return self._session_lifecycle_service().get_active_session(current_user_id)
+
     def create_session(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         return self._session_lifecycle_service().create_session(root_id, current_user_id, data)
 

@@ -36,6 +36,30 @@ class TestSessionListEndpoints:
         assert isinstance(data, dict)
         assert "sessions" in data
         assert isinstance(data["sessions"], list)
+
+    def test_active_session_endpoint_returns_paused_session(
+        self, authed_client, db_session, sample_ultimate_goal, test_user
+    ):
+        active_session = Session(
+            id=str(uuid4()),
+            owner_id=test_user.id,
+            root_id=sample_ultimate_goal.id,
+            name='Paused session',
+            completed=False,
+            is_paused=True,
+            created_at=datetime.now(timezone.utc),
+            attributes={},
+        )
+        db_session.add(active_session)
+        db_session.commit()
+
+        response = authed_client.get('/api/sessions/active')
+
+        assert response.status_code == 200
+        payload = response.get_json()['active_session']
+        assert payload['id'] == active_session.id
+        assert payload['root_id'] == sample_ultimate_goal.id
+        assert payload['is_paused'] is True
     
     def test_list_sessions_with_data(self, authed_client, sample_practice_session):
         """Test listing sessions when they exist."""

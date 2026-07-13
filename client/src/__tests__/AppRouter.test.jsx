@@ -8,11 +8,13 @@ import { NavigationHeader } from '../AppRouter';
 const {
     getAllFractals,
     mockIsMobile,
+    mockActiveSession,
     mockRootGoal,
     mockUser,
 } = vi.hoisted(() => ({
     getAllFractals: vi.fn(),
     mockIsMobile: vi.fn(() => false),
+    mockActiveSession: { current: null },
     mockRootGoal: {
         id: 'root-1',
         name: 'First Root',
@@ -30,6 +32,10 @@ vi.mock('../utils/api', () => ({
 
 vi.mock('../hooks/useGoalQueries', () => ({
     useRootGoal: () => ({ data: mockRootGoal }),
+}));
+
+vi.mock('../hooks/useSessionQueries', () => ({
+    useActiveSession: () => ({ data: mockActiveSession.current }),
 }));
 
 vi.mock('../contexts/AuthContext', () => ({
@@ -100,6 +106,7 @@ describe('NavigationHeader', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockIsMobile.mockReturnValue(false);
+        mockActiveSession.current = null;
         mockUser.current = { id: 'user-1', is_admin: false };
         getAllFractals.mockResolvedValue({
             data: [
@@ -196,5 +203,38 @@ describe('NavigationHeader', () => {
         expect(screen.getByRole('link', { name: 'PROGRAMS' })).toHaveAttribute('aria-current', 'page');
         expect(screen.getByRole('link', { name: 'GOALS' })).not.toHaveAttribute('aria-current');
         expect(screen.getAllByRole('link').filter(link => ['GOALS', 'PROGRAMS', 'SESSIONS', 'NOTES', 'ANALYTICS'].includes(link.textContent))).toHaveLength(5);
+    });
+
+    it('links a running session across fractals from the desktop nav', () => {
+        mockActiveSession.current = {
+            id: 'session-9',
+            root_id: 'root-2',
+            is_paused: false,
+        };
+
+        renderHeader('/root-1/goals');
+
+        const link = screen.getByRole('link', { name: /session in progress/i });
+        expect(link).toHaveAttribute('href', '/root-2/session/session-9');
+        expect(link).toHaveTextContent('SESSION IN PROGRESS');
+        const status = link.querySelector('[aria-label="Session in progress"]');
+        expect(status).not.toBeNull();
+        expect(link.lastElementChild).toBe(status);
+    });
+
+    it('uses the shared paused badge and label in the mobile nav', () => {
+        mockIsMobile.mockReturnValue(true);
+        mockActiveSession.current = {
+            id: 'session-8',
+            root_id: 'root-1',
+            is_paused: true,
+        };
+
+        renderHeader('/root-1/goals');
+
+        const link = screen.getByRole('link', { name: /session paused/i });
+        expect(link).toHaveAttribute('href', '/root-1/session/session-8');
+        expect(link).toHaveTextContent('SESSION PAUSED');
+        expect(link.querySelector('[aria-label="Paused session"]')).not.toBeNull();
     });
 });

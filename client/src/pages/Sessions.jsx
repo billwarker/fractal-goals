@@ -31,7 +31,6 @@ import styles from './Sessions.module.css';
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
 import { logError } from '../utils/logger';
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
-
 /**
  * Sessions Page - View and query practice sessions
  */
@@ -300,6 +299,7 @@ function Sessions() {
             setSessionToDelete(null);
 
             queryClient.removeQueries({ queryKey: queryKeys.session(rootId, sessionToDelete.id) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.activeSession() });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.activityHistoryRoot(rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.progressRoot() });

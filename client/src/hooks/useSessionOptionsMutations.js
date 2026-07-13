@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { invalidateSessionLists as invalidateSharedSessionLists } from '../utils/queryInvalidation';
 import { fractalApi } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
@@ -9,11 +10,7 @@ export function useSessionOptionsMutations(rootId, sessionId) {
     const queryClient = useQueryClient();
 
     const invalidateSessionLists = async () => {
-        await Promise.all([
-            queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.sessionsAll(rootId) }),
-            queryClient.invalidateQueries({ queryKey: queryKeys.sessionsPaginated(rootId) }),
-        ]);
+        await invalidateSharedSessionLists(queryClient, rootId, queryKeys);
     };
 
     const createTemplateMutation = useMutation({
