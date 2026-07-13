@@ -193,17 +193,6 @@
     display: none;
 }
 
-.mobileControlsRow {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-}
-
 .mobileBtn {
     min-height: 34px !important;
     font-size: 11px !important;
@@ -213,23 +202,35 @@
 }
 
 .mobileTopAddBtn {
-    font-size: 11px !important;
-    padding: 6px 12px !important;
+    width: clamp(150px, 42vw, 190px);
+    font-size: 10px !important;
+    padding: 6px 4px !important;
     margin-right: 0;
     white-space: nowrap;
 }
 
-.mobileBottomNav { display: none; }
+.mobilePrimaryNav { display: none; }
 
 @media (max-width: 768px) {
-    .mobileBottomNav { position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-nav); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); min-height: calc(58px + env(safe-area-inset-bottom)); padding: 4px 4px env(safe-area-inset-bottom); border-top: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-bg-header) 94%, transparent); backdrop-filter: blur(14px); }
-    .mobileBottomNav a { position: relative; display: grid; place-items: center; min-height: 48px; padding: 4px 2px; color: var(--color-text-muted); font-size: 9px; font-weight: var(--font-weight-semibold); letter-spacing: .04em; text-decoration: none; }
-    .mobileBottomNav a::after { content: ''; position: absolute; left: 25%; right: 25%; bottom: 1px; height: 2px; border-radius: 2px; background: transparent; }
-    .mobileBottomNav .mobileBottomActive { color: var(--color-brand-primary); }
-    .mobileBottomNav .mobileBottomActive::after { background: var(--color-brand-primary); }
+    .mobilePrimaryNav { display: flex; flex: 0 0 auto; align-items: center; }
+    .mobilePrimaryNav a { position: relative; display: grid; place-items: center; min-width: 88px; min-height: 48px; padding: 4px 10px; color: var(--color-text-muted); font-size: 10px; font-weight: var(--font-weight-semibold); letter-spacing: .04em; text-decoration: none; }
+    .mobilePrimaryNav a::after { content: ''; position: absolute; left: 25%; right: 25%; bottom: 0; height: 2px; border-radius: 2px; background: transparent; }
+    .mobilePrimaryNav .mobilePrimaryActive { color: var(--color-brand-primary); }
+    .mobilePrimaryNav .mobilePrimaryActive::after { background: var(--color-brand-primary); }
     .mobileNav {
         display: flex;
+        align-items: center;
+        gap: 12px;
         width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .mobileNav::-webkit-scrollbar {
+        display: none;
     }
 
     .navContainer {
@@ -246,9 +247,17 @@
     }
 
     .fractalSwitcherButton {
-        max-width: 210px;
-        min-height: 34px;
-        padding: 6px 10px;
+        width: 52px;
+        max-width: none;
+        min-height: 48px;
+        padding: 5px;
+        justify-content: center;
+        gap: 3px;
+    }
+
+    .fractalSwitcherChevron {
+        margin-left: 0;
+        font-size: 9px;
     }
 
     .fractalSwitcherMobile .fractalSwitcherMenu {
@@ -276,5 +285,20 @@
 
     .navSeparator {
         height: 16px;
+    }
+}
+
+@media (max-width: 360px) {
+    .fractalSwitcherButton {
+        width: 46px;
+    }
+
+    .mobileBtn,
+    .mobileTopAddBtn {
+        font-size: 9px !important;
+    }
+
+    .mobileTopAddBtn {
+        width: 140px;
     }
 }

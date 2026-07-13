@@ -156,4 +156,28 @@ describe('NavigationHeader', () => {
 
         expect(screen.getByRole('link', { name: 'LOGS' })).toHaveAttribute('href', '/root-1/logs');
     });
+
+    it('renders mobile primary navigation inside the sticky header with active-route semantics', () => {
+        mockIsMobile.mockReturnValue(true);
+
+        renderHeader('/root-1/programs');
+
+        const primaryNav = screen.getByRole('navigation', { name: 'Primary' });
+        const switcher = screen.getByRole('button', { name: /switch fractal.*first root/i });
+        const settings = screen.getByRole('button', { name: 'SETTINGS' });
+        const exit = screen.getByRole('link', { name: 'EXIT' });
+        expect(primaryNav.closest('.top-nav-links')).not.toBeNull();
+        expect(primaryNav.className).toContain('mobilePrimaryNav');
+        expect(primaryNav.parentElement).toContainElement(switcher);
+        expect(primaryNav.parentElement).toContainElement(screen.getByRole('link', { name: '+ ADD SESSION' }));
+        expect(switcher).toContainElement(screen.getByTestId('goal-icon'));
+        expect(switcher).not.toHaveTextContent('First Root');
+        expect(settings).toBeVisible();
+        expect(primaryNav.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(settings.compareDocumentPosition(exit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(exit).toHaveAttribute('href', '/');
+        expect(screen.getByRole('link', { name: 'PROGRAMS' })).toHaveAttribute('aria-current', 'page');
+        expect(screen.getByRole('link', { name: 'GOALS' })).not.toHaveAttribute('aria-current');
+        expect(screen.getAllByRole('link').filter(link => ['GOALS', 'PROGRAMS', 'SESSIONS', 'NOTES', 'ANALYTICS'].includes(link.textContent))).toHaveLength(5);
+    });
 });

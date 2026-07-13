@@ -175,11 +175,13 @@ function FractalSwitcher({
                         color={currentDisplay.color}
                         secondaryColor={currentDisplay.secondaryColor}
                         isSmart={currentDisplay.isSmart}
-                        size={isMobile ? 18 : 22}
+                        size={isMobile ? 30 : 22}
                         className={styles.fractalTitleIcon}
                     />
                 )}
-                <span className={`fractal-title ${styles.fractalTitle}`}>{currentDisplay.name}</span>
+                {!isMobile && (
+                    <span className={`fractal-title ${styles.fractalTitle}`}>{currentDisplay.name}</span>
+                )}
                 <span className={styles.fractalSwitcherChevron} aria-hidden="true">▾</span>
             </button>
 
@@ -305,7 +307,6 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
             <>
                 <div className="top-nav-links" ref={navRef}>
                     <div className={styles.mobileNav}>
-                        <div className={styles.mobileControlsRow}>
                         <FractalSwitcher
                             rootId={rootId}
                             rootGoal={rootGoal}
@@ -320,20 +321,21 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                         >
                             + ADD SESSION
                         </Link>
-
+                        <nav className={styles.mobilePrimaryNav} aria-label="Primary">
+                            {primaryNavItems.map(item => (
+                                <Link key={item.path} to={item.path} aria-current={isActive(item.path) ? 'page' : undefined} className={isActive(item.path) ? styles.mobilePrimaryActive : ''} onClick={handleRouteLinkClick}>
+                                    {item.label}
+                                </Link>
+                            ))}
+                        </nav>
                         <button className={`nav-text-link ${styles.mobileBtn}`} onClick={handleOpenSettings}>
-                            SET
+                            SETTINGS
                         </button>
-                        </div>
+                        <Link className={`nav-text-link home-link ${styles.mobileBtn}`} to="/" onClick={handleRouteLinkClick}>
+                            EXIT
+                        </Link>
                     </div>
                 </div>
-                <nav className={styles.mobileBottomNav} aria-label="Primary">
-                    {primaryNavItems.map(item => (
-                        <Link key={item.path} to={item.path} aria-current={isActive(item.path) ? 'page' : undefined} className={isActive(item.path) ? styles.mobileBottomActive : ''} onClick={handleRouteLinkClick}>
-                            {item.label}
-                        </Link>
-                    ))}
-                </nav>
             </>
         );
     }

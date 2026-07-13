@@ -141,7 +141,7 @@
     .sessionsList {
         overflow-y: visible;
         padding: 12px;
-        padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
         background-size: 16px 16px;
     }
 
