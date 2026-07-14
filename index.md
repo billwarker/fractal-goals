@@ -390,6 +390,8 @@ They support:
 - goal associations
 - progress tracking and comparison settings
 
+The shared activity builder keeps its create/save actions in a persistent footer while the form body scrolls, and reflects the in-progress activity name in its header. Activity groups are selected before direct goal associations: choosing a group merges its linked goals into the activity draft, and the same selector can open the canonical group builder, automatically select the newly created group, and retain the unfinished activity. Inline fractal-metric creation uses the canonical additive, multiplicative, trend-direction, and integer/decimal/duration input-type semantics instead of a name/unit-only shortcut; its compact, cancellable creator stays beneath the metric row that opened it and fills that exact slot on success. These behaviors are shared by Manage Activities and the Goal Details activity-creation flow.
+
 Activity metrics now use fractal-level metric definitions as the user-facing configuration source:
 
 - session metric inputs honor metric input type, default value, predefined allowed values, and min/max bounds

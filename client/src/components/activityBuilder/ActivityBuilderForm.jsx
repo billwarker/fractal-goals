@@ -1,6 +1,5 @@
 import { logError } from '../../utils/logger';
 import React, { useState } from 'react';
-
 import ActivityAssociationModal from '../sessionDetail/ActivityAssociationModal';
 import Button from '../atoms/Button';
 import Checkbox from '../atoms/Checkbox';
@@ -8,6 +7,9 @@ import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 import Input from '../atoms/Input';
 import Select from '../atoms/Select';
 import TextArea from '../atoms/TextArea';
+import GroupBuilderModal from '../modals/GroupBuilderModal';
+import ModalBody from '../atoms/ModalBody';
+import ModalFooter from '../atoms/ModalFooter';
 import { buildActivityPayload } from '../../utils/activityBuilder';
 import { getGroupBreadcrumb, sortGroupsTreeOrder } from '../../utils/manageActivities';
 import styles from '../ActivityBuilder.module.css';
@@ -32,6 +34,7 @@ function ActivityBuilderForm({
     onClose,
     getGoalColor,
     getGoalIcon,
+    onNameChange,
 }) {
     const initialState = getInitialActivityBuilderState(editingActivity);
     const [error, setError] = useState(null);
@@ -40,6 +43,7 @@ function ActivityBuilderForm({
     const [showMetricWarning, setShowMetricWarning] = useState(false);
     const [metricWarningMessage, setMetricWarningMessage] = useState('');
     const [showAssociationModal, setShowAssociationModal] = useState(false);
+    const [showGroupBuilder, setShowGroupBuilder] = useState(false);
     const [name, setName] = useState(initialState.name);
     const [description, setDescription] = useState(initialState.description);
     const [metrics, setMetrics] = useState(initialState.metrics);
@@ -69,6 +73,7 @@ function ActivityBuilderForm({
         setShowMetricWarning(false);
         setMetricWarningMessage('');
         setShowAssociationModal(false);
+        setShowGroupBuilder(false);
     };
 
     const handleAddMetric = (metric = DEFAULT_METRIC) => {
@@ -116,6 +121,32 @@ function ActivityBuilderForm({
         if (!enabled) {
             setDeltaDisplayMode(null);
         }
+    };
+
+    const mergeGroupGoals = (group, currentGoalIds = selectedGoalIds) => {
+        const linkedGoalIds = Array.isArray(group?.associated_goal_ids)
+            ? group.associated_goal_ids.filter(Boolean)
+            : [];
+        setSelectedGoalIds([...new Set([...currentGoalIds, ...linkedGoalIds])]);
+    };
+
+    const handleGroupChange = (event) => {
+        const nextGroupId = event.target.value;
+        if (nextGroupId === '__create__') {
+            setShowGroupBuilder(true);
+            return;
+        }
+
+        setGroupId(nextGroupId);
+        if (!nextGroupId) return;
+        mergeGroupGoals((activityGroups || []).find((group) => group.id === nextGroupId));
+    };
+
+    const handleGroupCreated = (createdGroup) => {
+        if (!createdGroup?.id) return;
+        setGroupId(createdGroup.id);
+        mergeGroupGoals(createdGroup);
+        setShowGroupBuilder(false);
     };
 
     const handleAddSplit = () => {
@@ -241,19 +272,22 @@ function ActivityBuilderForm({
 
     return (
         <>
-            {error && (
-                <div className={styles.errorMessage}>
-                    {error}
-                </div>
-            )}
-
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} className={styles.builderForm}>
+                <ModalBody className={styles.formScrollRegion}>
+                {error && (
+                    <div className={styles.errorMessage}>
+                        {error}
+                    </div>
+                )}
                 <div className={styles.formGrid}>
                     <div>
                         <Input
                             label="Activity Name"
                             value={name}
-                            onChange={(event) => setName(event.target.value)}
+                            onChange={(event) => {
+                                setName(event.target.value);
+                                onNameChange?.(event.target.value);
+                            }}
                             placeholder="e.g. Scale Practice"
                             fullWidth
                             required
@@ -270,19 +304,11 @@ function ActivityBuilderForm({
                         />
                     </div>
 
-                    <ActivityAssociationsField
-                        allGoals={allGoals}
-                        selectedGoalIds={selectedGoalIds}
-                        onOpenModal={() => setShowAssociationModal(true)}
-                        getGoalColor={getGoalColor}
-                        getGoalIcon={getGoalIcon}
-                    />
-
                     <div>
                         <Select
                             label="Activity Group"
                             value={groupId}
-                            onChange={(event) => setGroupId(event.target.value)}
+                            onChange={handleGroupChange}
                             fullWidth
                         >
                             <option value="">(No Group)</option>
@@ -291,8 +317,17 @@ function ActivityBuilderForm({
                                     {getGroupBreadcrumb(group.id, activityGroups)}
                                 </option>
                             ))}
+                            <option value="__create__">+ Create new activity group…</option>
                         </Select>
                     </div>
+
+                    <ActivityAssociationsField
+                        allGoals={allGoals}
+                        selectedGoalIds={selectedGoalIds}
+                        onOpenModal={() => setShowAssociationModal(true)}
+                        getGoalColor={getGoalColor}
+                        getGoalIcon={getGoalIcon}
+                    />
 
                     <div className={styles.flagsContainer}>
                         <Checkbox
@@ -347,7 +382,10 @@ function ActivityBuilderForm({
 
                     {hasMetrics && <ActivityMetricsSection rootId={rootId} metrics={metrics} hasSets={hasSets} onAddMetric={handleAddMetric} onRemoveMetric={handleRemoveMetric} onMetricChange={handleMetricChange} />}
 
-                    <div className={styles.actionsRow}>
+                </div>
+                </ModalBody>
+
+                <ModalFooter className={styles.actionsRow}>
                         <Button
                             type="button"
                             onClick={handleCancel}
@@ -365,8 +403,7 @@ function ActivityBuilderForm({
                         >
                             {editingActivity?.id ? 'Save Activity' : 'Create Activity'}
                         </Button>
-                    </div>
-                </div>
+                </ModalFooter>
             </form>
 
             <DeleteConfirmModal
@@ -395,6 +432,15 @@ function ActivityBuilderForm({
                     initialSelectedGoalIds={selectedGoalIds}
                 />
             )}
+
+            <GroupBuilderModal
+                isOpen={showGroupBuilder}
+                onClose={() => setShowGroupBuilder(false)}
+                editingGroup={null}
+                rootId={rootId}
+                activityGroups={activityGroups}
+                onSave={handleGroupCreated}
+            />
         </>
     );
 }

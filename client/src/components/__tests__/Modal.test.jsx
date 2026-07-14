@@ -23,6 +23,25 @@ function RerenderingTextModal() {
     );
 }
 
+function NestedModals({ onOuterClose, onInnerClose }) {
+    const [innerOpen, setInnerOpen] = useState(true);
+    return (
+        <Modal isOpen onClose={onOuterClose} title="Outer modal">
+            <Modal
+                isOpen={innerOpen}
+                stackLevel={1}
+                onClose={() => {
+                    setInnerOpen(false);
+                    onInnerClose();
+                }}
+                title="Inner modal"
+            >
+                Inner content
+            </Modal>
+        </Modal>
+    );
+}
+
 describe('Modal', () => {
     it('does not close on backdrop click while a text field is focused', () => {
         const onClose = vi.fn();
@@ -69,5 +88,18 @@ describe('Modal', () => {
             fireEvent.change(input, { target: { value } });
             expect(input).toHaveFocus();
         }
+    });
+
+    it('only lets the topmost modal handle Escape', () => {
+        const onOuterClose = vi.fn();
+        const onInnerClose = vi.fn();
+        render(<NestedModals onOuterClose={onOuterClose} onInnerClose={onInnerClose} />);
+
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(onInnerClose).toHaveBeenCalledTimes(1);
+        expect(onOuterClose).not.toHaveBeenCalled();
+
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(onOuterClose).toHaveBeenCalledTimes(1);
     });
 });

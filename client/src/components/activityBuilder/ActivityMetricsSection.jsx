@@ -8,49 +8,119 @@ import Button from '../atoms/Button';
 import Checkbox from '../atoms/Checkbox';
 import CloseIcon from '../atoms/CloseIcon';
 import Input from '../atoms/Input';
+import Select from '../atoms/Select';
 import styles from '../ActivityBuilder.module.css';
 import metricStyles from './ActivityMetricsSection.module.css';
 
-function InlineMetricCreator({ rootId, onCreated }) {
+function InlineMetricCreator({ rootId, onCreated, onCancel }) {
     const createMutation = useCreateFractalMetric(rootId);
     const [name, setName] = useState('');
     const [unit, setUnit] = useState('');
+    const [inputType, setInputType] = useState('number');
+    const [isMultiplicative, setIsMultiplicative] = useState(true);
+    const [isAdditive, setIsAdditive] = useState(true);
+    const [higherIsBetter, setHigherIsBetter] = useState(true);
 
     const handleCreate = async () => {
-        if (!name.trim() || !unit.trim()) return;
+        if (!name.trim() || !unit.trim() || createMutation.isPending) return;
         try {
-            const res = await createMutation.mutateAsync({ name: name.trim(), unit: unit.trim() });
+            const res = await createMutation.mutateAsync({
+                name: name.trim(),
+                unit: unit.trim(),
+                input_type: inputType,
+                is_multiplicative: isMultiplicative,
+                is_additive: isAdditive,
+                higher_is_better: higherIsBetter,
+            });
             onCreated(res.data);
             setName('');
             setUnit('');
+            setInputType('number');
+            setIsMultiplicative(true);
+            setIsAdditive(true);
+            setHigherIsBetter(true);
         } catch (err) {
             notify.error(`Failed to create metric: ${formatError(err)}`);
         }
     };
 
     return (
-        <div className={metricStyles.inlineCreator}>
-            <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Name (e.g. Reps)"
-                style={{ marginBottom: 0, flex: 1 }}
-            />
-            <Input
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                placeholder="Unit (e.g. reps)"
-                style={{ marginBottom: 0, width: '100px' }}
-            />
-            <Button
-                type="button"
-                variant="success"
-                size="sm"
-                onClick={handleCreate}
-                disabled={!name.trim() || !unit.trim() || createMutation.isPending}
-            >
-                Create
-            </Button>
+        <div
+            className={metricStyles.inlineCreator}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter' && event.target.matches('input[type="text"]')) {
+                    event.preventDefault();
+                    handleCreate();
+                }
+            }}
+        >
+            <div className={metricStyles.inlineCreatorControls}>
+                <Input
+                    label="Metric name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Reps"
+                    className={metricStyles.compactField}
+                    fullWidth
+                />
+                <Input
+                    label="Unit"
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    placeholder="e.g. reps"
+                    className={metricStyles.compactField}
+                    fullWidth
+                />
+                <Select
+                    label="Data type"
+                    value={inputType}
+                    onChange={(event) => setInputType(event.target.value)}
+                    className={metricStyles.compactField}
+                    fullWidth
+                >
+                    <option value="integer">Integer</option>
+                    <option value="number">Decimal</option>
+                    <option value="duration">Duration</option>
+                </Select>
+                <div className={metricStyles.inlineCreatorOptions} aria-label="Metric behavior">
+                    <Checkbox
+                        label="Multiplicative"
+                        checked={isMultiplicative}
+                        onChange={(event) => setIsMultiplicative(event.target.checked)}
+                    />
+                    <Checkbox
+                        label="Additive"
+                        checked={isAdditive}
+                        onChange={(event) => setIsAdditive(event.target.checked)}
+                    />
+                    <Checkbox
+                        label="Higher is better"
+                        checked={higherIsBetter}
+                        onChange={(event) => setHigherIsBetter(event.target.checked)}
+                    />
+                </div>
+            </div>
+            <div className={metricStyles.inlineCreatorActions}>
+                <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={onCancel}
+                    disabled={createMutation.isPending}
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="button"
+                    variant="success"
+                    size="sm"
+                    onClick={handleCreate}
+                    disabled={!name.trim() || !unit.trim() || createMutation.isPending}
+                    isLoading={createMutation.isPending}
+                >
+                    Create Metric
+                </Button>
+            </div>
         </div>
     );
 }
@@ -64,13 +134,14 @@ function ActivityMetricsSection({
     onMetricChange,
 }) {
     const { fractalMetrics = [] } = useFractalMetrics(rootId);
-    const [showCreator, setShowCreator] = useState(false);
+    const [creatorMetricIndex, setCreatorMetricIndex] = useState(null);
 
     const handleSelectMetric = (idx, fractalMetricId) => {
         if (fractalMetricId === '__create__') {
-            setShowCreator(true);
+            setCreatorMetricIndex(idx);
             return;
         }
+        if (creatorMetricIndex === idx) setCreatorMetricIndex(null);
         const selected = fractalMetrics.find((m) => m.id === fractalMetricId);
         if (!selected) return;
         onMetricChange(idx, 'fractal_metric_id', selected.id);
@@ -79,18 +150,12 @@ function ActivityMetricsSection({
         onMetricChange(idx, 'is_multiplicative', selected.is_multiplicative);
     };
 
-    const handleCreated = (newMetric) => {
-        setShowCreator(false);
-        // If there's a pending empty metric slot, fill it; otherwise add a new slot
-        const emptyIdx = metrics.findIndex((m) => !m.fractal_metric_id && !m.name);
-        if (emptyIdx >= 0) {
-            onMetricChange(emptyIdx, 'fractal_metric_id', newMetric.id);
-            onMetricChange(emptyIdx, 'name', newMetric.name);
-            onMetricChange(emptyIdx, 'unit', newMetric.unit);
-            onMetricChange(emptyIdx, 'is_multiplicative', newMetric.is_multiplicative);
-        } else if (metrics.length < 3) {
-            onAddMetric({ fractal_metric_id: newMetric.id, name: newMetric.name, unit: newMetric.unit, is_multiplicative: newMetric.is_multiplicative, is_best_set_metric: false });
-        }
+    const handleCreated = (metricIndex, newMetric) => {
+        setCreatorMetricIndex(null);
+        onMetricChange(metricIndex, 'fractal_metric_id', newMetric.id);
+        onMetricChange(metricIndex, 'name', newMetric.name);
+        onMetricChange(metricIndex, 'unit', newMetric.unit);
+        onMetricChange(metricIndex, 'is_multiplicative', newMetric.is_multiplicative);
     };
 
     return (
@@ -131,6 +196,14 @@ function ActivityMetricsSection({
                                     </Button>
                                 )}
                             </div>
+
+                            {creatorMetricIndex === idx && (
+                                <InlineMetricCreator
+                                    rootId={rootId}
+                                    onCreated={(newMetric) => handleCreated(idx, newMetric)}
+                                    onCancel={() => setCreatorMetricIndex(null)}
+                                />
+                            )}
 
                             {linked && (
                                 <div className={metricStyles.metricMeta}>
@@ -177,11 +250,7 @@ function ActivityMetricsSection({
                     );
                 })}
 
-                {showCreator && (
-                    <InlineMetricCreator rootId={rootId} onCreated={handleCreated} />
-                )}
-
-                {metrics.length < 3 && !showCreator && (
+                {metrics.length < 3 && (
                     <Button
                         type="button"
                         onClick={onAddMetric}

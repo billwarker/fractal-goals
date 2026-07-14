@@ -1,10 +1,12 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './Modal.module.css';
 import Card from './Card';
 import CloseButton from './CloseButton';
 import { Heading } from './Typography';
 import ModalBackdrop from './ModalBackdrop';
+
+const openModalLevels = new Map();
 
 /**
  * Standardized Modal Component
@@ -19,9 +21,11 @@ const Modal = ({
     overlayClassName = '',
     showCloseButton = true,
     closeOnEsc = true,
-    closeOnBackdrop = true
+    closeOnBackdrop = true,
+    stackLevel = 0,
 }) => {
     const dialogRef = useRef(null);
+    const modalId = useId();
     const onCloseRef = useRef(onClose);
     const closeOnEscRef = useRef(closeOnEsc);
     useEffect(() => {
@@ -32,6 +36,16 @@ const Modal = ({
     useEffect(() => {
         const previousFocus = document.activeElement;
         const handleKeyDown = (e) => {
+            let topModalId = null;
+            let topStackLevel = -Infinity;
+            openModalLevels.forEach((level, id) => {
+                if (level >= topStackLevel) {
+                    topModalId = id;
+                    topStackLevel = level;
+                }
+            });
+            if (modalId !== topModalId) return;
+
             if (e.key === 'Escape' && closeOnEscRef.current) onCloseRef.current();
             if (e.key !== 'Tab' || !dialogRef.current) return;
             const focusable = [...dialogRef.current.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')];
@@ -47,6 +61,7 @@ const Modal = ({
         };
 
         if (isOpen) {
+            openModalLevels.set(modalId, stackLevel);
             document.addEventListener('keydown', handleKeyDown);
             const previousOverflow = document.body.style.overflow;
             document.body.style.overflow = 'hidden';
@@ -57,6 +72,7 @@ const Modal = ({
 
             return () => {
                 window.cancelAnimationFrame(focusFrame);
+                openModalLevels.delete(modalId);
                 document.removeEventListener('keydown', handleKeyDown);
                 document.body.style.overflow = previousOverflow;
                 previousFocus?.focus?.();
@@ -73,6 +89,7 @@ const Modal = ({
     const modalContent = (
         <ModalBackdrop
             className={`${styles.overlay} ${overlayClassName}`}
+            style={stackLevel > 0 ? { zIndex: `calc(var(--z-modal) + ${stackLevel})` } : undefined}
             closeOnBackdrop={closeOnBackdrop}
             onClose={onClose}
             aria-modal="true"

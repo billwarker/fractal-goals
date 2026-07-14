@@ -64,6 +64,7 @@ describe('GroupBuilderModal', () => {
 
     it('uses the hierarchy selector when associating goals to an activity group', async () => {
         const onClose = vi.fn();
+        const onSave = vi.fn();
 
         render(
             <GroupBuilderModal
@@ -72,7 +73,7 @@ describe('GroupBuilderModal', () => {
                 editingGroup={null}
                 rootId="root-1"
                 activityGroups={[]}
-                onSave={vi.fn()}
+                onSave={onSave}
             />
         );
 
@@ -99,6 +100,10 @@ describe('GroupBuilderModal', () => {
             });
             expect(mockSetActivityGroupGoals).toHaveBeenCalledWith('root-1', 'group-1', ['goal-child']);
         });
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+            id: 'group-1',
+            associated_goal_ids: ['goal-child'],
+        }));
         expect(onClose).toHaveBeenCalled();
     });
 });

@@ -108,11 +108,62 @@
 }
 
 .inlineCreator {
-    display: flex;
-    gap: 8px;
-    align-items: flex-end;
+    display: grid;
+    gap: 12px;
     padding: 10px;
     border: 1px dashed var(--color-border);
     border-radius: 8px;
     background: var(--color-bg-hover);
+}
+
+.inlineCreatorControls {
+    display: grid;
+    grid-template-columns: minmax(150px, 1.5fr) minmax(90px, 0.7fr) minmax(120px, 0.8fr) auto;
+    gap: 8px 12px;
+    align-items: end;
+}
+
+.compactField {
+    margin-bottom: 0;
+}
+
+.inlineCreatorOptions {
+    display: flex;
+    gap: 10px 14px;
+    align-items: center;
+    min-height: 38px;
+    padding-bottom: 1px;
+    white-space: nowrap;
+}
+
+.inlineCreatorActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+@media (max-width: 760px) {
+    .inlineCreatorControls {
+        grid-template-columns: minmax(0, 1fr) minmax(100px, 0.7fr) minmax(120px, 0.8fr);
+    }
+
+    .inlineCreatorOptions {
+        grid-column: 1 / -1;
+        flex-wrap: wrap;
+        white-space: normal;
+    }
+
+    .inlineCreatorActions > * {
+        flex: 1;
+    }
+}
+
+@media (max-width: 520px) {
+    .inlineCreatorControls {
+        grid-template-columns: 1fr;
+    }
+
+    .inlineCreatorOptions {
+        grid-column: auto;
+    }
 }

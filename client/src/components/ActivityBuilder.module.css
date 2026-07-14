@@ -15,6 +15,18 @@
     gap: 15px;
 }
 
+.builderForm {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+}
+
+.formScrollRegion {
+    min-height: 0;
+    overflow-y: auto;
+}
+
 .label {
     display: block;
     font-size: var(--font-size-xs);
@@ -247,11 +259,20 @@
 .actionsRow {
     display: flex;
     gap: 12px;
-    margin-top: 10px;
+    flex-shrink: 0;
+    background: var(--color-bg-card);
+    box-shadow: 0 -10px 24px color-mix(in srgb, var(--color-bg-app) 72%, transparent);
 }
 
 .actionBtn {
     flex: 1;
+}
+
+@media (max-width: 768px) {
+    .actionsRow {
+        flex-direction: column-reverse;
+        padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom, 0px));
+    }
 }
 
 /* Warning Modal */

@@ -1,33 +1,42 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import { useActivities } from '../contexts/ActivitiesContext';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import Modal from './atoms/Modal';
-import ModalBody from './atoms/ModalBody';
 import ActivityBuilderForm from './activityBuilder/ActivityBuilderForm';
 import { flattenGoals } from './activityBuilder/activityBuilderUtils';
 
-function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
-    const { createActivity, updateActivity } = useActivities();
-    const { getGoalColor, getGoalIcon } = useGoalLevels();
-    const { activityGroups = [] } = useActivityGroups(rootId);
-    const { data: currentFractal } = useFractalTree(rootId);
+function ActivityBuilderDialog({
+    onClose,
+    editingActivity,
+    rootId,
+    onSave,
+    createActivity,
+    updateActivity,
+    getGoalColor,
+    getGoalIcon,
+    activityGroups,
+    currentFractal,
+}) {
+    const [draftName, setDraftName] = useState(editingActivity?.name || '');
 
     const allGoals = useMemo(
         () => flattenGoals(currentFractal, editingActivity?.id),
         [currentFractal, editingActivity?.id]
     );
 
+    const actionLabel = editingActivity?.id ? 'Edit Activity' : 'Create Activity';
+    const modalTitle = draftName.trim() ? `${actionLabel}: ${draftName.trim()}` : actionLabel;
+
     return (
         <Modal
-            isOpen={isOpen}
+            isOpen
             onClose={onClose}
-            title={editingActivity?.id ? 'Edit Activity' : 'Create Activity'}
+            title={modalTitle}
             size="lg"
         >
-            <ModalBody>
             <ActivityBuilderForm
                 key={editingActivity?.id || editingActivity?._builderKey || 'create'}
                 allGoals={allGoals}
@@ -40,9 +49,34 @@ function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
                 onClose={onClose}
                 getGoalColor={getGoalColor}
                 getGoalIcon={getGoalIcon}
+                onNameChange={setDraftName}
             />
-            </ModalBody>
         </Modal>
+    );
+}
+
+function ActivityBuilder({ isOpen, onClose, editingActivity, rootId, onSave }) {
+    const { createActivity, updateActivity } = useActivities();
+    const { getGoalColor, getGoalIcon } = useGoalLevels();
+    const { activityGroups = [] } = useActivityGroups(rootId);
+    const { data: currentFractal } = useFractalTree(rootId);
+
+    if (!isOpen) return null;
+
+    return (
+        <ActivityBuilderDialog
+            key={editingActivity?.id || editingActivity?._builderKey || 'create'}
+            onClose={onClose}
+            editingActivity={editingActivity}
+            rootId={rootId}
+            onSave={onSave}
+            createActivity={createActivity}
+            updateActivity={updateActivity}
+            getGoalColor={getGoalColor}
+            getGoalIcon={getGoalIcon}
+            activityGroups={activityGroups}
+            currentFractal={currentFractal}
+        />
     );
 }
 

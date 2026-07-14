@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useActivities } from '../../contexts/ActivitiesContext';
@@ -13,6 +13,7 @@ function InlineActivityBuilderModal({ rootId, activityGroups = [], activityTempl
     const { createActivity, updateActivity } = useActivities();
     const { getGoalColor, getGoalIcon } = useGoalLevels();
     const { data: currentFractal } = useFractalTree(rootId);
+    const [draftName, setDraftName] = useState(activityTemplate?.name || '');
 
     const allGoals = useMemo(() => flattenGoals(currentFractal, null), [currentFractal]);
 
@@ -22,7 +23,9 @@ function InlineActivityBuilderModal({ rootId, activityGroups = [], activityTempl
                 <div className={styles.activityBuilderHeader}>
                     <button onClick={onCancel} className={styles.backButton}>←</button>
                     <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--color-text-primary)', flex: 1 }}>
-                        {activityTemplate ? 'Copy Activity' : 'Create New Activity'}
+                        {draftName.trim()
+                            ? `${activityTemplate ? 'Copy Activity' : 'Create New Activity'}: ${draftName.trim()}`
+                            : (activityTemplate ? 'Copy Activity' : 'Create New Activity')}
                     </h3>
                 </div>
                 <ActivityBuilderForm
@@ -37,6 +40,7 @@ function InlineActivityBuilderModal({ rootId, activityGroups = [], activityTempl
                     onClose={onCancel}
                     getGoalColor={getGoalColor}
                     getGoalIcon={getGoalIcon}
+                    onNameChange={setDraftName}
                 />
             </div>
         </ModalBackdrop>

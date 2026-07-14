@@ -1,18 +1,18 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-
 import ActivityBuilder from '../ActivityBuilder';
-
 const {
     mockCreateActivity,
     mockUpdateActivity,
     mockUseFractalTree,
     mockUseFractalMetrics,
+    mockCreateFractalMetric,
 } = vi.hoisted(() => ({
     mockCreateActivity: vi.fn(),
     mockUpdateActivity: vi.fn(),
     mockUseFractalTree: vi.fn(),
     mockUseFractalMetrics: vi.fn(),
+    mockCreateFractalMetric: vi.fn(),
 }));
 
 vi.mock('../../contexts/ActivitiesContext', () => ({
@@ -24,12 +24,12 @@ vi.mock('../../contexts/ActivitiesContext', () => ({
 
 vi.mock('../../hooks/useActivityQueries', () => ({
     useActivityGroups: () => ({
-        activityGroups: [{ id: 'group-1', name: 'Technique' }],
+        activityGroups: [{ id: 'group-1', name: 'Technique', associated_goal_ids: ['goal-1'] }],
         isLoading: false,
         error: null,
     }),
     useFractalMetrics: (...args) => mockUseFractalMetrics(...args),
-    useCreateFractalMetric: () => ({ mutateAsync: vi.fn(), isPending: false }),
+    useCreateFractalMetric: () => ({ mutateAsync: mockCreateFractalMetric, isPending: false }),
 }));
 
 vi.mock('../../hooks/useGoalQueries', () => ({
@@ -60,11 +60,38 @@ vi.mock('../sessionDetail/ActivityAssociationModal', () => ({
     ),
 }));
 
+vi.mock('../modals/GroupBuilderModal', () => ({
+    default: ({ isOpen, onSave }) => (
+        isOpen ? (
+            <button
+                type="button"
+                onClick={() => onSave({
+                    id: 'group-created',
+                    name: 'New Group',
+                    associated_goal_ids: ['goal-1'],
+                })}
+            >
+                finish creating group
+            </button>
+        ) : null
+    ),
+}));
+
 describe('ActivityBuilder', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockCreateActivity.mockResolvedValue({ id: 'activity-1', name: 'Scale Practice' });
         mockUpdateActivity.mockResolvedValue({ id: 'activity-1', name: 'Scale Practice' });
+        mockCreateFractalMetric.mockResolvedValue({
+            data: {
+                id: 'metric-created',
+                name: 'Errors',
+                unit: 'count',
+                is_multiplicative: false,
+                is_additive: false,
+                higher_is_better: false,
+            },
+        });
         mockUseFractalTree.mockReturnValue({
             data: {
                 id: 'goal-root',
@@ -88,6 +115,105 @@ describe('ActivityBuilder', () => {
             ],
             isLoading: false,
             error: null,
+        });
+    });
+
+    it('updates the modal header from the activity name and renders group before goals', () => {
+        render(
+            <ActivityBuilder
+                isOpen={true}
+                onClose={vi.fn()}
+                editingActivity={null}
+                rootId="root-1"
+                onSave={vi.fn()}
+            />
+        );
+        expect(screen.getByRole('heading', { name: 'Create Activity' })).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Activity Name'), {
+            target: { value: 'Scale Practice' },
+        });
+        expect(screen.getByRole('heading', { name: 'Create Activity: Scale Practice' })).toBeInTheDocument();
+        const groupField = screen.getByLabelText('Activity Group');
+        const goalsField = screen.getByText('Associated Goals (0)');
+        expect(groupField.compareDocumentPosition(goalsField) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it('merges linked goals when a group is selected', async () => {
+        render(
+            <ActivityBuilder
+                isOpen={true}
+                onClose={vi.fn()}
+                editingActivity={null}
+                rootId="root-1"
+                onSave={vi.fn()}
+            />
+        );
+        fireEvent.change(screen.getByLabelText('Activity Name'), { target: { value: 'Practice' } });
+        fireEvent.change(screen.getByLabelText('Activity Group'), { target: { value: 'group-1' } });
+        expect(screen.getByText('Associated Goals (1)')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Create Activity' }));
+        await waitFor(() => {
+            expect(mockCreateActivity).toHaveBeenCalledWith('root-1', expect.objectContaining({
+                group_id: 'group-1',
+                goal_ids: ['goal-1'],
+            }));
+        });
+    });
+
+    it('opens the canonical group creator, selects its result, and preserves the activity draft', async () => {
+        render(
+            <ActivityBuilder
+                isOpen={true}
+                onClose={vi.fn()}
+                editingActivity={null}
+                rootId="root-1"
+                onSave={vi.fn()}
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText('Activity Name'), { target: { value: 'Practice' } });
+        fireEvent.change(screen.getByLabelText('Activity Group'), { target: { value: '__create__' } });
+        fireEvent.click(screen.getByRole('button', { name: 'finish creating group' }));
+        expect(screen.getByLabelText('Activity Name')).toHaveValue('Practice');
+        expect(screen.getByText('Associated Goals (1)')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Create Activity' }));
+        await waitFor(() => {
+            expect(mockCreateActivity).toHaveBeenCalledWith('root-1', expect.objectContaining({
+                group_id: 'group-created',
+                goal_ids: ['goal-1'],
+            }));
+        });
+    });
+
+    it('creates a reusable metric with additive, multiplicative, and direction settings', async () => {
+        render(
+            <ActivityBuilder
+                isOpen={true}
+                onClose={vi.fn()}
+                editingActivity={null}
+                rootId="root-1"
+                onSave={vi.fn()}
+            />
+        );
+
+        fireEvent.change(screen.getByLabelText('Metric 1'), { target: { value: '__create__' } });
+        fireEvent.change(screen.getByLabelText('Metric name'), { target: { value: 'Errors' } });
+        fireEvent.change(screen.getByLabelText('Unit'), { target: { value: 'count' } });
+        fireEvent.click(screen.getByLabelText('Multiplicative'));
+        fireEvent.click(screen.getByLabelText('Additive'));
+        fireEvent.click(screen.getByLabelText('Higher is better'));
+        fireEvent.click(screen.getByRole('button', { name: 'Create Metric' }));
+
+        await waitFor(() => {
+            expect(mockCreateFractalMetric).toHaveBeenCalledWith({
+                name: 'Errors',
+                unit: 'count',
+                input_type: 'number',
+                is_multiplicative: false,
+                is_additive: false,
+                higher_is_better: false,
+            });
         });
     });
 

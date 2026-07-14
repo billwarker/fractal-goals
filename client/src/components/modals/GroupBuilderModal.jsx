@@ -89,6 +89,7 @@ function GroupGoalSelectorModal({
             onClose={onClose}
             title={`Link Goals${groupName ? `: ${groupName}` : ''}`}
             size="lg"
+            stackLevel={2}
         >
             <ModalBody>
                 <GoalHierarchySelector
@@ -157,16 +158,20 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
             let result;
             if (editingGroup) {
                 result = await updateActivityGroup(rootId, editingGroup.id, data);
-                // Update goal associations
-                await setActivityGroupGoals(rootId, editingGroup.id, selectedGoalIds);
+                const updatedGroup = await setActivityGroupGoals(rootId, editingGroup.id, selectedGoalIds);
+                result = updatedGroup?.id
+                    ? updatedGroup
+                    : { ...result, associated_goal_ids: selectedGoalIds };
             } else {
                 result = await createActivityGroup(rootId, data);
-                // Set goal associations for new group
                 if (result && result.id && selectedGoalIds.length > 0) {
-                    await setActivityGroupGoals(rootId, result.id, selectedGoalIds);
+                    const updatedGroup = await setActivityGroupGoals(rootId, result.id, selectedGoalIds);
+                    result = updatedGroup?.id
+                        ? updatedGroup
+                        : { ...result, associated_goal_ids: selectedGoalIds };
                 }
             }
-            onSave?.();
+            onSave?.(result);
             onClose();
         } catch (err) {
             logError("Failed to save group", err);
@@ -219,6 +224,7 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
             onClose={onClose}
             title={editingGroup ? 'Edit Group' : 'Create Group'}
             size="md"
+            stackLevel={1}
         >
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <ModalBody>
