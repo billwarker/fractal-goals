@@ -86,7 +86,7 @@ function ActivityCard({
                 )}
                 {multiplicativeMetricCount > 1 && (
                     <span className={`${styles.indicator} ${styles.indicatorMulti}`}>
-                        Product
+                        Yield
                     </span>
                 )}
                 {activity.metric_definitions?.map(m => (

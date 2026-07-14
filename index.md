@@ -398,7 +398,7 @@ Activity metrics now use fractal-level metric definitions as the user-facing con
 - predefined values render as constrained session input options with helper text, not optional quick-pick buttons
 - metric definition validation prevents conflicting default/min/max/predefined value settings
 - duration metrics are entered as `MM:SS` but stored numerically as seconds for progress calculations
-- product/yield behavior is driven by metric-level `is_multiplicative` flags, not the legacy activity-level `metrics_multiplicative` switch; yield is only valid when every tracked metric for the activity is multiplicative
+- yield behavior is driven by metric-level `is_multiplicative` flags, not the legacy activity-level `metrics_multiplicative` switch; the UI calls the calculated product of two or more multiplicative metrics "Yield," and yield is only valid when every tracked metric for the activity is multiplicative
 
 Key backend pieces:
 
