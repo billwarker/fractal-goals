@@ -219,17 +219,12 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
             const primary = getGoalColor(goal);
             return adjustBrightness(primary, -0.6);
         }
-        // Check if database has a custom secondary_color for this level
-        if (goal && typeof goal === 'string') {
-            const normalizedName = goal.replace(/([A-Z])/g, ' $1').trim();
-            const lvl = getLevelByName(normalizedName) || getLevelByName(goal);
-            if (lvl?.secondary_color) return lvl.secondary_color;
-        } else if (goal?.level?.secondary_color) {
-            return goal.level.secondary_color;
-        } else if (goal?.level_id) {
-            const lvl = getLevelById(goal.level_id);
-            if (lvl?.secondary_color) return lvl.secondary_color;
-        }
+        // Resolve through the effective level list. A customized/scoped level can
+        // have a different ID from the base level still referenced by the goal,
+        // so the shared resolver also recovers by level name and canonical type.
+        const level = _resolveLevel(goal);
+        if (level?.secondary_color) return level.secondary_color;
+
         // Fallback: auto-derive from primary
         const primary = getGoalColor(goal);
         return adjustBrightness(primary, -0.6);
@@ -299,15 +294,29 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
             const normalized = goalOrType.replace(/([A-Z])/g, ' $1').trim();
             return getLevelByName(normalized) || getLevelByName(goalOrType);
         }
-        // It's a goal object — resolve by level_id first, then type
+        // Prefer style data embedded on the goal, then resolve effective levels by
+        // ID, level name, or canonical type. Name/type recovery is important when
+        // a scoped override has replaced the base level in the effective list.
+        const embeddedLevel = goalOrType.level || goalOrType.attributes?.level;
+        if (embeddedLevel) return embeddedLevel;
+
         const levelId = goalOrType.level_id || goalOrType.attributes?.level_id;
         if (levelId) {
             const level = getLevelById(levelId);
             if (level) return level;
         }
 
+        const levelName = goalOrType.level_name || goalOrType.attributes?.level_name;
+        if (levelName) {
+            const level = getLevelByName(levelName);
+            if (level) return level;
+        }
+
         const type = goalOrType.type || goalOrType.attributes?.type;
-        if (type) return getLevelByName(type);
+        if (type) {
+            const normalized = type.replace(/([A-Z])/g, ' $1').trim();
+            return getLevelByName(normalized) || getLevelByName(type);
+        }
         return null;
     };
 

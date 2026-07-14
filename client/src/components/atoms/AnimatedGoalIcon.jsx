@@ -230,7 +230,7 @@ ${isTriangle ? `
     const meridianDuration = reduced ? 20 : 14;
     const globeTilt = -18;
 
-    const circleGlobeDetail = isCircle ? (
+    const circleGlobeDetail = isSmart && isCircle ? (
         <g mask={`url(#mask_${uid})`}>
             <g
                 style={{
@@ -322,7 +322,7 @@ ${isTriangle ? `
     const baseCore = React.cloneElement(pathElem, {
         fill: isStrokeBased
             ? 'none'
-            : isCircle
+            : isSmart && isCircle
                 ? secondaryColor
                 : (isSmart && isTriangle
                     ? trianglePrimary

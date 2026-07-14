@@ -21,11 +21,18 @@ vi.mock('../../utils/api', () => ({
 }));
 
 function Probe() {
-    const { getGoalColor, getGoalIcon } = useGoalLevels();
+    const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
+    const goalWithBaseLevelId = {
+        level_id: 'base-level-id',
+        level_name: 'Ultimate Goal',
+        type: 'UltimateGoal',
+    };
+
     return (
         <div>
             <span data-testid="color">{getGoalColor('UltimateGoal')}</span>
             <span data-testid="icon">{getGoalIcon('UltimateGoal')}</span>
+            <span data-testid="secondary-color">{getGoalSecondaryColor(goalWithBaseLevelId)}</span>
         </div>
     );
 }
@@ -46,6 +53,7 @@ describe('GoalLevelsProvider seedLevels', () => {
 
         expect(screen.getByTestId('color')).toHaveTextContent('#66d9ef');
         expect(screen.getByTestId('icon')).toHaveTextContent('star');
+        expect(screen.getByTestId('secondary-color')).toHaveTextContent('#102235');
         expect(getGoalLevels).not.toHaveBeenCalled();
     });
 });
