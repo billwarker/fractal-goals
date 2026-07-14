@@ -89,7 +89,10 @@ describe('ManageMetricsModal', () => {
 
         render(<ManageMetricsModal isOpen={true} onClose={onClose} rootId="root-1" />);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+        expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByText('Form'));
+
+        expect(screen.getByText('Edit Metric')).toBeInTheDocument();
         fireEvent.change(screen.getByLabelText('Name *'), {
             target: { value: 'Form Quality' },
         });

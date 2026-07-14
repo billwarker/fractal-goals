@@ -138,7 +138,7 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
         onClose();
     };
 
-    const handleEdit = (metric) => {
+    const handleSelectMetric = (metric) => {
         setEditingId(metric.id);
         setCopyingFrom(null);
         setValidationMessage('');
@@ -285,7 +285,7 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
                                             <li
                                                 key={m.id}
                                                 className={`${styles.metricRow} ${editingId === m.id ? styles.metricRowSelected : ''}`}
-                                                onClick={() => handleEdit(m)}
+                                                onClick={() => handleSelectMetric(m)}
                                             >
                                                 <div className={styles.metricTop}>
                                                     <div className={styles.metricNameRow}>
@@ -299,9 +299,6 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
                                                     <div className={styles.metricActions}>
                                                         <button type="button" className={styles.linkButton} onClick={(e) => { e.stopPropagation(); handleCopy(m); }}>
                                                             Copy
-                                                        </button>
-                                                        <button type="button" className={styles.linkButton} onClick={(e) => { e.stopPropagation(); handleEdit(m); }}>
-                                                            Edit
                                                         </button>
                                                         <button
                                                             type="button"
