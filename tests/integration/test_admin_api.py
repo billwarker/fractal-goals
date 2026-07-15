@@ -10,6 +10,7 @@ from sqlalchemy import text
 from config import config
 from models import (
     ActivityDefinition,
+    ActivityGroup,
     ActivityInstance,
     AnalyticsDashboard,
     AppSetting,
@@ -631,7 +632,7 @@ def _landing_example_payload(root_id, showcase=None):
 def test_landing_example_showcase_settings_round_trip(admin_client, db_session, admin_landing_fractal):
     showcase = {
         'session_id': 'session-1',
-        'activity_ids': ['activity-1', 'activity-2'],
+        'activity_ids': ['activity-1'],
         'program_id': 'program-1',
         'program_start_date': '2026-01-05',
         'program_end_date': '2026-01-20',
@@ -738,7 +739,7 @@ def test_landing_goals_content_round_trips_and_publishes_selected_examples(
 
 @pytest.mark.integration
 @pytest.mark.parametrize('showcase', [
-    {'activity_ids': ['a1', 'a2', 'a3', 'a4', 'a5']},
+    {'activity_ids': ['a1', 'a2']},
     {'analytics_view_ids': ['v1', 'v2', 'v3', 'v4']},
     {'activity_ids': ['a1', 'a1']},
     {'analytics_view_ids': ['v1', 'v1']},
@@ -1044,6 +1045,12 @@ def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, a
 @pytest.mark.integration
 def test_landing_example_options_endpoint(admin_client, authed_client, db_session, admin_landing_fractal, sample_ultimate_goal):
     root = admin_landing_fractal
+    group = ActivityGroup(
+        id=str(uuid.uuid4()),
+        root_id=root.id,
+        name='Options Group',
+        sort_order=0,
+    )
     program = Program(
         id=str(uuid.uuid4()),
         root_id=root.id,
@@ -1052,7 +1059,12 @@ def test_landing_example_options_endpoint(admin_client, authed_client, db_sessio
         end_date=datetime(2026, 3, 1),
         weekly_schedule={},
     )
-    db_session.add(program)
+    db_session.add_all([group, program])
+    db_session.flush()
+    db_session.query(ActivityDefinition).filter(
+        ActivityDefinition.root_id == root.id,
+        ActivityDefinition.name == 'Public Demo Activity',
+    ).update({'group_id': group.id})
     db_session.commit()
 
     response = admin_client.get(f'/api/admin/landing-examples/options?root_id={root.id}')
@@ -1063,6 +1075,8 @@ def test_landing_example_options_endpoint(admin_client, authed_client, db_sessio
     assert options['sessions'][0]['total_duration_seconds'] == 2700
     activity = next(item for item in options['activities'] if item['name'] == 'Public Demo Activity')
     assert activity['associated_goal_count'] == 1
+    assert activity['group_id'] == group.id
+    assert [item['name'] for item in options['activity_groups']] == ['Options Group']
     assert [item['name'] for item in options['programs']] == ['Options Program']
     assert [item['name'] for item in options['analytics_views']] == ['Public Demo Analytics View']
     assert {item['name'] for item in options['goals']} == {'Public Demo Fractal', 'Public Demo Child'}

@@ -245,7 +245,7 @@
 .activityViewportHeader {
     flex: 0 0 auto;
     display: grid;
-    grid-template-columns: minmax(360px, 1fr) minmax(220px, 340px);
+    grid-template-columns: minmax(0, 1fr);
     align-items: center;
     justify-content: space-between;
     gap: 16px;
@@ -278,34 +278,6 @@
 
 .activityViewTabs :global([class*="ViewToggleTabs_tabActive"]) {
     background: color-mix(in srgb, var(--color-bg-card) 92%, var(--color-bg-body));
-}
-
-.activitySelectLabel {
-    min-width: 0;
-    display: grid;
-    gap: 5px;
-    justify-self: end;
-    width: min(340px, 100%);
-    color: var(--color-text-muted);
-    font-size: var(--font-size-xs);
-    font-weight: 900;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
-.activitySelectLabel select {
-    width: 100%;
-    min-width: 0;
-    min-height: 44px;
-    padding: 8px 38px 8px 12px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm);
-    background: color-mix(in srgb, var(--color-bg-card) 88%, transparent);
-    color: var(--color-text-primary);
-    font: inherit;
-    font-size: var(--font-size-sm);
-    font-weight: 800;
-    cursor: pointer;
 }
 
 .activityModalPreview,
@@ -1347,11 +1319,6 @@
 
     .activityViewportHeader {
         grid-template-columns: 1fr;
-    }
-
-    .activitySelectLabel {
-        justify-self: stretch;
-        width: 100%;
     }
 
     .previewModalHeader {

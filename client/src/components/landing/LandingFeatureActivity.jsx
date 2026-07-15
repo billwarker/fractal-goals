@@ -197,20 +197,14 @@ function FieldPreview({ label, value, multiline = false }) {
 // their ancestors glow up to the ultimate goal.
 export default function LandingFeatureActivity({
     example,
-    activities,
+    activity,
     activeView = 'builder',
     onViewChange,
 }) {
     const { getGoalColor, getGoalIcon } = useGoalLevels();
-    const [selectedActivityId, setSelectedActivityId] = useState(activities[0]?.id || null);
     const [previewSelectedGoalIds, setPreviewSelectedGoalIds] = useState([]);
     const [selectedMetricId, setSelectedMetricId] = useState(null);
-
-    // Derive the effective selection so example switches (new activity list)
-    // fall back to the first activity without a state-reset effect.
-    const selectedActivity = activities.find((activity) => activity.id === selectedActivityId)
-        || activities[0]
-        || null;
+    const selectedActivity = activity || null;
 
     const lineage = useMemo(
         () => buildActivityLineage(example.tree, selectedActivity),
@@ -517,22 +511,6 @@ export default function LandingFeatureActivity({
                         '--view-toggle-panel-bg': 'var(--color-bg-card)',
                     }}
                 />
-                {activities.length > 1 && (
-                    <label className={styles.activitySelectLabel}>
-                        <span>Activity</span>
-                        <select
-                            value={selectedActivity?.id || ''}
-                            onChange={(event) => setSelectedActivityId(event.target.value)}
-                            aria-label="Example activity"
-                        >
-                            {activities.map((activity) => (
-                                <option value={activity.id} key={activity.id}>
-                                    {activity.name}
-                                </option>
-                            ))}
-                        </select>
-                    </label>
-                )}
             </div>
             <div className={styles.activityViewportBody}>
                 {renderActiveView()}

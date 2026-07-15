@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     buildActivityLineage,
     overlapsDateWindow,
-    resolveFeaturedActivities,
+    resolveFeaturedActivity,
     resolveFeaturedAnalyticsViews,
     resolveFeaturedProgram,
     resolveFeaturedSession,
@@ -62,7 +62,7 @@ describe('landingFeatureModel v4 fallbacks (showcase null)', () => {
     });
 
     it('prefers goal-linked activities', () => {
-        expect(resolveFeaturedActivities(baseExample).map((a) => a.id)).toEqual(['activity-1']);
+        expect(resolveFeaturedActivity(baseExample).id).toBe('activity-1');
     });
 
     it('falls back to the first program with no window', () => {
@@ -82,7 +82,7 @@ describe('landingFeatureModel v6 showcase resolution', () => {
         ...baseExample,
         showcase: {
             session_id: 's2',
-            activity_ids: ['activity-2'],
+            activity_ids: ['activity-2', 'activity-1'],
             program_id: 'p2',
             program_start_date: '2026-01-05',
             program_end_date: '2026-01-20',
@@ -92,7 +92,7 @@ describe('landingFeatureModel v6 showcase resolution', () => {
 
     it('honors the featured session/activities/program/analytics views', () => {
         expect(resolveFeaturedSession(example).id).toBe('s2');
-        expect(resolveFeaturedActivities(example).map((a) => a.id)).toEqual(['activity-2']);
+        expect(resolveFeaturedActivity(example).id).toBe('activity-2');
         const { program, windowStart, windowEnd } = resolveFeaturedProgram(example);
         expect(program.id).toBe('p2');
         expect(windowStart).toBe('2026-01-05');
@@ -111,7 +111,7 @@ describe('landingFeatureModel v6 showcase resolution', () => {
             },
         };
         expect(resolveFeaturedSession(stale).id).toBe('s1');
-        expect(resolveFeaturedActivities(stale).map((a) => a.id)).toEqual(['activity-1']);
+        expect(resolveFeaturedActivity(stale).id).toBe('activity-1');
         expect(resolveFeaturedProgram(stale).program.id).toBe('p1');
         expect(resolveFeaturedAnalyticsViews(stale)).toHaveLength(2);
     });

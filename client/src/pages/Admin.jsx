@@ -6,6 +6,7 @@ import {
     DEFAULT_ACCOUNT_TIER,
 } from '../constants/accountTiers';
 import BetaSignupsPanel from '../components/admin/BetaSignupsPanel';
+import LandingActivitySpotlightPicker from '../components/admin/LandingActivitySpotlightPicker';
 import LandingExampleOrderControls from '../components/admin/LandingExampleOrderControls';
 import TierQuotasPanel from '../components/admin/TierQuotasPanel';
 import UsagePanel from '../components/admin/UsagePanel';
@@ -16,7 +17,6 @@ import LandingGoalsEditor, {
     normalizeLandingContent,
 } from '../components/admin/LandingGoalsEditor';
 import { useAuth } from '../contexts/AuthContext';
-import { AlertTriangleIcon } from '../components/atoms/AppIcons';
 import CloseButton from '../components/atoms/CloseButton';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
 import { queryKeys } from '../hooks/queryKeys';
@@ -125,12 +125,11 @@ const EMPTY_LANDING_SHOWCASE = {
     program_end_date: null,
     analytics_view_ids: [],
 };
-const LANDING_SHOWCASE_ACTIVITY_CAP = 4;
 const LANDING_SHOWCASE_ANALYTICS_VIEW_CAP = 3;
 const normalizeShowcase = (showcase) => ({
     ...EMPTY_LANDING_SHOWCASE,
     ...(showcase || {}),
-    activity_ids: (showcase?.activity_ids || []).slice(0, LANDING_SHOWCASE_ACTIVITY_CAP),
+    activity_ids: (showcase?.activity_ids || []).slice(0, 1),
     analytics_view_ids: (showcase?.analytics_view_ids || []).slice(0, LANDING_SHOWCASE_ANALYTICS_VIEW_CAP),
 });
 function LandingExampleShowcaseEditor({ example, onShowcaseChange, onContentChange }) {
@@ -146,12 +145,6 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange, onContentChan
     });
     const options = optionsQuery.data;
     const update = (patch) => onShowcaseChange(example.root_id, { ...showcase, ...patch });
-    const toggleActivity = (activityId) => {
-        const next = showcase.activity_ids.includes(activityId)
-            ? showcase.activity_ids.filter((id) => id !== activityId)
-            : [...showcase.activity_ids, activityId].slice(0, LANDING_SHOWCASE_ACTIVITY_CAP);
-        update({ activity_ids: next });
-    };
     const toggleAnalyticsView = (viewId) => {
         const next = showcase.analytics_view_ids.includes(viewId)
             ? showcase.analytics_view_ids.filter((id) => id !== viewId)
@@ -211,35 +204,16 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange, onContentChan
                                 ))}
                             </select>
                         </label>}
-                        {activeTab === 'activities' && <fieldset>
-                            <legend>Featured activities (max {LANDING_SHOWCASE_ACTIVITY_CAP})</legend>
-                            {(options?.activities || []).length === 0 && (
-                                <div className={styles.status}>No activities in this fractal.</div>
-                            )}
-                            {(options?.activities || []).map((activity) => {
-                                const checked = showcase.activity_ids.includes(activity.id);
-                                const capped = !checked && showcase.activity_ids.length >= LANDING_SHOWCASE_ACTIVITY_CAP;
-                                return (
-                                    <label className={styles.landingShowcaseCheck} key={activity.id}>
-                                        <input
-                                            type="checkbox"
-                                            checked={checked}
-                                            disabled={capped}
-                                            onChange={() => toggleActivity(activity.id)}
-                                        />
-                                        <span>
-                                            {activity.name}
-                                            {activity.associated_goal_count === 0 && (
-                                                <em title="No goal links: the inheritance demo would be empty">
-                                                    <AlertTriangleIcon size={12} />
-                                                    <span>no goal links</span>
-                                                </em>
-                                            )}
-                                        </span>
-                                    </label>
-                                );
-                            })}
-                        </fieldset>}
+                        {activeTab === 'activities' && (
+                            (options?.activities || []).length === 0
+                                ? <div className={styles.status}>No activities in this fractal.</div>
+                                : <LandingActivitySpotlightPicker
+                                    activities={options?.activities || []}
+                                    activityGroups={options?.activity_groups || []}
+                                    selectedActivityId={showcase.activity_ids[0] || null}
+                                    onChange={(activityId) => update({ activity_ids: activityId ? [activityId] : [] })}
+                                />
+                        )}
                         {activeTab === 'programs' && <>
                         <label>
                             <span>Featured program</span>

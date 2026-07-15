@@ -215,7 +215,7 @@ class LandingExampleShowcaseSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     session_id: Optional[str] = Field(None, min_length=1, max_length=120)
-    activity_ids: List[str] = Field(default_factory=list, max_length=4)
+    activity_ids: List[str] = Field(default_factory=list, max_length=1)
     program_id: Optional[str] = Field(None, min_length=1, max_length=120)
     program_start_date: Optional[str] = None
     program_end_date: Optional[str] = None

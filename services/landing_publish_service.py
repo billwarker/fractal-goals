@@ -72,7 +72,7 @@ LANDING_EXAMPLE_ANALYTICS_LIMIT = 24
 # Bound the admin showcase picker lists so the options endpoint stays light.
 LANDING_EXAMPLE_OPTIONS_SESSIONS_LIMIT = 50
 LANDING_EXAMPLE_OPTIONS_ACTIVITIES_LIMIT = 200
-LANDING_EXAMPLE_SHOWCASE_ACTIVITY_LIMIT = 4
+LANDING_EXAMPLE_SHOWCASE_ACTIVITY_LIMIT = 1
 LANDING_EXAMPLE_SHOWCASE_ANALYTICS_VIEW_LIMIT = 3
 LANDING_EXAMPLE_SHOWCASE_KEYS = (
     "session_id",
@@ -311,6 +311,11 @@ class LandingPublishService:
             ActivityDefinition.deleted_at.is_(None),
         ).order_by(ActivityDefinition.name.asc()).limit(LANDING_EXAMPLE_OPTIONS_ACTIVITIES_LIMIT).all()
 
+        activity_groups = self.db_session.query(ActivityGroup).filter(
+            ActivityGroup.root_id == root.id,
+            ActivityGroup.deleted_at.is_(None),
+        ).order_by(ActivityGroup.sort_order.asc(), ActivityGroup.name.asc()).all()
+
         try:
             programs = ProgramService.get_programs(self.db_session, root.id, owner_id)
         except Exception:
@@ -376,6 +381,7 @@ class LandingPublishService:
                 }
                 for activity in activities
             ],
+            "activity_groups": [serialize_activity_group(group) for group in activity_groups],
             "programs": [
                 {
                     "id": program.get("id"),

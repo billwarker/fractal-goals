@@ -7,7 +7,7 @@ import LandingFeatureActivity from './LandingFeatureActivity';
 import LandingFeaturePrograms from './LandingFeaturePrograms';
 import LandingFeatureAnalytics from './LandingFeatureAnalytics';
 import {
-    resolveFeaturedActivities,
+    resolveFeaturedActivity,
     resolveFeaturedAnalyticsViews,
     resolveFeaturedProgram,
     resolveFeaturedSession,
@@ -32,7 +32,7 @@ export default function LandingFeaturesSection({
     const activeItem = content.items[activeFeature];
 
     const featuredSession = useMemo(() => resolveFeaturedSession(example), [example]);
-    const featuredActivities = useMemo(() => resolveFeaturedActivities(example), [example]);
+    const featuredActivity = useMemo(() => resolveFeaturedActivity(example), [example]);
     const featuredProgram = useMemo(() => resolveFeaturedProgram(example), [example]);
     const featuredAnalyticsViews = useMemo(() => resolveFeaturedAnalyticsViews(example), [example]);
 
@@ -53,7 +53,7 @@ export default function LandingFeaturesSection({
                 return (
                     <LandingFeatureActivity
                         example={example}
-                        activities={featuredActivities}
+                        activity={featuredActivity}
                         activeView={activeActivityView}
                         onViewChange={setActiveActivityView}
                     />

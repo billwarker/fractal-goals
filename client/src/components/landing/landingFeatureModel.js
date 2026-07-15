@@ -4,8 +4,6 @@ import { flattenGoalTree } from '../../utils/goalNodeModel';
 // admin-published `showcase` selections (schema v6+) and falls back to sensible
 // auto-derived picks for older snapshots where `showcase` is null.
 
-export const MAX_FEATURED_ACTIVITIES = 4;
-
 const getShowcase = (example) => example?.showcase || {};
 
 export function resolveFeaturedSession(example) {
@@ -23,15 +21,13 @@ const activityHasGoalLinks = (activity, goalLinkedActivityIds) => (
     || goalLinkedActivityIds.has(String(activity.id))
 );
 
-export function resolveFeaturedActivities(example) {
+export function resolveFeaturedActivity(example) {
     const definitions = example?.activityDefinitions || [];
     const featuredIds = getShowcase(example).activity_ids || [];
     if (featuredIds.length > 0) {
         const byId = new Map(definitions.map((definition) => [String(definition.id), definition]));
-        const featured = featuredIds
-            .map((activityId) => byId.get(String(activityId)))
-            .filter(Boolean);
-        if (featured.length > 0) return featured.slice(0, MAX_FEATURED_ACTIVITIES);
+        const featured = featuredIds.map((activityId) => byId.get(String(activityId))).find(Boolean);
+        if (featured) return featured;
     }
     // v4 fallback: prefer activities that can demonstrate goal inheritance.
     const goalLinkedActivityIds = new Set(
@@ -40,7 +36,7 @@ export function resolveFeaturedActivities(example) {
             .map(String)
     );
     const withLinks = definitions.filter((activity) => activityHasGoalLinks(activity, goalLinkedActivityIds));
-    return (withLinks.length > 0 ? withLinks : definitions).slice(0, MAX_FEATURED_ACTIVITIES);
+    return (withLinks.length > 0 ? withLinks : definitions)[0] || null;
 }
 
 export function resolveFeaturedProgram(example) {
