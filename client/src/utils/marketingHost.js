@@ -23,6 +23,11 @@ export const isLandingPreviewPath = (
     hostname = (typeof window === 'undefined' ? '' : window.location.hostname),
 ) => pathname === LANDING_PREVIEW_PATH && isLocalDevHost(hostname);
 
+export const isPublicLandingLocation = (
+    pathname = (typeof window === 'undefined' ? '' : window.location.pathname),
+    hostname = (typeof window === 'undefined' ? '' : window.location.hostname),
+) => isLandingPreviewPath(pathname, hostname) || (pathname === '/' && isPublicMarketingHost(hostname));
+
 export const getLandingPageHref = (hostname = (typeof window === 'undefined' ? '' : window.location.hostname)) => {
     if (isLocalDevHost(hostname)) return LANDING_PREVIEW_PATH;
     return 'https://fractalgoals.com/';

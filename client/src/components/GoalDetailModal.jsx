@@ -4,6 +4,7 @@ import { useGoalAssociationMutations } from '../hooks/useGoalAssociationMutation
 import useGoalDetailController from '../hooks/useGoalDetailController';
 import { useGoalForm } from '../hooks/useGoalForm';
 import useGoalDetailOnboardingVisits from '../hooks/useGoalDetailOnboardingVisits';
+import useInitialGoalDetailView from '../hooks/useInitialGoalDetailView';
 import { useGoalNotes } from '../hooks/useGoalNotes';
 import { useGoalAssociations, useGoalDailyDurations, useGoalMetrics } from '../hooks/useGoalQueries';
 import { getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
@@ -54,8 +55,8 @@ function GoalDetailModal({
     onAssociationsChanged, // Callback when activity associations change
     onMobileCollapse,
     readOnly = false,
-    initialActivities = [], // Initial associated activities for create mode
-    initialActivityGroups = [] // Initial associated groups for create mode
+    initialActivities = [], initialActivityGroups = [], // Create-mode associations
+    initialView = 'goal', initialTargetId = null, initialViewKey = 0,
 }) {
     const {
         getGoalColor = () => '#4caf50',
@@ -82,10 +83,8 @@ function GoalDetailModal({
         () => (Array.isArray(activityGroupsRaw) ? activityGroupsRaw : []),
         [activityGroupsRaw]
     );
-    // Normalize programs to always be an array (handles null case)
     const programs = Array.isArray(programsRaw) ? programsRaw : [];
 
-    // Use extracted form hook
     const {
         name, setName,
         description, setDescription,
@@ -211,6 +210,7 @@ function GoalDetailModal({
         },
         resetForm,
     });
+    useInitialGoalDetailView({ goalId, initialTargetId, initialView, initialViewKey, isOpen, mode, setTargetToEdit, setViewState, targets });
     const textColor = getGoalTextColor(goalType);
     const completedColor = getGoalColor('Completed');
     const completedSecondaryColor = getGoalSecondaryColor('Completed');

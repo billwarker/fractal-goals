@@ -565,8 +565,12 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     assert [view['name'] for view in public_example['analytics_views']] == ['Public Demo Analytics View']
 
     # Snapshot carries a schema version for forward-safe shape evolution.
-    assert public_example['schema_version'] == 8
-    assert public_payload['schema_version'] == 8
+    assert public_example['schema_version'] == 9
+    assert public_payload['schema_version'] == 9
+    assert [bullet['key'] for bullet in public_example['landing_content']['goals']['bullets']] == [
+        'break_down', 'associate_activities', 'set_targets',
+    ]
+    assert public_example['landing_content']['goals']['bullets'][0]['heading'] == 'Break it down'
 
     # Without admin curation, the showcase key is still present with stable
     # null/empty defaults so the frontend never branches on key existence.
@@ -586,7 +590,7 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     cache = db_session.get(AppSetting, 'landing_example_cache')
     assert cache is not None
     assert cache.value['examples'][0]['root_id'] == admin_landing_fractal.id
-    assert cache.value['schema_version'] == 8
+    assert cache.value['schema_version'] == 9
 
 
 @pytest.mark.integration
@@ -661,6 +665,75 @@ def test_landing_example_showcase_settings_round_trip(admin_client, db_session, 
         'program_end_date': None,
         'analytics_view_ids': [],
     }
+
+
+@pytest.mark.integration
+def test_landing_goals_content_round_trips_and_publishes_selected_examples(
+    admin_client, client, db_session, admin_landing_fractal,
+):
+    child = db_session.query(Goal).filter(
+        Goal.root_id == admin_landing_fractal.id,
+        Goal.parent_id.is_not(None),
+    ).first()
+    target = db_session.query(Target).filter(Target.goal_id == child.id).first()
+    landing_content = {
+        'goals': {
+            'bullets': [
+                {
+                    'key': 'break_down',
+                    'heading': 'Build the path',
+                    'body': 'Turn the outcome into achievable steps.',
+                    'goal_id': child.id,
+                    'target_id': None,
+                },
+                {
+                    'key': 'associate_activities',
+                    'heading': 'Connect the work',
+                    'body': 'Let evidence roll through the goal lineage.',
+                    'goal_id': child.id,
+                    'target_id': None,
+                },
+                {
+                    'key': 'set_targets',
+                    'heading': 'Measure the outcome',
+                    'body': 'Track performance against a concrete target.',
+                    'goal_id': child.id,
+                    'target_id': target.id,
+                },
+            ],
+        },
+    }
+    payload = {
+        'examples': [{
+            'root_id': admin_landing_fractal.id,
+            'label': 'Configured demo',
+            'sort_order': 0,
+            'landing_content': landing_content,
+        }],
+    }
+
+    response = admin_client.patch(
+        '/api/admin/landing-examples',
+        data=json.dumps(payload),
+        content_type='application/json',
+    )
+    assert response.status_code == 200
+    assert response.get_json()['examples'][0]['landing_content'] == landing_content
+
+    publish_response = admin_client.post(
+        '/api/admin/landing-examples/publish',
+        data=json.dumps(payload),
+        content_type='application/json',
+    )
+    assert publish_response.status_code == 200
+    public_example = client.get('/api/public/landing-examples').get_json()['examples'][0]
+    assert public_example['landing_content'] == landing_content
+    published_target = next(
+        item for item in public_example['tree']['children'][0]['attributes']['targets']
+        if item['id'] == target.id
+    )
+    assert published_target['activity_id'] == target.activity_id
+    assert 'metrics' in published_target
 
 
 @pytest.mark.integration
@@ -892,7 +965,7 @@ def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, a
     static_publish = publish()
     assert static_publish['static_snapshot'] == 'ok'
     static_payload = json.loads(static_snapshot_path.read_text())
-    assert static_payload['schema_version'] == 8
+    assert static_payload['schema_version'] == 9
     assert static_payload['published_at'] == static_publish['published_at']
     assert static_payload['examples'][0]['root_id'] == admin_landing_fractal.id
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_PATH', '')
@@ -950,6 +1023,9 @@ def test_landing_example_options_endpoint(admin_client, authed_client, db_sessio
     assert activity['associated_goal_count'] == 1
     assert [item['name'] for item in options['programs']] == ['Options Program']
     assert [item['name'] for item in options['analytics_views']] == ['Public Demo Analytics View']
+    assert {item['name'] for item in options['goals']} == {'Public Demo Fractal', 'Public Demo Child'}
+    target_goal = next(item for item in options['goals'] if item['targets'])
+    assert target_goal['targets'][0]['name']
 
     assert admin_client.get('/api/admin/landing-examples/options').status_code == 400
     # Roots not owned by an active admin are rejected.

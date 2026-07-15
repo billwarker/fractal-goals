@@ -61,7 +61,7 @@ LANDING_EXAMPLE_SETTINGS_KEY = "landing_example_settings"
 LANDING_EXAMPLE_CACHE_KEY = "landing_example_cache"
 # Bump when the published landing snapshot shape changes so the frontend / future
 # migrations can detect and handle stale caches.
-LANDING_EXAMPLE_SCHEMA_VERSION = 8
+LANDING_EXAMPLE_SCHEMA_VERSION = 9
 # Match the production goal timeline's first-page depth so the landing modal
 # keeps feature parity while the payload stays lean through field compaction.
 LANDING_EXAMPLE_TIMELINE_LIMIT = 50
@@ -81,6 +81,23 @@ LANDING_EXAMPLE_SHOWCASE_KEYS = (
     "program_start_date",
     "program_end_date",
     "analytics_view_ids",
+)
+LANDING_GOAL_BULLET_DEFAULTS = (
+    {
+        "key": "break_down",
+        "heading": "Break it down",
+        "body": "Turn ambitious outcomes into achievable child goals. Map the journey one step at a time—and build momentum every time you complete one.",
+    },
+    {
+        "key": "associate_activities",
+        "heading": "Connect your work to your goals",
+        "body": "Attach activities as evidence of progress. Each completed activity advances the goal it supports and carries that evidence up through its lineage.",
+    },
+    {
+        "key": "set_targets",
+        "heading": "Set measurable targets",
+        "body": "Define performance targets for the activities behind each goal, then see your progress build over time.",
+    },
 )
 
 
@@ -148,6 +165,32 @@ class LandingPublishService:
         )
         return normalized
 
+    @staticmethod
+    def _normalize_landing_example_content(content: JsonDict | None) -> JsonDict:
+        source = content if isinstance(content, dict) else {}
+        goals = source.get("goals") if isinstance(source.get("goals"), dict) else {}
+        supplied = goals.get("bullets") if isinstance(goals.get("bullets"), list) else []
+        supplied_by_key = {
+            item.get("key"): item
+            for item in supplied
+            if isinstance(item, dict) and item.get("key")
+        }
+        bullets = []
+        for default in LANDING_GOAL_BULLET_DEFAULTS:
+            item = supplied_by_key.get(default["key"], {})
+            bullets.append({
+                "key": default["key"],
+                "heading": str(item.get("heading") or default["heading"]),
+                "body": str(item.get("body") or default["body"]),
+                "goal_id": str(item["goal_id"]) if item.get("goal_id") else None,
+                "target_id": (
+                    str(item["target_id"])
+                    if default["key"] == "set_targets" and item.get("target_id")
+                    else None
+                ),
+            })
+        return {"goals": {"bullets": bullets}}
+
     def _normalize_landing_example_settings(self, examples: list[JsonDict]) -> list[JsonDict]:
         normalized = []
         for index, item in enumerate(examples or []):
@@ -156,6 +199,7 @@ class LandingPublishService:
                 "label": item["label"],
                 "sort_order": int(item.get("sort_order", index)),
                 "showcase": self._normalize_landing_example_showcase(item.get("showcase")),
+                "landing_content": self._normalize_landing_example_content(item.get("landing_content")),
             })
         return sorted(normalized, key=lambda item: (item["sort_order"], item["label"].lower()))
 
@@ -283,8 +327,33 @@ class LandingPublishService:
             AnalyticsDashboard.name.asc(),
         ).all()
 
+        goals = load_fractal_goals_for_serialization(self.db_session, root.id)
+        goal_options = sorted(
+            (
+                {
+                    "id": goal.id,
+                    "name": goal.name,
+                    "parent_id": goal.parent_id,
+                    "level_name": getattr(getattr(goal, "level", None), "name", None),
+                    "targets": [
+                        {
+                            "id": target.id,
+                            "name": target.name,
+                            "activity_id": target.activity_id,
+                        }
+                        for target in (goal.targets_rel or [])
+                        if target.deleted_at is None
+                    ],
+                }
+                for goal in goals.values()
+                if goal.deleted_at is None
+            ),
+            key=lambda item: (item["name"].lower(), item["id"]),
+        )
+
         return {
             "root_id": root.id,
+            "goals": goal_options,
             "sessions": [
                 {
                     "id": session.get("id"),
@@ -340,6 +409,8 @@ class LandingPublishService:
         metrics = []
         for condition in getattr(target, "metric_conditions", []) or []:
             metrics.append({
+                "metric_id": condition.metric_definition_id,
+                "metric_definition_id": condition.metric_definition_id,
                 "operator": condition.operator,
                 "value": condition.target_value,
                 "target_value": condition.target_value,
@@ -347,6 +418,7 @@ class LandingPublishService:
         return {
             "id": target.id,
             "name": target.name,
+            "activity_id": target.activity_id,
             "type": target.type or "threshold",
             "metrics": metrics,
             "time_scope": target.time_scope or "all_time",
@@ -693,6 +765,49 @@ class LandingPublishService:
             "programs": programs,
         }
 
+    def _resolve_landing_goal_content(
+        self,
+        root: Goal,
+        content: JsonDict | None,
+    ) -> tuple[JsonDict, list[str]]:
+        """Resolve per-bullet demo references without making stale content unpublishable."""
+        resolved = self._normalize_landing_example_content(content)
+        warnings: list[str] = []
+        goal_ids = {
+            bullet.get("goal_id")
+            for bullet in resolved["goals"]["bullets"]
+            if bullet.get("goal_id")
+        }
+        existing_goals = {
+            row[0]
+            for row in self.db_session.query(Goal.id).filter(
+                Goal.id.in_(goal_ids),
+                Goal.root_id == root.id,
+                Goal.deleted_at.is_(None),
+            ).all()
+        } if goal_ids else set()
+
+        for bullet in resolved["goals"]["bullets"]:
+            goal_id = bullet.get("goal_id")
+            if goal_id and goal_id not in existing_goals:
+                warnings.append(f"{bullet['heading']}: selected goal no longer exists and was skipped")
+                bullet["goal_id"] = None
+                bullet["target_id"] = None
+                continue
+            target_id = bullet.get("target_id")
+            if not target_id:
+                continue
+            target_exists = self.db_session.query(Target.id).filter(
+                Target.id == target_id,
+                Target.goal_id == goal_id,
+                Target.root_id == root.id,
+                Target.deleted_at.is_(None),
+            ).first()
+            if not target_exists:
+                warnings.append(f"{bullet['heading']}: selected target no longer exists and was skipped")
+                bullet["target_id"] = None
+        return resolved, warnings
+
     def _resolve_landing_showcase(self, root: Goal, showcase: JsonDict | None) -> tuple[JsonDict, list[str]]:
         """Validate admin-picked showcase references against the root, dropping any
         stale ids (deleted/moved content) instead of failing publish."""
@@ -1004,6 +1119,10 @@ class LandingPublishService:
             flowtree_data = self._build_landing_flowtree_data(root, serialized_tree)
             resolved_showcase, warnings = self._resolve_landing_showcase(root, item.get("showcase"))
             showcase_warnings.extend(f"{item['label']}: {warning}" for warning in warnings)
+            resolved_content, content_warnings = self._resolve_landing_goal_content(
+                root, item.get("landing_content")
+            )
+            showcase_warnings.extend(f"{item['label']}: {warning}" for warning in content_warnings)
             showcase_data = self._build_landing_showcase_data(root, resolved_showcase)
             published_examples.append({
                 "root_id": root.id,
@@ -1016,6 +1135,7 @@ class LandingPublishService:
                 "metrics_summary": flowtree_data["metrics_summary"],
                 "programs": flowtree_data["programs"],
                 "showcase": resolved_showcase,
+                "landing_content": resolved_content,
                 "sessions": showcase_data["sessions"],
                 "activity_definitions": showcase_data["activity_definitions"],
                 "activity_groups": showcase_data["activity_groups"],

@@ -2,10 +2,8 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-
 import Admin from '../Admin';
 import notify from '../../utils/notify';
-
 const {
     getSummary,
     getUsage,
@@ -28,6 +26,7 @@ const {
     forcePasswordChange,
     updateUserRole,
     getLandingExamples,
+    getLandingExampleOptions,
     updateLandingExamples,
     publishLandingExamples,
     getBetaSignups,
@@ -55,20 +54,19 @@ const {
     forcePasswordChange: vi.fn(),
     updateUserRole: vi.fn(),
     getLandingExamples: vi.fn(),
+    getLandingExampleOptions: vi.fn(),
     updateLandingExamples: vi.fn(),
     publishLandingExamples: vi.fn(),
     getBetaSignups: vi.fn(),
     updateBetaSignupStatus: vi.fn(),
     sendBetaSignupInvite: vi.fn(),
 }));
-
 vi.mock('../../contexts/AuthContext', () => ({
     useAuth: () => ({
         user: { id: 'admin-1', username: 'admin', is_admin: true },
         loading: false,
     }),
 }));
-
 vi.mock('../../utils/api', () => ({
     adminApi: {
         getSummary: (...args) => getSummary(...args),
@@ -94,6 +92,7 @@ vi.mock('../../utils/api', () => ({
         forcePasswordChange: (...args) => forcePasswordChange(...args),
         updateUserRole: (...args) => updateUserRole(...args),
         getLandingExamples: (...args) => getLandingExamples(...args),
+        getLandingExampleOptions: (...args) => getLandingExampleOptions(...args),
         updateLandingExamples: (...args) => updateLandingExamples(...args),
         publishLandingExamples: (...args) => publishLandingExamples(...args),
         getBetaSignups: (...args) => getBetaSignups(...args),
@@ -103,18 +102,15 @@ vi.mock('../../utils/api', () => ({
         revokeInviteKey: vi.fn(),
     },
 }));
-
 vi.mock('../../utils/notify', () => ({
     default: {
         success: vi.fn(),
         error: vi.fn(),
     },
 }));
-
 vi.mock('react-chartjs-2', () => ({
     Bar: () => <div data-testid="dau-bar-chart" />,
 }));
-
 vi.mock('../../components/analytics/ChartJSWrapper', () => ({
     DISABLED_CHART_ANIMATION: { animation: false },
     useChartThemeDefaults: () => ({
@@ -125,7 +121,6 @@ vi.mock('../../components/analytics/ChartJSWrapper', () => ({
         tooltipBg: '#111',
     }),
 }));
-
 function renderAdmin() {
     const queryClient = new QueryClient({
         defaultOptions: {
@@ -141,7 +136,6 @@ function renderAdmin() {
         </QueryClientProvider>
     );
 }
-
 describe('Admin', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -361,17 +355,36 @@ describe('Admin', () => {
                 published_example_count: 1,
             },
         });
-        updateLandingExamples.mockResolvedValue({
+        getLandingExampleOptions.mockResolvedValue({
             data: {
-                eligible_fractals: [],
-                examples: [
-                    { root_id: 'root-1', label: 'Guitar practice refined', sort_order: 0 },
-                    { root_id: 'root-2', label: 'Chinese language tracker', sort_order: 1 },
+                root_id: 'root-1',
+                goals: [
+                    { id: 'goal-1', name: 'Build a repertoire', level_name: 'Long Term Goal', targets: [] },
+                    { id: 'goal-2', name: 'Play CAGED triads', level_name: 'Short Term Goal', targets: [] },
+                    {
+                        id: 'goal-3',
+                        name: 'Improve triad speed',
+                        level_name: 'Immediate Goal',
+                        targets: [{ id: 'target-1', name: '120 BPM clean changes' }],
+                    },
                 ],
+                sessions: [],
+                activities: [],
+                programs: [],
+                analytics_views: [],
+            },
+        });
+        updateLandingExamples.mockImplementation(({ examples }) => Promise.resolve({
+            data: {
+                eligible_fractals: [
+                    { root_id: 'root-1', name: 'Guitar practice tracker', updated_at: '2026-06-09T12:00:00Z' },
+                    { root_id: 'root-2', name: 'Chinese language tracker', updated_at: '2026-06-08T12:00:00Z' },
+                ],
+                examples,
                 published_at: '2026-06-09T12:00:00Z',
                 published_example_count: 1,
             },
-        });
+        }));
         publishLandingExamples.mockResolvedValue({
             data: {
                 published_at: '2026-06-09T13:00:00Z',
@@ -398,24 +411,19 @@ describe('Admin', () => {
         updateBetaSignupStatus.mockResolvedValue({ data: { request: { id: 'signup-1', status: 'invited' } } });
         sendBetaSignupInvite.mockResolvedValue({ data: { request: { id: 'signup-1', status: 'invited' } } });
     });
-
     it('renders user entity metrics, storage, and invite key creation', async () => {
         renderAdmin();
-
         await waitFor(() => {
             expect(screen.getByText('Admin')).toBeInTheDocument();
             expect(screen.getByText('Users')).toBeInTheDocument();
         });
-
         fireEvent.click(screen.getByText('users'));
         await waitFor(() => expect(screen.getByText('tester')).toBeInTheDocument());
         fireEvent.click(screen.getByText('+'));
-
         expect(screen.getByText('goals')).toBeInTheDocument();
         expect(screen.getByText('activity instances')).toBeInTheDocument();
         expect(screen.getAllByText('Storage').length).toBeGreaterThan(0);
         expect(screen.getByText('Root')).toBeInTheDocument();
-
         fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'newbie' } });
         fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'newbie@example.com' } });
         expect(screen.getByPlaceholderText('Tier default')).toHaveValue(null);
@@ -424,28 +432,22 @@ describe('Admin', () => {
             username: 'newbie',
             email: 'newbie@example.com',
         }));
-
         fireEvent.click(screen.getByText('invite keys'));
         fireEvent.change(screen.getByPlaceholderText('Email'), { target: { value: 'invitee@example.com' } });
         fireEvent.change(screen.getByPlaceholderText('Label'), { target: { value: 'Wave 1' } });
         fireEvent.click(screen.getByText('Generate'));
-
         await waitFor(() => expect(createInviteKey).toHaveBeenCalledWith({
             email: 'invitee@example.com',
             label: 'Wave 1',
         }));
         await waitFor(() => expect(screen.getByText('fg_invite_secret')).toBeInTheDocument());
     });
-
     it('opens user actions and runs core account actions', async () => {
         renderAdmin();
-
         fireEvent.click(screen.getByText('users'));
         await waitFor(() => expect(screen.getByText('tester')).toBeInTheDocument());
-
         expect(screen.queryByText('Delete User')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
-
         expect(screen.getByText('Actions for tester')).toBeInTheDocument();
         expect(screen.getByText('Upgrade Tier')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Quota' }));
@@ -460,11 +462,9 @@ describe('Admin', () => {
         expect(screen.getByText('Not locked')).toBeInTheDocument();
         expect(screen.getByText('Clear Login Lock')).toBeInTheDocument();
         expect(screen.getByText('Force Password Change')).toBeInTheDocument();
-
         fireEvent.click(screen.getByRole('button', { name: 'Account' }));
         fireEvent.click(screen.getByText('Upgrade Tier'));
         await waitFor(() => expect(updateUserTier).toHaveBeenCalledWith('user-1', { membership_tier: 'free' }));
-
         fireEvent.click(screen.getByRole('button', { name: 'Quota' }));
         fireEvent.click(screen.getByText('Upgrade Quotas'));
         await waitFor(() => expect(updateUserQuota).toHaveBeenCalledWith('user-1', {
@@ -487,7 +487,6 @@ describe('Admin', () => {
             storage_limit_bytes: 104857600,
         }));
         expect(screen.getByDisplayValue(/"goals": 77/)).toBeInTheDocument();
-
         fireEvent.click(screen.getByRole('button', { name: 'Access' }));
         updateUserStatus.mockResolvedValueOnce({
             data: {
@@ -515,7 +514,6 @@ describe('Admin', () => {
         await waitFor(() => expect(notify.success).toHaveBeenCalledWith('User account suspended. They cannot log in.'));
         expect(screen.getByText('Admin access state: this account is suspended and cannot sign in.')).toBeInTheDocument();
         expect(screen.getByText('Reactivate Account')).toBeInTheDocument();
-
         updateUserStatus.mockResolvedValueOnce({
             data: {
                 id: 'user-1',
@@ -541,59 +539,45 @@ describe('Admin', () => {
         await waitFor(() => expect(updateUserStatus).toHaveBeenCalledWith('user-1', { is_active: true }));
         await waitFor(() => expect(notify.success).toHaveBeenCalledWith('User account reactivated. They can log in again.'));
         expect(screen.getByText('Admin access state: this account is allowed to sign in.')).toBeInTheDocument();
-
         fireEvent.click(screen.getByText('Clear Login Lock'));
         await waitFor(() => expect(unlockUser).toHaveBeenCalledWith('user-1'));
         await waitFor(() => expect(notify.success).toHaveBeenCalledWith('Login lock cleared'));
-
         fireEvent.click(screen.getByText('Force Password Change'));
         await waitFor(() => expect(forcePasswordChange).toHaveBeenCalledWith('user-1', { force_password_change: true }));
-
         fireEvent.click(screen.getByRole('button', { name: 'Account' }));
         fireEvent.click(screen.getByText('Update Role'));
         await waitFor(() => expect(updateUserRole).toHaveBeenCalledWith('user-1', { role: 'user' }));
-
         fireEvent.click(screen.getByRole('button', { name: 'Password' }));
         fireEvent.click(screen.getByText('Generate Temporary Password'));
         await waitFor(() => expect(generateTemporaryPassword).toHaveBeenCalledWith('user-1'));
         expect(screen.getByText(/A1temporaryPassword/)).toBeInTheDocument();
     });
-
     it('requires typed confirmations for soft and hard delete actions', async () => {
         renderAdmin();
-
         fireEvent.click(screen.getByText('users'));
         await waitFor(() => expect(screen.getByText('tester')).toBeInTheDocument());
-
         fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
         fireEvent.click(screen.getByRole('button', { name: 'Destructive' }));
-
         const softButton = screen.getByRole('button', { name: 'Soft Delete User' });
         const hardButton = screen.getByRole('button', { name: 'Hard Delete User' });
         expect(softButton).toBeDisabled();
         expect(hardButton).toBeDisabled();
-
         fireEvent.change(screen.getByPlaceholderText('soft delete'), { target: { value: 'soft delete' } });
         fireEvent.click(softButton);
         await waitFor(() => expect(softDeleteUser).toHaveBeenCalledWith('user-1'));
-
         fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
         fireEvent.click(screen.getByRole('button', { name: 'Destructive' }));
         fireEvent.change(screen.getByPlaceholderText('hard delete tester'), { target: { value: 'hard delete tester' } });
         fireEvent.click(screen.getByRole('button', { name: 'Hard Delete User' }));
-
         await waitFor(() => expect(hardDeleteUser).toHaveBeenCalledWith('user-1'));
     });
-
     it('manages tier quota defaults with new-user or existing-user scope', async () => {
         renderAdmin();
-
         fireEvent.click(screen.getByText('tier quotas'));
         await waitFor(() => expect(screen.getByDisplayValue(/"goals": 50/)).toBeInTheDocument());
         const storageInput = screen.getByLabelText('Default Storage MB');
         expect(storageInput).toHaveValue(100);
         fireEvent.change(storageInput, { target: { value: '250' } });
-
         fireEvent.click(screen.getByText('Save Tier Quotas'));
         await waitFor(() => expect(updateTierQuotas).toHaveBeenCalledWith({
             tier: 'free',
@@ -611,7 +595,6 @@ describe('Admin', () => {
             storage_limit_bytes: 262144000,
             apply_existing_users: false,
         }));
-
         fireEvent.click(screen.getByLabelText('Apply to existing users in this tier'));
         fireEvent.click(screen.getByText('Save Tier Quotas'));
         await waitFor(() => expect(updateTierQuotas).toHaveBeenLastCalledWith({
@@ -631,38 +614,51 @@ describe('Admin', () => {
             apply_existing_users: true,
         }));
     });
-
     it('manages feature flags', async () => {
         renderAdmin();
-
         fireEvent.click(screen.getByText('feature flags'));
         await waitFor(() => expect(screen.getByText('Goal view configuration')).toBeInTheDocument());
-
         expect(screen.getByText('Analytics SQL explorer')).toBeInTheDocument();
         fireEvent.click(screen.getByLabelText('Goal view configuration'));
-
         await waitFor(() => expect(updateFeatureFlags).toHaveBeenCalledWith({
             flags: { goal_surface_configuration: true },
         }));
     });
-
     it('manages landing example draft selection and publish', async () => {
         renderAdmin();
-
         fireEvent.click(screen.getByText('landing'));
         await waitFor(() => expect(screen.getByText('Landing Examples')).toBeInTheDocument());
-
         expect(screen.getByRole('link', { name: 'View landing page' })).toHaveAttribute('href', '/landing-preview');
         expect(screen.getAllByText('Guitar practice tracker').length).toBeGreaterThan(0);
         expect(screen.getByDisplayValue('Guitar practice')).toBeInTheDocument();
         expect(screen.getByText('Chinese language tracker')).toBeInTheDocument();
-
+        expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
+        expect(screen.getByText(/Publishing needs 4 more selections/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /Landing page content/ }));
+        await waitFor(() => expect(getLandingExampleOptions).toHaveBeenCalledWith('root-1'));
+        expect((await screen.findAllByRole('tab')).map((tab) => tab.textContent))
+            .toEqual(['Goals', 'Sessions', 'Activities', 'Programs', 'Analytics']);
+        fireEvent.change(screen.getByLabelText('Example goal for Break it down'), {
+            target: { value: 'goal-1' },
+        });
+        fireEvent.change(screen.getByLabelText('Example goal for Connect your work to your goals'), {
+            target: { value: 'goal-2' },
+        });
+        fireEvent.change(screen.getByLabelText('Example goal for Set measurable targets'), {
+            target: { value: 'goal-3' },
+        });
+        fireEvent.change(screen.getByLabelText('Example target for Set measurable targets'), {
+            target: { value: 'target-1' },
+        });
+        expect(screen.getByText('Ready to publish 1 example.')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
         fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+        expect(screen.getByRole('status')).toHaveTextContent(/Chinese language tracker:.*select an example goal/);
+        expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
         fireEvent.change(screen.getByDisplayValue('Guitar practice'), {
             target: { value: 'Guitar practice refined' },
         });
         fireEvent.click(screen.getByText('Save Draft'));
-
         const emptyShowcase = {
             session_id: null,
             activity_ids: [],
@@ -671,35 +667,39 @@ describe('Admin', () => {
             program_end_date: null,
             analytics_view_ids: [],
         };
-        await waitFor(() => expect(updateLandingExamples).toHaveBeenCalledWith({
-            examples: [
-                { root_id: 'root-1', label: 'Guitar practice refined', sort_order: 0, showcase: emptyShowcase },
-                { root_id: 'root-2', label: 'Chinese language tracker', sort_order: 1, showcase: emptyShowcase },
-            ],
+        await waitFor(() => expect(updateLandingExamples).toHaveBeenCalled());
+        const savedExamples = updateLandingExamples.mock.calls.at(-1)[0].examples;
+        expect(savedExamples).toHaveLength(2);
+        expect(savedExamples[0]).toEqual(expect.objectContaining({
+            root_id: 'root-1',
+            label: 'Guitar practice refined',
+            sort_order: 0,
+            showcase: emptyShowcase,
         }));
-
+        expect(savedExamples[0].landing_content.goals.bullets.map((bullet) => [bullet.goal_id, bullet.target_id])).toEqual([
+            ['goal-1', null],
+            ['goal-2', null],
+            ['goal-3', 'target-1'],
+        ]);
+        fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[1]);
         fireEvent.click(screen.getByText('Publish'));
-        await waitFor(() => expect(publishLandingExamples).toHaveBeenCalledWith({
-            examples: [
-                { root_id: 'root-1', label: 'Guitar practice refined', sort_order: 0, showcase: emptyShowcase },
-                { root_id: 'root-2', label: 'Chinese language tracker', sort_order: 1, showcase: emptyShowcase },
-            ],
+        await waitFor(() => expect(publishLandingExamples).toHaveBeenCalled());
+        const publishedExamples = publishLandingExamples.mock.calls.at(-1)[0].examples;
+        expect(publishedExamples).toHaveLength(1);
+        expect(publishedExamples[0].landing_content.goals.bullets[2]).toEqual(expect.objectContaining({
+            goal_id: 'goal-3',
+            target_id: 'target-1',
         }));
     });
-
     it('lists beta signups and updates their status', async () => {
         renderAdmin();
-
         fireEvent.click(screen.getByText('beta signups'));
-
         await waitFor(() => expect(screen.getByText('tester@example.com')).toBeInTheDocument());
         expect(screen.getByText('Learn jazz guitar')).toBeInTheDocument();
         expect(getBetaSignups).toHaveBeenCalled();
-
         const statusSelect = screen.getByDisplayValue('new');
         fireEvent.change(statusSelect, { target: { value: 'invited' } });
         await waitFor(() => expect(updateBetaSignupStatus).toHaveBeenCalledWith('signup-1', { status: 'invited' }));
-
         fireEvent.click(screen.getByRole('button', { name: 'Send invite' }));
         await waitFor(() => expect(sendBetaSignupInvite).toHaveBeenCalledWith('signup-1'));
     });

@@ -89,8 +89,7 @@ const TargetManager = ({
     const [frequencyCount, setFrequencyCount] = useState(initialTarget?.frequency_count || 1);
 
     // Fetch Programs for Block Selection
-    const { programs = [] } = usePrograms(timeScope === 'program_block' ? rootId : null);
-
+    const { programs = [] } = usePrograms(!readOnly && timeScope === 'program_block' ? rootId : null);
     // Initialize metrics with operators
     const [metricValues, setMetricValues] = useState(() => {
         const metricsObj = {};
@@ -139,7 +138,6 @@ const TargetManager = ({
         });
     }, [onDraftChange, effectiveSelectedActivityId, targetName, targetType, metricValues, metricDerivedName]);
 
-    // Handlers
     const handleOpenAddTarget = () => {
         setEditingTarget(null);
         setSelectedActivityId(initialActivityId || '');
@@ -359,7 +357,9 @@ const TargetManager = ({
         const containerClass = viewMode === 'builder' ? styles.containerFull : styles.containerEmbedded;
 
         return (
-            <div className={containerClass}>
+            <div className={`${containerClass} ${readOnly ? styles.readOnlyPreview : ''}`} aria-readonly={readOnly || undefined}
+                onClickCapture={readOnly ? (event) => !event.target.closest(`.${styles.backButton}`) && event.preventDefault() : undefined}
+                onKeyDownCapture={readOnly ? (event) => !event.target.closest(`.${styles.backButton}`) && event.preventDefault() : undefined}>
                 {renderDeleteConfirm()}
                 {/* Header (hidden when the host renders its own) */}
                 {!hideBuilderHeader && (

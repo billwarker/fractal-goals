@@ -5,6 +5,7 @@ import GoalIcon from '../components/atoms/GoalIcon';
 import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
 import LandingExampleRail from '../components/landing/LandingExampleRail';
 import LandingFeaturesSection from '../components/landing/LandingFeaturesSection';
+import LandingGoalCards from '../components/landing/LandingGoalCards';
 import LandingSkeleton from '../components/landing/LandingSkeleton';
 import { GoalLevelsProvider } from '../contexts/GoalLevelsContext';
 import landingContent from '../content/landingContent';
@@ -14,6 +15,7 @@ import { queryKeys } from '../hooks/queryKeys';
 import { findGoalNodeById, getGoalNodeId } from '../utils/goalNodeModel';
 import { publicApi } from '../utils/api';
 import { fetchLandingExamples, LANDING_EXAMPLES_STALE_TIME } from '../utils/landingPrefetch';
+import { buildLandingGoalDemos } from '../utils/landingGoalDemos';
 import styles from './Landing.module.css';
 // Reuse the real goals-page styles for the view-options widget and the docked
 // side-in detail panel (.flowtree-options-pane, .details-window.sidebar.docked).
@@ -385,6 +387,7 @@ function Landing() {
     const isMobile = useIsMobile();
     const [selectedExampleId, setSelectedExampleId] = useState(null);
     const [selectedGoalId, setSelectedGoalId] = useState(null);
+    const [goalDetailEntry, setGoalDetailEntry] = useState({ view: 'goal', targetId: null, key: 0 });
     const [flowTreeScopeKey, setFlowTreeScopeKey] = useState(0);
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
     const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
@@ -454,6 +457,7 @@ function Landing() {
                 // Admin-curated feature picks (schema v6+); null on older
                 // snapshots, in which case the Features section auto-derives.
                 showcase: example.showcase || null,
+                landingContent: example.landing_content || example.landingContent || null,
             }))
             .filter((example) => example.id && example.tree);
     }, [
@@ -567,6 +571,7 @@ function Landing() {
     const handleExampleSelect = (exampleId, { scrollToTree = false } = {}) => {
         setSelectedExampleId(exampleId);
         setSelectedGoalId(null);
+        setGoalDetailEntry((current) => ({ view: 'goal', targetId: null, key: current.key + 1 }));
         setHoveredHeroExampleId(null);
         setIsGoalTreeInteractionLocked(true);
         setFlowTreeScopeKey((current) => current + 1);
@@ -578,6 +583,7 @@ function Landing() {
     const handleGoalSelect = (goal) => {
         const goalId = getGoalNodeId(goal);
         setSelectedGoalId(goalId);
+        setGoalDetailEntry((current) => ({ view: 'goal', targetId: null, key: current.key + 1 }));
         // Bump the scope transition key so FlowTree re-filters to this goal's
         // lineage and re-centers smoothly, matching the authenticated goals page.
         setFlowTreeScopeKey((current) => current + 1);
@@ -585,6 +591,7 @@ function Landing() {
 
     const clearSelectedGoal = () => {
         setSelectedGoalId(null);
+        setGoalDetailEntry((current) => ({ view: 'goal', targetId: null, key: current.key + 1 }));
         setFlowTreeScopeKey((current) => current + 1);
     };
 
@@ -612,42 +619,10 @@ function Landing() {
         }, GOAL_TREE_UNLOCK_HINT_MS);
     }, [isGoalTreeInteractionLocked]);
 
-    // A representative mid-tree goal for the lineage-scoping card demo.
-    const demoLineageGoal = useMemo(() => (
-        findFirstGoalByType(selectedExample?.tree, 'ShortTermGoal')
-        || findFirstGoalByType(selectedExample?.tree, 'MidTermGoal')
-        || selectedExample?.tree?.children?.[0]
-        || null
-    ), [selectedExample]);
-
-    const goalViewCardActiveState = {
-        lineage: Boolean(selectedGoal),
-        evidence: viewSettings.fadeInactiveBranches,
-        metrics: viewSettings.showMetricsOverlay,
-        layout: goalsViewMode === 'hierarchy',
-    };
-
-    const handleGoalViewCardActivate = (cardKey) => {
-        if (cardKey === 'lineage') {
-            if (selectedGoalId) {
-                clearSelectedGoal();
-            } else if (demoLineageGoal) {
-                handleGoalSelect(demoLineageGoal);
-            }
-            return;
-        }
-        if (cardKey === 'evidence') {
-            setViewSettings((prev) => ({ ...prev, fadeInactiveBranches: !prev.fadeInactiveBranches }));
-            return;
-        }
-        if (cardKey === 'metrics') {
-            setViewSettings((prev) => ({ ...prev, showMetricsOverlay: !prev.showMetricsOverlay }));
-            return;
-        }
-        if (cardKey === 'layout') {
-            setGoalsViewMode((prev) => (prev === 'tree' ? 'hierarchy' : 'tree'));
-        }
-    };
+    const goalDemos = buildLandingGoalDemos({ clearSelectedGoal, fallbackCards: goalViewCards,
+        findGoalById: findGoalNodeById, findGoalByType: findFirstGoalByType, goalsViewMode,
+        handleGoalSelect, selectedExample, selectedGoal, selectedGoalId, setFlowTreeScopeKey,
+        setGoalDetailEntry, setGoalsViewMode, setSelectedGoalId, setViewSettings, viewSettings });
 
     const isHeaderNavItemActive = (href) => {
         if (!href?.startsWith('#')) return false;
@@ -852,20 +827,8 @@ function Landing() {
                             <h2 id="examples-title">{landingContent.examples.title}</h2>
                             <p>{landingContent.examples.body}</p>
                         </div>
-                        <div className={styles.goalViewCards} role="group" aria-label="Goals view highlights">
-                            {goalViewCards.map((card) => (
-                                <button
-                                    type="button"
-                                    className={`${styles.goalViewCard} ${goalViewCardActiveState[card.key] ? styles.goalViewCardActive : ''}`}
-                                    aria-pressed={Boolean(goalViewCardActiveState[card.key])}
-                                    onClick={() => handleGoalViewCardActivate(card.key)}
-                                    key={card.key}
-                                >
-                                    <span className={styles.goalViewCardTitle}>{card.title}</span>
-                                    <span className={styles.goalViewCardBody}>{card.body}</span>
-                                </button>
-                            ))}
-                        </div>
+                        <LandingGoalCards cards={goalDemos.cards} activeState={goalDemos.activeState}
+                            onActivate={goalDemos.activate} selectedGoalId={selectedGoalId} styles={styles} />
                     </aside>
                     <div className={styles.goalViewMain}>
                         {!selectedExample ? (
@@ -957,6 +920,9 @@ function Landing() {
                                                             activityGroups={selectedExample.activityGroups}
                                                             displayMode="panel"
                                                             readOnly
+                                                            initialView={goalDetailEntry.view}
+                                                            initialTargetId={goalDetailEntry.targetId}
+                                                            initialViewKey={goalDetailEntry.key}
                                                             onGoalSelect={handleGoalSelect}
                                                         />
                                                     </GoalLevelsProvider>
@@ -982,6 +948,9 @@ function Landing() {
                                 activityGroups={selectedExample.activityGroups}
                                 displayMode="modal"
                                 readOnly
+                                initialView={goalDetailEntry.view}
+                                initialTargetId={goalDetailEntry.targetId}
+                                initialViewKey={goalDetailEntry.key}
                                 onGoalSelect={handleGoalSelect}
                             />
                         </GoalLevelsProvider>

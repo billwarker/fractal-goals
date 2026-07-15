@@ -8,6 +8,12 @@ import {
 import BetaSignupsPanel from '../components/admin/BetaSignupsPanel';
 import TierQuotasPanel from '../components/admin/TierQuotasPanel';
 import UsagePanel from '../components/admin/UsagePanel';
+import LandingGoalsEditor, {
+    getLandingContentDraftIssues,
+    getLandingContentPublishIssues,
+    LANDING_CONTENT_TABS,
+    normalizeLandingContent,
+} from '../components/admin/LandingGoalsEditor';
 import { useAuth } from '../contexts/AuthContext';
 import { AlertTriangleIcon } from '../components/atoms/AppIcons';
 import CloseButton from '../components/atoms/CloseButton';
@@ -18,7 +24,6 @@ import notify from '../utils/notify';
 import { formatError } from '../utils/mutationNotify';
 import { getLandingPageHref } from '../utils/marketingHost';
 import styles from './Admin.module.css';
-
 const ADMIN_USERS_KEY = ['admin', 'users'];
 const ADMIN_SUMMARY_KEY = ['admin', 'summary'];
 const ADMIN_INVITES_KEY = ['admin', 'invite-keys'];
@@ -26,7 +31,6 @@ const ADMIN_TIER_QUOTAS_KEY = ['admin', 'tier-quotas'];
 const ADMIN_FEATURE_FLAGS_KEY = ['admin', 'feature-flags'];
 const ADMIN_LANDING_EXAMPLES_KEY = ['admin', 'landing-examples'];
 const QUOTA_PLACEHOLDER = '{"goals": 100, "sessions": 500}';
-
 const formatDate = (value) => value ? new Date(value).toLocaleString() : 'Never';
 const formatLockStatus = (user) => user?.locked_until
     ? `Locked until ${formatDate(user.locked_until)}`
@@ -69,7 +73,6 @@ const getTierDefaultQuotas = (user, tier) => {
     const tierDefaults = defaults[tier] ?? defaults[DEFAULT_ACCOUNT_TIER] ?? {};
     return tierDefaults || {};
 };
-
 function UsageBar({ label, used, limit }) {
     const unlimited = limit === null || limit === undefined;
     const percent = unlimited ? 100 : Math.min(100, Math.round((used / Math.max(limit, 1)) * 100));
@@ -85,7 +88,6 @@ function UsageBar({ label, used, limit }) {
         </div>
     );
 }
-
 function StorageEditor({ user }) {
     const queryClient = useQueryClient();
     const [draftMb, setDraftMb] = useState(() => String(Math.round((user.storage_limit_bytes ?? 0) / 1048576)));
@@ -114,7 +116,6 @@ function StorageEditor({ user }) {
         </div>
     );
 }
-
 const EMPTY_LANDING_SHOWCASE = {
     session_id: null,
     activity_ids: [],
@@ -125,42 +126,36 @@ const EMPTY_LANDING_SHOWCASE = {
 };
 const LANDING_SHOWCASE_ACTIVITY_CAP = 4;
 const LANDING_SHOWCASE_ANALYTICS_VIEW_CAP = 3;
-
 const normalizeShowcase = (showcase) => ({
     ...EMPTY_LANDING_SHOWCASE,
     ...(showcase || {}),
     activity_ids: (showcase?.activity_ids || []).slice(0, LANDING_SHOWCASE_ACTIVITY_CAP),
     analytics_view_ids: (showcase?.analytics_view_ids || []).slice(0, LANDING_SHOWCASE_ANALYTICS_VIEW_CAP),
 });
-
-function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
+function LandingExampleShowcaseEditor({ example, onShowcaseChange, onContentChange }) {
     const [expanded, setExpanded] = useState(false);
+    const [activeTab, setActiveTab] = useState('goals');
     const showcase = normalizeShowcase(example.showcase);
-
     const optionsQuery = useQuery({
         queryKey: ['admin', 'landing-example-options', example.root_id],
         queryFn: async () => (await adminApi.getLandingExampleOptions(example.root_id)).data,
         enabled: expanded,
         staleTime: 60 * 1000,
     });
-
     const options = optionsQuery.data;
     const update = (patch) => onShowcaseChange(example.root_id, { ...showcase, ...patch });
-
     const toggleActivity = (activityId) => {
         const next = showcase.activity_ids.includes(activityId)
             ? showcase.activity_ids.filter((id) => id !== activityId)
             : [...showcase.activity_ids, activityId].slice(0, LANDING_SHOWCASE_ACTIVITY_CAP);
         update({ activity_ids: next });
     };
-
     const toggleAnalyticsView = (viewId) => {
         const next = showcase.analytics_view_ids.includes(viewId)
             ? showcase.analytics_view_ids.filter((id) => id !== viewId)
             : [...showcase.analytics_view_ids, viewId].slice(0, LANDING_SHOWCASE_ANALYTICS_VIEW_CAP);
         update({ analytics_view_ids: next });
     };
-
     const selectedProgram = (options?.programs || []).find((program) => program.id === showcase.program_id) || null;
     const summaryBits = [
         showcase.session_id ? 'session' : null,
@@ -168,7 +163,6 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
         showcase.program_id ? 'program window' : null,
         showcase.analytics_view_ids.length ? `${showcase.analytics_view_ids.length} analytics views` : null,
     ].filter(Boolean);
-
     return (
         <div className={styles.landingShowcaseEditor}>
             <button
@@ -177,8 +171,8 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
                 onClick={() => setExpanded((current) => !current)}
                 aria-expanded={expanded}
             >
-                {expanded ? '▾' : '▸'} Showcase picks
-                <span>{summaryBits.length ? summaryBits.join(', ') : 'auto'}</span>
+                {expanded ? '▾' : '▸'} Landing page content
+                <span>{summaryBits.length ? summaryBits.join(', ') : 'Goals copy + example selections'}</span>
             </button>
             {expanded && (
                 optionsQuery.isLoading ? (
@@ -187,7 +181,24 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
                     <div className={styles.status}>Failed to load showcase options.</div>
                 ) : (
                     <div className={styles.landingShowcaseFields}>
-                        <label>
+                        <div className={styles.landingContentTabs} role="tablist" aria-label="Landing page sections">
+                            {LANDING_CONTENT_TABS.map((tab) => (
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeTab === tab}
+                                    className={activeTab === tab ? styles.landingContentTabActive : ''}
+                                    onClick={() => setActiveTab(tab)}
+                                    key={tab}
+                                >
+                                    {tab[0].toUpperCase() + tab.slice(1)}
+                                </button>
+                            ))}
+                        </div>
+                        {activeTab === 'goals' && <LandingGoalsEditor content={example.landing_content}
+                            options={options} styles={styles}
+                            onChange={(value) => onContentChange(example.root_id, value)} />}
+                        {activeTab === 'sessions' && <label>
                             <span>Featured session</span>
                             <select
                                 value={showcase.session_id || ''}
@@ -200,9 +211,8 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
                                     </option>
                                 ))}
                             </select>
-                        </label>
-
-                        <fieldset>
+                        </label>}
+                        {activeTab === 'activities' && <fieldset>
                             <legend>Featured activities (max {LANDING_SHOWCASE_ACTIVITY_CAP})</legend>
                             {(options?.activities || []).length === 0 && (
                                 <div className={styles.status}>No activities in this fractal.</div>
@@ -230,8 +240,8 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
                                     </label>
                                 );
                             })}
-                        </fieldset>
-
+                        </fieldset>}
+                        {activeTab === 'programs' && <>
                         <label>
                             <span>Featured program</span>
                             <select
@@ -276,8 +286,8 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
                                 </label>
                             </div>
                         )}
-
-                        <fieldset>
+                        </>}
+                        {activeTab === 'analytics' && <fieldset>
                             <legend>Analytics views (max {LANDING_SHOWCASE_ANALYTICS_VIEW_CAP})</legend>
                             {(options?.analytics_views || []).length === 0 && (
                                 <div className={styles.status}>No saved analytics views in this fractal.</div>
@@ -298,23 +308,20 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange }) {
                                     </label>
                                 );
                             })}
-                        </fieldset>
+                        </fieldset>}
                     </div>
                 )
             )}
         </div>
     );
 }
-
 function LandingExamplesPanel() {
     const queryClient = useQueryClient();
     const [draftExamples, setDraftExamples] = useState([]);
-
     const landingExamplesQuery = useQuery({
         queryKey: ADMIN_LANDING_EXAMPLES_KEY,
         queryFn: async () => (await adminApi.getLandingExamples()).data,
     });
-
     React.useEffect(() => {
         if (!landingExamplesQuery.data) return;
         setDraftExamples((landingExamplesQuery.data.examples || []).map((example, index) => ({
@@ -322,22 +329,21 @@ function LandingExamplesPanel() {
             label: example.label,
             sort_order: example.sort_order ?? index,
             showcase: normalizeShowcase(example.showcase),
+            landing_content: normalizeLandingContent(example.landing_content),
         })));
     }, [landingExamplesQuery.data]);
-
     const eligibleFractals = landingExamplesQuery.data?.eligible_fractals || [];
     const selectedRootIds = new Set(draftExamples.map((example) => example.root_id));
     const sortedDraftExamples = [...draftExamples].sort((left, right) => (
         (left.sort_order ?? 0) - (right.sort_order ?? 0)
     ));
-
     const normalizeDraft = (examples) => examples.map((example, index) => ({
         root_id: example.root_id,
         label: example.label,
         sort_order: index,
         showcase: normalizeShowcase(example.showcase),
+        landing_content: normalizeLandingContent(example.landing_content),
     }));
-
     const updateMutation = useMutation({
         mutationFn: (examples) => adminApi.updateLandingExamples({ examples: normalizeDraft(examples) }),
         onSuccess: (res) => {
@@ -346,7 +352,6 @@ function LandingExamplesPanel() {
         },
         onError: (error) => notify.error(`Failed to save landing examples: ${formatError(error)}`),
     });
-
     const publishMutation = useMutation({
         mutationFn: () => adminApi.publishLandingExamples({ examples: normalizeDraft(sortedDraftExamples) }),
         onSuccess: (res) => {
@@ -367,13 +372,18 @@ function LandingExamplesPanel() {
         },
         onError: (error) => notify.error(`Failed to publish landing examples: ${formatError(error)}`),
     });
-
     const updateShowcase = (rootId, showcase) => {
         setDraftExamples((current) => current.map((example) => (
             example.root_id === rootId ? { ...example, showcase: normalizeShowcase(showcase) } : example
         )));
     };
-
+    const updateLandingContent = (rootId, landingContentValue) => {
+        setDraftExamples((current) => current.map((example) => (
+            example.root_id === rootId
+                ? { ...example, landing_content: normalizeLandingContent(landingContentValue) }
+                : example
+        )));
+    };
     const addExample = (fractal) => {
         setDraftExamples((current) => normalizeDraft([
             ...current,
@@ -381,14 +391,13 @@ function LandingExamplesPanel() {
                 root_id: fractal.root_id,
                 label: fractal.name,
                 sort_order: current.length,
+                landing_content: normalizeLandingContent(),
             },
         ]));
     };
-
     const removeExample = (rootId) => {
         setDraftExamples((current) => normalizeDraft(current.filter((example) => example.root_id !== rootId)));
     };
-
     const moveExample = (rootId, direction) => {
         setDraftExamples((current) => {
             const next = normalizeDraft([...current]);
@@ -399,23 +408,31 @@ function LandingExamplesPanel() {
             return normalizeDraft(next);
         });
     };
-
     const updateLabel = (rootId, label) => {
         setDraftExamples((current) => current.map((example) => (
             example.root_id === rootId ? { ...example, label } : example
         )));
     };
-
-    const canSave = sortedDraftExamples.every((example) => example.label.trim().length > 0);
-
+    const draftIssues = sortedDraftExamples.flatMap((example) => [
+        ...(!example.label.trim() ? ['Add a public label'] : []),
+        ...getLandingContentDraftIssues(example.landing_content),
+    ]);
+    const publishIssues = sortedDraftExamples.map((example) => ({
+        rootId: example.root_id,
+        label: example.label.trim() || eligibleFractals.find((item) => item.root_id === example.root_id)?.name || example.root_id,
+        issues: [
+            ...(!example.label.trim() ? ['Add a public label'] : []),
+            ...getLandingContentPublishIssues(example.landing_content),
+        ],
+    })).filter((example) => example.issues.length > 0);
+    const canSave = draftIssues.length === 0;
+    const canPublish = sortedDraftExamples.length > 0 && publishIssues.length === 0;
     if (landingExamplesQuery.isLoading) {
         return <div className={styles.status}>Loading landing examples...</div>;
     }
-
     if (landingExamplesQuery.isError) {
         return <div className={styles.status}>Failed to load landing examples.</div>;
     }
-
     return (
         <section className={styles.section}>
             <div className={styles.landingExamplesHeader}>
@@ -432,7 +449,6 @@ function LandingExamplesPanel() {
                     <span>{landingExamplesQuery.data?.published_example_count || 0} examples live</span>
                 </div>
             </div>
-
             <div className={styles.landingExamplesGrid}>
                 <div className={styles.landingExamplesPanel}>
                     <div className={styles.landingExamplesPanelHeader}>
@@ -478,6 +494,7 @@ function LandingExamplesPanel() {
                                         <LandingExampleShowcaseEditor
                                             example={example}
                                             onShowcaseChange={updateShowcase}
+                                            onContentChange={updateLandingContent}
                                         />
                                     </div>
                                 );
@@ -485,6 +502,22 @@ function LandingExamplesPanel() {
                         </div>
                     )}
                     <div className={styles.landingExamplesFooter}>
+                        <div className={styles.landingPublishReadiness} role="status" aria-live="polite">
+                            {sortedDraftExamples.length === 0 ? (
+                                <span>Select at least one fractal before publishing.</span>
+                            ) : canPublish ? (
+                                <span className={styles.landingPublishReady}>Ready to publish {sortedDraftExamples.length} example{sortedDraftExamples.length === 1 ? '' : 's'}.</span>
+                            ) : (
+                                <>
+                                    <strong>Publishing needs {publishIssues.reduce((total, example) => total + example.issues.length, 0)} more selection{publishIssues.reduce((total, example) => total + example.issues.length, 0) === 1 ? '' : 's'}:</strong>
+                                    <ul>
+                                        {publishIssues.map((example) => (
+                                            <li key={example.rootId}><strong>{example.label}:</strong> {example.issues.join('; ')}</li>
+                                        ))}
+                                    </ul>
+                                </>
+                            )}
+                        </div>
                         <button
                             onClick={() => updateMutation.mutate(sortedDraftExamples)}
                             disabled={updateMutation.isPending || !canSave}
@@ -493,13 +526,13 @@ function LandingExamplesPanel() {
                         </button>
                         <button
                             onClick={() => publishMutation.mutate()}
-                            disabled={publishMutation.isPending || !canSave}
+                            disabled={publishMutation.isPending || !canPublish}
+                            title={canPublish ? undefined : 'Complete the publishing requirements shown above'}
                         >
                             {publishMutation.isPending ? 'Publishing...' : 'Publish'}
                         </button>
                     </div>
                 </div>
-
                 <div className={styles.landingExamplesPanel}>
                     <div className={styles.landingExamplesPanelHeader}>
                         <h3>Eligible admin fractals</h3>
@@ -526,14 +559,12 @@ function LandingExamplesPanel() {
         </section>
     );
 }
-
 function FeatureFlagsPanel() {
     const queryClient = useQueryClient();
     const featureFlagsQuery = useQuery({
         queryKey: ADMIN_FEATURE_FLAGS_KEY,
         queryFn: async () => (await adminApi.getFeatureFlags()).data,
     });
-
     const mutation = useMutation({
         mutationFn: ({ key, enabled }) => adminApi.updateFeatureFlags({ flags: { [key]: enabled } }),
         onSuccess: (res) => {
@@ -543,17 +574,13 @@ function FeatureFlagsPanel() {
         },
         onError: (error) => notify.error(`Failed to update feature flag: ${formatError(error)}`),
     });
-
     if (featureFlagsQuery.isLoading) {
         return <div className={styles.status}>Loading feature flags...</div>;
     }
-
     if (featureFlagsQuery.isError) {
         return <div className={styles.status}>Failed to load feature flags.</div>;
     }
-
     const definitions = featureFlagsQuery.data?.definitions || [];
-
     return (
         <section className={styles.section}>
             <div className={styles.featureFlagsHeader}>
@@ -586,7 +613,6 @@ function FeatureFlagsPanel() {
         </section>
     );
 }
-
 function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generatedPassword }) {
     const [activeTab, setActiveTab] = useState('account');
     const [tierDraft, setTierDraft] = useState(user?.membership_tier || DEFAULT_ACCOUNT_TIER);
@@ -595,7 +621,6 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
     const [quotaDraft, setQuotaDraft] = useState('{}');
     const [softConfirm, setSoftConfirm] = useState('');
     const [hardConfirm, setHardConfirm] = useState('');
-
     React.useEffect(() => {
         if (!user) return;
         setTierDraft(user.membership_tier || DEFAULT_ACCOUNT_TIER);
@@ -605,11 +630,9 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
         setSoftConfirm('');
         setHardConfirm('');
     }, [user]);
-
     React.useEffect(() => {
         if (isOpen && user?.id) setActiveTab('account');
     }, [isOpen, user?.id]);
-
     React.useEffect(() => {
         if (!isOpen) return undefined;
         const previousOverflow = document.body.style.overflow;
@@ -623,9 +646,7 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
             document.removeEventListener('keydown', handleEsc);
         };
     }, [isOpen, onClose]);
-
     if (!user || !isOpen) return null;
-
     const submitQuota = () => {
         try {
             const parsed = quotaDraft.trim() ? JSON.parse(quotaDraft) : {};
@@ -637,7 +658,6 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
             notify.error('Quota overrides must be valid JSON');
         }
     };
-
     const resetQuotaToTierDefaults = () => {
         setQuotaDraft(formatQuotaJson(getTierDefaultQuotas(user, tierDraft)));
         onAction('quota', {
@@ -645,7 +665,6 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
             storage_limit_bytes: Math.max(0, Number(storageDraftMb || 0)) * 1048576,
         });
     };
-
     const tabs = [
         ['account', 'Account'],
         ['quota', 'Quota'],
@@ -653,7 +672,6 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
         ['password', 'Password'],
         ['destructive', 'Destructive'],
     ];
-
     return (
         <ModalBackdrop className={styles.actionsOverlay} onClose={onClose} aria-modal="true" role="dialog">
             <div className={styles.actionsShell} onClick={(event) => event.stopPropagation()}>
@@ -679,7 +697,6 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
                             <span>{getAccountStatusLabel(user)} · {user.membership_tier}</span>
                         </div>
                     </aside>
-
                     <div className={styles.actionsContentArea}>
                         {activeTab === 'account' && (
                             <section className={styles.actionsTabContent}>
@@ -719,7 +736,6 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
                                 </div>
                             </section>
                         )}
-
                         {activeTab === 'quota' && (
                             <section className={styles.actionsTabContent}>
                                 <h3 className={styles.actionsSectionTitle}>Quota</h3>
@@ -752,7 +768,6 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
                                 </div>
                             </section>
                         )}
-
                         {activeTab === 'access' && (
                             <section className={styles.actionsTabContent}>
                                 <h3 className={styles.actionsSectionTitle}>Access</h3>
@@ -803,7 +818,6 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
                                 </div>
                             </section>
                         )}
-
                         {activeTab === 'password' && (
                             <section className={styles.actionsTabContent}>
                                 <h3 className={styles.actionsSectionTitle}>Password</h3>
@@ -821,7 +835,6 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
                                 )}
                             </section>
                         )}
-
                         {activeTab === 'destructive' && (
                             <section className={`${styles.actionsTabContent} ${styles.actionsDangerContent}`}>
                                 <h3 className={styles.actionsSectionTitle}>Destructive</h3>
@@ -870,7 +883,6 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
         </ModalBackdrop>
     );
 }
-
 function UserRow({ user, onActions }) {
     const [expanded, setExpanded] = useState(false);
     const navigate = useNavigate();
@@ -879,11 +891,9 @@ function UserRow({ user, onActions }) {
     const storage = user.storage || {};
     const storageLimit = storage.limit_bytes ?? user.storage_limit_bytes;
     const storagePercent = storageLimit ? Math.min(100, Math.round((storage.used_bytes / storageLimit) * 100)) : 100;
-
     const openFractal = (rootId, mode) => {
         navigate(`/${rootId}/goals?admin_user_id=${user.id}&admin_mode=${mode}`);
     };
-
     return (
         <>
             <tr>
@@ -968,7 +978,6 @@ function UserRow({ user, onActions }) {
         </>
     );
 }
-
 function Admin() {
     const { user, loading } = useAuth();
     const [tab, setTab] = useState('overview');
@@ -985,7 +994,6 @@ function Admin() {
         storage_limit_mb: '',
     });
     const queryClient = useQueryClient();
-
     const summaryQuery = useQuery({
         queryKey: ADMIN_SUMMARY_KEY,
         queryFn: async () => (await adminApi.getSummary()).data,
@@ -1006,7 +1014,6 @@ function Admin() {
         queryFn: async () => (await adminApi.getTierQuotas()).data,
         enabled: Boolean(user?.is_admin),
     });
-
     const createInviteMutation = useMutation({
         mutationFn: () => adminApi.createInviteKey({ label: inviteLabel, email: inviteEmail }),
         onSuccess: (res) => {
@@ -1018,7 +1025,6 @@ function Admin() {
         },
         onError: (error) => notify.error(`Failed to create invite key: ${formatError(error)}`),
     });
-
     const revokeInviteMutation = useMutation({
         mutationFn: (inviteId) => adminApi.revokeInviteKey(inviteId),
         onSuccess: () => {
@@ -1027,7 +1033,6 @@ function Admin() {
         },
         onError: (error) => notify.error(`Failed to revoke invite key: ${formatError(error)}`),
     });
-
     const createUserMutation = useMutation({
         mutationFn: () => {
             const payload = {
@@ -1048,7 +1053,6 @@ function Admin() {
         },
         onError: (error) => notify.error(`Failed to create user: ${formatError(error)}`),
     });
-
     const adminActionMutation = useMutation({
         mutationFn: ({ action, targetUserId, data }) => {
             if (action === 'softDelete') return adminApi.softDeleteUser(targetUserId);
@@ -1079,12 +1083,10 @@ function Admin() {
         },
         onError: (error) => notify.error(`Failed to update user: ${formatError(error)}`),
     });
-
     const runUserAction = (action, data) => {
         if (!selectedUser) return;
         adminActionMutation.mutate({ action, targetUserId: selectedUser.id, data });
     };
-
     const summaryCards = useMemo(() => {
         const summary = summaryQuery.data || {};
         return [
@@ -1096,10 +1098,8 @@ function Admin() {
             ['Invite Keys', summary.invite_keys?.available || 0],
         ];
     }, [summaryQuery.data]);
-
     if (loading) return <div className={styles.status}>Loading...</div>;
     if (!user?.is_admin) return <Navigate to="/" replace />;
-
     return (
         <div className={styles.container}>
             <header className={styles.header}>
@@ -1109,7 +1109,6 @@ function Admin() {
                 </div>
                 <Link to="/" className={styles.homeLink}>Home</Link>
             </header>
-
             <div className={styles.tabs}>
                 {['overview', 'users', 'beta signups', 'tier quotas', 'feature flags', 'landing', 'invite keys'].map((item) => (
                     <button
@@ -1121,7 +1120,6 @@ function Admin() {
                     </button>
                 ))}
             </div>
-
             {tab === 'overview' && (
                 <>
                     <section className={styles.section}>
@@ -1137,7 +1135,6 @@ function Admin() {
                     <UsagePanel enabled={Boolean(user?.is_admin) && tab === 'overview'} />
                 </>
             )}
-
             {tab === 'users' && (
                 <section className={styles.section}>
                     <input
@@ -1210,23 +1207,18 @@ function Admin() {
                     </table>
                 </section>
             )}
-
             {tab === 'beta signups' && (
                 <BetaSignupsPanel enabled={Boolean(user?.is_admin) && tab === 'beta signups'} />
             )}
-
             {tab === 'tier quotas' && (
                 <TierQuotasPanel tierQuotasQuery={tierQuotasQuery} />
             )}
-
             {tab === 'feature flags' && (
                 <FeatureFlagsPanel />
             )}
-
             {tab === 'landing' && (
                 <LandingExamplesPanel />
             )}
-
             {tab === 'invite keys' && (
                 <section className={styles.section}>
                     <div className={styles.inviteCreator}>
@@ -1283,7 +1275,6 @@ function Admin() {
                     </table>
                 </section>
             )}
-
             <UserActionsModal
                 user={selectedUser}
                 isOpen={Boolean(selectedUser)}
@@ -1298,5 +1289,4 @@ function Admin() {
         </div>
     );
 }
-
 export default Admin;

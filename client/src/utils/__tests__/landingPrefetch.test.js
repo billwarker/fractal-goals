@@ -13,7 +13,7 @@ vi.mock('../api', () => ({
 }));
 
 import { publicApi } from '../api';
-import { getLandingPageHref, isLandingPreviewPath, isPublicMarketingHost } from '../marketingHost';
+import { getLandingPageHref, isLandingPreviewPath, isPublicLandingLocation, isPublicMarketingHost } from '../marketingHost';
 import { fetchLandingExamples, maybePrefetchLandingExamples } from '../landingPrefetch';
 
 describe('isPublicMarketingHost', () => {
@@ -36,6 +36,14 @@ describe('landing preview routing helpers', () => {
         expect(isLandingPreviewPath('/landing-preview', '::1')).toBe(true);
         expect(isLandingPreviewPath('/landing-preview', 'my.fractalgoals.com')).toBe(false);
         expect(isLandingPreviewPath('/landing', 'localhost')).toBe(false);
+    });
+
+    it('identifies only the production root and local preview as public landing locations', () => {
+        expect(isPublicLandingLocation('/', 'fractalgoals.com')).toBe(true);
+        expect(isPublicLandingLocation('/', 'www.fractalgoals.com')).toBe(true);
+        expect(isPublicLandingLocation('/landing-preview', 'localhost')).toBe(true);
+        expect(isPublicLandingLocation('/', 'my.fractalgoals.com')).toBe(false);
+        expect(isPublicLandingLocation('/landing-preview', 'my.fractalgoals.com')).toBe(false);
     });
 
     it('links admins to local preview in dev and the apex site elsewhere', () => {

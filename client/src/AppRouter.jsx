@@ -41,12 +41,12 @@ import { usePageViewTelemetry } from './hooks/usePageViewTelemetry';
 import { trackEvent } from './utils/telemetry';
 import { dismissGoalDetailsForNavigation } from './utils/navigationEvents';
 import { useGoalLevels } from './contexts/GoalLevelsContext';
-import { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } from './utils/marketingHost';
+import { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicLandingLocation } from './utils/marketingHost';
 import GettingStartedChecklist from './components/onboarding/GettingStartedChecklist';
 import NavigationSessionAction from './components/layout/NavigationSessionAction';
 import { getFractalDisplay, getFractalSwitchPath } from './utils/fractalNavigation';
 
-export { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicMarketingHost } from './utils/marketingHost';
+export { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicLandingLocation, isPublicMarketingHost } from './utils/marketingHost';
 
 function RequireAdmin({ children }) {
     const { user } = useAuth();
@@ -422,7 +422,7 @@ function App() {
     const redirectDeprecatedLandingRoute = location.pathname === '/landing' || (
         location.pathname === LANDING_PREVIEW_PATH && !isLandingPreviewPath(location.pathname)
     );
-    const showLandingPage = isLandingPreviewPath(location.pathname) || (location.pathname === '/' && isPublicMarketingHost());
+    const showLandingPage = isPublicLandingLocation(location.pathname);
     const showSelectionPage = location.pathname === '/' && !showLandingPage;
 
     // Determine page title based on path

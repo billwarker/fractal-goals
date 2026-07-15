@@ -334,7 +334,7 @@ function GoalDetailModalRenderSurface({
         );
     };
 
-    const READ_ONLY_VIEW_STATES = ['goal', 'goal-timeline', 'goal-activities', 'goal-notes'];
+    const READ_ONLY_VIEW_STATES = ['goal', 'goal-timeline', 'goal-activities', 'goal-notes', 'target-manager'];
     let content;
     if (readOnly && !READ_ONLY_VIEW_STATES.includes(viewState)) {
         content = renderGoalContent();
@@ -370,13 +370,14 @@ function GoalDetailModalRenderSurface({
                     targets={targets}
                     setTargets={setTargets}
                     activityDefinitions={activityDefinitions}
-                    associatedActivities={associatedActivities}
+                    associatedActivities={readOnly ? (readOnlyAssociatedActivities || []) : associatedActivities}
                     goalId={goalId}
                     rootId={rootId}
-                    isEditing={true}
+                    isEditing={!readOnly}
                     viewMode="builder"
                     headerColor="var(--color-text-muted)"
                     initialTarget={targetToEdit}
+                    readOnly={readOnly}
                     onCloseBuilder={() => {
                         setTargetToEdit(null);
                         setViewState(targetManagerReturnView);

@@ -4,7 +4,7 @@ Re-exported by the validators package __init__, so existing
 `from validators import <Schema>` imports keep working.
 """
 from datetime import date
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Literal
 import re
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
@@ -253,6 +253,44 @@ class LandingExampleShowcaseSchema(BaseModel):
         return self
 
 
+class LandingGoalBulletSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    key: Literal['break_down', 'associate_activities', 'set_targets']
+    heading: str = Field(..., min_length=1, max_length=100)
+    body: str = Field(..., min_length=1, max_length=600)
+    goal_id: Optional[str] = Field(None, min_length=1, max_length=120)
+    target_id: Optional[str] = Field(None, min_length=1, max_length=120)
+
+    @field_validator('heading', 'body', 'goal_id', 'target_id')
+    @classmethod
+    def sanitize_landing_goal_content(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_string(v) if v else v
+
+    @model_validator(mode='after')
+    def validate_target_selection(self) -> 'LandingGoalBulletSchema':
+        if self.key != 'set_targets' and self.target_id:
+            raise ValueError('Only the set-targets landing bullet may select a target')
+        if self.target_id and not self.goal_id:
+            raise ValueError('A landing target selection requires a goal selection')
+        return self
+
+
+class LandingGoalsPageSchema(BaseModel):
+    bullets: List[LandingGoalBulletSchema] = Field(..., min_length=3, max_length=3)
+
+    @field_validator('bullets')
+    @classmethod
+    def validate_goal_bullet_keys(cls, v: List[LandingGoalBulletSchema]) -> List[LandingGoalBulletSchema]:
+        if [bullet.key for bullet in v] != ['break_down', 'associate_activities', 'set_targets']:
+            raise ValueError('Landing goal bullets must use the canonical order and keys')
+        return v
+
+
+class LandingExampleContentSchema(BaseModel):
+    goals: LandingGoalsPageSchema
+
+
 class LandingExampleSelectionSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -260,6 +298,7 @@ class LandingExampleSelectionSchema(BaseModel):
     label: str = Field(..., min_length=1, max_length=120)
     sort_order: int = Field(..., ge=0, le=1000)
     showcase: Optional[LandingExampleShowcaseSchema] = None
+    landing_content: Optional[LandingExampleContentSchema] = None
 
     @field_validator('root_id', 'label')
     @classmethod

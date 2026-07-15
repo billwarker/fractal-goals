@@ -510,13 +510,77 @@
     gap: 14px;
 }
 
+.landingContentTabs {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    padding: 4px;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+}
+
+.landingContentTabs button {
+    min-width: 0;
+    min-height: 36px;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: calc(var(--border-radius-md) - 2px);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    text-transform: capitalize;
+    cursor: pointer;
+}
+
+.landingContentTabs .landingContentTabActive {
+    background: var(--color-bg-card-hover);
+    color: var(--color-brand-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.landingGoalBullets {
+    display: grid;
+    gap: 12px;
+}
+
+.landingGoalBullet {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 14px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-card);
+}
+
+.landingGoalBullet legend {
+    padding: 0 6px;
+    color: var(--color-brand-primary);
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.landingInteractionHint {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+}
+
 .landingShowcaseFields label {
     display: grid;
     gap: 6px;
 }
 
 .landingShowcaseFields select,
-.landingShowcaseFields input[type='date'] {
+.landingShowcaseFields input[type='date'],
+.landingShowcaseFields input[type='text'],
+.landingShowcaseFields textarea,
+.landingGoalBullet input {
     border: 1px solid var(--color-border);
     background: var(--color-bg-input);
     color: var(--color-text-primary);
@@ -524,6 +588,11 @@
     min-height: 38px;
     padding: 8px 12px;
     font: inherit;
+}
+
+.landingShowcaseFields textarea {
+    resize: vertical;
+    line-height: 1.5;
 }
 
 .landingShowcaseFields fieldset {
@@ -606,8 +675,31 @@
 }
 
 .landingExamplesFooter {
-    justify-content: flex-end;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: end;
     padding-top: 4px;
+}
+
+.landingPublishReadiness {
+    align-self: center;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+}
+
+.landingPublishReadiness > strong {
+    color: var(--color-brand-warning, #f59f4d);
+}
+
+.landingPublishReadiness ul {
+    margin: 4px 0 0;
+    padding-left: 18px;
+}
+
+.landingPublishReady {
+    color: var(--color-brand-success);
+    font-weight: 800;
 }
 
 .storageEditor span {
@@ -636,6 +728,10 @@
 
     .storageEditor button {
         width: 100%;
+    }
+
+    .landingContentTabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -1090,6 +1186,18 @@
 }
 
 @media (max-width: 760px) {
+    .landingExamplesFooter {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .landingPublishReadiness {
+        grid-column: 1 / -1;
+    }
+
+    .landingExamplesFooter button {
+        width: 100%;
+    }
+
     .container {
         padding: 16px;
     }

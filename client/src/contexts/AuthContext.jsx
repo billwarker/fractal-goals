@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { authApi, clearAccessToken, setAccessToken } from '../utils/api';
 import notify from '../utils/notify';
 import { logError } from '../utils/logger';
+import { isPublicLandingLocation } from '../utils/marketingHost';
 
 const AuthContext = createContext();
 
@@ -12,7 +13,9 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+    const location = useLocation();
     const authVersionRef = useRef(0);
+    const isPublicLanding = isPublicLandingLocation(location.pathname);
 
     const replaceUser = (nextUser) => {
         const previousUserId = user?.id || null;
@@ -24,12 +27,17 @@ export function AuthProvider({ children }) {
     };
 
     useEffect(() => {
+        if (isPublicLanding) {
+            setLoading(false);
+            return;
+        }
         fetchCurrentUser();
-    }, []);
+    }, [isPublicLanding]);
 
     // Handle events from axios interceptors
     useEffect(() => {
         const handleSessionExpired = () => {
+            if (isPublicLanding) return;
             authVersionRef.current += 1;
             clearAccessToken();
             replaceUser(null);
@@ -55,7 +63,7 @@ export function AuthProvider({ children }) {
             window.removeEventListener('auth:session_expired', handleSessionExpired);
             window.removeEventListener('auth:token_refreshed', handleTokenRefresh);
         };
-    }, [navigate, queryClient, user?.id]);
+    }, [isPublicLanding, navigate, queryClient, user?.id]);
 
     const fetchCurrentUser = async () => {
         const authVersion = authVersionRef.current;

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { isPublicLandingLocation } from '../marketingHost';
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
@@ -103,13 +104,14 @@ const isCsrfAuthFailure = (error) => (
 );
 
 const dispatchSessionExpired = (detail = {}) => {
-    if (typeof window === 'undefined' || hasDispatchedSessionExpired) return;
+    if (typeof window === 'undefined' || hasDispatchedSessionExpired || isPublicLandingLocation()) return;
     hasDispatchedSessionExpired = true;
     window.dispatchEvent(new CustomEvent('auth:session_expired', { detail }));
 };
 
 axios.interceptors.request.use(async (config) => {
-    if (accessToken && !getHeader(config.headers, 'Authorization')) {
+    const isPublicRequest = String(config.url || '').includes('/public/');
+    if (accessToken && !isPublicRequest && !getHeader(config.headers, 'Authorization')) {
         setHeader(config, 'Authorization', `Bearer ${accessToken}`);
     }
     if (String(config.url || '').includes('/auth/refresh') && !getHeader(config.headers, CSRF_HEADER_NAME)) {

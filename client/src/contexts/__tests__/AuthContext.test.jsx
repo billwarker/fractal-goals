@@ -60,10 +60,10 @@ function AuthHarness() {
     );
 }
 
-function renderAuthHarness(queryClient = createQueryClient()) {
+function renderAuthHarness(queryClient = createQueryClient(), initialEntries = ['/']) {
     const view = render(
         <QueryClientProvider client={queryClient}>
-            <MemoryRouter>
+            <MemoryRouter initialEntries={initialEntries}>
                 <AuthProvider>
                     <AuthHarness />
                 </AuthProvider>
@@ -224,5 +224,22 @@ describe('AuthContext cache boundary', () => {
         expect(queryClient.getQueryData(['fractals', 'user-a'])).toBeUndefined();
         expect(clearAccessToken).toHaveBeenCalled();
         expect(notify.error).toHaveBeenCalledWith('Your session expired. Please log in again.');
+    });
+
+    it('does not initialize auth or surface stale-session events on the public landing preview', async () => {
+        renderAuthHarness(createQueryClient(), ['/landing-preview']);
+
+        await waitFor(() => {
+            expect(screen.getByTestId('loading')).toHaveTextContent('false');
+        });
+        expect(authApi.getMe).not.toHaveBeenCalled();
+        expect(authApi.refresh).not.toHaveBeenCalled();
+
+        act(() => {
+            window.dispatchEvent(new CustomEvent('auth:session_expired', { detail: { reason: 'refresh_failed' } }));
+        });
+
+        expect(clearAccessToken).not.toHaveBeenCalled();
+        expect(notify.error).not.toHaveBeenCalled();
     });
 });

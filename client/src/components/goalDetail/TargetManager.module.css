@@ -398,3 +398,13 @@
 .targetWrapper {
     position: relative;
 }
+.readOnlyPreview input,
+.readOnlyPreview textarea,
+.readOnlyPreview select,
+.readOnlyPreview button:not(.backButton) {
+    pointer-events: none;
+}
+
+.readOnlyPreview .actionFooter {
+    display: none;
+}
