@@ -6,6 +6,11 @@
     min-height: 100%;
     color: var(--color-text-primary);
     padding: 20px var(--landing-page-x-padding) 56px;
+    background-color: var(--color-bg-app);
+    background-image:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+    background-size: 20px 20px;
 }
 
 .header,

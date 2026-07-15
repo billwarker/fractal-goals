@@ -86,6 +86,7 @@ describe('maybePrefetchLandingExamples', () => {
 describe('fetchLandingExamples', () => {
     beforeEach(() => {
         apiState.apiBase = '/api';
+        window.history.replaceState({}, '', '/');
         publicApi.getLandingExamples.mockClear();
         publicApi.getStaticLandingExamples.mockClear();
         vi.unstubAllGlobals();
@@ -136,6 +137,15 @@ describe('fetchLandingExamples', () => {
 
     it('uses the API when no preload promise exists', async () => {
         await expect(fetchLandingExamples()).resolves.toEqual({ examples: [] });
+        expect(publicApi.getLandingExamples).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses the local API for landing preview even when a production static URL is present', async () => {
+        window.history.replaceState({}, '', '/landing-preview');
+        window.__fgLandingExamplesStaticUrl = 'https://storage.example/landing-examples.json';
+
+        await expect(fetchLandingExamples()).resolves.toEqual({ examples: [] });
+        expect(publicApi.getStaticLandingExamples).not.toHaveBeenCalled();
         expect(publicApi.getLandingExamples).toHaveBeenCalledTimes(1);
     });
 

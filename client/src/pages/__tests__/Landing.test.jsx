@@ -317,6 +317,7 @@ const publishedExamples = {
 // active-section observer manually.
 const scrollIntoViewCalls = [];
 const intersectionObservers = [];
+const LAZY_PREVIEW_WAIT = { timeout: 5000 };
 const IntersectionObserverStub = createLandingIntersectionObserverStub(intersectionObservers, act);
 const getActiveSectionObserver = () => intersectionObservers.find((observer) => (
     observer.options.threshold === 0
@@ -390,7 +391,7 @@ describe('Landing', () => {
         fireEvent.click(chineseHeroTab);
         expect(screen.getByRole('tab', { name: 'Become fluent in Chinese' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getAllByText('Shadow 10 minutes').length).toBeGreaterThan(0);
-        expect(await screen.findByLabelText('Listening Review detail preview')).toBeInTheDocument();
+        expect(await screen.findByLabelText('Listening Review detail preview', {}, LAZY_PREVIEW_WAIT)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Session Notes' })).toBeInTheDocument();
         expect(screen.queryByText('One system, four views: goals, programs, sessions, and progress.')).not.toBeInTheDocument();
         expect(screen.queryByRole('heading', { name: 'Common questions' })).not.toBeInTheDocument();
@@ -500,12 +501,12 @@ describe('Landing', () => {
         landingContent.features.items.session.cards.forEach((card) => {
             expect(screen.getByRole('heading', { name: card.title })).toBeInTheDocument();
         });
-        expect(await screen.findByLabelText('Technique Session detail preview')).toBeInTheDocument();
+        expect(await screen.findByLabelText('Technique Session detail preview', {}, LAZY_PREVIEW_WAIT)).toBeInTheDocument();
         expect(screen.getByRole('tablist', { name: 'Session side pane views' })).toBeInTheDocument();
         // Activity feature shows the builder modal plus the goal selector demo.
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
         expect(screen.getByRole('tab', { name: landingContent.features.items.activity.label })).toHaveAttribute('aria-selected', 'true');
-        expect(await screen.findByRole('region', { name: 'Activity catalogue' })).toBeInTheDocument();
+        expect(await screen.findByRole('region', { name: 'Activity catalogue' }, LAZY_PREVIEW_WAIT)).toBeInTheDocument();
         expect(screen.getByText('2 instances')).toBeInTheDocument();
         expect(screen.getByText('Avg: 9m')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: /Activity builder/i }));
@@ -514,7 +515,7 @@ describe('Landing', () => {
         expect(screen.getByRole('checkbox', { name: 'Select Map the fretboard' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.programs.label }));
         expect(screen.getByRole('tab', { name: landingContent.features.items.programs.label })).toHaveAttribute('aria-selected', 'true');
-        expect(await screen.findByTestId('showcase-calendar')).toBeInTheDocument();
+        expect(await screen.findByTestId('showcase-calendar', {}, LAZY_PREVIEW_WAIT)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Blocks' }));
         expect(screen.getByTestId('showcase-program-blocks')).toBeInTheDocument();
         expect(screen.queryByTestId('showcase-calendar')).not.toBeInTheDocument();
@@ -523,7 +524,7 @@ describe('Landing', () => {
         expect(screen.queryByLabelText('Program side pane preview')).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Show Sidebar' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.analytics.label }));
-        expect(await screen.findByText('Session Duration Trend')).toBeInTheDocument();
+        expect(await screen.findByText('Session Duration Trend', {}, LAZY_PREVIEW_WAIT)).toBeInTheDocument();
         expect(screen.getByTestId('landing-analytics-window')).toHaveTextContent('sessionTrends');
         expect(screen.getByRole('button', { name: 'Show Filters' })).toBeInTheDocument();
         expect(screen.queryByRole('tab', { name: landingContent.features.items.more.label })).not.toBeInTheDocument();
@@ -589,10 +590,10 @@ describe('Landing', () => {
         renderLanding();
         await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         // Featured session replaces the most-recent default.
-        expect(await screen.findByLabelText('Featured Older Session detail preview')).toBeInTheDocument();
+        expect(await screen.findByLabelText('Featured Older Session detail preview', {}, LAZY_PREVIEW_WAIT)).toBeInTheDocument();
         // Featured activity is the activity loaded into the builder preview.
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
-        fireEvent.click(await screen.findByRole('button', { name: /Activity builder/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /Activity builder/i }, LAZY_PREVIEW_WAIT));
         expect(screen.getByLabelText('Activity Name')).toHaveValue('Featured Scales');
         expect(screen.getByRole('heading', { name: 'Associate "Featured Scales"' })).toBeInTheDocument();
         // The featured activity's linked goal and its ancestors render in the
@@ -602,7 +603,7 @@ describe('Landing', () => {
         expect(screen.getAllByText('Build complete musicianship').length).toBeGreaterThan(0);
         // Analytics view curation filters to the featured view only.
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.analytics.label }));
-        expect(await screen.findByText('Featured Analytics View')).toBeInTheDocument();
+        expect(await screen.findByText('Featured Analytics View', {}, LAZY_PREVIEW_WAIT)).toBeInTheDocument();
         expect(screen.getByTestId('landing-analytics-window')).toHaveTextContent('activityTrends');
         expect(screen.queryByRole('button', { name: 'Session Duration Trend' })).not.toBeInTheDocument();
     });
@@ -866,7 +867,7 @@ describe('Landing', () => {
         renderLanding();
         await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
-        fireEvent.click(await screen.findByRole('button', { name: /Activity builder/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /Activity builder/i }, LAZY_PREVIEW_WAIT));
         scrollIntoViewCalls.length = 0;
         fireEvent.click(screen.getByText('Map the fretboard'));
         expect(scrollIntoViewCalls).toHaveLength(0);

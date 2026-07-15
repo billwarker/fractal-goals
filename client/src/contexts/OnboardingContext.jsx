@@ -40,6 +40,7 @@ export function OnboardingProvider({ children }) {
     // triggering a fetch of our own.
     const fractalsQuery = useQuery({
         queryKey: queryKeys.fractals(user?.id),
+        queryFn: async () => queryClient.getQueryData(queryKeys.fractals(user?.id)) || [],
         enabled: false,
     });
     const state = query.data || null;

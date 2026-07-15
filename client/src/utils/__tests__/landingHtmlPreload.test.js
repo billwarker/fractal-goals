@@ -21,7 +21,7 @@ describe('inline landing snapshot preload', () => {
         delete window.__fgLandingExamplesStaticUrl;
     });
 
-    it('aborts a stalled static request after two seconds', async () => {
+    it('uses and bounds the local API preload even when the build contains a production GCS URL', async () => {
         vi.useFakeTimers();
         window.history.replaceState({}, '', '/landing-preview');
         const fetchMock = vi.fn((_url, options) => new Promise((_resolve, reject) => {
@@ -35,7 +35,10 @@ describe('inline landing snapshot preload', () => {
 
         await expect(preload).rejects.toMatchObject({ name: 'AbortError' });
         expect(fetchMock).toHaveBeenCalledTimes(1);
-        expect(fetchMock.mock.calls[0][1].credentials).toBe('omit');
-        expect(window.__fgLandingExamplesStaticAttempted).toBe(true);
+        expect(fetchMock).toHaveBeenCalledWith('/api/public/landing-examples', expect.objectContaining({
+            credentials: 'same-origin',
+        }));
+        expect(window.__fgLandingExamplesStaticUrl).toBe('');
+        expect(window.__fgLandingExamplesStaticAttempted).toBe(false);
     });
 });

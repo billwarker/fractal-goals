@@ -3,15 +3,9 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import AppRouter from './AppRouter';
+import ApplicationProviders from './ApplicationProviders';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
-import { ActivitiesProvider } from './contexts/ActivitiesContext';
-import { AuthProvider } from './contexts/AuthContext';
 import { DebugProvider, useDebug } from './contexts/DebugContext';
-import { GoalLevelsProvider } from './contexts/GoalLevelsContext';
-import { GoalsProvider } from './contexts/GoalsContext';
-import { OnboardingProvider } from './contexts/OnboardingContext';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { TimezoneProvider } from './contexts/TimezoneContext';
 
 const ReactQueryDevtools = lazy(() => import('@tanstack/react-query-devtools').then((module) => ({
     default: module.ReactQueryDevtools,
@@ -52,21 +46,9 @@ export default function AuthenticatedRoot({ queryClient }) {
                                 },
                             }}
                         />
-                        <TimezoneProvider>
-                            <AuthProvider>
-                                <OnboardingProvider>
-                                    <GoalLevelsProvider>
-                                        <GoalsProvider>
-                                            <ThemeProvider>
-                                                <ActivitiesProvider>
-                                                    <AppRouter />
-                                                </ActivitiesProvider>
-                                            </ThemeProvider>
-                                        </GoalsProvider>
-                                    </GoalLevelsProvider>
-                                </OnboardingProvider>
-                            </AuthProvider>
-                        </TimezoneProvider>
+                        <ApplicationProviders>
+                            <AppRouter />
+                        </ApplicationProviders>
                     </DebugProvider>
                 </BrowserRouter>
             </QueryClientProvider>

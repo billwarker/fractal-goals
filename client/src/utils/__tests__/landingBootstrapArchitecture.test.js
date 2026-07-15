@@ -11,14 +11,22 @@ describe('landing bootstrap architecture', () => {
         expect(main).not.toMatch(/from ['"]\.\/AppRouter/);
         expect(main).not.toMatch(/from ['"]\.\/contexts\/AuthContext/);
         expect(main).not.toMatch(/from ['"]@sentry\/react/);
+
+        const publicRoot = fs.readFileSync(path.join(process.cwd(), 'src/PublicLandingRoot.jsx'), 'utf8');
+        const authenticatedRoot = fs.readFileSync(path.join(process.cwd(), 'src/AuthenticatedRoot.jsx'), 'utf8');
+        expect(publicRoot).toContain("import ApplicationProviders from './ApplicationProviders'");
+        expect(authenticatedRoot).toContain("import ApplicationProviders from './ApplicationProviders'");
     });
 
     it('ships an accessible landing first-paint shell before React boots', () => {
         const html = fs.readFileSync(path.join(process.cwd(), 'index.html'), 'utf8');
+        const landingCss = fs.readFileSync(path.join(process.cwd(), 'src/pages/Landing.module.css'), 'utf8');
 
         expect(html).toContain('data-entry-surface');
         expect(html).toContain('class="landing-boot-shell"');
         expect(html).toContain('aria-busy="true"');
+        expect(html).toMatch(/\.landing-boot-shell[\s\S]*?background-image:[\s\S]*?linear-gradient/);
+        expect(landingCss).toMatch(/\.page[\s\S]*?background-image:[\s\S]*?linear-gradient/);
         expect(html).toContain(landingContent.hero.title);
         expect(html).toContain(landingContent.hero.body);
     });

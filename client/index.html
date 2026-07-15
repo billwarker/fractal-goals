@@ -50,12 +50,19 @@
       box-sizing: border-box;
       display: block;
       padding: 20px clamp(16px, 4vw, 56px) 56px;
-      background: #10131a;
+      background-color: #10131a;
+      background-image:
+        linear-gradient(rgba(148, 163, 184, 0.13) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.13) 1px, transparent 1px);
+      background-size: 20px 20px;
       color: #eef2f8;
       font-family: "DM Sans", system-ui, sans-serif;
     }
     [data-theme="light"][data-entry-surface="landing"] .landing-boot-shell {
-      background: #f8fafc;
+      background-color: #f8fafc;
+      background-image:
+        linear-gradient(rgba(71, 85, 105, 0.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(71, 85, 105, 0.12) 1px, transparent 1px);
       color: #162033;
     }
     .landing-boot-header {
@@ -151,6 +158,7 @@
       if (!isLandingEntry) return;
       var staticUrl = '%VITE_LANDING_EXAMPLES_STATIC_URL%';
       if (!staticUrl || staticUrl.charAt(0) === '%') staticUrl = '';
+      if (!isMarketingHost) staticUrl = '';
       window.__fgLandingExamplesStaticUrl = staticUrl;
       var preloadUrl = staticUrl || '/api/public/landing-examples';
       window.__fgLandingExamplesStaticAttempted = Boolean(staticUrl);

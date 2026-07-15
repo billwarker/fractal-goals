@@ -41,6 +41,9 @@ const isLandingSnapshot = (payload) => (
 );
 
 const getLandingExamplesStaticUrl = () => {
+    // Local preview is for testing the local backend/draft publication. Never
+    // let a production build argument silently redirect it to production GCS.
+    if (typeof window !== 'undefined' && isLandingPreviewPath()) return '';
     if (typeof window !== 'undefined' && typeof window[STATIC_URL_GLOBAL_KEY] === 'string') {
         return window[STATIC_URL_GLOBAL_KEY];
     }
