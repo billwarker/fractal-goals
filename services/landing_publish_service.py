@@ -856,7 +856,10 @@ class LandingPublishService:
                 if view_id not in existing_ids
             ]
             if dropped:
-                warnings.append(f"{len(dropped)} analytics views no longer exist and were skipped")
+                if len(dropped) == 1:
+                    warnings.append("1 analytics view no longer exists and was removed")
+                else:
+                    warnings.append(f"{len(dropped)} analytics views no longer exist and were removed")
             resolved["analytics_view_ids"] = [
                 view_id for view_id in resolved["analytics_view_ids"] if view_id in existing_ids
             ]
@@ -1123,6 +1126,8 @@ class LandingPublishService:
                 root, item.get("landing_content")
             )
             showcase_warnings.extend(f"{item['label']}: {warning}" for warning in content_warnings)
+            item["showcase"] = resolved_showcase
+            item["landing_content"] = resolved_content
             showcase_data = self._build_landing_showcase_data(root, resolved_showcase)
             published_examples.append({
                 "root_id": root.id,
@@ -1149,6 +1154,9 @@ class LandingPublishService:
             "schema_version": LANDING_EXAMPLE_SCHEMA_VERSION,
             "examples": published_examples,
         }
+        # Reconcile stale references back into the editable draft so an
+        # unavailable hidden selection warns once instead of on every publish.
+        self._set_app_setting_value(LANDING_EXAMPLE_SETTINGS_KEY, {"examples": examples})
         self._set_app_setting_value(LANDING_EXAMPLE_CACHE_KEY, cache)
         self.db_session.commit()
         return {

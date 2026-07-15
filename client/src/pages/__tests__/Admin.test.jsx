@@ -103,10 +103,7 @@ vi.mock('../../utils/api', () => ({
     },
 }));
 vi.mock('../../utils/notify', () => ({
-    default: {
-        success: vi.fn(),
-        error: vi.fn(),
-    },
+    default: { success: vi.fn(), warning: vi.fn(), error: vi.fn() },
 }));
 vi.mock('react-chartjs-2', () => ({
     Bar: () => <div data-testid="dau-bar-chart" />,

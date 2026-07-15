@@ -354,14 +354,16 @@ function LandingExamplesPanel() {
     const publishMutation = useMutation({
         mutationFn: () => adminApi.publishLandingExamples({ examples: normalizeDraft(sortedDraftExamples) }),
         onSuccess: (res) => {
+            const resolvedExamples = normalizeDraft(res.data.examples || sortedDraftExamples);
+            setDraftExamples(resolvedExamples);
             queryClient.setQueryData(ADMIN_LANDING_EXAMPLES_KEY, (current) => ({
                 ...(current || {}),
-                examples: normalizeDraft(sortedDraftExamples),
+                examples: resolvedExamples,
                 published_at: res.data.published_at,
                 published_example_count: res.data.published_example_count,
             }));
             notify.success('Landing examples published');
-            (res.data.showcase_warnings || []).forEach((warning) => notify.error(warning));
+            (res.data.showcase_warnings || []).forEach((warning) => notify.warning(warning));
             if (res.data.static_snapshot === 'failed') {
                 notify.error('Published, but writing the static landing snapshot failed; the API fallback is still live.');
             }

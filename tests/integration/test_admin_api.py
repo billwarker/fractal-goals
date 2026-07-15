@@ -943,6 +943,48 @@ def test_publish_drops_stale_showcase_refs_with_warnings(admin_client, client, a
         'analytics_view_ids': [],
     }
 
+    # Publishing reconciles unavailable references into the editable settings,
+    # so the same hidden selections cannot warn forever.
+    saved_example = admin_client.get('/api/admin/landing-examples').get_json()['examples'][0]
+    assert saved_example['showcase'] == public_example['showcase']
+    second_publish = admin_client.post(
+        '/api/admin/landing-examples/publish',
+        data=json.dumps({}),
+        content_type='application/json',
+    )
+    assert second_publish.status_code == 200
+    assert second_publish.get_json()['showcase_warnings'] == []
+
+
+@pytest.mark.integration
+def test_publish_keeps_valid_analytics_view_while_reconciling_stale_selection(
+    admin_client,
+    db_session,
+    admin_landing_fractal,
+):
+    valid_view_id = db_session.query(AnalyticsDashboard.id).filter(
+        AnalyticsDashboard.root_id == admin_landing_fractal.id,
+        AnalyticsDashboard.kind == 'view',
+        AnalyticsDashboard.deleted_at.is_(None),
+    ).scalar()
+    stale_view_id = str(uuid.uuid4())
+    showcase = {'analytics_view_ids': [stale_view_id, valid_view_id]}
+
+    response = admin_client.post(
+        '/api/admin/landing-examples/publish',
+        data=_landing_example_payload(admin_landing_fractal.id, showcase),
+        content_type='application/json',
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['examples'][0]['showcase']['analytics_view_ids'] == [valid_view_id]
+    assert payload['showcase_warnings'] == [
+        'Software demo: 1 analytics view no longer exists and was removed',
+    ]
+    saved_example = admin_client.get('/api/admin/landing-examples').get_json()['examples'][0]
+    assert saved_example['showcase']['analytics_view_ids'] == [valid_view_id]
+
 
 @pytest.mark.integration
 def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, admin_landing_fractal, monkeypatch, tmp_path):
