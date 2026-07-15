@@ -617,16 +617,15 @@ describe('Landing', () => {
         // Uses the shared docked detail-window container (carries slideInRight animation).
         expect(container.querySelector('.details-window.sidebar.docked.landing-goal-dock')).toBeInTheDocument();
     });
-    it('shows fallback example icons while published examples are loading', async () => {
+    it('reserves the final picker footprint while published examples are loading', async () => {
         let resolveExamples;
         getLandingExamples.mockReturnValue(new Promise((resolve) => {
             resolveExamples = resolve;
         }));
         renderLanding();
-        expect(screen.getByRole('tablist', { name: 'Example goal trees' })).toBeInTheDocument();
-        expect(screen.getByRole('tab', { name: 'Become a skilled guitar player' })).toHaveAttribute('aria-selected', 'true');
-        expect(screen.queryByTestId('example-picker-skeleton')).not.toBeInTheDocument();
-        expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
+        expect(screen.queryByRole('tablist', { name: 'Example goal trees' })).not.toBeInTheDocument();
+        expect(screen.getByTestId('example-picker-skeleton')).toHaveAttribute('aria-busy', 'true');
+        expect(screen.getByTestId('examples-skeleton')).toBeInTheDocument();
         expect(await screen.findByTestId('features-stage-skeleton')).toBeInTheDocument();
         await act(async () => resolveExamples({ data: publishedExamples }));
         expect(await screen.findByRole('tab', { name: 'Become a skilled guitar player' })).toHaveAttribute('aria-selected', 'true');

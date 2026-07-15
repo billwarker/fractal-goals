@@ -54,19 +54,19 @@
       display: block;
       overflow: auto;
       padding: 20px clamp(16px, 4vw, 56px) 56px;
-      background-color: #10131a;
+      background-color: #121419;
       background-image:
-        linear-gradient(rgba(148, 163, 184, 0.13) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(148, 163, 184, 0.13) 1px, transparent 1px);
+        linear-gradient(rgba(166, 182, 201, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(166, 182, 201, 0.1) 1px, transparent 1px);
       background-size: 20px 20px;
-      color: #eef2f8;
+      color: #e6edf5;
       font-family: "DM Sans", system-ui, sans-serif;
     }
     [data-theme="light"][data-entry-surface="landing"] .landing-boot-shell {
-      background-color: #f8fafc;
+      background-color: #f4f7fb;
       background-image:
-        linear-gradient(rgba(71, 85, 105, 0.12) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(71, 85, 105, 0.12) 1px, transparent 1px);
+        linear-gradient(rgba(82, 113, 145, 0.14) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(82, 113, 145, 0.14) 1px, transparent 1px);
       color: #162033;
     }
     .landing-boot-header {
@@ -77,13 +77,61 @@
       align-items: center;
       justify-content: space-between;
       gap: 20px;
-      font-size: 14px;
+      font-size: 13px;
+    }
+    .landing-boot-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       font-weight: 800;
       text-transform: uppercase;
     }
-    .landing-boot-brand { display: flex; align-items: center; gap: 10px; }
-    .landing-boot-mark { width: 34px; height: 34px; color: #4f9cf9; }
-    .landing-boot-nav { display: flex; gap: 24px; color: #9da9bb; }
+    .landing-boot-mark {
+      box-sizing: border-box;
+      width: 38px;
+      height: 38px;
+      padding: 2px;
+      color: #4f9cf9;
+    }
+    .landing-boot-mark-detail { fill: #101820; }
+    [data-theme="light"] .landing-boot-mark-detail { fill: #f9fbfe; }
+    .landing-boot-nav {
+      display: flex;
+      gap: 8px;
+      color: #bcc9d8;
+      font-weight: 700;
+      text-transform: none;
+    }
+    .landing-boot-nav span {
+      position: relative;
+      min-height: 36px;
+      padding: 8px 12px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      box-sizing: border-box;
+      display: inline-flex;
+      align-items: center;
+    }
+    .landing-boot-nav-active {
+      color: #e6edf5;
+      background: #24303d;
+      border-color: #304052 !important;
+    }
+    .landing-boot-nav-active::after {
+      content: "";
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 3px;
+      height: 2px;
+      border-radius: 999px;
+      background: #4f9cf9;
+    }
+    [data-theme="light"] .landing-boot-nav-active {
+      color: #162033;
+      background: #eef4fb;
+      border-color: #ced8e5 !important;
+    }
     .landing-boot-hero { max-width: 1560px; margin: 0 auto; padding-top: 68px; }
     .landing-boot-hero h1 {
       max-width: 1120px;
@@ -92,33 +140,47 @@
       line-height: .94;
       letter-spacing: 0;
     }
-    .landing-boot-examples { display: flex; gap: 18px; margin-top: 40px; }
-    .landing-boot-example {
-      width: 120px;
-      height: 120px;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      background: #161b24;
+    .landing-boot-examples {
+      width: min(1120px, 100%);
+      height: clamp(108px, 10vw, 152px);
+      margin-top: 40px;
     }
-    [data-theme="light"] .landing-boot-example { background: #eef2f7; border-color: #cbd5e1; }
     .landing-boot-copy {
-      max-width: 1050px;
+      max-width: min(1120px, 100%);
+      box-sizing: border-box;
       margin-top: 32px;
       padding: clamp(20px, 3vw, 34px);
-      border: 1px solid #334155;
+      border: 1px solid #304052;
       border-radius: 12px;
-      color: #b8c2d1;
+      background: rgba(28, 36, 46, 0.6);
+      color: #bcc9d8;
       font-size: clamp(1.2rem, 2.5vw, 2rem);
       line-height: 1.35;
       font-weight: 500;
     }
-    [data-theme="light"] .landing-boot-copy { color: #526176; border-color: #cbd5e1; }
+    [data-theme="light"] .landing-boot-copy {
+      color: #526176;
+      border-color: #ced8e5;
+      background: rgba(255, 255, 255, 0.6);
+    }
     .boot-error { min-height: 100vh; display: grid; place-content: center; padding: 24px; text-align: center; }
-    @media (max-width: 700px) {
-      .landing-boot-nav { display: none; }
-      .landing-boot-hero { padding-top: 44px; }
-      .landing-boot-examples { gap: 10px; }
-      .landing-boot-example { width: min(28vw, 104px); height: min(28vw, 104px); }
+    @media (max-width: 980px) {
+      .landing-boot-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .landing-boot-nav { flex-wrap: wrap; }
+    }
+    @media (max-width: 620px) {
+      [data-entry-surface="landing"] .landing-boot-shell { padding: 16px 14px 42px; }
+      .landing-boot-hero { padding-top: 48px; }
+      .landing-boot-hero h1 { font-size: 3.2rem; }
+      .landing-boot-examples { height: 86px; }
+      .landing-boot-copy {
+        padding: 18px;
+      }
+      .landing-boot-brand { font-size: 15px; }
+      .landing-boot-nav { font-size: 15px; }
     }
     @media (min-width: 981px) {
       [data-entry-surface="landing"] .landing-boot-shell { padding: 0; }
@@ -131,12 +193,50 @@
         transform: translateX(-50%);
         justify-content: center;
         gap: clamp(24px, 3vw, 44px);
+        min-height: 56px;
+        font-size: 15px;
       }
+      .landing-boot-nav { gap: clamp(12px, 1.6vw, 24px); }
       .landing-boot-hero {
         box-sizing: border-box;
         max-width: none;
+        width: 100%;
         min-height: 100vh;
-        padding: clamp(78px, 9vh, 104px) clamp(12px, 1.2vw, 24px) 24px;
+        padding: calc(clamp(78px, 9vh, 104px) + clamp(20px, 5vh, 64px)) clamp(12px, 1.2vw, 24px) 24px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .landing-boot-hero h1 {
+        max-width: min(1120px, 100%);
+        min-height: 2lh;
+        display: grid;
+        place-items: center;
+        font-size: clamp(3.6rem, 5.8vw, 6.8rem);
+        line-height: .98;
+      }
+      .landing-boot-examples { margin-top: clamp(26px, 5vh, 52px); }
+      .landing-boot-copy {
+        width: min(1120px, calc(100% - 120px));
+        box-sizing: border-box;
+        margin-top: clamp(22px, 4vh, 48px);
+        text-align: left;
+      }
+    }
+    @media (min-width: 981px) and (max-height: 820px) {
+      .landing-boot-hero {
+        padding-top: calc(clamp(78px, 9vh, 104px) + clamp(28px, 6vh, 54px));
+      }
+      .landing-boot-hero h1 { font-size: clamp(2.6rem, 6vw, 4.6rem); }
+      .landing-boot-examples {
+        height: 108px;
+        margin-top: clamp(26px, 5vh, 52px);
+      }
+      .landing-boot-copy {
+        margin-top: clamp(18px, 4vh, 34px);
+        padding: 18px 22px;
+        font-size: clamp(1.05rem, 2vw, 1.4rem);
       }
     }
   </style>
@@ -196,19 +296,25 @@
       <header class="landing-boot-header">
         <span class="landing-boot-brand">
           <svg class="landing-boot-mark" viewBox="0 0 100 100" aria-hidden="true">
-            <rect x="20" y="20" width="60" height="60" fill="currentColor" />
-            <rect x="20" y="20" width="60" height="60" fill="currentColor" transform="rotate(30 50 50)" />
-            <rect x="20" y="20" width="60" height="60" fill="currentColor" transform="rotate(60 50 50)" />
+            <g class="landing-boot-mark-detail" stroke="currentColor" stroke-width="5">
+              <rect x="20" y="20" width="60" height="60" />
+              <rect x="20" y="20" width="60" height="60" transform="rotate(30 50 50)" />
+              <rect x="20" y="20" width="60" height="60" transform="rotate(60 50 50)" />
+              <rect x="30" y="30" width="40" height="40" />
+              <rect x="30" y="30" width="40" height="40" transform="rotate(30 50 50)" />
+              <rect x="30" y="30" width="40" height="40" transform="rotate(60 50 50)" />
+              <rect x="40" y="40" width="20" height="20" />
+              <rect x="40" y="40" width="20" height="20" transform="rotate(30 50 50)" />
+              <rect x="40" y="40" width="20" height="20" transform="rotate(60 50 50)" />
+            </g>
           </svg>
           Fractal Goals
         </span>
-        <span class="landing-boot-nav" aria-hidden="true"><span>Goals</span><span>Features</span><span>Private beta</span><span>Open app</span></span>
+        <span class="landing-boot-nav" aria-hidden="true"><span class="landing-boot-nav-active">Goals</span><span>Features</span><span>Private beta</span><span>Open app</span></span>
       </header>
       <section class="landing-boot-hero">
         <h1>Achieve Your Most Ambitious Goals</h1>
-        <div class="landing-boot-examples" aria-hidden="true">
-          <span class="landing-boot-example"></span><span class="landing-boot-example"></span><span class="landing-boot-example"></span>
-        </div>
+        <div class="landing-boot-examples" aria-hidden="true"></div>
         <div class="landing-boot-copy">
           Want to achieve big goals? Start by making them smaller. Fractal Goals breaks any ambition into a tree of smaller goals, lets you build your own programs toward them, and logs every session, activity, and metric - so all your training, across every discipline, lives in one connected system instead of five scattered apps.
         </div>

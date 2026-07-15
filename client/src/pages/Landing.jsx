@@ -313,8 +313,7 @@ function Landing() {
     const isExamplesLoading = landingExamplesQuery.isPending;
     const publishedExamples = useMemo(() => {
         const apiExamples = landingExamplesQuery.data?.examples || [];
-        const shouldUseFallback = landingExamplesQuery.isPending
-            || landingExamplesQuery.isError
+        const shouldUseFallback = landingExamplesQuery.isError
             || (landingExamplesQuery.isSuccess && apiExamples.length === 0);
         const sourceExamples = apiExamples.length > 0
             ? apiExamples
@@ -353,7 +352,6 @@ function Landing() {
     }, [
         landingExamplesQuery.data,
         landingExamplesQuery.isError,
-        landingExamplesQuery.isPending,
         landingExamplesQuery.isSuccess,
     ]);
 
@@ -691,10 +689,13 @@ function Landing() {
                     <h1 id="landing-title">{heroTitle}</h1>
                     <div className={styles.heroExamplePicker}>
                         {isExamplesLoading && !selectedExample ? (
-                            <div className={styles.exampleToggle} aria-hidden="true" data-testid="example-picker-skeleton">
-                                <LandingSkeleton height="120px" width="120px" radius="8px" />
-                                <LandingSkeleton height="120px" width="120px" radius="8px" />
-                                <LandingSkeleton height="120px" width="120px" radius="8px" />
+                            <div
+                                className={styles.heroExamplesPlaceholder}
+                                aria-label="Loading example goals"
+                                aria-busy="true"
+                                data-testid="example-picker-skeleton"
+                            >
+                                <span className={styles.visuallyHidden}>Loading example goals</span>
                             </div>
                         ) : (
                             <div className={styles.exampleToggle} role="tablist" aria-label="Example goal trees">

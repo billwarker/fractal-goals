@@ -64,6 +64,7 @@
 .nav a,
 .nav button {
     appearance: none;
+    font-family: inherit;
     position: relative;
     color: var(--color-text-secondary);
     border: 1px solid transparent;
@@ -76,7 +77,6 @@
     font-size: var(--font-size-sm);
     font-weight: 700;
     background: transparent;
-    font: inherit;
     cursor: pointer;
 }
 
@@ -127,6 +127,26 @@
 
 .heroExamplePicker {
     margin-top: 40px;
+}
+
+/* Reserve the exact final picker footprint while the static example snapshot
+   is in flight. The intentionally empty surface avoids showing a fake example
+   that would be replaced as soon as GCS responds. */
+.heroExamplesPlaceholder {
+    width: min(1120px, 100%);
+    height: clamp(108px, 10vw, 152px);
+}
+
+.visuallyHidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .hero h1 {
@@ -635,6 +655,10 @@
         height: 86px;
     }
 
+    .heroExamplesPlaceholder {
+        height: 86px;
+    }
+
     .exampleToggleIcon {
         transform: scale(0.7);
     }
@@ -933,6 +957,10 @@
 
     .exampleToggle button {
         width: 108px;
+        height: 108px;
+    }
+
+    .heroExamplesPlaceholder {
         height: 108px;
     }
 

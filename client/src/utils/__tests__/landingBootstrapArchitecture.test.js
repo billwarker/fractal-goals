@@ -28,8 +28,18 @@ describe('landing bootstrap architecture', () => {
         expect(html).toMatch(/<main id="landing-boot-shell"[\s\S]*?<\/main>\s*<div id="root"><\/div>/);
         expect(html).toMatch(/\.landing-boot-shell[\s\S]*?position: fixed/);
         expect(html).toMatch(/\.landing-boot-shell[\s\S]*?background-image:[\s\S]*?linear-gradient/);
+        expect(html).toMatch(/\.landing-boot-hero h1[\s\S]*?font-size: clamp\(3\.6rem, 5\.8vw, 6\.8rem\)/);
+        expect(html).toContain('height: clamp(108px, 10vw, 152px)');
+        expect(html).toContain('width: min(1120px, calc(100% - 120px))');
+        expect(html).toContain('<div class="landing-boot-examples" aria-hidden="true"></div>');
+        expect(html).not.toContain('class="landing-boot-example"');
+        expect(html).toMatch(/\.landing-boot-brand[\s\S]*?text-transform: uppercase/);
+        expect(html).toMatch(/\.landing-boot-nav[\s\S]*?font-weight: 700[\s\S]*?text-transform: none/);
+        expect(html).toMatch(/\.landing-boot-mark[\s\S]*?box-sizing: border-box/);
+        expect(html).toContain('<span class="landing-boot-nav-active">Goals</span>');
         expect(landingCss).toContain('--landing-css-ready: 1');
         expect(landingCss).toMatch(/\.page[\s\S]*?background-image:[\s\S]*?linear-gradient/);
+        expect(landingCss).toMatch(/\.heroExamplesPlaceholder[\s\S]*?height: clamp\(108px, 10vw, 152px\)/);
         expect(html).toContain(landingContent.hero.title);
         expect(html).toContain(landingContent.hero.body);
     });
