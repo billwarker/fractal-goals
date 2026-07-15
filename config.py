@@ -86,6 +86,15 @@ class Config:
     LANDING_EXAMPLES_STATIC_PATH = os.getenv('LANDING_EXAMPLES_STATIC_PATH', '')
     LANDING_EXAMPLES_STATIC_GCS_BUCKET = os.getenv('LANDING_EXAMPLES_STATIC_GCS_BUCKET', '')
     LANDING_EXAMPLES_STATIC_GCS_BLOB = os.getenv('LANDING_EXAMPLES_STATIC_GCS_BLOB', 'landing-examples.json')
+    # Delivery is best-effort after the database snapshot commits. Keep each
+    # external call well inside the frontend proxy budget so it cannot turn a
+    # successful publish into a browser-visible gateway timeout.
+    LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS = max(
+        1.0, min(30.0, float(os.getenv('LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS', '10')))
+    )
+    LANDING_CACHE_WARM_TIMEOUT_SECONDS = max(
+        0.5, min(10.0, float(os.getenv('LANDING_CACHE_WARM_TIMEOUT_SECONDS', '2')))
+    )
 
     # Email
     EMAIL_PROVIDER = os.getenv('EMAIL_PROVIDER', 'test' if ENV in ('testing', 'local') else 'disabled')

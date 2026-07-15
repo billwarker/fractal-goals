@@ -1068,6 +1068,7 @@ def test_publish_keeps_valid_analytics_view_while_reconciling_stale_selection(
 @pytest.mark.integration
 def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, admin_landing_fractal, monkeypatch, tmp_path):
     import requests as requests_lib
+    import services.landing_publish_service as landing_publish_module
 
     def publish():
         response = admin_client.post(
@@ -1091,6 +1092,41 @@ def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, a
     assert static_payload['examples'][0]['root_id'] == admin_landing_fractal.id
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_PATH', '')
 
+    gcs_uploads = []
+
+    class _StaticBlob:
+        cache_control = None
+
+        def upload_from_string(self, data, **kwargs):
+            gcs_uploads.append({'data': data, **kwargs})
+
+    class _StaticBucket:
+        def blob(self, name):
+            assert name == config.LANDING_EXAMPLES_STATIC_GCS_BLOB
+            return _StaticBlob()
+
+    class _StaticClient:
+        def bucket(self, name):
+            assert name == 'landing-snapshots'
+            return _StaticBucket()
+
+    monkeypatch.setattr(landing_publish_module.storage, 'Client', _StaticClient)
+    monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_GCS_BUCKET', 'landing-snapshots')
+    assert publish()['static_snapshot'] == 'ok'
+    assert len(gcs_uploads) == 1
+    assert gcs_uploads[0]['content_type'] == 'application/json'
+    assert gcs_uploads[0]['timeout'] == config.LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS
+    assert gcs_uploads[0]['retry'] is None
+
+    def _timed_out_upload(*args, **kwargs):
+        raise TimeoutError('static upload exceeded its delivery budget')
+
+    monkeypatch.setattr(_StaticBlob, 'upload_from_string', _timed_out_upload)
+    timed_out_publish = publish()
+    assert timed_out_publish['static_snapshot'] == 'failed'
+    assert timed_out_publish['publish_duration_ms'] >= 0
+    monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_GCS_BUCKET', '')
+
     warm_url = 'https://www.example.com/api/public/landing-examples'
     monkeypatch.setattr(config, 'LANDING_CACHE_WARM_URL', warm_url)
 
@@ -1109,7 +1145,7 @@ def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, a
     assert warm_calls == [{
         'url': warm_url,
         'headers': {'X-Landing-Cache-Warm': '1'},
-        'timeout': 1.5,
+        'timeout': config.LANDING_CACHE_WARM_TIMEOUT_SECONDS,
     }]
 
     def _failing_get(url, headers=None, timeout=None):

@@ -12,6 +12,7 @@ import re
 import tempfile
 from copy import deepcopy
 from pathlib import Path
+from time import perf_counter
 
 import requests
 from google.cloud import storage
@@ -460,7 +461,7 @@ class LandingPublishService:
         }
 
     def _build_landing_target_analytics(
-        self, root: Goal, serialized_tree: JsonDict
+        self, root: Goal, serialized_tree: JsonDict, goals_by_id: dict[str, Goal]
     ) -> dict[str, JsonDict]:
         """Publish bounded target analytics for the read-only public demo."""
         targets = []
@@ -493,7 +494,12 @@ class LandingPublishService:
                 }
                 continue
             payload, error, _ = target_service.get_target_analytics(
-                root.id, target_id, root.owner_id, since="all"
+                root.id,
+                target_id,
+                root.owner_id,
+                since="all",
+                validated_root=root,
+                preloaded_goals_by_id=goals_by_id,
             )
             if error or not payload:
                 continue
@@ -730,7 +736,13 @@ class LandingPublishService:
             }
         return result
 
-    def _enrich_landing_tree_with_history(self, serialized_root: JsonDict, root: Goal) -> None:
+    def _enrich_landing_tree_with_history(
+        self,
+        serialized_root: JsonDict,
+        root: Goal,
+        goals_by_id: dict[str, Goal],
+        effective_levels_by_name: dict[str, GoalLevel],
+    ) -> None:
         """Embed bounded per-goal timeline + notes into the serialized snapshot tree.
 
         Publishing is a rare manual admin action and example fractals are small, so
@@ -747,7 +759,14 @@ class LandingPublishService:
             attributes = node.get("attributes") or {}
             goal_id = attributes.get("id") or node.get("id")
             if goal_id:
-                activities, activities_error, _ = activity_association_service.get_goal_activities(root.id, goal_id, owner_id)
+                goal = goals_by_id.get(goal_id)
+                activities, activities_error, _ = activity_association_service.get_goal_activities(
+                    root.id,
+                    goal_id,
+                    owner_id,
+                    validated_root=root,
+                    goals_by_id=goals_by_id,
+                )
                 if activities_error is None and isinstance(activities, list):
                     attributes["associated_activities"] = activities
                     attributes["associated_activity_ids"] = [
@@ -756,7 +775,13 @@ class LandingPublishService:
                         if activity.get("id")
                     ]
 
-                groups, groups_error, _ = activity_association_service.get_goal_activity_groups(root.id, goal_id, owner_id)
+                groups, groups_error, _ = activity_association_service.get_goal_activity_groups(
+                    root.id,
+                    goal_id,
+                    owner_id,
+                    validated_root=root,
+                    goals_by_id=goals_by_id,
+                )
                 if groups_error is None and isinstance(groups, list):
                     attributes["associated_activity_groups"] = groups
                     attributes["associated_activity_group_ids"] = [
@@ -771,6 +796,9 @@ class LandingPublishService:
                     owner_id,
                     include_children=False,
                     limit=LANDING_EXAMPLE_TIMELINE_LIMIT,
+                    validated_root=root,
+                    preloaded_goals_by_id=goals_by_id,
+                    preloaded_levels_by_name=effective_levels_by_name,
                 )
                 attributes["timeline_events"] = (
                     [
@@ -779,11 +807,25 @@ class LandingPublishService:
                     ] if timeline_result and not timeline_error else []
                 )
 
+                direct_activity_ids = {
+                    activity.id
+                    for activity in (getattr(goal, "associated_activities", None) or [])
+                    if not activity.deleted_at
+                }
+                for group in (getattr(goal, "associated_activity_groups", None) or []):
+                    direct_activity_ids.update(
+                        activity.id
+                        for activity in (group.activities or [])
+                        if not activity.deleted_at
+                    )
                 notes_result, notes_error, _ = note_service.get_goal_notes(
                     root.id,
                     goal_id,
                     owner_id,
                     include_descendants=False,
+                    validated_root=root,
+                    preloaded_goal=goal,
+                    preloaded_activity_definition_ids=list(direct_activity_ids),
                 )
                 notes = notes_result if notes_result and not notes_error else []
                 attributes["notes"] = notes[:LANDING_EXAMPLE_NOTES_LIMIT]
@@ -1230,6 +1272,7 @@ class LandingPublishService:
         }
 
     def publish_landing_examples(self) -> ServiceResult[JsonDict]:
+        publish_started = perf_counter()
         examples = self._normalize_landing_example_settings(
             self._get_app_setting_value(LANDING_EXAMPLE_SETTINGS_KEY, {"examples": []}).get("examples", [])
         )
@@ -1240,13 +1283,18 @@ class LandingPublishService:
         published_examples = []
         showcase_warnings: list[str] = []
         for item in examples:
-            goals_by_id = load_fractal_goals_for_serialization(self.db_session, item["root_id"])
+            example_started = perf_counter()
+            goals_by_id = load_fractal_goals_for_serialization(
+                self.db_session, item["root_id"], include_group_activities=True,
+            )
             root = goals_by_id.get(item["root_id"])
             if not root:
                 return None, "Landing example root not found", 404
             effective_levels_by_name = self._load_effective_landing_levels(root.owner_id, root.id)
             serialized_tree = self._serialize_public_goal_tree(root, effective_levels_by_name)
-            self._enrich_landing_tree_with_history(serialized_tree, root)
+            self._enrich_landing_tree_with_history(
+                serialized_tree, root, goals_by_id, effective_levels_by_name,
+            )
             flowtree_data = self._build_landing_flowtree_data(root, serialized_tree)
             resolved_showcase, warnings = self._resolve_landing_showcase(root, item.get("showcase"))
             showcase_warnings.extend(f"{item['label']}: {warning}" for warning in warnings)
@@ -1257,7 +1305,9 @@ class LandingPublishService:
             item["showcase"] = resolved_showcase
             item["landing_content"] = resolved_content
             showcase_data = self._build_landing_showcase_data(root, resolved_showcase)
-            target_analytics = self._build_landing_target_analytics(root, serialized_tree)
+            target_analytics = self._build_landing_target_analytics(
+                root, serialized_tree, goals_by_id,
+            )
             published_examples.append({
                 "root_id": root.id,
                 "label": item["label"],
@@ -1280,6 +1330,12 @@ class LandingPublishService:
                 "target_analytics": target_analytics,
                 "session_templates": showcase_data["session_templates"],
             })
+            logger.info(
+                "Landing publish example built root_id=%s goals=%s duration_ms=%s",
+                root.id,
+                len(goals_by_id),
+                round((perf_counter() - example_started) * 1000),
+            )
 
         cache = {
             "published_at": format_utc(utc_now()),
@@ -1291,13 +1347,34 @@ class LandingPublishService:
         self._set_app_setting_value(LANDING_EXAMPLE_SETTINGS_KEY, {"examples": examples})
         self._set_app_setting_value(LANDING_EXAMPLE_CACHE_KEY, cache)
         self.db_session.commit()
+        committed_ms = round((perf_counter() - publish_started) * 1000)
+        delivery_started = perf_counter()
+        serialized_snapshot = self._serialized_landing_snapshot(cache)
+        static_snapshot = self._write_landing_static_snapshot(
+            cache, payload=serialized_snapshot,
+        )
+        cache_warm = self._warm_landing_cache()
+        delivery_ms = round((perf_counter() - delivery_started) * 1000)
+        total_ms = round((perf_counter() - publish_started) * 1000)
+        logger.info(
+            "Landing publish completed examples=%s snapshot_bytes=%s committed_ms=%s "
+            "delivery_ms=%s total_ms=%s static_snapshot=%s cache_warm=%s",
+            len(published_examples),
+            len(serialized_snapshot.encode("utf-8")),
+            committed_ms,
+            delivery_ms,
+            total_ms,
+            static_snapshot,
+            cache_warm,
+        )
         return {
             "published_at": cache["published_at"],
             "published_example_count": len(published_examples),
             "examples": examples,
             "showcase_warnings": showcase_warnings,
-            "static_snapshot": self._write_landing_static_snapshot(cache),
-            "cache_warm": self._warm_landing_cache(),
+            "static_snapshot": static_snapshot,
+            "cache_warm": cache_warm,
+            "publish_duration_ms": total_ms,
         }, None, 200
 
     @staticmethod
@@ -1305,14 +1382,16 @@ class LandingPublishService:
         return json.dumps(cache, ensure_ascii=False, separators=(",", ":"))
 
     @classmethod
-    def _write_landing_static_snapshot(cls, cache: JsonDict) -> str:
+    def _write_landing_static_snapshot(
+        cls, cache: JsonDict, *, payload: str | None = None,
+    ) -> str:
         """Materialize the published snapshot as a static artifact when configured.
 
         This is intentionally best-effort and post-commit: the database cache
         remains the source of truth, while a static file/object lets the landing
         page hydrate before React has to wait on the API path.
         """
-        payload = cls._serialized_landing_snapshot(cache)
+        payload = payload or cls._serialized_landing_snapshot(cache)
 
         bucket_name = config.LANDING_EXAMPLES_STATIC_GCS_BUCKET
         if bucket_name:
@@ -1320,7 +1399,12 @@ class LandingPublishService:
                 bucket = storage.Client().bucket(bucket_name)
                 blob = bucket.blob(config.LANDING_EXAMPLES_STATIC_GCS_BLOB or "landing-examples.json")
                 blob.cache_control = "public, max-age=300, stale-while-revalidate=86400"
-                blob.upload_from_string(payload, content_type="application/json")
+                blob.upload_from_string(
+                    payload,
+                    content_type="application/json",
+                    timeout=config.LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS,
+                    retry=None,
+                )
                 return "ok"
             except Exception:
                 logger.warning("Landing static GCS snapshot write failed", exc_info=True)
@@ -1371,7 +1455,7 @@ class LandingPublishService:
             response = requests.get(
                 warm_url,
                 headers={"X-Landing-Cache-Warm": "1"},
-                timeout=1.5,
+                timeout=config.LANDING_CACHE_WARM_TIMEOUT_SECONDS,
             )
             response.raise_for_status()
             return "ok"

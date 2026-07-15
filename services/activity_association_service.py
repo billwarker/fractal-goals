@@ -162,16 +162,22 @@ class ActivityAssociationService:
             "group_ids": list(valid_group_ids),
         }, None, 200
 
-    def get_goal_activities(self, root_id, goal_id, current_user_id) -> ServiceResult[JsonList]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
+    def get_goal_activities(
+        self, root_id, goal_id, current_user_id, *, validated_root=None, goals_by_id=None,
+    ) -> ServiceResult[JsonList]:
+        if validated_root is not None and (
+            validated_root.id != root_id or validated_root.owner_id != current_user_id
+        ):
+            return None, "Fractal not found or access denied", 404
+        if validated_root is None:
+            _, error = self._validate_owned_root(root_id, current_user_id)
+            if error:
+                return None, *error
 
-        goals_by_id = load_fractal_goals_for_serialization(
-            self.db_session,
-            root_id,
-            include_group_activities=True,
-        )
+        if goals_by_id is None:
+            goals_by_id = load_fractal_goals_for_serialization(
+                self.db_session, root_id, include_group_activities=True,
+            )
         goal = goals_by_id.get(goal_id)
         if not goal:
             return None, "Goal not found", 404
@@ -279,12 +285,21 @@ class ActivityAssociationService:
 
         return list(activities.values()), None, 200
 
-    def get_goal_activity_groups(self, root_id, goal_id, current_user_id) -> ServiceResult[JsonList]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
+    def get_goal_activity_groups(
+        self, root_id, goal_id, current_user_id, *, validated_root=None, goals_by_id=None,
+    ) -> ServiceResult[JsonList]:
+        if validated_root is not None and (
+            validated_root.id != root_id or validated_root.owner_id != current_user_id
+        ):
+            return None, "Fractal not found or access denied", 404
+        if validated_root is None:
+            _, error = self._validate_owned_root(root_id, current_user_id)
+            if error:
+                return None, *error
 
-        goal = self.db_session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
+        goal = goals_by_id.get(goal_id) if goals_by_id is not None else self.db_session.query(Goal).filter_by(
+            id=goal_id, root_id=root_id,
+        ).first()
         if not goal:
             return None, "Goal not found", 404
 

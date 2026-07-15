@@ -59,6 +59,13 @@ describe('mutationNotify', () => {
         it('uses the fallback message when nothing else is available', () => {
             expect(formatError({}, 'Fallback message')).toBe('Fallback message');
         });
+
+        it('replaces gateway HTML and client timeouts with actionable messages', () => {
+            expect(formatError({ response: { status: 504, data: '<html>Gateway Time-out</html>' } }))
+                .toBe('Publishing took too long at the gateway. The snapshot may still have been saved; refresh before retrying.');
+            expect(formatError({ code: 'ECONNABORTED', message: 'timeout of 205000ms exceeded' }))
+                .toBe('The request timed out. Refresh to check whether it completed before retrying.');
+        });
     });
 
     describe('withNotify', () => {

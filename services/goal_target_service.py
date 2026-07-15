@@ -464,7 +464,10 @@ class GoalTargetService:
             'instances': instances,
         }, None, 200
 
-    def get_target_analytics(self, root_id, target_id, current_user_id, *, since='creation') -> ServiceResult[JsonDict]:
+    def get_target_analytics(
+        self, root_id, target_id, current_user_id, *, since='creation',
+        validated_root=None, preloaded_goals_by_id=None,
+    ) -> ServiceResult[JsonDict]:
         """Assemble a self-contained analytics read model for a single target.
 
         Returns the serialized target, its activity definition, the completed
@@ -476,9 +479,14 @@ class GoalTargetService:
         `since='creation'` (default) bounds instances to the target's effective
         start; `since='all'` returns the full activity history.
         """
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
+        if validated_root is not None and (
+            validated_root.id != root_id or validated_root.owner_id != current_user_id
+        ):
+            return None, "Fractal not found or access denied", 404
+        if validated_root is None:
+            _, error = self._validate_owned_root(root_id, current_user_id)
+            if error:
+                return None, *error
 
         target = self.db_session.query(Target).options(
             selectinload(Target.metric_conditions).selectinload(TargetMetricCondition.metric),
@@ -490,7 +498,9 @@ class GoalTargetService:
         if not target:
             return None, "Target not found", 404
 
-        goals_by_id = load_fractal_goals_for_serialization(self.db_session, root_id)
+        goals_by_id = preloaded_goals_by_id
+        if goals_by_id is None:
+            goals_by_id = load_fractal_goals_for_serialization(self.db_session, root_id)
         goal = goals_by_id.get(target.goal_id)
         if not goal:
             return None, "Goal not found", 404

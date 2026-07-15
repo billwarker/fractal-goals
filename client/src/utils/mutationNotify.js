@@ -38,6 +38,20 @@ function formatStructuredError(value) {
 }
 
 export function formatError(error, fallbackMessage = 'Unknown error') {
+    const status = Number(error?.response?.status || 0);
+    const responseData = error?.response?.data;
+    if (
+        typeof responseData === 'string'
+        && /<!doctype\s+html|<html[\s>]/i.test(responseData)
+        && status >= 500
+    ) {
+        return status === 504
+            ? 'Publishing took too long at the gateway. The snapshot may still have been saved; refresh before retrying.'
+            : `The server gateway returned an error (${status}). Please retry.`;
+    }
+    if (error?.code === 'ECONNABORTED') {
+        return 'The request timed out. Refresh to check whether it completed before retrying.';
+    }
     return (
         formatStructuredError(error?.response?.data?.error)
         || formatStructuredError(error?.response?.data)

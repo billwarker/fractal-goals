@@ -96,16 +96,30 @@ class GoalTimelineService:
         types=None,
         include_children=True,
         limit=50,
+        validated_root=None,
+        preloaded_goals_by_id=None,
+        preloaded_levels_by_name=None,
     ) -> ServiceResult[JsonDict]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
+        if validated_root is not None and (
+            validated_root.id != root_id or validated_root.owner_id != current_user_id
+        ):
+            return None, "Fractal not found or access denied", 404
+        if validated_root is None:
+            _, error = self._validate_owned_root(root_id, current_user_id)
+            if error:
+                return None, *error
 
-        goals_by_id = load_fractal_goals_for_serialization(self.db_session, root_id)
+        goals_by_id = preloaded_goals_by_id
+        if goals_by_id is None:
+            goals_by_id = load_fractal_goals_for_serialization(self.db_session, root_id)
         goal = goals_by_id.get(goal_id)
         if not goal:
             return None, "Goal not found", 404
-        effective_levels_by_name = self._get_effective_levels_by_name(current_user_id, root_id)
+        effective_levels_by_name = preloaded_levels_by_name
+        if effective_levels_by_name is None:
+            effective_levels_by_name = self._get_effective_levels_by_name(
+                current_user_id, root_id,
+            )
 
         limit = max(1, min(int(limit or 50), 200))
         if types is None:

@@ -342,15 +342,21 @@ class NoteService:
         include_descendants=False,
         include_goal_notes=True,
         include_activity_instance_notes=True,
+        validated_root=None,
+        preloaded_goal=None,
+        preloaded_activity_definition_ids=None,
     ) -> ServiceResult[JsonList]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
+        if validated_root is not None and (
+            validated_root.id != root_id or validated_root.owner_id != current_user_id
+        ):
+            return None, "Fractal not found or access denied", 404
+        if validated_root is None:
+            _, error = self._validate_owned_root(root_id, current_user_id)
+            if error:
+                return None, *error
 
-        goal = self.db_session.query(Goal).filter(
-            Goal.id == goal_id,
-            Goal.root_id == root_id,
-            Goal.deleted_at.is_(None),
+        goal = preloaded_goal or self.db_session.query(Goal).filter(
+            Goal.id == goal_id, Goal.root_id == root_id, Goal.deleted_at.is_(None),
         ).first()
         if not goal:
             return None, "Goal not found", 404
@@ -380,7 +386,11 @@ class NoteService:
                     Note.goal_id.in_(goal_ids),
                 )
             ]
-            activity_definition_ids = self._collect_goal_activity_definition_ids(root_id, goal_ids)
+            activity_definition_ids = (
+                preloaded_activity_definition_ids
+                if preloaded_activity_definition_ids is not None and not include_descendants
+                else self._collect_goal_activity_definition_ids(root_id, goal_ids)
+            )
             if activity_definition_ids:
                 scoped_instance_ids = select(ActivityInstance.id).where(
                     ActivityInstance.root_id == root_id,

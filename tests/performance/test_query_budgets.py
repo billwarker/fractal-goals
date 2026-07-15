@@ -409,11 +409,11 @@ def test_publish_landing_examples_query_budget(client, query_counter, landing_pu
         content_type="application/json",
     )
 
-    # The 1200ms budget predates the schema v8 publish read model (showcase,
-    # sessions, analytics instances); publish now measures ~1.4-1.7s locally.
-    # Keep the budget loose enough to avoid flakes while catching blowups.
-    assert_response_budget(response, max_bytes=100_000, max_ms=2_500, elapsed_ms=elapsed_ms)
-    assert query_counter["total"] <= 80
+    # Reusing the validated/preloaded goal graph across enrichment phases keeps
+    # this production-shaped 17-goal snapshot below one second locally while
+    # retaining CI headroom and a strict regression ceiling.
+    assert_response_budget(response, max_bytes=140_000, max_ms=1_800, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 65
 
 
 @pytest.mark.integration

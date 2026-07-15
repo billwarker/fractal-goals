@@ -16,7 +16,7 @@ export const adminApi = {
     publishLandingExamples: (data = {}) => axios.post(
         `${API_BASE}/admin/landing-examples/publish`,
         data,
-        { timeout: 90000 }
+        { timeout: 205000 }
     ),
     createUser: (data) => axios.post(`${API_BASE}/admin/users`, data),
     updateUser: (userId, data) => axios.patch(`${API_BASE}/admin/users/${userId}`, data),
