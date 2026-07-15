@@ -505,8 +505,11 @@ describe('Landing', () => {
             {
                 id: 'session-2',
                 name: 'Featured Older Session',
-                attributes: { updated_at: '2026-01-02T10:00:00Z', session_data: { sections: [] } },
-                activity_instances: [],
+                attributes: {
+                    updated_at: '2026-01-02T10:00:00Z',
+                    session_data: { sections: [{ name: 'Work', activity_ids: ['instance-2'] }] },
+                },
+                activity_instances: [{ id: 'instance-2', activity_definition_id: 'activity-2' }],
             },
         ];
         example.activity_definitions = [

@@ -46,7 +46,10 @@ const tree = {
 
 const baseExample = {
     tree,
-    sessions: [{ id: 's1', name: 'Recent' }, { id: 's2', name: 'Older' }],
+    sessions: [
+        { id: 's1', name: 'Recent', activity_instances: [{ id: 'i1' }] },
+        { id: 's2', name: 'Older', activity_instances: [{ id: 'i2' }] },
+    ],
     activityDefinitions: [
         { id: 'activity-1', name: 'Linked', associated_goal_ids: ['short'] },
         { id: 'activity-2', name: 'Unlinked', associated_goal_ids: [] },
@@ -59,6 +62,18 @@ const baseExample = {
 describe('landingFeatureModel v4 fallbacks (showcase null)', () => {
     it('falls back to the first session', () => {
         expect(resolveFeaturedSession(baseExample).id).toBe('s1');
+    });
+
+    it('prefers a substantive session over a newer timer-only record', () => {
+        const withActivities = {
+            ...baseExample,
+            sessions: [
+                { id: 'empty', activity_instances: [] },
+                { id: 'work', activity_instances: [{ id: 'instance-1' }] },
+            ],
+        };
+
+        expect(resolveFeaturedSession(withActivities).id).toBe('work');
     });
 
     it('prefers goal-linked activities', () => {
@@ -114,6 +129,18 @@ describe('landingFeatureModel v6 showcase resolution', () => {
         expect(resolveFeaturedActivity(stale).id).toBe('activity-1');
         expect(resolveFeaturedProgram(stale).program.id).toBe('p1');
         expect(resolveFeaturedAnalyticsViews(stale)).toHaveLength(2);
+    });
+
+    it('ignores an explicitly featured timer-only session when useful work is available', () => {
+        const emptyFeatured = {
+            ...example,
+            sessions: [
+                { id: 's2', activity_instances: [] },
+                { id: 's1', activity_instances: [{ id: 'instance-1' }] },
+            ],
+        };
+
+        expect(resolveFeaturedSession(emptyFeatured).id).toBe('s1');
     });
 });
 

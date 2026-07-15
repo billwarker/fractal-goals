@@ -198,8 +198,13 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange, onContentChan
                             >
                                 <option value="">Auto (most recent)</option>
                                 {(options?.sessions || []).map((session) => (
-                                    <option value={session.id} key={session.id}>
+                                    <option
+                                        value={session.id}
+                                        key={session.id}
+                                        disabled={session.activity_instance_count === 0}
+                                    >
                                         {session.name} — {session.session_start ? new Date(session.session_start).toLocaleDateString() : 'undated'}
+                                        {session.activity_instance_count === 0 ? ' — no activities' : ''}
                                     </option>
                                 ))}
                             </select>

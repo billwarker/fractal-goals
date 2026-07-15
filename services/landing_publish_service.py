@@ -368,6 +368,7 @@ class LandingPublishService:
                     "session_start": session.get("session_start"),
                     "total_duration_seconds": session.get("total_duration_seconds"),
                     "completed": session.get("completed"),
+                    "activity_instance_count": len(session.get("activity_instances") or []),
                 }
                 for session in sessions
             ],
@@ -823,13 +824,18 @@ class LandingPublishService:
         warnings: list[str] = []
 
         if resolved["session_id"]:
-            session_exists = self.db_session.query(Session.id).filter(
+            session = self.db_session.query(Session).options(
+                selectinload(Session.activity_instances),
+            ).filter(
                 Session.id == resolved["session_id"],
                 Session.root_id == root.id,
                 Session.deleted_at.is_(None),
             ).first()
-            if not session_exists:
+            if not session:
                 warnings.append("Featured session no longer exists and was skipped")
+                resolved["session_id"] = None
+            elif not any(instance.deleted_at is None for instance in (session.activity_instances or [])):
+                warnings.append("Featured session has no activities and was skipped")
                 resolved["session_id"] = None
 
         if resolved["activity_ids"]:

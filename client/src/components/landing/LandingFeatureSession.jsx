@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { QueuedQuickSessionProvider } from '../../contexts/ActiveSessionContext';
 import useSessionSidePaneViewModel from '../../hooks/useSessionSidePaneViewModel';
 import { flattenGoalTree } from '../../utils/goalNodeModel';
+import { normalizeSectionActivityIds } from '../../utils/sessionSection';
 import SessionSection from '../sessionDetail/SessionSection';
 import SessionDetailPaneLayout from '../sessionDetail/SessionDetailPaneLayout';
 import sessionDetailStyles from '../../pages/SessionDetail.module.css';
@@ -20,10 +21,11 @@ function ensureAttributes(session) {
     };
 }
 
-function buildSections(session) {
+export function buildSections(session) {
     const sessionData = session?.attributes?.session_data || {};
-    const sections = Array.isArray(sessionData.sections) ? sessionData.sections : [];
     const instances = Array.isArray(session?.activity_instances) ? session.activity_instances : [];
+    const normalizedSessionData = normalizeSectionActivityIds(sessionData, instances);
+    const sections = Array.isArray(normalizedSessionData?.sections) ? normalizedSessionData.sections : [];
 
     if (sections.length > 0) {
         return sections.map((section, index) => ({

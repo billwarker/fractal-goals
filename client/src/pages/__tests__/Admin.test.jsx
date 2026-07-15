@@ -365,7 +365,20 @@ describe('Admin', () => {
                         targets: [{ id: 'target-1', name: '120 BPM clean changes' }],
                     },
                 ],
-                sessions: [],
+                sessions: [
+                    {
+                        id: 'session-empty',
+                        name: 'Timer only',
+                        session_start: '2026-06-09T12:00:00Z',
+                        activity_instance_count: 0,
+                    },
+                    {
+                        id: 'session-work',
+                        name: 'Practice session',
+                        session_start: '2026-06-08T12:00:00Z',
+                        activity_instance_count: 3,
+                    },
+                ],
                 activities: [],
                 programs: [],
                 analytics_views: [],
@@ -635,6 +648,10 @@ describe('Admin', () => {
         await waitFor(() => expect(getLandingExampleOptions).toHaveBeenCalledWith('root-1'));
         expect((await screen.findAllByRole('tab')).map((tab) => tab.textContent))
             .toEqual(['Goals', 'Sessions', 'Activities', 'Programs', 'Analytics']);
+        fireEvent.click(screen.getByRole('tab', { name: 'Sessions' }));
+        expect(screen.getByRole('option', { name: /Timer only.*no activities/ })).toBeDisabled();
+        expect(screen.getByRole('option', { name: /Practice session/ })).toBeEnabled();
+        fireEvent.click(screen.getByRole('tab', { name: 'Goals' }));
         fireEvent.change(screen.getByLabelText('Example goal for Break it down'), {
             target: { value: 'goal-1' },
         });

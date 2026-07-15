@@ -11,9 +11,11 @@ export function resolveFeaturedSession(example) {
     const featuredId = getShowcase(example).session_id;
     if (featuredId) {
         const featured = sessions.find((session) => String(session.id) === String(featuredId));
-        if (featured) return featured;
+        if ((featured?.activity_instances || []).length > 0) return featured;
     }
-    return sessions[0] || null;
+    return sessions.find((session) => (session?.activity_instances || []).length > 0)
+        || sessions[0]
+        || null;
 }
 
 const activityHasGoalLinks = (activity, goalLinkedActivityIds) => (

@@ -1098,6 +1098,7 @@ def test_landing_example_options_endpoint(admin_client, authed_client, db_sessio
     assert options['root_id'] == root.id
     assert [session['name'] for session in options['sessions']] == ['Public Demo Session']
     assert options['sessions'][0]['total_duration_seconds'] == 2700
+    assert options['sessions'][0]['activity_instance_count'] == 1
     activity = next(item for item in options['activities'] if item['name'] == 'Public Demo Activity')
     assert activity['associated_goal_count'] == 1
     assert activity['group_id'] == group.id
@@ -1116,6 +1117,43 @@ def test_landing_example_options_endpoint(admin_client, authed_client, db_sessio
     assert authed_client.get(
         f'/api/admin/landing-examples/options?root_id={root.id}'
     ).status_code == 403
+
+
+@pytest.mark.integration
+def test_publish_drops_featured_session_without_activities(
+    admin_client,
+    client,
+    db_session,
+    admin_landing_fractal,
+):
+    empty_session = Session(
+        id=str(uuid.uuid4()),
+        root_id=admin_landing_fractal.id,
+        name='Timer-only session',
+        session_start=datetime(2026, 2, 1, 9, 0),
+        session_end=datetime(2026, 2, 1, 10, 0),
+        total_duration_seconds=3600,
+        completed=True,
+        attributes={'session_data': {'sections': [{'name': 'Exercises', 'activity_ids': []}]}},
+    )
+    db_session.add(empty_session)
+    db_session.commit()
+
+    publish_response = admin_client.post(
+        '/api/admin/landing-examples/publish',
+        data=_landing_example_payload(
+            admin_landing_fractal.id,
+            {'session_id': empty_session.id},
+        ),
+        content_type='application/json',
+    )
+
+    assert publish_response.status_code == 200
+    warnings = publish_response.get_json()['showcase_warnings']
+    assert len(warnings) == 1
+    assert warnings[0].endswith('Featured session has no activities and was skipped')
+    public_example = client.get('/api/public/landing-examples').get_json()['examples'][0]
+    assert public_example['showcase']['session_id'] is None
 
 
 @pytest.mark.integration
