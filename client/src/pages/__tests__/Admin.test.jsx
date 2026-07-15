@@ -633,7 +633,7 @@ describe('Admin', () => {
         expect(screen.getByDisplayValue('Guitar practice')).toBeInTheDocument();
         expect(screen.getByText('Chinese language tracker')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
-        expect(screen.getByText(/Publishing needs 4 more selections/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Landing page content/ })).toHaveTextContent('4 issues blocking publish');
         fireEvent.click(screen.getByRole('button', { name: /Landing page content/ }));
         await waitFor(() => expect(getLandingExampleOptions).toHaveBeenCalledWith('root-1'));
         expect((await screen.findAllByRole('tab')).map((tab) => tab.textContent))
@@ -650,7 +650,7 @@ describe('Admin', () => {
         fireEvent.change(screen.getByLabelText('Example target for Set measurable targets'), {
             target: { value: 'target-1' },
         });
-        expect(screen.getByText('Ready to publish 1 example.')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Landing page content/ })).toHaveTextContent('0 issues blocking publish');
         expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
         fireEvent.click(screen.getByRole('button', { name: 'Add' }));
         expect(screen.getByRole('status')).toHaveTextContent(/Chinese language tracker:.*select an example goal/);
@@ -681,7 +681,7 @@ describe('Admin', () => {
             ['goal-2', null],
             ['goal-3', 'target-1'],
         ]);
-        fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[1]);
+        fireEvent.click(screen.getByRole('button', { name: 'Remove Chinese language tracker' }));
         fireEvent.click(screen.getByText('Publish'));
         await waitFor(() => expect(publishLandingExamples).toHaveBeenCalled());
         const publishedExamples = publishLandingExamples.mock.calls.at(-1)[0].examples;

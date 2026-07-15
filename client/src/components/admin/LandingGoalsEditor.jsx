@@ -42,6 +42,11 @@ export const getLandingContentPublishIssues = (content) => {
     ];
 };
 
+export const getLandingExamplePublishIssues = (example) => [
+    ...(!String(example?.label || '').trim() ? ['Add a public label'] : []),
+    ...getLandingContentPublishIssues(example?.landing_content),
+];
+
 export default function LandingGoalsEditor({ content, onChange, options, styles }) {
     const draft = normalizeLandingContent(content);
     const update = (key, patch) => onChange({ goals: { bullets: draft.goals.bullets.map((bullet) => (

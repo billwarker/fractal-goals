@@ -6,11 +6,12 @@ import {
     DEFAULT_ACCOUNT_TIER,
 } from '../constants/accountTiers';
 import BetaSignupsPanel from '../components/admin/BetaSignupsPanel';
+import LandingExampleOrderControls from '../components/admin/LandingExampleOrderControls';
 import TierQuotasPanel from '../components/admin/TierQuotasPanel';
 import UsagePanel from '../components/admin/UsagePanel';
 import LandingGoalsEditor, {
     getLandingContentDraftIssues,
-    getLandingContentPublishIssues,
+    getLandingExamplePublishIssues,
     LANDING_CONTENT_TABS,
     normalizeLandingContent,
 } from '../components/admin/LandingGoalsEditor';
@@ -136,6 +137,7 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange, onContentChan
     const [expanded, setExpanded] = useState(false);
     const [activeTab, setActiveTab] = useState('goals');
     const showcase = normalizeShowcase(example.showcase);
+    const publishIssueCount = getLandingExamplePublishIssues(example).length;
     const optionsQuery = useQuery({
         queryKey: ['admin', 'landing-example-options', example.root_id],
         queryFn: async () => (await adminApi.getLandingExampleOptions(example.root_id)).data,
@@ -157,12 +159,6 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange, onContentChan
         update({ analytics_view_ids: next });
     };
     const selectedProgram = (options?.programs || []).find((program) => program.id === showcase.program_id) || null;
-    const summaryBits = [
-        showcase.session_id ? 'session' : null,
-        showcase.activity_ids.length ? `${showcase.activity_ids.length} activities` : null,
-        showcase.program_id ? 'program window' : null,
-        showcase.analytics_view_ids.length ? `${showcase.analytics_view_ids.length} analytics views` : null,
-    ].filter(Boolean);
     return (
         <div className={styles.landingShowcaseEditor}>
             <button
@@ -172,7 +168,10 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange, onContentChan
                 aria-expanded={expanded}
             >
                 {expanded ? '▾' : '▸'} Landing page content
-                <span>{summaryBits.length ? summaryBits.join(', ') : 'Goals copy + example selections'}</span>
+                <span className={publishIssueCount === 0 ? styles.landingShowcaseReady : styles.landingShowcaseIssues}
+                    aria-live="polite">
+                    {publishIssueCount} {publishIssueCount === 1 ? 'issue' : 'issues'} blocking publish
+                </span>
             </button>
             {expanded && (
                 optionsQuery.isLoading ? (
@@ -420,10 +419,7 @@ function LandingExamplesPanel() {
     const publishIssues = sortedDraftExamples.map((example) => ({
         rootId: example.root_id,
         label: example.label.trim() || eligibleFractals.find((item) => item.root_id === example.root_id)?.name || example.root_id,
-        issues: [
-            ...(!example.label.trim() ? ['Add a public label'] : []),
-            ...getLandingContentPublishIssues(example.landing_content),
-        ],
+        issues: getLandingExamplePublishIssues(example),
     })).filter((example) => example.issues.length > 0);
     const canSave = draftIssues.length === 0;
     const canPublish = sortedDraftExamples.length > 0 && publishIssues.length === 0;
@@ -463,10 +459,15 @@ function LandingExamplesPanel() {
                                 const fractal = eligibleFractals.find((item) => item.root_id === example.root_id);
                                 return (
                                     <div className={styles.landingExampleItem} key={example.root_id}>
-                                        <div>
-                                            <strong>{fractal?.name || 'Missing fractal'}</strong>
-                                            <span>{example.root_id}</span>
-                                        </div>
+                                        <LandingExampleOrderControls
+                                            example={example}
+                                            index={index}
+                                            total={sortedDraftExamples.length}
+                                            name={fractal?.name || 'Missing fractal'}
+                                            onMove={moveExample}
+                                            onRemove={removeExample}
+                                            styles={styles}
+                                        />
                                         <label>
                                             <span>Public label</span>
                                             <input
@@ -474,23 +475,6 @@ function LandingExamplesPanel() {
                                                 onChange={(event) => updateLabel(example.root_id, event.target.value)}
                                             />
                                         </label>
-                                        <div className={styles.landingExampleActions}>
-                                            <button
-                                                onClick={() => moveExample(example.root_id, -1)}
-                                                disabled={index === 0}
-                                                aria-label={`Move ${example.label} up`}
-                                            >
-                                                Up
-                                            </button>
-                                            <button
-                                                onClick={() => moveExample(example.root_id, 1)}
-                                                disabled={index === sortedDraftExamples.length - 1}
-                                                aria-label={`Move ${example.label} down`}
-                                            >
-                                                Down
-                                            </button>
-                                            <button onClick={() => removeExample(example.root_id)}>Remove</button>
-                                        </div>
                                         <LandingExampleShowcaseEditor
                                             example={example}
                                             onShowcaseChange={updateShowcase}

@@ -56,7 +56,6 @@
 .storageEditor button,
 .userCreator button,
 .landingExamplesFooter button,
-.landingExampleActions button,
 .landingFractalOption button {
     border: 1px solid var(--color-border);
     background: var(--color-bg-card-alt);
@@ -163,7 +162,6 @@
 .storageEditor button:disabled,
 .userCreator button:disabled,
 .landingExamplesFooter button:disabled,
-.landingExampleActions button:disabled,
 .landingFractalOption button:disabled {
     cursor: not-allowed;
     opacity: 0.45;
@@ -505,6 +503,14 @@
     text-transform: none;
 }
 
+.landingShowcaseToggle .landingShowcaseIssues {
+    color: var(--color-brand-warning, #f59f4d);
+}
+
+.landingShowcaseToggle .landingShowcaseReady {
+    color: var(--color-brand-success);
+}
+
 .landingShowcaseFields {
     display: grid;
     gap: 14px;
@@ -662,16 +668,59 @@
     gap: 4px;
 }
 
+.landingExampleItem > .landingExampleHeader {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.landingExampleIndex {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.landingExampleIdentity {
+    display: grid;
+    min-width: 0;
+    gap: 4px;
+}
+
+.landingExampleIdentity strong,
+.landingExampleIdentity span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .landingExampleItem label {
     display: grid;
     gap: 6px;
 }
 
-.landingExampleActions,
 .landingExamplesFooter {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+}
+
+.landingExampleActions {
+    display: flex;
+    gap: 4px;
+}
+
+.landingExampleRemoveButton {
+    margin-left: 2px;
 }
 
 .landingExamplesFooter {
