@@ -642,7 +642,7 @@ function Landing() {
     }, [activeSectionId]);
 
     return (
-        <main ref={mainRef} className={styles.page} tabIndex={-1} onWheel={handleLandingWheel}>
+        <main ref={mainRef} className={styles.page} data-landing-ready-surface tabIndex={-1} onWheel={handleLandingWheel}>
             <header className={styles.header}>
                 <a className={styles.brand} href="/">
                     <span className={styles.brandMark}>

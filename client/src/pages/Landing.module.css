@@ -2,6 +2,7 @@
     --landing-page-x-padding: clamp(16px, 4vw, 56px);
     --landing-section-max-width: 1560px;
     --landing-readable-max-width: 1120px;
+    --landing-css-ready: 1;
 
     min-height: 100%;
     color: var(--color-text-primary);

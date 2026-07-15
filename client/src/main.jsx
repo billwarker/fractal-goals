@@ -2,6 +2,7 @@ import { StrictMode, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient } from '@tanstack/react-query';
 import { isPublicLandingLocation } from './utils/marketingHost';
+import { dismissLandingBootShell } from './utils/landingBootHandoff';
 import { maybePrefetchLandingExamples } from './utils/landingPrefetch';
 import './index.css';
 
@@ -27,6 +28,7 @@ const loadApplication = isPublicLanding
     : import('./AuthenticatedRoot');
 
 const rootElement = document.getElementById('root');
+if (!isPublicLanding) dismissLandingBootShell();
 const root = createRoot(rootElement);
 
 loadApplication
@@ -39,6 +41,7 @@ loadApplication
     })
     .catch((error) => {
         console.error('Application bootstrap failed:', error);
+        dismissLandingBootShell();
         rootElement.innerHTML = `
             <main class="boot-error" role="alert">
                 <h1>Unable to load Fractal Goals</h1>

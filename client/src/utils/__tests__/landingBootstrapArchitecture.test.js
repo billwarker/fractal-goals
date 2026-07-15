@@ -23,9 +23,12 @@ describe('landing bootstrap architecture', () => {
         const landingCss = fs.readFileSync(path.join(process.cwd(), 'src/pages/Landing.module.css'), 'utf8');
 
         expect(html).toContain('data-entry-surface');
-        expect(html).toContain('class="landing-boot-shell"');
+        expect(html).toContain('id="landing-boot-shell" class="landing-boot-shell"');
         expect(html).toContain('aria-busy="true"');
+        expect(html).toMatch(/<main id="landing-boot-shell"[\s\S]*?<\/main>\s*<div id="root"><\/div>/);
+        expect(html).toMatch(/\.landing-boot-shell[\s\S]*?position: fixed/);
         expect(html).toMatch(/\.landing-boot-shell[\s\S]*?background-image:[\s\S]*?linear-gradient/);
+        expect(landingCss).toContain('--landing-css-ready: 1');
         expect(landingCss).toMatch(/\.page[\s\S]*?background-image:[\s\S]*?linear-gradient/);
         expect(html).toContain(landingContent.hero.title);
         expect(html).toContain(landingContent.hero.body);

@@ -46,9 +46,13 @@
   <style>
     .landing-boot-shell { display: none; }
     [data-entry-surface="landing"] .landing-boot-shell {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
       min-height: 100vh;
       box-sizing: border-box;
       display: block;
+      overflow: auto;
       padding: 20px clamp(16px, 4vw, 56px) 56px;
       background-color: #10131a;
       background-image:
@@ -188,8 +192,7 @@
 </head>
 
 <body>
-  <div id="root">
-    <main class="landing-boot-shell" aria-label="Loading Fractal Goals" aria-busy="true">
+  <main id="landing-boot-shell" class="landing-boot-shell" aria-label="Loading Fractal Goals" aria-busy="true">
       <header class="landing-boot-header">
         <span class="landing-boot-brand">
           <svg class="landing-boot-mark" viewBox="0 0 100 100" aria-hidden="true">
@@ -210,8 +213,8 @@
           Want to achieve big goals? Start by making them smaller. Fractal Goals breaks any ambition into a tree of smaller goals, lets you build your own programs toward them, and logs every session, activity, and metric - so all your training, across every discipline, lives in one connected system instead of five scattered apps.
         </div>
       </section>
-    </main>
-  </div>
+  </main>
+  <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 
