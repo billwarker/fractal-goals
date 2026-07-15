@@ -1,0 +1,24 @@
+displayName: Landing snapshot publication failed
+documentation:
+  content: >-
+    A landing snapshot could not be delivered, or database commit compensation
+    could not restore the prior artifact. Inspect Cloud Run logs for
+    ops_event=landing.publish_failed before retrying publication.
+  mimeType: text/markdown
+conditions:
+  - displayName: Any landing publication failure
+    conditionThreshold:
+      filter: >-
+        metric.type="logging.googleapis.com/user/landing_publish_failures"
+        AND resource.type="cloud_run_revision"
+      comparison: COMPARISON_GT
+      thresholdValue: 0
+      duration: 0s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_DELTA
+          crossSeriesReducer: REDUCE_SUM
+combiner: OR
+enabled: true
+alertStrategy:
+  autoClose: 604800s

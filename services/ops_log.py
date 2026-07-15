@@ -15,6 +15,7 @@ Grep contract (stable event names):
 - ``quota.denied``
 - ``http.rate_limited``
 - ``http.server_error``
+- ``landing.publish_delivered`` / ``landing.publish_failed``
 
 Values are sanitized: never log secrets, passwords, tokens, or email bodies.
 Prefer ``user_id`` over email except operator-facing invite/beta events where

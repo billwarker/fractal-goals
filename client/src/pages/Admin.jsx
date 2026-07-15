@@ -1,13 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import {
-    ACCOUNT_TIERS,
-    DEFAULT_ACCOUNT_TIER,
-} from '../constants/accountTiers';
+import { ACCOUNT_TIERS, DEFAULT_ACCOUNT_TIER } from '../constants/accountTiers';
 import BetaSignupsPanel from '../components/admin/BetaSignupsPanel';
 import LandingActivitySpotlightPicker from '../components/admin/LandingActivitySpotlightPicker';
 import LandingExampleOrderControls from '../components/admin/LandingExampleOrderControls';
+import { LandingPublicationSummary, LandingPublicDataNotice } from '../components/admin/LandingPublicationStatus';
 import TierQuotasPanel from '../components/admin/TierQuotasPanel';
 import UsagePanel from '../components/admin/UsagePanel';
 import LandingGoalsEditor, {
@@ -372,15 +370,20 @@ function LandingExamplesPanel() {
                 examples: resolvedExamples,
                 published_at: res.data.published_at,
                 published_example_count: res.data.published_example_count,
+                delivery: {
+                    revision: res.data.revision,
+                    status: res.data.static_snapshot === 'ok' ? 'delivered' : 'database_only',
+                    published_at: res.data.published_at,
+                    snapshot_bytes: res.data.snapshot_bytes,
+                    compressed_snapshot_bytes: res.data.compressed_snapshot_bytes,
+                },
             }));
-            notify.success('Landing examples published');
+            notify.success(
+                res.data.static_snapshot === 'ok'
+                    ? 'Landing examples published and delivered to the static site'
+                    : 'Landing examples published to the API cache',
+            );
             (res.data.showcase_warnings || []).forEach((warning) => notify.warning(warning));
-            if (res.data.static_snapshot === 'failed') {
-                notify.error('Published, but writing the static landing snapshot failed; the API fallback is still live.');
-            }
-            if (res.data.cache_warm === 'failed') {
-                notify.error('Published, but warming the landing edge cache failed; it will refresh on its own within ~5 minutes.');
-            }
         },
         onError: (error) => notify.error(`Failed to publish landing examples: ${formatError(error)}`),
     });
@@ -459,11 +462,10 @@ function LandingExamplesPanel() {
                         View landing page
                     </a>
                 </div>
-                <div className={styles.landingExamplesPublishMeta}>
-                    <span>Published</span>
-                    <strong>{formatDate(landingExamplesQuery.data?.published_at)}</strong>
-                    <span>{landingExamplesQuery.data?.published_example_count || 0} examples live</span>
-                </div>
+                <LandingPublicationSummary
+                    publishedAt={landingExamplesQuery.data?.published_at}
+                    publishedCount={landingExamplesQuery.data?.published_example_count}
+                    delivery={landingExamplesQuery.data?.delivery} />
             </div>
             <div className={styles.landingExamplesGrid}>
                 <div className={styles.landingExamplesPanel}>
@@ -507,6 +509,7 @@ function LandingExamplesPanel() {
                         </div>
                     )}
                     <div className={styles.landingExamplesFooter}>
+                        <LandingPublicDataNotice />
                         <div className={styles.landingPublishReadiness} role="status" aria-live="polite">
                             {sortedDraftExamples.length === 0 ? (
                                 <span>Select at least one fractal before publishing.</span>

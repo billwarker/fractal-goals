@@ -12,8 +12,13 @@ def test_public_landing_examples_empty_when_unpublished(client):
     response = client.get('/api/public/landing-examples')
 
     assert response.status_code == 200
-    assert response.headers['Cache-Control'] == 'public, max-age=300, stale-while-revalidate=86400'
-    assert response.get_json() == {'published_at': None, 'schema_version': None, 'examples': []}
+    assert response.headers['Cache-Control'] == 'no-store'
+    assert response.get_json() == {
+        'published_at': None,
+        'revision': None,
+        'schema_version': None,
+        'examples': [],
+    }
 
 
 def test_create_beta_signup_request(client, db_session):

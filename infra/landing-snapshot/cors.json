@@ -1,0 +1,16 @@
+[
+  {
+    "origin": [
+      "https://fractalgoals.com",
+      "https://www.fractalgoals.com"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": [
+      "Content-Type",
+      "Content-Encoding",
+      "Cache-Control",
+      "ETag"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

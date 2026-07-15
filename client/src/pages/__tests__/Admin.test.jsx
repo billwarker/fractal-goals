@@ -1,4 +1,3 @@
-import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -622,6 +621,7 @@ describe('Admin', () => {
         fireEvent.click(screen.getByText('landing'));
         await waitFor(() => expect(screen.getByText('Landing Examples')).toBeInTheDocument());
         expect(screen.getByRole('link', { name: 'View landing page' })).toHaveAttribute('href', '/landing-preview');
+        expect(screen.getByText(/Publishing makes the selected fractals publicly downloadable/)).toBeInTheDocument();
         expect(screen.getAllByText('Guitar practice tracker').length).toBeGreaterThan(0);
         expect(screen.getByDisplayValue('Guitar practice')).toBeInTheDocument();
         expect(screen.getByText('Chinese language tracker')).toBeInTheDocument();

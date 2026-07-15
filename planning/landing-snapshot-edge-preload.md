@@ -1,5 +1,9 @@
 # Landing Examples: Publish-Time Pre-Positioning (Option 3)
 
+> Historical design note. Superseded by the revisioned GCS publication contract
+> documented in `index.md` and `infra/landing-snapshot/README.md`; the Nginx
+> proxy-cache/cache-warm implementation described below has been removed.
+
 ## Context
 
 The landing page's example explorer and feature showcase render from `/api/public/landing-examples`, which serves the snapshot that admin "Publish" writes to `app_settings.landing_example_cache` in Postgres. Today the first visitor pays a full waterfall: HTML → download/parse JS bundle → `main.jsx` boot → prefetch fires (`client/src/utils/landingPrefetch.js`) → Nginx → Flask → Postgres. Visitors stare at shimmer skeletons during that chain.

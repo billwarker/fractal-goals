@@ -1,0 +1,5 @@
+title: Landing Snapshot Reader
+description: Read the public landing snapshot without granting bucket object listing.
+stage: GA
+includedPermissions:
+  - storage.objects.get

@@ -367,8 +367,61 @@ def landing_publish_budget_dataset(db_session):
         kind="view",
         layout={"version": 3, "layout": {"type": "grid", "panels": []}, "window_states": {}},
     ))
+
+    second_root = Goal(
+        id=str(uuid.uuid4()),
+        name="Landing Budget Root Two",
+        description="Second budget fixture root",
+        owner_id=admin.id,
+        level_id=ultimate_level.id,
+        created_at=datetime.now(timezone.utc),
+    )
+    second_root.root_id = second_root.id
+    db_session.add(second_root)
+    db_session.flush()
+    second_activity = ActivityDefinition(
+        id=str(uuid.uuid4()),
+        root_id=second_root.id,
+        name="Landing Budget Activity Two",
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(second_activity)
+    db_session.flush()
+    for index in range(8):
+        child = Goal(
+            id=str(uuid.uuid4()),
+            name=f"Second Landing Child {index}",
+            description="Second budget child",
+            relevance_statement="Public-safe relevance",
+            parent_id=second_root.id,
+            root_id=second_root.id,
+            owner_id=admin.id,
+            level_id=child_level.id,
+            created_at=datetime.now(timezone.utc) - timedelta(days=index),
+        )
+        db_session.add(child)
+        db_session.flush()
+        db_session.execute(activity_goal_associations.insert().values(
+            activity_id=second_activity.id,
+            goal_id=child.id,
+        ))
+        db_session.add(Target(
+            id=str(uuid.uuid4()),
+            goal_id=child.id,
+            root_id=second_root.id,
+            name=f"Second Landing Target {index}",
+            activity_id=second_activity.id,
+        ))
+        db_session.add(Note(
+            id=str(uuid.uuid4()),
+            root_id=second_root.id,
+            context_type="goal",
+            context_id=child.id,
+            goal_id=child.id,
+            content=f"Second budget note {index}",
+        ))
     db_session.commit()
-    return {"admin": admin, "root": root}
+    return {"admin": admin, "root": root, "second_root": second_root}
 
 
 @pytest.mark.integration
@@ -414,6 +467,41 @@ def test_publish_landing_examples_query_budget(client, query_counter, landing_pu
     # retaining CI headroom and a strict regression ceiling.
     assert_response_budget(response, max_bytes=140_000, max_ms=1_800, elapsed_ms=elapsed_ms)
     assert query_counter["total"] <= 65
+
+
+@pytest.mark.integration
+def test_publish_multiple_landing_examples_total_payload_budget(
+    client,
+    query_counter,
+    landing_publish_budget_dataset,
+):
+    """The aggregate static artifact stays bounded when multiple examples publish together."""
+    admin = landing_publish_budget_dataset["admin"]
+    roots = [
+        landing_publish_budget_dataset["root"],
+        landing_publish_budget_dataset["second_root"],
+    ]
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_request(
+        client,
+        "post",
+        "/api/admin/landing-examples/publish",
+        data=json.dumps({
+            "examples": [
+                {"root_id": root.id, "label": root.name, "sort_order": index}
+                for index, root in enumerate(roots)
+            ],
+        }),
+        headers=auth_headers_for(admin),
+        content_type="application/json",
+    )
+
+    assert_response_budget(response, max_bytes=160_000, max_ms=3_000, elapsed_ms=elapsed_ms)
+    payload = response.get_json()
+    assert payload["published_example_count"] == 2
+    assert payload["snapshot_bytes"] <= 400_000
+    assert payload["compressed_snapshot_bytes"] <= 100_000
+    assert query_counter["total"] <= 115
 
 
 @pytest.mark.integration

@@ -91,6 +91,7 @@ describe('fetchLandingExamples', () => {
         vi.unstubAllGlobals();
         delete window.__fgLandingExamplesPreload;
         delete window.__fgLandingExamplesStaticUrl;
+        delete window.__fgLandingExamplesStaticAttempted;
     });
 
     it('consumes the index.html preload promise once, then uses the API', async () => {
@@ -110,6 +111,17 @@ describe('fetchLandingExamples', () => {
 
         await expect(fetchLandingExamples()).resolves.toEqual({ examples: [] });
         expect(window.__fgLandingExamplesPreload).toBeUndefined();
+        expect(publicApi.getLandingExamples).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry the static origin after the inline preload already attempted it', async () => {
+        window.__fgLandingExamplesStaticUrl = 'https://storage.example/landing-examples.json';
+        window.__fgLandingExamplesStaticAttempted = true;
+        window.__fgLandingExamplesPreload = Promise.reject(new DOMException('timed out', 'AbortError'));
+        window.__fgLandingExamplesPreload.catch(() => {});
+
+        await expect(fetchLandingExamples()).resolves.toEqual({ examples: [] });
+        expect(publicApi.getStaticLandingExamples).not.toHaveBeenCalled();
         expect(publicApi.getLandingExamples).toHaveBeenCalledTimes(1);
     });
 
@@ -139,6 +151,24 @@ describe('fetchLandingExamples', () => {
     it('falls back to the API when the static snapshot is unavailable', async () => {
         window.__fgLandingExamplesStaticUrl = '/landing-examples.json';
         publicApi.getStaticLandingExamples.mockRejectedValueOnce(new Error('static snapshot unavailable'));
+
+        await expect(fetchLandingExamples()).resolves.toEqual({ examples: [] });
+        expect(publicApi.getLandingExamples).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a malformed static snapshot and falls back to the API', async () => {
+        window.__fgLandingExamplesStaticUrl = '/landing-examples.json';
+        publicApi.getStaticLandingExamples.mockResolvedValueOnce({ data: { examples: 'not-an-array' } });
+
+        await expect(fetchLandingExamples()).resolves.toEqual({ examples: [] });
+        expect(publicApi.getLandingExamples).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects a current-schema static snapshot without its publication revision', async () => {
+        window.__fgLandingExamplesStaticUrl = '/landing-examples.json';
+        publicApi.getStaticLandingExamples.mockResolvedValueOnce({
+            data: { schema_version: 12, examples: [{ root_id: 'root', tree: {} }] },
+        });
 
         await expect(fetchLandingExamples()).resolves.toEqual({ examples: [] });
         expect(publicApi.getLandingExamples).toHaveBeenCalledTimes(1);

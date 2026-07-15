@@ -1,5 +1,10 @@
 # Migrate the landing page to the root of fractalgoals.com
 
+> Historical migration plan. Static snapshot publication now uses the
+> project-derived bucket and revision-safe workflow documented in `index.md`
+> and `infra/landing-snapshot/README.md`; older cache-warm commands below are
+> retained only as implementation history.
+
 ## Context
 
 The goal is to make the public landing page appear at `https://fractalgoals.com/` (the apex/root) and `https://www.fractalgoals.com/`, while the authenticated app stays at `https://my.fractalgoals.com/`.

@@ -443,6 +443,18 @@
     font-size: var(--font-size-base);
 }
 
+.landingPublicDataNotice {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--color-brand-warning) 45%, var(--color-border));
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--color-brand-warning) 8%, var(--color-bg-card));
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+}
+
 .landingExamplesGrid {
     display: grid;
     grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);

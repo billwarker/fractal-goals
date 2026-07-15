@@ -74,11 +74,6 @@ class Config:
         if source.strip()
     ]
     
-    # Public URL of the landing-examples endpoint as served by the frontend
-    # edge (e.g. https://www.fractalgoals.com/api/public/landing-examples).
-    # When set, publishing landing examples warms the frontend Nginx cache.
-    # Empty disables warming (development/tests).
-    LANDING_CACHE_WARM_URL = os.getenv('LANDING_CACHE_WARM_URL', '')
     # Optional publish-time static landing snapshot destinations. Use either a
     # local/shared filesystem path or a GCS bucket/blob. The frontend can fetch
     # the resulting object by setting VITE_LANDING_EXAMPLES_STATIC_URL at build
@@ -86,14 +81,20 @@ class Config:
     LANDING_EXAMPLES_STATIC_PATH = os.getenv('LANDING_EXAMPLES_STATIC_PATH', '')
     LANDING_EXAMPLES_STATIC_GCS_BUCKET = os.getenv('LANDING_EXAMPLES_STATIC_GCS_BUCKET', '')
     LANDING_EXAMPLES_STATIC_GCS_BLOB = os.getenv('LANDING_EXAMPLES_STATIC_GCS_BLOB', 'landing-examples.json')
-    # Delivery is best-effort after the database snapshot commits. Keep each
-    # external call well inside the frontend proxy budget so it cannot turn a
-    # successful publish into a browser-visible gateway timeout.
+    # A configured static destination is part of the publish contract and is
+    # written before the database revision commits. Bound retries well inside
+    # the frontend proxy budget; failure preserves the prior publication.
     LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS = max(
         1.0, min(30.0, float(os.getenv('LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS', '10')))
     )
-    LANDING_CACHE_WARM_TIMEOUT_SECONDS = max(
-        0.5, min(10.0, float(os.getenv('LANDING_CACHE_WARM_TIMEOUT_SECONDS', '2')))
+    # Reject unexpectedly large public snapshots before either the database
+    # cache or static artifact changes. These ceilings protect publish latency,
+    # GCS egress, browser parse time, and the landing page's memory footprint.
+    LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES = max(
+        131_072, min(10_000_000, int(os.getenv('LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES', '2000000')))
+    )
+    LANDING_EXAMPLES_MAX_COMPRESSED_BYTES = max(
+        65_536, min(5_000_000, int(os.getenv('LANDING_EXAMPLES_MAX_COMPRESSED_BYTES', '500000')))
     )
 
     # Email

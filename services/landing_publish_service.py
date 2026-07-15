@@ -5,18 +5,22 @@ in its own service boundary. AdminService and the admin blueprint compose this
 service; the public landing read path (`PublicService.get_landing_examples`)
 consumes the published cache via `LANDING_EXAMPLE_CACHE_KEY`.
 """
+import gzip
 import json
 import logging
 import os
 import re
 import tempfile
+import threading
+import uuid
+from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 from time import perf_counter
 
-import requests
+from google.api_core.retry import Retry
 from google.cloud import storage
-from sqlalchemy import and_, case, func, or_
+from sqlalchemy import and_, case, func, or_, text
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -44,6 +48,7 @@ from services.goal_target_service import GoalTargetService
 from services.goal_timeline_service import GoalTimelineService
 from services.goal_type_utils import get_canonical_goal_type
 from services.note_service import NoteService
+from services.ops_log import log_ops_event
 from services.programs import ProgramService
 from services.serializers import (
     calculate_smart_status,
@@ -62,6 +67,12 @@ logger = logging.getLogger(__name__)
 
 LANDING_EXAMPLE_SETTINGS_KEY = "landing_example_settings"
 LANDING_EXAMPLE_CACHE_KEY = "landing_example_cache"
+LANDING_EXAMPLE_DELIVERY_KEY = "landing_example_delivery"
+# PostgreSQL transaction-scoped advisory lock key for the single public
+# landing publication stream. The in-process lock covers SQLite/tests and also
+# avoids duplicate work between threads before PostgreSQL grants the lock.
+LANDING_EXAMPLE_PUBLISH_LOCK_KEY = 1_176_518_982
+_landing_publish_process_lock = threading.Lock()
 # Bump when the published landing snapshot shape changes so the frontend / future
 # migrations can detect and handle stale caches.
 LANDING_EXAMPLE_SCHEMA_VERSION = 12
@@ -290,11 +301,13 @@ class LandingPublishService:
             self._get_app_setting_value(LANDING_EXAMPLE_SETTINGS_KEY, {"examples": []}).get("examples", [])
         )
         cache = self._get_app_setting_value(LANDING_EXAMPLE_CACHE_KEY, {"published_at": None, "examples": []})
+        delivery = self._get_app_setting_value(LANDING_EXAMPLE_DELIVERY_KEY, {})
         return {
             "eligible_fractals": [self._serialize_landing_eligible_fractal(root) for root in eligible_roots],
             "examples": draft_examples,
             "published_at": cache.get("published_at"),
             "published_example_count": len(cache.get("examples") or []),
+            "delivery": delivery,
         }, None, 200
 
     def update_landing_example_settings(self, data: JsonDict) -> ServiceResult[JsonDict]:
@@ -1271,11 +1284,39 @@ class LandingPublishService:
             "session_templates": [serialize_session_template(template) for template in templates],
         }
 
-    def publish_landing_examples(self) -> ServiceResult[JsonDict]:
+    @contextmanager
+    def _landing_publish_lock(self):
+        """Serialize the one global landing publication stream.
+
+        Production uses a PostgreSQL transaction advisory lock so ordering is
+        preserved across threads and instances. The process lock supplies the
+        equivalent invariant for SQLite tests and local development.
+        """
+        with _landing_publish_process_lock:
+            bind = self.db_session.get_bind()
+            if bind is not None and bind.dialect.name == "postgresql":
+                self.db_session.execute(
+                    text("SELECT pg_advisory_xact_lock(:lock_key)"),
+                    {"lock_key": LANDING_EXAMPLE_PUBLISH_LOCK_KEY},
+                )
+            yield
+
+    def publish_landing_examples(
+        self, *, examples_override: list[JsonDict] | None = None,
+    ) -> ServiceResult[JsonDict]:
+        with self._landing_publish_lock():
+            return self._publish_landing_examples_locked(examples_override=examples_override)
+
+    def _publish_landing_examples_locked(
+        self, *, examples_override: list[JsonDict] | None = None,
+    ) -> ServiceResult[JsonDict]:
         publish_started = perf_counter()
-        examples = self._normalize_landing_example_settings(
-            self._get_app_setting_value(LANDING_EXAMPLE_SETTINGS_KEY, {"examples": []}).get("examples", [])
-        )
+        source_examples = examples_override
+        if source_examples is None:
+            source_examples = self._get_app_setting_value(
+                LANDING_EXAMPLE_SETTINGS_KEY, {"examples": []}
+            ).get("examples", [])
+        examples = self._normalize_landing_example_settings(source_examples)
         _, error, status = self._validate_landing_example_roots(examples)
         if error:
             return None, error, status
@@ -1339,42 +1380,119 @@ class LandingPublishService:
 
         cache = {
             "published_at": format_utc(utc_now()),
+            "revision": str(uuid.uuid4()),
             "schema_version": LANDING_EXAMPLE_SCHEMA_VERSION,
             "examples": published_examples,
         }
+        serialized_snapshot = self._serialized_landing_snapshot(cache)
+        snapshot_bytes = len(serialized_snapshot.encode("utf-8"))
+        compressed_snapshot = gzip.compress(
+            serialized_snapshot.encode("utf-8"), compresslevel=9, mtime=0,
+        )
+        compressed_bytes = len(compressed_snapshot)
+        if snapshot_bytes > config.LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES:
+            self.db_session.rollback()
+            return None, (
+                "Landing snapshot is too large to publish "
+                f"({snapshot_bytes:,} bytes; limit {config.LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES:,}). "
+                "Choose fewer or smaller example fractals."
+            ), 413
+        if compressed_bytes > config.LANDING_EXAMPLES_MAX_COMPRESSED_BYTES:
+            self.db_session.rollback()
+            return None, (
+                "Compressed landing snapshot is too large to publish "
+                f"({compressed_bytes:,} bytes; limit {config.LANDING_EXAMPLES_MAX_COMPRESSED_BYTES:,}). "
+                "Choose fewer or smaller example fractals."
+            ), 413
+
+        previous_cache = self._get_app_setting_value(
+            LANDING_EXAMPLE_CACHE_KEY, {"published_at": None, "examples": []},
+        )
+        delivery_started = perf_counter()
+        static_snapshot = self._write_landing_static_snapshot(
+            cache,
+            payload=serialized_snapshot,
+            compressed_payload=compressed_snapshot,
+        )
+        if static_snapshot == "failed":
+            self.db_session.rollback()
+            logger.error(
+                "Landing publish delivery failed revision=%s; database snapshot unchanged",
+                cache["revision"],
+            )
+            log_ops_event(
+                "landing.publish_failed",
+                level="error",
+                revision=cache["revision"],
+                reason="static_delivery",
+            )
+            return None, (
+                "Static landing snapshot delivery failed; published examples were not changed. "
+                "Retry publishing."
+            ), 503
+
         # Reconcile stale references back into the editable draft so an
         # unavailable hidden selection warns once instead of on every publish.
         self._set_app_setting_value(LANDING_EXAMPLE_SETTINGS_KEY, {"examples": examples})
         self._set_app_setting_value(LANDING_EXAMPLE_CACHE_KEY, cache)
-        self.db_session.commit()
+        delivery = {
+            "revision": cache["revision"],
+            "status": "delivered" if static_snapshot == "ok" else "database_only",
+            "published_at": cache["published_at"],
+            "snapshot_bytes": snapshot_bytes,
+            "compressed_snapshot_bytes": compressed_bytes,
+        }
+        self._set_app_setting_value(LANDING_EXAMPLE_DELIVERY_KEY, delivery)
+        try:
+            self.db_session.commit()
+        except Exception:
+            self.db_session.rollback()
+            if static_snapshot == "ok":
+                restored = self._restore_landing_static_snapshot(previous_cache)
+                if not restored:
+                    logger.critical(
+                        "Landing publish database commit failed and static rollback failed revision=%s",
+                        cache["revision"],
+                        exc_info=True,
+                    )
+                    log_ops_event(
+                        "landing.publish_failed",
+                        level="error",
+                        revision=cache["revision"],
+                        reason="database_commit_and_static_rollback",
+                    )
+            raise
         committed_ms = round((perf_counter() - publish_started) * 1000)
-        delivery_started = perf_counter()
-        serialized_snapshot = self._serialized_landing_snapshot(cache)
-        static_snapshot = self._write_landing_static_snapshot(
-            cache, payload=serialized_snapshot,
-        )
-        cache_warm = self._warm_landing_cache()
         delivery_ms = round((perf_counter() - delivery_started) * 1000)
         total_ms = round((perf_counter() - publish_started) * 1000)
         logger.info(
             "Landing publish completed examples=%s snapshot_bytes=%s committed_ms=%s "
-            "delivery_ms=%s total_ms=%s static_snapshot=%s cache_warm=%s",
+            "delivery_ms=%s total_ms=%s static_snapshot=%s",
             len(published_examples),
-            len(serialized_snapshot.encode("utf-8")),
+            snapshot_bytes,
             committed_ms,
             delivery_ms,
             total_ms,
             static_snapshot,
-            cache_warm,
+        )
+        log_ops_event(
+            "landing.publish_delivered",
+            revision=cache["revision"],
+            examples=len(published_examples),
+            snapshot_bytes=snapshot_bytes,
+            compressed_bytes=compressed_bytes,
+            static_snapshot=static_snapshot,
         )
         return {
             "published_at": cache["published_at"],
+            "revision": cache["revision"],
             "published_example_count": len(published_examples),
             "examples": examples,
             "showcase_warnings": showcase_warnings,
             "static_snapshot": static_snapshot,
-            "cache_warm": cache_warm,
             "publish_duration_ms": total_ms,
+            "snapshot_bytes": snapshot_bytes,
+            "compressed_snapshot_bytes": compressed_bytes,
         }, None, 200
 
     @staticmethod
@@ -1383,27 +1501,44 @@ class LandingPublishService:
 
     @classmethod
     def _write_landing_static_snapshot(
-        cls, cache: JsonDict, *, payload: str | None = None,
+        cls,
+        cache: JsonDict,
+        *,
+        payload: str | None = None,
+        compressed_payload: bytes | None = None,
     ) -> str:
-        """Materialize the published snapshot as a static artifact when configured.
+        """Materialize the candidate snapshot before its database commit.
 
-        This is intentionally best-effort and post-commit: the database cache
-        remains the source of truth, while a static file/object lets the landing
-        page hydrate before React has to wait on the API path.
+        A configured static destination is part of the publication contract:
+        failure leaves the prior database/static publication unchanged.
         """
         payload = payload or cls._serialized_landing_snapshot(cache)
+        compressed_payload = compressed_payload or gzip.compress(
+            payload.encode("utf-8"), compresslevel=9, mtime=0,
+        )
 
         bucket_name = config.LANDING_EXAMPLES_STATIC_GCS_BUCKET
         if bucket_name:
             try:
                 bucket = storage.Client().bucket(bucket_name)
                 blob = bucket.blob(config.LANDING_EXAMPLES_STATIC_GCS_BLOB or "landing-examples.json")
-                blob.cache_control = "public, max-age=300, stale-while-revalidate=86400"
+                # The URL is stable across publishes, so browsers must
+                # revalidate it instead of retaining an older selection for a
+                # fixed TTL. GCS ETags make unchanged responses inexpensive,
+                blob.cache_control = "public, max-age=0, must-revalidate, no-transform"
+                # Cloud Storage does not dynamically compress objects. Store
+                # the JSON as deterministic gzip so landing hydration transfers
+                blob.content_encoding = "gzip"
                 blob.upload_from_string(
-                    payload,
+                    compressed_payload,
                     content_type="application/json",
-                    timeout=config.LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS,
-                    retry=None,
+                    timeout=min(5.0, config.LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS),
+                    retry=Retry(
+                        initial=0.25,
+                        maximum=1.0,
+                        multiplier=2.0,
+                        deadline=config.LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS,
+                    ),
                 )
                 return "ok"
             except Exception:
@@ -1412,6 +1547,11 @@ class LandingPublishService:
 
         static_path = config.LANDING_EXAMPLES_STATIC_PATH
         if not static_path:
+            if config.ENV == "production":
+                logger.error(
+                    "Landing static snapshot destination is not configured in production"
+                )
+                return "failed"
             return "skipped"
 
         temp_name = None
@@ -1440,25 +1580,40 @@ class LandingPublishService:
             logger.warning("Landing static filesystem snapshot write failed for %s", static_path, exc_info=True)
             return "failed"
 
-    @staticmethod
-    def _warm_landing_cache() -> str:
-        """Refresh the frontend edge cache with the just-published snapshot.
+    @classmethod
+    def _restore_landing_static_snapshot(cls, previous_cache: JsonDict) -> bool:
+        """Compensate an external write when the database commit fails."""
+        if previous_cache.get("published_at"):
+            return cls._write_landing_static_snapshot(previous_cache) == "ok"
+        return cls._delete_landing_static_snapshot()
 
-        Best-effort post-commit side effect: the bypass header makes Nginx
-        fetch fresh from the backend and overwrite its stored entry. Failures
-        never fail the publish — the edge cache self-heals within its TTL.
-        """
-        warm_url = config.LANDING_CACHE_WARM_URL
-        if not warm_url:
-            return "skipped"
+    @staticmethod
+    def _delete_landing_static_snapshot() -> bool:
+        bucket_name = config.LANDING_EXAMPLES_STATIC_GCS_BUCKET
+        if bucket_name:
+            try:
+                blob = storage.Client().bucket(bucket_name).blob(
+                    config.LANDING_EXAMPLES_STATIC_GCS_BLOB or "landing-examples.json"
+                )
+                blob.delete(
+                    timeout=min(5.0, config.LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS),
+                    retry=Retry(deadline=config.LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS),
+                )
+                return True
+            except Exception:
+                logger.critical("Landing static GCS rollback delete failed", exc_info=True)
+                return False
+
+        static_path = config.LANDING_EXAMPLES_STATIC_PATH
+        if not static_path:
+            return True
         try:
-            response = requests.get(
-                warm_url,
-                headers={"X-Landing-Cache-Warm": "1"},
-                timeout=config.LANDING_CACHE_WARM_TIMEOUT_SECONDS,
+            Path(static_path).unlink(missing_ok=True)
+            return True
+        except OSError:
+            logger.critical(
+                "Landing static filesystem rollback delete failed for %s",
+                static_path,
+                exc_info=True,
             )
-            response.raise_for_status()
-            return "ok"
-        except requests.RequestException:
-            logger.warning("Landing cache warm request failed for %s", warm_url, exc_info=True)
-            return "failed"
+            return False

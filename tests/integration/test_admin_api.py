@@ -1,3 +1,4 @@
+import gzip
 import json
 import uuid
 from datetime import datetime
@@ -628,7 +629,7 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
 
     # Published responses serve with short public caching; the cache only
     # changes on manual publish.
-    assert public_response.headers['Cache-Control'] == 'public, max-age=300, stale-while-revalidate=86400'
+    assert public_response.headers['Cache-Control'] == 'no-store'
 
     cache = db_session.get(AppSetting, 'landing_example_cache')
     assert cache is not None
@@ -1066,21 +1067,28 @@ def test_publish_keeps_valid_analytics_view_while_reconciling_stale_selection(
 
 
 @pytest.mark.integration
-def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, admin_landing_fractal, monkeypatch, tmp_path):
-    import requests as requests_lib
+def test_publish_landing_examples_static_delivery_contract(admin_client, admin_landing_fractal, monkeypatch, tmp_path):
     import services.landing_publish_service as landing_publish_module
 
-    def publish():
+    def publish(expected_status=200):
         response = admin_client.post(
             '/api/admin/landing-examples/publish',
             data=_landing_example_payload(admin_landing_fractal.id),
             content_type='application/json',
         )
-        assert response.status_code == 200
+        assert response.status_code == expected_status
         return response.get_json()
 
-    # No warm URL configured (the dev/test default): warming is skipped.
-    assert publish()['cache_warm'] == 'skipped'
+    # No static destination configured in tests by default.
+    assert publish()['static_snapshot'] == 'skipped'
+
+    # Production fails closed if a deployment loses its static destination.
+    previous_published_at = admin_client.get('/api/admin/landing-examples').get_json()['published_at']
+    original_env = config.ENV
+    monkeypatch.setattr(config, 'ENV', 'production')
+    assert 'not changed' in publish(expected_status=503)['error'].lower()
+    assert admin_client.get('/api/admin/landing-examples').get_json()['published_at'] == previous_published_at
+    monkeypatch.setattr(config, 'ENV', original_env)
 
     static_snapshot_path = tmp_path / 'landing-examples.json'
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_PATH', str(static_snapshot_path))
@@ -1094,16 +1102,21 @@ def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, a
 
     gcs_uploads = []
 
+    static_blob = None
+
     class _StaticBlob:
         cache_control = None
+        content_encoding = None
 
         def upload_from_string(self, data, **kwargs):
             gcs_uploads.append({'data': data, **kwargs})
 
     class _StaticBucket:
         def blob(self, name):
+            nonlocal static_blob
             assert name == config.LANDING_EXAMPLES_STATIC_GCS_BLOB
-            return _StaticBlob()
+            static_blob = _StaticBlob()
+            return static_blob
 
     class _StaticClient:
         def bucket(self, name):
@@ -1112,48 +1125,84 @@ def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, a
 
     monkeypatch.setattr(landing_publish_module.storage, 'Client', _StaticClient)
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_GCS_BUCKET', 'landing-snapshots')
-    assert publish()['static_snapshot'] == 'ok'
+    gcs_publish = publish()
+    assert gcs_publish['static_snapshot'] == 'ok'
     assert len(gcs_uploads) == 1
+    assert static_blob.cache_control == 'public, max-age=0, must-revalidate, no-transform'
+    assert static_blob.content_encoding == 'gzip'
     assert gcs_uploads[0]['content_type'] == 'application/json'
-    assert gcs_uploads[0]['timeout'] == config.LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS
-    assert gcs_uploads[0]['retry'] is None
+    assert gcs_uploads[0]['timeout'] == min(5.0, config.LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS)
+    assert gcs_uploads[0]['retry'] is not None
+    gcs_payload = json.loads(gzip.decompress(gcs_uploads[0]['data']).decode('utf-8'))
+    assert len(gcs_uploads[0]['data']) < len(json.dumps(gcs_payload).encode('utf-8'))
+    assert gcs_payload['published_at'] == gcs_publish['published_at']
+    assert gcs_payload['examples'][0]['root_id'] == admin_landing_fractal.id
 
     def _timed_out_upload(*args, **kwargs):
         raise TimeoutError('static upload exceeded its delivery budget')
 
     monkeypatch.setattr(_StaticBlob, 'upload_from_string', _timed_out_upload)
-    timed_out_publish = publish()
-    assert timed_out_publish['static_snapshot'] == 'failed'
-    assert timed_out_publish['publish_duration_ms'] >= 0
+    timed_out_publish = publish(expected_status=503)
+    assert 'published examples were not changed' in timed_out_publish['error'].lower()
+    unchanged = admin_client.get('/api/admin/landing-examples').get_json()
+    assert unchanged['published_at'] == gcs_publish['published_at']
+    assert unchanged['delivery']['revision'] == gcs_publish['revision']
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_GCS_BUCKET', '')
 
-    warm_url = 'https://www.example.com/api/public/landing-examples'
-    monkeypatch.setattr(config, 'LANDING_CACHE_WARM_URL', warm_url)
 
-    warm_calls = []
+@pytest.mark.integration
+def test_publish_landing_examples_rejects_oversized_snapshot_without_changing_publication(
+    admin_client,
+    admin_landing_fractal,
+    monkeypatch,
+):
+    initial = admin_client.post(
+        '/api/admin/landing-examples/publish',
+        data=_landing_example_payload(admin_landing_fractal.id),
+        content_type='application/json',
+    )
+    assert initial.status_code == 200
+    initial_payload = initial.get_json()
 
-    class _WarmResponse:
-        def raise_for_status(self):
-            return None
+    monkeypatch.setattr(config, 'LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES', 1)
+    rejected = admin_client.post(
+        '/api/admin/landing-examples/publish',
+        data=_landing_example_payload(admin_landing_fractal.id),
+        content_type='application/json',
+    )
 
-    def _fake_get(url, headers=None, timeout=None):
-        warm_calls.append({'url': url, 'headers': headers, 'timeout': timeout})
-        return _WarmResponse()
+    assert rejected.status_code == 413
+    assert 'too large to publish' in rejected.get_json()['error'].lower()
+    unchanged = admin_client.get('/api/public/landing-examples').get_json()
+    assert unchanged['published_at'] == initial_payload['published_at']
+    assert unchanged['revision'] == initial_payload['revision']
 
-    monkeypatch.setattr(requests_lib, 'get', _fake_get)
-    assert publish()['cache_warm'] == 'ok'
-    assert warm_calls == [{
-        'url': warm_url,
-        'headers': {'X-Landing-Cache-Warm': '1'},
-        'timeout': config.LANDING_CACHE_WARM_TIMEOUT_SECONDS,
-    }]
 
-    def _failing_get(url, headers=None, timeout=None):
-        raise requests_lib.ConnectionError('warm endpoint unreachable')
+@pytest.mark.integration
+def test_publish_restores_static_snapshot_when_database_commit_fails(
+    db_session,
+    admin_landing_fractal,
+    monkeypatch,
+):
+    from services.landing_publish_service import LandingPublishService
 
-    monkeypatch.setattr(requests_lib, 'get', _failing_get)
-    # A warm failure must never fail the publish itself.
-    assert publish()['cache_warm'] == 'failed'
+    service = LandingPublishService(db_session)
+    restored = []
+    monkeypatch.setattr(service, '_write_landing_static_snapshot', lambda *args, **kwargs: 'ok')
+    monkeypatch.setattr(
+        service,
+        '_restore_landing_static_snapshot',
+        lambda previous: restored.append(previous) or True,
+    )
+    monkeypatch.setattr(db_session, 'commit', lambda: (_ for _ in ()).throw(RuntimeError('commit failed')))
+
+    with pytest.raises(RuntimeError, match='commit failed'):
+        service.publish_landing_examples(
+            examples_override=json.loads(_landing_example_payload(admin_landing_fractal.id))['examples'],
+        )
+
+    assert len(restored) == 1
+    assert restored[0].get('published_at') is None
 
 
 @pytest.mark.integration

@@ -111,7 +111,7 @@ const dispatchSessionExpired = (detail = {}) => {
 
 axios.interceptors.request.use(async (config) => {
     const isPublicRequest = String(config.url || '').includes('/public/');
-    if (accessToken && !isPublicRequest && !getHeader(config.headers, 'Authorization')) {
+    if (accessToken && !isPublicRequest && !config._skipAuth && !getHeader(config.headers, 'Authorization')) {
         setHeader(config, 'Authorization', `Bearer ${accessToken}`);
     }
     if (String(config.url || '').includes('/auth/refresh') && !getHeader(config.headers, CSRF_HEADER_NAME)) {

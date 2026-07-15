@@ -21,7 +21,7 @@ steps:
       '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:$BUILD_ID',
       '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:latest',
       '--build-arg', 'VITE_API_URL=/api',
-      '--build-arg', 'VITE_LANDING_EXAMPLES_STATIC_URL=$_LANDING_EXAMPLES_STATIC_URL',
+      '--build-arg', 'VITE_LANDING_EXAMPLES_STATIC_URL=https://storage.googleapis.com/$PROJECT_ID-landing-public-$PROJECT_NUMBER/landing-examples.json',
       'client'
     ]
 
@@ -97,7 +97,7 @@ steps:
       '--platform', 'managed',
       '--allow-unauthenticated', # Remove if auth required
       '--set-secrets', 'SUPABASE_DATABASE_URL=SUPABASE_DATABASE_URL:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest,RESEND_EMAIL_API_KEY=RESEND_EMAIL_API_KEY:latest,RESEND_WEBHOOK_SIGNING_SECRET=RESEND_WEBHOOK_SIGNING_SECRET:latest',
-      '--set-env-vars', 'FLASK_ENV=production,FLASK_DEBUG=false,CORS_ORIGINS=https://my.fractalgoals.com;https://fractalgoals.com;https://www.fractalgoals.com;https://fractal-frontend-195572181270.us-east1.run.app,AUTH_COOKIE_SAMESITE=Strict,AUTH_COOKIE_SECURE=True,CSP_CONNECT_SRC=https://fractal-backend-195572181270.us-east1.run.app,RATELIMIT_STORAGE_URI=memory://,ALLOW_IN_MEMORY_RATELIMIT=true,WEB_CONCURRENCY=1,GUNICORN_THREADS=4,GUNICORN_TIMEOUT=210,EMAIL_PROVIDER=resend,EMAIL_FROM=Fractal Goals <support@fractalgoals.com>,APP_BASE_URL=https://my.fractalgoals.com,PUBLIC_MARKETING_URL=https://fractalgoals.com,LANDING_CACHE_WARM_URL=https://fractalgoals.com/api/public/landing-examples,LANDING_EXAMPLES_STATIC_GCS_BUCKET=$_LANDING_EXAMPLES_STATIC_GCS_BUCKET,LANDING_EXAMPLES_STATIC_GCS_BLOB=$_LANDING_EXAMPLES_STATIC_GCS_BLOB,LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS=10,LANDING_CACHE_WARM_TIMEOUT_SECONDS=2',
+      '--set-env-vars', 'FLASK_ENV=production,FLASK_DEBUG=false,CORS_ORIGINS=https://my.fractalgoals.com;https://fractalgoals.com;https://www.fractalgoals.com;https://fractal-frontend-195572181270.us-east1.run.app,AUTH_COOKIE_SAMESITE=Strict,AUTH_COOKIE_SECURE=True,CSP_CONNECT_SRC=https://fractal-backend-195572181270.us-east1.run.app,RATELIMIT_STORAGE_URI=memory://,ALLOW_IN_MEMORY_RATELIMIT=true,WEB_CONCURRENCY=1,GUNICORN_THREADS=4,GUNICORN_TIMEOUT=210,EMAIL_PROVIDER=resend,EMAIL_FROM=Fractal Goals <support@fractalgoals.com>,APP_BASE_URL=https://my.fractalgoals.com,PUBLIC_MARKETING_URL=https://fractalgoals.com,LANDING_EXAMPLES_STATIC_GCS_BUCKET=$PROJECT_ID-landing-public-$PROJECT_NUMBER,LANDING_EXAMPLES_STATIC_GCS_BLOB=$_LANDING_EXAMPLES_STATIC_GCS_BLOB,LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS=10,LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES=2000000,LANDING_EXAMPLES_MAX_COMPRESSED_BYTES=500000',
       '--timeout', '240s',
       '--max-instances', '1',
       # Startup gates rollout on DB reachability (/api/readyz does SELECT 1);
@@ -127,12 +127,11 @@ steps:
 # Global timeout
 timeout: '1200s'
 
-# Substitutions to be configured in Cloud Build Trigger
+# The public bucket and URL are derived from Cloud Build's built-in PROJECT_ID
+# and PROJECT_NUMBER values above, keeping every environment project-isolated.
 substitutions:
   _REGION: 'us-east1'
   _REPOSITORY: 'fractal-repo' # Artifact Registry Repository Name
-  _LANDING_EXAMPLES_STATIC_URL: ''
-  _LANDING_EXAMPLES_STATIC_GCS_BUCKET: ''
   _LANDING_EXAMPLES_STATIC_GCS_BLOB: 'landing-examples.json'
   _BIGQUERY_DATASET: 'fractal_analytics'
 

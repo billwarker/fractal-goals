@@ -58,10 +58,16 @@ class PublicService:
     def get_landing_examples(self):
         setting = self.db_session.get(AppSetting, LANDING_EXAMPLE_CACHE_KEY)
         if setting is None or not isinstance(setting.value, dict):
-            return {"published_at": None, "schema_version": None, "examples": []}, None, 200
+            return {
+                "published_at": None,
+                "revision": None,
+                "schema_version": None,
+                "examples": [],
+            }, None, 200
 
         return {
             "published_at": setting.value.get("published_at"),
+            "revision": setting.value.get("revision"),
             "schema_version": setting.value.get("schema_version"),
             "examples": setting.value.get("examples") or [],
         }, None, 200

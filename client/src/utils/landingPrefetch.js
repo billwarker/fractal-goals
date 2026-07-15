@@ -11,6 +11,34 @@ export const LANDING_EXAMPLES_STATIC_URL = import.meta.env.VITE_LANDING_EXAMPLES
 // should hit the network, and a rejected preload falls back to the API call.
 const PRELOAD_GLOBAL_KEY = '__fgLandingExamplesPreload';
 const STATIC_URL_GLOBAL_KEY = '__fgLandingExamplesStaticUrl';
+const STATIC_ATTEMPTED_GLOBAL_KEY = '__fgLandingExamplesStaticAttempted';
+
+const isLandingSnapshot = (payload) => (
+    payload !== null
+    && typeof payload === 'object'
+    && Array.isArray(payload.examples)
+    && (
+        payload.schema_version === undefined
+        || payload.schema_version === null
+        || Number.isInteger(payload.schema_version)
+    )
+    && (
+        !Number.isInteger(payload.schema_version)
+        || payload.schema_version < 12
+        || (typeof payload.revision === 'string' && payload.revision.length > 0)
+    )
+    && payload.examples.every((example) => (
+        example !== null
+        && typeof example === 'object'
+        && typeof example.root_id === 'string'
+        && example.root_id.length > 0
+        && (
+            !Number.isInteger(payload.schema_version)
+            || payload.schema_version < 12
+            || (example.tree !== null && typeof example.tree === 'object')
+        )
+    ))
+);
 
 const getLandingExamplesStaticUrl = () => {
     if (typeof window !== 'undefined' && typeof window[STATIC_URL_GLOBAL_KEY] === 'string') {
@@ -32,9 +60,11 @@ const takeLandingExamplesPreload = () => {
 
 const fetchStaticLandingExamples = async () => {
     const staticUrl = getLandingExamplesStaticUrl();
-    if (!staticUrl) return null;
+    if (!staticUrl || (typeof window !== 'undefined' && window[STATIC_ATTEMPTED_GLOBAL_KEY])) return null;
+    if (typeof window !== 'undefined') window[STATIC_ATTEMPTED_GLOBAL_KEY] = true;
     try {
-        return (await publicApi.getStaticLandingExamples(staticUrl)).data;
+        const payload = (await publicApi.getStaticLandingExamples(staticUrl)).data;
+        return isLandingSnapshot(payload) ? payload : null;
     } catch {
         return null;
     }
@@ -44,7 +74,8 @@ export const fetchLandingExamples = async () => {
     const preload = takeLandingExamplesPreload();
     if (preload) {
         try {
-            return await preload;
+            const payload = await preload;
+            if (isLandingSnapshot(payload)) return payload;
         } catch {
             // Fall through to the regular API request.
         }

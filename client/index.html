@@ -43,6 +43,7 @@
   <meta name="twitter:title" content="Track every goal, program, and training session in one place" />
   <meta name="twitter:description" content="Break big goals into trackable trees, build your own programs, and log every session in one composable platform. Built for people training across many disciplines." />
   <meta name="twitter:image" content="https://fractalgoals.com/og-cover.png" />
+  <link rel="preconnect" href="https://storage.googleapis.com" crossorigin />
   <!-- Typography: DM Sans (UI body), DM Serif Display (display headings), JetBrains Mono (code/metrics) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -64,10 +65,25 @@
       if (!staticUrl || staticUrl.charAt(0) === '%') staticUrl = '';
       window.__fgLandingExamplesStaticUrl = staticUrl;
       var preloadUrl = staticUrl || '/api/public/landing-examples';
-      window.__fgLandingExamplesPreload = fetch(preloadUrl, { credentials: staticUrl ? 'omit' : 'same-origin' })
+      window.__fgLandingExamplesStaticAttempted = Boolean(staticUrl);
+      var controller = typeof AbortController === 'function' ? new AbortController() : null;
+      var timeoutId = controller ? setTimeout(function () { controller.abort(); }, 2000) : null;
+      window.__fgLandingExamplesPreload = fetch(preloadUrl, {
+        credentials: staticUrl ? 'omit' : 'same-origin',
+        signal: controller ? controller.signal : undefined
+      })
         .then(function (response) {
           if (!response.ok) throw new Error('landing examples preload failed: ' + response.status);
           return response.json();
+        })
+        .then(function (payload) {
+          if (!payload || !Array.isArray(payload.examples)) {
+            throw new Error('landing examples preload returned an invalid snapshot');
+          }
+          return payload;
+        })
+        .finally(function () {
+          if (timeoutId) clearTimeout(timeoutId);
         });
       // landingPrefetch falls back to its own request on rejection.
       window.__fgLandingExamplesPreload.catch(function () {});
