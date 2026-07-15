@@ -24,6 +24,10 @@ import { adminApi } from '../utils/api';
 import notify from '../utils/notify';
 import { formatError } from '../utils/mutationNotify';
 import { getLandingPageHref } from '../utils/marketingHost';
+import {
+    LANDING_TREE_VIEW_SETTING_OPTIONS,
+    normalizeLandingTreeViewSettings,
+} from '../utils/landingTreeViewSettings';
 import styles from './Admin.module.css';
 const ADMIN_USERS_KEY = ['admin', 'users'];
 const ADMIN_SUMMARY_KEY = ['admin', 'summary'];
@@ -132,7 +136,12 @@ const normalizeShowcase = (showcase) => ({
     activity_ids: (showcase?.activity_ids || []).slice(0, 1),
     analytics_view_ids: (showcase?.analytics_view_ids || []).slice(0, LANDING_SHOWCASE_ANALYTICS_VIEW_CAP),
 });
-function LandingExampleShowcaseEditor({ example, onShowcaseChange, onContentChange }) {
+function LandingExampleShowcaseEditor({
+    example,
+    onShowcaseChange,
+    onTreeViewSettingsChange,
+    onContentChange,
+}) {
     const [expanded, setExpanded] = useState(false);
     const [activeTab, setActiveTab] = useState('goals');
     const showcase = normalizeShowcase(example.showcase);
@@ -187,9 +196,30 @@ function LandingExampleShowcaseEditor({ example, onShowcaseChange, onContentChan
                                 </button>
                             ))}
                         </div>
-                        {activeTab === 'goals' && <LandingGoalsEditor content={example.landing_content}
-                            options={options} styles={styles}
-                            onChange={(value) => onContentChange(example.root_id, value)} />}
+                        {activeTab === 'goals' && <>
+                            <fieldset>
+                                <legend>Goal tree viewer defaults</legend>
+                                <p className={styles.landingInteractionHint}>
+                                    Checked options start enabled whenever visitors select this example.
+                                </p>
+                                {LANDING_TREE_VIEW_SETTING_OPTIONS.map(({ key, label }) => (
+                                    <label className={styles.landingShowcaseCheck} key={key}>
+                                        <input
+                                            type="checkbox"
+                                            checked={example.tree_view_settings?.[key] === true}
+                                            onChange={(event) => onTreeViewSettingsChange(example.root_id, {
+                                                ...normalizeLandingTreeViewSettings(example.tree_view_settings),
+                                                [key]: event.target.checked,
+                                            })}
+                                        />
+                                        <span>{label}</span>
+                                    </label>
+                                ))}
+                            </fieldset>
+                            <LandingGoalsEditor content={example.landing_content}
+                                options={options} styles={styles}
+                                onChange={(value) => onContentChange(example.root_id, value)} />
+                        </>}
                         {activeTab === 'sessions' && <label>
                             <span>Featured session</span>
                             <select
@@ -307,6 +337,7 @@ function LandingExamplesPanel() {
             label: example.label,
             sort_order: example.sort_order ?? index,
             showcase: normalizeShowcase(example.showcase),
+            tree_view_settings: normalizeLandingTreeViewSettings(example.tree_view_settings),
             landing_content: normalizeLandingContent(example.landing_content),
         })));
     }, [landingExamplesQuery.data]);
@@ -320,6 +351,7 @@ function LandingExamplesPanel() {
         label: example.label,
         sort_order: index,
         showcase: normalizeShowcase(example.showcase),
+        tree_view_settings: normalizeLandingTreeViewSettings(example.tree_view_settings),
         landing_content: normalizeLandingContent(example.landing_content),
     }));
     const updateMutation = useMutation({
@@ -361,6 +393,13 @@ function LandingExamplesPanel() {
         setDraftExamples((current) => current.map((example) => (
             example.root_id === rootId
                 ? { ...example, landing_content: normalizeLandingContent(landingContentValue) }
+                : example
+        )));
+    };
+    const updateTreeViewSettings = (rootId, treeViewSettings) => {
+        setDraftExamples((current) => current.map((example) => (
+            example.root_id === rootId
+                ? { ...example, tree_view_settings: normalizeLandingTreeViewSettings(treeViewSettings) }
                 : example
         )));
     };
@@ -459,6 +498,7 @@ function LandingExamplesPanel() {
                                         <LandingExampleShowcaseEditor
                                             example={example}
                                             onShowcaseChange={updateShowcase}
+                                            onTreeViewSettingsChange={updateTreeViewSettings}
                                             onContentChange={updateLandingContent}
                                         />
                                     </div>

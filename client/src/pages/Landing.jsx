@@ -12,12 +12,14 @@ import landingContent from '../content/landingContent';
 import useActiveLandingSection from '../hooks/useActiveLandingSection';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import useLandingTargetManager from '../hooks/useLandingTargetManager';
+import useLandingTreeViewSettings from '../hooks/useLandingTreeViewSettings';
 import { queryKeys } from '../hooks/queryKeys';
 import { findGoalNodeById, getGoalNodeId } from '../utils/goalNodeModel';
 import { publicApi } from '../utils/api';
 import { fetchLandingExamples, LANDING_EXAMPLES_STALE_TIME } from '../utils/landingPrefetch';
 import { buildLandingGoalDemos } from '../utils/landingGoalDemos';
 import { resolveNestedWheelIntent } from '../utils/landingScrollNavigation';
+import { normalizeLandingTreeViewSettings } from '../utils/landingTreeViewSettings';
 import styles from './Landing.module.css';
 // Reuse the real goals-page styles for the view-options widget and the docked
 // side-in detail panel (.flowtree-options-pane, .details-window.sidebar.docked).
@@ -27,12 +29,6 @@ const FlowTree = lazy(() => import('../FlowTree'));
 const GoalDetailModal = lazy(() => import('../components/ConnectedGoalDetailModal'));
 const LandingTargetManagerModal = lazy(() => import('../components/landing/LandingTargetManagerModal'));
 
-const DEFAULT_VIEW_SETTINGS = {
-    fadeInactiveBranches: false,
-    hideInactiveGoals: false,
-    hideCompletedGoals: false,
-    showMetricsOverlay: false,
-};
 const FLOWTREE_SCOPE_TRANSITION_MS = 160;
 const WHEEL_SECTION_COOLDOWN_MS = 760;
 const WHEEL_SECTION_DELTA_THRESHOLD = 24;
@@ -374,7 +370,6 @@ function Landing() {
     const [selectedGoalId, setSelectedGoalId] = useState(null);
     const [goalDetailEntry, setGoalDetailEntry] = useState({ view: 'goal', key: 0 });
     const [flowTreeScopeKey, setFlowTreeScopeKey] = useState(0);
-    const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
     const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
     const [isOptionsPaneMinimized, setIsOptionsPaneMinimized] = useState(true);
     const [hoveredHeroExampleId, setHoveredHeroExampleId] = useState(null);
@@ -447,6 +442,7 @@ function Landing() {
                 // Admin-curated feature picks (schema v6+); null on older
                 // snapshots, in which case the Features section auto-derives.
                 showcase: example.showcase || null,
+                treeViewSettings: normalizeLandingTreeViewSettings(example.tree_view_settings),
                 landingContent: example.landing_content || example.landingContent || null,
             }))
             .filter((example) => example.id && example.tree);
@@ -464,7 +460,8 @@ function Landing() {
             return;
         }
         if (!publishedExamples.some((example) => example.id === selectedExampleId)) {
-            setSelectedExampleId(publishedExamples[0].id);
+            const firstExample = publishedExamples[0];
+            setSelectedExampleId(firstExample.id);
             setSelectedGoalId(null);
         }
     }, [publishedExamples, selectedExampleId]);
@@ -473,6 +470,7 @@ function Landing() {
         () => publishedExamples.find((example) => example.id === selectedExampleId) || publishedExamples[0] || null,
         [publishedExamples, selectedExampleId]
     );
+    const [viewSettings, setViewSettings] = useLandingTreeViewSettings(selectedExample);
     const { activeSelection: activeTargetManagerSelection, close: closeTargetManager,
         open: openTargetManager } = useLandingTargetManager(selectedExample);
     const selectedGoal = useMemo(
@@ -562,6 +560,10 @@ function Landing() {
     // scrollToTree is only passed from the hero picker's click handler, so the
     // initial default selection (set directly in an effect) never auto-scrolls.
     const handleExampleSelect = (exampleId, { scrollToTree = false } = {}) => {
+        if (flowTreeScopeTransitionTimerRef.current) {
+            clearTimeout(flowTreeScopeTransitionTimerRef.current);
+            flowTreeScopeTransitionTimerRef.current = null;
+        }
         setSelectedExampleId(exampleId);
         setSelectedGoalId(null);
         setGoalDetailEntry((current) => ({ view: 'goal', key: current.key + 1 }));
@@ -646,7 +648,7 @@ function Landing() {
             setFlowTreeScopeKey((prev) => prev + 1);
             flowTreeScopeTransitionTimerRef.current = null;
         }, FLOWTREE_SCOPE_TRANSITION_MS);
-    }, []);
+    }, [setViewSettings]);
 
     useEffect(() => () => {
         if (flowTreeScopeTransitionTimerRef.current) {

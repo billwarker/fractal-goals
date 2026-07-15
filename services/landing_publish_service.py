@@ -63,7 +63,7 @@ LANDING_EXAMPLE_SETTINGS_KEY = "landing_example_settings"
 LANDING_EXAMPLE_CACHE_KEY = "landing_example_cache"
 # Bump when the published landing snapshot shape changes so the frontend / future
 # migrations can detect and handle stale caches.
-LANDING_EXAMPLE_SCHEMA_VERSION = 11
+LANDING_EXAMPLE_SCHEMA_VERSION = 12
 # Match the production goal timeline's first-page depth so the landing modal
 # keeps feature parity while the payload stays lean through field compaction.
 LANDING_EXAMPLE_TIMELINE_LIMIT = 50
@@ -84,6 +84,12 @@ LANDING_EXAMPLE_SHOWCASE_KEYS = (
     "program_start_date",
     "program_end_date",
     "analytics_view_ids",
+)
+LANDING_TREE_VIEW_SETTING_KEYS = (
+    "fadeInactiveBranches",
+    "hideInactiveGoals",
+    "hideCompletedGoals",
+    "showMetricsOverlay",
 )
 LANDING_GOAL_BULLET_DEFAULTS = (
     {
@@ -169,6 +175,15 @@ class LandingPublishService:
         return normalized
 
     @staticmethod
+    def _normalize_landing_tree_view_settings(settings: JsonDict | None) -> JsonDict:
+        """Return the exact public tree-view defaults, including legacy-safe false values."""
+        source = settings if isinstance(settings, dict) else {}
+        return {
+            key: source.get(key) is True
+            for key in LANDING_TREE_VIEW_SETTING_KEYS
+        }
+
+    @staticmethod
     def _normalize_landing_example_content(content: JsonDict | None) -> JsonDict:
         source = content if isinstance(content, dict) else {}
         goals = source.get("goals") if isinstance(source.get("goals"), dict) else {}
@@ -202,6 +217,9 @@ class LandingPublishService:
                 "label": item["label"],
                 "sort_order": int(item.get("sort_order", index)),
                 "showcase": self._normalize_landing_example_showcase(item.get("showcase")),
+                "tree_view_settings": self._normalize_landing_tree_view_settings(
+                    item.get("tree_view_settings")
+                ),
                 "landing_content": self._normalize_landing_example_content(item.get("landing_content")),
             })
         return sorted(normalized, key=lambda item: (item["sort_order"], item["label"].lower()))
@@ -1251,6 +1269,7 @@ class LandingPublishService:
                 "metrics_summary": flowtree_data["metrics_summary"],
                 "programs": flowtree_data["programs"],
                 "showcase": resolved_showcase,
+                "tree_view_settings": item["tree_view_settings"],
                 "landing_content": resolved_content,
                 "sessions": showcase_data["sessions"],
                 "activity_definitions": showcase_data["activity_definitions"],

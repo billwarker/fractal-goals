@@ -472,6 +472,22 @@ describe('Landing', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Hierarchy' }));
         expect(screen.getByTestId('flow-tree-demo')).toHaveAttribute('data-layout-mode', 'hierarchy');
     });
+    it('hydrates each example tree from its admin defaults without leaking visitor changes', async () => {
+        const configuredExamples = JSON.parse(JSON.stringify(publishedExamples));
+        configuredExamples.examples[0].tree_view_settings = { fadeInactiveBranches: true, hideInactiveGoals: false, hideCompletedGoals: true, showMetricsOverlay: true };
+        delete configuredExamples.examples[1].tree_view_settings;
+        getLandingExamples.mockResolvedValue({ data: configuredExamples });
+        renderLanding(configuredExamples);
+        await screen.findByRole('tab', { name: 'Become a skilled guitar player' });
+        fireEvent.click(screen.getByRole('button', { name: 'Expand tree view options' }));
+        expect(['Fade inactive branches', 'Hide inactive goals', 'Hide completed goals', 'Show metrics overlay']
+            .map((label) => screen.getByLabelText(label).checked)).toEqual([true, false, true, true]);
+        fireEvent.click(screen.getByLabelText('Hide inactive goals'));
+        await waitFor(() => expect(screen.getByLabelText('Hide inactive goals')).toBeChecked());
+        fireEvent.click(screen.getByRole('tab', { name: 'Become fluent in Chinese' }));
+        await waitFor(() => expect(['Fade inactive branches', 'Hide inactive goals', 'Hide completed goals', 'Show metrics overlay']
+            .map((label) => screen.getByLabelText(label).checked)).toEqual([false, false, false, false]));
+    });
     it('renders the features section with sidebar controls and read-only surfaces', async () => {
         const { container } = renderLanding();
         await screen.findByRole('tab', { name: 'Become fluent in Chinese' });

@@ -602,8 +602,8 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     ]['name'] == 'Public Demo Activity'
 
     # Snapshot carries a schema version for forward-safe shape evolution.
-    assert public_example['schema_version'] == 11
-    assert public_payload['schema_version'] == 11
+    assert public_example['schema_version'] == 12
+    assert public_payload['schema_version'] == 12
     assert [bullet['key'] for bullet in public_example['landing_content']['goals']['bullets']] == [
         'break_down', 'associate_activities', 'set_targets',
     ]
@@ -619,6 +619,12 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
         'program_end_date': None,
         'analytics_view_ids': [],
     }
+    assert public_example['tree_view_settings'] == {
+        'fadeInactiveBranches': False,
+        'hideInactiveGoals': False,
+        'hideCompletedGoals': False,
+        'showMetricsOverlay': False,
+    }
 
     # Published responses serve with short public caching; the cache only
     # changes on manual publish.
@@ -627,7 +633,7 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     cache = db_session.get(AppSetting, 'landing_example_cache')
     assert cache is not None
     assert cache.value['examples'][0]['root_id'] == admin_landing_fractal.id
-    assert cache.value['schema_version'] == 11
+    assert cache.value['schema_version'] == 12
 
 
 @pytest.mark.integration
@@ -657,10 +663,12 @@ def test_non_admin_cannot_manage_landing_examples(authed_client):
     assert response.status_code == 403
 
 
-def _landing_example_payload(root_id, showcase=None):
+def _landing_example_payload(root_id, showcase=None, tree_view_settings=None):
     example = {'root_id': root_id, 'label': 'Software demo', 'sort_order': 0}
     if showcase is not None:
         example['showcase'] = showcase
+    if tree_view_settings is not None:
+        example['tree_view_settings'] = tree_view_settings
     return json.dumps({'examples': [example]})
 
 
@@ -702,6 +710,40 @@ def test_landing_example_showcase_settings_round_trip(admin_client, db_session, 
         'program_end_date': None,
         'analytics_view_ids': [],
     }
+
+
+@pytest.mark.integration
+def test_landing_tree_view_settings_round_trip_and_publish(
+    admin_client, client, admin_landing_fractal,
+):
+    tree_view_settings = {
+        'fadeInactiveBranches': True,
+        'hideInactiveGoals': True,
+        'hideCompletedGoals': False,
+        'showMetricsOverlay': True,
+    }
+    response = admin_client.patch(
+        '/api/admin/landing-examples',
+        data=_landing_example_payload(
+            admin_landing_fractal.id,
+            tree_view_settings=tree_view_settings,
+        ),
+        content_type='application/json',
+    )
+    assert response.status_code == 200
+    assert response.get_json()['examples'][0]['tree_view_settings'] == tree_view_settings
+    assert admin_client.get('/api/admin/landing-examples').get_json()[
+        'examples'
+    ][0]['tree_view_settings'] == tree_view_settings
+
+    publish_response = admin_client.post(
+        '/api/admin/landing-examples/publish',
+        data=json.dumps({}),
+        content_type='application/json',
+    )
+    assert publish_response.status_code == 200
+    public_example = client.get('/api/public/landing-examples').get_json()['examples'][0]
+    assert public_example['tree_view_settings'] == tree_view_settings
 
 
 @pytest.mark.integration
@@ -1044,7 +1086,7 @@ def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, a
     static_publish = publish()
     assert static_publish['static_snapshot'] == 'ok'
     static_payload = json.loads(static_snapshot_path.read_text())
-    assert static_payload['schema_version'] == 11
+    assert static_payload['schema_version'] == 12
     assert static_payload['published_at'] == static_publish['published_at']
     assert static_payload['examples'][0]['root_id'] == admin_landing_fractal.id
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_PATH', '')

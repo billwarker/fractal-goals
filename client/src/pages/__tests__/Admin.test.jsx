@@ -25,13 +25,10 @@ const {
     unlockUser,
     forcePasswordChange,
     updateUserRole,
-    getLandingExamples,
-    getLandingExampleOptions,
-    updateLandingExamples,
-    publishLandingExamples,
+    getLandingExamples, getLandingExampleOptions,
+    updateLandingExamples, publishLandingExamples,
     getBetaSignups,
-    updateBetaSignupStatus,
-    sendBetaSignupInvite,
+    updateBetaSignupStatus, sendBetaSignupInvite,
 } = vi.hoisted(() => ({
     getSummary: vi.fn(),
     getUsage: vi.fn(),
@@ -638,6 +635,7 @@ describe('Admin', () => {
         expect(screen.getByRole('option', { name: /Timer only.*no activities/ })).toBeDisabled();
         expect(screen.getByRole('option', { name: /Practice session/ })).toBeEnabled();
         fireEvent.click(screen.getByRole('tab', { name: 'Goals' }));
+        expect(screen.getByRole('group', { name: 'Goal tree viewer defaults' })).toBeInTheDocument(); ['Fade inactive branches', 'Hide inactive goals', 'Show metrics overlay'].forEach((label) => fireEvent.click(screen.getByLabelText(label)));
         fireEvent.change(screen.getByLabelText('Example goal for Break it down'), {
             target: { value: 'goal-1' },
         });
@@ -675,6 +673,7 @@ describe('Admin', () => {
             label: 'Guitar practice refined',
             sort_order: 0,
             showcase: emptyShowcase,
+            tree_view_settings: { fadeInactiveBranches: true, hideInactiveGoals: true, hideCompletedGoals: false, showMetricsOverlay: true },
         }));
         expect(savedExamples[0].landing_content.goals.bullets.map((bullet) => [bullet.goal_id, bullet.target_id])).toEqual([
             ['goal-1', null],
@@ -690,6 +689,7 @@ describe('Admin', () => {
             goal_id: 'goal-3',
             target_id: 'target-1',
         }));
+        expect(publishedExamples[0].tree_view_settings).toEqual({ fadeInactiveBranches: true, hideInactiveGoals: true, hideCompletedGoals: false, showMetricsOverlay: true });
     });
     it('lists beta signups and updates their status', async () => {
         renderAdmin();

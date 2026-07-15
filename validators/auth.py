@@ -253,6 +253,13 @@ class LandingExampleShowcaseSchema(BaseModel):
         return self
 
 
+class LandingTreeViewSettingsSchema(BaseModel):
+    fadeInactiveBranches: bool = False
+    hideInactiveGoals: bool = False
+    hideCompletedGoals: bool = False
+    showMetricsOverlay: bool = False
+
+
 class LandingGoalBulletSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -298,6 +305,7 @@ class LandingExampleSelectionSchema(BaseModel):
     label: str = Field(..., min_length=1, max_length=120)
     sort_order: int = Field(..., ge=0, le=1000)
     showcase: Optional[LandingExampleShowcaseSchema] = None
+    tree_view_settings: Optional[LandingTreeViewSettingsSchema] = None
     landing_content: Optional[LandingExampleContentSchema] = None
 
     @field_validator('root_id', 'label')
