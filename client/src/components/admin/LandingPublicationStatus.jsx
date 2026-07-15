@@ -24,7 +24,10 @@ export function LandingPublicationSummary({ publishedAt, publishedCount, deliver
                 <span>
                     Delivery: {delivery.status === 'delivered' ? 'static verified' : 'API only'}
                     {Number.isFinite(delivery.compressed_snapshot_bytes)
-                        ? ` · ${formatBytes(delivery.compressed_snapshot_bytes)}`
+                        ? ` · ${formatBytes(delivery.compressed_snapshot_bytes)} transfer`
+                        : ''}
+                    {Number.isFinite(delivery.snapshot_bytes)
+                        ? ` · ${formatBytes(delivery.snapshot_bytes)} expanded`
                         : ''}
                 </span>
             )}

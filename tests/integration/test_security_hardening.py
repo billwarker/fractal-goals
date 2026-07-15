@@ -33,6 +33,8 @@ def test_cloudbuild_sets_private_beta_production_security_env():
     assert 'ALLOW_IN_MEMORY_RATELIMIT=true' in cloudbuild
     assert 'WEB_CONCURRENCY=1' in cloudbuild
     assert "'--max-instances', '1'" in cloudbuild
+    assert 'LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES=4000000' in cloudbuild
+    assert 'LANDING_EXAMPLES_MAX_COMPRESSED_BYTES=500000' in cloudbuild
 
 
 def test_cloudbuild_does_not_bake_cross_site_api_url_into_frontend():

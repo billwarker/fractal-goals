@@ -1172,7 +1172,10 @@ def test_publish_landing_examples_rejects_oversized_snapshot_without_changing_pu
     )
 
     assert rejected.status_code == 413
-    assert 'too large to publish' in rejected.get_json()['error'].lower()
+    rejected_error = rejected.get_json()['error'].lower()
+    assert 'too large to publish' in rejected_error
+    assert 'expanded bytes' in rejected_error
+    assert 'transfer bytes' in rejected_error
     unchanged = admin_client.get('/api/public/landing-examples').get_json()
     assert unchanged['published_at'] == initial_payload['published_at']
     assert unchanged['revision'] == initial_payload['revision']

@@ -1394,14 +1394,20 @@ class LandingPublishService:
             self.db_session.rollback()
             return None, (
                 "Landing snapshot is too large to publish "
-                f"({snapshot_bytes:,} bytes; limit {config.LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES:,}). "
+                f"({snapshot_bytes:,} expanded bytes; "
+                f"limit {config.LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES:,}; "
+                f"{compressed_bytes:,} transfer bytes; "
+                f"limit {config.LANDING_EXAMPLES_MAX_COMPRESSED_BYTES:,}). "
                 "Choose fewer or smaller example fractals."
             ), 413
         if compressed_bytes > config.LANDING_EXAMPLES_MAX_COMPRESSED_BYTES:
             self.db_session.rollback()
             return None, (
                 "Compressed landing snapshot is too large to publish "
-                f"({compressed_bytes:,} bytes; limit {config.LANDING_EXAMPLES_MAX_COMPRESSED_BYTES:,}). "
+                f"({compressed_bytes:,} transfer bytes; "
+                f"limit {config.LANDING_EXAMPLES_MAX_COMPRESSED_BYTES:,}; "
+                f"{snapshot_bytes:,} expanded bytes; "
+                f"limit {config.LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES:,}). "
                 "Choose fewer or smaller example fractals."
             ), 413
 

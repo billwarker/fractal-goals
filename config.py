@@ -91,7 +91,7 @@ class Config:
     # cache or static artifact changes. These ceilings protect publish latency,
     # GCS egress, browser parse time, and the landing page's memory footprint.
     LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES = max(
-        131_072, min(10_000_000, int(os.getenv('LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES', '2000000')))
+        131_072, min(10_000_000, int(os.getenv('LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES', '4000000')))
     )
     LANDING_EXAMPLES_MAX_COMPRESSED_BYTES = max(
         65_536, min(5_000_000, int(os.getenv('LANDING_EXAMPLES_MAX_COMPRESSED_BYTES', '500000')))
