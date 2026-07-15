@@ -79,10 +79,10 @@ const fallbackContent = {
                 heading: 'Every activity knows which goals it serves.',
                 body: "Activities are reusable building blocks with their own metrics. Link an activity to a goal once and every session that includes it feeds that goal automatically - the credit flows up the tree, from today's reps all the way to the ultimate ambition.",
                 cards: [
-                    { title: 'Reusable building blocks', body: 'Define an activity once, then reuse it across sessions, templates, and programs without rebuilding its metrics.' },
-                    { title: 'Goal associations travel with it', body: 'When an activity belongs to a goal, every future session that uses it contributes to that goal automatically.' },
-                    { title: 'Metrics are activity-native', body: 'Reps, ratings, durations, weights, attempts, and custom measures live with the activity they describe.' },
-                    { title: 'Progress compares to history', body: 'Completed activities can be compared against prior work so the log shows whether practice is improving.' },
+                    { title: 'Activity groups', body: 'Build a reusable catalogue, organize activities into groups, and add the right building blocks to any session without recreating them.' },
+                    { title: 'Activity builder', body: 'Define an activity once with its description, goal links, sets, splits, and reusable structure.' },
+                    { title: 'Metrics builder', body: 'Choose which measures the activity tracks, how they are entered, and which ones compare progress over time.' },
+                    { title: 'Progress timeline', body: 'Completed activities line up chronologically so each session can be compared against prior work.' },
                 ],
             },
             programs: {

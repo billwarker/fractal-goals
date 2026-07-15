@@ -20,6 +20,7 @@ import { buildGroupReorderPayload } from '../utils/manageActivities';
 import styles from './ManageActivities.module.css'; // Import CSS Module
 import { logError } from '../utils/logger';
 import EmptyState from '../components/common/EmptyState';
+import ActivityCatalogueToolbar from '../components/activities/ActivityCatalogueToolbar';
 
 /**
  * Manage Activities Page - Grid view of activity tiles with modal builder
@@ -481,21 +482,13 @@ function ManageActivities() {
                 subtitle="Create, group, and reuse activity definitions across sessions and templates."
                 actions={(
                     <>
-                        <label className={styles.searchLabel}>
-                            <span className={styles.searchText}>Search</span>
-                            <input
-                                type="search"
-                                value={searchTerm}
-                                onChange={(event) => setSearchTerm(event.target.value)}
-                                placeholder="Groups or activities"
-                                className={styles.searchInput}
-                            />
-                        </label>
-                        {allGroupIds.length > 0 && (
-                            <HeaderButton variant="secondary" onClick={handleToggleCollapseAll}>
-                                {allGroupsCollapsed ? 'Expand All' : 'Collapse All'}
-                            </HeaderButton>
-                        )}
+                        <ActivityCatalogueToolbar
+                            searchTerm={searchTerm}
+                            onSearchChange={setSearchTerm}
+                            hasGroups={allGroupIds.length > 0}
+                            allGroupsCollapsed={allGroupsCollapsed}
+                            onToggleCollapseAll={handleToggleCollapseAll}
+                        />
                         <HeaderButton variant="secondary" onClick={() => setShowMetricsModal(true)}>
                             Manage Metrics
                         </HeaderButton>

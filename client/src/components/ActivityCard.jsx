@@ -16,7 +16,8 @@ function ActivityCard({
     onDelete,
     isCreating,
     onDragStart,
-    isDragging
+    isDragging,
+    readOnly = false,
 }) {
     const formatLastUsedDate = (timestamp) => {
         if (!timestamp) return 'Never';
@@ -35,6 +36,7 @@ function ActivityCard({
         .length;
 
     const handleDragStart = (e) => {
+        if (readOnly) return;
         e.dataTransfer.setData('activityId', activity.id);
         e.dataTransfer.effectAllowed = 'move';
         if (onDragStart) onDragStart(activity.id);
@@ -42,11 +44,11 @@ function ActivityCard({
 
     return (
         <div
-            className={`${styles.card} ${styles.clickableCard} ${isDragging ? styles.dragging : ''}`}
-            onClick={() => onEdit(activity)}
-            draggable="true"
-            onDragStart={handleDragStart}
-            style={{ cursor: 'grab' }}
+            className={`${styles.card} ${readOnly ? '' : styles.clickableCard} ${isDragging ? styles.dragging : ''}`}
+            onClick={readOnly ? undefined : () => onEdit(activity)}
+            draggable={!readOnly}
+            onDragStart={readOnly ? undefined : handleDragStart}
+            style={readOnly ? undefined : { cursor: 'grab' }}
         >
             {/* Header */}
             <div>
@@ -100,25 +102,27 @@ function ActivityCard({
             </div>
 
             {/* Action Buttons */}
-            <div className={styles.actionList} onClick={(e) => e.stopPropagation()}>
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onDuplicate(activity);
-                    }}
-                    disabled={isCreating}
-                    className={styles.ghostAction}
-                    title="Copy this activity"
-                >
-                    Duplicate
-                </button>
-                <DeleteButton
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onDelete(activity);
-                    }}
-                />
-            </div>
+            {!readOnly && (
+                <div className={styles.actionList} onClick={(e) => e.stopPropagation()}>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDuplicate(activity);
+                        }}
+                        disabled={isCreating}
+                        className={styles.ghostAction}
+                        title="Copy this activity"
+                    >
+                        Duplicate
+                    </button>
+                    <DeleteButton
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(activity);
+                        }}
+                    />
+                </div>
+            )}
         </div>
     );
 }

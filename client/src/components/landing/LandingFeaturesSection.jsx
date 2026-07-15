@@ -15,7 +15,7 @@ import {
 import styles from './LandingFeaturesSection.module.css';
 
 const PRIMARY_FEATURE_ORDER = ['session', 'activity', 'programs', 'analytics'];
-const ACTIVITY_VIEW_ORDER = ['builder', 'metrics', 'timeline'];
+const ACTIVITY_VIEW_ORDER = ['catalogue', 'builder', 'metrics', 'timeline'];
 
 // The landing Features section mirrors the goals-view section: message and
 // feature selectors on the left, live viewport on the right.

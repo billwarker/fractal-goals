@@ -116,6 +116,10 @@ Session notes remain attached to the work that produced them, ready for review w
 
 Activities are reusable building blocks with their own metrics. Link an activity to a goal once and every session that includes it feeds that goal automatically - the credit flows up the tree, from today's reps all the way to the ultimate ambition.
 
+#### Activity groups
+
+Build a reusable catalogue, organize activities into groups, and add the right building blocks to any session without recreating them.
+
 #### Activity builder
 
 Define an activity once with its description, goal links, sets, splits, and reusable structure.

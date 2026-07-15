@@ -451,6 +451,7 @@ function Landing() {
                 sessions: Array.isArray(example.sessions) ? example.sessions : [],
                 activityDefinitions: Array.isArray(example.activity_definitions) ? example.activity_definitions : [],
                 activityGroups: Array.isArray(example.activity_groups) ? example.activity_groups : [],
+                activityInstantiationSummary: example.activity_instantiation_summary || {},
                 analyticsViews: Array.isArray(example.analytics_views) ? example.analytics_views : [],
                 analyticsActivityInstances: example.analytics_activity_instances || {},
                 sessionTemplates: Array.isArray(example.session_templates) ? example.session_templates : [],

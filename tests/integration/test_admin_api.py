@@ -502,6 +502,21 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     ))
     db_session.commit()
 
+    catalogue_group = ActivityGroup(
+        id=str(uuid.uuid4()),
+        root_id=admin_landing_fractal.id,
+        name='Catalogue Group',
+        sort_order=0,
+    )
+    catalogue_only_activity = ActivityDefinition(
+        id=str(uuid.uuid4()),
+        root_id=admin_landing_fractal.id,
+        group_id=catalogue_group.id,
+        name='Catalogue-only Activity',
+    )
+    db_session.add_all([catalogue_group, catalogue_only_activity])
+    db_session.commit()
+
     publish_response = admin_client.post(
         '/api/admin/landing-examples/publish',
         data=json.dumps({}),
@@ -561,13 +576,23 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     assert isinstance(public_example['programs'], list)
     assert [session['name'] for session in public_example['sessions']] == ['Public Demo Session']
     assert [template['name'] for template in public_example['session_templates']] == ['Public Demo Template']
-    assert [activity['name'] for activity in public_example['activity_definitions']] == ['Public Demo Activity']
-    assert isinstance(public_example['activity_groups'], list)
+    assert [activity['name'] for activity in public_example['activity_definitions']] == [
+        'Catalogue-only Activity', 'Public Demo Activity',
+    ]
+    assert [group['name'] for group in public_example['activity_groups']] == ['Catalogue Group']
+    demo_activity = next(
+        activity for activity in public_example['activity_definitions']
+        if activity['name'] == 'Public Demo Activity'
+    )
+    demo_activity_summary = public_example['activity_instantiation_summary'][demo_activity['id']]
+    assert demo_activity_summary['instance_count'] == 1
+    assert demo_activity_summary['average_duration_seconds'] == 2700
+    assert demo_activity_summary['last_used_at']
     assert [view['name'] for view in public_example['analytics_views']] == ['Public Demo Analytics View']
 
     # Snapshot carries a schema version for forward-safe shape evolution.
-    assert public_example['schema_version'] == 9
-    assert public_payload['schema_version'] == 9
+    assert public_example['schema_version'] == 10
+    assert public_payload['schema_version'] == 10
     assert [bullet['key'] for bullet in public_example['landing_content']['goals']['bullets']] == [
         'break_down', 'associate_activities', 'set_targets',
     ]
@@ -591,7 +616,7 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     cache = db_session.get(AppSetting, 'landing_example_cache')
     assert cache is not None
     assert cache.value['examples'][0]['root_id'] == admin_landing_fractal.id
-    assert cache.value['schema_version'] == 9
+    assert cache.value['schema_version'] == 10
 
 
 @pytest.mark.integration
@@ -1008,7 +1033,7 @@ def test_publish_landing_examples_reports_edge_cache_warm_status(admin_client, a
     static_publish = publish()
     assert static_publish['static_snapshot'] == 'ok'
     static_payload = json.loads(static_snapshot_path.read_text())
-    assert static_payload['schema_version'] == 9
+    assert static_payload['schema_version'] == 10
     assert static_payload['published_at'] == static_publish['published_at']
     assert static_payload['examples'][0]['root_id'] == admin_landing_fractal.id
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_PATH', '')

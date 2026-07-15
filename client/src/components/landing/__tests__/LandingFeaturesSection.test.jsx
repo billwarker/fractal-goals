@@ -55,6 +55,10 @@ describe('LandingFeaturesSection', () => {
 
         fireEvent.click(screen.getByRole('tab', { name: 'Activities' }));
 
+        expect(screen.getByTestId('activity-view')).toHaveTextContent('catalogue');
+
+        fireEvent.click(screen.getByRole('button', { name: /Activity builder/i }));
+
         expect(screen.getByTestId('activity-view')).toHaveTextContent('builder');
 
         fireEvent.click(screen.getByRole('button', { name: /Metrics builder/i }));

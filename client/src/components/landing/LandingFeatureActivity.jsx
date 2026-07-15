@@ -5,11 +5,13 @@ import { ActivityTimelineCard } from '../common/ActivityTimeline';
 import ViewToggleTabs from '../common/ViewToggleTabs';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { buildGoalAssociationSummary, flattenGoals } from '../activityBuilder/activityBuilderUtils';
+import LandingActivityCatalogue from './LandingActivityCatalogue';
 import { buildActivityLineage } from './landingFeatureModel';
 import styles from './LandingFeaturesSection.module.css';
 import metricModalStyles from '../modals/ManageMetricsModal.module.css';
 
 const ACTIVITY_VIEWS = [
+    { key: 'catalogue', label: 'Groups' },
     { key: 'builder', label: 'Builder' },
     { key: 'metrics', label: 'Metrics' },
     { key: 'timeline', label: 'Timeline' },
@@ -241,7 +243,7 @@ export default function LandingFeatureActivity({
         setPreviewSelectedGoalIds(activityGoalIds);
     }, [activityGoalIds]);
 
-    if (!selectedActivity) {
+    if (!selectedActivity && activeView !== 'catalogue') {
         return <div className={styles.emptyState}>Publish an example with activities to preview goal inheritance.</div>;
     }
 
@@ -493,6 +495,15 @@ export default function LandingFeatureActivity({
     );
 
     const renderActiveView = () => {
+        if (activeView === 'catalogue') {
+            return (
+                <LandingActivityCatalogue
+                    activities={resolveExampleActivityDefinitions(example)}
+                    activityGroups={example?.activityGroups || example?.activity_groups || []}
+                    instantiationSummary={example?.activityInstantiationSummary || example?.activity_instantiation_summary || {}}
+                />
+            );
+        }
         if (activeView === 'metrics') return renderMetricsView();
         if (activeView === 'timeline') return renderTimelineView();
         return renderBuilderView();

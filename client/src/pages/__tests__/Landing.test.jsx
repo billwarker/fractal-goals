@@ -168,6 +168,13 @@ const publishedExamples = {
                 metric_definitions: [{ id: 'metric-1', name: 'Reps', unit: 'count' }],
             }],
             activity_groups: [{ id: 'group-1', name: 'Technique', parent_id: null, sort_order: 0 }],
+            activity_instantiation_summary: {
+                'activity-1': {
+                    instance_count: 2,
+                    last_used_at: '2026-07-14T12:00:00Z',
+                    average_duration_seconds: 540,
+                },
+            },
             analytics_views: [{
                 id: 'view-1',
                 name: 'Session Duration Trend',
@@ -467,6 +474,10 @@ describe('Landing', () => {
         // Activity feature shows the builder modal plus the goal selector demo.
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
         expect(screen.getByRole('tab', { name: landingContent.features.items.activity.label })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByRole('region', { name: 'Activity catalogue' })).toBeInTheDocument();
+        expect(screen.getByText('2 instances')).toBeInTheDocument();
+        expect(screen.getByText('Avg: 9m')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /Activity builder/i }));
         expect(screen.getByLabelText('Activity Name')).toHaveValue('CAGED Triads');
         expect(screen.getByRole('heading', { name: 'Associate "CAGED Triads"' })).toBeInTheDocument();
         expect(screen.getByRole('checkbox', { name: 'Select Map the fretboard' })).toBeInTheDocument();
@@ -547,6 +558,7 @@ describe('Landing', () => {
         expect(screen.getByLabelText('Featured Older Session detail preview')).toBeInTheDocument();
         // Featured activity is the activity loaded into the builder preview.
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
+        fireEvent.click(screen.getByRole('button', { name: /Activity builder/i }));
         expect(screen.getByLabelText('Activity Name')).toHaveValue('Featured Scales');
         expect(screen.getByRole('heading', { name: 'Associate "Featured Scales"' })).toBeInTheDocument();
         // The featured activity's linked goal and its ancestors render in the
@@ -806,6 +818,7 @@ describe('Landing', () => {
         renderLanding();
         await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.activity.label }));
+        fireEvent.click(screen.getByRole('button', { name: /Activity builder/i }));
         scrollIntoViewCalls.length = 0;
         fireEvent.click(screen.getByText('Map the fretboard'));
         expect(scrollIntoViewCalls).toHaveLength(0);

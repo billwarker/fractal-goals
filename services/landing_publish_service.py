@@ -15,7 +15,7 @@ from pathlib import Path
 
 import requests
 from google.cloud import storage
-from sqlalchemy import func, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -54,6 +54,7 @@ from services.serializers import (
 )
 from services.service_types import JsonDict, ServiceResult
 from services.session_service import SessionService
+from services.session_template_stats_service import MAX_DURATION_SECONDS
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ LANDING_EXAMPLE_SETTINGS_KEY = "landing_example_settings"
 LANDING_EXAMPLE_CACHE_KEY = "landing_example_cache"
 # Bump when the published landing snapshot shape changes so the frontend / future
 # migrations can detect and handle stale caches.
-LANDING_EXAMPLE_SCHEMA_VERSION = 9
+LANDING_EXAMPLE_SCHEMA_VERSION = 10
 # Match the production goal timeline's first-page depth so the landing modal
 # keeps feature parity while the payload stays lean through field compaction.
 LANDING_EXAMPLE_TIMELINE_LIMIT = 50
@@ -72,6 +73,7 @@ LANDING_EXAMPLE_ANALYTICS_LIMIT = 24
 # Bound the admin showcase picker lists so the options endpoint stays light.
 LANDING_EXAMPLE_OPTIONS_SESSIONS_LIMIT = 50
 LANDING_EXAMPLE_OPTIONS_ACTIVITIES_LIMIT = 200
+LANDING_EXAMPLE_ACTIVITY_CATALOGUE_LIMIT = 200
 LANDING_EXAMPLE_SHOWCASE_ACTIVITY_LIMIT = 1
 LANDING_EXAMPLE_SHOWCASE_ANALYTICS_VIEW_LIMIT = 3
 LANDING_EXAMPLE_SHOWCASE_KEYS = (
@@ -1055,6 +1057,16 @@ class LandingPublishService:
         activity_ids.update(showcase["activity_ids"])
         activity_ids.update(analytics_activity_ids)
 
+        # The Activities feature opens on a read-only Manage Activities-style
+        # catalogue, so publish the bounded fractal catalogue rather than only
+        # definitions referenced by recent sessions or analytics. Explicit
+        # showcase/analytics references above remain included beyond the cap.
+        catalogue_activity_ids = self.db_session.query(ActivityDefinition.id).filter(
+            ActivityDefinition.root_id == root.id,
+            ActivityDefinition.deleted_at == None,
+        ).order_by(ActivityDefinition.name.asc()).limit(LANDING_EXAMPLE_ACTIVITY_CATALOGUE_LIMIT).all()
+        activity_ids.update(row[0] for row in catalogue_activity_ids)
+
         activity_groups = self.db_session.query(ActivityGroup).filter(
             ActivityGroup.root_id == root.id,
             ActivityGroup.deleted_at == None,
@@ -1082,8 +1094,48 @@ class LandingPublishService:
                 ActivityDefinition.id.in_(activity_ids),
                 ActivityDefinition.root_id == root.id,
                 ActivityDefinition.deleted_at == None,
-            ).all()
+            ).order_by(ActivityDefinition.name.asc()).all()
             activity_definitions = [serialize_activity_definition(activity) for activity in activities]
+
+        activity_instantiation_summary = {}
+        if activity_ids:
+            summary_rows = self.db_session.query(
+                ActivityInstance.activity_definition_id,
+                func.count(ActivityInstance.id),
+                func.max(func.coalesce(Session.session_start, Session.created_at, ActivityInstance.created_at)),
+                func.avg(case(
+                    (
+                        and_(
+                            ActivityInstance.completed.is_(True),
+                            ActivityInstance.duration_seconds > 0,
+                            ActivityInstance.duration_seconds <= MAX_DURATION_SECONDS,
+                        ),
+                        ActivityInstance.duration_seconds,
+                    ),
+                    else_=None,
+                )),
+            ).join(
+                Session,
+                Session.id == ActivityInstance.session_id,
+            ).filter(
+                ActivityInstance.activity_definition_id.in_(activity_ids),
+                ActivityInstance.root_id == root.id,
+                ActivityInstance.deleted_at == None,
+                Session.root_id == root.id,
+                Session.deleted_at == None,
+            ).group_by(ActivityInstance.activity_definition_id).all()
+            activity_instantiation_summary = {
+                str(activity_id): {
+                    "instance_count": int(instance_count or 0),
+                    "last_used_at": format_utc(last_used_at),
+                    "average_duration_seconds": (
+                        int(round(float(average_duration_seconds)))
+                        if average_duration_seconds is not None
+                        else None
+                    ),
+                }
+                for activity_id, instance_count, last_used_at, average_duration_seconds in summary_rows
+            }
 
         analytics_activity_instances = self._build_landing_analytics_activity_instances(
             root,
@@ -1102,6 +1154,7 @@ class LandingPublishService:
             "sessions": sessions,
             "activity_definitions": activity_definitions,
             "activity_groups": [serialize_activity_group(group) for group in activity_groups],
+            "activity_instantiation_summary": activity_instantiation_summary,
             "analytics_views": analytics_views,
             "analytics_activity_instances": analytics_activity_instances,
             "session_templates": [serialize_session_template(template) for template in templates],
@@ -1150,6 +1203,7 @@ class LandingPublishService:
                 "sessions": showcase_data["sessions"],
                 "activity_definitions": showcase_data["activity_definitions"],
                 "activity_groups": showcase_data["activity_groups"],
+                "activity_instantiation_summary": showcase_data["activity_instantiation_summary"],
                 "analytics_views": showcase_data["analytics_views"],
                 "analytics_activity_instances": showcase_data["analytics_activity_instances"],
                 "session_templates": showcase_data["session_templates"],
