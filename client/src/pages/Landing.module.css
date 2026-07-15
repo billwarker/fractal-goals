@@ -771,6 +771,15 @@
         flex-direction: column;
         gap: 4px;
         overflow-y: auto;
+        overscroll-behavior-y: contain;
+    }
+
+    /* The dock owns several nested Goal Details scrollers. Contain their native
+       overscroll while the page-level wheel guard handles boundary intent. */
+    :global(.landing-goal-dock) :global([class*="viewContainer"]),
+    :global(.landing-goal-dock) :global([class*="panelContent"]),
+    :global(.landing-goal-dock) :global([class*="modalScrollArea"]) {
+        overscroll-behavior-y: contain;
     }
 
     .goalViewCards {

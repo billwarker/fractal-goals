@@ -17,6 +17,7 @@ import { findGoalNodeById, getGoalNodeId } from '../utils/goalNodeModel';
 import { publicApi } from '../utils/api';
 import { fetchLandingExamples, LANDING_EXAMPLES_STALE_TIME } from '../utils/landingPrefetch';
 import { buildLandingGoalDemos } from '../utils/landingGoalDemos';
+import { resolveNestedWheelIntent } from '../utils/landingScrollNavigation';
 import styles from './Landing.module.css';
 // Reuse the real goals-page styles for the view-options widget and the docked
 // side-in detail panel (.flowtree-options-pane, .details-window.sidebar.docked).
@@ -116,24 +117,6 @@ function scrollToSection(sectionId) {
         block: 'nearest',
         inline: 'start',
     });
-}
-
-function canScrollVerticallyWithin(target, boundary, deltaY) {
-    let element = target instanceof Element ? target : null;
-    while (element && element !== boundary) {
-        const style = window.getComputedStyle(element);
-        const canScroll = /(auto|scroll)/.test(style.overflowY)
-            && element.scrollHeight > element.clientHeight;
-        if (canScroll) {
-            const canScrollUp = element.scrollTop > 0;
-            const canScrollDown = element.scrollTop + element.clientHeight < element.scrollHeight - 1;
-            if ((deltaY < 0 && canScrollUp) || (deltaY > 0 && canScrollDown)) {
-                return true;
-            }
-        }
-        element = element.parentElement;
-    }
-    return false;
 }
 
 const fallbackLandingExamples = [{
@@ -397,15 +380,16 @@ function Landing() {
     const [hoveredHeroExampleId, setHoveredHeroExampleId] = useState(null);
     const [isGoalTreeInteractionLocked, setIsGoalTreeInteractionLocked] = useState(true);
     const [goalTreeUnlockHint, setGoalTreeUnlockHint] = useState('locked');
+    const [goalExampleSpaceElement, setGoalExampleSpaceElement] = useState(null);
     const [formState, setFormState] = useState(initialFormState);
     const [status, setStatus] = useState('idle');
     const [message, setMessage] = useState('');
     const flowTreeRef = useRef(null);
     const flowTreeScopeTransitionTimerRef = useRef(null);
     const goalTreeUnlockHintTimerRef = useRef(null);
-    const goalExampleSpaceRef = useRef(null);
     const wheelSectionCooldownTimerRef = useRef(null);
     const wheelTargetSectionRef = useRef(SECTION_IDS[0]);
+    const wheelGestureRef = useRef(null);
     const mainRef = useRef(null);
     const activeSectionId = useActiveLandingSection(mainRef, SECTION_IDS);
 
@@ -417,6 +401,7 @@ function Landing() {
 
     useEffect(() => {
         wheelTargetSectionRef.current = activeSectionId || SECTION_IDS[0];
+        wheelGestureRef.current = null;
     }, [activeSectionId]);
 
     // Same key/fn/staleTime as the boot-time prefetch in main.jsx, so this
@@ -570,6 +555,7 @@ function Landing() {
 
     const navigateToSection = useCallback((sectionId) => {
         wheelTargetSectionRef.current = sectionId;
+        wheelGestureRef.current = null;
         scrollToSection(sectionId);
     }, []);
 
@@ -709,8 +695,18 @@ function Landing() {
         const container = mainRef.current;
         if (!container || event.defaultPrevented) return;
         if (!window.matchMedia('(min-width: 981px)').matches) return;
-        if (Math.abs(event.deltaY) > Math.abs(event.deltaX)
-            && canScrollVerticallyWithin(event.target, container, event.deltaY)) {
+        const nestedIntent = resolveNestedWheelIntent({
+            target: event.target,
+            boundary: container,
+            deltaX: event.deltaX,
+            deltaY: event.deltaY,
+            previousGesture: wheelGestureRef.current,
+            now: Date.now(),
+        });
+        wheelGestureRef.current = nestedIntent.gesture;
+        if (nestedIntent.action === 'nested') return;
+        if (nestedIntent.action === 'hold') {
+            event.preventDefault();
             return;
         }
 
@@ -732,6 +728,7 @@ function Landing() {
 
         const nextSectionId = SECTION_IDS[nextIndex];
         wheelTargetSectionRef.current = nextSectionId;
+        wheelGestureRef.current = null;
         scrollToSection(nextSectionId);
         wheelSectionCooldownTimerRef.current = setTimeout(() => {
             wheelSectionCooldownTimerRef.current = null;
@@ -851,7 +848,7 @@ function Landing() {
                         ) : (
                             <div className={styles.goalExplorer}>
                                 <div
-                                    ref={goalExampleSpaceRef}
+                                    ref={setGoalExampleSpaceElement}
                                     className={`${styles.goalTreeCanvas} ${isGoalTreeInteractionLocked ? styles.goalTreeCanvasLocked : ''}`}
                                     aria-label={`${selectedExample.root} goal tree`}
                                     aria-describedby="examples-title"
@@ -979,7 +976,7 @@ function Landing() {
                             historicalInstances={selectedExample.analyticsActivityInstances?.[
                                 activeTargetManagerSelection.target.activity_id
                             ]}
-                            portalTarget={goalExampleSpaceRef.current}
+                            portalTarget={goalExampleSpaceElement}
                             onClose={closeTargetManager}
                         />
                     </Suspense>

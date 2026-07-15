@@ -1183,6 +1183,7 @@
         flex: 1;
         min-height: 0;
         overflow-y: auto;
+        overscroll-behavior-y: contain;
         padding-right: 2px;
     }
 
@@ -1215,8 +1216,22 @@
         flex: 1;
         min-height: 0;
         overflow-y: auto;
+        overscroll-behavior-y: contain;
         display: flex;
         flex-direction: column;
+    }
+
+    /* Feature previews contain their own app-like scroll surfaces. Native
+       containment complements Landing's fresh-gesture boundary guard. */
+    .landingSessionScreen,
+    .activityModalPreview,
+    .activityTimelinePreview,
+    .builderModalBody,
+    .programPreviewBlocksPanel,
+    .programSidePaneScroll,
+    .analyticsDashboardGrid,
+    .analyticsFiltersPane {
+        overscroll-behavior-y: contain;
     }
 
     .stageBody > * {
