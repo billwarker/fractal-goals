@@ -133,7 +133,7 @@ function GoalViewMode({
                         headerColor="var(--color-text-primary)"
                         goalType={goalType}
                         goalCompleted={isCompleted}
-                        onTargetClick={readOnly ? undefined : onTargetClick}
+                        onTargetClick={onTargetClick}
                         onRequestBuilder={readOnly ? undefined : onRequestTargetBuilder}
                         readOnly={readOnly}
                     />

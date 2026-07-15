@@ -82,7 +82,7 @@ export default function LandingGoalsEditor({ content, onChange, options, styles 
                 <p className={styles.landingInteractionHint}>
                     {bullet.key === 'break_down' && 'Opens this goal, focuses its lineage, and shows Goal Details.'}
                     {bullet.key === 'associate_activities' && 'Opens this goal directly on its Activities view.'}
-                    {bullet.key === 'set_targets' && 'Opens the selected target in its read-only target manager.'}
+                    {bullet.key === 'set_targets' && 'Opens the selected target in the read-only analytics manager modal.'}
                 </p>
             </fieldset>;
         })}

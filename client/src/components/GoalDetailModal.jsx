@@ -18,7 +18,6 @@ import { getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalDetailModalRenderSurface from './goalDetail/GoalDetailModalRenderSurface';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
 import { logError } from '../utils/logger';
-
 const loadGraphProfileModal = () => import('./analytics/graphs/GraphProfileModal');
 /**
  * GoalDetailModal Component
@@ -51,7 +50,7 @@ function GoalDetailModal({
     mode = 'view',  // 'view', 'edit', or 'create'
     onCreate,  // Function to call when creating a new goal
     parentGoal,  // Parent goal for context when creating
-    onGoalSelect, // Handler for selecting a goal (e.g. child)
+    onGoalSelect, onTargetOpen, // Optional host actions for selecting goals/opening read-only targets
     onAssociationsChanged, // Callback when activity associations change
     onMobileCollapse,
     readOnly = false,
@@ -711,6 +710,7 @@ function GoalDetailModal({
             needsLevelPicker={needsLevelPicker}
             onDelete={onDelete}
             onGoalSelect={onGoalSelect}
+            onTargetOpen={onTargetOpen}
             onMobileCollapse={onMobileCollapse}
             onToggleCompletion={onToggleCompletion}
             onUpdate={onUpdate}

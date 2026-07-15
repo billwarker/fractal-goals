@@ -1,25 +1,24 @@
 import React from 'react';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, within } from '@testing-library/react';
 
 import { renderWithProviders } from '../../../test/test-utils';
 import TargetAnalyticsModal from '../TargetAnalyticsModal';
 import { baseAnalytics } from './targetAnalyticsTestFixtures';
-
-const { mockData, mockPreviewData, chartMocks } = vi.hoisted(() => ({
+const { mockData, mockPreviewData, chartMocks, targetAnalyticsHookMock } = vi.hoisted(() => ({
     mockData: { current: null },
     mockPreviewData: { current: null },
     chartMocks: {
         line: vi.fn(),
         scatter: vi.fn(),
     },
+    targetAnalyticsHookMock: vi.fn(),
 }));
 
 vi.mock('../../../hooks/useTargetQueries', () => ({
-    useTargetAnalytics: () => ({
-        data: mockData.current,
-        isLoading: false,
-        error: null,
-    }),
+    useTargetAnalytics: (...args) => {
+        targetAnalyticsHookMock(...args);
+        return { data: mockData.current, isLoading: false, error: null };
+    },
     useGoalActivityInstances: () => ({
         data: mockPreviewData.current,
         isLoading: false,
@@ -67,13 +66,14 @@ describe('TargetAnalyticsModal', () => {
         mockPreviewData.current = null;
         chartMocks.line.mockClear();
         chartMocks.scatter.mockClear();
+        targetAnalyticsHookMock.mockClear();
         document.documentElement.style.removeProperty('--color-bg-tooltip');
         document.documentElement.style.removeProperty('--color-text-primary');
         document.documentElement.style.removeProperty('--color-text-secondary');
         document.documentElement.style.removeProperty('--color-border');
     });
 
-    function setup() {
+    function setup(overrides = {}) {
         return renderWithProviders(
             <TargetAnalyticsModal
                 mode="view"
@@ -83,16 +83,14 @@ describe('TargetAnalyticsModal', () => {
                 goalColor="#a855f7"
                 activityDefinitions={[baseAnalytics.activity_definition]}
                 onClose={() => {}}
+                {...overrides}
             />,
             RENDER_OPTIONS
         );
     }
-
     function switchGraphType(type) {
         fireEvent.click(screen.getByRole('button', { name: 'Graph Type' }));
-        fireEvent.click(screen.getByRole('option', { name: type }));
-    }
-
+        fireEvent.click(screen.getByRole('option', { name: type })); }
     it('renders the target name and minimal status meta', () => {
         setup();
         expect(screen.getByText('Playthrough')).toBeInTheDocument();
@@ -103,7 +101,22 @@ describe('TargetAnalyticsModal', () => {
         expect(screen.getByLabelText('Primary Metric')).toHaveValue('speed');
         expect(screen.getByLabelText('Secondary Metric')).toHaveValue('quality');
     });
-
+    it('renders supplied landing analytics read-only without enabling an API query', () => {
+        const snapshotData = { ...baseAnalytics, target: { ...baseAnalytics.target, name: 'Published target' } };
+        setup({ rootId: 'public-example', target: snapshotData.target, analyticsData: snapshotData, readOnly: true });
+        expect(screen.getByText('Published target')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Edit target' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
+        expect(targetAnalyticsHookMock).toHaveBeenCalledWith('public-example', 'target-1',
+            expect.objectContaining({ enabled: false }));
+    });
+    it('can portal its backdrop into a scoped landing host', () => {
+        const host = document.createElement('div');
+        document.body.appendChild(host);
+        const view = setup({ analyticsData: baseAnalytics, portalTarget: host, overlayClassName: 'scoped-overlay' });
+        expect(within(host).getByText('Playthrough')).toBeInTheDocument();
+        expect(host.querySelector('.scoped-overlay')).toBeInTheDocument();
+        view.unmount(); host.remove(); });
     it('does not present a partially met metric as target completion', () => {
         mockData.current = {
             ...baseAnalytics,

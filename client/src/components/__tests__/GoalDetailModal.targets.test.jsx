@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import GoalDetailModal from '../GoalDetailModal';
 
@@ -70,12 +70,14 @@ vi.mock('../goals/GoalHeader', () => ({
 }));
 
 vi.mock('../goals/GoalViewMode', () => ({
-    default: ({ name, targets }) => (
+    default: ({ name, targets, onTargetClick }) => (
         <div>
             <div>view:{name}</div>
             <div>target-count:{targets.length}</div>
             {targets.map((target) => (
-                <div key={target.id}>target:{target.name}</div>
+                <button type="button" key={target.id} onClick={() => onTargetClick?.(target)}>
+                    target:{target.name}
+                </button>
             ))}
         </div>
     ),
@@ -148,5 +150,30 @@ describe('GoalDetailModal target hydration', () => {
 
         expect(screen.getByText('target-count:1')).toBeInTheDocument();
         expect(screen.getByText('target:Section 1')).toBeInTheDocument();
+    });
+
+    it('forwards read-only target opens to the host without entering inline target editing', () => {
+        const onTargetOpen = vi.fn();
+        const target = { id: 'target-1', name: 'Section 1', activity_id: 'activity-1', metrics: [] };
+        render(
+            <GoalDetailModal
+                isOpen
+                readOnly
+                onClose={vi.fn()}
+                onTargetOpen={onTargetOpen}
+                goal={{
+                    id: 'goal-1',
+                    name: 'Practice',
+                    type: 'ShortTermGoal',
+                    attributes: { id: 'goal-1', type: 'ShortTermGoal', targets: [target] },
+                }}
+                rootId="root-1"
+                activityDefinitions={[{ id: 'activity-1', name: 'Practice', metric_definitions: [] }]}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'target:Section 1' }));
+        expect(onTargetOpen).toHaveBeenCalledWith(target);
+        expect(screen.queryByText('target manager')).not.toBeInTheDocument();
     });
 });

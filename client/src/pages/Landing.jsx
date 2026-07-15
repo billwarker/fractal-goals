@@ -11,6 +11,7 @@ import { GoalLevelsProvider } from '../contexts/GoalLevelsContext';
 import landingContent from '../content/landingContent';
 import useActiveLandingSection from '../hooks/useActiveLandingSection';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
+import useLandingTargetManager from '../hooks/useLandingTargetManager';
 import { queryKeys } from '../hooks/queryKeys';
 import { findGoalNodeById, getGoalNodeId } from '../utils/goalNodeModel';
 import { publicApi } from '../utils/api';
@@ -23,6 +24,7 @@ import './FractalGoals.css';
 
 const FlowTree = lazy(() => import('../FlowTree'));
 const GoalDetailModal = lazy(() => import('../components/ConnectedGoalDetailModal'));
+const LandingTargetManagerModal = lazy(() => import('../components/landing/LandingTargetManagerModal'));
 
 const DEFAULT_VIEW_SETTINGS = {
     fadeInactiveBranches: false,
@@ -387,7 +389,7 @@ function Landing() {
     const isMobile = useIsMobile();
     const [selectedExampleId, setSelectedExampleId] = useState(null);
     const [selectedGoalId, setSelectedGoalId] = useState(null);
-    const [goalDetailEntry, setGoalDetailEntry] = useState({ view: 'goal', targetId: null, key: 0 });
+    const [goalDetailEntry, setGoalDetailEntry] = useState({ view: 'goal', key: 0 });
     const [flowTreeScopeKey, setFlowTreeScopeKey] = useState(0);
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
     const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
@@ -401,6 +403,7 @@ function Landing() {
     const flowTreeRef = useRef(null);
     const flowTreeScopeTransitionTimerRef = useRef(null);
     const goalTreeUnlockHintTimerRef = useRef(null);
+    const goalExampleSpaceRef = useRef(null);
     const wheelSectionCooldownTimerRef = useRef(null);
     const wheelTargetSectionRef = useRef(SECTION_IDS[0]);
     const mainRef = useRef(null);
@@ -454,6 +457,7 @@ function Landing() {
                 activityInstantiationSummary: example.activity_instantiation_summary || {},
                 analyticsViews: Array.isArray(example.analytics_views) ? example.analytics_views : [],
                 analyticsActivityInstances: example.analytics_activity_instances || {},
+                targetAnalytics: example.target_analytics || {},
                 sessionTemplates: Array.isArray(example.session_templates) ? example.session_templates : [],
                 // Admin-curated feature picks (schema v6+); null on older
                 // snapshots, in which case the Features section auto-derives.
@@ -484,6 +488,8 @@ function Landing() {
         () => publishedExamples.find((example) => example.id === selectedExampleId) || publishedExamples[0] || null,
         [publishedExamples, selectedExampleId]
     );
+    const { activeSelection: activeTargetManagerSelection, close: closeTargetManager,
+        open: openTargetManager } = useLandingTargetManager(selectedExample);
     const selectedGoal = useMemo(
         () => findGoalNodeById(selectedExample?.tree, selectedGoalId),
         [selectedExample, selectedGoalId]
@@ -572,7 +578,8 @@ function Landing() {
     const handleExampleSelect = (exampleId, { scrollToTree = false } = {}) => {
         setSelectedExampleId(exampleId);
         setSelectedGoalId(null);
-        setGoalDetailEntry((current) => ({ view: 'goal', targetId: null, key: current.key + 1 }));
+        setGoalDetailEntry((current) => ({ view: 'goal', key: current.key + 1 }));
+        closeTargetManager();
         setHoveredHeroExampleId(null);
         setIsGoalTreeInteractionLocked(true);
         setFlowTreeScopeKey((current) => current + 1);
@@ -584,7 +591,8 @@ function Landing() {
     const handleGoalSelect = (goal) => {
         const goalId = getGoalNodeId(goal);
         setSelectedGoalId(goalId);
-        setGoalDetailEntry((current) => ({ view: 'goal', targetId: null, key: current.key + 1 }));
+        setGoalDetailEntry((current) => ({ view: 'goal', key: current.key + 1 }));
+        closeTargetManager();
         // Bump the scope transition key so FlowTree re-filters to this goal's
         // lineage and re-centers smoothly, matching the authenticated goals page.
         setFlowTreeScopeKey((current) => current + 1);
@@ -592,7 +600,8 @@ function Landing() {
 
     const clearSelectedGoal = () => {
         setSelectedGoalId(null);
-        setGoalDetailEntry((current) => ({ view: 'goal', targetId: null, key: current.key + 1 }));
+        setGoalDetailEntry((current) => ({ view: 'goal', key: current.key + 1 }));
+        closeTargetManager();
         setFlowTreeScopeKey((current) => current + 1);
     };
 
@@ -623,7 +632,8 @@ function Landing() {
     const goalDemos = buildLandingGoalDemos({ clearSelectedGoal, fallbackCards: goalViewCards,
         findGoalById: findGoalNodeById, findGoalByType: findFirstGoalByType, goalsViewMode,
         handleGoalSelect, selectedExample, selectedGoal, selectedGoalId, setFlowTreeScopeKey,
-        setGoalDetailEntry, setGoalsViewMode, setSelectedGoalId, setViewSettings, viewSettings });
+        openTargetManager, setGoalDetailEntry, setGoalsViewMode, setSelectedGoalId,
+        setViewSettings, viewSettings });
 
     const isHeaderNavItemActive = (href) => {
         if (!href?.startsWith('#')) return false;
@@ -841,6 +851,7 @@ function Landing() {
                         ) : (
                             <div className={styles.goalExplorer}>
                                 <div
+                                    ref={goalExampleSpaceRef}
                                     className={`${styles.goalTreeCanvas} ${isGoalTreeInteractionLocked ? styles.goalTreeCanvasLocked : ''}`}
                                     aria-label={`${selectedExample.root} goal tree`}
                                     aria-describedby="examples-title"
@@ -922,9 +933,9 @@ function Landing() {
                                                             displayMode="panel"
                                                             readOnly
                                                             initialView={goalDetailEntry.view}
-                                                            initialTargetId={goalDetailEntry.targetId}
                                                             initialViewKey={goalDetailEntry.key}
                                                             onGoalSelect={handleGoalSelect}
+                                                            onTargetOpen={(target) => openTargetManager(selectedGoal, target)}
                                                         />
                                                     </GoalLevelsProvider>
                                                 </Suspense>
@@ -950,11 +961,27 @@ function Landing() {
                                 displayMode="modal"
                                 readOnly
                                 initialView={goalDetailEntry.view}
-                                initialTargetId={goalDetailEntry.targetId}
                                 initialViewKey={goalDetailEntry.key}
                                 onGoalSelect={handleGoalSelect}
+                                onTargetOpen={(target) => openTargetManager(selectedGoal, target)}
                             />
                         </GoalLevelsProvider>
+                    </Suspense>
+                )}
+                {activeTargetManagerSelection && (
+                    <Suspense fallback={null}>
+                        <LandingTargetManagerModal
+                            exampleId={selectedExample.id}
+                            goal={activeTargetManagerSelection.goal}
+                            target={activeTargetManagerSelection.target}
+                            activityDefinitions={selectedExample.activityDefinitions}
+                            analyticsData={selectedExample.targetAnalytics?.[activeTargetManagerSelection.target.id]}
+                            historicalInstances={selectedExample.analyticsActivityInstances?.[
+                                activeTargetManagerSelection.target.activity_id
+                            ]}
+                            portalTarget={goalExampleSpaceRef.current}
+                            onClose={closeTargetManager}
+                        />
                     </Suspense>
                 )}
             </section>

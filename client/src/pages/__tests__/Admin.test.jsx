@@ -358,26 +358,12 @@ describe('Admin', () => {
                 goals: [
                     { id: 'goal-1', name: 'Build a repertoire', level_name: 'Long Term Goal', targets: [] },
                     { id: 'goal-2', name: 'Play CAGED triads', level_name: 'Short Term Goal', targets: [] },
-                    {
-                        id: 'goal-3',
-                        name: 'Improve triad speed',
-                        level_name: 'Immediate Goal',
-                        targets: [{ id: 'target-1', name: '120 BPM clean changes' }],
-                    },
+                    { id: 'goal-3', name: 'Improve triad speed', level_name: 'Immediate Goal',
+                        targets: [{ id: 'target-1', name: '120 BPM clean changes' }] },
                 ],
                 sessions: [
-                    {
-                        id: 'session-empty',
-                        name: 'Timer only',
-                        session_start: '2026-06-09T12:00:00Z',
-                        activity_instance_count: 0,
-                    },
-                    {
-                        id: 'session-work',
-                        name: 'Practice session',
-                        session_start: '2026-06-08T12:00:00Z',
-                        activity_instance_count: 3,
-                    },
+                    { id: 'session-empty', name: 'Timer only', session_start: '2026-06-09T12:00:00Z', activity_instance_count: 0 },
+                    { id: 'session-work', name: 'Practice session', session_start: '2026-06-08T12:00:00Z', activity_instance_count: 3 },
                 ],
                 activities: [],
                 programs: [],

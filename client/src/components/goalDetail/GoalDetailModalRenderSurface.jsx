@@ -104,6 +104,7 @@ function GoalDetailModalRenderSurface({
     needsLevelPicker,
     onDelete,
     onGoalSelect,
+    onTargetOpen,
     onMobileCollapse,
     onToggleCompletion,
     onUpdate,
@@ -324,7 +325,7 @@ function GoalDetailModalRenderSurface({
                         onGoalSelect={onGoalSelect}
                         onUpdate={onUpdate}
                         setTargets={setTargets}
-                        onTargetClick={readOnly ? undefined : setActiveAnalyticsTarget}
+                        onTargetClick={readOnly ? onTargetOpen : setActiveAnalyticsTarget}
                         onRequestTargetBuilder={readOnly ? undefined : (target) => setBuilderConfig({ target: target ?? null })}
                         readOnly={readOnly}
                     />

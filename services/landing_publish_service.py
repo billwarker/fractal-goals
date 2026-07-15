@@ -39,6 +39,7 @@ from models import (
 )
 from services.activity_association_service import ActivityAssociationService
 from services.goal_loading import load_fractal_goals_for_serialization
+from services.goal_target_service import GoalTargetService
 from services.goal_timeline_service import GoalTimelineService
 from services.goal_type_utils import get_canonical_goal_type
 from services.note_service import NoteService
@@ -62,7 +63,7 @@ LANDING_EXAMPLE_SETTINGS_KEY = "landing_example_settings"
 LANDING_EXAMPLE_CACHE_KEY = "landing_example_cache"
 # Bump when the published landing snapshot shape changes so the frontend / future
 # migrations can detect and handle stale caches.
-LANDING_EXAMPLE_SCHEMA_VERSION = 10
+LANDING_EXAMPLE_SCHEMA_VERSION = 11
 # Match the production goal timeline's first-page depth so the landing modal
 # keeps feature parity while the payload stays lean through field compaction.
 LANDING_EXAMPLE_TIMELINE_LIMIT = 50
@@ -437,7 +438,51 @@ class LandingPublishService:
             "frequency_count": target.frequency_count,
             "completed": bool(target.completed),
             "completed_at": format_utc(target.completed_at),
+            "created_at": format_utc(target.created_at),
         }
+
+    def _build_landing_target_analytics(
+        self, root: Goal, serialized_tree: JsonDict
+    ) -> dict[str, JsonDict]:
+        """Publish bounded target analytics for the read-only public demo."""
+        targets = []
+        stack = [serialized_tree]
+        while stack:
+            node = stack.pop()
+            targets.extend(node.get("attributes", {}).get("targets") or [])
+            stack.extend(node.get("children") or [])
+
+        target_service = GoalTargetService(self.db_session)
+        result = {}
+        for target in targets:
+            target_id = target.get("id")
+            if not target_id:
+                continue
+            if not target.get("activity_id"):
+                result[target_id] = {
+                    "target": target,
+                    "activity_definition": None,
+                    "instances": [],
+                    "summary": {
+                        "created_at": target.get("created_at"),
+                        "total_count": 0,
+                        "last_instance_at": None,
+                        "days_since_created": None,
+                        "conditions": [],
+                        "completed": bool(target.get("completed")),
+                        "completed_at": target.get("completed_at"),
+                    },
+                }
+                continue
+            payload, error, _ = target_service.get_target_analytics(
+                root.id, target_id, root.owner_id, since="all"
+            )
+            if error or not payload:
+                continue
+            instances = payload.get("instances") or []
+            payload["instances"] = instances[-LANDING_EXAMPLE_ANALYTICS_LIMIT:]
+            result[target_id] = payload
+        return result
 
     @staticmethod
     def _serialize_landing_metric_ref(metric: MetricDefinition) -> JsonDict:
@@ -1194,6 +1239,7 @@ class LandingPublishService:
             item["showcase"] = resolved_showcase
             item["landing_content"] = resolved_content
             showcase_data = self._build_landing_showcase_data(root, resolved_showcase)
+            target_analytics = self._build_landing_target_analytics(root, serialized_tree)
             published_examples.append({
                 "root_id": root.id,
                 "label": item["label"],
@@ -1212,6 +1258,7 @@ class LandingPublishService:
                 "activity_instantiation_summary": showcase_data["activity_instantiation_summary"],
                 "analytics_views": showcase_data["analytics_views"],
                 "analytics_activity_instances": showcase_data["analytics_activity_instances"],
+                "target_analytics": target_analytics,
                 "session_templates": showcase_data["session_templates"],
             })
 

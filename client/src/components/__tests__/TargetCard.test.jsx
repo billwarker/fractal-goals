@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import TargetCard from '../TargetCard';
 
 vi.mock('../../contexts/GoalLevelsContext', () => ({
@@ -74,5 +74,30 @@ describe('TargetCard', () => {
         );
 
         expect(screen.getByText(/activity not found \(may have been deleted\)/i)).toBeInTheDocument();
+    });
+
+    it('supports keyboard activation when a target open action is provided', () => {
+        const onClick = vi.fn();
+        render(
+            <TargetCard
+                target={{
+                    id: 'target-1',
+                    activity_id: 'activity-1',
+                    type: 'threshold',
+                    metrics: [],
+                }}
+                activityDefinitions={[{ id: 'activity-1', name: 'Performance', metric_definitions: [] }]}
+                isCompleted={false}
+                goalType="ImmediateGoal"
+                onClick={onClick}
+            />
+        );
+
+        const card = screen.getByRole('button', { name: /Performance/ });
+        expect(card).toHaveAttribute('tabindex', '0');
+        expect(card).toHaveAttribute('data-readonly-allow', 'true');
+        fireEvent.keyDown(card, { key: 'Enter' });
+        fireEvent.keyDown(card, { key: ' ' });
+        expect(onClick).toHaveBeenCalledTimes(2);
     });
 });

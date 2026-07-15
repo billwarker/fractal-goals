@@ -64,6 +64,14 @@ function TargetCard({ target, activityDefinitions, onEdit, onDelete, onClick, is
     return (
         <div
             onClick={onClick}
+            onKeyDown={onClick ? (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                onClick();
+            } : undefined}
+            role={onClick ? 'button' : undefined}
+            tabIndex={onClick ? 0 : undefined}
+            data-readonly-allow={onClick ? true : undefined}
             className={`${styles.card} ${onClick ? styles.clickable : ''}`}
             style={cardStyleVars}
         >

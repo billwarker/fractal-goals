@@ -16,6 +16,7 @@ import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { computeAutoAggregations } from '../../utils/progressAggregations';
 import { themedTooltipOptions, thresholdLineAnnotations } from './targetAnalyticsChartOptions';
+import { selectTargetAnalyticsData } from './targetAnalyticsSnapshot';
 import styles from './TargetAnalyticsModal.module.css';
 
 const TargetManager = lazyWithRetry(
@@ -168,6 +169,10 @@ function TargetAnalyticsModal({
     onSaved,
     onDelete, // (target) => void — delete the target (view mode only)
     onClose,
+    analyticsData = null,
+    readOnly = false,
+    portalTarget = null,
+    overlayClassName = '',
 }) {
     // The modal can switch from view → edit in place when the user clicks Edit.
     const [activeMode, setActiveMode] = useState(mode);
@@ -193,11 +198,17 @@ function TargetAnalyticsModal({
     }, []);
 
     // View/edit of a saved target: analytics read model (respects since-toggle).
-    const { data, isLoading: analyticsLoading, error: analyticsError } = useTargetAnalytics(
+    const { data: remoteData, isLoading: remoteLoading, error: remoteError } = useTargetAnalytics(
         rootId,
         target?.id,
-        { since: showAllHistory ? 'all' : 'creation', enabled: Boolean(target?.id) }
+        { since: showAllHistory ? 'all' : 'creation', enabled: !analyticsData && Boolean(target?.id) }
     );
+    const data = useMemo(
+        () => selectTargetAnalyticsData(analyticsData, remoteData, showAllHistory),
+        [analyticsData, remoteData, showAllHistory]
+    );
+    const analyticsLoading = analyticsData ? false : remoteLoading;
+    const analyticsError = analyticsData ? null : remoteError;
 
     // Add mode (or live activity-history preview): instances for the draft activity.
     const draftActivityId = isBuilding ? (draft?.activity_id || initialActivityId) : null;
@@ -474,7 +485,7 @@ function TargetAnalyticsModal({
 
     return createPortal(
         <>
-            <ModalBackdrop className={styles.overlay} onClose={onClose}>
+            <ModalBackdrop className={`${styles.overlay} ${overlayClassName}`} onClose={onClose}>
                 <div
                     className={styles.content}
                     style={{ borderTop: `4px solid ${accent}` }}
@@ -488,7 +499,7 @@ function TargetAnalyticsModal({
                             <h2 className={styles.title} style={{ color: accent }}>{targetName}</h2>
                             {!isBuilding && <TargetMeta summary={summary} now={renderNow} />}
                         </div>
-                        {!isBuilding && target?.id && (
+                        {!readOnly && !isBuilding && target?.id && (
                             <div className={styles.headerActions}>
                                 <button
                                     type="button"
@@ -709,7 +720,7 @@ function TargetAnalyticsModal({
                 </div>
             </ModalBackdrop>
             <DeleteConfirmModal
-                isOpen={showDeleteConfirm}
+                isOpen={!readOnly && showDeleteConfirm}
                 onClose={() => setShowDeleteConfirm(false)}
                 onConfirm={handleConfirmDelete}
                 title="Delete Target"
@@ -718,7 +729,7 @@ function TargetAnalyticsModal({
                 overlayClassName={styles.deleteConfirmOverlay}
             />
         </>,
-        document.body
+        portalTarget || document.body
     );
 }
 
