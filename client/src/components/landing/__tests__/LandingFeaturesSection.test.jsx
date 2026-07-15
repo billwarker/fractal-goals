@@ -50,12 +50,12 @@ const example = {
 };
 
 describe('LandingFeaturesSection', () => {
-    it('syncs activity sidebar cards with the activity viewport tabs', () => {
+    it('syncs activity sidebar cards with the activity viewport tabs', async () => {
         render(<LandingFeaturesSection example={example} />);
 
         fireEvent.click(screen.getByRole('tab', { name: 'Activities' }));
 
-        expect(screen.getByTestId('activity-view')).toHaveTextContent('catalogue');
+        expect(await screen.findByTestId('activity-view')).toHaveTextContent('catalogue');
 
         fireEvent.click(screen.getByRole('button', { name: /Activity builder/i }));
 

@@ -43,6 +43,92 @@
   <meta name="twitter:title" content="Track every goal, program, and training session in one place" />
   <meta name="twitter:description" content="Break big goals into trackable trees, build your own programs, and log every session in one composable platform. Built for people training across many disciplines." />
   <meta name="twitter:image" content="https://fractalgoals.com/og-cover.png" />
+  <style>
+    .landing-boot-shell { display: none; }
+    [data-entry-surface="landing"] .landing-boot-shell {
+      min-height: 100vh;
+      box-sizing: border-box;
+      display: block;
+      padding: 20px clamp(16px, 4vw, 56px) 56px;
+      background: #10131a;
+      color: #eef2f8;
+      font-family: "DM Sans", system-ui, sans-serif;
+    }
+    [data-theme="light"][data-entry-surface="landing"] .landing-boot-shell {
+      background: #f8fafc;
+      color: #162033;
+    }
+    .landing-boot-header {
+      min-height: 48px;
+      max-width: 1560px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      font-size: 14px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .landing-boot-brand { display: flex; align-items: center; gap: 10px; }
+    .landing-boot-mark { width: 34px; height: 34px; color: #4f9cf9; }
+    .landing-boot-nav { display: flex; gap: 24px; color: #9da9bb; }
+    .landing-boot-hero { max-width: 1560px; margin: 0 auto; padding-top: 68px; }
+    .landing-boot-hero h1 {
+      max-width: 1120px;
+      margin: 0;
+      font-size: clamp(3.1rem, 8vw, 7.8rem);
+      line-height: .94;
+      letter-spacing: 0;
+    }
+    .landing-boot-examples { display: flex; gap: 18px; margin-top: 40px; }
+    .landing-boot-example {
+      width: 120px;
+      height: 120px;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #161b24;
+    }
+    [data-theme="light"] .landing-boot-example { background: #eef2f7; border-color: #cbd5e1; }
+    .landing-boot-copy {
+      max-width: 1050px;
+      margin-top: 32px;
+      padding: clamp(20px, 3vw, 34px);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      color: #b8c2d1;
+      font-size: clamp(1.2rem, 2.5vw, 2rem);
+      line-height: 1.35;
+      font-weight: 500;
+    }
+    [data-theme="light"] .landing-boot-copy { color: #526176; border-color: #cbd5e1; }
+    .boot-error { min-height: 100vh; display: grid; place-content: center; padding: 24px; text-align: center; }
+    @media (max-width: 700px) {
+      .landing-boot-nav { display: none; }
+      .landing-boot-hero { padding-top: 44px; }
+      .landing-boot-examples { gap: 10px; }
+      .landing-boot-example { width: min(28vw, 104px); height: min(28vw, 104px); }
+    }
+    @media (min-width: 981px) {
+      [data-entry-surface="landing"] .landing-boot-shell { padding: 0; }
+      .landing-boot-header {
+        position: fixed;
+        z-index: 1;
+        top: clamp(8px, 1.8vh, 18px);
+        left: 50%;
+        width: min(1120px, calc(100% - 48px));
+        transform: translateX(-50%);
+        justify-content: center;
+        gap: clamp(24px, 3vw, 44px);
+      }
+      .landing-boot-hero {
+        box-sizing: border-box;
+        max-width: none;
+        min-height: 100vh;
+        padding: clamp(78px, 9vh, 104px) clamp(12px, 1.2vw, 24px) 24px;
+      }
+    }
+  </style>
   <link rel="preconnect" href="https://storage.googleapis.com" crossorigin />
   <!-- Typography: DM Sans (UI body), DM Serif Display (display headings), JetBrains Mono (code/metrics) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -60,7 +146,9 @@
       var isMarketingHost = host === 'fractalgoals.com' || host === 'www.fractalgoals.com';
       var isLocalDevHost = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
       var isLocalPreviewPath = path === '/landing-preview' && isLocalDevHost;
-      if (!isLocalPreviewPath && !(path === '/' && isMarketingHost)) return;
+      var isLandingEntry = isLocalPreviewPath || (path === '/' && isMarketingHost);
+      document.documentElement.setAttribute('data-entry-surface', isLandingEntry ? 'landing' : 'app');
+      if (!isLandingEntry) return;
       var staticUrl = '%VITE_LANDING_EXAMPLES_STATIC_URL%';
       if (!staticUrl || staticUrl.charAt(0) === '%') staticUrl = '';
       window.__fgLandingExamplesStaticUrl = staticUrl;
@@ -92,7 +180,30 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <main class="landing-boot-shell" aria-label="Loading Fractal Goals" aria-busy="true">
+      <header class="landing-boot-header">
+        <span class="landing-boot-brand">
+          <svg class="landing-boot-mark" viewBox="0 0 100 100" aria-hidden="true">
+            <rect x="20" y="20" width="60" height="60" fill="currentColor" />
+            <rect x="20" y="20" width="60" height="60" fill="currentColor" transform="rotate(30 50 50)" />
+            <rect x="20" y="20" width="60" height="60" fill="currentColor" transform="rotate(60 50 50)" />
+          </svg>
+          Fractal Goals
+        </span>
+        <span class="landing-boot-nav" aria-hidden="true"><span>Goals</span><span>Features</span><span>Private beta</span><span>Open app</span></span>
+      </header>
+      <section class="landing-boot-hero">
+        <h1>Achieve Your Most Ambitious Goals</h1>
+        <div class="landing-boot-examples" aria-hidden="true">
+          <span class="landing-boot-example"></span><span class="landing-boot-example"></span><span class="landing-boot-example"></span>
+        </div>
+        <div class="landing-boot-copy">
+          Want to achieve big goals? Start by making them smaller. Fractal Goals breaks any ambition into a tree of smaller goals, lets you build your own programs toward them, and logs every session, activity, and metric - so all your training, across every discipline, lives in one connected system instead of five scattered apps.
+        </div>
+      </section>
+    </main>
+  </div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 

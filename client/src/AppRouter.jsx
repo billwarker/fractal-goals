@@ -17,9 +17,9 @@ import { queryKeys } from './hooks/queryKeys';
 
 // Import page components
 import Selection from './pages/Selection';
-import Landing from './pages/Landing';
 
 // Lazy load non-critical pages
+const Landing = lazyWithRetry(() => import('./pages/Landing'), 'pages/Landing');
 const FractalGoals = lazyWithRetry(() => import('./pages/FractalGoals'), 'pages/FractalGoals');
 const ProgramCalendarPage = lazyWithRetry(() => import('./pages/ProgramCalendarPage'), 'pages/ProgramCalendarPage');
 const Sessions = lazyWithRetry(() => import('./pages/Sessions'), 'pages/Sessions');
@@ -544,7 +544,7 @@ function App() {
                     {redirectDeprecatedLandingRoute ? (
                         <Navigate to="/" replace />
                     ) : showLandingPage ? (
-                        <Landing />
+                        <Suspense fallback={<div className="loading-spinner">Loading...</div>}><Landing /></Suspense>
                     ) : showSelectionPage ? (
                         <Selection />
                     ) : location.pathname === '/admin' ? (

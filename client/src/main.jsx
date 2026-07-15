@@ -1,120 +1,61 @@
-import { StrictMode, Suspense, lazy } from 'react'
-import { createRoot } from 'react-dom/client'
-import * as Sentry from "@sentry/react";
-import { BrowserRouter } from 'react-router-dom'
-import './index.css'
-
-if (import.meta.env.VITE_SENTRY_DSN) {
-  Sentry.init({
-    dsn: import.meta.env.VITE_SENTRY_DSN,
-    integrations: [
-      Sentry.browserTracingIntegration(),
-      Sentry.replayIntegration(),
-    ],
-    tracesSampleRate: 1.0,
-    replaysSessionSampleRate: 0.1,
-    replaysOnErrorSampleRate: 1.0,
-  });
-}
-import AppRouter from './AppRouter.jsx'
-import { AuthProvider } from './contexts/AuthContext.jsx'
-import { OnboardingProvider } from './contexts/OnboardingContext.jsx'
-import { ActivitiesProvider } from './contexts/ActivitiesContext.jsx'
-import { GoalsProvider } from './contexts/GoalsContext.jsx'
-import { GoalLevelsProvider } from './contexts/GoalLevelsContext.jsx'
-
-import { TimezoneProvider } from './contexts/TimezoneContext.jsx'
-import { ThemeProvider } from './contexts/ThemeContext.jsx'
-
-import { DebugProvider } from './contexts/DebugContext.jsx'
-
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useDebug } from './contexts/DebugContext.jsx'
-import { maybePrefetchLandingExamples } from './utils/landingPrefetch.js'
-const ReactQueryDevtools = lazy(() =>
-  import('@tanstack/react-query-devtools').then((module) => ({
-    default: module.ReactQueryDevtools,
-  }))
-);
+import { StrictMode, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { QueryClient } from '@tanstack/react-query';
+import { isPublicLandingLocation } from './utils/marketingHost';
+import { maybePrefetchLandingExamples } from './utils/landingPrefetch';
+import './index.css';
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60, // 1 minute
-      cacheTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
-      refetchOnWindowFocus: false,
+    defaultOptions: {
+        queries: {
+            staleTime: 1000 * 60,
+            gcTime: 1000 * 60 * 5,
+            retry: 1,
+            refetchOnWindowFocus: false,
+        },
     },
-  },
-})
+});
 
-// Start fetching public landing examples before React mounts so the landing
-// page renders real data as early as possible.
-maybePrefetchLandingExamples(queryClient)
+const isPublicLanding = isPublicLandingLocation();
 
-// Helper to conditionally render devtools based on debug mode
-const QueryDevtools = () => {
-  const { debugMode } = useDebug();
-  if (!debugMode) return null;
-  return (
-    <Suspense fallback={null}>
-      <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
-    </Suspense>
-  );
-};
+// Preserve the HTML-parse snapshot head start while the route-specific React
+// bundle downloads. The query uses the same key in Landing, so it deduplicates.
+maybePrefetchLandingExamples(queryClient);
 
-import { Toaster } from 'react-hot-toast';
-import GlobalErrorBoundary from './components/GlobalErrorBoundary.jsx';
+const loadApplication = isPublicLanding
+    ? import('./PublicLandingRoot')
+    : import('./AuthenticatedRoot');
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <GlobalErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <DebugProvider>
-            <QueryDevtools />
-            <Toaster
-              position="bottom-center"
-              toastOptions={{
-                style: {
-                  background: 'var(--color-bg-card)',
-                  color: 'var(--color-text-primary)',
-                  border: '1px solid var(--color-border)',
-                },
-                success: {
-                  duration: 3000,
-                  iconTheme: {
-                    primary: 'var(--color-brand-success)',
-                    secondary: '#fff',
-                  },
-                },
-                error: {
-                  duration: 5000,
-                  iconTheme: {
-                    primary: 'var(--color-brand-danger)',
-                    secondary: '#fff',
-                  },
-                },
-              }}
-            />
-            <TimezoneProvider>
-              <AuthProvider>
-                <OnboardingProvider>
-                  <GoalLevelsProvider>
-                    <GoalsProvider>
-                      <ThemeProvider>
-                        <ActivitiesProvider>
-                          <AppRouter />
-                        </ActivitiesProvider>
-                      </ThemeProvider>
-                    </GoalsProvider>
-                  </GoalLevelsProvider>
-                </OnboardingProvider>
-              </AuthProvider>
-            </TimezoneProvider>
-          </DebugProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
-    </GlobalErrorBoundary>
-  </StrictMode>,
-)
+const rootElement = document.getElementById('root');
+const root = createRoot(rootElement);
+
+loadApplication
+    .then(({ default: ApplicationRoot }) => {
+        root.render(createElement(
+            StrictMode,
+            null,
+            createElement(ApplicationRoot, { queryClient }),
+        ));
+    })
+    .catch((error) => {
+        console.error('Application bootstrap failed:', error);
+        rootElement.innerHTML = `
+            <main class="boot-error" role="alert">
+                <h1>Unable to load Fractal Goals</h1>
+                <p>Check your connection and refresh the page.</p>
+            </main>
+        `;
+    });
+
+if (import.meta.env.VITE_SENTRY_DSN) {
+    const startMonitoring = () => import('./utils/monitoring').then(
+        ({ initializeMonitoring }) => initializeMonitoring(import.meta.env.VITE_SENTRY_DSN),
+    );
+    if (isPublicLanding && 'requestIdleCallback' in window) {
+        window.requestIdleCallback(startMonitoring, { timeout: 4000 });
+    } else if (isPublicLanding) {
+        window.setTimeout(startMonitoring, 2000);
+    } else {
+        startMonitoring();
+    }
+}

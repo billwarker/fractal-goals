@@ -4,12 +4,12 @@ import AnimatedGoalIcon from '../components/atoms/AnimatedGoalIcon';
 import GoalIcon from '../components/atoms/GoalIcon';
 import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
 import LandingExampleRail from '../components/landing/LandingExampleRail';
-import LandingFeaturesSection from '../components/landing/LandingFeaturesSection';
 import LandingGoalCards from '../components/landing/LandingGoalCards';
 import LandingSkeleton from '../components/landing/LandingSkeleton';
 import { GoalLevelsProvider } from '../contexts/GoalLevelsContext';
 import landingContent from '../content/landingContent';
 import useActiveLandingSection from '../hooks/useActiveLandingSection';
+import useDeferredSection from '../hooks/useDeferredSection';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import useLandingTargetManager from '../hooks/useLandingTargetManager';
 import useLandingTreeViewSettings from '../hooks/useLandingTreeViewSettings';
@@ -18,6 +18,7 @@ import { findGoalNodeById, getGoalNodeId } from '../utils/goalNodeModel';
 import { publicApi } from '../utils/api';
 import { fetchLandingExamples, LANDING_EXAMPLES_STALE_TIME } from '../utils/landingPrefetch';
 import { buildLandingGoalDemos } from '../utils/landingGoalDemos';
+import { collectSnapshotLevels, findFirstGoalByType, getGoalIconProps } from '../utils/landingPageModel';
 import { resolveNestedWheelIntent } from '../utils/landingScrollNavigation';
 import { normalizeLandingTreeViewSettings } from '../utils/landingTreeViewSettings';
 import styles from './Landing.module.css';
@@ -25,7 +26,12 @@ import styles from './Landing.module.css';
 // side-in detail panel (.flowtree-options-pane, .details-window.sidebar.docked).
 import './FractalGoals.css';
 
-const FlowTree = lazy(() => import('../FlowTree'));
+const loadFlowTree = () => import('../FlowTree');
+const loadLandingFeatures = () => import('../components/landing/LandingFeaturesSection');
+const FlowTree = lazy(loadFlowTree);
+const LandingFeaturesSection = lazy(loadLandingFeatures);
+const warmFlowTree = () => loadFlowTree().catch(() => {});
+const warmLandingFeatures = () => loadLandingFeatures().catch(() => {});
 const GoalDetailModal = lazy(() => import('../components/ConnectedGoalDetailModal'));
 const LandingTargetManagerModal = lazy(() => import('../components/landing/LandingTargetManagerModal'));
 
@@ -33,57 +39,6 @@ const FLOWTREE_SCOPE_TRANSITION_MS = 160;
 const WHEEL_SECTION_COOLDOWN_MS = 760;
 const WHEEL_SECTION_DELTA_THRESHOLD = 24;
 const GOAL_TREE_UNLOCK_HINT_MS = 1400;
-
-const goalLevels = [
-    {
-        label: 'Ultimate',
-        type: 'UltimateGoal',
-        shape: 'twelvePointStar',
-        color: '#4f9cf9',
-        secondaryColor: '#102235',
-        description: 'The identity-level ambition everything else serves.',
-    },
-    {
-        label: 'Long Term',
-        type: 'LongTermGoal',
-        shape: 'hexagon',
-        color: '#3bc57c',
-        secondaryColor: '#0f271c',
-        description: 'Major directions that make the big ambition real.',
-    },
-    {
-        label: 'Mid Term',
-        type: 'MidTermGoal',
-        shape: 'diamond',
-        color: '#f59f4d',
-        secondaryColor: '#2c1d0f',
-        description: 'Trackable milestones with a clear outcome.',
-    },
-    {
-        label: 'Short Term',
-        type: 'ShortTermGoal',
-        shape: 'triangle',
-        color: '#8b6fff',
-        secondaryColor: '#181329',
-        description: 'Focused projects that turn plans into near-term work.',
-    },
-    {
-        label: 'Immediate',
-        type: 'ImmediateGoal',
-        shape: 'circle',
-        color: '#ef6a6a',
-        secondaryColor: '#301515',
-        description: 'The next concrete action you can log and measure.',
-    },
-];
-
-const levelByType = {
-    UltimateGoal: goalLevels[0],
-    LongTermGoal: goalLevels[1],
-    MidTermGoal: goalLevels[2],
-    ShortTermGoal: goalLevels[3],
-    ImmediateGoal: goalLevels[4],
-};
 
 const initialFormState = {
     email: '',
@@ -300,70 +255,6 @@ const fallbackLandingExamples = [{
     },
 }];
 
-// Collect the distinct goal levels embedded in a snapshot tree so the landing page
-// can seed GoalLevelsContext, making colors/icons/SMART resolve from the published
-// snapshot's real (admin-customized) levels rather than the generic fallback palette.
-function collectSnapshotLevels(rootNode) {
-    if (!rootNode) return [];
-    const levelsByKey = new Map();
-    const stack = [rootNode];
-    while (stack.length > 0) {
-        const node = stack.pop();
-        if (!node) continue;
-        const level = node.level || node.attributes?.level;
-        const key = level?.id || level?.name;
-        if (level && key && !levelsByKey.has(key)) {
-            levelsByKey.set(key, {
-                id: level.id,
-                name: level.name,
-                color: level.color,
-                secondary_color: level.secondary_color,
-                icon: level.icon,
-                ...(node.level_characteristics || {}),
-            });
-        }
-        const children = node.children || [];
-        for (let index = children.length - 1; index >= 0; index -= 1) {
-            stack.push(children[index]);
-        }
-    }
-    return Array.from(levelsByKey.values());
-}
-
-function getGoalIconProps(goal) {
-    const goalType = goal?.attributes?.type || goal?.type || 'UltimateGoal';
-    const serializedLevel = goal?.level || goal?.attributes?.level || null;
-    if (serializedLevel?.icon) {
-        return {
-            shape: serializedLevel.icon,
-            color: serializedLevel.color || levelByType[goalType]?.color || levelByType.UltimateGoal.color,
-            secondaryColor: serializedLevel.secondary_color || levelByType[goalType]?.secondaryColor || levelByType.UltimateGoal.secondaryColor,
-            isSmart: Boolean(goal?.attributes?.is_smart ?? goal?.is_smart),
-        };
-    }
-
-    const fallbackLevel = levelByType[goalType] || levelByType.UltimateGoal;
-
-    return {
-        shape: fallbackLevel.shape,
-        color: fallbackLevel.color,
-        secondaryColor: fallbackLevel.secondaryColor,
-        isSmart: Boolean(goal?.attributes?.is_smart ?? goal?.is_smart),
-    };
-}
-
-function findFirstGoalByType(rootNode, goalType) {
-    if (!rootNode) return null;
-    const stack = [rootNode];
-    while (stack.length > 0) {
-        const node = stack.shift();
-        const nodeType = node?.attributes?.type || node?.type;
-        if (nodeType === goalType) return node;
-        stack.unshift(...(node?.children || []));
-    }
-    return null;
-}
-
 function Landing() {
     const isMobile = useIsMobile();
     const [selectedExampleId, setSelectedExampleId] = useState(null);
@@ -386,7 +277,15 @@ function Landing() {
     const wheelTargetSectionRef = useRef(SECTION_IDS[0]);
     const wheelGestureRef = useRef(null);
     const mainRef = useRef(null);
+    const examplesSectionRef = useRef(null);
+    const featuresSectionRef = useRef(null);
     const activeSectionId = useActiveLandingSection(mainRef, SECTION_IDS);
+    const shouldRenderGoalExplorer = useDeferredSection(examplesSectionRef, mainRef);
+    const shouldRenderFeatures = useDeferredSection(
+        featuresSectionRef,
+        mainRef,
+        isMobile ? '600px 0px' : '0px 100%',
+    );
 
     // The page itself is the snap-scroll container (html/body are overflow
     // hidden), so it must hold focus for Space/PageDown/arrow paging to work.
@@ -397,6 +296,11 @@ function Landing() {
     useEffect(() => {
         wheelTargetSectionRef.current = activeSectionId || SECTION_IDS[0];
         wheelGestureRef.current = null;
+        if (activeSectionId === 'examples') {
+            // The feature section is the next panel. Warm it while visitors
+            // explore the tree so advancing again is visually immediate.
+            warmLandingFeatures();
+        }
     }, [activeSectionId]);
 
     // Same key/fn/staleTime as the boot-time prefetch in main.jsx, so this
@@ -803,9 +707,15 @@ function Landing() {
                                             aria-selected={example.id === selectedExample?.id}
                                             aria-label={example.root}
                                             className={example.id === selectedExample?.id ? styles.toggleActive : ''}
-                                            onMouseEnter={() => setHoveredHeroExampleId(example.id)}
+                                            onMouseEnter={() => {
+                                                setHoveredHeroExampleId(example.id);
+                                                warmFlowTree();
+                                            }}
                                             onMouseLeave={() => setHoveredHeroExampleId(null)}
-                                            onFocus={() => setHoveredHeroExampleId(example.id)}
+                                            onFocus={() => {
+                                                setHoveredHeroExampleId(example.id);
+                                                warmFlowTree();
+                                            }}
                                             onBlur={() => setHoveredHeroExampleId(null)}
                                             onClick={() => handleExampleSelect(example.id, { scrollToTree: true })}
                                             key={example.id}
@@ -830,7 +740,7 @@ function Landing() {
                 </div>
             </section>
 
-            <section className={`${styles.treeSection} ${styles.snapSection}`} id="examples" aria-labelledby="examples-title">
+            <section ref={examplesSectionRef} className={`${styles.treeSection} ${styles.snapSection}`} id="examples" aria-labelledby="examples-title">
                 <div className={styles.goalViewLayout}>
                     <aside className={styles.goalViewSidebar}>
                         <div className={`${styles.sectionHeader} ${styles.sectionHeaderCompact}`}>
@@ -896,25 +806,29 @@ function Landing() {
                                                     : (isMobile ? 'Tap graph to unlock.' : 'Click the graph to unlock panning and zooming.')}
                                             </div>
                                         )}
-                                        <Suspense fallback={<div className={styles.flowTreeLoading}>Loading preview...</div>}>
-                                            <FlowTree
-                                                ref={flowTreeRef}
-                                                key={selectedExample.id}
-                                                treeData={selectedExample.tree}
-                                                onNodeClick={isGoalTreeInteractionLocked ? () => {} : handleGoalSelect}
-                                                onAddChild={null}
-                                                viewSettings={viewSettings}
-                                                evidenceGoalIds={selectedExample.evidenceGoalIds}
-                                                metricsSummary={selectedExample.metricsSummary}
-                                                programs={selectedExample.programs}
-                                                layoutMode={goalsViewMode}
-                                                selectedNodeId={selectedGoalId}
-                                                zoomTargetNodeId={selectedGoalId}
-                                                scopeTransitionKey={flowTreeScopeKey}
-                                                sidebarOpen={Boolean(selectedGoal)}
-                                                interactionLocked={isGoalTreeInteractionLocked}
-                                            />
-                                        </Suspense>
+                                        {shouldRenderGoalExplorer ? (
+                                            <Suspense fallback={<div className={styles.flowTreeLoading}>Loading preview...</div>}>
+                                                <FlowTree
+                                                    ref={flowTreeRef}
+                                                    key={selectedExample.id}
+                                                    treeData={selectedExample.tree}
+                                                    onNodeClick={isGoalTreeInteractionLocked ? () => {} : handleGoalSelect}
+                                                    onAddChild={null}
+                                                    viewSettings={viewSettings}
+                                                    evidenceGoalIds={selectedExample.evidenceGoalIds}
+                                                    metricsSummary={selectedExample.metricsSummary}
+                                                    programs={selectedExample.programs}
+                                                    layoutMode={goalsViewMode}
+                                                    selectedNodeId={selectedGoalId}
+                                                    zoomTargetNodeId={selectedGoalId}
+                                                    scopeTransitionKey={flowTreeScopeKey}
+                                                    sidebarOpen={Boolean(selectedGoal)}
+                                                    interactionLocked={isGoalTreeInteractionLocked}
+                                                />
+                                            </Suspense>
+                                        ) : (
+                                            <LandingSkeleton height="100%" width="100%" />
+                                        )}
                                     </div>
                                     {selectedGoal && !isMobile && (
                                         <div className="details-window sidebar docked landing-goal-dock">
@@ -985,13 +899,33 @@ function Landing() {
                 )}
             </section>
 
-            <LandingFeaturesSection
-                example={selectedExample}
-                seedLevels={snapshotLevels}
-                isMobile={isMobile}
-                isLoading={isExamplesLoading}
-                className={styles.snapSection}
-            />
+            <section
+                ref={featuresSectionRef}
+                className={`${styles.featuresHost} ${styles.snapSection}`}
+                id="features"
+                aria-labelledby={shouldRenderFeatures ? 'features-title' : undefined}
+                aria-label={shouldRenderFeatures ? undefined : 'Loading features'}
+            >
+                {shouldRenderFeatures ? (
+                    <Suspense fallback={(
+                        <div className={styles.deferredFeatureSection} aria-label="Loading features">
+                            <LandingSkeleton height="100%" width="100%" />
+                        </div>
+                    )}>
+                        <LandingFeaturesSection
+                            example={selectedExample}
+                            seedLevels={snapshotLevels}
+                            isMobile={isMobile}
+                            isLoading={isExamplesLoading}
+                            embedded
+                        />
+                    </Suspense>
+                ) : (
+                    <div className={styles.deferredFeatureSection} aria-hidden="true">
+                        <LandingSkeleton height="100%" width="100%" />
+                    </div>
+                )}
+            </section>
 
             <section className={`${styles.betaSection} ${styles.snapSection}`} id="beta" aria-labelledby="beta-title">
                 <div className={styles.betaAudience}>

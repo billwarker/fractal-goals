@@ -168,6 +168,18 @@
     max-width: var(--landing-section-max-width);
 }
 
+.deferredFeatureSection {
+    min-height: 520px;
+    max-width: var(--landing-section-max-width);
+    margin: 72px auto 0;
+    padding: 24px;
+}
+
+.featuresHost {
+    max-width: var(--landing-section-max-width);
+    margin: 0 auto;
+}
+
 .sectionHeader {
     max-width: 820px;
 }
@@ -670,6 +682,21 @@
         flex-direction: column;
         margin-top: 0;
         padding: var(--landing-header-reserve) var(--landing-page-x-padding) 24px;
+    }
+
+    .featuresHost {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+    }
+
+    .deferredFeatureSection {
+        flex: 1;
+        width: 100%;
+        min-height: 0;
+        max-width: none;
+        margin: 0;
+        padding: 0;
     }
 
     .treeSection {

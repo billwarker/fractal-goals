@@ -1,11 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { Suspense, lazy, useMemo, useState } from 'react';
 import { GoalLevelsProvider } from '../../contexts/GoalLevelsContext';
 import landingContent from '../../content/landingContent';
 import LandingSkeleton from './LandingSkeleton';
-import LandingFeatureSession from './LandingFeatureSession';
-import LandingFeatureActivity from './LandingFeatureActivity';
-import LandingFeaturePrograms from './LandingFeaturePrograms';
-import LandingFeatureAnalytics from './LandingFeatureAnalytics';
 import {
     resolveFeaturedActivity,
     resolveFeaturedAnalyticsViews,
@@ -16,6 +12,20 @@ import styles from './LandingFeaturesSection.module.css';
 
 const PRIMARY_FEATURE_ORDER = ['session', 'activity', 'programs', 'analytics'];
 const ACTIVITY_VIEW_ORDER = ['catalogue', 'builder', 'metrics', 'timeline'];
+const featureLoaders = {
+    session: () => import('./LandingFeatureSession'),
+    activity: () => import('./LandingFeatureActivity'),
+    programs: () => import('./LandingFeaturePrograms'),
+    analytics: () => import('./LandingFeatureAnalytics'),
+};
+const LandingFeatureSession = lazy(featureLoaders.session);
+const LandingFeatureActivity = lazy(featureLoaders.activity);
+const LandingFeaturePrograms = lazy(featureLoaders.programs);
+const LandingFeatureAnalytics = lazy(featureLoaders.analytics);
+
+const warmFeature = (key) => {
+    featureLoaders[key]?.().catch(() => {});
+};
 
 // The landing Features section mirrors the goals-view section: message and
 // feature selectors on the left, live viewport on the right.
@@ -25,6 +35,7 @@ export default function LandingFeaturesSection({
     isMobile = false,
     isLoading = false,
     className = '',
+    embedded = false,
 }) {
     const [activeFeature, setActiveFeature] = useState(PRIMARY_FEATURE_ORDER[0]);
     const [activeActivityView, setActiveActivityView] = useState(ACTIVITY_VIEW_ORDER[0]);
@@ -78,10 +89,12 @@ export default function LandingFeaturesSection({
     const activeDetailCards = activeItem.cards?.length ? activeItem.cards : content.extras;
     const getActivityViewForCard = (index) => ACTIVITY_VIEW_ORDER[index] || ACTIVITY_VIEW_ORDER[0];
 
+    const RootElement = embedded ? 'div' : 'section';
+
     return (
-        <section
-            className={`${styles.featuresSection}${className ? ` ${className}` : ''}`}
-            id="features"
+        <RootElement
+            className={`${styles.featuresSection}${embedded ? ` ${styles.embeddedFeaturesSection}` : ''}${className ? ` ${className}` : ''}`}
+            id={embedded ? undefined : 'features'}
             aria-labelledby="features-title"
         >
             <div className={styles.featureViewLayout}>
@@ -106,6 +119,8 @@ export default function LandingFeaturesSection({
                                         aria-label={content.items[key].label}
                                         className={activeFeature === key ? styles.featureToggleActive : ''}
                                         onClick={() => setActiveFeature(key)}
+                                        onMouseEnter={() => warmFeature(key)}
+                                        onFocus={() => warmFeature(key)}
                                         key={key}
                                     >
                                         <span className={styles.featureCardLabel}>{content.items[key].label}</span>
@@ -153,12 +168,20 @@ export default function LandingFeaturesSection({
                     <div className={styles.featureStage}>
                         <div className={styles.stageBody}>
                             <GoalLevelsProvider seedLevels={seedLevels}>
-                                {renderStage()}
+                                <Suspense fallback={(
+                                    <div className={styles.stageSkeleton} aria-label="Loading feature preview">
+                                        <LandingSkeleton height="38px" width="60%" />
+                                        <LandingSkeleton height="220px" />
+                                        <LandingSkeleton height="120px" />
+                                    </div>
+                                )}>
+                                    {renderStage()}
+                                </Suspense>
                             </GoalLevelsProvider>
                         </div>
                     </div>
                 </div>
             </div>
-        </section>
+        </RootElement>
     );
 }
