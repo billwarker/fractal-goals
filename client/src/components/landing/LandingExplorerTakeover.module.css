@@ -1,0 +1,77 @@
+.titleIcon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+}
+
+.titleText {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.canvas {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: color-mix(in srgb, var(--color-bg-card) 40%, transparent);
+}
+
+.viewport {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    /* ReactFlow owns touch gestures inside the takeover; without this the
+       browser competes for vertical pans. */
+    touch-action: none;
+}
+
+.demoRow {
+    flex: 0 0 auto;
+    margin-top: 10px;
+    /* Clear the fixed example tray floating in the lower-left corner. */
+    padding-left: 56px;
+}
+
+/*
+ * Goal detail showcase: fully covers the example canvas (no messy partial
+ * overlay over the tree) — on mobile these read-only modals ARE the demo.
+ * Overrides the shared docked detail-window styles; specificity intentionally
+ * beats the desktop .landing-goal-dock rules in Landing.module.css.
+ */
+:global(.landing-goal-sheet.landing-goal-dock.details-window.sidebar.docked) {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    margin: 0;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    animation: sheetFadeIn 160ms ease;
+}
+
+@keyframes sheetFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :global(.landing-goal-sheet.landing-goal-dock.details-window.sidebar.docked) {
+        animation: none;
+    }
+}

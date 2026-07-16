@@ -1,0 +1,66 @@
+.takeover {
+    position: fixed;
+    inset: 0;
+    height: var(--app-viewport-height, 100dvh);
+    /* Below --z-modal so the real goal detail / target manager modals stack
+       above the takeover instead of underneath it. */
+    z-index: var(--z-sheet);
+    display: flex;
+    flex-direction: column;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-app);
+    background-image:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+    background-size: 20px 20px;
+    overscroll-behavior: contain;
+    animation: takeoverIn 180ms ease;
+    outline: none;
+}
+
+@keyframes takeoverIn {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .takeover {
+        animation: none;
+    }
+}
+
+.topBar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+    padding-bottom: 8px;
+}
+
+.topBarTitle {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: var(--font-size-md);
+    font-weight: 800;
+    line-height: var(--line-height-snug);
+    overflow: hidden;
+}
+
+.body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}

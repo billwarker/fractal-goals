@@ -322,6 +322,22 @@ const IntersectionObserverStub = createLandingIntersectionObserverStub(intersect
 const getActiveSectionObserver = () => intersectionObservers.find((observer) => (
     observer.options.threshold === 0
 ));
+// The landing page branches on viewport media queries (desktop snap sections
+// vs the compact vertical experience); tests stub matchMedia explicitly.
+const stubMatchMedia = (matcher) => vi.stubGlobal('matchMedia', (query) => ({
+    matches: matcher(query),
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+}));
+const stubDesktopViewport = (extraMatcher = () => false) => stubMatchMedia(
+    (query) => query === '(min-width: 981px)' || extraMatcher(query)
+);
+const stubCompactViewport = () => stubMatchMedia(
+    (query) => query === '(max-width: 980px)' || query === '(max-width: 768px)'
+);
 function renderLanding(initialExamples = null) {
     const queryClient = new QueryClient({
         defaultOptions: {
@@ -349,6 +365,7 @@ describe('Landing', () => {
             scrollIntoViewCalls.push({ element: this, options });
         };
         vi.stubGlobal('IntersectionObserver', IntersectionObserverStub);
+        stubDesktopViewport();
     });
     afterEach(() => {
         delete Element.prototype.scrollIntoView;
@@ -650,14 +667,7 @@ describe('Landing', () => {
         expect(scrollIntoViewCalls[0].options).toEqual({ behavior: 'smooth', block: 'nearest', inline: 'start' });
     });
     it('jumps without animation when the user prefers reduced motion', async () => {
-        vi.stubGlobal('matchMedia', (query) => ({
-            matches: query === '(prefers-reduced-motion: reduce)',
-            media: query,
-            addEventListener: () => {},
-            removeEventListener: () => {},
-            addListener: () => {},
-            removeListener: () => {},
-        }));
+        stubDesktopViewport((query) => query === '(prefers-reduced-motion: reduce)');
         renderLanding();
         fireEvent.click(await screen.findByRole('tab', { name: 'Become fluent in Chinese' }));
         expect(scrollIntoViewCalls).toHaveLength(1);
@@ -686,14 +696,7 @@ describe('Landing', () => {
         expect(updatedButtons.filter((button) => button.getAttribute('aria-current') === 'page')).toHaveLength(1);
     });
     it('maps desktop wheel and trackpad movement to one smooth section jump', async () => {
-        vi.stubGlobal('matchMedia', (query) => ({
-            matches: query === '(min-width: 981px)',
-            media: query,
-            addEventListener: () => {},
-            removeEventListener: () => {},
-            addListener: () => {},
-            removeListener: () => {},
-        }));
+        stubDesktopViewport();
         const { container } = renderLanding();
         await screen.findByRole('tab', { name: 'Become fluent in Chinese' });
         const page = container.querySelector('main');
@@ -882,5 +885,131 @@ describe('Landing', () => {
         expect(screen.getByLabelText('Become a skilled guitar player goal tree')).toBeInTheDocument();
         expect(screen.getByLabelText('Triad Session detail preview')).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: landingContent.hero.title })).toBeInTheDocument();
+    });
+});
+
+describe('Landing (compact viewports)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        delete window.__fgLandingExamplesPreload;
+        getLandingExamples.mockResolvedValue({ data: publishedExamples });
+        scrollIntoViewCalls.length = 0;
+        intersectionObservers.length = 0;
+        Element.prototype.scrollIntoView = function scrollIntoViewStub(options) {
+            scrollIntoViewCalls.push({ element: this, options });
+        };
+        vi.stubGlobal('IntersectionObserver', IntersectionObserverStub);
+        stubCompactViewport();
+    });
+    afterEach(() => {
+        delete Element.prototype.scrollIntoView;
+        vi.unstubAllGlobals();
+    });
+    it('renders the sticky bar CTA, kicker, hero CTAs, mobile body, and the fixed example tray', async () => {
+        renderLanding();
+        // The external nav item becomes the sticky-bar CTA (no duplicate).
+        const openApp = screen.getByRole('link', { name: 'Open app' });
+        expect(openApp).toHaveAttribute('href', 'https://my.fractalgoals.com');
+        const headerNav = screen.getByRole('navigation', { name: 'Primary' });
+        expect(within(headerNav).queryByRole('link', { name: 'Open app' })).not.toBeInTheDocument();
+        expect(within(headerNav).getByRole('button', { name: 'Goals' })).toBeInTheDocument();
+        // Kicker + shorter mobile explainer replace the desktop-only copy.
+        expect(screen.getByText(landingContent.hero.kicker)).toBeInTheDocument();
+        expect(screen.getByText(landingContent.hero.mobileBody)).toBeInTheDocument();
+        expect(screen.queryByText(landingContent.hero.body)).not.toBeInTheDocument();
+        // Hero CTA row from landing.md actions; no hero example picker.
+        const hero = document.getElementById('hero');
+        expect(within(hero).getByRole('button', { name: 'Request beta access' })).toBeInTheDocument();
+        expect(within(hero).getByRole('link', { name: 'Go to app' })).toHaveAttribute('href', 'https://my.fractalgoals.com');
+        await screen.findByTestId('flow-tree-demo');
+        expect(within(hero).queryByRole('tablist')).not.toBeInTheDocument();
+        // The single example switcher is the fixed icon tray, shown past the hero.
+        expect(screen.queryByRole('navigation', { name: 'Example fractals' })).not.toBeInTheDocument();
+        const observer = getActiveSectionObserver();
+        act(() => {
+            observer.callback([{ target: document.getElementById('examples'), isIntersecting: true }]);
+        });
+        const tray = screen.getByRole('navigation', { name: 'Example fractals' });
+        fireEvent.click(within(tray).getByRole('button', { name: 'Chinese language tracker' }));
+        await waitFor(() => {
+            expect(screen.getByLabelText('Become fluent in Chinese goal tree')).toBeInTheDocument();
+        });
+        expect(within(tray).getByRole('button', { name: 'Chinese language tracker' })).toHaveAttribute('aria-current', 'true');
+    });
+    it('tracks sections against the viewport midline and jumps with block start', async () => {
+        renderLanding();
+        await screen.findByTestId('flow-tree-demo');
+        const observer = getActiveSectionObserver();
+        expect(observer.options.rootMargin).toBe('-50% 0px -50% 0px');
+        expect(observer.options.root).toBe(null);
+        const headerNav = screen.getByRole('navigation', { name: 'Primary' });
+        fireEvent.click(within(headerNav).getByRole('button', { name: 'Features' }));
+        expect(scrollIntoViewCalls.at(-1).element.id).toBe('features');
+        expect(scrollIntoViewCalls.at(-1).options).toEqual({ behavior: 'smooth', block: 'start', inline: 'start' });
+    });
+    it('keeps the inline tree locked and explores through the full-screen takeover', async () => {
+        renderLanding();
+        const inlineTree = await screen.findByTestId('flow-tree-demo');
+        // Permanently locked inline: no tap-to-unlock hint, hierarchy default.
+        expect(inlineTree).toHaveAttribute('data-interaction-locked', 'yes');
+        expect(inlineTree).toHaveAttribute('data-layout-mode', 'hierarchy');
+        expect(screen.queryByText(/unlock panning/i)).not.toBeInTheDocument();
+        // Reveal the fixed example tray (active section past the hero), then
+        // open the takeover; the tray floats above it and still switches.
+        const observer = getActiveSectionObserver();
+        act(() => {
+            observer.callback([{ target: document.getElementById('examples'), isIntersecting: true }]);
+        });
+        fireEvent.click(screen.getByRole('button', { name: /Explore full screen/ }));
+        const dialog = await screen.findByRole('dialog', { name: 'Become a skilled guitar player goal explorer' });
+        expect(document.body.style.overflow).toBe('hidden');
+        // Fully interactive tree inside the takeover; inline instance yields.
+        await waitFor(() => {
+            expect(within(dialog).getByTestId('flow-tree-demo')).toHaveAttribute('data-interaction-locked', 'no');
+        });
+        const tray = screen.getByRole('navigation', { name: 'Example fractals' });
+        fireEvent.click(within(tray).getByRole('button', { name: 'Chinese language tracker' }));
+        expect(await screen.findByRole('dialog', { name: 'Become fluent in Chinese goal explorer' })).toBeInTheDocument();
+        // Tapping a goal opens the read-only detail as a bottom sheet inside
+        // the takeover (panel mode), keeping the example space visible.
+        const activeDialog = screen.getByRole('dialog', { name: 'Become fluent in Chinese goal explorer' });
+        fireEvent.click(within(activeDialog).getByRole('button', { name: 'Open mocked goal' }));
+        await within(activeDialog).findByText('panel');
+        expect(screen.queryByText('modal')).not.toBeInTheDocument();
+        // Escape steps back: sheet first, takeover second.
+        fireEvent.keyDown(document, { key: 'Escape' });
+        await waitFor(() => {
+            expect(within(activeDialog).queryByText('panel')).not.toBeInTheDocument();
+        });
+        expect(screen.getByRole('dialog', { name: 'Become fluent in Chinese goal explorer' })).toBeInTheDocument();
+        fireEvent.keyDown(document, { key: 'Escape' });
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog', { name: 'Become fluent in Chinese goal explorer' })).not.toBeInTheDocument();
+        });
+        expect(document.body.style.overflow).toBe('');
+        // Goal-detail CTAs outside (demo highlight cards) reopen the takeover
+        // with the sheet instead of a page-eclipsing modal.
+        const cardsGroup = screen.getByRole('group', { name: 'Goals view highlights' });
+        fireEvent.click(within(cardsGroup).getAllByRole('button')[0]);
+        const reopened = await screen.findByRole('dialog', { name: 'Become fluent in Chinese goal explorer' });
+        await within(reopened).findByText('panel');
+    });
+    it('frames feature previews in a scaled app window with a full-screen takeover', async () => {
+        renderLanding();
+        await screen.findByTestId('flow-tree-demo');
+        // Feature selector still works as pill tabs.
+        expect(await screen.findByRole('tab', { name: landingContent.features.items.session.label })).toHaveAttribute('aria-selected', 'true');
+        const expandButton = await screen.findByRole('button', { name: /View full screen/ }, LAZY_PREVIEW_WAIT);
+        fireEvent.click(expandButton);
+        const dialog = await screen.findByRole('dialog', { name: 'Sessions full-screen preview' });
+        // Zoom toggle switches between fitted and natural width.
+        const fullZoom = within(dialog).getByRole('button', { name: '100%' });
+        fireEvent.click(fullZoom);
+        expect(fullZoom).toHaveAttribute('aria-pressed', 'true');
+        expect(await within(dialog).findByLabelText('Technique Session detail preview', {}, LAZY_PREVIEW_WAIT)).toBeInTheDocument();
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+        await waitFor(() => {
+            expect(screen.queryByRole('dialog', { name: 'Sessions full-screen preview' })).not.toBeInTheDocument();
+        });
     });
 });

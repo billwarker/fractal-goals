@@ -20,6 +20,9 @@ const fallbackContent = {
         navLabel: 'Top',
         title: 'Track every goal, program, and training session in one place',
         body: 'Want to achieve big goals? Start by making them smaller. Fractal Goals breaks any ambition into a tree of smaller goals, lets you build your own programs toward them, and logs every session, activity, and metric - so all your training, across every discipline, lives in one connected system instead of five scattered apps.',
+        // Optional shorter explainer used on compact widths; empty falls back
+        // to `body`.
+        mobileBody: '',
         actions: [
             { label: 'Request beta access', href: '#beta' },
             { label: 'Go to app', href: 'https://my.fractalgoals.com' },
@@ -163,6 +166,7 @@ const metaKeyMap = {
     heading: 'heading',
     kicker: 'kicker',
     label: 'label',
+    'mobile body': 'mobileBody',
     'nav label': 'navLabel',
     'open graph title': 'ogTitle',
     'submit label': 'submitLabel',

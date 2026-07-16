@@ -140,25 +140,5 @@
     text-align: center;
 }
 
-@media (max-width: 620px) {
-    .toolbar {
-        padding: 12px 16px;
-    }
-
-    .catalogueBody {
-        gap: 16px;
-        padding: 16px 0;
-    }
-
-    .groupSection {
-        padding: 16px;
-    }
-
-    .ungrouped {
-        padding: 0 16px;
-    }
-
-    .activityGrid {
-        grid-template-columns: 1fr;
-    }
-}
+/* No phone-width overrides: on compact viewports the catalogue renders at
+   its desktop design width inside LandingAppFrame / the preview takeover. */

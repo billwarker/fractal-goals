@@ -2,6 +2,52 @@
     display: none;
 }
 
+/*
+ * Compact widths (mobile/tablet): the rail becomes a vertical icon tray fixed
+ * to the lower-left corner, floating above the page and the full-screen
+ * explorer/preview takeovers (but below real modals at --z-modal) so the
+ * active example can be flipped from anywhere past the hero.
+ */
+@media (max-width: 980px) {
+    .rail {
+        position: fixed;
+        left: 10px;
+        bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+        z-index: calc(var(--z-sheet, 900) + 10);
+        display: grid;
+        justify-items: center;
+        padding: 10px 6px;
+        background: color-mix(in srgb, var(--color-bg-card) 88%, transparent);
+        border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+        border-radius: 999px;
+        box-shadow: var(--shadow-md);
+        animation: railFadeInTray 180ms ease;
+    }
+
+    .iconList {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    /* Touch has no hover tooltip, so the active example needs a visible ring. */
+    .iconActive {
+        border-color: var(--color-brand-primary);
+        background: color-mix(in srgb, var(--color-brand-primary) 16%, var(--color-bg-card));
+    }
+}
+
+@keyframes railFadeInTray {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 @media (min-width: 981px) {
     .rail {
         position: fixed;

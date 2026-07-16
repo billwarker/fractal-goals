@@ -9,3 +9,25 @@
     height: min(640px, calc(100% - 32px));
     max-height: calc(100% - 32px);
 }
+
+/*
+ * Compact widths: the two-column target analytics surface keeps a natural
+ * width and the visitor pans across it, instead of squishing the graph and
+ * timeline into a phone column.
+ */
+@media (max-width: 980px) {
+    .scopedOverlay.scopedOverlay {
+        display: block;
+        padding: 12px;
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+
+    .scopedOverlay.scopedOverlay > * {
+        width: 960px;
+        min-width: 960px;
+        height: calc(100% - 4px);
+        max-height: none;
+    }
+}

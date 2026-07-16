@@ -1,0 +1,98 @@
+.frame {
+    position: relative;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+}
+
+.chromelessFrame {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.chrome {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 34px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-bg-card) 96%, transparent);
+}
+
+.chromeDots {
+    display: inline-flex;
+    gap: 5px;
+    flex: 0 0 auto;
+}
+
+.chromeDots span {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color-text-muted) 45%, transparent);
+}
+
+.chromeLabel {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.stageClip {
+    position: relative;
+    overflow: hidden;
+    /* Pre-measure footprint so the frame does not collapse before the first
+       ResizeObserver pass. */
+    min-height: 240px;
+}
+
+.stageContent {
+    transform-origin: top left;
+    pointer-events: none;
+    user-select: none;
+}
+
+.expandButton {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px 14px;
+    font: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+    color: white;
+    background: var(--color-brand-primary);
+    border: 1px solid var(--color-border-btn);
+    border-radius: 999px;
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+}
+
+.expandButton:hover {
+    color: white;
+    background: var(--color-brand-primary-hover);
+}
+
+.expandButton:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 2px;
+}
+
+.expandGlyph {
+    font-size: 1.05em;
+    line-height: 1;
+}

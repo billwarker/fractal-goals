@@ -61,6 +61,40 @@
     gap: 8px;
 }
 
+/* Brand + CTA row of the compact sticky header. Desktop flattens it away
+   with display: contents so the fixed centered header keeps its layout. */
+.headerBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+}
+
+/* Plain text like the nav items; the brand color + outbound arrow signal it
+   leaves the marketing site for the app. */
+.headerCta {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 40px;
+    padding: 8px 4px;
+    color: var(--color-brand-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.headerCta:hover,
+.headerCta:focus-visible {
+    color: var(--color-brand-primary-hover);
+}
+
+.headerCtaGlyph {
+    font-size: 0.9em;
+    line-height: 1;
+}
+
 .nav a,
 .nav button {
     appearance: none;
@@ -155,6 +189,62 @@
     font-size: clamp(3.1rem, 8vw, 7.8rem);
     line-height: 0.94;
     letter-spacing: 0;
+}
+
+/* Compact-width hero extras; the desktop block hides them. */
+.heroKicker {
+    margin: 0 0 12px;
+    color: var(--color-brand-primary);
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+}
+
+.heroActions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.heroActionPrimary,
+.heroActionSecondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 0;
+    min-height: 48px;
+    padding: 10px 16px;
+    font: inherit;
+    font-size: var(--font-size-base);
+    font-weight: 800;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    text-align: center;
+}
+
+.heroActionPrimary {
+    color: white;
+    background: var(--color-brand-primary);
+    border: 1px solid var(--color-border-btn);
+}
+
+.heroActionPrimary:hover,
+.heroActionPrimary:focus-visible {
+    color: white;
+    background: var(--color-brand-primary-hover);
+}
+
+.heroActionSecondary {
+    color: var(--color-text-primary);
+    background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
+    border: 1px solid var(--color-border);
+}
+
+.heroActionSecondary:hover,
+.heroActionSecondary:focus-visible {
+    background: var(--color-bg-card-hover);
+    border-color: color-mix(in srgb, var(--color-brand-primary) 55%, var(--color-border));
 }
 
 .heroBodyPanel p {
@@ -445,6 +535,45 @@
     font-weight: 700;
 }
 
+/* Opens the full-screen explorer takeover; rendered only on compact widths
+   where the inline tree stays locked. */
+.exploreButton {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 10px 16px;
+    font: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: 800;
+    color: white;
+    background: var(--color-brand-primary);
+    border: 1px solid var(--color-border-btn);
+    border-radius: 999px;
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+}
+
+.exploreButton:hover,
+.exploreButton:focus-visible {
+    color: white;
+    background: var(--color-brand-primary-hover);
+}
+
+.exploreButton:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 2px;
+}
+
+.exploreButtonGlyph {
+    font-size: 1.1em;
+    line-height: 1;
+}
+
 /*
  * The docked detail panel is an in-flow flex sibling of the FlowTree viewport
  * (NOT absolutely positioned), so its width compresses the tree viewport and the
@@ -587,26 +716,154 @@
     color: var(--color-brand-danger);
 }
 
+/*
+ * Compact landing experience (mobile/tablet, <=980px): continuous vertical
+ * scroll with a sticky brand bar + scroll-spy pill rail, a locked inline tree
+ * preview with a full-screen takeover, and snap-scroll carousels for demo and
+ * detail cards.
+ */
 @media (max-width: 980px) {
+    /* Sections align their top under the sticky two-row header on jumps. */
+    .snapSection {
+        scroll-margin-top: 118px;
+    }
+
     .header {
-        align-items: flex-start;
+        position: sticky;
+        top: 0;
+        z-index: 45;
         flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        margin: -20px calc(var(--landing-page-x-padding) * -1) 0;
+        padding: calc(10px + env(safe-area-inset-top, 0px)) var(--landing-page-x-padding) 10px;
+        background: color-mix(in srgb, var(--color-bg-app) 90%, transparent);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
     }
 
+    /* Scroll-spy pill rail; mirrors the app's mobile horizontal nav rail. */
     .nav {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        gap: 8px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
     }
 
-    .exampleToggle {
-        gap: 24px;
+    .nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Plain text items like desktop; the active item keeps the brand underline. */
+    .nav a,
+    .nav button {
+        flex: 0 0 auto;
+        min-height: 40px;
+        padding: 8px 12px;
+        border-color: transparent;
+        background: transparent;
+        white-space: nowrap;
+    }
+
+    .navActive {
+        color: var(--color-text-primary);
+        background: transparent;
+        border-color: transparent;
+    }
+
+    .hero {
+        min-height: auto;
+        padding-bottom: 28px;
+    }
+
+    .heroCopy {
+        display: flex;
+        flex-direction: column;
+        padding-top: 32px;
+    }
+
+    /* Visual order: kicker, headline, explainer, CTAs, example chips. */
+    .heroKicker {
+        order: 0;
+    }
+
+    .hero h1 {
+        order: 1;
+        font-size: clamp(2.5rem, 8.5vw, 4.2rem);
+        line-height: 1.02;
+    }
+
+    .heroBodyPanel {
+        order: 2;
+        margin-top: 22px;
+    }
+
+    .heroActions {
+        order: 3;
+    }
+
+    .goalTreeCanvas {
+        height: min(62svh, 560px);
+        min-height: 380px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius-md);
+        background: color-mix(in srgb, var(--color-bg-card) 40%, transparent);
+    }
+
+    .goalTreeCanvas:hover {
+        border-color: var(--color-border);
+        box-shadow: none;
+    }
+
+    /* Demo highlight cards become a swipeable snap row with edge peek. */
+    .goalViewCards {
+        display: flex;
+        gap: 10px;
+        margin-top: 14px;
+        overflow-x: auto;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        padding: 2px 2px 6px;
+    }
+
+    .goalViewCards::-webkit-scrollbar {
+        display: none;
+    }
+
+    .goalViewCard {
+        flex: 0 0 min(78vw, 320px);
+        scroll-snap-align: start;
     }
 
     .audienceGrid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    /* Signup panel (with its own heading) leads; audience cards follow. */
     .betaSection {
-        grid-template-columns: 1fr;
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+    }
+
+    .betaSignup {
+        order: -1;
+    }
+
+    /* 16px inputs prevent iOS zoom-on-focus. */
+    .betaForm input,
+    .betaForm select,
+    .betaForm textarea {
+        font-size: max(var(--font-size-base), 16px);
+    }
+
+    .betaForm button {
+        min-height: 48px;
     }
 }
 
@@ -617,16 +874,20 @@
         padding: 16px 14px 42px;
     }
 
-    .hero {
-        min-height: auto;
+    .snapSection {
+        scroll-margin-top: 112px;
+    }
+
+    .header {
+        margin-top: -16px;
     }
 
     .heroCopy {
-        padding-top: 48px;
+        padding-top: 26px;
     }
 
     .hero h1 {
-        font-size: 3.2rem;
+        font-size: clamp(2.4rem, 10vw, 3.1rem);
     }
 
     .heroBodyPanel p,
@@ -635,46 +896,34 @@
     }
 
     .heroBodyPanel {
-        padding: 18px;
+        padding: 16px 18px;
+        margin-top: 18px;
+    }
+
+    .heroActions {
+        flex-direction: column;
     }
 
     .audienceGrid {
         grid-template-columns: 1fr;
     }
 
+    .audienceCard {
+        padding: 16px;
+    }
+
+    .audienceCard h3 {
+        font-size: var(--font-size-lg);
+    }
+
     .betaSignupPanel {
         padding: 18px;
     }
 
-    .exampleToggle {
-        gap: 18px;
-    }
-
-    .exampleToggle button {
-        width: 86px;
-        height: 86px;
-    }
-
-    .heroExamplesPlaceholder {
-        height: 86px;
-    }
-
-    .exampleToggleIcon {
-        transform: scale(0.7);
-    }
-
     .goalTreeCanvas {
-        height: 520px;
-        min-height: 520px;
+        height: min(58svh, 480px);
+        min-height: 360px;
     }
-
-    .goalTreeUnlockHint {
-        top: 66px;
-        left: 18px;
-        max-width: calc(100% - 36px);
-        font-size: var(--font-size-xs);
-    }
-
 }
 
 /*
@@ -776,6 +1025,12 @@
     .nav a,
     .nav button {
         font-size: var(--font-size-base);
+    }
+
+    /* .headerBar flattens so the desktop header keeps its original flat flex
+       layout (brand + nav); compact-only elements are not rendered here. */
+    .headerBar {
+        display: contents;
     }
 
     .heroCopy {

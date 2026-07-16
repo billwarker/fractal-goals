@@ -21,6 +21,7 @@ Edit this file to change the public landing page messaging without touching Reac
 
 **Kicker:** Composable goal tracking
 **Nav Label:** Top
+**Mobile Body:** Want to achieve big goals? Start by making them smaller. Fractal Goals breaks any ambition into a tree of smaller goals, builds your own programs toward them, and logs every session and metric - all your training in one connected system.
 
 # Achieve Your Most Ambitious Goals
 

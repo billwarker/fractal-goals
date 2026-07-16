@@ -11,6 +11,7 @@ import landingContent from '../content/landingContent';
 import useActiveLandingSection from '../hooks/useActiveLandingSection';
 import useDeferredSection from '../hooks/useDeferredSection';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
+import useMediaQuery from '../hooks/useMediaQuery';
 import useLandingTargetManager from '../hooks/useLandingTargetManager';
 import useLandingTreeViewSettings from '../hooks/useLandingTreeViewSettings';
 import { queryKeys } from '../hooks/queryKeys';
@@ -34,6 +35,13 @@ const warmFlowTree = () => loadFlowTree().catch(() => {});
 const warmLandingFeatures = () => loadLandingFeatures().catch(() => {});
 const GoalDetailModal = lazy(() => import('../components/ConnectedGoalDetailModal'));
 const LandingTargetManagerModal = lazy(() => import('../components/landing/LandingTargetManagerModal'));
+const LandingExplorerTakeover = lazy(() => import('../components/landing/LandingExplorerTakeover'));
+
+// Above this width the landing is the horizontal snap-section experience; at
+// or below it the page is a continuous vertical scroll with the compact
+// (mobile/tablet) design: sticky pill nav, locked inline tree + takeover,
+// framed feature previews.
+const DESKTOP_LANDING_MEDIA_QUERY = '(min-width: 981px)';
 
 const FLOWTREE_SCOPE_TRANSITION_MS = 160;
 const WHEEL_SECTION_COOLDOWN_MS = 760;
@@ -62,10 +70,18 @@ function prefersReducedMotion() {
         && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+function isDesktopLandingViewport() {
+    return typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia(DESKTOP_LANDING_MEDIA_QUERY).matches;
+}
+
 function scrollToSection(sectionId) {
     document.getElementById(sectionId)?.scrollIntoView({
         behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-        block: 'nearest',
+        // Vertical scroll (compact widths) aligns the section top under the
+        // sticky header (sections carry scroll-margin-top for the offset).
+        block: isDesktopLandingViewport() ? 'nearest' : 'start',
         inline: 'start',
     });
 }
@@ -257,7 +273,10 @@ const fallbackLandingExamples = [{
 
 function Landing() {
     const isMobile = useIsMobile();
+    const isDesktopLanding = useMediaQuery(DESKTOP_LANDING_MEDIA_QUERY);
     const [selectedExampleId, setSelectedExampleId] = useState(null);
+    const [isExplorerTakeoverOpen, setIsExplorerTakeoverOpen] = useState(false);
+    const [takeoverCanvasElement, setTakeoverCanvasElement] = useState(null);
     const [selectedGoalId, setSelectedGoalId] = useState(null);
     const [goalDetailEntry, setGoalDetailEntry] = useState({ view: 'goal', key: 0 });
     const [flowTreeScopeKey, setFlowTreeScopeKey] = useState(0);
@@ -279,13 +298,34 @@ function Landing() {
     const mainRef = useRef(null);
     const examplesSectionRef = useRef(null);
     const featuresSectionRef = useRef(null);
-    const activeSectionId = useActiveLandingSection(mainRef, SECTION_IDS);
+    const activeSectionId = useActiveLandingSection(
+        mainRef,
+        SECTION_IDS,
+        isDesktopLanding ? 'horizontal' : 'vertical',
+    );
     const shouldRenderGoalExplorer = useDeferredSection(examplesSectionRef, mainRef);
     const shouldRenderFeatures = useDeferredSection(
         featuresSectionRef,
         mainRef,
-        isMobile ? '600px 0px' : '0px 100%',
+        isDesktopLanding ? '0px 100%' : '600px 0px',
     );
+
+    // The takeover pattern only exists on compact widths; resizing to the
+    // desktop snap experience must never leave a stale full-screen overlay.
+    useEffect(() => {
+        if (isDesktopLanding) {
+            setIsExplorerTakeoverOpen(false);
+        }
+    }, [isDesktopLanding]);
+
+    // On compact widths every goal-detail entry point (demo cards, published
+    // Goals copy, tree taps) presents inside the explorer takeover as a bottom
+    // sheet, keeping the example space visible instead of a full-screen modal.
+    useEffect(() => {
+        if (!isDesktopLanding && selectedGoalId) {
+            setIsExplorerTakeoverOpen(true);
+        }
+    }, [isDesktopLanding, selectedGoalId]);
 
     // The page itself is the snap-scroll container (html/body are overflow
     // hidden), so it must hold focus for Space/PageDown/arrow paging to work.
@@ -384,6 +424,8 @@ function Landing() {
         [hoveredHeroExampleId, publishedExamples]
     );
     const heroTitle = hoveredHeroExample?.root || landingContent.hero.title;
+    // Optional shorter explainer for compact widths (landing.md `Mobile Body`).
+    const heroBody = (!isDesktopLanding && landingContent.hero.mobileBody) || landingContent.hero.body;
     const snapshotLevels = useMemo(
         () => collectSnapshotLevels(selectedExample?.tree),
         [selectedExample]
@@ -506,6 +548,10 @@ function Landing() {
         }
     }, [activeSectionId]);
 
+    // The inline preview is permanently locked on compact widths; interaction
+    // happens in the full-screen explorer takeover instead.
+    const isInlineTreeLocked = !isDesktopLanding || isGoalTreeInteractionLocked;
+
     const unlockGoalTreeInteraction = useCallback(() => {
         if (!isGoalTreeInteractionLocked) return;
         setIsGoalTreeInteractionLocked(false);
@@ -529,6 +575,9 @@ function Landing() {
         if (!href?.startsWith('#')) return false;
         return activeSectionId === href.slice(1);
     };
+
+    // Compact sticky bar surfaces the external nav item (Open app) as a CTA.
+    const headerCta = landingContent.header.nav.find((item) => !item.href?.startsWith('#')) || null;
 
     // Mirror the goals page: scope-changing toggles fade the tree out, apply after a
     // short delay, and bump the scope key so FlowTree re-centers; others apply instantly.
@@ -598,7 +647,7 @@ function Landing() {
     const handleLandingWheel = useCallback((event) => {
         const container = mainRef.current;
         if (!container || event.defaultPrevented) return;
-        if (!window.matchMedia('(min-width: 981px)').matches) return;
+        if (!isDesktopLandingViewport()) return;
         const nestedIntent = resolveNestedWheelIntent({
             target: event.target,
             boundary: container,
@@ -642,23 +691,43 @@ function Landing() {
     return (
         <main ref={mainRef} className={styles.page} data-landing-ready-surface tabIndex={-1} onWheel={handleLandingWheel}>
             <header className={styles.header}>
-                <a className={styles.brand} href="/">
-                    <span className={styles.brandMark}>
-                        <GoalIcon
-                            shape="twelvePointStar"
-                            color="var(--color-brand-primary)"
-                            secondaryColor="var(--color-bg-input)"
-                            isSmart
-                            size={34}
-                        />
-                    </span>
-                    <span>{landingContent.header.brand}</span>
-                </a>
+                {/* .headerBar is display:contents on desktop, so the fixed
+                    centered desktop header keeps its exact flat flex layout. */}
+                <div className={styles.headerBar}>
+                    <a className={styles.brand} href="/">
+                        <span className={styles.brandMark}>
+                            <GoalIcon
+                                shape="twelvePointStar"
+                                color="var(--color-brand-primary)"
+                                secondaryColor="var(--color-bg-input)"
+                                isSmart
+                                size={34}
+                            />
+                        </span>
+                        <span>{landingContent.header.brand}</span>
+                    </a>
+                    {!isDesktopLanding && headerCta && (
+                        <a className={styles.headerCta} href={headerCta.href}>
+                            {headerCta.label}
+                            <span className={styles.headerCtaGlyph} aria-hidden="true">↗</span>
+                        </a>
+                    )}
+                </div>
                 <nav className={styles.nav} aria-label="Primary">
                     {landingContent.header.nav.map((item) => {
                         const isInternal = item.href?.startsWith('#');
                         if (!isInternal) {
-                            return <a href={item.href} key={`${item.href}-${item.label}`}>{item.label}</a>;
+                            // Compact widths surface this as the sticky-bar CTA
+                            // instead of a nav item.
+                            if (!isDesktopLanding) return null;
+                            return (
+                                <a
+                                    href={item.href}
+                                    key={`${item.href}-${item.label}`}
+                                >
+                                    {item.label}
+                                </a>
+                            );
                         }
                         const sectionId = item.href.slice(1);
                         const isActive = isHeaderNavItemActive(item.href);
@@ -686,7 +755,13 @@ function Landing() {
 
             <section className={`${styles.hero} ${styles.snapSection}`} id="hero" aria-labelledby="landing-title">
                 <div className={styles.heroCopy}>
+                    {!isDesktopLanding && (
+                        <p className={styles.heroKicker}>{landingContent.hero.kicker}</p>
+                    )}
                     <h1 id="landing-title">{heroTitle}</h1>
+                    {/* Compact widths have no hero picker; the fixed example
+                        tray appears once the visitor scrolls past the hero. */}
+                    {isDesktopLanding && (
                     <div className={styles.heroExamplePicker}>
                         {isExamplesLoading && !selectedExample ? (
                             <div
@@ -735,9 +810,34 @@ function Landing() {
                             </div>
                         )}
                     </div>
+                    )}
                     <div className={styles.heroBodyPanel}>
-                        <p>{landingContent.hero.body}</p>
+                        <p>{heroBody}</p>
                     </div>
+                    {!isDesktopLanding && (
+                    <div className={styles.heroActions}>
+                        {landingContent.hero.actions.map((action) => (
+                            action.href?.startsWith('#') ? (
+                                <button
+                                    type="button"
+                                    className={styles.heroActionPrimary}
+                                    onClick={() => navigateToSection(action.href.slice(1))}
+                                    key={`${action.href}-${action.label}`}
+                                >
+                                    {action.label}
+                                </button>
+                            ) : (
+                                <a
+                                    className={styles.heroActionSecondary}
+                                    href={action.href}
+                                    key={`${action.href}-${action.label}`}
+                                >
+                                    {action.label}
+                                </a>
+                            )
+                        ))}
+                    </div>
+                    )}
                 </div>
             </section>
 
@@ -748,8 +848,10 @@ function Landing() {
                             <h2 id="examples-title">{landingContent.examples.title}</h2>
                             <p>{landingContent.examples.body}</p>
                         </div>
-                        <LandingGoalCards cards={goalDemos.cards} activeState={goalDemos.activeState}
-                            onActivate={goalDemos.activate} selectedGoalId={selectedGoalId} styles={styles} />
+                        {isDesktopLanding && (
+                            <LandingGoalCards cards={goalDemos.cards} activeState={goalDemos.activeState}
+                                onActivate={goalDemos.activate} selectedGoalId={selectedGoalId} styles={styles} />
+                        )}
                     </aside>
                     <div className={styles.goalViewMain}>
                         {!selectedExample ? (
@@ -762,14 +864,14 @@ function Landing() {
                             <div className={styles.goalExplorer}>
                                 <div
                                     ref={setGoalExampleSpaceElement}
-                                    className={`${styles.goalTreeCanvas} ${isGoalTreeInteractionLocked ? styles.goalTreeCanvasLocked : ''}`}
+                                    className={`${styles.goalTreeCanvas} ${isInlineTreeLocked ? styles.goalTreeCanvasLocked : ''}`}
                                     aria-label={`${selectedExample.root} goal tree`}
                                     aria-describedby="examples-title"
                                     role="group"
-                                    tabIndex={0}
-                                    onPointerDown={unlockGoalTreeInteraction}
-                                    onFocus={unlockGoalTreeInteraction}
-                                    onKeyDown={(event) => {
+                                    tabIndex={isDesktopLanding ? 0 : undefined}
+                                    onPointerDown={isDesktopLanding ? unlockGoalTreeInteraction : undefined}
+                                    onFocus={isDesktopLanding ? unlockGoalTreeInteraction : undefined}
+                                    onKeyDown={isDesktopLanding ? (event) => {
                                         if (event.key === 'Escape') {
                                             setIsGoalTreeInteractionLocked(true);
                                             setGoalTreeUnlockHint('locked');
@@ -779,41 +881,43 @@ function Landing() {
                                             }
                                             event.currentTarget.blur();
                                         }
-                                    }}
+                                    } : undefined}
                                 >
                                     <div
-                                        className={`${styles.flowTreeViewport} ${isGoalTreeInteractionLocked ? styles.flowTreeViewportLocked : ''}`}
-                                        data-interaction-locked={isGoalTreeInteractionLocked ? 'true' : 'false'}
+                                        className={`${styles.flowTreeViewport} ${isInlineTreeLocked ? styles.flowTreeViewportLocked : ''}`}
+                                        data-interaction-locked={isInlineTreeLocked ? 'true' : 'false'}
                                     >
-                                        <FlowTreeOptionsPane
-                                            isMobile={isMobile}
-                                            isMinimized={isOptionsPaneMinimized}
-                                            onToggleMinimized={() => setIsOptionsPaneMinimized((prev) => !prev)}
-                                            goalsViewMode={goalsViewMode}
-                                            onGoalsViewModeChange={setGoalsViewMode}
-                                            viewSettings={viewSettings}
-                                            onToggleViewSetting={handleToggleViewSetting}
-                                            inactiveBranchTooltip="Dims branches with no recent completed activity evidence."
-                                            hideInactiveTooltip="Hides goals with no completed activity evidence in the active window."
-                                            hideCompletedTooltip="Hides completed goals from the fractal tree."
-                                        />
-                                        {goalTreeUnlockHint !== 'hidden' && (
+                                        {isDesktopLanding && (
+                                            <FlowTreeOptionsPane
+                                                isMobile={isMobile}
+                                                isMinimized={isOptionsPaneMinimized}
+                                                onToggleMinimized={() => setIsOptionsPaneMinimized((prev) => !prev)}
+                                                goalsViewMode={goalsViewMode}
+                                                onGoalsViewModeChange={setGoalsViewMode}
+                                                viewSettings={viewSettings}
+                                                onToggleViewSetting={handleToggleViewSetting}
+                                                inactiveBranchTooltip="Dims branches with no recent completed activity evidence."
+                                                hideInactiveTooltip="Hides goals with no completed activity evidence in the active window."
+                                                hideCompletedTooltip="Hides completed goals from the fractal tree."
+                                            />
+                                        )}
+                                        {isDesktopLanding && goalTreeUnlockHint !== 'hidden' && (
                                             <div
                                                 className={`${styles.goalTreeUnlockHint} ${goalTreeUnlockHint === 'unlocked' ? styles.goalTreeUnlockHintUnlocked : ''}`}
                                                 aria-live="polite"
                                             >
                                                 {goalTreeUnlockHint === 'unlocked'
-                                                    ? (isMobile ? 'Unlocked.' : 'Unlocked. Explore the tree.')
-                                                    : (isMobile ? 'Tap graph to unlock.' : 'Click the graph to unlock panning and zooming.')}
+                                                    ? 'Unlocked. Explore the tree.'
+                                                    : 'Click the graph to unlock panning and zooming.'}
                                             </div>
                                         )}
-                                        {shouldRenderGoalExplorer ? (
+                                        {shouldRenderGoalExplorer && !isExplorerTakeoverOpen ? (
                                             <Suspense fallback={<div className={styles.flowTreeLoading}>Loading preview...</div>}>
                                                 <FlowTree
                                                     ref={flowTreeRef}
                                                     key={selectedExample.id}
                                                     treeData={selectedExample.tree}
-                                                    onNodeClick={isGoalTreeInteractionLocked ? () => {} : handleGoalSelect}
+                                                    onNodeClick={isInlineTreeLocked ? () => {} : handleGoalSelect}
                                                     onAddChild={null}
                                                     viewSettings={viewSettings}
                                                     evidenceGoalIds={selectedExample.evidenceGoalIds}
@@ -823,15 +927,25 @@ function Landing() {
                                                     selectedNodeId={selectedGoalId}
                                                     zoomTargetNodeId={selectedGoalId}
                                                     scopeTransitionKey={flowTreeScopeKey}
-                                                    sidebarOpen={Boolean(selectedGoal)}
-                                                    interactionLocked={isGoalTreeInteractionLocked}
+                                                    sidebarOpen={Boolean(selectedGoal) && isDesktopLanding}
+                                                    interactionLocked={isInlineTreeLocked}
                                                 />
                                             </Suspense>
                                         ) : (
                                             <LandingSkeleton height="100%" width="100%" />
                                         )}
                                     </div>
-                                    {selectedGoal && !isMobile && (
+                                    {!isDesktopLanding && (
+                                        <button
+                                            type="button"
+                                            className={styles.exploreButton}
+                                            onClick={() => setIsExplorerTakeoverOpen(true)}
+                                        >
+                                            <span aria-hidden="true" className={styles.exploreButtonGlyph}>⛶</span>
+                                            Explore full screen
+                                        </button>
+                                    )}
+                                    {selectedGoal && isDesktopLanding && (
                                         <div className="details-window sidebar docked landing-goal-dock">
                                             <div className="window-content landing-goal-dock-content">
                                                 <Suspense fallback={<div className={styles.flowTreeLoading}>Loading details...</div>}>
@@ -859,29 +973,12 @@ function Landing() {
                                 </div>
                             </div>
                         )}
+                        {!isDesktopLanding && (
+                            <LandingGoalCards cards={goalDemos.cards} activeState={goalDemos.activeState}
+                                onActivate={goalDemos.activate} selectedGoalId={selectedGoalId} styles={styles} />
+                        )}
                     </div>
                 </div>
-                {selectedGoal && isMobile && (
-                    <Suspense fallback={<div className={styles.flowTreeLoading}>Loading details...</div>}>
-                        <GoalLevelsProvider seedLevels={snapshotLevels}>
-                            <GoalDetailModal
-                                isOpen
-                                onClose={() => setSelectedGoalId(null)}
-                                goal={selectedGoal}
-                                rootId={selectedExample.id}
-                                treeData={selectedExample.tree}
-                                activityDefinitions={selectedExample.activityDefinitions}
-                                activityGroups={selectedExample.activityGroups}
-                                displayMode="modal"
-                                readOnly
-                                initialView={goalDetailEntry.view}
-                                initialViewKey={goalDetailEntry.key}
-                                onGoalSelect={handleGoalSelect}
-                                onTargetOpen={(target) => openTargetManager(selectedGoal, target)}
-                            />
-                        </GoalLevelsProvider>
-                    </Suspense>
-                )}
                 {activeTargetManagerSelection && (
                     <Suspense fallback={null}>
                         <LandingTargetManagerModal
@@ -893,8 +990,46 @@ function Landing() {
                             historicalInstances={selectedExample.analyticsActivityInstances?.[
                                 activeTargetManagerSelection.target.activity_id
                             ]}
-                            portalTarget={goalExampleSpaceElement}
+                            portalTarget={takeoverCanvasElement || goalExampleSpaceElement}
                             onClose={closeTargetManager}
+                        />
+                    </Suspense>
+                )}
+                {!isDesktopLanding && isExplorerTakeoverOpen && selectedExample && (
+                    <Suspense fallback={null}>
+                        <LandingExplorerTakeover
+                            example={selectedExample}
+                            flowTreeRef={flowTreeRef}
+                            flowTreeScopeKey={flowTreeScopeKey}
+                            viewSettings={viewSettings}
+                            onToggleViewSetting={handleToggleViewSetting}
+                            goalsViewMode={goalsViewMode}
+                            onGoalsViewModeChange={setGoalsViewMode}
+                            selectedGoalId={selectedGoalId}
+                            selectedGoal={selectedGoal}
+                            goalDetailEntry={goalDetailEntry}
+                            seedLevels={snapshotLevels}
+                            onNodeClick={handleGoalSelect}
+                            onClearSelectedGoal={clearSelectedGoal}
+                            onTargetOpen={(target) => openTargetManager(selectedGoal, target)}
+                            goalDemos={goalDemos}
+                            cardStyles={styles}
+                            onCanvasElement={setTakeoverCanvasElement}
+                            escapeDisabled={Boolean(activeTargetManagerSelection)}
+                            onEscape={() => {
+                                // Step back through takeover state: close the
+                                // goal-detail sheet first, then the takeover.
+                                if (selectedGoal) {
+                                    clearSelectedGoal();
+                                    return;
+                                }
+                                setIsExplorerTakeoverOpen(false);
+                            }}
+                            onClose={() => {
+                                // The top-bar close always fully dismisses.
+                                clearSelectedGoal();
+                                setIsExplorerTakeoverOpen(false);
+                            }}
                         />
                     </Suspense>
                 )}
