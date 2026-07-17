@@ -27,6 +27,22 @@ const checks = [
     patterns: [/\.workspace/, /\.header/, /@media\s*\(max-width:\s*980px\)/],
   },
   {
+    file: 'src/components/landing/LandingFeaturesSection.module.css',
+    patterns: [
+      /\.featureMain\s*\{[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/s,
+      /\.featureStage\s*\{[^}]*min-height:\s*0;[^}]*max-height:\s*100%;/s,
+      /\.programPagePreview,\s*\.analyticsPagePreview\s*\{[^}]*min-height:\s*0;/s,
+    ],
+  },
+  {
+    file: 'src/pages/Landing.module.css',
+    patterns: [
+      /\.page\s*\{[^}]*height:\s*100%;[^}]*overflow-x:\s*auto;[^}]*scrollbar-width:\s*none;/s,
+      /\.page::-webkit-scrollbar\s*\{[^}]*display:\s*none;/s,
+      /\.snapSection\s*\{[^}]*height:\s*100%;/s,
+    ],
+  },
+  {
     file: 'src/FlowTree.jsx',
     patterns: [
       /fitViewOptions/,

@@ -179,9 +179,16 @@
     max-width: 100%;
     overflow: hidden;
     padding: 0;
-    border: 0;
+    border: 1px dashed transparent;
+    border-radius: var(--border-radius-sm);
     background: transparent;
     box-shadow: none;
+    transition: border-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard);
+}
+
+.featureStage:hover {
+    border-color: color-mix(in srgb, var(--color-brand-primary) 58%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 22%, transparent);
 }
 
 .stageSkeleton {
@@ -1216,11 +1223,13 @@
         margin-top: 0;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
     }
 
     .featureStage {
         flex: 1;
         min-height: 0;
+        max-height: 100%;
         display: flex;
         flex-direction: column;
     }
@@ -1228,8 +1237,7 @@
     .stageBody {
         flex: 1;
         min-height: 0;
-        overflow-y: auto;
-        overscroll-behavior-y: contain;
+        overflow: hidden;
         display: flex;
         flex-direction: column;
     }
@@ -1258,6 +1266,11 @@
     .landingSessionScreen {
         flex: 1 1 auto;
         height: auto;
+        min-height: 0;
+    }
+
+    .programPagePreview,
+    .analyticsPagePreview {
         min-height: 0;
     }
 }
