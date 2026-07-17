@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { QueuedQuickSessionProvider } from '../../contexts/ActiveSessionContext';
 import useSessionSidePaneViewModel from '../../hooks/useSessionSidePaneViewModel';
 import { flattenGoalTree } from '../../utils/goalNodeModel';
 import { normalizeSectionActivityIds } from '../../utils/sessionSection';
 import SessionSection from '../sessionDetail/SessionSection';
 import SessionDetailPaneLayout from '../sessionDetail/SessionDetailPaneLayout';
+import { resolveLandingTargetAnalyticsData } from './landingTargetAnalyticsData';
 import sessionDetailStyles from '../../pages/SessionDetail.module.css';
+import targetModalStyles from './LandingTargetManagerModal.module.css';
 import styles from './LandingFeaturesSection.module.css';
 
 function ensureAttributes(session) {
@@ -41,6 +43,15 @@ export function buildSections(session) {
         name: 'Exercises',
         activity_ids: instances.map((instance) => instance.id).filter(Boolean),
     }];
+}
+
+export function resolveSessionTargetAnalytics(example, activityDefinitions, target) {
+    return resolveLandingTargetAnalyticsData({
+        target,
+        activityDefinitions,
+        analyticsData: example?.targetAnalytics?.[target.id] || null,
+        historicalInstances: example?.analyticsActivityInstances?.[target.activity_id] || [],
+    });
 }
 
 function getNoteText(note) {
@@ -170,9 +181,26 @@ function LandingSessionScreen({
     );
 }
 
-function LandingSessionScreenWithModel({ sessionName, sections, notes }) {
+function LandingSessionScreenWithModel({
+    example,
+    activityDefinitions,
+    sessionName,
+    sections,
+    notes,
+}) {
     const [selectedActivity, setSelectedActivity] = useState(null);
     const [sidePaneMode, setSidePaneMode] = useState('details');
+    const [modalHost, setModalHost] = useState(null);
+    const resolveAnalyticsData = useCallback(
+        (target) => resolveSessionTargetAnalytics(example, activityDefinitions, target),
+        [activityDefinitions, example]
+    );
+    const targetModal = useMemo(() => ({
+        readOnly: true,
+        portalTarget: modalHost,
+        overlayClassName: targetModalStyles.scopedOverlay,
+        resolveAnalyticsData,
+    }), [modalHost, resolveAnalyticsData]);
     const sidePaneModel = useSessionSidePaneViewModel({
         selectedActivity,
         onNoteAdded: () => {},
@@ -188,17 +216,20 @@ function LandingSessionScreenWithModel({ sessionName, sections, notes }) {
         onOptions: () => {},
         mode: sidePaneMode,
         onModeChange: setSidePaneMode,
+        targetModal,
     });
 
     return (
+        <div className={styles.landingSessionModalHost} ref={setModalHost}>
             <LandingSessionScreen
                 sessionName={sessionName}
                 sections={sections}
                 notes={notes}
-            sidePaneModel={sidePaneModel}
-            selectedActivity={selectedActivity}
-            setSelectedActivity={setSelectedActivity}
-        />
+                sidePaneModel={sidePaneModel}
+                selectedActivity={selectedActivity}
+                setSelectedActivity={setSelectedActivity}
+            />
+        </div>
     );
 }
 
@@ -237,7 +268,13 @@ export default function LandingFeatureSession({ example, session }) {
             activityGroups={example.activityGroups || []}
             setDraftSession={() => {}}
         >
-            <LandingSessionScreenWithModel sessionName={sessionName} sections={sections} notes={notes} />
+            <LandingSessionScreenWithModel
+                example={example}
+                activityDefinitions={activityDefinitions}
+                sessionName={sessionName}
+                sections={sections}
+                notes={notes}
+            />
         </QueuedQuickSessionProvider>
     );
 }

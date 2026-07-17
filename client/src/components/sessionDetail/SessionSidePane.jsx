@@ -104,6 +104,7 @@ function SessionSidePane({
                                 selectedActivity={goals?.selectedActivity}
                                 onGoalClick={goals?.onGoalClick}
                                 onGoalCreated={goals?.onGoalCreated}
+                                targetModal={goals?.targetModal}
                                 className={styles.detailsGoalHierarchy}
                             />
                         ) : (

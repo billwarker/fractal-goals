@@ -83,7 +83,17 @@ vi.mock('../TargetsSection', () => ({
 }));
 vi.mock('../GoalRow', () => ({ default: () => <div /> }));
 vi.mock('../../goalDetail/TargetAnalyticsModal', () => ({
-    default: ({ target }) => <div data-testid="target-analytics-modal">{target.name}</div>,
+    default: ({ target, analyticsData, readOnly, portalTarget, overlayClassName }) => (
+        <div
+            data-testid="target-analytics-modal"
+            data-instance-count={analyticsData?.instances?.length || 0}
+            data-read-only={String(Boolean(readOnly))}
+            data-portal-target={portalTarget?.id || ''}
+            data-overlay-class={overlayClassName || ''}
+        >
+            {target.name}
+        </div>
+    ),
 }));
 
 describe('SessionGoalHierarchyPanel smoke', () => {
@@ -190,6 +200,44 @@ describe('SessionGoalHierarchyPanel smoke', () => {
 
         fireEvent.click(await screen.findByRole('button', { name: 'Targets: Pull Up' }));
         expect(await screen.findByTestId('target-analytics-modal')).toHaveTextContent('Target 1');
+    });
+
+    it('uses a scoped read-only modal host and supplied landing analytics', async () => {
+        const portalTarget = document.createElement('div');
+        portalTarget.id = 'landing-session-example';
+        const analyticsData = { instances: [{ id: 'history-1' }, { id: 'history-2' }] };
+        const resolveAnalyticsData = vi.fn(() => analyticsData);
+
+        renderWithProviders(
+            <SessionGoalHierarchyPanel
+                selectedActivity={{
+                    id: 'instance-1',
+                    activity_definition_id: 'activity-1',
+                    name: 'Pull Up'
+                }}
+                targetModal={{
+                    readOnly: true,
+                    portalTarget,
+                    overlayClassName: 'scoped-overlay',
+                    resolveAnalyticsData,
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Targets: Pull Up' }));
+
+        const modal = await screen.findByTestId('target-analytics-modal');
+        expect(resolveAnalyticsData).toHaveBeenCalledWith(expect.objectContaining({ id: 'target-1' }));
+        expect(modal).toHaveAttribute('data-instance-count', '2');
+        expect(modal).toHaveAttribute('data-read-only', 'true');
+        expect(modal).toHaveAttribute('data-portal-target', 'landing-session-example');
+        expect(modal).toHaveAttribute('data-overlay-class', 'scoped-overlay');
     });
 
     it('keeps the session hierarchy visible when focused activity has no eligible goals', async () => {

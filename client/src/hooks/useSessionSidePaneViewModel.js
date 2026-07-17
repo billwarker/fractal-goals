@@ -17,6 +17,7 @@ export function useSessionSidePaneViewModel({
     onOptions,
     mode,
     onModeChange,
+    targetModal = null,
 }) {
     const {
         rootId,
@@ -54,6 +55,7 @@ export function useSessionSidePaneViewModel({
             selectedActivity,
             onGoalClick,
             onGoalCreated,
+            targetModal,
         },
         timeline: {
             rootId,
@@ -78,6 +80,7 @@ export function useSessionSidePaneViewModel({
         session?.attributes?.completed,
         sessionActivityDefs,
         sessionId,
+        targetModal,
         toggleSessionComplete,
         unpinNote,
         updateNote,

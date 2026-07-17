@@ -18,6 +18,7 @@ function SessionGoalHierarchyPanel({
     selectedActivity,
     onGoalClick,
     onGoalCreated,
+    targetModal = null,
     className = '',
 }) {
     const {
@@ -166,7 +167,7 @@ function SessionGoalHierarchyPanel({
                 </div>
             </div>
 
-            {activeTarget && createPortal(
+            {activeTarget && (
                 <React.Suspense fallback={<div>Loading Target...</div>}>
                     <TargetAnalyticsModal
                         mode="view"
@@ -177,13 +178,16 @@ function SessionGoalHierarchyPanel({
                         goalColor={getGoalColor(activeTarget._goalType)}
                         activityDefinitions={activityDefinitions}
                         associatedActivities={activityDefinitions}
+                        analyticsData={targetModal?.resolveAnalyticsData?.(activeTarget) || null}
+                        readOnly={Boolean(targetModal?.readOnly)}
+                        portalTarget={targetModal?.portalTarget || null}
+                        overlayClassName={targetModal?.overlayClassName || ''}
                         targets={targetCards.filter((target) => target._goalId === activeTargetGoalId)}
                         setTargets={() => {}}
-                        onDelete={handleTargetDelete}
+                        onDelete={targetModal?.readOnly ? undefined : handleTargetDelete}
                         onClose={() => setActiveTarget(null)}
                     />
-                </React.Suspense>,
-                document.body
+                </React.Suspense>
             )}
 
             {createSubGoalParent && createPortal(
