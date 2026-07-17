@@ -1,6 +1,9 @@
 @import './design-tokens.css';
 
 :root {
+  --app-nav-height: 0px;
+  --app-viewport-height: 100vh;
+  --grid-unit: 20px;
   font-family: var(--font-family);
   font-size: 16px; /* base for rem calculations */
   line-height: var(--line-height-base);
@@ -12,6 +15,12 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-optical-sizing: auto;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-viewport-height: 100dvh;
+  }
 }
 
 *,

@@ -938,7 +938,7 @@
         --landing-page-x-padding: clamp(12px, 1.2vw, 24px);
         --landing-header-reserve: clamp(78px, 9vh, 104px);
 
-        height: 100%;
+        height: var(--app-viewport-height);
         overflow-x: auto;
         overflow-y: hidden;
         scrollbar-width: none;

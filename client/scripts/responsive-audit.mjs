@@ -37,9 +37,17 @@ const checks = [
   {
     file: 'src/pages/Landing.module.css',
     patterns: [
-      /\.page\s*\{[^}]*height:\s*100%;[^}]*overflow-x:\s*auto;[^}]*scrollbar-width:\s*none;/s,
+      /\.page\s*\{[^}]*height:\s*var\(--app-viewport-height\);[^}]*overflow-x:\s*auto;[^}]*scrollbar-width:\s*none;/s,
       /\.page::-webkit-scrollbar\s*\{[^}]*display:\s*none;/s,
       /\.snapSection\s*\{[^}]*height:\s*100%;/s,
+    ],
+  },
+  {
+    file: 'src/index.css',
+    patterns: [
+      /--app-viewport-height:\s*100vh;/,
+      /@supports\s*\(height:\s*100dvh\)/,
+      /--app-viewport-height:\s*100dvh;/,
     ],
   },
   {
