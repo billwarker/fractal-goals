@@ -17,6 +17,7 @@ export function useSessionSidePaneViewModel({
     onOptions,
     mode,
     onModeChange,
+    readOnly = false,
     targetModal = null,
 }) {
     const {
@@ -55,6 +56,7 @@ export function useSessionSidePaneViewModel({
             selectedActivity,
             onGoalClick,
             onGoalCreated,
+            readOnly,
             targetModal,
         },
         timeline: {
@@ -76,6 +78,7 @@ export function useSessionSidePaneViewModel({
         previousSessionNotes,
         pinNote,
         rootId,
+        readOnly,
         selectedActivity,
         session?.attributes?.completed,
         sessionActivityDefs,

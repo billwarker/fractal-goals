@@ -18,6 +18,7 @@ function SessionGoalHierarchyPanel({
     selectedActivity,
     onGoalClick,
     onGoalCreated,
+    readOnly = false,
     targetModal = null,
     className = '',
 }) {
@@ -146,7 +147,7 @@ function SessionGoalHierarchyPanel({
                         getGoalConnectorHighlightState={getGoalConnectorHighlightState}
                         getGoalConnectorEdgeHighlightState={getGoalConnectorEdgeHighlightState}
                         connectorHighlightMode="lineage"
-                        onStartSubGoalCreation={handleStartSubGoalCreation}
+                        onStartSubGoalCreation={readOnly ? undefined : handleStartSubGoalCreation}
                         scopedActivityName={scopedActivityName}
                     />
                     {displayHierarchy.length === 0 && (
@@ -190,7 +191,7 @@ function SessionGoalHierarchyPanel({
                 </React.Suspense>
             )}
 
-            {createSubGoalParent && createPortal(
+            {!readOnly && createSubGoalParent && createPortal(
                 <React.Suspense fallback={<div>Loading Details...</div>}>
                     <GoalDetailModal
                         isOpen={Boolean(createSubGoalParent)}

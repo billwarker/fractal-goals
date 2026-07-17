@@ -1,5 +1,4 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 
 import { prepareActivityDefinitionCopy } from '../../utils/activityBuilder';
 import { getProgramsAffectedByGoalCompletion } from '../../utils/goalCompletionPrograms';
@@ -17,6 +16,7 @@ import GoalUncompletionModal from '../goals/GoalUncompletionModal';
 import GoalViewMode from '../goals/GoalViewMode';
 import GoalDetailModalFooter from './GoalDetailModalFooter';
 import GraphProfileLoadingFallback from './GraphProfileLoadingFallback';
+import GoalDetailModalPortal from './GoalDetailModalPortal';
 import styles from '../GoalDetailModal.module.css';
 
 const TargetManager = lazyWithRetry(() => import('./TargetManager'), 'components/goalDetail/TargetManager');
@@ -114,6 +114,8 @@ function GoalDetailModalRenderSurface({
     parentType,
     persistAssociations,
     persistTargetChanges,
+    portalTarget,
+    overlayClassName,
     programs,
     readOnly,
     readOnlyAssociatedActivities,
@@ -810,7 +812,7 @@ function GoalDetailModalRenderSurface({
 
     const modalMarkup = (
         <ModalBackdrop
-            className={styles.modalOverlay}
+            className={`${styles.modalOverlay} ${overlayClassName}`}
             onClose={handleClose}
         >
             <div
@@ -833,7 +835,7 @@ function GoalDetailModalRenderSurface({
 
     return (
         <>
-            {createPortal(modalMarkup, document.body)}
+            <GoalDetailModalPortal portalTarget={portalTarget}>{modalMarkup}</GoalDetailModalPortal>
             {timeGraphModal}
             {targetAnalyticsModal}
             {targetBuilderModal}

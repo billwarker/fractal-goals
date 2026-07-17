@@ -2,13 +2,23 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { QueuedQuickSessionProvider } from '../../contexts/ActiveSessionContext';
 import useSessionSidePaneViewModel from '../../hooks/useSessionSidePaneViewModel';
 import { flattenGoalTree } from '../../utils/goalNodeModel';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { normalizeSectionActivityIds } from '../../utils/sessionSection';
 import SessionSection from '../sessionDetail/SessionSection';
 import SessionDetailPaneLayout from '../sessionDetail/SessionDetailPaneLayout';
 import { resolveLandingTargetAnalyticsData } from './landingTargetAnalyticsData';
 import sessionDetailStyles from '../../pages/SessionDetail.module.css';
-import targetModalStyles from './LandingTargetManagerModal.module.css';
+import scopedModalStyles from './LandingScopedModal.module.css';
 import styles from './LandingFeaturesSection.module.css';
+
+const GoalDetailModal = lazyWithRetry(
+    () => import('../ConnectedGoalDetailModal'),
+    'components/ConnectedGoalDetailModal'
+);
+const LandingTargetManagerModal = lazyWithRetry(
+    () => import('./LandingTargetManagerModal'),
+    'components/landing/LandingTargetManagerModal'
+);
 
 function ensureAttributes(session) {
     const attributes = session?.attributes || {};
@@ -191,6 +201,16 @@ function LandingSessionScreenWithModel({
     const [selectedActivity, setSelectedActivity] = useState(null);
     const [sidePaneMode, setSidePaneMode] = useState('details');
     const [modalHost, setModalHost] = useState(null);
+    const [selectedGoal, setSelectedGoal] = useState(null);
+    const [selectedGoalTarget, setSelectedGoalTarget] = useState(null);
+    const handleGoalClick = useCallback((goal) => {
+        setSelectedGoal(goal);
+        setSelectedGoalTarget(null);
+    }, []);
+    const closeGoalDetail = useCallback(() => {
+        setSelectedGoal(null);
+        setSelectedGoalTarget(null);
+    }, []);
     const resolveAnalyticsData = useCallback(
         (target) => resolveSessionTargetAnalytics(example, activityDefinitions, target),
         [activityDefinitions, example]
@@ -198,13 +218,13 @@ function LandingSessionScreenWithModel({
     const targetModal = useMemo(() => ({
         readOnly: true,
         portalTarget: modalHost,
-        overlayClassName: targetModalStyles.scopedOverlay,
+        overlayClassName: scopedModalStyles.scopedOverlay,
         resolveAnalyticsData,
     }), [modalHost, resolveAnalyticsData]);
     const sidePaneModel = useSessionSidePaneViewModel({
         selectedActivity,
         onNoteAdded: () => {},
-        onGoalClick: () => {},
+        onGoalClick: handleGoalClick,
         onGoalCreated: () => {},
         notes,
         previousSessionNotes: [],
@@ -216,6 +236,7 @@ function LandingSessionScreenWithModel({
         onOptions: () => {},
         mode: sidePaneMode,
         onModeChange: setSidePaneMode,
+        readOnly: true,
         targetModal,
     });
 
@@ -229,6 +250,37 @@ function LandingSessionScreenWithModel({
                 selectedActivity={selectedActivity}
                 setSelectedActivity={setSelectedActivity}
             />
+            {modalHost && selectedGoal && (
+                <React.Suspense fallback={null}>
+                    <GoalDetailModal
+                        isOpen
+                        onClose={closeGoalDetail}
+                        goal={selectedGoal}
+                        rootId={example.id}
+                        treeData={example.tree}
+                        activityDefinitions={activityDefinitions}
+                        activityGroups={example.activityGroups || []}
+                        readOnly
+                        portalTarget={modalHost}
+                        overlayClassName={scopedModalStyles.scopedOverlay}
+                        onGoalSelect={handleGoalClick}
+                        onTargetOpen={setSelectedGoalTarget}
+                    />
+                </React.Suspense>
+            )}
+            {modalHost && selectedGoal && selectedGoalTarget && (
+                <React.Suspense fallback={null}>
+                    <LandingTargetManagerModal
+                        exampleId={example.id}
+                        goal={selectedGoal}
+                        target={selectedGoalTarget}
+                        activityDefinitions={activityDefinitions}
+                        analyticsData={resolveAnalyticsData(selectedGoalTarget)}
+                        portalTarget={modalHost}
+                        onClose={() => setSelectedGoalTarget(null)}
+                    />
+                </React.Suspense>
+            )}
         </div>
     );
 }

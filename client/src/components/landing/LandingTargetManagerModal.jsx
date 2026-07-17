@@ -2,7 +2,7 @@ import React from 'react';
 
 import TargetAnalyticsModal from '../goalDetail/TargetAnalyticsModal';
 import { resolveLandingTargetAnalyticsData } from './landingTargetAnalyticsData';
-import styles from './LandingTargetManagerModal.module.css';
+import styles from './LandingScopedModal.module.css';
 
 export default function LandingTargetManagerModal({
     exampleId,

@@ -240,6 +240,28 @@ describe('SessionGoalHierarchyPanel smoke', () => {
         expect(modal).toHaveAttribute('data-overlay-class', 'scoped-overlay');
     });
 
+    it('opens read-only hierarchy goals without offering sub-goal creation', async () => {
+        const onGoalClick = vi.fn();
+        renderWithProviders(
+            <SessionGoalHierarchyPanel
+                selectedActivity={null}
+                onGoalClick={onGoalClick}
+                readOnly
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        expect(await screen.findByText('IG')).toBeInTheDocument();
+        expect(screen.queryByTitle('Add Sub-goal')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByText('IG'));
+        expect(onGoalClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'ig-1' }));
+    });
+
     it('keeps the session hierarchy visible when focused activity has no eligible goals', async () => {
         activeSessionMock = {
             ...activeSessionMock,

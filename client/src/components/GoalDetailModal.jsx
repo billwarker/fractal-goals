@@ -53,7 +53,7 @@ function GoalDetailModal({
     onGoalSelect, onTargetOpen, // Optional host actions for selecting goals/opening read-only targets
     onAssociationsChanged, // Callback when activity associations change
     onMobileCollapse,
-    readOnly = false,
+    readOnly = false, portalTarget = null, overlayClassName = '',
     initialActivities = [], initialActivityGroups = [], // Create-mode associations
     initialView = 'goal', initialTargetId = null, initialViewKey = 0,
 }) {
@@ -65,8 +65,7 @@ function GoalDetailModal({
         getLevelByName = () => null,
     } = useGoalLevels() || {};
     // Normalize activityDefinitions to always be an array (handles null case)
-    const activityDefinitions = useMemo(
-        () => (Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : []),
+    const activityDefinitions = useMemo(() => (Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : []),
         [activityDefinitionsRaw]
     );
     const evidenceGoalIds = useMemo(() => {
@@ -721,6 +720,7 @@ function GoalDetailModal({
             persistAssociations={persistAssociations}
             persistTargetChanges={persistTargetChanges}
             programs={programs}
+            portalTarget={portalTarget} overlayClassName={overlayClassName}
             readOnly={readOnly}
             readOnlyAssociatedActivities={readOnlyAssociatedActivities}
             readOnlyAssociatedActivityGroups={readOnlyAssociatedActivityGroups}
