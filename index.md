@@ -638,7 +638,7 @@ Shared frontend infrastructure to know:
 - `client/src/**/__tests__/` and `client/src/hooks/__tests__/`: frontend tests
 - `docs/architecture/`: ADRs
 - `docs/planning/`: historical roadmap and planning docs
-- `planning/`: active implementation plans, design explorations, and readiness audits, including `planning/beta-readiness-2026-07.md`, `planning/beta-readiness-findings-2026-07.md`, and the independent 32-concept basic/SMART icon workbench at `planning/goal-icon-concept-lab-2026-07.html`
+- `planning/`: active implementation plans, design explorations, and readiness audits, including the circuit execution architecture at `planning/circuit-activity-architecture.md`, `planning/beta-readiness-2026-07.md`, `planning/beta-readiness-findings-2026-07.md`, and the independent 32-concept basic/SMART icon workbench at `planning/goal-icon-concept-lab-2026-07.html`
 
 ## Testing And Quality
 
