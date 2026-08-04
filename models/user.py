@@ -17,13 +17,13 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
     preferences = Column(JSON_TYPE, default={})  # Store UI preferences like goal colors
-    role = Column(String(32), default='user', nullable=False, index=True)
-    membership_tier = Column(String(32), default='free', nullable=False)
+    role = Column(String(32), default='user', nullable=False, index=True, server_default='user')
+    membership_tier = Column(String(32), default='free', nullable=False, server_default='free')
     quota_overrides = Column(JSON_TYPE, nullable=True)
-    storage_limit_bytes = Column(BigInteger, default=104857600, nullable=True)
+    storage_limit_bytes = Column(BigInteger, default=104857600, nullable=True, server_default='104857600')
     stripe_customer_id = Column(String(255), nullable=True)
     stripe_subscription_id = Column(String(255), nullable=True)
-    subscription_status = Column(String(32), default='none', nullable=False)
+    subscription_status = Column(String(32), default='none', nullable=False, server_default='none')
     paid_amount_cad_cents = Column(Integer, nullable=True)
     
     # Auth & Security Improvements

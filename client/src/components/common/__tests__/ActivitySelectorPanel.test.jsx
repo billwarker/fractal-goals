@@ -4,6 +4,81 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import ActivitySelectorPanel from '../ActivitySelectorPanel';
 
 describe('ActivitySelectorPanel', () => {
+    it('separates all circuits behind the definition-type toggle', () => {
+        const onSelectActivity = vi.fn();
+        const onSelectCircuit = vi.fn();
+        render(
+            <ActivitySelectorPanel
+                activities={[{ id: 'activity-1', name: 'Scale Practice', group_id: null }]}
+                circuits={[
+                    {
+                        id: 'circuit-1',
+                        name: 'Technique Circuit',
+                        group_id: 'group-technique',
+                        planned_rounds: 1,
+                    },
+                    {
+                        id: 'circuit-2',
+                        name: 'Ungrouped Circuit',
+                        group_id: null,
+                        planned_rounds: 3,
+                        slots: [
+                            {
+                                id: 'slot-2',
+                                sort_order: 2,
+                                activity: { name: 'Rows', description: 'Pull with a controlled tempo.' },
+                            },
+                            {
+                                id: 'slot-1',
+                                sort_order: 1,
+                                activity: { name: 'Scapular Pulls', description: 'Keep the elbows straight.' },
+                            },
+                        ],
+                    },
+                ]}
+                activityGroups={[{ id: 'group-technique', name: 'Technique', parent_id: null }]}
+                onClose={vi.fn()}
+                onSelectActivity={onSelectActivity}
+                onSelectCircuit={onSelectCircuit}
+                allowCreate
+                allowCopy
+                showTypeToggle
+            />,
+        );
+
+        const toggle = screen.getByRole('tablist', { name: 'Definition type' });
+        const backButton = screen.getByRole('button', { name: /Back/ });
+        expect(screen.queryByRole('heading', { name: 'Select Activity Group' })).not.toBeInTheDocument();
+        expect(toggle.compareDocumentPosition(backButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Select Scale Practice' })).toBeInTheDocument();
+        expect(screen.queryByText('Ungrouped Circuit')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Activity Circuits' }));
+
+        expect(screen.queryByText('Scale Practice')).not.toBeInTheDocument();
+        expect(screen.getByPlaceholderText('Search activity circuits...')).toBeInTheDocument();
+        expect(screen.getByText('Ungrouped Activity Circuits')).toBeInTheDocument();
+        expect(screen.getByText('Circuit • 3 rounds')).toBeInTheDocument();
+        const circuitActivities = screen.getByRole('list', { name: 'Ungrouped Circuit activities' });
+        expect(circuitActivities).toHaveTextContent('Scapular Pulls');
+        expect(circuitActivities).toHaveTextContent('Keep the elbows straight.');
+        expect(circuitActivities).toHaveTextContent('Rows');
+        expect(circuitActivities).toHaveTextContent('Pull with a controlled tempo.');
+        expect(
+            screen.getByText('Scapular Pulls').compareDocumentPosition(screen.getByText('Rows'))
+            & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+        expect(screen.queryByRole('button', { name: '+ Create New Activity Definition' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: '+ Copy Existing Activity Definition' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Select Ungrouped Circuit' }));
+        expect(onSelectCircuit).toHaveBeenCalledWith(expect.objectContaining({ id: 'circuit-2' }));
+        expect(onSelectActivity).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Technique' }));
+        expect(screen.getByRole('button', { name: 'Select Technique Circuit' })).toBeInTheDocument();
+        expect(screen.getByText('Circuit • 1 round')).toBeInTheDocument();
+    });
+
     it('opens directly inside the requested activity group', () => {
         render(
             <ActivitySelectorPanel
@@ -22,6 +97,7 @@ describe('ActivitySelectorPanel', () => {
         );
 
         expect(screen.getByRole('heading', { name: 'Warm Up' })).toBeInTheDocument();
+        expect(screen.getAllByText('Warm Up')).toHaveLength(1);
         expect(screen.getByText('Wrist Circles')).toBeInTheDocument();
         expect(screen.queryByText('Repertoire Run')).not.toBeInTheDocument();
     });

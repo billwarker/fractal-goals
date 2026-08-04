@@ -2,7 +2,7 @@ import json
 import uuid
 from datetime import date, timedelta
 
-from models import Goal, Note, Program
+from models import ActivitySet, Goal, Note, Program
 from services.serializers import derive_note_type
 from services.events import Events
 from services.note_service import NoteService
@@ -302,6 +302,9 @@ def test_get_all_notes_scopes_program_notes_to_selected_program(db_session, samp
 
 
 def test_pin_note_rejects_activity_set_notes(db_session, sample_goal_hierarchy, sample_activity_instance, test_user):
+    activity_set = ActivitySet(activity_instance_id=sample_activity_instance.id, sort_order=0)
+    db_session.add(activity_set)
+    db_session.flush()
     note = Note(
         id=str(uuid.uuid4()),
         root_id=sample_goal_hierarchy['ultimate'].id,
@@ -309,7 +312,7 @@ def test_pin_note_rejects_activity_set_notes(db_session, sample_goal_hierarchy, 
         context_id=sample_activity_instance.id,
         activity_instance_id=sample_activity_instance.id,
         activity_definition_id=sample_activity_instance.activity_definition_id,
-        set_index=0,
+        activity_set_id=activity_set.id,
         content='Set-specific note',
     )
     db_session.add(note)
@@ -331,6 +334,7 @@ def test_get_session_notes_includes_session_template_name(
     test_user,
 ):
     session = sample_activity_instance.session
+    sample_session_template.template_data = json.dumps({'template_color': '#22c55e'})
     session.template_id = sample_session_template.id
     session.attributes = json.dumps({
         'session_data': {
@@ -360,7 +364,38 @@ def test_get_session_notes_includes_session_template_name(
     assert error is None
     assert status == 200
     assert payload[0]['session_template_name'] == 'Standard Practice Session'
-    assert payload[0]['session_template_color'] == '#123456'
+    assert payload[0]['session_template_color'] == '#22c55e'
+
+
+def test_activity_history_uses_current_session_template_style(
+    db_session,
+    sample_goal_hierarchy,
+    sample_activity_instance,
+    sample_session_template,
+    test_user,
+):
+    session = sample_activity_instance.session
+    sample_session_template.template_data = json.dumps({'template_color': '#22c55e'})
+    session.template_id = sample_session_template.id
+    session.attributes = json.dumps({
+        'session_data': {
+            'template_name': 'Standard Practice Session',
+            'template_color': '#4A90E2',
+        },
+    })
+    db_session.commit()
+
+    service = NoteService(db_session)
+    payload, error, status = service.get_activity_history(
+        sample_goal_hierarchy['ultimate'].id,
+        sample_activity_instance.activity_definition_id,
+        test_user.id,
+    )
+
+    assert error is None
+    assert status == 200
+    assert payload[0]['session_template_name'] == 'Standard Practice Session'
+    assert payload[0]['session_template_color'] == '#22c55e'
 
 
 def test_get_all_notes_filters_regular_goal_notes_by_goal_id(

@@ -20,6 +20,7 @@ class TestGoalAnalyticsService:
         invalidate_root(root_id)
 
         session = Session(
+            owner_id=sample_ultimate_goal.owner_id,
             id=str(uuid.uuid4()),
             name="Analytics Session",
             root_id=root_id,

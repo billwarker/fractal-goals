@@ -6,6 +6,7 @@ from services.serializers import (
     serialize_note,
     serialize_note_display,
 )
+from services.session_runtime import get_session_template_color, get_session_template_name
 
 
 def serialize_fractal_summary(root, last_activity, display_level=None):
@@ -62,6 +63,10 @@ def serialize_activity_history_entry(instance, notes):
     payload = serialize_activity_instance(instance)
     if instance.session:
         payload['session_name'] = instance.session.name
+        payload['session_template_name'] = (
+            get_session_template_name(instance.session) or instance.session.name
+        )
+        payload['session_template_color'] = get_session_template_color(instance.session)
         payload['session_date'] = format_utc(instance.session.session_start or instance.session.created_at)
     payload['notes'] = [serialize_note_display(note) for note in notes]
     return payload

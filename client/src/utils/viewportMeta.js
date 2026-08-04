@@ -2,7 +2,7 @@ export function isFlowTreeRoute(pathname = '') {
     return /^\/[^/]+\/goals(?:\/)?$/.test(pathname);
 }
 
-export function shouldAllowZoom({ isMobile, pathname = '' }) {
+export function shouldAllowZoom({ isMobile }) {
     return !isMobile;
 }
 

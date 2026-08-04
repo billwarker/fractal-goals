@@ -11,8 +11,10 @@ def test_feature_flags_default_off_and_persisted(db_session):
     assert payload["flags"] == {
         "goal_surface_configuration": False,
         "analytics_sql_explorer": False,
+        "onboarding_v1": False,
     }
     assert [item["key"] for item in payload["definitions"]] == [
+        "onboarding_v1",
         "goal_surface_configuration",
         "analytics_sql_explorer",
     ]

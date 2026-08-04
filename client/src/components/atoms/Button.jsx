@@ -8,6 +8,7 @@ import styles from './Button.module.css';
  * 
  * variants: 'primary' | 'secondary' | 'success' | 'danger' | 'ghost'
  * sizes: 'sm' | 'md' | 'lg'
+ * unstyled: preserves button semantics while delegating all visuals to className
  */
 const Button = ({
     children,
@@ -18,6 +19,7 @@ const Button = ({
     isLoading = false,
     type = 'button',
     fullWidth = false,
+    unstyled = false,
     leftIcon,
     rightIcon,
     ...props
@@ -28,7 +30,9 @@ const Button = ({
     return (
         <button
             type={type}
-            className={`${styles.button} ${variantClass} ${sizeClass} ${fullWidth ? styles.fullWidth : ''} ${className}`}
+            className={unstyled
+                ? className
+                : `${styles.button} ${variantClass} ${sizeClass} ${fullWidth ? styles.fullWidth : ''} ${className}`}
             disabled={disabled || isLoading}
             {...props}
         >

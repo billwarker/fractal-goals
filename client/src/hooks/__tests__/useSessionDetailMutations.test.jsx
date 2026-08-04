@@ -171,7 +171,10 @@ describe('useSessionDetailMutations', () => {
             { id: 'inst-1', activity_definition_id: 'act-1' },
             { id: 'inst-2', activity_definition_id: 'act-1' },
         ]);
-        expect(draftState.sections[0].activity_ids).toEqual(['inst-1', 'inst-2']);
+        expect(draftState.sections[0].items).toEqual([
+            { type: 'activity', activity_instance_id: 'inst-1' },
+            { type: 'activity', activity_instance_id: 'inst-2' },
+        ]);
         expect(selectorState[0]).toBe(false);
     });
 
@@ -245,7 +248,11 @@ describe('useSessionDetailMutations', () => {
                 }),
             ],
         }));
-        expect(draftState.sections[0].activity_ids).toEqual(['inst-1', 'inst-2', 'inst-3']);
+        expect(draftState.sections[0].items).toEqual([
+            { type: 'activity', activity_instance_id: 'inst-1' },
+            { type: 'activity', activity_instance_id: 'inst-2' },
+            { type: 'activity', activity_instance_id: 'inst-3' },
+        ]);
         expect(notify.success).toHaveBeenCalledWith('Activity instance duplicated');
     });
 
@@ -504,7 +511,9 @@ describe('useSessionDetailMutations', () => {
             await result.current.addActivity(0, 'act-2');
         });
 
-        expect(draftState.sections[0].activity_ids).toEqual(['inst-2']);
+        expect(draftState.sections[0].items).toEqual([
+            { type: 'activity', activity_instance_id: 'inst-2' },
+        ]);
         expect(queryClient.getQueryData(queryKeys.sessionGoalsView('root-1', 'session-1'))).toMatchObject({
             session_activity_ids: ['act-2'],
             session_goal_ids: [],
@@ -551,6 +560,50 @@ describe('useSessionDetailMutations', () => {
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.progressHistoryRoot('act-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessionProgressSummary('session-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessions('root-1') });
+    });
+
+    it('omits blank metric placeholders when adding an activity set', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        queryClient.setQueryData(queryKeys.sessionActivities('root-1', 'session-1'), [
+            { id: 'inst-1', activity_definition_id: 'act-1', sets: [] },
+        ]);
+        updateActivityInstance.mockResolvedValueOnce({
+            data: { id: 'inst-1', activity_definition_id: 'act-1', sets: [{ id: 'set-1', metrics: [] }] },
+        });
+
+        const { result } = renderHook(
+            () => useSessionDetailMutations(createBaseOptions(queryClient)),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.updateInstance('inst-1', {
+                sets: [{
+                    instance_id: 'draft-set-1',
+                    metrics: [
+                        { metric_id: 'metric-1', value: '' },
+                        { metric_id: 'metric-2', value: '   ' },
+                        { metric_id: 'metric-3', value: null },
+                        { metric_id: 'metric-4', value: '8' },
+                    ],
+                }],
+            });
+        });
+
+        expect(updateActivityInstance).toHaveBeenCalledWith('root-1', 'inst-1', {
+            session_id: 'session-1',
+            activity_definition_id: 'act-1',
+            sets: [{
+                instance_id: 'draft-set-1',
+                metrics: [{ metric_id: 'metric-4', value: '8' }],
+            }],
+        });
+        expect(notify.error).not.toHaveBeenCalled();
     });
 
     it('invalidates session list queries after timer actions update activity state', async () => {

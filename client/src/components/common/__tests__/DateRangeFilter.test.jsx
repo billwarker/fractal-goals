@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import DateRangeFilter from '../DateRangeFilter';
-import { presetToRange, toISODate } from '../../../utils/dateRange';
+import { presetToRange } from '../../../utils/dateRange';
 
 function ControlledFilter({ initial = { start: null, end: null }, presets, onChange }) {
     const [value, setValue] = useState(initial);

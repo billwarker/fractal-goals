@@ -82,7 +82,7 @@ const Modal = ({
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isOpen]);
+    }, [isOpen, modalId, stackLevel]);
 
     if (!isOpen) return null;
 

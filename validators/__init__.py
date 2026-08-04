@@ -138,6 +138,14 @@ from .templates import (
     SessionTemplateFromSessionSchema,
     SessionTemplateUpdateSchema,
 )
+from .circuits import (
+    CircuitDefinitionCreateSchema,
+    CircuitDefinitionUpdateSchema,
+    CircuitMemberMetricsUpdateSchema,
+    CircuitRunCreateSchema,
+    CircuitRunTimingUpdateSchema,
+    CircuitSlotSchema,
+)
 
 __all__ = [
     "ActivityDefinitionCreateSchema",
@@ -150,6 +158,12 @@ __all__ = [
     "ActivityMetricsUpdateSchema",
     "ActivityReorderSchema",
     "ActivityTimerStartSchema",
+    "CircuitDefinitionCreateSchema",
+    "CircuitDefinitionUpdateSchema",
+    "CircuitMemberMetricsUpdateSchema",
+    "CircuitRunCreateSchema",
+    "CircuitRunTimingUpdateSchema",
+    "CircuitSlotSchema",
     "AdminBetaSignupStatusSchema",
     "AdminFeatureFlagsUpdateSchema",
     "AdminInviteKeyCreateSchema",

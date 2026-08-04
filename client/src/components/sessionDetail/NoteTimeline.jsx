@@ -13,6 +13,9 @@ function NoteTimeline({
     onPin,
     onUnpin,
     compact = false,
+    minimal = true,
+    showContext = false,
+    showTypePill = true,
     selectedNoteId,
     onNoteSelect,
 }) {
@@ -29,8 +32,9 @@ function NoteTimeline({
             selectedNoteId={selectedNoteId}
             onNoteSelect={(note) => onNoteSelect && onNoteSelect(note.id)}
             groupByDate={false}
-            showContext={false}
-            minimal
+            showContext={showContext}
+            minimal={minimal}
+            showTypePill={showTypePill}
             variant="flat"
         />
     );

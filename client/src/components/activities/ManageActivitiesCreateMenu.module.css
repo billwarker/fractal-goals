@@ -1,0 +1,32 @@
+.container {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.chevron {
+    margin-left: 2px;
+    color: var(--color-text-muted);
+    font-size: 10px;
+}
+
+.menu {
+    min-width: 250px;
+}
+
+.optionCopy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.optionCopy strong {
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: var(--font-weight-semibold);
+}
+
+.optionCopy > span {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    line-height: 1.35;
+}

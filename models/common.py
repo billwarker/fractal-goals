@@ -10,7 +10,8 @@ class Note(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
     
-    context_type = Column(String, nullable=False) # 'root', 'goal', 'session', 'program', 'activity_instance', 'activity_definition'
+    # Validated semantic target, including circuit_run and circuit_round.
+    context_type = Column(String, nullable=False)
     context_id = Column(String, nullable=False, index=True)
     
     __table_args__ = (
@@ -22,7 +23,7 @@ class Note(Base):
     activity_definition_id = Column(String, ForeignKey('activity_definitions.id', ondelete='SET NULL'), nullable=True, index=True)
     goal_id = Column(String, ForeignKey('goals.id', ondelete='SET NULL'), nullable=True, index=True)
 
-    set_index = Column(Integer, nullable=True)
+    activity_set_id = Column(String, ForeignKey('activity_sets.id', ondelete='SET NULL'), nullable=True, index=True)
 
     content = Column(Text, nullable=False)
     note_kind = Column(String, nullable=True, index=True)
@@ -34,6 +35,7 @@ class Note(Base):
 
     session = relationship("Session", backref="notes_list")
     activity_instance = relationship("ActivityInstance", backref="notes_list")
+    activity_set = relationship("ActivitySet")
     activity_definition = relationship("ActivityDefinition", backref="notes_list")
     goal = relationship("Goal", foreign_keys=[goal_id])
 
@@ -97,7 +99,7 @@ class AnalyticsQueryProfile(Base):
     description = Column(Text, nullable=True)
     query_spec = Column(JSON_TYPE, nullable=False)
     visualization_spec = Column(JSON_TYPE, nullable=True)
-    spec_version = Column(Integer, nullable=False, default=1)
+    spec_version = Column(Integer, nullable=False, default=1, server_default='1')
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)

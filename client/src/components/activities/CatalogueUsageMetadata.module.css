@@ -1,0 +1,12 @@
+.metadata {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.separator {
+    opacity: 0.7;
+}

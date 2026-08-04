@@ -61,6 +61,7 @@ function SessionFilterSelectionModal({
     const [browseParentGroupId, setBrowseParentGroupId] = useState(null);
     const [activeLeafGroupId, setActiveLeafGroupId] = useState(null);
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Each modal opening intentionally creates a fresh filter transaction. */
     useEffect(() => {
         if (!isOpen) return;
         setSearchTerm('');
@@ -68,6 +69,7 @@ function SessionFilterSelectionModal({
         setBrowseParentGroupId(null);
         setActiveLeafGroupId(null);
     }, [isOpen, selectedIds]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     const groupMap = useMemo(
         () => buildActivityGroupMap(Array.isArray(activityGroups) ? activityGroups : []),

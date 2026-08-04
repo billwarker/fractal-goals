@@ -1,0 +1,77 @@
+.title {
+    margin: 0;
+    font-size: inherit;
+}
+
+.rounds {
+    gap: 8px;
+}
+
+.round {
+    padding-bottom: 7px;
+    border-bottom: 1px dashed var(--color-border);
+}
+
+.round:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.roundLabel {
+    margin-bottom: 5px;
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.members {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.member {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: start;
+    gap: 6px 12px;
+    min-width: 0;
+}
+
+.memberIndex {
+    width: auto;
+    font-family: var(--font-family-mono);
+}
+
+.memberContent {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.memberName {
+    min-width: 0;
+    color: var(--color-text-primary);
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.metrics {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+}
+
+@media (max-width: 768px) {
+    .member {
+        grid-template-columns: 36px minmax(0, 1fr);
+        gap: 4px 8px;
+    }
+
+}

@@ -341,6 +341,7 @@ def test_unschedule_block_day_occurrence_emits_program_day_unscheduled_event(db_
 
     scheduled_session = Session(
         id=str(uuid.uuid4()),
+        owner_id=sample_goal_hierarchy['ultimate'].owner_id,
         root_id=root_id,
         name='Scheduled Session',
         session_start=datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0),
@@ -463,6 +464,7 @@ def test_check_program_day_completion(db_session, sample_program, sample_session
     # Create the completed session
     completed_sess = Session(
         id=str(uuid.uuid4()),
+        owner_id=sample_goal_hierarchy['ultimate'].owner_id,
         root_id=root_id,
         name="Test Session",
         completed=True,
@@ -515,6 +517,7 @@ def test_check_program_day_completion_allows_optional_template_missing(db_sessio
 
     completed_sess = Session(
         id=str(uuid.uuid4()),
+        owner_id=sample_goal_hierarchy['ultimate'].owner_id,
         root_id=root_id,
         name="Required Session",
         completed=True,
@@ -568,6 +571,7 @@ def test_check_program_day_completion_requires_minimum_template_count(db_session
 
     first_session = Session(
         id=str(uuid.uuid4()),
+        owner_id=sample_goal_hierarchy['ultimate'].owner_id,
         root_id=root_id,
         name="First Session",
         completed=True,
@@ -581,6 +585,7 @@ def test_check_program_day_completion_requires_minimum_template_count(db_session
 
     second_session = Session(
         id=str(uuid.uuid4()),
+        owner_id=sample_goal_hierarchy['ultimate'].owner_id,
         root_id=root_id,
         name="Second Session",
         completed=True,
@@ -613,6 +618,7 @@ def test_check_program_day_completion_queues_events_until_commit(
 
     completed_sess = Session(
         id=str(uuid.uuid4()),
+        owner_id=sample_goal_hierarchy['ultimate'].owner_id,
         root_id=root_id,
         name="Queued Session",
         completed=True,

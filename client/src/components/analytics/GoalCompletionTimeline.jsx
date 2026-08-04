@@ -1,8 +1,15 @@
 import React, { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
-import { useTheme } from '../../contexts/ThemeContext'
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import { DISABLED_CHART_ANIMATION } from './ChartJSWrapper';
+
+const GOAL_TYPES_HIERARCHY = [
+    'UltimateGoal',
+    'LongTermGoal',
+    'MidTermGoal',
+    'ShortTermGoal',
+    'ImmediateGoal',
+];
 
 /**
  * GoalCompletionTimeline - Stacked area chart showing cumulative goal completions over time
@@ -15,13 +22,6 @@ function GoalCompletionTimeline({ goals, chartRef }) {
     const { getGoalColor } = useGoalLevels();;
     // Goal types in hierarchy order from PARENT (bottom of stack) to CHILD (top of stack)
     // This ensures parent goals form the base of the stacked area chart
-    const goalTypesHierarchy = [
-        'UltimateGoal',   // Level 0 - Bottom of stack
-        'LongTermGoal',   // Level 1
-        'MidTermGoal',    // Level 2
-        'ShortTermGoal',  // Level 3
-        'ImmediateGoal',  // Level 4 - Top of stack
-    ];
 
     // Process goals to build cumulative completion data
     const chartData = useMemo(() => {
@@ -46,7 +46,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
         // For each date, we track cumulative count per goal type
         const timelineData = [];
         const cumulativeCounts = {};
-        goalTypesHierarchy.forEach(type => cumulativeCounts[type] = 0);
+        GOAL_TYPES_HIERARCHY.forEach(type => cumulativeCounts[type] = 0);
 
         // Group completions by date (to handle multiple completions on same day)
         const completionsByDate = {};
@@ -78,7 +78,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
 
             // Update cumulative counts for this date
             goalsOnDate.forEach(goal => {
-                if (cumulativeCounts.hasOwnProperty(goal.type)) {
+                if (Object.prototype.hasOwnProperty.call(cumulativeCounts, goal.type)) {
                     cumulativeCounts[goal.type]++;
                 }
             });
@@ -96,7 +96,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
             const firstDate = new Date(timelineData[0].date);
             firstDate.setDate(firstDate.getDate() - 1);
             const zeroCounts = {};
-            goalTypesHierarchy.forEach(type => zeroCounts[type] = 0);
+            GOAL_TYPES_HIERARCHY.forEach(type => zeroCounts[type] = 0);
             const prevDateKey = firstDate.toISOString().split('T')[0];
             timelineData.unshift({
                 date: firstDate,
@@ -108,7 +108,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
         // Build Chart.js datasets in hierarchy order
         // Parents (UltimateGoal) at bottom, children (ImmediateGoal) at top
         // Chart.js stacks in order of array, so first dataset = bottom layer
-        const datasets = goalTypesHierarchy
+        const datasets = GOAL_TYPES_HIERARCHY
             .filter(type => {
                 // Only include types that have at least one completion
                 return timelineData.some(d => d.counts[type] > 0);
@@ -150,7 +150,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
             datasets,
             goalsPerDate
         };
-    }, [goals]);
+    }, [getGoalColor, goals]);
 
     const chartOptions = useMemo(() => ({
         responsive: true,

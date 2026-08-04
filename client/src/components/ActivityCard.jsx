@@ -1,7 +1,7 @@
 import React from 'react';
 import Linkify from './atoms/Linkify';
 import DeleteButton from './atoms/DeleteButton';
-import { formatAverageDuration } from '../utils/durationStats';
+import CatalogueUsageMetadata from './activities/CatalogueUsageMetadata';
 import styles from './ActivityCard.module.css';
 
 /**
@@ -19,18 +19,6 @@ function ActivityCard({
     isDragging,
     readOnly = false,
 }) {
-    const formatLastUsedDate = (timestamp) => {
-        if (!timestamp) return 'Never';
-        const date = new Date(timestamp);
-        if (Number.isNaN(date.getTime())) return 'Never';
-        return date.toLocaleDateString(undefined, {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-        });
-    };
-    const instanceCount = instantiationSummary?.instance_count;
-    const averageDuration = formatAverageDuration(instantiationSummary?.average_duration_seconds, '—');
     const multiplicativeMetricCount = (activity.metric_definitions || [])
         .filter((metric) => metric.is_multiplicative !== false)
         .length;
@@ -60,13 +48,7 @@ function ActivityCard({
                         <Linkify>{activity.description}</Linkify>
                     </p>
                 )}
-                <div className={styles.metadata}>
-                    <span>{instanceCount ?? 0} instance{instanceCount === 1 ? '' : 's'}</span>
-                    <span className={styles.metadataSeparator}>•</span>
-                    <span>Last used: {formatLastUsedDate(instantiationSummary?.last_used_at)}</span>
-                    <span className={styles.metadataSeparator}>•</span>
-                    <span>Avg: {averageDuration}</span>
-                </div>
+                <CatalogueUsageMetadata summary={instantiationSummary} />
             </div>
 
             {/* Indicators */}

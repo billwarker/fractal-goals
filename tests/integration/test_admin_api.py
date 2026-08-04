@@ -52,6 +52,7 @@ def free_limits_with(**overrides):
         'sessions': 200,
         'activity_instances': 500,
         'activities': 50,
+        'circuits': 25,
         'metrics': 20,
         'session_templates': 10,
         'notes': 1000,
@@ -228,6 +229,7 @@ def test_admin_users_include_entity_and_storage_metrics(admin_client, test_user,
         'sessions',
         'activity_instances',
         'activities',
+        'circuits',
         'metrics',
         'session_templates',
         'notes',
@@ -364,6 +366,7 @@ def admin_landing_fractal(db_session, admin_user):
         )
     )
     session = Session(
+        owner_id=admin_user.id,
         id=str(uuid.uuid4()),
         root_id=root.id,
         name='Public Demo Session',
@@ -843,6 +846,8 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
     # Push the featured session out of the most-recent-4 window.
     for day in range(11, 15):
         db_session.add(Session(
+            owner_id=root.owner_id,
+            completed=True,
             id=str(uuid.uuid4()),
             root_id=root.id,
             name=f'Newer Session {day}',
@@ -866,6 +871,8 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
         track_progress=True,
     )
     analytics_session = Session(
+        owner_id=root.owner_id,
+        completed=True,
         id=str(uuid.uuid4()),
         root_id=root.id,
         name='Analytics-only Session',
@@ -1268,6 +1275,7 @@ def test_publish_drops_featured_session_without_activities(
     admin_landing_fractal,
 ):
     empty_session = Session(
+        owner_id=admin_landing_fractal.owner_id,
         id=str(uuid.uuid4()),
         root_id=admin_landing_fractal.id,
         name='Timer-only session',

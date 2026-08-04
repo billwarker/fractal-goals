@@ -9,6 +9,8 @@ import models
 from models import (
     ActivityDurationStats,
     ActivityInstance,
+    CircuitRound,
+    CircuitRun,
     Session,
     SessionTemplate,
     SessionTemplateStats,
@@ -191,6 +193,8 @@ class SessionTemplateStatsService:
 
         sessions = self.db_session.query(Session).options(
             selectinload(Session.activity_instances),
+            selectinload(Session.circuit_runs).selectinload(CircuitRun.slots),
+            selectinload(Session.circuit_runs).selectinload(CircuitRun.rounds).selectinload(CircuitRound.members),
         ).filter(
             Session.root_id == root_id,
             Session.template_id.in_(ids),
@@ -248,14 +252,28 @@ class SessionTemplateStatsService:
                 for instance in session.activity_instances or []
                 if not instance.deleted_at
             }
+            circuit_run_by_id = {run.id: run for run in (session.circuit_runs or [])}
             for index, section in enumerate(sections):
                 key = _section_key(section, index)
                 if not key:
                     continue
-                activity_ids = section.get("activity_ids") if isinstance(section, dict) else None
+                if not isinstance(section, dict):
+                    continue
+                circuit_seconds = 0
+                if isinstance(section.get("items"), list):
+                    activity_ids = []
+                    for item in section["items"]:
+                        if item.get("type") == "activity" and item.get("activity_instance_id"):
+                            activity_ids.append(item["activity_instance_id"])
+                        elif item.get("type") == "circuit":
+                            run = circuit_run_by_id.get(item.get("circuit_run_id"))
+                            if run and run.duration_seconds is not None:
+                                circuit_seconds += max(0, int(run.duration_seconds))
+                else:
+                    activity_ids = section.get("activity_ids")
                 if not isinstance(activity_ids, list):
                     continue
-                section_seconds = 0
+                section_seconds = circuit_seconds
                 for instance_id in activity_ids:
                     instance = instance_by_id.get(instance_id)
                     instance_duration = _duration_from_instance(instance) if instance else None

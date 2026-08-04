@@ -68,6 +68,7 @@ function Sessions() {
     const { filters, apiFilters, heatmapApiFilters, hasActiveFilters, updateFilters, resetFilters } = useSessionsPageFilters(timezone);
     const SESSIONS_PER_PAGE = 10;
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Router deletion state is reconciled into the local hidden-card state. */
     useEffect(() => {
         if (!rootId) {
             navigate('/');
@@ -115,19 +116,25 @@ function Sessions() {
         });
         setSelectedSessionId((prev) => (prev === deletedId ? null : prev));
     }, [location.state]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Changing roots loads that root's persisted pane preference. */
     useEffect(() => {
         if (typeof window === 'undefined') return;
         const stored = window.localStorage.getItem(filtersPaneStorageKey);
         setIsFiltersPaneOpen(getIsMobileViewport() ? false : (stored == null ? true : stored === 'true'));
     }, [filtersPaneStorageKey]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Responsive navigation closes a desktop-only pane. */
     useEffect(() => {
         if (isMobile) {
             setIsFiltersPaneOpen(false);
         }
     }, [isMobile, rootId]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Filtering can invalidate the currently expanded session card. */
     useEffect(() => {
         if (typeof window === 'undefined') return;
         window.localStorage.setItem(filtersPaneStorageKey, String(isFiltersPaneOpen));
@@ -149,6 +156,7 @@ function Sessions() {
             setSelectedSessionId(null);
         }
     }, [selectedSessionId, visibleSessions]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     useEffect(() => {
         if (selectedSessionId) {

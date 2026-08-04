@@ -324,21 +324,9 @@
     background: rgba(79, 156, 249, 0.08);
 }
 
-.addActivityButton {
-    background: rgba(79, 156, 249, 0.08);
-    border: 1px dashed var(--color-brand-primary);
-    color: var(--color-brand-primary);
-    padding: 10px 16px;
-    border-radius: var(--border-radius-md);
-    cursor: pointer;
-    font-size: var(--font-size-base);
-    font-weight: 600;
-    width: 100%;
-    text-align: center;
-}
-
-.addActivityButton:hover {
-    background: rgba(79, 156, 249, 0.14);
+.circuitError {
+    margin: 0;
+    color: var(--color-error);
 }
 
 @keyframes fadeIn {
@@ -386,6 +374,10 @@
     }
 
     .selectorPrimaryActions {
+        grid-template-columns: 1fr;
+    }
+
+    .addItemActions {
         grid-template-columns: 1fr;
     }
 }

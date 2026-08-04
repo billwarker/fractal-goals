@@ -287,7 +287,7 @@ function GoalMoveSubView({
     }, [search]);
 
     const { data, isLoading } = useEligibleMoveParents(rootId, goalId, debouncedSearch, true);
-    const eligible = data?.data?.eligible_parents ?? [];
+    const eligible = useMemo(() => data?.data?.eligible_parents ?? [], [data?.data?.eligible_parents]);
     const eligibleIds = useMemo(() => new Set(eligible.map((e) => e.id)), [eligible]);
     const currentParentId = useMemo(() => eligible.find((e) => e.is_current_parent)?.id, [eligible]);
 

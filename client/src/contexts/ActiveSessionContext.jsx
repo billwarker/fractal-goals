@@ -8,6 +8,7 @@ import useSessionDetailMutations from '../hooks/useSessionDetailMutations';
 import { queryKeys } from '../hooks/queryKeys';
 import { fractalApi } from '../utils/api';
 import { invalidateSessionLists } from '../utils/queryInvalidation';
+import { calculateSessionItemDuration } from '../utils/sessionTime';
 import { useGoals } from './GoalsContext';
 
 const SessionDataContext = createContext(null);
@@ -60,9 +61,11 @@ export function QueuedQuickSessionProvider({
         }, {});
     }, [activityDefinitions]);
 
-    const calculateTotalDuration = useCallback(() => (
-        (draftSession?.activityInstances || []).reduce((sum, instance) => sum + (instance.duration_seconds || 0), 0)
-    ), [draftSession?.activityInstances]);
+    const calculateTotalDuration = useCallback(() => calculateSessionItemDuration(
+        draftSession?.activityInstances,
+        draftSession?.circuitRuns,
+        draftSession?.localSessionData,
+    ), [draftSession?.activityInstances, draftSession?.circuitRuns, draftSession?.localSessionData]);
 
     const updateInstance = useCallback((instanceId, updates) => {
         updateDraft((previous) => ({
@@ -80,6 +83,7 @@ export function QueuedQuickSessionProvider({
         activityInstances: draftSession?.activityInstances || [],
         activities: activityDefinitions,
         activityGroups,
+        circuitRuns: draftSession?.circuitRuns || [],
         sessionGoalsView: draftSession?.sessionGoalsView || null,
         loading: false,
         instancesLoading: false,
@@ -100,6 +104,7 @@ export function QueuedQuickSessionProvider({
         activityGroups,
         calculateTotalDuration,
         draftSession?.activityInstances,
+        draftSession?.circuitRuns,
         draftSession?.localSessionData,
         draftSession?.session,
         draftSession?.sessionGoalsView,
@@ -211,6 +216,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         activities,
         activitiesLoading,
         activityGroups,
+        circuitRuns,
         sessionGoalsView,
         sessionGoalsViewLoading,
         normalizedSessionData,
@@ -261,6 +267,12 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         setSidePaneMode,
     });
 
+    const calculateTotalDuration = useCallback(() => calculateSessionItemDuration(
+        activityInstances,
+        circuitRuns,
+        localSessionData,
+    ), [activityInstances, circuitRuns, localSessionData]);
+
     const {
         addActivity,
         removeActivity,
@@ -279,7 +291,6 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         pauseSession,
         resumeSession,
         toggleSessionComplete,
-        calculateTotalDuration,
     } = useSessionDetailMutations({
         rootId,
         sessionId,
@@ -333,6 +344,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         activityInstances,
         activities,
         activityGroups,
+        circuitRuns,
         sessionGoalsView,
         loading,
         instancesLoading,
@@ -353,6 +365,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         activityInstances,
         activities,
         activityGroups,
+        circuitRuns,
         sessionGoalsView,
         loading,
         instancesLoading,

@@ -8,12 +8,14 @@ import { queryKeys } from '../../../hooks/queryKeys';
 const getSessionTemplates = vi.fn();
 const getActivities = vi.fn();
 const getActivityGroups = vi.fn();
+const getCircuits = vi.fn();
 
 vi.mock('../../../utils/api', () => ({
     fractalApi: {
         getSessionTemplates: (...args) => getSessionTemplates(...args),
         getActivities: (...args) => getActivities(...args),
         getActivityGroups: (...args) => getActivityGroups(...args),
+        getCircuits: (...args) => getCircuits(...args),
         updateSessionTemplate: vi.fn(),
         createSessionTemplate: vi.fn(),
     },
@@ -39,6 +41,7 @@ function createQueryClient() {
 describe('ProgramDayModal', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        getCircuits.mockResolvedValue({ data: [] });
     });
 
     it('reads template/activity datasets from shared query keys', async () => {

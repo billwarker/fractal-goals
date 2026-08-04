@@ -7,7 +7,9 @@ import pytest
 from models import (
     ActivityDefinition,
     ActivityInstance,
+    ActivitySet,
     FractalMetricDefinition,
+    Goal,
     MetricDefinition,
     MetricValue,
     Session,
@@ -60,11 +62,15 @@ def _build_activity_with_metrics(db_session, root_id, *, metric_specs):
 
 
 def _build_session(db_session, root_id, name, created_at):
+    root = db_session.get(Goal, root_id)
+    assert root is not None
     session = Session(
         id=str(uuid4()),
+        owner_id=root.owner_id,
         name=name,
         description='',
         root_id=root_id,
+        completed=True,
         session_start=created_at,
         created_at=created_at,
         attributes=json.dumps({}),
@@ -96,6 +102,25 @@ def _build_instance(db_session, *, root_id, session_id, activity_id, created_at,
             metric_definition_id=metric_definition_id,
             value=value,
         ))
+
+    for set_index, set_payload in enumerate((data or {}).get('sets', [])):
+        activity_set = ActivitySet(
+            activity_instance_id=instance.id,
+            sort_order=set_index,
+            status='completed' if completed else 'planned',
+        )
+        db_session.add(activity_set)
+        db_session.flush()
+        for metric_payload in set_payload.get('metrics', []):
+            value = metric_payload.get('value')
+            if value is None or (isinstance(value, str) and not value.strip()):
+                continue
+            db_session.add(MetricValue(
+                activity_instance_id=instance.id,
+                activity_set_id=activity_set.id,
+                metric_definition_id=metric_payload['metric_id'],
+                value=value,
+            ))
 
     db_session.flush()
     return instance

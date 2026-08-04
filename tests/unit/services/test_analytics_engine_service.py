@@ -41,6 +41,16 @@ def test_catalog_exposes_semantic_datasets(db_session, test_user):
     assert status == 200
     dataset_ids = {dataset["id"] for dataset in payload["datasets"]}
     assert {"sessions", "goals", "activity_instances", "metric_values", "targets", "notes"}.issubset(dataset_ids)
+    assert {
+        "circuit_definitions",
+        "circuit_slots",
+        "circuit_runs",
+        "circuit_run_slots",
+        "circuit_rounds",
+        "circuit_round_members",
+        "activity_sets",
+        "session_work_intervals",
+    }.issubset(dataset_ids)
     sessions = next(dataset for dataset in payload["datasets"] if dataset["id"] == "sessions")
     assert any(field["id"] == "duration_seconds" and "sum" in field["aggregations"] for field in sessions["fields"])
 
@@ -76,6 +86,7 @@ def test_run_query_aggregates_user_wide_sessions_and_excludes_other_tenants(db_s
     db_session.add_all([
         Session(
             id=str(uuid.uuid4()),
+            owner_id=test_user.id,
             root_id=first_root.id,
             name="First Session",
             completed=True,
@@ -84,6 +95,7 @@ def test_run_query_aggregates_user_wide_sessions_and_excludes_other_tenants(db_s
         ),
         Session(
             id=str(uuid.uuid4()),
+            owner_id=test_user.id,
             root_id=second_root.id,
             name="Second Session",
             completed=True,
@@ -92,6 +104,7 @@ def test_run_query_aggregates_user_wide_sessions_and_excludes_other_tenants(db_s
         ),
         Session(
             id=str(uuid.uuid4()),
+            owner_id=other_user.id,
             root_id=other_root.id,
             name="Other Session",
             completed=True,
@@ -147,6 +160,7 @@ def test_run_raw_sql_supports_select_star_and_excludes_other_tenants(db_session,
     db_session.add_all([
         Session(
             id=str(uuid.uuid4()),
+            owner_id=test_user.id,
             root_id=owned_root.id,
             name="Visible Raw Session",
             session_start=datetime(2026, 3, 1, tzinfo=timezone.utc),
@@ -154,6 +168,7 @@ def test_run_raw_sql_supports_select_star_and_excludes_other_tenants(db_session,
         ),
         Session(
             id=str(uuid.uuid4()),
+            owner_id=other_user.id,
             root_id=other_root.id,
             name="Hidden Raw Session",
             session_start=datetime(2026, 3, 2, tzinfo=timezone.utc),
@@ -228,12 +243,14 @@ def test_run_query_exposes_junction_tables_with_join_through_tenant_scope(db_ses
     other_root = _create_root(db_session, other_user, "Other Junction Root")
     owned_session = Session(
         id=str(uuid.uuid4()),
+        owner_id=test_user.id,
         root_id=owned_root.id,
         name="Owned Junction Session",
         session_start=datetime(2026, 2, 1, tzinfo=timezone.utc),
     )
     other_session = Session(
         id=str(uuid.uuid4()),
+        owner_id=other_user.id,
         root_id=other_root.id,
         name="Other Junction Session",
         session_start=datetime(2026, 2, 2, tzinfo=timezone.utc),
@@ -290,6 +307,7 @@ def test_run_query_marks_second_identical_query_as_cache_hit(db_session, test_us
     clear_cache()
     db_session.add(Session(
         id=str(uuid.uuid4()),
+        owner_id=test_user.id,
         root_id=sample_ultimate_goal.id,
         name="Cached Session",
         completed=True,

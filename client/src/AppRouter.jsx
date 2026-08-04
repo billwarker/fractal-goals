@@ -70,11 +70,12 @@ function FractalSwitcher({
     const navigate = useNavigate();
     const { user, isAuthenticated } = useAuth();
     const goalLevels = useGoalLevels();
-    const [isOpen, setIsOpen] = useState(false);
+    const [openPath, setOpenPath] = useState(null);
     const [menuPosition, setMenuPosition] = useState(null);
     const switcherRef = useRef(null);
     const menuRef = useRef(null);
     const userId = user?.id || null;
+    const isOpen = openPath === location.pathname;
 
     const fractalsQuery = useQuery({
         queryKey: queryKeys.fractals(userId),
@@ -111,12 +112,12 @@ function FractalSwitcher({
 
         const handlePointerDown = (event) => {
             if (!switcherRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) {
-                setIsOpen(false);
+                setOpenPath(null);
             }
         };
         const handleKeyDown = (event) => {
             if (event.key === 'Escape') {
-                setIsOpen(false);
+                setOpenPath(null);
             }
         };
 
@@ -143,13 +144,9 @@ function FractalSwitcher({
         };
     }, [isOpen, updateMenuPosition]);
 
-    useEffect(() => {
-        setIsOpen(false);
-    }, [location.pathname]);
-
     const handleSelectFractal = (nextRootId) => {
         if (!nextRootId || nextRootId === rootId) {
-            setIsOpen(false);
+            setOpenPath(null);
             return;
         }
 
@@ -166,12 +163,13 @@ function FractalSwitcher({
                 aria-expanded={isOpen}
                 aria-controls={menuId}
                 aria-label={`Switch fractal. Current fractal: ${currentDisplay.name}`}
-                onClick={() => setIsOpen((value) => {
-                    if (!value) {
+                onClick={() => setOpenPath((value) => {
+                    if (value !== location.pathname) {
                         updateMenuPosition();
                         onSwitch();
+                        return location.pathname;
                     }
-                    return !value;
+                    return null;
                 })}
             >
                 {currentDisplay.type && (

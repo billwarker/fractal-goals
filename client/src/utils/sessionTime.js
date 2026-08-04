@@ -26,23 +26,52 @@ export function formatHourMinuteDuration(totalSeconds, emptyValue = '-') {
     return `${hours}:${String(mins).padStart(2, '0')}`;
 }
 
-export function calculateSectionDurationFromInstanceIds(section, activityInstances) {
-    if (!section?.activity_ids || !Array.isArray(activityInstances)) {
-        return 0;
-    }
-
-    let totalSeconds = 0;
-    for (const instanceId of section.activity_ids) {
-        const instance = activityInstances.find((inst) => inst.id === instanceId);
-        if (instance?.duration_seconds != null) {
-            totalSeconds += instance.duration_seconds;
-        }
-    }
-
-    return totalSeconds;
+function durationById(rows) {
+    return new Map((Array.isArray(rows) ? rows : []).map((row) => [
+        row.id,
+        Number(row.duration_seconds) || 0,
+    ]));
 }
 
-export function calculateTotalCompletedDuration(sessionData, activityInstances) {
+export function calculateSectionDurationFromInstanceIds(section, activityInstances, circuitRuns = []) {
+    if (!section) return 0;
+
+    const activityDurations = durationById(activityInstances);
+    const circuitDurations = durationById(circuitRuns);
+    const items = Array.isArray(section.items)
+        ? section.items
+        : (section.activity_ids || []).map((id) => ({ type: 'activity', activity_instance_id: id }));
+
+    return items.reduce((total, item) => {
+        if (item?.type === 'circuit') {
+            return total + (circuitDurations.get(item.circuit_run_id) || 0);
+        }
+        if (item?.type === 'activity') {
+            return total + (activityDurations.get(item.activity_instance_id) || 0);
+        }
+        return total;
+    }, 0);
+}
+
+export function calculateSessionItemDuration(activityInstances, circuitRuns = [], sessionData = null) {
+    if (Array.isArray(sessionData?.sections)) {
+        return sessionData.sections.reduce(
+            (sum, section) => sum + calculateSectionDurationFromInstanceIds(
+                section,
+                activityInstances,
+                circuitRuns,
+            ),
+            0,
+        );
+    }
+    const activityTotal = (Array.isArray(activityInstances) ? activityInstances : [])
+        .reduce((sum, instance) => sum + (Number(instance.duration_seconds) || 0), 0);
+    const circuitTotal = (Array.isArray(circuitRuns) ? circuitRuns : [])
+        .reduce((sum, run) => sum + (Number(run.duration_seconds) || 0), 0);
+    return activityTotal + circuitTotal;
+}
+
+export function calculateTotalCompletedDuration(sessionData, activityInstances, circuitRuns = []) {
     if (!sessionData) return 0;
 
     if (sessionData.session_end && sessionData.session_start) {
@@ -56,7 +85,7 @@ export function calculateTotalCompletedDuration(sessionData, activityInstances) 
 
     let totalSeconds = 0;
     for (const section of sessionData.sections) {
-        totalSeconds += calculateSectionDurationFromInstanceIds(section, activityInstances);
+        totalSeconds += calculateSectionDurationFromInstanceIds(section, activityInstances, circuitRuns);
     }
 
     return totalSeconds;

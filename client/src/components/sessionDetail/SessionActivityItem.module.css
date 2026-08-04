@@ -439,6 +439,13 @@
     max-width: 138px;
 }
 
+.timerConflict {
+    display: grid;
+    gap: 6px;
+    color: var(--color-brand-danger);
+    font-size: 12px;
+}
+
 .timerModeHint {
     position: absolute;
     top: 100%;
@@ -563,17 +570,10 @@
 }
 
 .deleteButton {
-    background: none;
-    border: none;
-    color: var(--color-brand-danger);
-    cursor: pointer;
     position: absolute;
     top: 8px;
     right: 8px;
     z-index: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .contentArea {

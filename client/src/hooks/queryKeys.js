@@ -1,5 +1,8 @@
 export const queryKeys = {
     activities: (rootId) => ['activities', rootId],
+    circuits: (rootId, includeArchived = false) => ['circuits', rootId, { includeArchived }],
+    circuit: (rootId, circuitId) => ['circuit', rootId, circuitId],
+    sessionCircuitRuns: (rootId, sessionId) => ['circuit-runs', rootId, sessionId],
     activeProgramDays: (rootId) => ['active-program-days', rootId],
     analyticsSummary: (rootId, limit = 50) => ['analytics-summary', rootId, limit],
     analyticsSessions: (rootId, limit = 50) => ['analytics-sessions', rootId, limit],

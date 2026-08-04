@@ -197,7 +197,7 @@ function SessionList({ sessions, selectedSession, onSelectSession }) {
                                     name={session.template_name}
                                     color={session.template_color}
                                     size="sm"
-                                    className={`${styles.sessionRowTitle} ${isSessionSelected ? styles.sessionRowTitleSelected : ''}`}
+                                    className={styles.sessionRowTitle}
                                 />
                                 {session.template_description && (
                                     <div className={styles.sessionRowDescription}>

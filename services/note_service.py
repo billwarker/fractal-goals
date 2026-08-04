@@ -8,6 +8,8 @@ from sqlalchemy.orm import selectinload
 from models import (
     ActivityDefinition,
     ActivityInstance,
+    CircuitRound,
+    CircuitRun,
     Goal,
     Note,
     Program,
@@ -332,6 +334,34 @@ class NoteService:
                 return None, ("activity definition notes cannot also target a session, instance, or goal", 400)
             return {'activity_definition': activity}, None
 
+        if context_type == 'circuit_run':
+            if not session_id or not context_id:
+                return None, ("circuit run notes require a context_id and session_id", 400)
+            if activity_instance_id or activity_definition_id or goal_id:
+                return None, ("circuit run notes cannot also target an activity or goal", 400)
+            circuit_run = self.db_session.query(CircuitRun).filter(
+                CircuitRun.id == context_id,
+                CircuitRun.root_id == root_id,
+                CircuitRun.session_id == session_id,
+            ).first()
+            if not circuit_run:
+                return None, ("Circuit run not found in the provided session", 400)
+            return {'circuit_run': circuit_run}, None
+
+        if context_type == 'circuit_round':
+            if not session_id or not context_id:
+                return None, ("circuit round notes require a context_id and session_id", 400)
+            if activity_instance_id or activity_definition_id or goal_id:
+                return None, ("circuit round notes cannot also target an activity or goal", 400)
+            circuit_round = self.db_session.query(CircuitRound).join(CircuitRun).filter(
+                CircuitRound.id == context_id,
+                CircuitRun.root_id == root_id,
+                CircuitRun.session_id == session_id,
+            ).first()
+            if not circuit_round:
+                return None, ("Circuit round not found in the provided session", 400)
+            return {'circuit_round': circuit_round}, None
+
         return None, ("Unsupported note context_type", 400)
 
     def get_goal_notes(
@@ -578,7 +608,7 @@ class NoteService:
         if not note:
             return None, "Note not found", 404
 
-        if derive_note_type(note.context_type, note.set_index) == 'activity_set_note':
+        if derive_note_type(note.context_type, activity_set_id=note.activity_set_id) == 'activity_set_note':
             return None, "Activity set notes cannot be pinned", 400
 
         note.pinned_at = datetime.now(timezone.utc)
@@ -633,6 +663,8 @@ class NoteService:
 
         if note_kind == 'goal_completion' and context_type != 'goal':
             return None, "goal_completion notes must be attached to a goal", 400
+        if data.get('activity_set_id') and context_type != 'activity_instance':
+            return None, "activity_set_id is only valid for activity instance notes", 400
 
         context_payload, context_error = self._validate_note_context(
             root_id=root_id,
@@ -665,6 +697,23 @@ class NoteService:
             return None, "Quick sessions do not support notes", 400
 
         with self.db_session.begin_nested():
+            activity_set_id = data.get('activity_set_id')
+            if activity_set_id:
+                from models import ActivitySet
+
+                set_query = self.db_session.query(ActivitySet).join(ActivityInstance).filter(
+                    ActivityInstance.root_id == root_id,
+                    ActivityInstance.deleted_at.is_(None),
+                )
+                set_query = set_query.filter(ActivitySet.id == activity_set_id)
+                activity_set = set_query.first()
+                if not activity_set:
+                    return None, "Activity set not found", 404
+                if activity_instance_id and activity_set.activity_instance_id != activity_instance_id:
+                    return None, "Activity set does not belong to the selected activity instance", 400
+                activity_set_id = activity_set.id
+                activity_instance_id = activity_set.activity_instance_id
+
             note = Note(
                 id=str(uuid.uuid4()),
                 root_id=root_id,
@@ -674,7 +723,7 @@ class NoteService:
                 activity_instance_id=activity_instance_id,
                 activity_definition_id=activity_definition_id,
                 goal_id=goal_id,
-                set_index=data.get('set_index'),
+                activity_set_id=activity_set_id,
                 content=content,
                 note_kind=note_kind,
             )

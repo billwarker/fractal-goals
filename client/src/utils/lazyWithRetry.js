@@ -37,7 +37,7 @@ function getSessionStorage() {
 
     try {
         return window.sessionStorage;
-    } catch (error) {
+    } catch {
         return null;
     }
 }

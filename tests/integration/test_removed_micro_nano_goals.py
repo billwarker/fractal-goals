@@ -50,6 +50,7 @@ class TestRemovedMicroNanoGoals:
     ):
         root = sample_goal_hierarchy['ultimate']
         session = Session(
+            owner_id=root.owner_id,
             id=str(uuid.uuid4()),
             name="Test Session",
             root_id=root.id,
@@ -76,6 +77,7 @@ class TestRemovedMicroNanoGoals:
             root_id=root.id,
         )
         session = Session(
+            owner_id=root.owner_id,
             id=str(uuid.uuid4()),
             name="Session View Test",
             root_id=root.id,

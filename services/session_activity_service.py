@@ -9,6 +9,7 @@ import models
 from models import (
     ActivityDefinition,
     ActivityInstance,
+    ActivitySet,
     Goal,
     MetricDefinition,
     MetricValue,
@@ -62,10 +63,21 @@ class SessionActivityService:
             return "section_index out of range"
 
         section = sections[target_index] if isinstance(sections[target_index], dict) else {}
-        activity_ids = section.get('activity_ids') if isinstance(section.get('activity_ids'), list) else []
-        next_activity_ids = [item for item in activity_ids if item != instance_id]
-        next_activity_ids.append(instance_id)
-        section['activity_ids'] = next_activity_ids
+        items = section.get('items') if isinstance(section.get('items'), list) else [
+            {'type': 'activity', 'activity_instance_id': item}
+            for item in (section.get('activity_ids') or [])
+        ]
+        items = [
+            item for item in items
+            if not (
+                isinstance(item, dict)
+                and item.get('type') == 'activity'
+                and item.get('activity_instance_id') == instance_id
+            )
+        ]
+        items.append({'type': 'activity', 'activity_instance_id': instance_id})
+        section['items'] = items
+        section.pop('activity_ids', None)
         sections[target_index] = section
 
         session_data['sections'] = sections
@@ -87,9 +99,21 @@ class SessionActivityService:
                 next_sections.append(raw_section)
                 continue
             section = copy.deepcopy(raw_section)
-            activity_ids = section.get('activity_ids')
-            if isinstance(activity_ids, list) and instance_id in activity_ids:
-                section['activity_ids'] = [item for item in activity_ids if item != instance_id]
+            items = section.get('items') if isinstance(section.get('items'), list) else [
+                {'type': 'activity', 'activity_instance_id': item}
+                for item in (section.get('activity_ids') or [])
+            ]
+            next_items = [
+                item for item in items
+                if not (
+                    isinstance(item, dict)
+                    and item.get('type') == 'activity'
+                    and item.get('activity_instance_id') == instance_id
+                )
+            ]
+            if len(next_items) != len(items):
+                section['items'] = next_items
+                section.pop('activity_ids', None)
                 changed = True
             next_sections.append(section)
 
@@ -104,6 +128,8 @@ class SessionActivityService:
             joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split),
+            selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.definition),
+            selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.split),
         )
 
     @staticmethod
@@ -421,7 +447,8 @@ class SessionActivityService:
                 }, 400
 
         existing_metrics = self.db_session.query(MetricValue).filter_by(
-            activity_instance_id=instance_id
+            activity_instance_id=instance_id,
+            activity_set_id=None,
         ).all()
         existing_dict = {(metric.metric_definition_id, metric.split_definition_id): metric for metric in existing_metrics}
         updated_keys = set()

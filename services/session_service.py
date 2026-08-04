@@ -3,7 +3,8 @@ import logging
 from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import selectinload, with_loader_criteria
 from models import (
-    ActivityDefinition, ActivityGroup, ActivityInstance,
+    ActivityDefinition, ActivityGroup, ActivityInstance, ActivitySet,
+    CircuitRun, CircuitRound, CircuitRoundMember,
     Goal, Target,
     MetricValue, ProgramBlock, ProgramDay, Session,
     validate_root_goal
@@ -89,7 +90,11 @@ class SessionService:
             selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.definition),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.split),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.progress_record),
+            selectinload(Session.circuit_runs).selectinload(CircuitRun.slots),
+            selectinload(Session.circuit_runs).selectinload(CircuitRun.rounds).selectinload(CircuitRound.members),
             selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program),
             with_loader_criteria(ActivityInstance, ActivityInstance.deleted_at == None, include_aliases=True),
         )

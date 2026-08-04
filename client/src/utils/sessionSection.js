@@ -27,6 +27,17 @@ export function buildSessionPositionMap(sections = []) {
     let index = 0;
 
     sections.forEach((section) => {
+        if (Array.isArray(section?.items)) {
+            section.items.forEach((item) => {
+                if (item?.type === 'activity' && item.activity_instance_id) {
+                    map.set(item.activity_instance_id, index);
+                } else if (item?.type === 'circuit' && item.circuit_run_id) {
+                    map.set(`circuit:${item.circuit_run_id}`, index);
+                }
+                index += 1;
+            });
+            return;
+        }
         (section?.activity_ids || []).forEach((id) => {
             map.set(id, index);
             index += 1;
@@ -92,7 +103,10 @@ export function normalizeSectionActivityIds(data, instances) {
     const normalizedSections = sections.map((section) => {
         if (!section || typeof section !== 'object') return section;
 
-        const rawActivityIds = Array.isArray(section.activity_ids) ? section.activity_ids : [];
+        const typedItems = Array.isArray(section.items) ? section.items : null;
+        const rawActivityIds = typedItems
+            ? typedItems.filter((item) => item?.type === 'activity').map((item) => item.activity_instance_id)
+            : (Array.isArray(section.activity_ids) ? section.activity_ids : []);
         const activityIds = rawActivityIds.filter((id) => allInstanceIdSet.has(id) && !used.has(id));
         const sectionIds = new Set(activityIds);
 
@@ -131,7 +145,16 @@ export function normalizeSectionActivityIds(data, instances) {
         }
 
         activityIds.forEach((id) => used.add(id));
-        return { ...section, activity_ids: activityIds };
+        const items = typedItems
+            ? typedItems.map((item) => {
+                if (item?.type !== 'activity') return item;
+                const activityInstanceId = item.activity_instance_id;
+                return allInstanceIdSet.has(activityInstanceId)
+                    ? { ...item, activity_instance_id: activityInstanceId }
+                    : null;
+            }).filter(Boolean)
+            : activityIds.map((activityInstanceId) => ({ type: 'activity', activity_instance_id: activityInstanceId }));
+        return { ...section, items, activity_ids: activityIds };
     });
 
     if (normalizedSections.length === 1 && normalizedSections[0]

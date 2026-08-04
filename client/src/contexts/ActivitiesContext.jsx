@@ -168,6 +168,7 @@ export function ActivitiesProvider({ children }) {
             });
 
             await queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) });
+            await queryClient.invalidateQueries({ queryKey: ['circuits', rootId] });
         },
         {
             success: 'Deleted group',

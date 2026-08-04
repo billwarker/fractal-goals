@@ -4,6 +4,7 @@ from sqlalchemy.orm import selectinload
 from models import (
     ActivityDefinition,
     ActivityGroup,
+    CircuitDefinition,
     Goal,
     goal_activity_group_associations,
     validate_root_goal,
@@ -273,6 +274,13 @@ class ActivityGroupService:
         ).all()
         for activity in activities:
             activity.group_id = None
+
+        circuits = self.db_session.query(CircuitDefinition).filter(
+            CircuitDefinition.group_id.in_(group_ids_to_delete),
+            CircuitDefinition.deleted_at.is_(None),
+        ).all()
+        for circuit in circuits:
+            circuit.group_id = None
 
         deleted_group_id = group.id
         deleted_group_name = group.name

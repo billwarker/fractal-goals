@@ -122,7 +122,7 @@ function GoalTimeDistribution({
             return (typeIndexA === -1 ? 999 : typeIndexA) - (typeIndexB === -1 ? 999 : typeIndexB);
         });
 
-        const datasets = goalsWithData.map((goalId, index) => {
+        const datasets = goalsWithData.map((goalId) => {
             const goal = goalMap[goalId];
             const color = getGoalColor(goal?.type);
 
@@ -157,7 +157,7 @@ function GoalTimeDistribution({
             datasets,
             sortedDates // Keep for tooltip formatting
         };
-    }, [goals, inheritanceMode, durationMode]);
+    }, [durationMode, getGoalColor, goals, inheritanceMode]);
 
     const chartOptions = useMemo(() => ({
         indexAxis: 'x', // Explicit: vertical bars (dates on X-axis)

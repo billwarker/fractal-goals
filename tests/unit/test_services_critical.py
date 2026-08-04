@@ -93,6 +93,15 @@ class TestCompletionHandlersHelpers:
                 self.session_id = session_id
                 self.data = data
                 self.metric_values = metric_values
+                self.sets = [
+                    SimpleNamespace(
+                        metric_values=[
+                            MetricValueStub(metric['metric_id'], metric['value'])
+                            for metric in set_payload.get('metrics', [])
+                        ]
+                    )
+                    for set_payload in data.get('sets', [])
+                ]
 
         instances = [
             ActivityInstanceStub(

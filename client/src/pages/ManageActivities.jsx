@@ -20,7 +20,19 @@ import { buildGroupReorderPayload } from '../utils/manageActivities';
 import styles from './ManageActivities.module.css'; // Import CSS Module
 import { logError } from '../utils/logger';
 import EmptyState from '../components/common/EmptyState';
+import ViewToggleTabs from '../components/common/ViewToggleTabs';
 import ActivityCatalogueToolbar from '../components/activities/ActivityCatalogueToolbar';
+import ManageActivitiesCreateMenu from '../components/activities/ManageActivitiesCreateMenu';
+import CircuitBuilderModal from '../components/circuits/CircuitBuilderModal';
+import CircuitDefinitionCard from '../components/circuits/CircuitDefinitionCard';
+import { useCircuits, useCircuitDefinitionMutations } from '../hooks/useCircuitQueries';
+import useManageActivitiesCatalogue from '../hooks/useManageActivitiesCatalogue';
+
+
+const CATALOGUE_VIEWS = [
+    { value: 'activities', label: 'Activities' },
+    { value: 'circuits', label: 'Activity Circuits' },
+];
 
 /**
  * Manage Activities Page - Grid view of activity tiles with modal builder
@@ -31,10 +43,12 @@ function ManageActivities() {
     const { updateActivity, deleteActivity, deleteActivityGroup, reorderActivityGroups } = useActivities();
     const { activities = [], isLoading: activitiesLoading } = useActivitiesQuery(rootId);
     const { activityGroups = [], isLoading: activityGroupsLoading } = useActivityGroups(rootId);
+    const { data: circuits = [], isLoading: circuitsLoading } = useCircuits(rootId);
+    const { createMutation: createCircuitMutation } = useCircuitDefinitionMutations(rootId);
     const { data: activityInstantiationSummary = {} } = useActivityInstantiationSummary(rootId);
 
     const [error, setError] = useState(null);
-    const creating = false;
+    const [catalogueView, setCatalogueView] = useState('activities');
     const [activityToDelete, setActivityToDelete] = useState(null);
     const [showBuilder, setShowBuilder] = useState(false);
     const [editingActivity, setEditingActivity] = useState(null);
@@ -44,6 +58,7 @@ function ManageActivities() {
     const [editingGroup, setEditingGroup] = useState(null);
     const [groupToDelete, setGroupToDelete] = useState(null);
     const [showMetricsModal, setShowMetricsModal] = useState(false);
+    const [showCircuitBuilder, setShowCircuitBuilder] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
     // Collapsed state for groups (Set of group IDs)
@@ -63,104 +78,20 @@ function ManageActivities() {
         return new Map(Object.entries(activityInstantiationSummary || {}));
     }, [activityInstantiationSummary]);
 
-    const groupChildrenMap = useMemo(() => {
-        const map = new Map();
-        (Array.isArray(activityGroups) ? activityGroups : []).forEach((group) => {
-            const key = group.parent_id || '__root__';
-            if (!map.has(key)) map.set(key, []);
-            map.get(key).push(group);
-        });
-        map.forEach((groups) => {
-            groups.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-        });
-        return map;
-    }, [activityGroups]);
+    const activeCatalogueItems = catalogueView === 'circuits' ? circuits : activities;
+    const filteredCatalogue = useManageActivitiesCatalogue({
+        items: activeCatalogueItems,
+        activityGroups,
+        searchTerm,
+        includeEmptyGroups: catalogueView === 'activities',
+    });
 
-    const activitiesByGroupMap = useMemo(() => {
-        const map = new Map();
-        (Array.isArray(activities) ? activities : []).forEach((activity) => {
-            const key = activity.group_id || '__ungrouped__';
-            if (!map.has(key)) map.set(key, []);
-            map.get(key).push(activity);
-        });
-        return map;
-    }, [activities]);
-
-    const filteredActivityView = useMemo(() => {
-        const query = searchTerm.trim().toLowerCase();
-        if (!query) {
-            return {
-                groupChildrenMap,
-                activitiesByGroupMap,
-                rootGroups: groupChildrenMap.get('__root__') || [],
-                hasSearch: false,
-                resultCount: (Array.isArray(activities) ? activities.length : 0) + (Array.isArray(activityGroups) ? activityGroups.length : 0),
-            };
-        }
-
-        const groupById = new Map((Array.isArray(activityGroups) ? activityGroups : []).map((group) => [group.id, group]));
-        const directGroupMatches = new Set();
-        const visibleGroupIds = new Set();
-        const groupScopeMatches = new Set();
-
-        const addAncestors = (groupId) => {
-            let current = groupById.get(groupId);
-            while (current) {
-                visibleGroupIds.add(current.id);
-                current = current.parent_id ? groupById.get(current.parent_id) : null;
-            }
-        };
-
-        const addDescendants = (groupId) => {
-            groupScopeMatches.add(groupId);
-            visibleGroupIds.add(groupId);
-            (groupChildrenMap.get(groupId) || []).forEach((child) => addDescendants(child.id));
-        };
-
-        (Array.isArray(activityGroups) ? activityGroups : []).forEach((group) => {
-            if ((group.name || '').toLowerCase().includes(query)) {
-                directGroupMatches.add(group.id);
-                addAncestors(group.id);
-                addDescendants(group.id);
-            }
-        });
-
-        const filteredActivities = new Map();
-        let resultCount = directGroupMatches.size;
-        (Array.isArray(activities) ? activities : []).forEach((activity) => {
-            const groupId = activity.group_id || '__ungrouped__';
-            const activityMatches = (activity.name || '').toLowerCase().includes(query);
-            const groupMatches = activity.group_id && groupScopeMatches.has(activity.group_id);
-            if (!activityMatches && !groupMatches) return;
-
-            if (!filteredActivities.has(groupId)) filteredActivities.set(groupId, []);
-            filteredActivities.get(groupId).push(activity);
-            resultCount += activityMatches ? 1 : 0;
-            if (activity.group_id) addAncestors(activity.group_id);
-        });
-
-        const filteredChildren = new Map();
-        visibleGroupIds.forEach((groupId) => {
-            const group = groupById.get(groupId);
-            if (!group) return;
-            const parentKey = group.parent_id && visibleGroupIds.has(group.parent_id)
-                ? group.parent_id
-                : '__root__';
-            if (!filteredChildren.has(parentKey)) filteredChildren.set(parentKey, []);
-            filteredChildren.get(parentKey).push(group);
-        });
-        filteredChildren.forEach((groups) => {
-            groups.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-        });
-
-        return {
-            groupChildrenMap: filteredChildren,
-            activitiesByGroupMap: filteredActivities,
-            rootGroups: filteredChildren.get('__root__') || [],
-            hasSearch: true,
-            resultCount,
-        };
-    }, [activities, activityGroups, activitiesByGroupMap, groupChildrenMap, searchTerm]);
+    const handleCatalogueViewChange = (nextView) => {
+        setCatalogueView(nextView);
+        setSearchTerm('');
+        setDraggingActivityId(null);
+        setDragOverGroupId(null);
+    };
 
     // Group Handlers
     const handleCreateGroup = () => {
@@ -233,6 +164,20 @@ function ManageActivities() {
     const handleCreateClick = () => {
         setEditingActivity(null);
         setShowBuilder(true);
+    };
+
+    const handleCreateCircuit = () => setShowCircuitBuilder(true);
+
+    const handleCircuitBuilderSave = async (payload) => {
+        try {
+            await createCircuitMutation.mutateAsync(payload);
+            setShowCircuitBuilder(false);
+            setCatalogueView('circuits');
+            setSearchTerm('');
+        } catch (err) {
+            logError('Failed to create activity circuit', err);
+            setError(err?.response?.data?.error || 'Failed to create activity circuit');
+        }
     };
 
     const handleEditClick = (activity) => {
@@ -338,27 +283,26 @@ function ManageActivities() {
         setDragOverGroupId(null);
     };
 
-    if (activitiesLoading || activityGroupsLoading) {
+    if (activitiesLoading || activityGroupsLoading || circuitsLoading) {
         return <div className={styles.loadingState}>Loading activities...</div>;
     }
 
     // Recursive Group Renderer
     const renderGroup = (group, level = 0) => {
-        const isCollapsed = !filteredActivityView.hasSearch && collapsedGroups.has(group.id);
+        const isCollapsed = !filteredCatalogue.hasSearch && collapsedGroups.has(group.id);
         const isDragOver = dragOverGroupId === group.id;
 
         // Find children groups
-        const childrenGroups = filteredActivityView.groupChildrenMap.get(group.id) || [];
+        const childrenGroups = filteredCatalogue.groupChildrenMap.get(group.id) || [];
 
-        // Find activities in this group
-        const groupActivities = filteredActivityView.activitiesByGroupMap.get(group.id) || [];
+        const groupItems = filteredCatalogue.itemsByGroupMap.get(group.id) || [];
 
         const isRoot = level === 0;
 
         return (
             <div
                 key={group.id}
-                className={`${styles.groupContainer} ${styles.dropZone} ${isDragOver ? styles.dropZoneActive : ''}`}
+                className={`${styles.groupContainer} ${catalogueView === 'activities' ? styles.dropZone : ''} ${isDragOver ? styles.dropZoneActive : ''}`}
                 style={{
                     marginBottom: '24px',
                     marginLeft: 0,
@@ -367,9 +311,9 @@ function ManageActivities() {
                     padding: '20px 24px',
                     borderRadius: isRoot ? '0' : '8px'
                 }}
-                onDragOver={(e) => handleDragOver(e, group.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, group.id)}
+                onDragOver={catalogueView === 'activities' ? (e) => handleDragOver(e, group.id) : undefined}
+                onDragLeave={catalogueView === 'activities' ? handleDragLeave : undefined}
+                onDrop={catalogueView === 'activities' ? (e) => handleDrop(e, group.id) : undefined}
             >
                 <div className={styles.groupHeader}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -440,10 +384,10 @@ function ManageActivities() {
                             </div>
                         )}
 
-                        {/* Render Activities */}
-                        {groupActivities.length > 0 ? (
-                            <div className={styles.grid} onDragEnd={handleDragEnd}>
-                                {groupActivities.map(activity => (
+                        {/* Render the active catalogue type */}
+                        {groupItems.length > 0 ? (
+                            <div className={styles.grid} onDragEnd={catalogueView === 'activities' ? handleDragEnd : undefined}>
+                                {catalogueView === 'activities' ? groupItems.map((activity) => (
                                     <ActivityCard
                                         key={activity.id}
                                         activity={activity}
@@ -451,16 +395,26 @@ function ManageActivities() {
                                         onEdit={handleEditClick}
                                         onDuplicate={handleDuplicate}
                                         onDelete={handleDeleteClick}
-                                        isCreating={creating}
                                         onDragStart={handleDragStart}
                                         isDragging={draggingActivityId === activity.id}
+                                    />
+                                )) : groupItems.map((circuit) => (
+                                    <CircuitDefinitionCard
+                                        key={circuit.id}
+                                        circuit={circuit}
+                                        rootId={rootId}
+                                        activities={activities}
+                                        activityGroups={activityGroups}
+                                        onError={setError}
                                     />
                                 ))}
                             </div>
                         ) : (
                             childrenGroups.length === 0 && (
                                 <div className={`${styles.emptyGroupState} ${styles.emptyGroupDropTarget}`} style={{ padding: '15px' }}>
-                                    {isDragOver ? 'Drop activity here' : 'No activities in this group'}
+                                    {isDragOver
+                                        ? 'Drop activity here'
+                                        : `No ${catalogueView === 'activities' ? 'activities' : 'activity circuits'} in this group`}
                                 </div>
                             )
                         )}
@@ -471,33 +425,47 @@ function ManageActivities() {
     };
 
     // Filter root groups
-    const rootGroups = filteredActivityView.rootGroups;
-    const ungroupedActivities = filteredActivityView.activitiesByGroupMap.get('__ungrouped__') || [];
-    const hasSearchResults = !filteredActivityView.hasSearch || filteredActivityView.resultCount > 0 || ungroupedActivities.length > 0;
+    const rootGroups = filteredCatalogue.rootGroups;
+    const ungroupedItems = filteredCatalogue.itemsByGroupMap.get('__ungrouped__') || [];
+    const showUngroupedHeading = catalogueView === 'activities'
+        ? rootGroups.length > 0
+        : ungroupedItems.length > 0;
+    const hasSearchResults = !filteredCatalogue.hasSearch
+        || filteredCatalogue.resultCount > 0
+        || ungroupedItems.length > 0;
 
     return (
         <div className={`${headerStyles.pageShell} ${styles.container}`}>
             <PageHeader
                 title="Manage Activities"
-                subtitle="Create, group, and reuse activity definitions across sessions and templates."
+                subtitle="Create, organize, and reuse activities and circuits across sessions and templates."
                 actions={(
                     <>
+                        <ViewToggleTabs
+                            className={styles.viewToggle}
+                            items={CATALOGUE_VIEWS}
+                            value={catalogueView}
+                            onChange={handleCatalogueViewChange}
+                            ariaLabel="Manage activities view"
+                        />
                         <ActivityCatalogueToolbar
                             searchTerm={searchTerm}
                             onSearchChange={setSearchTerm}
+                            placeholder={catalogueView === 'activities' ? 'Groups or activities' : 'Groups or activity circuits'}
                             hasGroups={allGroupIds.length > 0}
                             allGroupsCollapsed={allGroupsCollapsed}
                             onToggleCollapseAll={handleToggleCollapseAll}
+                            controlClassName={styles.headerControl}
                         />
-                        <HeaderButton variant="secondary" onClick={() => setShowMetricsModal(true)}>
+                        <HeaderButton className={styles.headerControl} variant="secondary" onClick={() => setShowMetricsModal(true)}>
                             Manage Metrics
                         </HeaderButton>
-                        <HeaderButton variant="tertiary" onClick={handleCreateGroup}>
-                            + Create Group
-                        </HeaderButton>
-                        <HeaderButton variant="primary" onClick={handleCreateClick}>
-                            + Create Activity
-                        </HeaderButton>
+                        <ManageActivitiesCreateMenu
+                            onCreateActivity={handleCreateClick}
+                            onCreateGroup={handleCreateGroup}
+                            onCreateCircuit={handleCreateCircuit}
+                            triggerClassName={styles.headerControl}
+                        />
                     </>
                 )}
             />
@@ -509,28 +477,28 @@ function ManageActivities() {
                     </div>
                 )}
 
-                {/* 1. Render Root Activity Groups (recursively renders children) */}
+                {/* Render root activity groups (recursively renders children). */}
                 {rootGroups.map(group => renderGroup(group))}
 
-                {/* 2. Render Ungrouped Activities - also serves as drop zone */}
+                {/* Render the active type's ungrouped definitions. */}
                 <div
-                    className={`${styles.ungroupedSection} ${rootGroups.length === 0 ? styles.noGroups : ''} ${styles.ungroupedDropZone} ${dragOverGroupId === 'ungrouped' ? styles.ungroupedDropZoneActive : ''}`}
-                    onDragOver={(e) => handleDragOver(e, 'ungrouped')}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, null)}
+                    className={`${styles.ungroupedSection} ${rootGroups.length === 0 ? styles.noGroups : ''} ${catalogueView === 'activities' ? styles.ungroupedDropZone : ''} ${dragOverGroupId === 'ungrouped' ? styles.ungroupedDropZoneActive : ''}`}
+                    onDragOver={catalogueView === 'activities' ? (e) => handleDragOver(e, 'ungrouped') : undefined}
+                    onDragLeave={catalogueView === 'activities' ? handleDragLeave : undefined}
+                    onDrop={catalogueView === 'activities' ? (e) => handleDrop(e, null) : undefined}
                 >
-                    {rootGroups.length > 0 && (
+                    {showUngroupedHeading && (
                         <h3 className={styles.ungroupedTitle}>
                             {dragOverGroupId === 'ungrouped' ? (
                                 <>
                                     <InboxIcon size={18} />
                                     <span>Drop here to ungroup</span>
                                 </>
-                            ) : 'Ungrouped Activities'}
+                            ) : `Ungrouped ${catalogueView === 'activities' ? 'Activities' : 'Activity Circuits'}`}
                         </h3>
                     )}
-                    <div className={styles.grid} onDragEnd={handleDragEnd}>
-                        {ungroupedActivities.map(activity => (
+                    <div className={styles.grid} onDragEnd={catalogueView === 'activities' ? handleDragEnd : undefined}>
+                        {catalogueView === 'activities' ? ungroupedItems.map((activity) => (
                             <ActivityCard
                                 key={activity.id}
                                 activity={activity}
@@ -538,34 +506,48 @@ function ManageActivities() {
                                 onEdit={handleEditClick}
                                 onDuplicate={handleDuplicate}
                                 onDelete={handleDeleteClick}
-                                isCreating={creating}
                                 onDragStart={handleDragStart}
                                 isDragging={draggingActivityId === activity.id}
                             />
+                        )) : ungroupedItems.map((circuit) => (
+                            <CircuitDefinitionCard
+                                key={circuit.id}
+                                circuit={circuit}
+                                rootId={rootId}
+                                activities={activities}
+                                activityGroups={activityGroups}
+                                onError={setError}
+                            />
                         ))}
                     </div>
-                    {ungroupedActivities.length === 0 && rootGroups.length > 0 && !filteredActivityView.hasSearch && (
+                    {ungroupedItems.length === 0 && rootGroups.length > 0 && !filteredCatalogue.hasSearch && catalogueView === 'activities' && (
                         <div className={styles.emptyGroupState} style={{ padding: '15px', marginTop: '10px' }}>
                             {dragOverGroupId === 'ungrouped' ? 'Drop activity here to ungroup' : 'Drag activities here to ungroup'}
                         </div>
                     )}
                 </div>
 
-                {filteredActivityView.hasSearch && !hasSearchResults && (
+                {filteredCatalogue.hasSearch && !hasSearchResults && (
                     <div className={styles.emptyState}>
                         <p className={styles.emptyStateText}>
-                            No groups or activities match "{searchTerm.trim()}"
+                            No groups or {catalogueView === 'activities' ? 'activities' : 'activity circuits'} match "{searchTerm.trim()}"
                         </p>
                     </div>
                 )}
 
-                {/* Empty State (No activities and no groups) */}
-                {!filteredActivityView.hasSearch && (Array.isArray(activities) ? activities.length : 0) === 0 && rootGroups.length === 0 && (
+                {/* Empty state for the active catalogue type. */}
+                {!filteredCatalogue.hasSearch
+                    && activeCatalogueItems.length === 0
+                    && rootGroups.length === 0 && (
                     <EmptyState
-                        title="Define the practice that moves a goal"
-                        description="Activities describe what you do. Add a metric when you want sessions to produce measurable evidence."
-                        actionLabel="Create your first activity"
-                        onAction={handleCreateClick}
+                        title={catalogueView === 'activities'
+                            ? 'Define the practice that moves a goal'
+                            : 'Build your first activity circuit'}
+                        description={catalogueView === 'activities'
+                            ? 'Activities describe what you do. Add a metric when you want sessions to produce measurable evidence.'
+                            : 'Activity circuits repeat an ordered sequence without double-counting activity time.'}
+                        actionLabel={catalogueView === 'activities' ? 'Create your first activity' : 'Create your first activity circuit'}
+                        onAction={catalogueView === 'activities' ? handleCreateClick : handleCreateCircuit}
                     />
                 )}
             </div>
@@ -590,6 +572,17 @@ function ManageActivities() {
                 }}
             />
 
+            {showCircuitBuilder && (
+                <CircuitBuilderModal
+                    isOpen
+                    onClose={() => setShowCircuitBuilder(false)}
+                    activities={activities}
+                    activityGroups={activityGroups}
+                    onSave={handleCircuitBuilderSave}
+                    isSaving={createCircuitMutation.isPending}
+                />
+            )}
+
             <DeleteConfirmModal
                 isOpen={!!activityToDelete}
                 onClose={() => setActivityToDelete(null)}
@@ -612,6 +605,7 @@ function ManageActivities() {
                 onClose={() => setShowMetricsModal(false)}
                 rootId={rootId}
             />
+
         </div>
     );
 }

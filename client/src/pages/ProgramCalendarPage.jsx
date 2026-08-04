@@ -227,6 +227,7 @@ function ProgramCalendarPage() {
         handleAddChildGoal,
     } = useProgramDetailController({ goals: displayGoals, onDayViewOpen: () => onboarding?.enabled && !onboarding.state?.visited?.includes('calendar_day_modal') && onboarding.markVisited('calendar_day_modal') });
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Responsive navigation collapses the desktop side pane on mobile. */
     useEffect(() => {
         if (!rootId || location.pathname.startsWith(`/${rootId}/programs`)) return;
 
@@ -394,6 +395,7 @@ function ProgramCalendarPage() {
             setIsSidePaneVisible(false);
         }
     }, [isMobile, rootId]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     const openCreateProgram = (startDate = '') => {
         setBuilderState({ open: true, mode: 'create', startDate, duplicateSource: null });

@@ -11,7 +11,7 @@ class Session(Base):
     __tablename__ = 'sessions'
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    owner_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, index=True)
+    owner_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
     root_id = Column(String, ForeignKey('goals.id'), nullable=False, index=True)
     name = Column(String, nullable=False)
     description = Column(String, default='')
@@ -46,6 +46,13 @@ class Session(Base):
             'deleted_at',
             sa.text('COALESCE(session_start, created_at) DESC'),
         ),
+        sa.Index(
+            'uq_sessions_one_active_per_owner_root',
+            'owner_id',
+            'root_id',
+            unique=True,
+            postgresql_where=sa.text('completed IS NOT TRUE AND deleted_at IS NULL'),
+        ),
     )
     
     # Relationships
@@ -55,6 +62,8 @@ class Session(Base):
         cascade="all, delete-orphan",
         foreign_keys="ActivityInstance.session_id"
     )
+    circuit_runs = relationship("CircuitRun", back_populates="session", cascade="all, delete-orphan")
+    work_intervals = relationship("SessionWorkInterval", back_populates="session", cascade="all, delete-orphan")
     
     goals = relationship(
         "Goal",
@@ -112,6 +121,10 @@ class SessionTemplate(Base):
     archived_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     template_data = Column(JSON_TYPE, nullable=False)
+
+    __table_args__ = (
+        sa.Index('ix_session_templates_root_archived_deleted', 'root_id', 'archived_at', 'deleted_at'),
+    )
     
     goals = relationship(
         "Goal",
@@ -125,18 +138,22 @@ class SessionTemplateStats(Base):
     __tablename__ = 'session_template_stats'
 
     template_id = Column(String, ForeignKey('session_templates.id', ondelete='CASCADE'), primary_key=True)
-    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
-    usage_count = Column(Integer, nullable=False, default=0)
-    session_count = Column(Integer, nullable=False, default=0)
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False)
+    usage_count = Column(Integer, nullable=False, default=0, server_default='0')
+    session_count = Column(Integer, nullable=False, default=0, server_default='0')
     average_duration_seconds = Column(Integer, nullable=True)
     median_duration_seconds = Column(Integer, nullable=True)
     min_duration_seconds = Column(Integer, nullable=True)
     max_duration_seconds = Column(Integer, nullable=True)
     last_used_at = Column(DateTime, nullable=True)
-    calculation_version = Column(Integer, nullable=False, default=1)
+    calculation_version = Column(Integer, nullable=False, default=1, server_default='1')
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     template = relationship("SessionTemplate", backref="persisted_stats", uselist=False)
+
+    __table_args__ = (
+        sa.Index('ix_session_template_stats_root_last_used', 'root_id', 'last_used_at'),
+    )
 
 
 class TemplateSectionStats(Base):
@@ -144,14 +161,18 @@ class TemplateSectionStats(Base):
 
     template_id = Column(String, ForeignKey('session_templates.id', ondelete='CASCADE'), primary_key=True)
     section_key = Column(String, primary_key=True)
-    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
-    sample_count = Column(Integer, nullable=False, default=0)
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False)
+    sample_count = Column(Integer, nullable=False, default=0, server_default='0')
     average_duration_seconds = Column(Integer, nullable=True)
     median_duration_seconds = Column(Integer, nullable=True)
     min_duration_seconds = Column(Integer, nullable=True)
     max_duration_seconds = Column(Integer, nullable=True)
-    calculation_version = Column(Integer, nullable=False, default=1)
+    calculation_version = Column(Integer, nullable=False, default=1, server_default='1')
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (
+        sa.Index('ix_template_section_stats_root_template', 'root_id', 'template_id'),
+    )
 
 
 class ActivityDurationStats(Base):
@@ -159,11 +180,15 @@ class ActivityDurationStats(Base):
 
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True)
     activity_definition_id = Column(String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), primary_key=True)
-    sample_count = Column(Integer, nullable=False, default=0)
+    sample_count = Column(Integer, nullable=False, default=0, server_default='0')
     average_duration_seconds = Column(Integer, nullable=True)
     median_duration_seconds = Column(Integer, nullable=True)
     min_duration_seconds = Column(Integer, nullable=True)
     max_duration_seconds = Column(Integer, nullable=True)
     last_observed_at = Column(DateTime, nullable=True)
-    calculation_version = Column(Integer, nullable=False, default=1)
+    calculation_version = Column(Integer, nullable=False, default=1, server_default='1')
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (
+        sa.Index('ix_activity_duration_stats_root_updated', 'root_id', 'updated_at'),
+    )

@@ -27,6 +27,7 @@ export function useAutoSave(data, saveFn, options = {}) {
     const isFirstRender = useRef(true);
     const lastDataRef = useRef(data);
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Pending is an explicit state-machine transition when new save input arrives. */
     useEffect(() => {
         // Skip first render to avoid saving on load
         if (skipFirstRender && isFirstRender.current) {
@@ -82,6 +83,7 @@ export function useAutoSave(data, saveFn, options = {}) {
             }
         };
     }, [data, saveFn, delay, enabled, skipFirstRender]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     /**
      * Force an immediate save (bypasses debounce)

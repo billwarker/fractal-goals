@@ -2,17 +2,17 @@
 
 ## Summary
 
-Introduce reusable circuit definitions managed beside activities, then snapshot them into session-specific circuit runs. A circuit is one ordered session item containing ordered activity slots, planned-but-adjustable rounds, a top-level circuit clock, explicit round clocks, and exclusive member work intervals.
+Introduce reusable circuit definitions managed beside activities, then snapshot them into session-specific circuit runs. A circuit is one ordered session item containing ordered activity slots, structural rounds, and one top-level circuit clock.
 
-Use “Round” for one complete pass through the circuit. Circuit elapsed time includes between-round gaps; round time runs from explicit round start to confirmed round end; activity totals receive only exclusive member work, preventing duplicated time.
+Use “Round” for one complete pass through the circuit. Set-based activities align one stable normalized set with each round; non-set activities align one untimed activity instance with each round. Child results retain metrics but never receive circuit duration.
 
 ## Data Model and Migration
 
-- Add reusable `CircuitDefinition` and ordered `CircuitSlot` tables scoped to a fractal. Definitions contain name, description, planned rounds, lifecycle/version fields, and activity-definition slots with optional display labels.
+- Add reusable `CircuitDefinition` and ordered `CircuitSlot` tables scoped to a fractal. Definitions contain name, description, planned rounds, lifecycle/version fields, and activity-definition slots. Slot labels and behavioral overrides are intentionally absent.
 - Add snapshotted `CircuitRun`, `CircuitRunSlot`, `CircuitRound`, and `CircuitRoundMember` tables:
   - Runs retain their original name, configuration, activity behavior, and ordering after definition edits.
-  - Planned round/member rows are created with explicit `planned`, `active`, `completed`, `skipped`, or `unfinished` status.
-  - Increasing rounds adds occurrences; reducing rounds removes only trailing unstarted occurrences.
+  - Round/member rows are structural and carry no lifecycle or timing state.
+  - Increasing or reducing rounds is allowed throughout an unfinished parent session, including while the circuit is active or after the circuit is marked complete.
   - Duplicate activity definitions are allowed as distinct slots; nested circuits are prohibited.
 - Normalize sets globally into `ActivitySet` rows with stable IDs, order, status, duration, notes, timestamps, and optional circuit-round-member linkage.
   - Backfill current `ActivityInstance.data.sets` values and positional set notes.
@@ -28,59 +28,52 @@ Use “Round” for one complete pass through the circuit. Circuit elapsed time 
 
 ## Timing and Lifecycle
 
-- Introduce a canonical session work-interval ledger with a database-enforced maximum of one open work interval per session.
-  - Ordinary activity timers and circuit member timing use the same service and locking path.
-  - Starting another subject returns the active subject; the UI offers an atomic stop-and-switch action.
-  - Activity, set, and member durations are derived from non-overlapping intervals rather than independent stopwatches.
-- Circuit, round, and member timing behavior:
-  - Circuit start and completion are explicit.
-  - Circuit duration is unpaused elapsed time between those bounds and includes gaps between rounds.
-  - Rounds start explicitly and end only when confirmed; duration is unpaused elapsed time between those events.
-  - Member timing starts/switches explicitly. Completing a member stops its work interval but leaves the round running.
-  - Transition/rest time counts toward circuit and active-round elapsed time but not activity work.
-  - Pausing a circuit or session atomically pauses the circuit, active round, and active member; resume restores the same state.
-- Historical corrections edit interval boundaries, statuses, metrics, and notes through one transactional service.
-  - Member intervals must be non-overlapping and contained by their round.
-  - Round intervals must be contained by the circuit.
-  - All derived durations and analytics projections are recomputed after correction.
-- Circuit completion may preserve planned or started occurrences as `unfinished` after confirmation. Skips are always explicit records rather than deleted/missing data.
-- Archive circuit definitions with soft deletion. Historical runs and snapshots remain immutable in structure, while their recorded result data remains correctable.
+- Keep the canonical session work-interval ledger exclusively for ordinary activity timers.
+- Circuit start and completion are explicit. Circuit duration is unpaused elapsed time between the run boundaries and includes all transitions and rests; pause/resume belongs exclusively to the parent session lifecycle.
+- Rounds and members have no start/stop/duration lifecycle. Circuit child `ActivityInstance` rows always keep `time_start`, `time_stop`, and `duration_seconds` null.
+- Prevent ordinary activity timers and active or paused circuits from overlapping within a session.
+- Completed circuit timing remains correctable through the shared relative start/stop adjustment. Member metrics remain editable through their canonical metric update path.
+- Circuit completion marks every generated child result complete and completes aligned `ActivitySet` rows without assigning child time.
+- Archive circuit definitions with soft deletion. Historical runs retain their definition snapshots, while their round structure and recorded result data remain correctable until the parent session is complete.
 
 ## APIs and UI
 
 - Add owned, root-scoped circuit definition endpoints for list, detail, create, atomic slot replacement/update, archive, and restore.
-- Add circuit-run endpoints for insertion into a session, detail, start/pause/resume/complete, round adjustment/start/complete, member start/switch/complete/skip, and reconciled historical correction.
-- Return typed session items and complete circuit-run projections with slots, rounds, member results, active timing state, and derived durations. Use conflict responses for stale versions and active-work collisions.
+- Add circuit-run endpoints for insertion into a session, detail, start/complete, timing adjustment, individual round addition/removal, and member metrics. Circuit pause/resume propagates exclusively through the parent session lifecycle.
+- Return typed session items and circuit-run projections with top-level timing plus structural slots, rounds, and member results. Round/member timing and lifecycle fields are absent.
 - Add a Circuits surface to Manage Activities with list cards and a builder for core fields, planned rounds, and ordered activity slots. Slots inherit their activity definition’s metrics and set behavior.
 - Extend session-template and live-session item pickers to add circuits as single ordered items.
-- Render a circuit as one expandable session item, with nested slot numbering such as `1.1`, `1.2`, and `1.3`, then show those slots within each named round.
-- Provide clear Start Circuit, Start Round, Start/Switch Member, Complete/Skip Member, End Round, Pause/Resume, and Complete Circuit controls with confirmation for incomplete work.
+- Render a circuit as one expandable session item whose nested indexes use round/activity coordinates: Round 1 contains `1.1`, `1.2`, and `1.3`; Round 2 restarts the slot position as `2.1`, `2.2`, and `2.3`. The member's shared set-style metric row does not repeat another inner result index.
+- Provide synchronized Start, Stop, and Duration fields plus Start and Complete actions only on the circuit container. Parent-session pause displays the circuit as paused and parent-session resume continues it; there is no standalone circuit pause/resume action. Actions remain authoritative, while the shared relative-time adjustment is the sole timing-correction workflow.
 - Derive circuit goal relevance from the union of member activity associations; do not create separate circuit-goal associations.
+- Keep quick-entry sessions activity-only: their atomic create-and-complete workflow has no interactive round or circuit-timer phase. Managed circuits remain available in standard sessions and session templates.
+- Keep interactive authoring within 100 rounds, 50 slots, and 1,000 generated results. Session detail initially renders ten rounds and progressively reveals more, bounding mobile DOM work without truncating persisted results.
 
 ## Analytics, Compatibility, and Quality Gates
 
-- Include exclusive circuit-member work in existing activity history, targets, progress comparisons, notes, and duration totals.
-- Add circuit history and trend views for circuit elapsed duration, round durations, member work totals, completion/skip rates, and changes over time.
+- Include circuit child metrics in existing activity history, targets, and progress comparisons while excluding circuit duration from child activity duration totals.
+- Use existing Sessions summaries, session detail, and the governed analytics catalog for circuit history. The abandoned dedicated circuit-history and circuit-trend endpoints remain removed.
 - Add circuit definitions, runs, rounds, members, and normalized sets to the governed analytics catalog with tenant isolation.
 - Keep session duration independent: circuit and activity times are categorized subviews and are never summed into the session clock.
-- Add quota/storage accounting and domain events for definitions, runs, rounds, members, sets, corrections, and lifecycle changes.
+- Add quota/storage accounting and domain events for definitions, runs, sets, and top-level lifecycle changes.
+- Serialize definition edits with a row lock before optimistic-version evaluation. Session structure, timer, run deletion, and round mutations share a session-first lock order.
 - Update `index.md` as part of implementation and delete superseded JSON-set, positional-note, legacy section-ordering, and multiple-active-timer code.
 
 ## Test Plan
 
 - Migration tests cover empty sets, populated sets, metrics/splits, positional notes, completed history, active timers, malformed legacy JSON, rollback safety, and idempotent backfill.
-- Model/service tests enforce ownership, snapshot isolation, unique slot ordering, no nesting, exclusive active work, valid result linkage, interval containment, pause propagation, skips, unfinished completion, and round-count adjustment.
-- API tests cover CRUD, archive behavior, template instantiation, optimistic conflicts, atomic switching, validation errors, historical correction, and cross-fractal access denial.
-- Frontend tests cover circuit building, typed ordering, template/session insertion, nested numbering, mixed set/non-set rounds, timer transitions, pause/resume, incomplete confirmation, corrections, and accessible keyboard/mobile operation.
-- Analytics tests prove that member intervals roll up exactly once, circuit/round time does not inflate activity totals, set history retains stable identity, and session totals remain independent.
-- End-to-end acceptance scenario: run two rounds of set-based Activity A plus non-set Activity B, include transitions and a between-round gap, pause once, skip one occurrence, and verify every circuit, round, set, activity, and session duration reconciles precisely.
+- Model/service tests enforce ownership, snapshot isolation, unique slot ordering, no nesting, timer exclusivity, valid result linkage, null child timing, pause propagation, completion, and round adjustment across planned, active, and completed circuit states until the parent session completes.
+- API tests cover CRUD, archive behavior, template instantiation, active-timer conflicts, validation errors, metrics, and cross-fractal access denial.
+- Frontend tests cover circuit building, typed ordering, template/session insertion, nested numbering, mixed set/non-set rounds, top-level timer transitions, pause/resume, progressive rendering, and accessible keyboard/mobile operation.
+- Analytics tests prove that circuit duration is counted at the circuit/section level and never inflates child activity totals, while set history retains stable identity.
+- End-to-end acceptance scenario: run two rounds of set-based Activity A plus non-set Activity B, record metrics, pause once, complete the circuit, and verify that only the circuit has timing while every child result remains untimed.
 
 ## Assumptions and S+ Audit
 
-- V1 circuit definitions contain only name, description, planned rounds, ordered slots, and optional slot labels; timing targets, rest prescriptions, and behavioral overrides are deferred.
+- V1 circuit definitions contain only name, description, planned rounds, an optional activity group, and ordered activity slots; timing targets, rest prescriptions, slot labels, and behavioral overrides are intentionally absent.
 - Existing templates reference definitions, while every session run snapshots them.
 - Current implementation quality is strong for ordinary activities but materially below the circuit requirement because sets and ordering are positional JSON and concurrent timers are supported.
-- The plan reaches S+ when there is one normalized set model, one typed session-item model, one authoritative work ledger, database-enforced timing invariants, complete migration coverage, and no legacy competing write paths.
+- The plan reaches S+ when there is one normalized set model, one typed session-item model, exactly one circuit timer owner, database-enforced structural invariants, complete migration coverage, and no legacy round/member timing paths.
 
 ## Commit Message
 

@@ -102,6 +102,9 @@ def start_activity_timer(current_user, root_id, instance_id):
         if error:
             return jsonify({"error": error}), status
 
+        if status == 409 and isinstance(payload, dict) and payload.get("code"):
+            return jsonify(payload), status
+
         response_data = dict(payload["serialized"])
         if payload.get("instance") and getattr(payload["instance"], "completed", False):
             response_data["progress_comparison"] = (

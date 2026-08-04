@@ -53,6 +53,8 @@ def upgrade() -> None:
         sa.Column('root_id', sa.String(), nullable=True),
         sa.Column('relevance_statement', sa.Text(), nullable=True),
         sa.Column('is_smart', sa.Boolean(), server_default='false'),
+        sa.Column('allow_manual_completion', sa.Boolean(), server_default='true'),
+        sa.Column('track_activities', sa.Boolean(), server_default='true'),
         sa.Column('targets', sa.Text(), nullable=True),
         sa.PrimaryKeyConstraint('id'),
         sa.ForeignKeyConstraint(['parent_id'], ['goals.id'], ondelete='CASCADE'),
@@ -79,6 +81,21 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(['root_id'], ['goals.id'])
     )
     op.create_index('ix_activity_groups_root_id', 'activity_groups', ['root_id'])
+
+    # Goal/activity-group associations existed in the schema represented by
+    # the baseline and are referenced by the immediately following revision.
+    # Keep this in the baseline so a brand-new PostgreSQL database can replay
+    # the migration chain instead of requiring a pre-existing table.
+    op.create_table('goal_activity_group_associations',
+        sa.Column('goal_id', sa.String(), nullable=False),
+        sa.Column('activity_group_id', sa.String(), nullable=False),
+        sa.Column('created_at', sa.DateTime(), server_default=sa.text('CURRENT_TIMESTAMP')),
+        sa.PrimaryKeyConstraint('goal_id', 'activity_group_id'),
+        sa.ForeignKeyConstraint(['goal_id'], ['goals.id'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['activity_group_id'], ['activity_groups.id'], ondelete='CASCADE')
+    )
+    op.create_index('idx_goal_activity_group_goal', 'goal_activity_group_associations', ['goal_id'])
+    op.create_index('idx_goal_activity_group_group', 'goal_activity_group_associations', ['activity_group_id'])
     
     # Activity Definitions table
     op.create_table('activity_definitions',
@@ -320,9 +337,26 @@ def upgrade() -> None:
     op.create_index('ix_notes_session_id', 'notes', ['session_id'])
     op.create_index('ix_notes_context_id', 'notes', ['context_id'])
 
+    # Legacy visualization annotations are no longer part of the application
+    # model, but early follow-up revisions add an index and convert these JSON
+    # payloads. Preserve the represented baseline table so fresh replays can
+    # reach the later cleanup-era schema without failing mid-chain.
+    op.create_table('visualization_annotations',
+        sa.Column('id', sa.String(), nullable=False),
+        sa.Column('root_id', sa.String(), nullable=False),
+        sa.Column('visualization_type', sa.String(), nullable=False),
+        sa.Column('visualization_context', sa.Text(), nullable=True),
+        sa.Column('selected_points', sa.Text(), nullable=True),
+        sa.Column('selection_bounds', sa.Text(), nullable=True),
+        sa.Column('deleted_at', sa.DateTime(), nullable=True),
+        sa.PrimaryKeyConstraint('id'),
+        sa.ForeignKeyConstraint(['root_id'], ['goals.id'], ondelete='CASCADE')
+    )
+
 
 def downgrade() -> None:
     """Drop all tables."""
+    op.drop_table('visualization_annotations')
     op.drop_table('notes')
     op.drop_table('metric_values')
     op.drop_table('activity_instances')
@@ -337,5 +371,6 @@ def downgrade() -> None:
     op.drop_table('metric_definitions')
     op.drop_table('activity_goal_associations')
     op.drop_table('activity_definitions')
+    op.drop_table('goal_activity_group_associations')
     op.drop_table('activity_groups')
     op.drop_table('goals')

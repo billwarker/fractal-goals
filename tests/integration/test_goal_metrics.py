@@ -17,13 +17,13 @@ from services.metrics import GoalMetricsService
 def db_session(db_session):
     return db_session
 
-def test_recursive_metrics(db_session):
+def test_recursive_metrics(db_session, test_user):
     # Create a hierarchy:
     # Root -> Child A -> Child B
     
     # Create Root
     root_id = str(uuid.uuid4())
-    root = Goal(id=root_id, name="Root Goal", root_id=root_id)
+    root = Goal(id=root_id, name="Root Goal", root_id=root_id, owner_id=test_user.id)
     db_session.add(root)
     db_session.flush()
     
@@ -43,21 +43,21 @@ def test_recursive_metrics(db_session):
     
     # Create Sessions
     # Session 1 -> Root (direct)
-    s1 = Session(id=str(uuid.uuid4()), name="Session 1", total_duration_seconds=3600, root_id=root_id)
+    s1 = Session(id=str(uuid.uuid4()), owner_id=test_user.id, name="Session 1", total_duration_seconds=3600, root_id=root_id, completed=True)
     db_session.add(s1)
     db_session.flush()
     # Link s1 to Root
     db_session.execute(session_goals.insert().values(session_id=s1.id, goal_id=root_id, goal_type='UltimateGoal'))
     
     # Session 2 -> Child A
-    s2 = Session(id=str(uuid.uuid4()), name="Session 2", total_duration_seconds=1800, root_id=root_id)
+    s2 = Session(id=str(uuid.uuid4()), owner_id=test_user.id, name="Session 2", total_duration_seconds=1800, root_id=root_id, completed=True)
     db_session.add(s2)
     db_session.flush()
     # Link s2 to Child A
     db_session.execute(session_goals.insert().values(session_id=s2.id, goal_id=child_a_id, goal_type='ShortTermGoal'))
     
     # Session 3 -> Child B
-    s3 = Session(id=str(uuid.uuid4()), name="Session 3", total_duration_seconds=900, root_id=root_id)
+    s3 = Session(id=str(uuid.uuid4()), owner_id=test_user.id, name="Session 3", total_duration_seconds=900, root_id=root_id, completed=True)
     db_session.add(s3)
     db_session.flush()
     # Link s3 to Child B
@@ -90,18 +90,20 @@ def test_recursive_metrics(db_session):
     assert child_b_metrics["recursive"]["sessions_count"] == 1
     assert child_b_metrics["recursive"]["sessions_duration_seconds"] == 900
 
-def test_recursive_session_metrics_deduplicate_sessions_linked_to_multiple_subtree_goals(db_session):
+def test_recursive_session_metrics_deduplicate_sessions_linked_to_multiple_subtree_goals(db_session, test_user):
     root_id = str(uuid.uuid4())
-    root = Goal(id=root_id, name="Root Goal", root_id=root_id)
+    root = Goal(id=root_id, name="Root Goal", root_id=root_id, owner_id=test_user.id)
     child_id = str(uuid.uuid4())
     child = Goal(id=child_id, name="Child Goal", parent_id=root_id, root_id=root_id)
     db_session.add_all([root, child])
     db_session.flush()
 
     session = Session(
+        owner_id=test_user.id,
         id=str(uuid.uuid4()),
         name="Shared Session",
         total_duration_seconds=1200,
+        completed=True,
         root_id=root_id,
         session_start=datetime.utcnow(),
     )
@@ -130,16 +132,18 @@ def test_recursive_session_metrics_deduplicate_sessions_linked_to_multiple_subtr
     assert len(daily["points"]) == 1
     assert daily["points"][0]["session_duration"] == 1200
 
-def test_session_metrics_ignore_soft_deleted_goal_links(db_session):
+def test_session_metrics_ignore_soft_deleted_goal_links(db_session, test_user):
     root_id = str(uuid.uuid4())
-    root = Goal(id=root_id, name="Root Goal", root_id=root_id)
+    root = Goal(id=root_id, name="Root Goal", root_id=root_id, owner_id=test_user.id)
     db_session.add(root)
     db_session.flush()
 
     session = Session(
+        owner_id=test_user.id,
         id=str(uuid.uuid4()),
         name="Deleted Link Session",
         total_duration_seconds=600,
+        completed=True,
         root_id=root_id,
     )
     db_session.add(session)
@@ -213,10 +217,10 @@ def test_recursive_activity_metrics(db_session):
     assert root_metrics["recursive"]["activities_count"] == 1
     assert root_metrics["recursive"]["activities_duration_seconds"] == 600
 
-def test_metrics_count_group_activity_evidence_sessions_and_daily_points(db_session):
+def test_metrics_count_group_activity_evidence_sessions_and_daily_points(db_session, test_user):
     root_id = str(uuid.uuid4())
     created_at = datetime(2026, 6, 17, 10, 0)
-    root = Goal(id=root_id, name="Root Goal", root_id=root_id, created_at=created_at)
+    root = Goal(id=root_id, name="Root Goal", root_id=root_id, owner_id=test_user.id, created_at=created_at)
     child = Goal(
         id=str(uuid.uuid4()),
         name="Child Goal",
@@ -236,11 +240,13 @@ def test_metrics_count_group_activity_evidence_sessions_and_daily_points(db_sess
     )
     session_start = datetime(2026, 6, 25, 18, 15)
     session = Session(
+        owner_id=test_user.id,
         id=str(uuid.uuid4()),
         name="Evidence Session",
         root_id=root_id,
         session_start=session_start,
         total_duration_seconds=3600,
+        completed=True,
     )
     instance = ActivityInstance(
         id=str(uuid.uuid4()),
@@ -276,10 +282,10 @@ def test_metrics_count_group_activity_evidence_sessions_and_daily_points(db_sess
         "activity_duration": 2710,
     }]
 
-def test_metrics_count_parent_inherited_activity_evidence(db_session):
+def test_metrics_count_parent_inherited_activity_evidence(db_session, test_user):
     root_id = str(uuid.uuid4())
     created_at = datetime(2026, 6, 17, 10, 0)
-    parent = Goal(id=root_id, name="Parent Goal", root_id=root_id, created_at=created_at)
+    parent = Goal(id=root_id, name="Parent Goal", root_id=root_id, owner_id=test_user.id, created_at=created_at)
     child = Goal(
         id=str(uuid.uuid4()),
         name="Child Goal",
@@ -293,11 +299,13 @@ def test_metrics_count_parent_inherited_activity_evidence(db_session):
 
     activity = ActivityDefinition(id=str(uuid.uuid4()), name="Inherited Activity", root_id=root_id)
     session = Session(
+        owner_id=test_user.id,
         id=str(uuid.uuid4()),
         name="Inherited Evidence Session",
         root_id=root_id,
         session_start=datetime(2026, 6, 25, 23, 17),
         total_duration_seconds=1800,
+        completed=True,
     )
     instance = ActivityInstance(
         id=str(uuid.uuid4()),

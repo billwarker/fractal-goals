@@ -182,26 +182,32 @@ function buildTemplateSessionPayload(template, selectedProgramDay) {
                 day_name: selectedProgramDay.day_name,
             } : null,
             sections: (template.template_data?.sections || []).map((section) => {
-                const templateItems = section.activities || section.exercises || [];
-                const exercises = templateItems
-                    .map((activity) => {
-                        const activityId = extractActivityId(activity);
+                const templateItems = section.items || section.activities || section.exercises || [];
+                const items = templateItems
+                    .map((item) => {
+                        if (item?.type === 'circuit' && item.circuit_definition_id) {
+                            return {
+                                type: 'circuit',
+                                circuit_definition_id: item.circuit_definition_id,
+                            };
+                        }
+                        const activityId = extractActivityId(item);
                         if (!activityId) return null;
-                        const name = typeof activity === 'object' ? activity.name : null;
+                        const name = typeof item === 'object' ? item.name : null;
                         return {
                             type: 'activity',
                             name: name || 'Activity',
-                            activity_id: activityId,
-                            instance_id: crypto.randomUUID(),
-                            completed: false,
-                            notes: '',
+                            activity_definition_id: activityId,
                         };
                     })
                     .filter(Boolean);
 
+                const sectionFields = { ...section };
+                delete sectionFields.activities;
+                delete sectionFields.exercises;
                 return {
-                    ...section,
-                    exercises,
+                    ...sectionFields,
+                    items,
                     estimated_duration_minutes: section.estimated_duration_minutes || section.duration_minutes,
                 };
             }),

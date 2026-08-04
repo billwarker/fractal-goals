@@ -37,10 +37,11 @@ const NOTE_TYPE_OPTIONS = [
     { value: 'activity_instance_note', label: 'Activity Notes' },
     { value: 'activity_set_note', label: 'Activity Set Notes' },
     { value: 'activity_definition_note', label: 'Activity Definition Notes' },
+    { value: 'circuit_run_note', label: 'Activity Circuit Notes' },
+    { value: 'circuit_round_note', label: 'Circuit Round Notes' },
 ];
 
 // ─── Goal Picker Modal ───────────────────────────────────────────────────────
-
 function GoalPickerModal({ rootId, selectedGoalId, onSelect, onClose }) {
     const { data: treeData } = useFractalTree(rootId);
     const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
@@ -114,6 +115,7 @@ function Notes() {
     const [activityPickerOpen, setActivityPickerOpen] = useState(false);
     const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Responsive navigation collapses desktop-only panes on entry to mobile. */
     useEffect(() => {
         window.localStorage.setItem(filtersPaneStorageKey, String(isFiltersPaneOpen));
     }, [filtersPaneStorageKey, isFiltersPaneOpen]);
@@ -124,6 +126,7 @@ function Notes() {
             setMobilePanelOpen(false);
         }
     }, [isMobile, rootId]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     // Compose link state
     const [composeGoalId, setComposeGoalId] = useState(null);

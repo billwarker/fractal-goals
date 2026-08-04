@@ -23,6 +23,7 @@ function SessionOptionsModal({
     const [showTemplateInput, setShowTemplateInput] = useState(false);
     const [templateName, setTemplateName] = useState(sessionName || '');
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Modal visibility defines the lifecycle of its disposable form draft. */
     useEffect(() => {
         if (!isOpen) {
             setShowTemplateInput(false);
@@ -30,6 +31,7 @@ function SessionOptionsModal({
         }
         setTemplateName(sessionName || '');
     }, [isOpen, sessionName]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     const handleTemplateSave = async () => {
         const trimmed = templateName.trim();

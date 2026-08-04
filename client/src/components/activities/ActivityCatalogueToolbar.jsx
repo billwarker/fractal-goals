@@ -6,9 +6,11 @@ import styles from './ActivityCatalogueToolbar.module.css';
 export default function ActivityCatalogueToolbar({
     searchTerm,
     onSearchChange,
+    placeholder = 'Groups or activities',
     hasGroups,
     allGroupsCollapsed,
     onToggleCollapseAll,
+    controlClassName = '',
 }) {
     return (
         <>
@@ -18,12 +20,12 @@ export default function ActivityCatalogueToolbar({
                     type="search"
                     value={searchTerm}
                     onChange={(event) => onSearchChange(event.target.value)}
-                    placeholder="Groups or activities"
-                    className={styles.searchInput}
+                    placeholder={placeholder}
+                    className={`${styles.searchInput} ${controlClassName}`.trim()}
                 />
             </label>
             {hasGroups && (
-                <HeaderButton variant="secondary" onClick={onToggleCollapseAll}>
+                <HeaderButton className={controlClassName} variant="secondary" onClick={onToggleCollapseAll}>
                     {allGroupsCollapsed ? 'Expand All' : 'Collapse All'}
                 </HeaderButton>
             )}

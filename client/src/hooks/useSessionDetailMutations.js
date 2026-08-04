@@ -15,24 +15,7 @@ import {
     replaceGoalInTree,
 } from './sessionDetailMutationUtils';
 import notify from '../utils/notify';
-
-function cloneMetricRows(metrics = []) {
-    if (!Array.isArray(metrics)) return [];
-    return metrics.map((metric) => ({
-        metric_id: metric.metric_id || metric.metric_definition_id,
-        split_id: metric.split_id || metric.split_definition_id || null,
-        value: metric.value,
-    })).filter((metric) => metric.metric_id && metric.value !== undefined && metric.value !== null && metric.value !== '');
-}
-
-function cloneSetRows(sets = [], { preserveCompletion = true } = {}) {
-    if (!Array.isArray(sets)) return [];
-    return sets.map((set) => ({
-        instance_id: crypto.randomUUID(),
-        completed: preserveCompletion ? Boolean(set.completed) : false,
-        metrics: cloneMetricRows(set.metrics || []),
-    }));
-}
+import { cloneMetricRows, cloneSetRows, getSectionItems, withSectionItems } from './sessionItemMutationUtils';
 
 export function useSessionDetailMutations({
     rootId,
@@ -129,8 +112,12 @@ export function useSessionDetailMutations({
                 return {
                     ...previous,
                     sections: previous.sections.map((section) => ({
-                        ...section,
-                        activity_ids: (section.activity_ids || []).filter((id) => id !== instanceId),
+                        ...withSectionItems(
+                            section,
+                            getSectionItems(section).filter((item) => !(
+                                item?.type === 'activity' && item.activity_instance_id === instanceId
+                            )),
+                        ),
                     })),
                 };
             });
@@ -316,6 +303,23 @@ export function useSessionDetailMutations({
                 }
             }
 
+            if (updates.sets !== undefined) {
+                const setsPayload = (Array.isArray(updates.sets) ? updates.sets : []).map((set) => ({
+                    ...set,
+                    metrics: (Array.isArray(set?.metrics) ? set.metrics : [])
+                        .filter((metric) => {
+                            const value = metric?.value;
+                            return value != null && !(typeof value === 'string' && value.trim() === '');
+                        }),
+                }));
+                return fractalApi.updateActivityInstance(rootId, instanceId, {
+                    session_id: sessionId,
+                    activity_definition_id: instance.activity_definition_id,
+                    ...updates,
+                    sets: setsPayload,
+                });
+            }
+
             return fractalApi.updateActivityInstance(rootId, instanceId, {
                 session_id: sessionId,
                 activity_definition_id: instance.activity_definition_id,
@@ -343,12 +347,11 @@ export function useSessionDetailMutations({
             ) {
                 queryClient.invalidateQueries({ queryKey: sessionKey });
                 queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+                queryClient.invalidateQueries({ queryKey: queryKeys.sessionCircuitRuns(rootId, sessionId) });
                 queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
                 invalidateSessionListQueries();
                 invalidateFlowTreeActivityEvidence();
             }
-
-            // Invalidate progress comparison when metrics are updated
             if (updates?.metrics !== undefined || updates?.sets !== undefined) {
                 queryClient.invalidateQueries({ queryKey: queryKeys.progressComparison(instanceId) });
                 if (activityDefinitionId) {
@@ -440,31 +443,30 @@ export function useSessionDetailMutations({
                 );
                 queryClient.invalidateQueries({ queryKey: sessionKey });
                 queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+                queryClient.invalidateQueries({ queryKey: queryKeys.sessionCircuitRuns(rootId, sessionId) });
                 invalidateSessionListQueries();
                 invalidateFlowTreeActivityEvidence();
             }
         } catch (error) {
             logError('Timer action failed', error);
             notify.error(`Timer action failed: ${error.response?.data?.error || error.message}`);
+            throw error;
         }
     }, [activityInstances, invalidateFlowTreeActivityEvidence, invalidateSessionListQueries, queryClient, rootId, sessionActivitiesKey, sessionGoalsViewKey, sessionId, sessionKey]);
 
-    const handleReorderActivity = useCallback((sectionIndex, exerciseIndex, direction) => {
+    const handleReorderActivity = useCallback((sectionIndex, itemIndex, direction) => {
         updateSessionDataDraft((currentData) => {
             const updatedData = { ...currentData };
             const sections = [...(updatedData.sections || [])];
             const section = sections[sectionIndex];
             if (!section) return currentData;
 
-            const activityIds = [...(section.activity_ids || [])];
-            const newIndex = direction === 'up' ? exerciseIndex - 1 : exerciseIndex + 1;
-            if (newIndex < 0 || newIndex >= activityIds.length) return currentData;
+            const items = getSectionItems(section);
+            const newIndex = direction === 'up' ? itemIndex - 1 : itemIndex + 1;
+            if (newIndex < 0 || newIndex >= items.length) return currentData;
 
-            [activityIds[exerciseIndex], activityIds[newIndex]] = [activityIds[newIndex], activityIds[exerciseIndex]];
-            sections[sectionIndex] = {
-                ...section,
-                activity_ids: activityIds,
-            };
+            [items[itemIndex], items[newIndex]] = [items[newIndex], items[itemIndex]];
+            sections[sectionIndex] = withSectionItems(section, items);
             updatedData.sections = sections;
             return updatedData;
         });
@@ -481,21 +483,19 @@ export function useSessionDetailMutations({
             const targetSection = sections[targetSectionIndex];
             if (!sourceSection || !targetSection) return currentData;
 
-            const nextSource = { ...sourceSection };
-            const sourceIds = [...(nextSource.activity_ids || [])];
-            const activityIndex = sourceIds.indexOf(instanceId);
+            const sourceItems = getSectionItems(sourceSection);
+            const activityIndex = sourceItems.findIndex((item) => (
+                item?.type === 'activity' && item.activity_instance_id === instanceId
+            ));
             if (activityIndex === -1) return currentData;
 
-            sourceIds.splice(activityIndex, 1);
-            nextSource.activity_ids = sourceIds;
+            const [movedItem] = sourceItems.splice(activityIndex, 1);
 
-            const nextTarget = { ...targetSection };
-            const targetIds = [...(nextTarget.activity_ids || [])];
-            targetIds.push(instanceId);
-            nextTarget.activity_ids = targetIds;
+            const targetItems = getSectionItems(targetSection);
+            targetItems.push(movedItem);
 
-            sections[sourceSectionIndex] = nextSource;
-            sections[targetSectionIndex] = nextTarget;
+            sections[sourceSectionIndex] = withSectionItems(sourceSection, sourceItems);
+            sections[targetSectionIndex] = withSectionItems(targetSection, targetItems);
             updatedData.sections = sections;
             return updatedData;
         });
@@ -521,10 +521,11 @@ export function useSessionDetailMutations({
                 const updatedData = { ...currentData };
                 const sections = [...updatedData.sections];
                 const section = { ...sections[sectionIndex] };
-                const activityIds = [...(section.activity_ids || [])];
-                activityIds.push(newInstance.id);
-                section.activity_ids = activityIds;
-                sections[sectionIndex] = section;
+                const items = getSectionItems(section).filter((item) => !(
+                    item?.type === 'activity' && item.activity_instance_id === newInstance.id
+                ));
+                items.push({ type: 'activity', activity_instance_id: newInstance.id });
+                sections[sectionIndex] = withSectionItems(section, items);
                 updatedData.sections = sections;
                 return updatedData;
             });
@@ -572,14 +573,17 @@ export function useSessionDetailMutations({
                 const updatedData = { ...currentData };
                 const sections = [...updatedData.sections];
                 const section = { ...sections[sectionIndex] };
-                const activityIds = [...(section.activity_ids || [])].filter((id) => id !== newInstance.id);
-                const sourceIndex = activityIds.indexOf(sourceInstanceId);
+                const items = getSectionItems(section).filter((item) => !(
+                    item?.type === 'activity' && item.activity_instance_id === newInstance.id
+                ));
+                const sourceIndex = items.findIndex((item) => (
+                    item?.type === 'activity' && item.activity_instance_id === sourceInstanceId
+                ));
                 const insertionIndex = sourceIndex >= 0
                     ? sourceIndex + 1
-                    : Math.min(Math.max((insertAfterIndex ?? activityIds.length - 1) + 1, 0), activityIds.length);
-                activityIds.splice(insertionIndex, 0, newInstance.id);
-                section.activity_ids = activityIds;
-                sections[sectionIndex] = section;
+                    : Math.min(Math.max((insertAfterIndex ?? items.length - 1) + 1, 0), items.length);
+                items.splice(insertionIndex, 0, { type: 'activity', activity_instance_id: newInstance.id });
+                sections[sectionIndex] = withSectionItems(section, items);
                 updatedData.sections = sections;
                 return updatedData;
             });
@@ -756,10 +760,6 @@ export function useSessionDetailMutations({
         }
     }, [activityInstances, handleUpdateTimer, queryClient, session, sessionId, updateSession]);
 
-    const calculateTotalDuration = useCallback(() => {
-        return activityInstances.reduce((sum, instance) => sum + (instance.duration_seconds || 0), 0);
-    }, [activityInstances]);
-
     const createGoal = useCallback(async (goalData) => {
         try {
             const response = await fractalApi.createGoal(rootId, goalData);
@@ -792,7 +792,6 @@ export function useSessionDetailMutations({
         pauseSession: pauseSessionMutation.mutateAsync,
         resumeSession: resumeSessionMutation.mutateAsync,
         toggleSessionComplete: handleToggleSessionComplete,
-        calculateTotalDuration,
     };
 }
 export default useSessionDetailMutations;

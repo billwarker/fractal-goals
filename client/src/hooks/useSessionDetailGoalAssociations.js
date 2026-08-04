@@ -78,7 +78,7 @@ export function useSessionDetailGoalAssociations({
             ));
 
             return true;
-        } catch (error) {
+        } catch {
             return false;
         }
     };

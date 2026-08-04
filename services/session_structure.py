@@ -70,7 +70,7 @@ def _resolve_session_type(runtime_data, template_data):
 
 
 def _resolve_template_color(runtime_data, template_data):
-    return get_template_color(runtime_data) or get_template_color(template_data)
+    return get_template_color(template_data) or get_template_color(runtime_data)
 
 
 def _normalize_duration(value):

@@ -7,7 +7,18 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.orm.attributes import flag_modified
 
 import models
-from models import ActivityDefinition, ActivityInstance, Goal, Session, session_goals, validate_root_goal
+from models import (
+    ActivityDefinition,
+    ActivityInstance,
+    CircuitRound,
+    CircuitRoundMember,
+    CircuitRun,
+    CircuitRunSlot,
+    Goal,
+    Session,
+    session_goals,
+    validate_root_goal,
+)
 from services import Event, Events, event_bus
 from services.goal_type_utils import get_canonical_goal_type
 from services.payload_normalizers import normalize_session_payload
@@ -300,23 +311,30 @@ class SessionLifecycleService:
         self.db_session.flush()
 
         inherited_goal_map = {}
+        created_circuit_runs = []
 
         def collect_section_exercises(input_sections):
             local_activity_ids = set()
             local_section_exercises = []
-            for section in input_sections or []:
+            local_circuit_items = []
+            for section_index, section in enumerate(input_sections or []):
                 if not isinstance(section, dict):
                     continue
-                raw_exercises = section.get('exercises') or section.get('activities') or []
+                raw_exercises = section.get('items') or section.get('exercises') or section.get('activities') or []
                 normalized = []
-                for exercise in raw_exercises:
+                for item_index, exercise in enumerate(raw_exercises):
+                    if isinstance(exercise, dict) and exercise.get('type') == 'circuit':
+                        circuit_definition_id = exercise.get('circuit_definition_id')
+                        if circuit_definition_id:
+                            local_circuit_items.append((section_index, item_index, circuit_definition_id))
+                        continue
                     activity_id = self._extract_activity_definition_id(exercise)
                     if not activity_id:
                         continue
                     local_activity_ids.add(activity_id)
                     normalized.append((exercise, activity_id))
                 local_section_exercises.append((section, normalized))
-            return local_activity_ids, local_section_exercises
+            return local_activity_ids, local_section_exercises, local_circuit_items
 
         is_quick_template = template_session_type == SESSION_TYPE_QUICK
 
@@ -363,16 +381,17 @@ class SessionLifecycleService:
             session_data_dict.pop('sections', None)
         else:
             sections = session_data_dict.get('sections', []) if isinstance(session_data_dict, dict) else []
-            activity_def_ids, section_exercises = collect_section_exercises(sections)
+            activity_def_ids, section_exercises, circuit_items = collect_section_exercises(sections)
 
-            if not activity_def_ids and template:
+            if not activity_def_ids and not circuit_items and template:
                 template_sections = template_payload.get('sections', []) if isinstance(template_payload, dict) else []
-                template_activity_ids, template_section_exercises = collect_section_exercises(template_sections)
-                if template_activity_ids:
+                template_activity_ids, template_section_exercises, template_circuit_items = collect_section_exercises(template_sections)
+                if template_activity_ids or template_circuit_items:
                     session_data_dict['sections'] = template_sections
                     sections = session_data_dict.get('sections', [])
                     activity_def_ids = template_activity_ids
                     section_exercises = template_section_exercises
+                    circuit_items = template_circuit_items
 
             if activity_def_ids:
                 activities = self.db_session.query(ActivityDefinition).options(
@@ -400,6 +419,7 @@ class SessionLifecycleService:
                     if section.get('id') and not section.get('template_section_id'):
                         section['template_section_id'] = section.get('id')
                     section_activity_ids = []
+                    section_items = []
                     for exercise, activity_id in normalized_exercises:
                         if activity_id not in activity_map:
                             continue
@@ -413,8 +433,10 @@ class SessionLifecycleService:
                         self.db_session.add(instance)
                         self.db_session.flush()
                         section_activity_ids.append(instance_id)
+                        section_items.append({'type': 'activity', 'activity_instance_id': instance_id})
 
-                    section['activity_ids'] = section_activity_ids
+                    section['items'] = section_items
+                    section.pop('activity_ids', None)
                     section.pop('exercises', None)
                     section.pop('activities', None)
                     if 'estimated_duration_minutes' not in section and section.get('duration_minutes') is not None:
@@ -428,6 +450,51 @@ class SessionLifecycleService:
                             not goal.deleted_at
                         ):
                             inherited_goal_map[goal.id] = goal
+
+            if circuit_items:
+                from services.circuit_service import CircuitService
+
+                for section in sections:
+                    if not isinstance(section, dict) or not isinstance(section.get('items'), list):
+                        continue
+                    section['items'] = [
+                        item
+                        for item in section['items']
+                        if not (
+                            isinstance(item, dict)
+                            and item.get('type') == 'circuit'
+                            and item.get('circuit_definition_id')
+                        )
+                    ]
+                # Activity occurrences are normalized above in the local payload.
+                # Publish that canonical state before circuit insertion reads and
+                # augments the session's typed item list.
+                new_session.attributes = copy.deepcopy(session_data_dict)
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(new_session, 'attributes')
+                circuit_service = CircuitService(self.db_session)
+                for section_index, item_index, circuit_definition_id in circuit_items:
+                    created_run, circuit_error, circuit_status = circuit_service.create_run(
+                        root_id,
+                        new_session.id,
+                        current_user_id,
+                        {
+                            'circuit_definition_id': circuit_definition_id,
+                            'section_index': section_index,
+                            'item_index': item_index,
+                            'allow_archived': bool(template),
+                        },
+                        commit=False,
+                        emit=False,
+                    )
+                    if circuit_error:
+                        self.db_session.rollback()
+                        return None, circuit_error, circuit_status
+                    created_circuit_runs.append(created_run)
+                    # create_run updates the persisted session JSON. Keep the local
+                    # canonical payload in sync so the final assignment cannot
+                    # overwrite the newly inserted typed circuit item.
+                    session_data_dict = copy.deepcopy(new_session.attributes)
 
         new_session.attributes = copy.deepcopy(session_data_dict)
 
@@ -524,6 +591,14 @@ class SessionLifecycleService:
             'root_id': root_id,
             'goal_ids': [g.id for g in new_session.goals]
         }, source='session_service.create_session'))
+
+        for run_payload in created_circuit_runs:
+            event_bus.emit(Event(Events.CIRCUIT_RUN_CREATED, {
+                'circuit_run_id': run_payload['id'],
+                'circuit_definition_id': run_payload.get('circuit_definition_id'),
+                'session_id': new_session.id,
+                'root_id': root_id,
+            }, source='session_service.create_session'))
 
         return serialize_session(new_session), None, 201
 
@@ -653,6 +728,16 @@ class SessionLifecycleService:
             session.duration_minutes = data['duration_minutes']
 
         if 'completed' in data:
+            if data['completed']:
+                incomplete_circuit = self.db_session.query(CircuitRun.id).filter(
+                    CircuitRun.session_id == session.id,
+                    CircuitRun.status != 'completed',
+                ).first()
+                if incomplete_circuit:
+                    return None, (
+                        "Complete each circuit, explicitly preserving any unfinished work, "
+                        "before completing the session"
+                    ), 409
             if not data['completed'] and session.completed:
                 conflict = self._active_session_conflict(
                     root_id,
@@ -679,7 +764,26 @@ class SessionLifecycleService:
                     ActivityInstance.session_id == session.id,
                     ActivityInstance.deleted_at == None
                 ).all()
+                circuit_instance_ids = {instance_id for (instance_id,) in self.db_session.query(CircuitRunSlot.activity_instance_id).join(
+                    CircuitRun,
+                    CircuitRun.id == CircuitRunSlot.circuit_run_id,
+                ).filter(
+                    CircuitRun.session_id == session.id,
+                    CircuitRunSlot.activity_instance_id.is_not(None),
+                ).all()}
+                circuit_instance_ids.update(instance_id for (instance_id,) in self.db_session.query(CircuitRoundMember.activity_instance_id).join(
+                    CircuitRound,
+                    CircuitRound.id == CircuitRoundMember.circuit_round_id,
+                ).join(
+                    CircuitRun,
+                    CircuitRun.id == CircuitRound.circuit_run_id,
+                ).filter(
+                    CircuitRun.session_id == session.id,
+                    CircuitRoundMember.activity_instance_id.is_not(None),
+                ).all())
                 for instance in instances:
+                    if instance.id in circuit_instance_ids:
+                        continue
                     if instance.completed:
                         continue
                     if not instance.time_start:

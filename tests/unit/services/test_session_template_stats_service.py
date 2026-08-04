@@ -1,13 +1,16 @@
 import json
 from datetime import datetime, timedelta, timezone
 
-from models import ActivityInstance, Session, SessionTemplate
+from models import ActivityInstance, Goal, Session, SessionTemplate
 from services.session_template_stats_service import SessionTemplateStatsService
 
 
 def _session(db_session, *, root_id, template_id, name, duration, completed=True, deleted=False, start=None, attrs=None):
     start = start or datetime.now(timezone.utc)
+    root = db_session.get(Goal, root_id)
+    assert root is not None
     session = Session(
+        owner_id=root.owner_id,
         name=name,
         root_id=root_id,
         template_id=template_id,

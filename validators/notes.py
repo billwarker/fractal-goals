@@ -12,13 +12,16 @@ class NoteCreateSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
     
     content: str = Field(..., min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
-    context_type: str = Field(..., pattern=r'^(root|goal|session|program|activity_instance|activity_definition)$')
+    context_type: str = Field(
+        ...,
+        pattern=r'^(root|goal|session|program|activity_instance|activity_definition|circuit_run|circuit_round)$',
+    )
     context_id: str = Field(..., min_length=1)
     session_id: Optional[str] = None
     activity_instance_id: Optional[str] = None
     activity_definition_id: Optional[str] = None
     goal_id: Optional[str] = None
-    set_index: Optional[int] = Field(None, ge=0)
+    activity_set_id: Optional[str] = None
     note_kind: Optional[str] = Field(None, pattern=r'^(goal_completion)$')
 
     @field_validator('content')
@@ -38,4 +41,3 @@ class NoteUpdateSchema(BaseModel):
         if v is None:
             return v
         return sanitize_note_content(v)
-

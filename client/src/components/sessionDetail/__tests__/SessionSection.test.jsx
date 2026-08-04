@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import SessionSection from '../SessionSection';
 
@@ -12,6 +12,9 @@ const {
     moveActivity,
     reorderActivity,
     setDraggedItem,
+    createCircuitRun,
+    updateCircuitDefinition,
+    circuitDefinitionsState,
     sessionUiState,
     sessionDataState,
 } = vi.hoisted(() => ({
@@ -23,6 +26,9 @@ const {
     moveActivity: vi.fn(),
     reorderActivity: vi.fn(),
     setDraggedItem: vi.fn(),
+    createCircuitRun: vi.fn(),
+    updateCircuitDefinition: vi.fn(),
+    circuitDefinitionsState: { definitions: [] },
     sessionUiState: {
         showActivitySelector: {},
     },
@@ -84,6 +90,14 @@ vi.mock('../../../hooks/useIsMobile', () => ({
     default: () => false,
 }));
 
+vi.mock('../../../hooks/useCircuitQueries', () => ({
+    useCircuits: () => ({ data: circuitDefinitionsState.definitions, isLoading: false }),
+    useCreateCircuitRun: () => ({ mutateAsync: createCircuitRun, isPending: false }),
+    useCircuitDefinitionMutations: () => ({
+        updateMutation: { mutateAsync: updateCircuitDefinition, isPending: false },
+    }),
+}));
+
 vi.mock('../SessionActivityItem', () => ({
     default: ({ onFocus, exercise, sessionIndex, onDuplicate, onClearValues, onCopyPreviousValues }) => (
         <div onClick={() => onFocus(exercise, null)}>
@@ -102,11 +116,53 @@ describe('SessionSection', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         sessionUiState.showActivitySelector = {};
+        circuitDefinitionsState.definitions = [];
         sessionDataState.activityInstances = [];
         sessionDataState.localSessionData = null;
         sessionDataState.groupedActivities = {
             'group-1': [sessionDataState.activities[0]],
         };
+    });
+
+    it('offers circuits through Add Activity without a separate Add Circuit button', async () => {
+        createCircuitRun.mockResolvedValue({});
+        circuitDefinitionsState.definitions = [{
+            id: 'circuit-1',
+            name: 'Technique Circuit',
+            group_id: 'group-1',
+            planned_rounds: 3,
+        }];
+
+        const renderSection = () => (
+            <SessionSection
+                section={{ name: 'Main Practice', activity_ids: [], estimated_duration_minutes: 10 }}
+                sectionIndex={0}
+                onFocusActivity={vi.fn()}
+                selectedActivityId={null}
+                onOpenActivityBuilder={vi.fn()}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+            />
+        );
+        const { rerender } = render(renderSection());
+
+        expect(screen.queryByRole('button', { name: '+ Add Circuit' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '+ Add Activity' }));
+        rerender(renderSection());
+        expect(screen.queryByRole('button', { name: 'Select Technique Circuit' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'Activity Circuits' }));
+        fireEvent.click(screen.getByRole('button', { name: /Technique/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Select Technique Circuit' }));
+
+        await waitFor(() => expect(createCircuitRun).toHaveBeenCalledWith({
+            circuitDefinitionId: 'circuit-1',
+            sectionIndex: 0,
+        }));
+        expect(addActivity).not.toHaveBeenCalled();
     });
 
     it('opens copy mode and passes a duplicated activity definition into the builder flow', () => {

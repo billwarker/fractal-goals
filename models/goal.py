@@ -132,7 +132,7 @@ class Goal(Base):
     relevance_statement = Column(Text, nullable=True)
     is_smart = Column(Boolean, default=False)
     completed_via_children = Column(Boolean, default=False)
-    inherit_parent_activities = Column(Boolean, default=False)
+    inherit_parent_activities = Column(Boolean, default=False, nullable=False)
     allow_manual_completion = Column(Boolean, default=True)
     track_activities = Column(Boolean, default=True)
     paused = Column(Boolean, default=False)

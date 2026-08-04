@@ -43,10 +43,12 @@ function Selection() {
         [userId]
     );
 
+    /* eslint-disable react-hooks/set-state-in-effect -- The authenticated user's storage namespace is the source of this selection. */
     useEffect(() => {
         localStorage.removeItem(RECENT_ROOT_STORAGE_PREFIX);
         setRecentRootId(recentRootStorageKey ? localStorage.getItem(recentRootStorageKey) : null);
     }, [recentRootStorageKey]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     const fractalsQuery = useQuery({
         queryKey: queryKeys.fractals(userId),

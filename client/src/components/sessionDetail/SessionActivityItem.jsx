@@ -9,6 +9,7 @@ import { playCompletionSound } from '../../utils/playCompletionSound';
 import styles from './SessionActivityItem.module.css';
 import { SummaryDelta } from './SessionActivityProgressSummary';
 import SessionActivityItemView from './SessionActivityItemView';
+import MetricValueEditor from './MetricValueEditor';
 import useMetricDrafts from './useMetricDrafts';
 import { useActivityHistory } from '../../hooks/useActivityHistory';
 import { useProgressComparison } from '../../hooks/useProgressComparison';
@@ -27,10 +28,6 @@ import {
     formatMetricNumber,
     normalizeMetricValueForStorage,
     getMetricDefaultStorageValue,
-    formatMetricValueForInput,
-    formatAllowedMetricValueLabel,
-    getAllowedMetricValues,
-    getMetricInputProps,
     formatInlineProgressValue,
     getBestSetIndexes,
     buildEmptySet,
@@ -88,30 +85,28 @@ function SessionActivityItem({
     const onDelete = () => removeActivity(exercise.id);
     const onUpdate = useCallback((key, value, extraData = {}) => {
         if (key === 'timer_action') {
-            updateTimer(exercise.id, value, extraData);
+            return Promise.resolve(updateTimer(exercise.id, value, extraData)).catch((error) => {
+                if (value === 'start') throw error;
+                return undefined;
+            });
         } else {
-            updateInstance(exercise.id, { [key]: value });
+            return updateInstance(exercise.id, { [key]: value });
         }
     }, [exercise.id, updateInstance, updateTimer]);
 
-    // Get timezone from context
     const { timezone } = useTimezone();
     const handleUpdateSets = useCallback((newSets) => {
         onUpdate('sets', newSets);
     }, [onUpdate]);
-
     const resolveMetricId = useCallback((metric) => (
         metric?.metric_id || metric?.metric_definition_id || null
     ), []);
-
     const resolveSplitId = useCallback((metric) => (
         metric?.split_id || metric?.split_definition_id || null
     ), []);
 
-    // Local draft state for editing datetime fields. `null` means "show current query value".
     const [startTimeDraft, setStartTimeDraft] = useState(null);
     const [stopTimeDraft, setStopTimeDraft] = useState(null);
-    // Progress comparison: stored from completion mutation response or fetched live
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
     const [realtimeDuration, setRealtimeDuration] = useState(() => exercise.duration_seconds ?? 0);
     // Pre-start duration input (MM:SS) — if set before Start, enables countdown mode
@@ -126,7 +121,6 @@ function SessionActivityItem({
         && !targetDurationError
         ? `Countdown ${formatDuration(parsedTargetDuration)}`
         : null;
-
 
     // Real-time timer effect
     useEffect(() => {
@@ -203,13 +197,16 @@ function SessionActivityItem({
         if (!content.trim() || !onAddNote || !exercise.id) return;
 
         try {
+            const selectedSet = selectedSetIndex === null || selectedSetIndex === undefined
+                ? null
+                : exercise.sets?.[selectedSetIndex];
             await onAddNote({
                 context_type: 'activity_instance',
                 context_id: exercise.id,
                 session_id: sessionId || exercise.session_id,
                 activity_instance_id: exercise.id,
                 activity_definition_id: activityDefinition?.id,
-                set_index: selectedSetIndex,
+                activity_set_id: selectedSet?.id || null,
                 content: content.trim(),
             });
             if (onNoteCreated) onNoteCreated();
@@ -279,7 +276,7 @@ function SessionActivityItem({
                                 && resolveSplitId(item) === split.id
                             ));
                             if (!exists) {
-                                missingDefaultKeys.push(`${set.instance_id || 'set'}:${split.id}:${metric.id}`);
+                                missingDefaultKeys.push(`${set.id || set.instance_id || 'set'}:${split.id}:${metric.id}`);
                                 nextMetrics.push({
                                     metric_id: metric.id,
                                     split_id: split.id,
@@ -295,7 +292,7 @@ function SessionActivityItem({
                             resolveMetricId(item) === metric.id && !resolveSplitId(item)
                         ));
                         if (!exists) {
-                            missingDefaultKeys.push(`${set.instance_id || 'set'}:${metric.id}`);
+                            missingDefaultKeys.push(`${set.id || set.instance_id || 'set'}:${metric.id}`);
                             nextMetrics.push({
                                 metric_id: metric.id,
                                 value: getMetricDefaultStorageValue(metric),
@@ -658,47 +655,18 @@ function SessionActivityItem({
         progress,
         isDraft = false,
     }) => {
-        const allowedValues = getAllowedMetricValues(metricDef);
-        const displayValue = isDraft ? String(value ?? '') : formatMetricValueForInput(metricDef, value);
-        const selectedAllowedValue = normalizeMetricValueForStorage(metricDef, value);
         return (
-            <>
-                <div className={styles.metricValueControl}>
-                    {allowedValues.length > 0 ? (
-                        <select
-                            className={`${inputClassName} ${styles.metricSelect}`}
-                            value={allowedValues.includes(String(selectedAllowedValue)) ? String(selectedAllowedValue) : ''}
-                            onChange={(event) => {
-                                const nextValue = allowedValues.includes(event.target.value) ? event.target.value : '';
-                                onDraftChange(nextValue);
-                                onCommit(nextValue);
-                            }}
-                        >
-                            <option value="">--</option>
-                            {allowedValues.map((allowedValue) => (
-                                <option key={`${metricDef.id}-${allowedValue}`} value={allowedValue}>
-                                    {formatAllowedMetricValueLabel(metricDef, allowedValue)}
-                                </option>
-                            ))}
-                        </select>
-                    ) : (
-                        <input
-                            {...getMetricInputProps(metricDef)}
-                            className={inputClassName}
-                            value={displayValue}
-                            onChange={(event) => onDraftChange(event.target.value)}
-                            onBlur={(event) => onCommit(event.target.value)}
-                            onKeyDown={(event) => {
-                                if (event.key === 'Enter') event.currentTarget.blur();
-                            }}
-                        />
-                    )}
-                </div>
-                <span className={metaClassName}>
-                    <span className={unitClassName}>{metricDef.unit}</span>
-                    {progress}
-                </span>
-            </>
+            <MetricValueEditor
+                metricDef={metricDef}
+                value={value}
+                inputClassName={inputClassName}
+                metaClassName={metaClassName}
+                unitClassName={unitClassName}
+                onDraftChange={onDraftChange}
+                onCommit={onCommit}
+                progress={progress}
+                isDraft={isDraft}
+            />
         );
     };
 

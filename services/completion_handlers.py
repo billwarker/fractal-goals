@@ -943,11 +943,9 @@ def _evaluate_sum_target(target, instances):
     for inst in instances:
         # Flatten metrics from sets and instance
         all_metrics = []
-        if inst.data and isinstance(inst.data, dict) and 'sets' in inst.data:
-             # Add metrics from sets
-             sets = inst.data.get('sets', [])
-             for s in sets:
-                 all_metrics.extend(s.get('metrics', []))
+        for activity_set in inst.sets or []:
+            for metric in activity_set.metric_values or []:
+                all_metrics.append({'metric_id': metric.metric_definition_id, 'value': metric.value})
         
         # Add instance level metrics (serialized or DB objects?)
         if inst.metric_values:

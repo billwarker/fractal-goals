@@ -26,7 +26,7 @@ from services.serializers import (
     serialize_split_definition,
     serialize_target,
 )
-from services.session_runtime import get_session_runtime_data, get_template_color
+from services.session_runtime import get_session_template_color, get_session_template_name
 from services.service_types import JsonDict, ServiceResult
 
 
@@ -300,13 +300,8 @@ class GoalTimelineService:
                 session_template_name = None
                 session_template_color = None
                 if session:
-                    session_data = get_session_runtime_data(session)
-                    session_template_name = session_data.get('template_name')
-                    session_template_color = get_template_color(session_data)
-                    if not session_template_name and getattr(session, 'template', None):
-                        session_template_name = session.template.name
-                    if not session_template_color and getattr(session, 'template', None):
-                        session_template_color = get_template_color(session.template.template_data or {})
+                    session_template_name = get_session_template_name(session)
+                    session_template_color = get_session_template_color(session)
                 append_entry(
                     f"activity_completed:{instance.id}",
                     'activity.completed',

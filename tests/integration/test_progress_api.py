@@ -8,12 +8,32 @@ from sqlalchemy.exc import IntegrityError
 from models import (
     ActivityDefinition,
     ActivityInstance,
+    ActivitySet,
     Goal,
     MetricDefinition,
     MetricValue,
     ProgressRecord,
     Session,
 )
+
+
+def _add_metric_sets(db_session, instance, metric, values, *, set_ids=None):
+    for index, value in enumerate(values):
+        activity_set = ActivitySet(
+            id=set_ids[index] if set_ids else str(uuid4()),
+            activity_instance_id=instance.id,
+            sort_order=index,
+            status='completed',
+        )
+        db_session.add_all([
+            activity_set,
+            MetricValue(
+                activity_instance_id=instance.id,
+                activity_set_id=activity_set.id,
+                metric_definition_id=metric.id,
+                value=value,
+            ),
+        ])
 
 
 @pytest.mark.integration
@@ -122,6 +142,7 @@ class TestProgressApi:
             created_at=datetime.now(timezone.utc),
         )
         other_session = Session(
+            owner_id=test_user.id,
             id=str(uuid4()),
             name='Other Session',
             description='',
@@ -222,6 +243,7 @@ class TestProgressApi:
             created_at=datetime.now(timezone.utc),
         )
         session = Session(
+            owner_id=sample_ultimate_goal.owner_id,
             id=str(uuid4()),
             name='Disabled Progress Session',
             description='',
@@ -273,6 +295,8 @@ class TestProgressApi:
             created_at=datetime.now(timezone.utc),
         )
         prev_session = Session(
+            owner_id=sample_ultimate_goal.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Previous Session',
             description='',
@@ -282,6 +306,8 @@ class TestProgressApi:
             attributes=json.dumps({}),
         )
         current_session = Session(
+            owner_id=sample_ultimate_goal.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Current Session',
             description='',
@@ -408,6 +434,8 @@ class TestProgressApi:
             created_at=datetime.now(timezone.utc),
         )
         session_a = Session(
+            owner_id=sample_ultimate_goal.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Session A',
             description='',
@@ -417,6 +445,8 @@ class TestProgressApi:
             attributes=json.dumps({}),
         )
         session_b = Session(
+            owner_id=sample_ultimate_goal.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Session B',
             description='',
@@ -426,6 +456,8 @@ class TestProgressApi:
             attributes=json.dumps({}),
         )
         session_c = Session(
+            owner_id=sample_ultimate_goal.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Session C',
             description='',
@@ -447,10 +479,7 @@ class TestProgressApi:
             time_start=datetime(2026, 4, 8, 10, 0, tzinfo=timezone.utc),
             time_stop=datetime(2026, 4, 8, 10, 5, tzinfo=timezone.utc),
             duration_seconds=300,
-            data=json.dumps({'sets': [
-                {'metrics': [{'metric_id': metric.id, 'value': 100}]},
-                {'metrics': [{'metric_id': metric.id, 'value': 120}]},
-            ]}),
+            data={},
         )
         instance_b = ActivityInstance(
             id=str(uuid4()),
@@ -462,10 +491,7 @@ class TestProgressApi:
             time_start=datetime(2026, 4, 9, 10, 0, tzinfo=timezone.utc),
             time_stop=datetime(2026, 4, 9, 10, 5, tzinfo=timezone.utc),
             duration_seconds=300,
-            data=json.dumps({'sets': [
-                {'metrics': [{'metric_id': metric.id, 'value': 110}]},
-                {'metrics': [{'metric_id': metric.id, 'value': 130}]},
-            ]}),
+            data={},
         )
         instance_c = ActivityInstance(
             id=str(uuid4()),
@@ -477,12 +503,12 @@ class TestProgressApi:
             time_start=datetime(2026, 4, 10, 10, 0, tzinfo=timezone.utc),
             time_stop=datetime(2026, 4, 10, 10, 5, tzinfo=timezone.utc),
             duration_seconds=300,
-            data=json.dumps({'sets': [
-                {'metrics': [{'metric_id': metric.id, 'value': 40}]},
-                {'metrics': [{'metric_id': metric.id, 'value': 130}]},
-            ]}),
+            data={},
         )
         db_session.add_all([instance_a, instance_b, instance_c])
+        _add_metric_sets(db_session, instance_a, metric, [100, 120])
+        _add_metric_sets(db_session, instance_b, metric, [110, 130])
+        _add_metric_sets(db_session, instance_c, metric, [40, 130])
         db_session.commit()
 
         initial_progress = authed_client.get(
@@ -537,6 +563,8 @@ class TestProgressApi:
             created_at=datetime.now(timezone.utc),
         )
         prev_session = Session(
+            owner_id=sample_ultimate_goal.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Previous Session',
             description='',
@@ -546,6 +574,8 @@ class TestProgressApi:
             attributes=json.dumps({}),
         )
         current_session = Session(
+            owner_id=sample_ultimate_goal.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Current Session',
             description='',
@@ -567,10 +597,7 @@ class TestProgressApi:
             time_start=datetime(2026, 4, 9, 10, 0, tzinfo=timezone.utc),
             time_stop=datetime(2026, 4, 9, 10, 5, tzinfo=timezone.utc),
             duration_seconds=300,
-            data=json.dumps({'sets': [
-                {'instance_id': 'set-a1', 'metrics': [{'metric_id': metric.id, 'value': 100}]},
-                {'instance_id': 'set-a2', 'metrics': [{'metric_id': metric.id, 'value': 120}]},
-            ]}),
+            data={},
         )
         current_instance = ActivityInstance(
             id=str(uuid4()),
@@ -582,12 +609,11 @@ class TestProgressApi:
             time_start=datetime(2026, 4, 10, 10, 0, tzinfo=timezone.utc),
             time_stop=datetime(2026, 4, 10, 10, 5, tzinfo=timezone.utc),
             duration_seconds=300,
-            data=json.dumps({'sets': [
-                {'instance_id': 'set-b1', 'metrics': [{'metric_id': metric.id, 'value': 34}]},
-                {'instance_id': 'set-b2', 'metrics': [{'metric_id': metric.id, 'value': 23}]},
-            ]}),
+            data={},
         )
         db_session.add_all([prev_instance, current_instance])
+        _add_metric_sets(db_session, prev_instance, metric, [100, 120], set_ids=['set-a1', 'set-a2'])
+        _add_metric_sets(db_session, current_instance, metric, [34, 23], set_ids=['set-b1', 'set-b2'])
         db_session.commit()
 
         first_progress = authed_client.get(f'/api/{root_id}/activity-instances/{current_instance.id}/progress')
@@ -600,8 +626,8 @@ class TestProgressApi:
                 'session_id': current_session.id,
                 'activity_definition_id': activity.id,
                 'sets': [
-                    {'instance_id': 'set-b1', 'metrics': [{'metric_id': metric.id, 'value': 34}]},
-                    {'instance_id': 'set-b2', 'metrics': [{'metric_id': metric.id, 'value': 30}]},
+                    {'id': 'set-b1', 'metrics': [{'metric_id': metric.id, 'value': 34}]},
+                    {'id': 'set-b2', 'metrics': [{'metric_id': metric.id, 'value': 30}]},
                 ],
             },
         )
