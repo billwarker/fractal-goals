@@ -165,16 +165,7 @@ function GoalHierarchyList({
         });
     };
 
-    const sessionRows = useMemo(
-        () => flattenSessionTreeRows(treeRoots),
-        [
-            connectorHighlightMode,
-            getGoalBranchHighlightState,
-            getGoalConnectorHighlightState,
-            isGoalBranchHighlighted,
-            treeRoots,
-        ]
-    );
+    const sessionRows = flattenSessionTreeRows(treeRoots);
 
     const rowById = useMemo(
         () => new Map(sessionRows.map((row) => [String(row.node.id), row])),

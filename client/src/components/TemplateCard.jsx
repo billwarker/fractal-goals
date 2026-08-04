@@ -17,7 +17,12 @@ function getQuickActivityCount(template) {
 
 function getNormalActivityCount(template) {
     return template.template_data?.sections?.reduce(
-        (sum, section) => sum + (section.activities?.length || section.exercises?.length || 0),
+        (sum, section) => sum + (
+            section.items?.filter((item) => item?.type === 'activity' || item?.type === 'circuit').length
+            || section.activities?.length
+            || section.exercises?.length
+            || 0
+        ),
         0
     ) || 0;
 }

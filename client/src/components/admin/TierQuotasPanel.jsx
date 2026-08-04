@@ -24,8 +24,14 @@ export default function TierQuotasPanel({ tierQuotasQuery }) {
     const [storageDraftMb, setStorageDraftMb] = useState('100');
     const [applyExistingUsers, setApplyExistingUsers] = useState(false);
 
-    const tierDefaultLimits = tierQuotasQuery.data?.tier_default_limits || {};
-    const tierStorageLimitBytes = tierQuotasQuery.data?.tier_storage_limit_bytes || {};
+    const tierDefaultLimits = useMemo(
+        () => tierQuotasQuery.data?.tier_default_limits || {},
+        [tierQuotasQuery.data?.tier_default_limits],
+    );
+    const tierStorageLimitBytes = useMemo(
+        () => tierQuotasQuery.data?.tier_storage_limit_bytes || {},
+        [tierQuotasQuery.data?.tier_storage_limit_bytes],
+    );
     const tierOptions = useMemo(() => Object.keys(tierDefaultLimits), [tierDefaultLimits]);
     const editableTiers = tierQuotasQuery.data?.editable_tiers || FINITE_QUOTA_TIERS;
     const unlimitedTiers = tierQuotasQuery.data?.unlimited_tiers || UNLIMITED_QUOTA_TIERS;

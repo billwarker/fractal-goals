@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { adminApi } from '../../utils/api';
@@ -22,13 +22,8 @@ const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : 'â
  */
 function UsageStoragePanel({ storage, retention, exportState }) {
     const queryClient = useQueryClient();
-    const [retentionDays, setRetentionDays] = useState(retention?.product_events_days ?? 180);
-
-    useEffect(() => {
-        if (retention?.product_events_days) {
-            setRetentionDays(retention.product_events_days);
-        }
-    }, [retention?.product_events_days]);
+    const [retentionDaysDraft, setRetentionDaysDraft] = useState(null);
+    const retentionDays = retentionDaysDraft ?? retention?.product_events_days ?? 180;
 
     const retentionMutation = useMutation({
         mutationFn: (days) => adminApi.updateUsageRetention({ product_events_days: days }),
@@ -134,7 +129,7 @@ function UsageStoragePanel({ storage, retention, exportState }) {
                     min="30"
                     max="730"
                     value={retentionDays}
-                    onChange={(event) => setRetentionDays(event.target.value)}
+                    onChange={(event) => setRetentionDaysDraft(event.target.value)}
                 />
                 <button
                     type="button"

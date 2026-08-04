@@ -62,6 +62,7 @@ function SessionDetailContent() {
         selectedGoal,
         setSelectedGoal,
         selectedActivity,
+        selectedSetIndex,
         showAssociationModal,
         setShowAssociationModal,
         associationContext,
@@ -232,6 +233,7 @@ function SessionDetailContent() {
                             sectionIndex={sectionIndex}
                             onFocusActivity={handleActivityFocus}
                             selectedActivityId={selectedActivity?.id}
+                            selectedSetIndex={selectedSetIndex}
                             onOpenActivityBuilder={handleOpenActivityBuilder}
                             onNoteCreated={refreshNotes}
                             allNotes={sessionNotes}

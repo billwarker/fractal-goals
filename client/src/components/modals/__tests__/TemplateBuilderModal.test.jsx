@@ -71,4 +71,49 @@ describe('TemplateBuilderModal', () => {
         expect(screen.getAllByText('Squat')).toHaveLength(1);
     });
 
+    it('selects circuits through Add Activity and saves one typed ordered item list', () => {
+        const onSave = vi.fn();
+        render(
+            <TemplateBuilderModal
+                isOpen={true}
+                onClose={vi.fn()}
+                onSave={onSave}
+                editingTemplate={{
+                    id: 'template-1',
+                    name: 'Mixed Work',
+                    description: '',
+                    template_data: {
+                        sections: [{
+                            name: 'Main',
+                            duration_minutes: 20,
+                            items: [{ type: 'activity', activity_definition_id: 'activity-1', name: 'Squat' }],
+                        }],
+                    },
+                }}
+                activities={[
+                    { id: 'activity-1', name: 'Squat', type: 'strength' },
+                    {
+                        id: 'circuit:circuit-1',
+                        circuit_definition_id: 'circuit-1',
+                        item_type: 'circuit',
+                        name: 'Finisher',
+                        type: 'Circuit',
+                    },
+                ]}
+                activityGroups={[]}
+            />,
+        );
+
+        expect(screen.queryByText('Add circuit:')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '+ Add Activity' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Select Finisher' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Update Template' }));
+        expect(onSave).toHaveBeenCalledTimes(1);
+        expect(onSave.mock.calls[0][0].template_data.sections[0].items).toEqual([
+            { type: 'activity', activity_definition_id: 'activity-1', name: 'Squat' },
+            { type: 'circuit', circuit_definition_id: 'circuit-1' },
+        ]);
+        expect(onSave.mock.calls[0][0].template_data.sections[0].activities).toBeUndefined();
+    });
+
 });

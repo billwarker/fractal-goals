@@ -32,6 +32,22 @@ describe('sessionSection map builders', () => {
         expect(positionMap.get('song')).toBe(2);
     });
 
+    it('counts activity circuits in mixed session item positions', () => {
+        const positionMap = buildSessionPositionMap([
+            {
+                items: [
+                    { type: 'activity', activity_instance_id: 'warmup' },
+                    { type: 'circuit', circuit_run_id: 'circuit-run' },
+                ],
+            },
+            { items: [{ type: 'activity', activity_instance_id: 'cooldown' }] },
+        ]);
+
+        expect(positionMap.get('warmup')).toBe(0);
+        expect(positionMap.get('circuit:circuit-run')).toBe(1);
+        expect(positionMap.get('cooldown')).toBe(2);
+    });
+
     it('normalizes legacy definition ids to canonical instance ids across sections', () => {
         const normalized = normalizeSectionActivityIds({
             sections: [

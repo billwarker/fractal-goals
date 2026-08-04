@@ -1,13 +1,17 @@
 import copy
 from datetime import datetime, timezone, date
-import json
 
 from account_tiers import DEFAULT_ACCOUNT_TIER
 from models import _safe_load_json
 from .account_flags import must_change_password as _must_change_password
 from .goal_type_utils import get_canonical_goal_type
 from .goal_domain_rules import goal_uses_child_completion
-from .session_runtime import get_template_color, get_template_session_type
+from .session_runtime import (
+    get_session_template_color,
+    get_session_template_name,
+    get_template_color,
+    get_template_session_type,
+)
 from .progress_service import serialize_progress_record
 
 def format_utc(dt):
@@ -21,6 +25,14 @@ def format_utc(dt):
         return dt.isoformat(timespec='seconds') + 'Z'
     # If aware, ensure UTC and use Z suffix
     return dt.astimezone(timezone.utc).isoformat(timespec='seconds').replace('+00:00', 'Z')
+
+
+def format_utc_precise(dt):
+    """Preserve sub-second ledger boundaries used by historical corrections."""
+    if not dt:
+        return None
+    normalized = dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+    return normalized.isoformat(timespec='microseconds').replace('+00:00', 'Z')
 
 def calculate_smart_status(goal):
     """Calculate SMART criteria status for a goal."""
@@ -97,6 +109,20 @@ def serialize_metric_value(metric):
         "split_name": metric.split.name if metric.split else None
     }
 
+
+def serialize_activity_set(activity_set):
+    return {
+        "id": activity_set.id,
+        "sort_order": activity_set.sort_order,
+        "status": activity_set.status,
+        "completed": activity_set.status == "completed",
+        "duration_seconds": activity_set.duration_seconds,
+        "notes": activity_set.notes,
+        "metrics": [serialize_metric_value(metric) for metric in (activity_set.metric_values or [])],
+        "created_at": format_utc(activity_set.created_at),
+        "updated_at": format_utc(activity_set.updated_at),
+    }
+
 def serialize_fractal_metric(metric):
     """Serialize a FractalMetricDefinition object."""
     return {
@@ -123,7 +149,12 @@ def serialize_fractal_metric(metric):
 def serialize_activity_instance(instance):
     """Serialize an ActivityInstance object."""
     data_dict = _safe_load_json(instance.data, {})
-    metric_values_list = [serialize_metric_value(m) for m in instance.metric_values]
+    metric_values_list = [
+        serialize_metric_value(m)
+        for m in instance.metric_values
+        if getattr(m, "activity_set_id", None) is None
+    ]
+    normalized_sets = [serialize_activity_set(row) for row in (getattr(instance, "sets", None) or [])]
 
     # Build full group path (e.g., "Pull > Horizontal")
     group_path = None
@@ -153,9 +184,9 @@ def serialize_activity_instance(instance):
         "total_paused_seconds": getattr(instance, 'total_paused_seconds', 0),
         "completed": instance.completed,
         "notes": instance.notes,
-        "has_sets": bool(getattr(instance.definition, "has_sets", False) or data_dict.get('sets')),
+        "has_sets": bool(getattr(instance.definition, "has_sets", False) or normalized_sets),
         "has_metrics": bool(getattr(instance.definition, "has_metrics", False) or metric_values_list),
-        "sets": data_dict.get('sets', []),
+        "sets": normalized_sets,
         "data": data_dict,
         "metric_values": metric_values_list,
         "metrics": metric_values_list,  # Frontend alias
@@ -166,7 +197,12 @@ def serialize_activity_instance(instance):
 def serialize_activity_instance_for_analytics(instance, *, session_name=None, session_date=None):
     """Serialize the subset of activity-instance fields needed by analytics views."""
     data_dict = _safe_load_json(instance.data, {})
-    metric_values_list = [serialize_metric_value(m) for m in instance.metric_values]
+    metric_values_list = [
+        serialize_metric_value(m)
+        for m in instance.metric_values
+        if getattr(m, "activity_set_id", None) is None
+    ]
+    normalized_sets = [serialize_activity_set(row) for row in (getattr(instance, "sets", None) or [])]
 
     return {
         "id": instance.id,
@@ -179,11 +215,124 @@ def serialize_activity_instance_for_analytics(instance, *, session_name=None, se
         "time_stop": format_utc(instance.time_stop),
         "duration_seconds": instance.duration_seconds,
         "completed": instance.completed,
-        "has_sets": bool(getattr(instance.definition, "has_sets", False) or data_dict.get('sets')),
-        "sets": data_dict.get('sets', []),
+        "has_sets": bool(getattr(instance.definition, "has_sets", False) or normalized_sets),
+        "sets": normalized_sets,
         "metric_values": metric_values_list,
         "metrics": metric_values_list,
         "progress_comparison": serialize_progress_record(instance.progress_record) if getattr(instance, 'progress_record', None) else None,
+    }
+
+
+def serialize_circuit_definition(definition, instantiation_summary=None):
+    summary = instantiation_summary or {}
+    return {
+        "id": definition.id,
+        "root_id": definition.root_id,
+        "group_id": definition.group_id,
+        "name": definition.name,
+        "description": definition.description or "",
+        "planned_rounds": definition.planned_rounds,
+        "version": definition.version,
+        "archived": definition.deleted_at is not None,
+        "deleted_at": format_utc(definition.deleted_at),
+        "created_at": format_utc(definition.created_at),
+        "updated_at": format_utc(definition.updated_at),
+        "instantiation_summary": {
+            "instance_count": int(summary.get("instance_count") or 0),
+            "last_used_at": summary.get("last_used_at"),
+            "average_duration_seconds": summary.get("average_duration_seconds"),
+        },
+        "slots": [
+            {
+                "id": slot.id,
+                "activity_definition_id": slot.activity_definition_id,
+                "sort_order": slot.sort_order,
+                "activity": serialize_activity_definition(slot.activity_definition)
+                if slot.activity_definition else None,
+            }
+            for slot in (definition.slots or [])
+        ],
+    }
+
+
+def serialize_work_interval(interval):
+    return {
+        "id": interval.id,
+        "activity_instance_id": interval.activity_instance_id,
+        "activity_set_id": interval.activity_set_id,
+        "started_at": format_utc_precise(interval.started_at),
+        "ended_at": format_utc_precise(interval.ended_at),
+        "duration_seconds": interval.duration_seconds,
+    }
+
+
+def serialize_circuit_run(run):
+    slots = sorted(run.slots or [], key=lambda slot: slot.sort_order)
+    rounds = sorted(run.rounds or [], key=lambda item: item.round_number)
+    return {
+        "id": run.id,
+        "root_id": run.root_id,
+        "session_id": run.session_id,
+        "circuit_definition_id": run.circuit_definition_id,
+        "source_version": run.source_version,
+        "name": run.name,
+        "description": run.description or "",
+        "round_count": len(rounds),
+        # Compatibility field retained for existing clients and snapshots.
+        "planned_rounds": run.planned_rounds,
+        "status": run.status,
+        "time_start": format_utc(run.time_start),
+        "time_stop": format_utc(run.time_stop),
+        "duration_seconds": run.duration_seconds,
+        "is_paused": run.is_paused,
+        "last_paused_at": format_utc(run.last_paused_at),
+        "total_paused_seconds": run.total_paused_seconds,
+        "completed_at": format_utc(run.completed_at),
+        "created_at": format_utc(run.created_at),
+        "updated_at": format_utc(run.updated_at),
+        "slots": [
+            {
+                "id": slot.id,
+                "source_slot_id": slot.source_slot_id,
+                "activity_definition_id": slot.activity_definition_id,
+                "activity_instance_id": slot.activity_instance_id,
+                "sort_order": slot.sort_order,
+                "activity_name": slot.activity_name,
+                "has_sets": slot.has_sets,
+                "has_metrics": slot.has_metrics,
+                "activity_schema": slot.activity_schema or {},
+            }
+            for slot in slots
+        ],
+        "rounds": [
+            {
+                "id": circuit_round.id,
+                "round_number": circuit_round.round_number,
+                "members": [
+                    {
+                        "id": member.id,
+                        "circuit_run_slot_id": member.circuit_run_slot_id,
+                        "activity_instance_id": member.activity_instance_id,
+                        "activity_set_id": member.activity_set_id,
+                        "sort_order": member.sort_order,
+                        "metrics": [
+                            serialize_metric_value(metric)
+                            for metric in (
+                                member.activity_set.metric_values
+                                if member.activity_set_id and member.activity_set
+                                else [
+                                    metric
+                                    for metric in (member.activity_instance.metric_values or [])
+                                    if metric.activity_set_id is None
+                                ] if member.activity_instance else []
+                            )
+                        ],
+                    }
+                    for member in sorted(circuit_round.members or [], key=lambda member: member.sort_order)
+                ],
+            }
+            for circuit_round in rounds
+        ],
     }
 
 
@@ -195,28 +344,6 @@ def _active_session_instances(session):
     ]
 
 
-def _merge_legacy_activity_payload(serialized_instance, legacy_item):
-    """Backfill legacy embedded activity data onto a serialized instance payload."""
-    if not isinstance(serialized_instance, dict) or not isinstance(legacy_item, dict):
-        return serialized_instance
-
-    legacy_sets = legacy_item.get("sets")
-    if (
-        isinstance(legacy_sets, list)
-        and legacy_sets
-        and not (serialized_instance.get("sets") or [])
-    ):
-        serialized_instance["sets"] = copy.deepcopy(legacy_sets)
-        data_dict = serialized_instance.get("data")
-        if not isinstance(data_dict, dict):
-            data_dict = {}
-        data_dict = copy.deepcopy(data_dict)
-        data_dict["sets"] = copy.deepcopy(legacy_sets)
-        serialized_instance["data"] = data_dict
-
-    return serialized_instance
-
-
 def _serialize_session_sections_for_analytics(session):
     attrs = _safe_load_json(getattr(session, "attributes", None), {})
     session_data = attrs.get("session_data") if isinstance(attrs.get("session_data"), dict) else attrs
@@ -225,10 +352,11 @@ def _serialize_session_sections_for_analytics(session):
         return []
 
     serialized_sections = []
+    circuit_run_map = {run.id: run for run in (getattr(session, "circuit_runs", None) or [])}
     for index, section in enumerate(sections):
         if not isinstance(section, dict):
             continue
-        raw_items = section.get("exercises") or section.get("activities") or []
+        raw_items = section.get("items") or section.get("exercises") or section.get("activities") or []
         activity_ids = section.get("activity_ids") if isinstance(section.get("activity_ids"), list) else []
         instance_ids = []
 
@@ -240,7 +368,15 @@ def _serialize_session_sections_for_analytics(session):
             for item in raw_items:
                 if not isinstance(item, dict):
                     continue
-                instance_id = item.get("instance_id") or item.get("id")
+                if item.get("type") == "circuit":
+                    run = circuit_run_map.get(item.get("circuit_run_id"))
+                    for circuit_round in (run.rounds if run else []):
+                        for member in circuit_round.members:
+                            instance_id = member.activity_instance_id or member.run_slot.activity_instance_id
+                            if instance_id and instance_id not in instance_ids:
+                                instance_ids.append(instance_id)
+                    continue
+                instance_id = item.get("activity_instance_id") or item.get("instance_id") or item.get("id")
                 if instance_id and instance_id not in instance_ids:
                     instance_ids.append(instance_id)
 
@@ -346,12 +482,12 @@ def _merge_session_attributes(session, result_attributes):
 def _apply_template_metadata(session, session_data, template_payload):
     if not isinstance(template_payload, dict):
         return
-    if not session_data.get("template_name") and getattr(getattr(session, "template", None), "name", None):
-        session_data["template_name"] = session.template.name
-    if not session_data.get("template_color"):
-        fallback_color = get_template_color(template_payload)
-        if fallback_color:
-            session_data["template_color"] = fallback_color
+    template_name = get_session_template_name(session)
+    if template_name:
+        session_data["template_name"] = template_name
+    template_color = get_session_template_color(session)
+    if template_color:
+        session_data["template_color"] = template_color
     if not session_data.get("session_type"):
         session_data["session_type"] = get_template_session_type(template_payload)
 
@@ -411,7 +547,12 @@ def _build_section_activity_ids(section, raw_items, instance_map, ids_by_def, us
     return normalized_ids, legacy_items_by_instance_id
 
 
-def _hydrate_session_sections_from_instances(session_sections, active_instances, serialized_activity_instances):
+def _hydrate_session_sections_from_instances(
+    session_sections,
+    active_instances,
+    serialized_activity_instances,
+    circuit_runs=None,
+):
     """Normalize legacy section shapes and hydrate section exercises from canonical instances."""
     if not isinstance(session_sections, list):
         return
@@ -432,7 +573,16 @@ def _hydrate_session_sections_from_instances(session_sections, active_instances,
         if not isinstance(section, dict):
             continue
 
+        typed_items = section.get("items") if isinstance(section.get("items"), list) else None
         raw_items = section.get("exercises") or section.get("activities") or []
+        if typed_items is not None:
+            section["activity_ids"] = [
+                item.get("activity_instance_id")
+                for item in typed_items
+                if isinstance(item, dict)
+                and item.get("type") == "activity"
+                and item.get("activity_instance_id")
+            ]
         normalized_ids, legacy_items_by_instance_id = _build_section_activity_ids(
             section,
             raw_items,
@@ -452,10 +602,6 @@ def _hydrate_session_sections_from_instances(session_sections, active_instances,
                 continue
             inst = instance_map[inst_id]
             ex = serialize_activity_instance(inst)
-            legacy_item = legacy_items_by_instance_id.get(inst_id)
-            ex = _merge_legacy_activity_payload(ex, legacy_item)
-            if inst_id in serialized_instance_map:
-                _merge_legacy_activity_payload(serialized_instance_map[inst_id], legacy_item)
             ex['type'] = 'activity'
             ex['instance_id'] = inst.id
             ex['activity_id'] = inst.activity_definition_id
@@ -463,6 +609,30 @@ def _hydrate_session_sections_from_instances(session_sections, active_instances,
             ex['has_metrics'] = (len(ex.get('metrics', []) or []) > 0) or (len(ex.get('metric_values', []) or []) > 0)
             exercises.append(ex)
         section["exercises"] = exercises
+        if typed_items is not None:
+            exercise_by_id = {item.get("instance_id"): item for item in exercises}
+            run_map = {run.id: run for run in (circuit_runs or [])}
+            hydrated_items = []
+            for item in typed_items:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("type") == "activity":
+                    exercise = exercise_by_id.get(item.get("activity_instance_id"))
+                    if exercise:
+                        hydrated_items.append({
+                            "type": "activity",
+                            "activity_instance_id": item.get("activity_instance_id"),
+                            "activity": exercise,
+                        })
+                elif item.get("type") == "circuit":
+                    run = run_map.get(item.get("circuit_run_id"))
+                    if run:
+                        hydrated_items.append({
+                            "type": "circuit",
+                            "circuit_run_id": run.id,
+                            "circuit": serialize_circuit_run(run),
+                        })
+            section["items"] = hydrated_items
 
 
 def serialize_goal(goal, include_children=True):
@@ -619,6 +789,7 @@ def serialize_session(session):
         result["attributes"]["session_data"].get("sections"),
         active_instances,
         serialized_activity_instances,
+        getattr(session, "circuit_runs", None) or [],
     )
     
     # Hydrate canonical session goals across every goal level.
@@ -898,7 +1069,14 @@ def serialize_program_day(day):
 def serialize_note(note):
     """Serialize a Note object."""
     note_kind = getattr(note, "note_kind", None)
-    resolved_note_type = derive_note_type(note.context_type, note.set_index, note_kind=note_kind)
+    activity_set = getattr(note, "activity_set", None)
+    set_index = activity_set.sort_order if activity_set is not None else None
+    resolved_note_type = derive_note_type(
+        note.context_type,
+        set_index,
+        note_kind=note_kind,
+        activity_set_id=getattr(note, "activity_set_id", None),
+    )
     result = {
         "id": note.id,
         "context_type": note.context_type,
@@ -906,7 +1084,8 @@ def serialize_note(note):
         "session_id": note.session_id,
         "activity_instance_id": note.activity_instance_id,
         "activity_definition_id": note.activity_definition_id,
-        "set_index": note.set_index,
+        "set_index": set_index,
+        "activity_set_id": getattr(note, "activity_set_id", None),
         "content": note.content,
         "note_kind": note_kind,
         "note_type": resolved_note_type,
@@ -920,7 +1099,7 @@ def serialize_note(note):
     return result
 
 
-def derive_note_type(context_type, set_index=None, note_kind=None):
+def derive_note_type(context_type, set_index=None, note_kind=None, activity_set_id=None):
     """Derive a semantic note type from the stored note context."""
     if context_type == "goal" and note_kind == "goal_completion":
         return "goal_completion_note"
@@ -935,7 +1114,11 @@ def derive_note_type(context_type, set_index=None, note_kind=None):
     if context_type == "activity_definition":
         return "activity_definition_note"
     if context_type == "activity_instance":
-        return "activity_set_note" if set_index is not None else "activity_instance_note"
+        return "activity_set_note" if set_index is not None or activity_set_id else "activity_instance_note"
+    if context_type == "circuit_run":
+        return "circuit_run_note"
+    if context_type == "circuit_round":
+        return "circuit_round_note"
     return "note"
 
 
@@ -948,6 +1131,8 @@ def note_type_label(note_type):
         "activity_instance_note": "Activity Instance Note",
         "activity_set_note": "Activity Set Note",
         "activity_definition_note": "Activity Definition Note",
+        "circuit_run_note": "Activity Circuit Note",
+        "circuit_round_note": "Circuit Round Note",
         "goal_completion_note": "Goal Completion Note",
         "note": "Note",
     }
@@ -965,13 +1150,9 @@ def serialize_note_display(note):
         session_data = session_attrs.get("session_data") if isinstance(session_attrs, dict) else {}
         if not isinstance(session_data, dict):
             session_data = {}
-        template_name = session_data.get("template_name")
-        if not template_name and getattr(getattr(note.session, "template", None), "name", None):
-            template_name = note.session.template.name
+        template_name = get_session_template_name(note.session)
         result["session_template_name"] = template_name or note.session.name
-        template_color = session_data.get("template_color")
-        if not template_color and getattr(getattr(note.session, "template", None), "template_data", None):
-            template_color = get_template_color(note.session.template.template_data or {})
+        template_color = get_session_template_color(note.session)
         if template_color:
             result["session_template_color"] = template_color
 

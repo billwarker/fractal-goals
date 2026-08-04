@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from models import (
-    ActivityDefinition, ActivityInstance, Goal, Session, SessionTemplate, Target,
+    ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, Session, SessionTemplate, Target,
     activity_goal_associations, session_goals,
 )
 
@@ -129,6 +129,8 @@ class TestSessionListEndpoints:
         target_goal = sample_goal_hierarchy['short_term']
         other_goal = sample_goal_hierarchy['long_term']
         other_session = Session(
+            owner_id=sample_practice_session.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Other Completion Session',
             root_id=root_id,
@@ -174,18 +176,10 @@ class TestSessionListEndpoints:
         assert target_goal.id in completed_goal_ids
         assert other_goal.id not in completed_goal_ids
 
-    def test_list_sessions_backfills_legacy_sets_into_row_payload(
+    def test_list_sessions_returns_normalized_sets_in_row_payload(
         self, authed_client, db_session, sample_practice_session, sample_activity_definition
     ):
-        """Legacy section exercise set data should be preserved in session row payloads."""
-        legacy_sets = [
-            {
-                'metrics': [
-                    {'metric_id': 'metric-weight', 'value': 135},
-                    {'metric_id': 'metric-reps', 'value': 5},
-                ]
-            }
-        ]
+        """Relational set results should be serialized in session row payloads."""
         instance = ActivityInstance(
             id=str(uuid4()),
             session_id=sample_practice_session.id,
@@ -194,25 +188,27 @@ class TestSessionListEndpoints:
             created_at=datetime.now(timezone.utc),
             data=json.dumps({}),
         )
-        sample_practice_session.attributes = json.dumps({
-            'session_data': {
-                'sections': [
-                    {
-                        'name': 'Main',
-                        'exercises': [
-                            {
-                                'type': 'activity',
-                                'name': sample_activity_definition.name,
-                                'activity_id': sample_activity_definition.id,
-                                'instance_id': instance.id,
-                                'sets': legacy_sets,
-                            }
-                        ],
-                    }
-                ]
-            }
-        })
-        db_session.add(instance)
+        activity_set = ActivitySet(
+            id=str(uuid4()),
+            activity_instance_id=instance.id,
+            sort_order=0,
+            status='completed',
+        )
+        metric_values = [
+            MetricValue(
+                activity_instance_id=instance.id,
+                activity_set_id=activity_set.id,
+                metric_definition_id=sample_activity_definition.metric_definitions[0].id,
+                value=135,
+            ),
+            MetricValue(
+                activity_instance_id=instance.id,
+                activity_set_id=activity_set.id,
+                metric_definition_id=sample_activity_definition.metric_definitions[1].id,
+                value=5,
+            ),
+        ]
+        db_session.add_all([instance, activity_set, *metric_values])
         db_session.commit()
 
         response = authed_client.get(f'/api/{sample_practice_session.root_id}/sessions')
@@ -225,8 +221,9 @@ class TestSessionListEndpoints:
         )
 
         assert matching_session['activity_instances'][0]['has_sets'] is True
-        assert matching_session['activity_instances'][0]['sets'] == legacy_sets
-        assert matching_session['attributes']['session_data']['sections'][0]['exercises'][0]['sets'] == legacy_sets
+        serialized_set = matching_session['activity_instances'][0]['sets'][0]
+        assert serialized_set['id'] == activity_set.id
+        assert [metric['value'] for metric in serialized_set['metrics']] == [135.0, 5.0]
     
     def test_get_specific_session(self, authed_client, sample_practice_session):
         """Test retrieving a specific session."""
@@ -252,6 +249,7 @@ class TestSessionListEndpoints:
         sample_practice_session.updated_at = datetime(2026, 1, 11, 9, 0, tzinfo=timezone.utc)
 
         completed_session = Session(
+            owner_id=sample_practice_session.owner_id,
             id=str(uuid4()),
             name='Completed Session',
             description='Completed',
@@ -287,6 +285,8 @@ class TestSessionListEndpoints:
             created_at=datetime.now(timezone.utc),
         )
         other_session = Session(
+            owner_id=sample_practice_session.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Other Session',
             description='Different activity',
@@ -337,6 +337,8 @@ class TestSessionListEndpoints:
             created_at=datetime.now(timezone.utc),
         )
         other_session = Session(
+            owner_id=sample_practice_session.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Unrelated Session',
             description='No matching goal',
@@ -388,6 +390,8 @@ class TestSessionListEndpoints:
         sample_practice_session.total_duration_seconds = 45 * 60
 
         short_session = Session(
+            owner_id=sample_practice_session.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Short Session',
             description='Short',
@@ -441,6 +445,8 @@ class TestSessionListEndpoints:
         sample_practice_session.created_at = datetime(2026, 1, 10, 15, 0, tzinfo=timezone.utc)
 
         same_day_session = Session(
+            owner_id=sample_practice_session.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Same Day Session',
             description='Same day',
@@ -450,6 +456,8 @@ class TestSessionListEndpoints:
             attributes=json.dumps({}),
         )
         previous_day_session = Session(
+            owner_id=sample_practice_session.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Previous Day Session',
             description='Previous day',
@@ -489,6 +497,8 @@ class TestSessionListEndpoints:
         sample_practice_session.total_duration_seconds = 30 * 60
 
         same_day_session = Session(
+            owner_id=sample_practice_session.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Same Day Session',
             description='Same day',
@@ -796,6 +806,7 @@ class TestSessionCRUDEndpoints:
             activity_definition_id=sample_activity_definition.id,
             root_id=root_id,
         ))
+        sample_practice_session.completed = True
         db_session.commit()
 
         response = authed_client.post(f'/api/{root_id}/sessions/{sample_practice_session.id}/duplicate', json={})
@@ -828,6 +839,7 @@ class TestSessionCRUDEndpoints:
             activity_definition_id=sample_activity_definition.id,
             root_id=root_id,
         ))
+        sample_practice_session.completed = True
         db_session.commit()
 
         response = authed_client.post(f'/api/{root_id}/sessions/{sample_practice_session.id}/duplicate', json={})

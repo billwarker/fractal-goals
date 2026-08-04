@@ -142,6 +142,7 @@ export function useSessionDuration(session) {
 export function useLiveSessionDuration(session) {
     const [seconds, setSeconds] = useState(0);
 
+    /* eslint-disable react-hooks/set-state-in-effect -- The clock snapshot must reset immediately when its source session changes. */
     useEffect(() => {
         if (!session) return;
 
@@ -185,6 +186,7 @@ export function useLiveSessionDuration(session) {
         session?.attributes?.is_paused,
         session?.attributes?.total_paused_seconds
     ]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     return {
         seconds,
@@ -196,6 +198,7 @@ export function useLiveSessionDuration(session) {
 export function useLivePausedDuration(session) {
     const [seconds, setSeconds] = useState(() => calculatePausedSeconds(session));
 
+    /* eslint-disable react-hooks/set-state-in-effect -- The paused clock snapshot is synchronized to a newly supplied session. */
     useEffect(() => {
         if (!session) {
             setSeconds(0);
@@ -219,6 +222,7 @@ export function useLivePausedDuration(session) {
         session?.attributes?.last_paused_at,
         session?.attributes?.total_paused_seconds
     ]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     return {
         seconds,

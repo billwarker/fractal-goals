@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { authApi, clearAccessToken, setAccessToken } from '../utils/api';
@@ -15,24 +15,18 @@ export function AuthProvider({ children }) {
     const navigate = useNavigate();
     const location = useLocation();
     const authVersionRef = useRef(0);
+    const userIdRef = useRef(null);
     const isPublicLanding = isPublicLandingLocation(location.pathname);
 
-    const replaceUser = (nextUser) => {
-        const previousUserId = user?.id || null;
+    const replaceUser = useCallback((nextUser) => {
+        const previousUserId = userIdRef.current;
         const nextUserId = nextUser?.id || null;
         if (previousUserId !== nextUserId) {
             queryClient.clear();
         }
+        userIdRef.current = nextUserId;
         setUser(nextUser || null);
-    };
-
-    useEffect(() => {
-        if (isPublicLanding) {
-            setLoading(false);
-            return;
-        }
-        fetchCurrentUser();
-    }, [isPublicLanding]);
+    }, [queryClient]);
 
     // Handle events from axios interceptors
     useEffect(() => {
@@ -63,9 +57,9 @@ export function AuthProvider({ children }) {
             window.removeEventListener('auth:session_expired', handleSessionExpired);
             window.removeEventListener('auth:token_refreshed', handleTokenRefresh);
         };
-    }, [isPublicLanding, navigate, queryClient, user?.id]);
+    }, [isPublicLanding, navigate, replaceUser]);
 
-    const fetchCurrentUser = async () => {
+    const fetchCurrentUser = useCallback(async () => {
         const authVersion = authVersionRef.current;
         const isStaleAuthCheck = () => authVersionRef.current !== authVersion;
 
@@ -104,7 +98,15 @@ export function AuthProvider({ children }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [replaceUser]);
+
+    useEffect(() => {
+        if (isPublicLanding) {
+            setLoading(false);
+            return;
+        }
+        fetchCurrentUser();
+    }, [fetchCurrentUser, isPublicLanding]);
 
     const login = async (usernameOrEmail, password, options = {}) => {
         try {

@@ -123,9 +123,11 @@ function SessionCalendarHeatmap({
         scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
     }, [columns.length]);
 
+    /* eslint-disable react-hooks/set-state-in-effect -- A new heatmap dataset invalidates the pointer-anchored tooltip. */
     useEffect(() => {
         setTooltip(null);
     }, [heatmap?.metric, heatmap?.range_end, heatmap?.range_start]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     const updateTooltipPosition = (event, text) => {
         const tooltipWidth = 240;

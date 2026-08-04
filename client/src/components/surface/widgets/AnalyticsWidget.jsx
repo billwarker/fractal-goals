@@ -111,7 +111,7 @@ export default function AnalyticsWidget({ state, sharedData, viewMode = 'overvie
         viewMode === 'scoped' && sharedData?.visibleGoalIds
             ? new Set(sharedData.visibleGoalIds)
             : null
-    ), [sharedData?.visibleGoalIds, viewMode]);
+    ), [sharedData, viewMode]);
 
     const goalAnalytics = useMemo(() => {
         const raw = analyticsData.goalAnalytics || {};

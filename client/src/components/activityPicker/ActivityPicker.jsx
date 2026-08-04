@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-import CloseButton from '../atoms/CloseButton';
+import ActivityPickerHeader from './ActivityPickerHeader';
 import {
     ROOT_KEY,
     buildActivityPickerModel,
@@ -19,6 +19,9 @@ function ActivityPicker({
     activityGroups = [],
     title = 'Select Activity',
     searchPlaceholder = 'Search activities...',
+    itemLabelSingular = 'activity',
+    itemLabelPlural = 'activities',
+    ungroupedLabel = 'Ungrouped',
     selectionMode = 'multiple',
     selectedActivityIds = [],
     selectedGroupIds = [],
@@ -48,8 +51,11 @@ function ActivityPicker({
     onClose,
     onCreateActivity,
     onCopyActivity,
+    canCopyActivity,
     onCreateGroup,
     extraActions = null,
+    headerLeading = null,
+    renderActivityDetails = null,
     registerFooterActions,
 }) {
     const [pendingActivityIds, setPendingActivityIds] = useState(() => toSet(selectedActivityIds));
@@ -188,7 +194,9 @@ function ActivityPicker({
     const totalSelected = pendingActivityIds.size + pendingGroupIds.size;
     const selectedSummary = totalSelected > 0
         ? [
-            pendingActivityIds.size ? `${pendingActivityIds.size} activit${pendingActivityIds.size === 1 ? 'y' : 'ies'}` : null,
+            pendingActivityIds.size
+                ? `${pendingActivityIds.size} ${pendingActivityIds.size === 1 ? itemLabelSingular : itemLabelPlural}`
+                : null,
             pendingGroupIds.size ? `${pendingGroupIds.size} group${pendingGroupIds.size === 1 ? '' : 's'}` : null,
         ].filter(Boolean).join(', ')
         : 'None selected';
@@ -229,7 +237,7 @@ function ActivityPicker({
 
     const displayTitle = currentGroup ? currentGroup.name : title;
     const subtitle = currentGroup
-        ? model.getBreadcrumb(currentGroup.id).map((group) => group.name).join(' / ')
+        ? model.getBreadcrumb(currentGroup.id).slice(0, -1).map((group) => group.name).join(' / ')
         : null;
 
     const renderCountBadge = (count) => {
@@ -238,6 +246,7 @@ function ActivityPicker({
     };
 
     const renderActivity = (activity) => {
+        if (isCopyMode && canCopyActivity?.(activity) === false) return null;
         const isSelected = pendingActivityIds.has(activity.id);
         const groupBreadcrumb = activity.group_id
             ? model.getBreadcrumb(activity.group_id).map((item) => item.name).join(' / ')
@@ -256,7 +265,7 @@ function ActivityPicker({
                 <span className={`${styles.selectionControl} ${isSingleSelect ? styles.radioControl : ''}`}>
                     {isSelected ? '✓' : ''}
                 </span>
-                <span>
+                <div className={styles.activityContent}>
                     <span className={styles.activityName}>{isCopyMode ? `Copy ${activity.name}` : activity.name}</span>
                     {(isSearching && groupBreadcrumb) || activity.type ? (
                         <span className={styles.activityMeta}>
@@ -264,7 +273,8 @@ function ActivityPicker({
                             {activity.type || ''}
                         </span>
                     ) : null}
-                </span>
+                    {renderActivityDetails?.(activity)}
+                </div>
                 {renderCountBadge(counts.activitiesById?.[activity.id] ?? counts.activityCounts?.[activity.id]) || <span />}
             </button>
         );
@@ -292,7 +302,7 @@ function ActivityPicker({
                 >
                     <span className={styles.groupName}>{group.name} {hasChildren ? '›' : ''}</span>
                     <span className={styles.groupMeta}>
-                        {count} activit{count === 1 ? 'y' : 'ies'}
+                        {count} {count === 1 ? itemLabelSingular : itemLabelPlural}
                         {selectedCount > 0 && <span>{selectedCount} selected</span>}
                     </span>
                 </button>
@@ -318,27 +328,18 @@ function ActivityPicker({
         <div className={`${styles.picker} ${variant === 'panel' ? styles.panel : ''}`}>
             <div className={styles.body}>
                 {showHeader && (
-                    <div className={styles.header}>
-                        <div className={styles.titleBlock}>
-                            <h3 className={styles.title}>{displayTitle}</h3>
-                            {subtitle && <div className={styles.subtitle}>{subtitle}</div>}
-                            {isCopyMode && (
-                                <div className={styles.subtitle}>
-                                    Copy mode: select an existing activity definition to duplicate into a new one.
-                                </div>
-                            )}
-                        </div>
-                        <div className={styles.headerActions}>
-                            {(browseGroupId || (showRootBackButton && variant === 'panel' && (onCancel || onClose))) && (
-                                <button type="button" className={styles.backButton} onClick={handleBack}>
-                                    ← Back
-                                </button>
-                            )}
-                            {showCloseButton && onClose && (
-                                <CloseButton className={styles.closeButton} onClick={onClose} aria-label="Close activity picker" size={14} />
-                            )}
-                        </div>
-                    </div>
+                    <ActivityPickerHeader
+                        headerLeading={headerLeading}
+                        displayTitle={displayTitle}
+                        subtitle={subtitle}
+                        isCopyMode={isCopyMode}
+                        showBackButton={Boolean(
+                            browseGroupId || (showRootBackButton && variant === 'panel' && (onCancel || onClose))
+                        )}
+                        onBack={handleBack}
+                        showCloseButton={showCloseButton}
+                        onClose={onClose}
+                    />
                 )}
 
                 {showSearch && (
@@ -354,7 +355,7 @@ function ActivityPicker({
                     <div className={styles.activityList}>
                         {searchResults.length > 0
                             ? searchResults.map(renderActivity)
-                            : <div className={styles.emptyState}>No activities match "{searchText}"</div>}
+                            : <div className={styles.emptyState}>No {itemLabelPlural} match "{searchText}"</div>}
                     </div>
                 ) : (
                     <>
@@ -366,21 +367,23 @@ function ActivityPicker({
 
                         {currentActivities.length > 0 && (
                             <div className={styles.activityList}>
-                                {currentGroups.length > 0 && <div className={styles.sectionHeading}>Activities in this group</div>}
+                                {currentGroups.length > 0 && (
+                                    <div className={styles.sectionHeading}>{itemLabelPlural} in this group</div>
+                                )}
                                 {currentActivities.map(renderActivity)}
                             </div>
                         )}
 
                         {!browseGroupId && rootUngroupedActivities.length > 0 && (
                             <>
-                                <div className={styles.sectionHeading}>Ungrouped</div>
+                                <div className={styles.sectionHeading}>{ungroupedLabel}</div>
                                 <div className={styles.activityList}>
                                     {rootUngroupedActivities.map(renderActivity)}
                                 </div>
                             </>
                         )}
 
-                        {showEmpty && <div className={styles.emptyState}>No activities found.</div>}
+                        {showEmpty && <div className={styles.emptyState}>No {itemLabelPlural} found.</div>}
                     </>
                 )}
 

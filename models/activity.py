@@ -14,10 +14,10 @@ class ProgressRecord(Base):
     activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False, unique=True)
     session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=False)
     previous_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True)
-    is_first_instance = Column(Boolean, default=False, nullable=False)
-    has_change = Column(Boolean, default=False, nullable=False)
-    has_improvement = Column(Boolean, default=False, nullable=False)
-    has_regression = Column(Boolean, default=False, nullable=False)
+    is_first_instance = Column(Boolean, default=False, nullable=False, server_default=sa.text('false'))
+    has_change = Column(Boolean, default=False, nullable=False, server_default=sa.text('false'))
+    has_improvement = Column(Boolean, default=False, nullable=False, server_default=sa.text('false'))
+    has_regression = Column(Boolean, default=False, nullable=False, server_default=sa.text('false'))
     comparison_type = Column(String, nullable=True)  # 'flat_metrics' | 'set_metrics' | 'yield' | 'first_instance'
     metric_comparisons = Column(JSON_TYPE, nullable=True)  # list of per-metric dicts
     derived_summary = Column(JSON_TYPE, nullable=True)  # UI-facing aggregates
@@ -36,18 +36,18 @@ class FractalMetricDefinition(Base):
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
     name = Column(String, nullable=False)
     unit = Column(String, nullable=False)
-    is_multiplicative = Column(Boolean, default=True, nullable=False)
-    is_additive = Column(Boolean, default=True, nullable=False)
-    input_type = Column(String, default='number', nullable=False)  # 'number' | 'integer' | 'duration'
+    is_multiplicative = Column(Boolean, default=True, nullable=False, server_default=sa.text('true'))
+    is_additive = Column(Boolean, default=True, nullable=False, server_default=sa.text('true'))
+    input_type = Column(String, default='number', nullable=False, server_default='number')  # 'number' | 'integer' | 'duration'
     default_value = Column(Float, nullable=True)
     higher_is_better = Column(Boolean, nullable=True)
     predefined_values = Column(JSON_TYPE, nullable=True)
     min_value = Column(Float, nullable=True)
     max_value = Column(Float, nullable=True)
     description = Column(String, nullable=True)
-    sort_order = Column(Integer, default=0)
+    sort_order = Column(Integer, default=0, nullable=False, server_default='0')
     default_progress_aggregation = Column(String, nullable=True)
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True, nullable=False, server_default=sa.text('true'))
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
@@ -133,7 +133,7 @@ class MetricDefinition(Base):
     is_best_set_metric = Column(Boolean, default=False)
     is_multiplicative = Column(Boolean, default=True)
     sort_order = Column(Integer, default=0)
-    track_progress = Column(Boolean, default=True, nullable=False)
+    track_progress = Column(Boolean, default=True, nullable=False, server_default=sa.text('true'))
     progress_aggregation = Column(String, nullable=True)  # 'last' | 'sum' | 'max' | 'yield'
 
     fractal_metric = relationship("FractalMetricDefinition", lazy="joined")
@@ -171,6 +171,13 @@ class ActivityInstance(Base):
     sort_order = Column(Integer, default=0)
 
     metric_values = relationship("MetricValue", backref="activity_instance", cascade="all, delete-orphan")
+    sets = relationship(
+        "ActivitySet",
+        back_populates="activity_instance",
+        cascade="all, delete-orphan",
+        order_by="ActivitySet.sort_order",
+    )
+    work_intervals = relationship("SessionWorkInterval", back_populates="activity_instance")
     definition = relationship("ActivityDefinition")
     progress_record = relationship(
         "ProgressRecord",
@@ -199,11 +206,54 @@ class ActivityInstance(Base):
         ),
     )
 
+
+class ActivitySet(Base):
+    __tablename__ = 'activity_sets'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    activity_instance_id = Column(
+        String,
+        ForeignKey('activity_instances.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    sort_order = Column(Integer, nullable=False)
+    status = Column(String(16), nullable=False, default='planned', server_default='planned')
+    duration_seconds = Column(Integer, nullable=False, default=0, server_default=sa.text('0'))
+    notes = Column(String, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
+
+    activity_instance = relationship("ActivityInstance", back_populates="sets")
+    metric_values = relationship(
+        "MetricValue",
+        back_populates="activity_set",
+        cascade="all, delete-orphan",
+    )
+    work_intervals = relationship("SessionWorkInterval", back_populates="activity_set")
+    circuit_member = relationship(
+        "CircuitRoundMember",
+        back_populates="activity_set",
+        uselist=False,
+        foreign_keys="CircuitRoundMember.activity_set_id",
+    )
+
+    __table_args__ = (
+        sa.CheckConstraint('sort_order >= 0', name='ck_activity_sets_sort_order_nonnegative'),
+        sa.CheckConstraint(
+            "status IN ('planned', 'active', 'completed', 'skipped', 'unfinished')",
+            name='ck_activity_sets_status',
+        ),
+        sa.CheckConstraint('duration_seconds >= 0', name='ck_activity_sets_duration_nonnegative'),
+        sa.UniqueConstraint('activity_instance_id', 'sort_order', name='uq_activity_sets_instance_order'),
+    )
+
 class MetricValue(Base):
     __tablename__ = 'metric_values'
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False, index=True)
+    activity_set_id = Column(String, ForeignKey('activity_sets.id', ondelete='CASCADE'), nullable=True, index=True)
     metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False)
     split_definition_id = Column(String, ForeignKey('split_definitions.id', ondelete='RESTRICT'), nullable=True)
     value = Column(Float, nullable=False)
@@ -212,3 +262,15 @@ class MetricValue(Base):
 
     definition = relationship("MetricDefinition")
     split = relationship("SplitDefinition")
+    activity_set = relationship("ActivitySet", back_populates="metric_values")
+
+    __table_args__ = (
+        sa.Index(
+            'uq_metric_values_result_metric_split',
+            'activity_instance_id',
+            sa.func.coalesce(activity_set_id, ''),
+            'metric_definition_id',
+            sa.func.coalesce(split_definition_id, ''),
+            unique=True,
+        ),
+    )

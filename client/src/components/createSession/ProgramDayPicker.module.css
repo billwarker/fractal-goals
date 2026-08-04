@@ -126,13 +126,7 @@
 }
 
 .sessionRowTitle {
-    font-weight: 500;
-    font-size: 14px;
-    color: var(--color-text-primary);
-}
-
-.sessionRowTitleSelected {
-    color: var(--color-brand-success);
+    max-width: 100%;
 }
 
 .sessionRowDescription {

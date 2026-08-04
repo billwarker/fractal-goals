@@ -52,6 +52,15 @@ export function useSessionDetailData({ rootId, sessionId, isDeletingSession }) {
 
     const { activities = [], isLoading: activitiesLoading } = useActivities(rootId);
     const { activityGroups = [] } = useActivityGroups(rootId);
+    const {
+        data: circuitRuns = [],
+        isLoading: circuitRunsLoading,
+        refetch: refreshCircuitRuns,
+    } = useQuery({
+        queryKey: queryKeys.sessionCircuitRuns(rootId, sessionId),
+        queryFn: async () => (await fractalApi.getSessionCircuitRuns(rootId, sessionId)).data || [],
+        enabled: Boolean(rootId && sessionId && !isDeletingSession),
+    });
 
     const {
         data: sessionGoalsView = null,
@@ -112,6 +121,9 @@ export function useSessionDetailData({ rootId, sessionId, isDeletingSession }) {
         activities,
         activitiesLoading,
         activityGroups,
+        circuitRuns,
+        circuitRunsLoading,
+        refreshCircuitRuns,
         sessionGoalsView,
         sessionGoalsViewLoading,
         normalizedSessionData,
@@ -120,7 +132,7 @@ export function useSessionDetailData({ rootId, sessionId, isDeletingSession }) {
         targetAchievements,
         achievedTargetIds,
         goalAchievements,
-        loading: sessionLoading || (session && !normalizedSessionData),
+        loading: sessionLoading || circuitRunsLoading || (session && !normalizedSessionData),
     };
 }
 

@@ -18,6 +18,7 @@ from models import (
     ActivityDefinition,
     ActivityGroup,
     ActivityInstance,
+    CircuitDefinition,
     AnalyticsDashboard,
     AppSetting,
     EventLog,
@@ -43,6 +44,7 @@ FREE_LIMITS = {
     "sessions": 200,
     "activity_instances": 500,
     "activities": 50,
+    "circuits": 10,
     "metrics": 20,
     "session_templates": 10,
     "notes": 1000,
@@ -55,6 +57,7 @@ PAID_LIMITS = {
     "sessions": 5000,
     "activity_instances": 20000,
     "activities": 500,
+    "circuits": 250,
     "metrics": 250,
     "session_templates": 250,
     "notes": 10000,
@@ -67,6 +70,7 @@ RESOURCE_LABELS = {
     "sessions": "sessions",
     "activity_instances": "activity instances",
     "activities": "activities",
+    "circuits": "circuits",
     "metrics": "metrics",
     "session_templates": "session templates",
     "notes": "notes",
@@ -79,6 +83,7 @@ RESOURCE_ORDER = [
     "sessions",
     "activity_instances",
     "activities",
+    "circuits",
     "metrics",
     "session_templates",
     "notes",
@@ -149,7 +154,13 @@ class QuotaService:
             if tier_limits is None:
                 continue
             try:
-                defaults[tier] = self.validate_finite_limits(tier_limits)
+                # New resource types inherit their built-in limit in settings
+                # written before that resource existed; existing custom values
+                # remain intact instead of resetting the whole tier.
+                merged_limits = deepcopy(defaults[tier])
+                if isinstance(tier_limits, dict):
+                    merged_limits.update(tier_limits)
+                defaults[tier] = self.validate_finite_limits(merged_limits)
             except ValueError:
                 continue
         return defaults
@@ -236,6 +247,18 @@ class QuotaService:
 
         for row in self.db_session.query(ActivityDefinition).filter(ActivityDefinition.root_id.in_(roots), ActivityDefinition.deleted_at.is_(None)).all():
             total += self._payload_size(row.name, row.description)
+
+        for row in self.db_session.query(CircuitDefinition).filter(CircuitDefinition.root_id.in_(roots), CircuitDefinition.deleted_at.is_(None)).all():
+            total += self._payload_size(
+                row.name,
+                row.description,
+                [
+                    {
+                        "activity_definition_id": slot.activity_definition_id,
+                    }
+                    for slot in row.slots
+                ],
+            )
 
         for row in self.db_session.query(ActivityInstance).filter(ActivityInstance.root_id.in_(roots), ActivityInstance.deleted_at.is_(None)).all():
             total += self._payload_size(row.notes, row.data)
@@ -340,6 +363,12 @@ class QuotaService:
                 self.db_session.query(func.count(ActivityDefinition.id)).filter(
                     ActivityDefinition.root_id.in_(roots),
                     ActivityDefinition.deleted_at.is_(None),
+                )
+            ),
+            "circuits": scalar_count(
+                self.db_session.query(func.count(CircuitDefinition.id)).filter(
+                    CircuitDefinition.root_id.in_(roots),
+                    CircuitDefinition.deleted_at.is_(None),
                 )
             ),
             "metrics": metrics_count,

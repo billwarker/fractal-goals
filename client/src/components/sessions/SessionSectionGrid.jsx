@@ -1,18 +1,19 @@
 /**
- * SessionSectionGrid - Grid of session sections with activities
+ * SessionSectionGrid - Grid of session sections with recorded work
  *
- * Renders sections horizontally with their activities.
+ * Renders sections horizontally with ordered activity and circuit items.
  * Optimized with React.memo for list rendering performance.
  */
 
 import React, { memo, useMemo } from 'react';
 import { formatShortDuration } from '../../hooks/useSessionDuration';
 import ActivityCard from './ActivityCard';
+import CircuitWorkSummaryCard from './CircuitWorkSummaryCard';
 import useIsMobile from '../../hooks/useIsMobile';
 import styles from './SessionSectionGrid.module.css';
 
 /**
- * Single section column with activities
+ * Single section column with recorded work
  */
 const SectionColumn = memo(function SectionColumn({
     section,
@@ -22,7 +23,21 @@ const SectionColumn = memo(function SectionColumn({
     sessionStats = null,
     deltaDisplayMode = 'percent',
 }) {
-    const sectionActivities = useMemo(() => {
+    const sectionItems = useMemo(() => {
+        if (Array.isArray(section.items)) {
+            return section.items
+                .map((item) => {
+                    if (item?.type === 'circuit' && item.circuit) {
+                        return { type: 'circuit', circuit: item.circuit };
+                    }
+                    if (item?.type === 'activity' && item.activity) {
+                        return { type: 'activity', activity: item.activity };
+                    }
+                    return null;
+                })
+                .filter(Boolean);
+        }
+
         const instanceIds = section.activity_ids || [];
         if (!instanceIds.length || !activityInstances.length) return [];
 
@@ -32,23 +47,29 @@ const SectionColumn = memo(function SectionColumn({
                 if (!instance) return null;
 
                 return {
-                    ...instance,
                     type: 'activity',
-                    activity_id: instance.activity_definition_id,
-                    instance_id: instance.id,
-                    name: instance.name || ''
+                    activity: {
+                        ...instance,
+                        type: 'activity',
+                        activity_id: instance.activity_definition_id,
+                        instance_id: instance.id,
+                        name: instance.name || ''
+                    },
                 };
             })
             .filter(Boolean);
-    }, [section.activity_ids, activityInstances]);
+    }, [section.activity_ids, section.items, activityInstances]);
 
     const sectionDuration = useMemo(() => {
-        const seconds = sectionActivities.reduce((sum, activity) => sum + (activity.duration_seconds || 0), 0);
+        const seconds = sectionItems.reduce((sum, item) => {
+            const workItem = item.type === 'circuit' ? item.circuit : item.activity;
+            return sum + (workItem?.duration_seconds || 0);
+        }, 0);
         if (seconds > 0) {
             return formatShortDuration(seconds);
         }
         return `${section.duration_minutes || 0} min (planned)`;
-    }, [section.duration_minutes, sectionActivities]);
+    }, [section.duration_minutes, sectionItems]);
 
     return (
         <div className={styles.sectionColumn}>
@@ -61,17 +82,28 @@ const SectionColumn = memo(function SectionColumn({
                 {sectionDuration}
             </div>
 
-            {/* Activities - Vertical List */}
-            {sectionActivities.length > 0 && (
+            {/* Work items - Vertical List */}
+            {sectionItems.length > 0 && (
                 <div className={styles.activitiesList}>
-                    {sectionActivities.map((activity, activityIndex) => {
-                        const actDef = activity.type === 'activity'
-                            ? activities.find(a => a.id === activity.activity_id)
-                            : null;
+                    {sectionItems.map((item, itemIndex) => {
+                        if (item.type === 'circuit') {
+                            return (
+                                <CircuitWorkSummaryCard
+                                    key={`circuit-${item.circuit.id || itemIndex}`}
+                                    circuit={item.circuit}
+                                    activities={activities}
+                                    activityInstances={activityInstances}
+                                />
+                            );
+                        }
+
+                        const activity = item.activity;
+                        const activityDefinitionId = activity.activity_id || activity.activity_definition_id;
+                        const actDef = activities.find(a => a.id === activityDefinitionId);
 
                         return (
                             <ActivityCard
-                                key={activityIndex}
+                                key={`activity-${activity.instance_id || itemIndex}`}
                                 activity={activity}
                                 activityDefinition={actDef}
                                 activityGroups={activityGroups}

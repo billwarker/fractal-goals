@@ -13,8 +13,14 @@ import {
  * stays visually aligned with the Programs page instead of drifting.
  */
 export default function CalendarWidget({ sharedData }) {
-    const programs = Array.isArray(sharedData?.programs) ? sharedData.programs : [];
-    const goals = Array.isArray(sharedData?.goals) ? sharedData.goals : [];
+    const programs = useMemo(
+        () => Array.isArray(sharedData?.programs) ? sharedData.programs : [],
+        [sharedData?.programs],
+    );
+    const goals = useMemo(
+        () => Array.isArray(sharedData?.goals) ? sharedData.goals : [],
+        [sharedData?.goals],
+    );
     const timezone = sharedData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
     const { getGoalColor, getGoalTextColor } = useGoalLevels();
 

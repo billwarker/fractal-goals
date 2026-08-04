@@ -145,6 +145,8 @@ describe('Notes page', () => {
 
         expect(screen.getByRole('button', { name: 'Activity Set Notes' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Program Notes' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Activity Circuit Notes' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Circuit Round Notes' })).toBeInTheDocument();
 
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Program Notes' }));

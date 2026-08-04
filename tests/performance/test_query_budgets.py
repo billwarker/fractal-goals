@@ -173,14 +173,15 @@ def large_account_dataset(db_session, test_user):
     for index in range(120):
         session = PracticeSession(
             id=str(uuid.uuid4()),
+            owner_id=test_user.id,
             root_id=root.id,
             name=f"Large Session {index}",
             description="fixture session",
             session_start=datetime.now(timezone.utc) - timedelta(days=index),
             session_end=datetime.now(timezone.utc) - timedelta(days=index, hours=-1),
             total_duration_seconds=1800 + index,
-            completed=index % 3 != 0,
-            completed_at=datetime.now(timezone.utc) - timedelta(days=index) if index % 3 != 0 else None,
+            completed=index != 0,
+            completed_at=datetime.now(timezone.utc) - timedelta(days=index) if index != 0 else None,
             created_at=datetime.now(timezone.utc) - timedelta(days=index),
             attributes=json.dumps({
                 "session_data": {
@@ -294,6 +295,7 @@ def landing_publish_budget_dataset(db_session):
 
     session = PracticeSession(
         id=str(uuid.uuid4()),
+        owner_id=admin.id,
         root_id=root.id,
         name="Landing Budget Session",
         session_start=datetime.now(timezone.utc) - timedelta(days=1),

@@ -1,7 +1,6 @@
 import React from 'react';
 import { findGoalById, getTypeDisplayName } from '../../utils/goalHelpers';
 import { isSMART } from '../../utils/smartHelpers';
-import { useTheme } from '../../contexts/ThemeContext'
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import GoalIcon from '../atoms/GoalIcon';
 

@@ -17,9 +17,6 @@ import {
     getGoalNodeType,
 } from './goalNodeModel';
 
-// Canonical type key derived from a GoalLevel name (e.g. "Mid Term Goal" → "MidTermGoal")
-const levelNameToType = (name) => name.replace(/\s+/g, '');
-
 const MACRO_TYPES_BY_RANK = [
     'UltimateGoal',   // rank 0
     'LongTermGoal',   // rank 1

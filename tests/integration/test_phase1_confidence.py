@@ -63,8 +63,8 @@ class TestPhase1AuthConfidence:
             "/api/auth/refresh",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert response.status_code == 401
-        assert "disabled" in response.get_json().get("error", "").lower()
+        assert response.status_code == 403
+        assert "suspended" in response.get_json().get("error", "").lower()
 
 
 @pytest.mark.integration
@@ -217,6 +217,7 @@ class TestPhase1GoalConfidence:
         root_id = sample_ultimate_goal.id
 
         session = Session(
+            owner_id=sample_ultimate_goal.owner_id,
             id=str(uuid.uuid4()),
             name="Analytics Session",
             root_id=root_id,
@@ -356,6 +357,7 @@ class TestPhase1GoalConfidence:
         db_session.add(goal)
 
         session = Session(
+            owner_id=test_user.id,
             id=str(uuid.uuid4()),
             name="Eval Session",
             root_id=root_id,

@@ -51,6 +51,7 @@ from blueprints.goal_levels_api import goal_levels_bp
 from blueprints.public_api import public_bp
 from blueprints.health_api import health_bp
 from blueprints.telemetry_api import telemetry_bp
+from blueprints.circuits_api import circuits_bp
 from services.completion_handlers import clear_achievement_context, clear_live_progress
 
 
@@ -94,6 +95,7 @@ def app():
     test_app.register_blueprint(public_bp)
     test_app.register_blueprint(health_bp)
     test_app.register_blueprint(telemetry_bp)
+    test_app.register_blueprint(circuits_bp)
 
     from blueprints.error_handlers import register_error_handlers
     register_error_handlers(test_app)
@@ -390,6 +392,7 @@ def sample_practice_session(db_session, sample_goal_hierarchy):
     """Create a sample PracticeSession for testing."""
     session = PracticeSession(
         id=str(uuid.uuid4()),
+        owner_id=sample_goal_hierarchy['ultimate'].owner_id,
         name="Morning Workout",
         description="Strength training session",
         root_id=sample_goal_hierarchy['ultimate'].id,

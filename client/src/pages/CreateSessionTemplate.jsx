@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { fractalApi } from '../utils/api';
@@ -6,6 +6,7 @@ import { queryKeys } from '../hooks/queryKeys';
 import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
 import { useActivities, useActivityGroups } from '../hooks/useActivityQueries';
 import { useSessionTemplates } from '../hooks/useSessionTemplateQueries';
+import { useCircuits } from '../hooks/useCircuitQueries';
 import notify from '../utils/notify';
 import TemplateCard from '../components/TemplateCard';
 import TemplateBuilderModal from '../components/modals/TemplateBuilderModal';
@@ -16,6 +17,7 @@ import HeaderButton from '../components/layout/HeaderButton';
 import { getTemplateSortTimestamp } from '../utils/durationStats';
 import styles from './CreateSessionTemplate.module.css';
 import { logError } from '../utils/logger';
+import { buildTemplateActivityCatalogue } from '../components/modals/templateBuilderItems';
 
 function readStoredSort(rootId) {
     try {
@@ -68,6 +70,11 @@ function CreateSessionTemplate() {
     const { sessionTemplates: templates = [], isLoading: templatesLoading, error: templatesError } = useSessionTemplates(rootId);
     const { activities = [], isLoading: activitiesLoading, error: activitiesError } = useActivities(rootId);
     const { activityGroups = [], isLoading: activityGroupsLoading, error: activityGroupsError } = useActivityGroups(rootId);
+    const { data: circuits = [], isLoading: circuitsLoading, error: circuitsError } = useCircuits(rootId);
+    const templateActivities = useMemo(
+        () => buildTemplateActivityCatalogue(activities, circuits),
+        [activities, circuits],
+    );
 
     const saveTemplateMutation = useMutation({
         mutationFn: async ({ payload, templateId }) => {
@@ -112,8 +119,8 @@ function CreateSessionTemplate() {
         },
     });
 
-    const loading = templatesLoading || activitiesLoading || activityGroupsLoading;
-    const loadError = templatesError || activitiesError || activityGroupsError;
+    const loading = templatesLoading || activitiesLoading || activityGroupsLoading || circuitsLoading;
+    const loadError = templatesError || activitiesError || activityGroupsError || circuitsError;
     const sortedTemplates = [...templates].sort((a, b) => {
         if (sortMode === 'name') return a.name.localeCompare(b.name);
         if (sortMode === 'recentlyUpdated') {
@@ -298,7 +305,7 @@ function CreateSessionTemplate() {
                 onClose={handleBuilderClose}
                 onSave={handleBuilderSave}
                 editingTemplate={editingTemplate}
-                activities={activities}
+                activities={templateActivities}
                 activityGroups={activityGroups}
                 rootId={rootId}
             />

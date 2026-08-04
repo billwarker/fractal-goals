@@ -48,6 +48,7 @@ from blueprints.public_api import public_bp
 from blueprints.pages import pages_bp
 from blueprints.health_api import health_bp
 from blueprints.telemetry_api import telemetry_bp
+from blueprints.circuits_api import circuits_bp
 from blueprints.error_handlers import register_error_handlers
 from services.completion_handlers import clear_achievement_context, clear_live_progress
 from services import init_services
@@ -164,6 +165,7 @@ for write_limited_blueprint in (
     page_surface_bp,
     analytics_bp,
     logs_api,
+    circuits_bp,
 ):
     limiter.limit(
         "180 per minute",
@@ -196,14 +198,12 @@ app.register_blueprint(public_bp)
 app.register_blueprint(pages_bp)
 app.register_blueprint(health_bp)
 app.register_blueprint(telemetry_bp)
+app.register_blueprint(circuits_bp)
 register_error_handlers(app)
 
 # Initialize services (event bus, completion handlers, etc.)
 init_services()
 logger.info("Services initialized (event bus, completion handlers)")
-
-# Apply pending database migrations automatically for local development
-apply_startup_migrations()
 
 # Initialize database engine on startup (creates connection pool)
 from models import get_engine, remove_session
@@ -263,6 +263,10 @@ def add_cache_headers(response):
 
 if __name__ == '__main__':
     # Run the Flask development server
+    # Migration writes are restricted to the explicit development-server
+    # entry point. Importing the app for CLI inspection, tests, or WSGI
+    # discovery must remain side-effect free.
+    apply_startup_migrations()
     logger.info(f"Starting Fractal Goals Flask Server in {config.ENV} mode...")
     logger.info(f"API endpoints available at: http://{config.HOST}:{config.PORT}/api/")
     logger.info(f"Web interface available at: http://{config.HOST}:{config.PORT}/")

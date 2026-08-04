@@ -23,6 +23,8 @@ class TestSessionSummaryApi:
         sample_practice_session.session_start = latest_start
 
         older_session = Session(
+            owner_id=sample_practice_session.owner_id,
+            completed=True,
             id=str(uuid4()),
             name='Older Session',
             description='Previous work',
@@ -354,6 +356,7 @@ class TestSessionSummaryApi:
         sample_practice_session.program_day_id = day.id
 
         direct_goal_session = Session(
+            owner_id=sample_practice_session.owner_id,
             id=str(uuid4()),
             name='Goal Linked Session',
             description='Direct goal evidence',

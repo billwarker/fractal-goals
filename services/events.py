@@ -270,6 +270,20 @@ class Events:
     ACTIVITY_UPDATED = 'activity.updated'
     ACTIVITY_DELETED = 'activity.deleted'
 
+    # Circuit definition and execution events
+    CIRCUIT_CREATED = 'circuit.created'
+    CIRCUIT_UPDATED = 'circuit.updated'
+    CIRCUIT_DELETED = 'circuit.deleted'
+    CIRCUIT_RESTORED = 'circuit.restored'
+    CIRCUIT_RUN_CREATED = 'circuit_run.created'
+    CIRCUIT_RUN_DELETED = 'circuit_run.deleted'
+    CIRCUIT_RUN_STARTED = 'circuit_run.started'
+    CIRCUIT_RUN_COMPLETED = 'circuit_run.completed'
+    CIRCUIT_RUN_TIMING_UPDATED = 'circuit_run.timing_updated'
+    CIRCUIT_ROUND_ADDED = 'circuit_round.added'
+    CIRCUIT_ROUND_DELETED = 'circuit_round.deleted'
+    ACTIVITY_SET_UPDATED = 'activity_set.updated'
+
     # Activity Mode events
     ACTIVITY_MODE_CREATED = 'activity_mode.created'
     ACTIVITY_MODE_UPDATED = 'activity_mode.updated'

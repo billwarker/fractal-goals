@@ -12,8 +12,12 @@ from .goal import (
 )
 from .activity import (
     ActivityGroup, ActivityDefinition, MetricDefinition, FractalMetricDefinition,
-    SplitDefinition, ActivityInstance, MetricValue,
+    SplitDefinition, ActivityInstance, ActivitySet, MetricValue,
     ProgressRecord,
+)
+from .circuit import (
+    CircuitDefinition, CircuitSlot, CircuitRun, CircuitRunSlot,
+    CircuitRound, CircuitRoundMember, SessionWorkInterval,
 )
 from .session import (
     Session, SessionTemplate, SessionTemplateStats, TemplateSectionStats, ActivityDurationStats,

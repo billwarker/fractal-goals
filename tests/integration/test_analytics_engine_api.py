@@ -33,6 +33,7 @@ def _create_admin(db_session):
 
 def test_analytics_catalog_and_query_run_are_authenticated(authed_client, db_session, sample_ultimate_goal):
     db_session.add(Session(
+        owner_id=sample_ultimate_goal.owner_id,
         id=str(uuid.uuid4()),
         root_id=sample_ultimate_goal.id,
         name="Analytics API Session",
@@ -61,6 +62,7 @@ def test_analytics_catalog_and_query_run_are_authenticated(authed_client, db_ses
 
 def test_analytics_query_run_accepts_raw_read_only_sql(authed_client, db_session, sample_ultimate_goal):
     db_session.add(Session(
+        owner_id=sample_ultimate_goal.owner_id,
         id=str(uuid.uuid4()),
         root_id=sample_ultimate_goal.id,
         name="Raw SQL API Session",
@@ -111,6 +113,7 @@ def test_analytics_query_profiles_crud_through_api(authed_client):
 def test_admin_read_only_support_can_run_user_wide_analytics_but_not_write_profiles(client, db_session, test_user, sample_ultimate_goal):
     admin = _create_admin(db_session)
     db_session.add(Session(
+        owner_id=test_user.id,
         id=str(uuid.uuid4()),
         root_id=sample_ultimate_goal.id,
         name="Support Visible Session",

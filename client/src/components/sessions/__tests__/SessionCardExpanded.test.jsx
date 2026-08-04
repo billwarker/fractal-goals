@@ -320,6 +320,7 @@ describe('SessionCardExpanded', () => {
                 session={{
                     id: 'session-quick-link',
                     name: 'Weigh Myself',
+                    template_color: '#22c55e',
                     session_goals: [],
                     completed_goals: [],
                     attributes: {
@@ -347,6 +348,8 @@ describe('SessionCardExpanded', () => {
                 withTimezone: false,
             }
         );
+
+        expect(screen.getByTitle('Weigh Myself')).toHaveStyle({ color: '#22c55e' });
 
         expect(screen.getByRole('link', { name: 'Weigh Myself' })).toHaveAttribute(
             'href',

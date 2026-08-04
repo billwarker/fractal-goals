@@ -276,11 +276,11 @@ class TestManualTimeEntry:
             data=json.dumps(payload),
             content_type='application/json'
         )
-        # Should reject invalid time range
-        assert response.status_code in [200, 400, 422]
+        assert response.status_code == 409
+        assert 'end at or after its start' in response.get_json()['error']
     
     def test_update_only_start_time(self, authed_client, db_session, sample_activity_instance):
-        """Test updating only the start time."""
+        """Historical correction requires a complete boundary pair."""
         from models import Session
         session = db_session.query(Session).get(sample_activity_instance.session_id)
         root_id = session.root_id
@@ -296,9 +296,8 @@ class TestManualTimeEntry:
             data=json.dumps(payload),
             content_type='application/json'
         )
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data['time_start'] is not None
+        assert response.status_code == 400
+        assert 'both time_start and time_stop' in response.get_json()['error']
 
     def test_update_only_stop_time(self, authed_client, db_session, sample_activity_instance):
         """Test updating only the stop time."""
@@ -340,6 +339,45 @@ class TestManualTimeEntry:
 
         assert response.status_code == 400
         assert response.get_json()['error'] == 'Validation failed'
+
+    def test_add_empty_set_ignores_blank_metric_placeholders(
+        self,
+        authed_client,
+        db_session,
+        sample_activity_instance,
+        sample_activity_definition,
+    ):
+        """A new set can be saved before the user enters any metric values."""
+        from models import MetricDefinition, Session
+
+        session = db_session.query(Session).get(sample_activity_instance.session_id)
+        metrics = (
+            db_session.query(MetricDefinition)
+            .filter(MetricDefinition.activity_id == sample_activity_definition.id)
+            .order_by(MetricDefinition.name)
+            .all()
+        )
+
+        response = authed_client.put(
+            f'/api/{session.root_id}/activity-instances/{sample_activity_instance.id}',
+            json={
+                'sets': [{
+                    'instance_id': str(uuid4()),
+                    'completed': False,
+                    'metrics': [
+                        {'metric_id': metrics[0].id, 'value': ''},
+                        {'metric_id': metrics[1].id, 'value': '   '},
+                        {'metric_id': metrics[1].id, 'value': None},
+                    ],
+                }],
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert len(data['sets']) == 1
+        assert data['sets'][0]['status'] == 'planned'
+        assert data['sets'][0]['metrics'] == []
 
 
 @pytest.mark.integration
@@ -405,10 +443,10 @@ class TestTimerDurationCalculation:
 @pytest.mark.integration
 @pytest.mark.critical
 class TestConcurrentTimers:
-    """Test multiple timers running simultaneously."""
+    """Test exclusive timer ownership within a session."""
     
-    def test_multiple_timers_in_same_session(self, authed_client, sample_practice_session, sample_activity_definition):
-        """Test running multiple timers in the same session."""
+    def test_switches_between_timers_in_same_session(self, authed_client, sample_practice_session, sample_activity_definition):
+        """Only one timer accrues work, with an explicit atomic switch."""
         root_id = sample_practice_session.root_id
         
         # Create two instances
@@ -426,12 +464,20 @@ class TestConcurrentTimers:
             data = json.loads(response.data)
             instances.append(data['id'])
         
-        # Start both timers
-        for instance_id in instances:
-            response = authed_client.post(
-                f'/api/{root_id}/activity-instances/{instance_id}/start'
-            )
-            assert response.status_code == 200
+        first_start = authed_client.post(
+            f'/api/{root_id}/activity-instances/{instances[0]}/start'
+        )
+        assert first_start.status_code == 200
+        conflict = authed_client.post(
+            f'/api/{root_id}/activity-instances/{instances[1]}/start'
+        )
+        assert conflict.status_code == 409
+        assert conflict.get_json()['code'] == 'active_work_exists'
+        switched = authed_client.post(
+            f'/api/{root_id}/activity-instances/{instances[1]}/start',
+            json={'switch': True},
+        )
+        assert switched.status_code == 200
         
         # Stop both timers
         for instance_id in instances:

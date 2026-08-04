@@ -19,88 +19,19 @@ import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
 import ViewToggleTabs from '../common/ViewToggleTabs';
 
 import {
-    DEFAULT_TEMPLATE_COLOR,
     SESSION_TYPE_NORMAL,
     SESSION_TYPE_QUICK,
-    getSessionRuntimeType,
-    getTemplateColor,
 } from '../../utils/sessionRuntime';
 import ModalBackdrop from '../atoms/ModalBackdrop';
-
-const EMPTY_TEMPLATE = {
-    name: '',
-    description: '',
-    sessionType: SESSION_TYPE_NORMAL,
-    templateColor: DEFAULT_TEMPLATE_COLOR,
-    sections: [],
-    quickActivities: [],
-};
-
-function createSectionId() {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-    }
-    return `section-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function buildActivityPreview(activity) {
-    return {
-        activity_id: activity.id,
-        name: activity.name,
-        type: activity.type,
-    };
-}
-
-function buildActivityGroupOptions(activityGroups) {
-    const groupMap = new Map((activityGroups || []).map((group) => [group.id, group]));
-    const buildPath = (group) => {
-        const names = [];
-        const visited = new Set();
-        let current = group;
-        while (current && !visited.has(current.id)) {
-            visited.add(current.id);
-            names.unshift(current.name);
-            current = current.parent_id ? groupMap.get(current.parent_id) : null;
-        }
-        return names.join(' / ');
-    };
-
-    return (activityGroups || [])
-        .map((group) => ({
-            id: group.id,
-            label: buildPath(group),
-        }))
-        .sort((left, right) => left.label.localeCompare(right.label));
-}
-
-function buildInitialTemplate(editingTemplate) {
-    if (!editingTemplate) {
-        return {
-            ...EMPTY_TEMPLATE,
-            sections: [],
-            quickActivities: [],
-        };
-    }
-
-    const sections = (editingTemplate.template_data?.sections || []).map((section) => ({
-        ...section,
-        id: section.id || section.template_section_id || createSectionId(),
-        activities: (section.activities || section.exercises || []).map((activity) => ({
-            ...activity,
-        })),
-    }));
-
-    return {
-        name: editingTemplate.name || '',
-        description: editingTemplate.description || '',
-        sessionType: getSessionRuntimeType(editingTemplate),
-        templateColor: getTemplateColor(editingTemplate),
-        sections,
-        quickActivities: (editingTemplate.template_data?.activities || []).map((activity) => ({
-            ...activity,
-        })),
-    };
-}
+import {
+    buildActivityGroupOptions,
+    buildActivityPreview,
+    buildInitialTemplate,
+    canUseTemplateItemInQuickSession,
+    createSectionId,
+    getTemplateItemKey,
+    serializeTemplateItem,
+} from './templateBuilderItems';
 
 function TemplateBuilderModalContent({
     onClose,
@@ -125,6 +56,9 @@ function TemplateBuilderModalContent({
 
     const isExistingTemplate = Boolean(editingTemplate?.id);
     const isQuickTemplate = currentTemplate.sessionType === SESSION_TYPE_QUICK;
+    const selectableActivities = isQuickTemplate
+        ? activities.filter(canUseTemplateItemInQuickSession)
+        : activities;
     const totalDuration = currentTemplate.sections.reduce((sum, section) => sum + section.duration_minutes, 0);
     const activityGroupOptions = useMemo(
         () => buildActivityGroupOptions(activityGroups),
@@ -414,7 +348,13 @@ function TemplateBuilderModalContent({
             : {
                 session_type: SESSION_TYPE_NORMAL,
                 template_color: currentTemplate.templateColor,
-                sections: currentTemplate.sections,
+                sections: currentTemplate.sections.map((section) => {
+                    const { activities: sectionItems = [], ...sectionFields } = section;
+                    return {
+                        ...sectionFields,
+                        items: sectionItems.map(serializeTemplateItem),
+                    };
+                }),
                 total_duration_minutes: totalDuration,
             };
 
@@ -589,7 +529,7 @@ function TemplateBuilderModalContent({
                                     {showActivityModal && (
                                         <div className={styles.inlineActivitySelector}>
                                             <ActivitySelectorPanel
-                                                activities={activities}
+                                                activities={selectableActivities}
                                                 activityGroups={activityGroups}
                                                 onClose={resetActivityPicker}
                                                 onSelectActivity={handleAddActivity}
@@ -631,7 +571,7 @@ function TemplateBuilderModalContent({
                                                         title={(
                                                             <div className={styles.sectionTitleRow}>
                                                                 <strong className={styles.sectionName}>{section.name}</strong>
-                                                                <span className={styles.sectionDurationBadge}>
+                                                                <span className={styles.sectionDurationLabel}>
                                                                     {section.duration_minutes} min
                                                                 </span>
                                                             </div>
@@ -639,7 +579,7 @@ function TemplateBuilderModalContent({
                                                         meta={(
                                                             <div className={styles.sectionMetaStack}>
                                                                 <p className={styles.sectionMeta}>
-                                                                    {section.activities?.length || 0} activit{(section.activities?.length || 0) !== 1 ? 'ies' : 'y'}
+                                                                    {section.activities?.length || 0} item{(section.activities?.length || 0) !== 1 ? 's' : ''}
                                                                 </p>
                                                                 {section.default_activity_group_id && (
                                                                     <p className={styles.sectionMeta}>
@@ -689,7 +629,7 @@ function TemplateBuilderModalContent({
                                                     <div className={styles.activitiesList}>
                                                         {(section.activities || []).map((activity, activityIndex) => (
                                                             <div
-                                                                key={`${activity.activity_id || activity.name}-${activityIndex}`}
+                                                                key={getTemplateItemKey(activity, activityIndex)}
                                                                 className={styles.activityItem}
                                                             >
                                                                 <div className={styles.activityInfo}>
@@ -754,7 +694,7 @@ function TemplateBuilderModalContent({
                                                         {showActivityModal && selectedSectionIndex === sectionIndex && (
                                                             <div className={styles.inlineActivitySelector}>
                                                                 <ActivitySelectorPanel
-                                                                    activities={activities}
+                                                                    activities={selectableActivities}
                                                                     activityGroups={activityGroups}
                                                                     onClose={resetActivityPicker}
                                                                     onSelectActivity={handleAddActivity}
@@ -885,7 +825,7 @@ function TemplateBuilderModalContent({
 }
 
 function TemplateBuilderModal(props) {
-    const { isOpen, editingTemplate } = props;
+    const { isOpen, editingTemplate, activities = [] } = props;
     if (!isOpen) {
         return null;
     }
@@ -896,7 +836,7 @@ function TemplateBuilderModal(props) {
         <TemplateBuilderModalContent
             key={modalKey}
             {...props}
-            initialTemplate={buildInitialTemplate(editingTemplate)}
+            initialTemplate={buildInitialTemplate(editingTemplate, activities)}
         />
     );
 }

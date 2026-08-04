@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 export const MOBILE_MEDIA_QUERY = '(max-width: 768px)';
 
@@ -9,22 +9,15 @@ export function getIsMobileViewport() {
     return window.matchMedia(MOBILE_MEDIA_QUERY).matches;
 }
 
+function subscribeToMobileViewport(onStoreChange) {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+        return () => {};
+    }
+    const mediaQueryList = window.matchMedia(MOBILE_MEDIA_QUERY);
+    mediaQueryList.addEventListener('change', onStoreChange);
+    return () => mediaQueryList.removeEventListener('change', onStoreChange);
+}
+
 export default function useIsMobile() {
-    const [isMobile, setIsMobile] = useState(getIsMobileViewport);
-
-    useEffect(() => {
-        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-            return undefined;
-        }
-
-        const mediaQueryList = window.matchMedia(MOBILE_MEDIA_QUERY);
-        const onChange = (event) => setIsMobile(event.matches);
-
-        setIsMobile(mediaQueryList.matches);
-        mediaQueryList.addEventListener('change', onChange);
-
-        return () => mediaQueryList.removeEventListener('change', onChange);
-    }, []);
-
-    return isMobile;
+    return useSyncExternalStore(subscribeToMobileViewport, getIsMobileViewport, () => false);
 }

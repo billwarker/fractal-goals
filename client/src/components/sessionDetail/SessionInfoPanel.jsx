@@ -95,9 +95,9 @@ function SessionInfoPanel() {
             {/* Session Title */}
             <div className={styles.sessionInfoTitle}>
                 <Heading level={2}>
-                    {templateColor ? (
+                    {sessionData?.template_name ? (
                         <SessionTemplateNameBadge
-                            name={session.name}
+                            name={sessionData.template_name}
                             color={templateColor}
                             size="xl"
                             wrap
@@ -153,7 +153,16 @@ function SessionInfoPanel() {
                     <div className={styles.sessionInfoDetails}>
                         <div className={styles.sessionInfoRow}>
                             <span className={styles.label}>Template:</span>
-                            <span className={styles.value}>{sessionData?.template_name || '—'}</span>
+                            {sessionData?.template_name ? (
+                                <SessionTemplateNameBadge
+                                    name={sessionData.template_name}
+                                    color={templateColor}
+                                    size="sm"
+                                    wrap
+                                />
+                            ) : (
+                                <span className={styles.value}>—</span>
+                            )}
                         </div>
 
                         {/* Session Start */}

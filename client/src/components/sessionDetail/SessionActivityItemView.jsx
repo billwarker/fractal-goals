@@ -1,17 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
-import { applyRelativeTimeAdjustment, formatForInput, localToISO } from '../../utils/dateUtils';
-import { isTextEditingElement } from '../../hooks/useModalBackdropDismiss';
+import { formatForInput, localToISO } from '../../utils/dateUtils';
 import { formatAggValue } from '../../utils/progressAggregations';
 import { formatDuration } from '../../utils/sessionActivityMetrics';
+import Button from '../atoms/Button';
 import ActivityCompletionButton from '../common/ActivityCompletionButton';
-import { ChevronDownIcon, ChevronUpIcon, EditPencilIcon, PlayIcon } from '../atoms/AppIcons';
+import { EditPencilIcon, PlayIcon } from '../atoms/AppIcons';
 import DropdownMenu, { DropdownMenuItem } from '../atoms/DropdownMenu';
 import Linkify from '../atoms/Linkify';
 import CloseIcon from '../atoms/CloseIcon';
+import RemoveButton from '../atoms/RemoveButton';
 import { DeletedBadge } from '../ui/DeletedEntityFallback';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import SessionActivityProgressSummary, { SummaryDelta } from './SessionActivityProgressSummary';
+import TimerConflictAction, { startTimerWithConflict } from './TimerConflictAction';
+import useRelativeTimeAdjustment from './useRelativeTimeAdjustment';
+import {
+    SessionItemCard,
+    SessionItemHeader,
+    SessionItemHeaderLeft,
+    SessionItemHeaderRight,
+    SessionItemOrderRail,
+    SessionItemTimerActions,
+    SessionItemTimerControls,
+    SessionItemTimerMeta,
+} from './SessionItemCardPrimitives';
 import styles from './SessionActivityItem.module.css';
 
 function SessionActivityItemView({
@@ -87,12 +100,9 @@ function SessionActivityItemView({
     handleAddNote,
 }) {
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
-    const [activeTimeAdjustment, setActiveTimeAdjustment] = useState(null);
+    const [timerConflictExtras, setTimerConflictExtras] = useState(null);
     const [timeInputErrors, setTimeInputErrors] = useState({ start: '', stop: '' });
-    const [timeAdjustmentDrafts, setTimeAdjustmentDrafts] = useState({ start: '', stop: '' });
-    const [timeAdjustmentErrors, setTimeAdjustmentErrors] = useState({ start: '', stop: '' });
     const optionsRef = useRef(null);
-    const timeAdjustmentRef = useRef(null);
     const hasInstanceOptions = Boolean(onDuplicate || showCopyPreviousValuesOption || onClearValues || onDelete);
 
     useEffect(() => {
@@ -115,31 +125,6 @@ function SessionActivityItemView({
             document.removeEventListener('keydown', handleKeyDown);
         };
     }, [isOptionsOpen]);
-
-    useEffect(() => {
-        if (!activeTimeAdjustment) return undefined;
-
-        const handlePointerDown = (event) => {
-            if (timeAdjustmentRef.current?.contains(event.target)) return;
-
-            const activeElement = event.target?.ownerDocument?.activeElement;
-            if (
-                activeElement
-                && timeAdjustmentRef.current?.contains(activeElement)
-                && isTextEditingElement(activeElement)
-            ) {
-                activeElement.blur();
-                return;
-            }
-
-            setActiveTimeAdjustment(null);
-        };
-
-        document.addEventListener('pointerdown', handlePointerDown);
-        return () => {
-            document.removeEventListener('pointerdown', handlePointerDown);
-        };
-    }, [activeTimeAdjustment]);
 
     const handleOptionAction = (event, action) => {
         event.stopPropagation();
@@ -201,113 +186,30 @@ function SessionActivityItemView({
         }
     };
 
-    const handleTimeAdjustmentToggle = (event, target) => {
-        event.stopPropagation();
-        setActiveTimeAdjustment((current) => (current === target ? null : target));
-        setTimeAdjustmentErrors((current) => ({ ...current, [target]: '' }));
-    };
-
-    const handleApplyTimeAdjustment = (event, target, currentValue, field) => {
-        event.stopPropagation();
-        try {
-            const isoValue = applyRelativeTimeAdjustment(currentValue, timeAdjustmentDrafts[target], timezone);
-            const rangeError = getTimerRangeError(target, isoValue);
-            if (rangeError) {
-                setTimeAdjustmentErrors((current) => ({ ...current, [target]: rangeError }));
-                return;
-            }
-            onUpdate(field, isoValue);
-            setActiveTimeAdjustment(null);
-            setTimeAdjustmentDrafts((current) => ({ ...current, [target]: '' }));
-            setTimeAdjustmentErrors((current) => ({ ...current, [target]: '' }));
-        } catch (err) {
-            setTimeAdjustmentErrors((current) => ({
-                ...current,
-                [target]: err?.message || 'Use +10M, -2H, or +30S',
-            }));
-        }
-    };
-
-    const renderTimeAdjustment = (target, currentValue, field) => {
-        if (activeTimeAdjustment !== target) return null;
-
-        return (
-            <div
-                ref={timeAdjustmentRef}
-                className={styles.timeAdjustmentPanel}
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={(event) => event.stopPropagation()}
-            >
-                <div className={styles.timeAdjustmentControls}>
-                    <input
-                        type="text"
-                        inputMode="text"
-                        aria-label={`Relative ${target} adjustment`}
-                        placeholder="+10M"
-                        value={timeAdjustmentDrafts[target]}
-                        onChange={(event) => {
-                            setTimeAdjustmentDrafts((current) => ({ ...current, [target]: event.target.value }));
-                            setTimeAdjustmentErrors((current) => ({ ...current, [target]: '' }));
-                        }}
-                        onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                                handleApplyTimeAdjustment(event, target, currentValue, field);
-                            }
-                            if (event.key === 'Escape') {
-                                event.stopPropagation();
-                                setActiveTimeAdjustment(null);
-                            }
-                        }}
-                        className={`${styles.timeAdjustmentInput} ${timeAdjustmentErrors[target] ? styles.timerInputError : ''}`}
-                    />
-                    <button
-                        type="button"
-                        className={styles.timeAdjustmentApplyButton}
-                        onClick={(event) => handleApplyTimeAdjustment(event, target, currentValue, field)}
-                    >
-                        Apply
-                    </button>
-                </div>
-                {timeAdjustmentErrors[target] && (
-                    <div className={styles.timeAdjustmentValidation}>{timeAdjustmentErrors[target]}</div>
-                )}
-            </div>
-        );
-    };
+    const relativeTimeAdjustment = useRelativeTimeAdjustment({
+        timezone,
+        validate: getTimerRangeError,
+        onApply: (target, isoValue) => onUpdate(
+            target === 'start' ? 'time_start' : 'time_stop',
+            isoValue,
+        ),
+    });
 
     return (
-        <div
+        <SessionItemCard
             onClick={handleActivityCardClick}
-            className={`${styles.activityCard} ${isSelected ? styles.activityCardSelected : ''} ${isDragging ? styles.activityCardDragging : ''}`}
+            isSelected={isSelected}
+            isDragging={isDragging}
         >
-            <div className={styles.activityHeader}>
-                <div className={styles.activityHeaderLeft}>
-                    {/* Reorder Buttons */}
-                    {showReorderButtons && (
-                        <div className={styles.reorderButtons}>
-                            <button
-                                onClick={() => onReorder('up')}
-                                disabled={!canMoveUp}
-                                className={`${styles.reorderButton} ${!canMoveUp ? styles.reorderButtonDisabled : ''}`}
-                                title="Move up"
-                            >
-                                <ChevronUpIcon size={14} />
-                            </button>
-                            <button
-                                onClick={() => onReorder('down')}
-                                disabled={!canMoveDown}
-                                className={`${styles.reorderButton} ${!canMoveDown ? styles.reorderButtonDisabled : ''}`}
-                                title="Move down"
-                            >
-                                <ChevronDownIcon size={14} />
-                            </button>
-                            {sessionIndex != null && (
-                                <div className={styles.activitySessionIndex} title={`Activity ${sessionIndex} in this session`}>
-                                    #{sessionIndex}
-                                </div>
-                            )}
-                        </div>
-                    )}
+            <SessionItemHeader>
+                <SessionItemHeaderLeft>
+                    <SessionItemOrderRail
+                        showReorderButtons={showReorderButtons}
+                        onReorder={onReorder}
+                        canMoveUp={canMoveUp}
+                        canMoveDown={canMoveDown}
+                        sessionIndex={sessionIndex}
+                    />
                     <div
                         onClick={(e) => {
                             e.stopPropagation();
@@ -425,9 +327,9 @@ function SessionActivityItemView({
                             </div>
                         )}
                     </div>
-                </div>
+                </SessionItemHeaderLeft>
 
-                <div className={styles.activityHeaderRight}>
+                <SessionItemHeaderRight>
                     {quickMode ? (
                         <div className={styles.actionStack}>
                             <div className={styles.quickModeStatus}>
@@ -442,24 +344,14 @@ function SessionActivityItemView({
                         </div>
                     ) : (
                         <div className={styles.actionStack}>
-                            <div className={styles.timerControlsGrid}>
-                                <div className={styles.timerMetaColumn}>
+                            <SessionItemTimerControls>
+                                <SessionItemTimerMeta>
                                     {/* DateTime Start Field */}
                                     <div className={styles.timerFieldContainer}>
                                         <div className={styles.timerLabelRow}>
                                             <label className={styles.timerLabel}>Start</label>
                                             {isSelected && exercise.time_start && (
-                                                <button
-                                                    type="button"
-                                                    className={styles.timeAdjustmentToggle}
-                                                    onPointerDown={(event) => event.stopPropagation()}
-                                                    onClick={(event) => handleTimeAdjustmentToggle(event, 'start')}
-                                                    aria-expanded={activeTimeAdjustment === 'start'}
-                                                    aria-label="Adjust start time"
-                                                    title="Adjust start time"
-                                                >
-                                                    ±
-                                                </button>
+                                                relativeTimeAdjustment.renderToggle('start')
                                             )}
                                         </div>
                                         <input
@@ -476,7 +368,7 @@ function SessionActivityItemView({
                                         {timeInputErrors.start && (
                                             <div className={styles.timerValidationError}>{timeInputErrors.start}</div>
                                         )}
-                                        {renderTimeAdjustment('start', localStartTime, 'time_start')}
+                                        {relativeTimeAdjustment.renderPanel('start', localStartTime)}
                                     </div>
 
                                     {/* DateTime Stop Field */}
@@ -484,17 +376,7 @@ function SessionActivityItemView({
                                         <div className={styles.timerLabelRow}>
                                             <label className={styles.timerLabel}>Stop</label>
                                             {isSelected && exercise.time_stop && (
-                                                <button
-                                                    type="button"
-                                                    className={styles.timeAdjustmentToggle}
-                                                    onPointerDown={(event) => event.stopPropagation()}
-                                                    onClick={(event) => handleTimeAdjustmentToggle(event, 'stop')}
-                                                    aria-expanded={activeTimeAdjustment === 'stop'}
-                                                    aria-label="Adjust stop time"
-                                                    title="Adjust stop time"
-                                                >
-                                                    ±
-                                                </button>
+                                                relativeTimeAdjustment.renderToggle('stop')
                                             )}
                                         </div>
                                         <input
@@ -512,7 +394,7 @@ function SessionActivityItemView({
                                         {timeInputErrors.stop && (
                                             <div className={styles.timerValidationError}>{timeInputErrors.stop}</div>
                                         )}
-                                        {renderTimeAdjustment('stop', localStopTime, 'time_stop')}
+                                        {relativeTimeAdjustment.renderPanel('stop', localStopTime)}
                                     </div>
 
                                     {/* Duration Display / Pre-start target input */}
@@ -552,32 +434,26 @@ function SessionActivityItemView({
                                             </>
                                         )}
                                     </div>
-                                </div>
+                                </SessionItemTimerMeta>
 
-                                <div className={styles.timerActionColumn}>
+                                <SessionItemTimerActions>
                                     {!exercise.time_start ? (
                                         <>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    autoCompletedRef.current = false;
-                                                    const extras = {};
-                                                    if (hasTargetDurationInput && !parsedTargetDuration) {
-                                                        setTargetDurationError('Use MM:SS, seconds 00-59');
-                                                        return;
-                                                    }
-                                                    if (parsedTargetDuration) {
-                                                        extras.target_duration_seconds = parsedTargetDuration;
-                                                    }
-                                                    onUpdate('timer_action', 'start', extras);
-                                                }}
+                                            <Button
+                                                unstyled
+                                                onClick={(event) => startTimerWithConflict(event, {
+                                                    autoCompletedRef, hasTargetDurationInput, parsedTargetDuration, onUpdate,
+                                                    setError: setTargetDurationError, setConflict: setTimerConflictExtras,
+                                                })}
                                                 className={styles.startButton}
                                                 title="Start timer"
                                             >
                                                 <PlayIcon size={13} />
                                                 <span>Start</span>
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <TimerConflictAction extras={timerConflictExtras} onUpdate={onUpdate} onResolved={() => setTimerConflictExtras(null)} />
+                                            <Button
+                                                unstyled
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     onUpdate('timer_action', 'complete');
@@ -586,11 +462,12 @@ function SessionActivityItemView({
                                                 title="Instant complete (0s duration)"
                                             >
                                                 ✓ Complete
-                                            </button>
+                                            </Button>
                                         </>
                                     ) : !exercise.time_stop ? (
                                         <>
-                                            <button
+                                            <Button
+                                                unstyled
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     onUpdate('timer_action', 'complete');
@@ -599,8 +476,9 @@ function SessionActivityItemView({
                                                 title="Complete activity"
                                             >
                                                 ✓ Complete
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button
+                                                unstyled
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     autoCompletedRef.current = false;
@@ -612,14 +490,15 @@ function SessionActivityItemView({
                                                 title="Reset timer"
                                             >
                                                 ↺ Reset
-                                            </button>
+                                            </Button>
                                         </>
                                     ) : (
                                         <>
                                             <div className={styles.completedBadge} title={`Completed at ${formatForInput(exercise.time_stop, timezone)}`}>
                                                 Completed
                                             </div>
-                                            <button
+                                            <Button
+                                                unstyled
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     autoCompletedRef.current = false;
@@ -631,22 +510,24 @@ function SessionActivityItemView({
                                                 title="Reset timer"
                                             >
                                                 ↺ Reset
-                                            </button>
+                                            </Button>
                                         </>
                                     )}
-                                </div>
-                            </div>
+                                </SessionItemTimerActions>
+                            </SessionItemTimerControls>
                         </div>
                     )}
-                </div>
+                </SessionItemHeaderRight>
 
                 {/* Delete Button */}
                 {!quickMode && (
-                    <button onClick={onDelete} className={styles.deleteButton} aria-label="Delete activity">
-                        <CloseIcon size={14} />
-                    </button>
+                    <RemoveButton
+                        onClick={onDelete}
+                        className={styles.deleteButton}
+                        aria-label="Delete activity"
+                    />
                 )}
-            </div>
+            </SessionItemHeader>
 
             {/* Content Area */}
             <div className={styles.contentArea}>
@@ -657,7 +538,7 @@ function SessionActivityItemView({
                         <div className={styles.setsContainer}>
                             {exercise.sets?.map((set, setIdx) => (
                                 <div
-                                    key={set.instance_id}
+                                    key={set.id || set.instance_id || `set-${setIdx}`}
                                     onClick={(e) => {
                                         e.stopPropagation(); // Prevent card click from firing
                                         const newSetIndex = selectedSetIndex === setIdx ? null : setIdx;
@@ -771,12 +652,14 @@ function SessionActivityItemView({
                                 </div>
                             ))}
                         </div>
-                        <button
+                        <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={handleAddSet}
                             className={styles.addSetButton}
                         >
                             + Add Set
-                        </button>
+                        </Button>
                         <SessionActivityProgressSummary
                             sets={exercise.sets}
                             metricDefs={def.metric_definitions}
@@ -867,7 +750,7 @@ function SessionActivityItemView({
                 )}
             </div>
 
-        </div>
+        </SessionItemCard>
     );
 }
 

@@ -8,6 +8,7 @@ from services.quota_service import FREE_LIMITS, TIER_DEFAULT_LIMITS_SETTING_KEY,
 def test_free_quota_usage_counts_owned_root_entities(db_session, test_user, sample_ultimate_goal):
     session = Session(
         id=str(uuid.uuid4()),
+        owner_id=test_user.id,
         root_id=sample_ultimate_goal.id,
         name="Practice",
         created_at=datetime.now(timezone.utc),
@@ -84,12 +85,14 @@ def test_account_usage_can_scope_counts_to_selected_fractals(db_session, test_us
     )
     first_session = Session(
         id=str(uuid.uuid4()),
+        owner_id=test_user.id,
         root_id=sample_ultimate_goal.id,
         name="First session",
         created_at=datetime.now(timezone.utc),
     )
     second_session = Session(
         id=str(uuid.uuid4()),
+        owner_id=test_user.id,
         root_id=other_root.id,
         name="Second session",
         created_at=datetime.now(timezone.utc),
@@ -163,6 +166,7 @@ def test_free_limits_include_new_quota_resources():
     assert FREE_LIMITS["metrics"] == 20
     assert FREE_LIMITS["session_templates"] == 10
     assert FREE_LIMITS["activity_instances"] == 500
+    assert FREE_LIMITS["circuits"] == 10
 
 
 def test_configured_tier_defaults_drive_effective_limits(db_session, test_user):
@@ -190,6 +194,22 @@ def test_configured_tier_storage_defaults_are_available(db_session):
 
     assert storage_limits["free"] == 123456789
     assert storage_limits["paid"] == 104857600
+
+
+def test_older_tier_defaults_inherit_new_circuit_limit_without_losing_custom_values(db_session, test_user):
+    configured_free = dict(FREE_LIMITS)
+    configured_free.pop("circuits")
+    configured_free["goals"] = 123
+    db_session.add(AppSetting(
+        key=TIER_DEFAULT_LIMITS_SETTING_KEY,
+        value={"free": configured_free},
+    ))
+    db_session.commit()
+
+    limits = QuotaService(db_session).get_effective_limits(test_user)
+
+    assert limits["goals"] == 123
+    assert limits["circuits"] == FREE_LIMITS["circuits"]
 
 
 def test_invalid_configured_tier_defaults_fall_back_to_builtins(db_session, test_user):

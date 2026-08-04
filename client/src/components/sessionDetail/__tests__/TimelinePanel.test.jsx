@@ -268,4 +268,39 @@ describe('TimelinePanel', () => {
         const indicator = screen.getByText('(-5)');
         expect(indicator.className).toMatch(/timelineProgressImproved/);
     });
+
+    it('renders activity history with the current session-template badge color', () => {
+        useActivityHistory.mockReturnValue({
+            history: [{
+                id: 'instance-history-1',
+                session_name: 'Historical Session',
+                session_template_name: 'Simple Empty Template',
+                session_template_color: '#22c55e',
+                session_date: '2026-06-23T12:00:00Z',
+                duration_seconds: 110,
+                metric_values: [],
+                sets: [],
+                notes: [],
+            }],
+            loading: false,
+            error: null,
+        });
+
+        renderWithProviders(
+            <TimelinePanel
+                rootId="root-1"
+                sessionId="session-1"
+                selectedActivity={null}
+                sessionActivityDefs={sessionActivityDefs}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.getByText('Simple Empty Template')).toHaveStyle({ color: '#22c55e' });
+    });
 });

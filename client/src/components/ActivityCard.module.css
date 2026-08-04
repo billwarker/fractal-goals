@@ -34,19 +34,6 @@
     overflow-wrap: anywhere;
 }
 
-.metadata {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--color-text-muted);
-}
-
-.metadataSeparator {
-    opacity: 0.7;
-}
-
 .indicatorList {
     display: flex;
     gap: 4px;

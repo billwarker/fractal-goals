@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../../utils/api';
 import { queryKeys } from '../../hooks/queryKeys';
 import { useActivityGroups, useActivities } from '../../hooks/useActivityQueries';
 import { useSessionTemplates } from '../../hooks/useSessionTemplateQueries';
+import { useCircuits } from '../../hooks/useCircuitQueries';
 import { formatLiteralDate, getDatePart } from '../../utils/dateUtils';
 import TemplateBuilderModal from './TemplateBuilderModal';
 import Modal from '../atoms/Modal';
@@ -17,6 +18,7 @@ import { isQuickSession } from '../../utils/sessionRuntime';
 
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { logError } from '../../utils/logger';
+import { buildTemplateActivityCatalogue } from './templateBuilderItems';
 
 function getInitialSelectedDaysOfWeek(initialData) {
     if (!initialData) {
@@ -91,6 +93,11 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
 
     const { activities = [] } = useActivities(rootId);
     const { activityGroups = [] } = useActivityGroups(rootId);
+    const { data: circuits = [] } = useCircuits(rootId);
+    const templateActivities = useMemo(
+        () => buildTemplateActivityCatalogue(activities, circuits),
+        [activities, circuits],
+    );
 
     const saveTemplateMutation = useMutation({
         mutationFn: async ({ payload, templateId }) => {
@@ -396,7 +403,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                 onClose={() => setShowTemplateBuilder(false)}
                 onSave={handleTemplateBuilderSave}
                 editingTemplate={null}
-                activities={activities}
+                activities={templateActivities}
                 activityGroups={activityGroups}
                 rootId={rootId}
             />

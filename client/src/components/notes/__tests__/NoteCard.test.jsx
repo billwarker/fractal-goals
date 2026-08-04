@@ -108,6 +108,26 @@ describe('NoteCard', () => {
         expect(screen.getByText('Standard Practice Session')).toHaveStyle({ color: '#16a34a' });
     });
 
+    it('derives circuit run and round note labels from their canonical contexts', () => {
+        const baseNote = {
+            content: 'Circuit cue',
+            created_at: '2026-04-04T13:37:00Z',
+            updated_at: '2026-04-04T13:37:00Z',
+            session_id: 'session-1',
+            pinned_at: null,
+            is_pinned: false,
+        };
+        const { rerender } = render(
+            <NoteCard note={{ ...baseNote, id: 'run-note', context_type: 'circuit_run', context_id: 'run-1' }} />,
+        );
+        expect(screen.getByText('Activity Circuit Note')).toBeInTheDocument();
+
+        rerender(
+            <NoteCard note={{ ...baseNote, id: 'round-note', context_type: 'circuit_round', context_id: 'round-1' }} />,
+        );
+        expect(screen.getByText('Circuit Round Note')).toBeInTheDocument();
+    });
+
     it('uses the session template badge for activity note session context', () => {
         render(
             <NoteCard

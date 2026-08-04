@@ -24,10 +24,12 @@ function GoalHierarchySelectionModal({
 }) {
     const [draftGoalIds, setDraftGoalIds] = useState(selectedGoalIds);
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Opening the modal starts a new isolated selection transaction. */
     useEffect(() => {
         if (!isOpen) return;
         setDraftGoalIds(selectedGoalIds);
     }, [isOpen, selectedGoalIds]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     const handleConfirm = () => {
         onConfirm?.(draftGoalIds);

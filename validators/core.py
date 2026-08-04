@@ -205,7 +205,7 @@ def validate_session_template_data(template_data: Dict[str, Any]) -> Dict[str, A
                 else:
                     section.pop('default_activity_group_id', None)
             section_activities = None
-            for key in ('activities', 'exercises', 'activity_ids'):
+            for key in ('items', 'activities', 'exercises', 'activity_ids'):
                 if key in section:
                     section_activities = section.get(key)
                     break
@@ -213,6 +213,21 @@ def validate_session_template_data(template_data: Dict[str, Any]) -> Dict[str, A
                 continue
             if not isinstance(section_activities, list):
                 raise ValueError('section activities must be a list')
+            if 'items' in section:
+                for item_index, item in enumerate(section_activities):
+                    if not isinstance(item, dict):
+                        raise ValueError(f'section items[{item_index}] must be an object')
+                    item_type = item.get('type')
+                    if item_type == 'circuit':
+                        circuit_id = item.get('circuit_definition_id')
+                        if not isinstance(circuit_id, str) or not circuit_id.strip():
+                            raise ValueError(f'section items[{item_index}] circuit_definition_id is required')
+                    elif item_type == 'activity':
+                        activity_id = item.get('activity_definition_id') or item.get('activity_id') or item.get('id')
+                        if not isinstance(activity_id, str) or not activity_id.strip():
+                            raise ValueError(f'section items[{item_index}] activity_definition_id is required')
+                    else:
+                        raise ValueError(f"section items[{item_index}].type must be 'activity' or 'circuit'")
         quick_activities = normalized.get('activities')
         if isinstance(quick_activities, list) and len(quick_activities) > 0:
             raise ValueError('normal templates cannot define top-level activities')

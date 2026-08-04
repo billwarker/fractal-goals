@@ -66,6 +66,7 @@ def test_session_analytics_summary_returns_lightweight_sessions_and_activity_ins
     db_session.add(progress_record)
 
     legacy_session = Session(
+        owner_id=sample_practice_session.owner_id,
         id=str(uuid4()),
         name='Legacy Session',
         description='Legacy analytics fallback',

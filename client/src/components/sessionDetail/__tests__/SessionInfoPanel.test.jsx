@@ -11,10 +11,12 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
         session: {
             id: 's1',
             name: 'Test Session',
+            template_color: '#22c55e',
             created_at: '2026-01-01T00:00:00Z',
             program_info: null
         },
         localSessionData: {
+            template_name: 'Full Body Workout',
             session_start: '2026-01-01T00:00:00Z',
             session_end: null,
             total_duration_minutes: 30
@@ -63,5 +65,21 @@ describe('SessionInfoPanel', () => {
         expect(updateSession).toHaveBeenCalledWith({
             session_start: '2026-01-01T01:15:00.000Z'
         });
+    });
+
+    it('uses the shared template badge color in the header and expanded metadata', () => {
+        renderWithProviders(<SessionInfoPanel />, {
+            withTimezone: false,
+            withAuth: false,
+            withGoalLevels: false,
+            withTheme: false
+        });
+
+        expect(screen.getByText('Full Body Workout')).toHaveStyle({ color: '#22c55e' });
+
+        fireEvent.click(screen.getByTitle('Expand'));
+        const templateBadges = screen.getAllByText('Full Body Workout');
+        expect(templateBadges).toHaveLength(2);
+        expect(templateBadges[1]).toHaveStyle({ color: '#22c55e' });
     });
 });

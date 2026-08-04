@@ -9,6 +9,7 @@ import { queryKeys } from '../../hooks/queryKeys';
 const getSessionTemplates = vi.fn();
 const getActivities = vi.fn();
 const getActivityGroups = vi.fn();
+const getCircuits = vi.fn();
 const updateSessionTemplate = vi.fn();
 
 vi.mock('../../utils/api', () => ({
@@ -16,6 +17,7 @@ vi.mock('../../utils/api', () => ({
         getSessionTemplates: (...args) => getSessionTemplates(...args),
         getActivities: (...args) => getActivities(...args),
         getActivityGroups: (...args) => getActivityGroups(...args),
+        getCircuits: (...args) => getCircuits(...args),
         updateSessionTemplate: (...args) => updateSessionTemplate(...args),
         createSessionTemplate: vi.fn(),
         deleteSessionTemplate: vi.fn(),
@@ -61,6 +63,7 @@ function renderPage(queryClient) {
 describe('CreateSessionTemplate', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        getCircuits.mockResolvedValue({ data: [] });
         updateSessionTemplate.mockResolvedValue({ data: {} });
     });
 

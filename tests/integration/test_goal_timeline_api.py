@@ -3,7 +3,16 @@ from datetime import datetime, timezone
 
 import pytest
 
-from models import ActivityInstance, GoalLevel, GoalPauseInterval, Session, Target, activity_goal_associations
+from models import (
+    ActivityInstance,
+    ActivitySet,
+    GoalLevel,
+    GoalPauseInterval,
+    MetricValue,
+    Session,
+    Target,
+    activity_goal_associations,
+)
 
 
 @pytest.mark.integration
@@ -20,6 +29,7 @@ class TestGoalTimelineApi:
             )
         )
         session = Session(
+            owner_id=sample_goal_hierarchy['ultimate'].owner_id,
             id=str(uuid.uuid4()),
             root_id=root_id,
             name='Timeline Session',
@@ -37,18 +47,19 @@ class TestGoalTimelineApi:
             time_start=datetime.now(timezone.utc),
             time_stop=datetime.now(timezone.utc),
             duration_seconds=300,
-            data={
-                'sets': [
-                    {
-                        'metrics': [
-                            {
-                                'metric_id': sample_activity_definition.metric_definitions[0].id,
-                                'value': 135,
-                            },
-                        ],
-                    },
-                ],
-            },
+            data={},
+        )
+        activity_set = ActivitySet(
+            id=str(uuid.uuid4()),
+            activity_instance_id=instance.id,
+            sort_order=0,
+            status='completed',
+        )
+        metric_value = MetricValue(
+            activity_instance_id=instance.id,
+            activity_set_id=activity_set.id,
+            metric_definition_id=sample_activity_definition.metric_definitions[0].id,
+            value=135,
         )
         target = Target(
             id=str(uuid.uuid4()),
@@ -60,7 +71,7 @@ class TestGoalTimelineApi:
             completed_at=datetime.now(timezone.utc),
             created_at=datetime.now(timezone.utc),
         )
-        db_session.add_all([session, instance, target])
+        db_session.add_all([session, instance, activity_set, metric_value, target])
         db_session.commit()
 
         response = authed_client.get(
@@ -97,6 +108,7 @@ class TestGoalTimelineApi:
             )
         )
         session = Session(
+            owner_id=sample_goal_hierarchy['ultimate'].owner_id,
             id=str(uuid.uuid4()),
             root_id=root_id,
             name='Parent Inherited Session',

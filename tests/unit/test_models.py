@@ -116,6 +116,7 @@ class TestSession:
         """Test creating a Session."""
         session = Session(
             id=str(uuid.uuid4()),
+            owner_id=sample_goal_hierarchy['ultimate'].owner_id,
             name="Test Session",
             root_id=sample_goal_hierarchy['ultimate'].id,
             session_start=datetime.utcnow(),
@@ -151,6 +152,28 @@ class TestSession:
         assert 'session_start' in session_dict['attributes']
         # Should include session_data with hydrated activities in attributes
         assert 'attributes' in session_dict
+
+    def test_session_serialization_uses_current_template_color(
+        self,
+        db_session,
+        sample_practice_session,
+        sample_session_template,
+    ):
+        """Template restyling applies to existing linked sessions on every surface."""
+        sample_session_template.template_data = json.dumps({'template_color': '#22c55e'})
+        sample_practice_session.template_id = sample_session_template.id
+        sample_practice_session.attributes = json.dumps({
+            'session_data': {
+                'template_name': sample_session_template.name,
+                'template_color': '#4A90E2',
+            },
+        })
+        db_session.commit()
+
+        session_dict = serialize_session(sample_practice_session)
+
+        assert session_dict['template_color'] == '#22c55e'
+        assert session_dict['attributes']['session_data']['template_color'] == '#22c55e'
 
 @pytest.mark.unit
 class TestActivityDefinition:

@@ -38,6 +38,7 @@ class ActivityTimerStartSchema(BaseModel):
     session_id: Optional[str] = None
     activity_definition_id: Optional[str] = None
     target_duration_seconds: Optional[int] = None
+    switch: bool = False
 
     @field_validator('target_duration_seconds')
     @classmethod
@@ -252,5 +253,4 @@ class ActivityGoalsSetSchema(BaseModel):
 class GroupReorderSchema(BaseModel):
     """Schema for reordering activity groups."""
     group_ids: List[str] = Field(..., min_length=1)
-
 

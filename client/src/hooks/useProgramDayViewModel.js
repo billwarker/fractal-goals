@@ -61,7 +61,7 @@ export function useProgramDayViewModel({
                 isRecurringTemplate: !occurrence.day.date && !!occurrence.day.day_of_week && occurrence.day.day_of_week.length > 0,
                 type: 'program_day',
             }));
-    }, [date, program?.blocks]);
+    }, [date, program]);
 
     const scheduledSessions = useMemo(() => {
         return (sessions || []).filter((session) => {

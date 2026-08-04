@@ -172,9 +172,8 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     const blockColor = programInfo?.block_color || programColor;
     const completedGoalColor = getGoalColor('Completed');
     const completedGoalSecondaryColor = getGoalSecondaryColor('Completed');
-    const completedSessionGoals = Array.isArray(session.completed_goals) ? session.completed_goals : [];
-
     const completedGoals = useMemo(() => {
+        const completedSessionGoals = Array.isArray(session.completed_goals) ? session.completed_goals : [];
         return collectUniqueGoals(completedSessionGoals)
             .sort((goalA, goalB) => {
                 const levelA = getGoalLevelRank(goalA);
@@ -182,7 +181,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                 if (levelA !== levelB) return levelA - levelB;
                 return getGoalName(goalA).localeCompare(getGoalName(goalB));
             });
-    }, [completedSessionGoals]);
+    }, [session.completed_goals]);
 
     // Memoize duration calculation
     const duration = useMemo(() => {
@@ -228,7 +227,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
             instance_id: instance.id,
             name: instance.name || 'Activity',
         }));
-    }, [quickSession, sessionActivityInstances, sessionData?.activity_ids]);
+    }, [quickSession, sessionActivityInstances, sessionData]);
 
     return (
         <div
@@ -257,7 +256,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                                     color={templateColor}
                                     size="lg"
                                     wrap
-                                    className={`${styles.cardHeaderTitle} ${styles.cardHeaderTitleTemplate}`}
+                                    className={styles.cardHeaderTitleTemplate}
                                 />
                             ) : (
                                 <span className={styles.cardHeaderTitle}>
@@ -277,7 +276,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
                                     color={templateColor}
                                     size="lg"
                                     wrap
-                                    className={`${styles.cardHeaderTitle} ${styles.cardHeaderTitleTemplate}`}
+                                    className={styles.cardHeaderTitleTemplate}
                                 />
                                 ) : session.name}
                             </Link>

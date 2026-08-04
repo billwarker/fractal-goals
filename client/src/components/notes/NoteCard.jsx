@@ -1,8 +1,4 @@
-/**
- * NoteCard — shared note component used across all surfaces (notes page, goal modal, session detail).
- * Renders markdown content, options menu (edit/pin/delete), and context badges.
- */
-
+/** Shared note card for note feeds, goal details, and session details. */
 import React, { useState, useRef, useEffect } from 'react';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
@@ -13,10 +9,8 @@ import GoalIcon from '../atoms/GoalIcon';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import MarkdownNoteContent from './MarkdownNoteContent';
 import styles from './NoteCard.module.css';
-
 function buildPlainTextPreview(content) {
     if (!content) return '';
-
     return content
         .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
         .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
@@ -39,6 +33,7 @@ function deriveNoteType(note) {
             ? 'activity_set_note'
             : 'activity_instance_note';
     }
+    if (note.context_type?.startsWith('circuit_')) return `${note.context_type}_note`;
     return 'note';
 }
 
@@ -55,6 +50,8 @@ function deriveNoteTypeLabel(note) {
         activity_instance_note: 'Activity Instance Note',
         activity_set_note: 'Activity Set Note',
         activity_definition_note: 'Activity Definition Note',
+        circuit_run_note: 'Activity Circuit Note',
+        circuit_round_note: 'Circuit Round Note',
         note: 'Note',
     };
     return labels[deriveNoteType(note)] || 'Note';
@@ -264,7 +261,7 @@ function NoteCard({
         return () => observer.disconnect();
     }, [shouldDeferRichContent, shouldShowRichContent]);
 
-    const primaryContextLabel = (() => {
+    const primaryContextLabel = note.context_display_name || (() => {
         switch (resolvedNoteType) {
             case 'fractal_note':
                 return 'Fractal';
@@ -283,6 +280,8 @@ function NoteCard({
             case 'activity_instance_note':
             case 'activity_definition_note':
                 return note.activity_definition_name || 'Activity';
+            case 'circuit_run_note': return 'Activity circuit';
+            case 'circuit_round_note': return 'Circuit round';
             default:
                 return 'Note';
         }

@@ -76,7 +76,6 @@ export function useSessionDraftAutosave({
         });
     }, [normalizedSessionData]);
 
-    /* eslint-disable react-hooks/refs, react-hooks/exhaustive-deps */
     const autoSaveQueue = useMemo(() => createAutoSaveQueue({
         save: (nextData) => saveSessionData(nextData),
         onError: () => {
@@ -84,8 +83,8 @@ export function useSessionDraftAutosave({
             scheduleStatusClear(3000);
         },
     }), [saveSessionData, scheduleStatusClear, setAutoSaveStatus]);
-    /* eslint-enable react-hooks/refs, react-hooks/exhaustive-deps */
 
+    /* eslint-disable react-hooks/set-state-in-effect -- Session identity and server acknowledgements drive this autosave state machine. */
     useEffect(() => {
         const sessionKey = `${rootId || ''}:${sessionId || ''}`;
         if (previousSessionKeyRef.current !== sessionKey) {
@@ -139,6 +138,7 @@ export function useSessionDraftAutosave({
             setSessionDataDraft(null);
         }
     }, [sessionDataDraft, normalizedSessionData]);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     useEffect(() => {
         const instanceQueues = instanceQueuesRef.current;

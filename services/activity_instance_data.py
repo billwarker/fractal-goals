@@ -1,26 +1,14 @@
-"""Low-level primitives for reading set/metric data off an ActivityInstance.
-
-Both progress_service (configurable aggregations) and completion_handlers
-(target threshold evaluation) read the same persisted instance JSON shape:
-`{"sets": [{"metrics": [{"metric_id"|"metric_definition_id", "value"}]}]}`.
-
-The aggregation *semantics* in those two services are intentionally different
-and stay where they are; this module only centralizes the repeated parsing
-idioms (JSON-load + sets extraction, metric-id resolution) that were copy-pasted
-across ~15 call sites (audit P1-9).
-"""
+"""Low-level primitives for normalized set/metric result data."""
 from typing import Any, Optional
 
-import models
-
-
 def load_instance_sets(instance) -> list:
-    """Return the `sets` list persisted on an instance's JSON `data`, or []."""
-    raw_data = models._safe_load_json(instance.data, {})
-    if not isinstance(raw_data, dict):
-        return []
-    sets = raw_data.get("sets", [])
-    return sets if isinstance(sets, list) else []
+    """Return API-shaped set payloads from relational rows."""
+    normalized_sets = getattr(instance, "sets", None)
+    if normalized_sets:
+        from services.serializers import serialize_activity_set
+
+        return [serialize_activity_set(row) for row in normalized_sets]
+    return []
 
 
 def resolve_metric_id(metric_dict: dict) -> Optional[Any]:

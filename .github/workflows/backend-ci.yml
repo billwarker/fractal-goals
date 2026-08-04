@@ -6,6 +6,8 @@ on:
       - "blueprints/**"
       - "services/**"
       - "models/**"
+      - "migrations/**"
+      - "alembic.ini"
       - "tests/**"
       - "requirements*.txt"
       - "pytest.ini"
@@ -14,6 +16,54 @@ on:
     branches: ["main"]
 
 jobs:
+  migration-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ENV: testing
+      DATABASE_URL: postgresql://fractal:fractal_dev_password@localhost:5432/fractal_goals
+      JWT_SECRET_KEY: test-secret-key
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fractal
+          POSTGRES_PASSWORD: fractal_dev_password
+          POSTGRES_DB: fractal_goals
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fractal -d fractal_goals"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify fresh schema and metadata parity
+        run: |
+          python -m alembic upgrade head
+          python -m alembic check
+
+      - name: Verify latest migration reversibility
+        run: |
+          python -m alembic downgrade -1
+          python -m alembic upgrade head
+          python -m alembic check
+
   backend-unit:
     runs-on: ubuntu-latest
     timeout-minutes: 20

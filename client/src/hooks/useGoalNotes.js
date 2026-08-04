@@ -43,7 +43,7 @@ export function useGoalNotes(
     const createNoteMutation = useMutation({
         mutationFn: (data) => fractalNotesApi.createNote(rootId, data),
         onSuccess: () => { invalidate(); },
-        onError: (err) => notify.error('Failed to create note'),
+        onError: () => notify.error('Failed to create note'),
     });
 
     const updateNoteMutation = useMutation({

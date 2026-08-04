@@ -1,0 +1,184 @@
+.card {
+    display: grid;
+    gap: 12px;
+}
+
+.cardHeader {
+    padding-right: 36px;
+}
+
+.removeButton {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
+}
+
+.rounds {
+    display: grid;
+    gap: 8px;
+}
+
+.round {
+    display: grid;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 4px;
+    background: var(--color-bg-input);
+}
+
+.roundHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+}
+
+.roundIdentity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.roundNumber {
+    width: 30px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    flex: 0 0 30px;
+}
+
+.roundTitle {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.roundTitle strong {
+    font-size: 14px;
+}
+
+.roundHeader span {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    text-transform: capitalize;
+}
+
+.members {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.memberCard {
+    padding: 8px 10px;
+    border-radius: 4px;
+    background: var(--color-bg-card-alt);
+}
+
+.memberHeader {
+    align-items: center;
+    gap: 8px;
+    padding-right: 0;
+}
+
+.memberHeader > :first-child {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    justify-content: start;
+    gap: 8px;
+    width: 100%;
+}
+
+.memberHeader > :last-child {
+    align-items: center;
+}
+
+.memberIdentity {
+    display: block;
+    min-width: 0;
+    color: inherit;
+    padding: 0;
+    text-align: left;
+}
+
+.memberName {
+    font-size: 14px;
+}
+
+.memberMetrics {
+    margin: 8px 0 0;
+    cursor: default;
+}
+
+.memberMetricsContent {
+    min-width: 0;
+}
+
+.memberMetricError {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--color-brand-danger);
+    font-size: var(--font-size-xs);
+}
+
+.notesSection {
+    display: grid;
+    gap: 8px;
+}
+
+.notesSection > form {
+    margin-bottom: 0;
+}
+
+.notesTimeline {
+    min-width: 0;
+}
+
+.error {
+    margin: 0;
+    color: var(--color-brand-danger);
+}
+
+@media (max-width: 720px) {
+    .cardHeader {
+        flex-direction: column;
+    }
+
+    .roundHeader {
+        align-items: flex-start;
+    }
+
+    .memberHeader {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .memberCard {
+        padding-inline: 8px;
+    }
+
+    .memberHeader > :first-child {
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 4px;
+    }
+
+    .memberHeader > :last-child,
+    .memberHeader > :last-child > * {
+        width: 100%;
+    }
+
+    .memberMetrics {
+        margin-left: 0;
+    }
+
+    .memberMetrics .memberMetricsContent {
+        grid-column: 1 / -1;
+    }
+}

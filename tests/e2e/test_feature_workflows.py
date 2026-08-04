@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from models import ActivityInstance
+from models import ActivityInstance, SessionWorkInterval
 
 
 @pytest.mark.e2e
@@ -70,7 +70,13 @@ class TestFeatureWorkflows:
 
         db_session.expire_all()
         instance = db_session.query(ActivityInstance).get(sample_activity_instance.id)
-        instance.time_start = datetime.utcnow() - timedelta(seconds=4)
+        adjusted_start = datetime.utcnow() - timedelta(seconds=4)
+        instance.time_start = adjusted_start
+        interval = db_session.query(SessionWorkInterval).filter_by(
+            activity_instance_id=sample_activity_instance.id,
+            ended_at=None,
+        ).one()
+        interval.started_at = adjusted_start
         db_session.commit()
 
         complete_response = authed_client.post(
