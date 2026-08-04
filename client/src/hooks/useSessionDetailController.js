@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../contexts/ActiveSessionContext';
+import { useGoalActivities } from './useGoalQueries';
 import useSessionOptionsMutations from './useSessionOptionsMutations';
 import { useSessionDetailGoalAssociations } from './useSessionDetailGoalAssociations';
 import useSessionDetailNotes from './useSessionDetailNotes';
@@ -54,11 +56,35 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         handleActivityCreated,
         showOptionsModal,
         setShowOptionsModal,
+        scopedGoal,
+        handleToggleGoalScope,
+        clearGoalScope,
     } = useSessionDetailUiState({
+        rootId,
+        sessionId,
         isMobile,
         addActivity,
         setSidePaneMode: setSidePaneModeUi,
     });
+
+    const {
+        data: scopedGoalActivities = [],
+        isLoading: isGoalScopeLoading,
+        isError: isGoalScopeError,
+        refetch: retryGoalScope,
+    } = useGoalActivities(rootId, scopedGoal?.id);
+
+    const activityGoalScope = useMemo(() => {
+        if (!scopedGoal) return null;
+        return {
+            goal: scopedGoal,
+            activityIds: scopedGoalActivities.map((activity) => String(activity.id)),
+            isLoading: isGoalScopeLoading,
+            isError: isGoalScopeError,
+            onRetry: retryGoalScope,
+            onClear: clearGoalScope,
+        };
+    }, [clearGoalScope, isGoalScopeError, isGoalScopeLoading, retryGoalScope, scopedGoal, scopedGoalActivities]);
 
     const {
         allAvailableGoals,
@@ -135,6 +161,8 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         onOptions: () => setShowOptionsModal(true),
         mode: sidePaneMode,
         onModeChange: setSidePaneModeUi,
+        activityGoalScope,
+        onGoalScopeToggle: handleToggleGoalScope,
     });
 
     return {
@@ -189,5 +217,6 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         handleDeleteSessionRequest,
         isSavingTemplate,
         isDuplicatingSession,
+        activityGoalScope,
     };
 }

@@ -1,7 +1,7 @@
 .typeToggle {
     width: 270px;
     flex: 0 0 270px;
-    height: 32px;
+    height: 34px;
     padding: 2px;
     box-sizing: border-box;
 }
@@ -70,5 +70,98 @@
 
     .typeToggle :global([role='tab']) {
         min-height: 38px;
+    }
+}
+.pickerHeaderLeading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.pickerHeaderLeadingScoped {
+    flex: 1 1 auto;
+}
+
+.scopeBanner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex: 1 1 300px;
+    min-width: 220px;
+    min-height: 34px;
+    padding: 0 8px;
+    box-sizing: border-box;
+    border: 1px solid color-mix(in srgb, var(--color-brand-secondary) 62%, var(--color-border));
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--color-brand-secondary) 10%, var(--color-bg-elevated));
+}
+
+.scopeIdentity,
+.scopeActions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+}
+
+.scopeIdentity strong {
+    overflow: hidden;
+    color: var(--color-text-primary);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.scopeActions {
+    flex: 0 0 auto;
+}
+
+.scopeClearButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 5px 8px;
+    border: 0;
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    transition: color 0.16s ease;
+}
+
+.scopeClearButton:hover {
+    color: var(--color-brand-secondary);
+}
+
+.scopeClearButton:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+@media (max-width: 720px) {
+    .pickerHeaderLeading {
+        align-items: stretch;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .pickerHeaderLeading:not(.pickerHeaderLeadingScoped) {
+        width: auto;
+    }
+
+    .scopeBanner {
+        flex-basis: auto;
+        min-width: 0;
+    }
+
+    .scopeActions {
+        margin-left: auto;
     }
 }

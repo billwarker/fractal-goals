@@ -262,6 +262,41 @@ describe('SessionGoalHierarchyPanel smoke', () => {
         expect(onGoalClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'ig-1' }));
     });
 
+    it('uses the goal icon as an accessible independent scope toggle', async () => {
+        const onGoalClick = vi.fn();
+        const onGoalScopeToggle = vi.fn();
+        renderWithProviders(
+            <SessionGoalHierarchyPanel
+                selectedActivity={null}
+                onGoalClick={onGoalClick}
+                onGoalScopeToggle={onGoalScopeToggle}
+                activityGoalScope={{ goal: { id: 'ig-1', name: 'IG' }, activityIds: [] }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        const scopeButton = await screen.findByRole('button', { name: 'Clear activity scope for IG' });
+        expect(scopeButton).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(scopeButton);
+        expect(onGoalScopeToggle).toHaveBeenCalledWith(expect.objectContaining({
+            id: 'ig-1',
+            scopePresentation: {
+                icon: 'circle',
+                color: '#00aa00',
+                secondaryColor: '#005500',
+            },
+        }));
+        expect(onGoalClick).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByText('IG'));
+        expect(onGoalClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'ig-1' }));
+    });
+
     it('keeps the session hierarchy visible when focused activity has no eligible goals', async () => {
         activeSessionMock = {
             ...activeSessionMock,

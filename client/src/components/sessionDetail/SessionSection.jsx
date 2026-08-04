@@ -2,15 +2,15 @@ import React, { useMemo, useState } from 'react';
 import SessionActivityItem from './SessionActivityItem';
 import styles from './SessionSection.module.css';
 import { Heading } from '../atoms/Typography';
-import AddItemButton from '../atoms/AddItemButton';
 import MetaField from '../common/MetaField';
 import SectionHeader from '../common/SectionHeader';
 import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../../contexts/ActiveSessionContext';
 import useIsMobile from '../../hooks/useIsMobile';
 import ModalBackdrop from '../atoms/ModalBackdrop';
-import ActivitySelectorPanel from '../common/ActivitySelectorPanel';
 import CircuitRunCard from '../circuits/CircuitRunCard';
 import CircuitBuilderModal from '../circuits/CircuitBuilderModal';
+import SessionAddActivityButton from './SessionAddActivityButton';
+import SessionSectionActivitySelector from './SessionSectionActivitySelector';
 import { useCircuitDefinitionMutations, useCircuits, useCreateCircuitRun } from '../../hooks/useCircuitQueries';
 
 import { prepareActivityDefinitionCopy } from '../../utils/activityBuilder';
@@ -30,6 +30,7 @@ const SessionSection = ({
     onUpdateNote,
     onDeleteNote,
     onOpenGoals,
+    activityGoalScope = null,
 }) => {
     const isMobile = useIsMobile();
     // Context
@@ -217,18 +218,16 @@ const SessionSection = ({
     };
 
     const selectorContent = (
-        <ActivitySelectorPanel
+        <SessionSectionActivitySelector
             activities={activities}
-            circuits={circuitDefinitions}
+            circuitDefinitions={circuitDefinitions}
             activityGroups={activityGroups}
+            activityGoalScope={activityGoalScope}
             onClose={closeSelector}
             onSelectActivity={(activity) => addActivity(sectionIndex, activity.id, activity)}
             onSelectCircuit={(circuit) => addCircuit(circuit.id)}
             onCreateActivityDefinition={handleCreateActivityDefinition}
             onCopyActivityDefinition={(activity) => openActivityBuilder(prepareActivityDefinitionCopy(activity))}
-            allowCreate={true}
-            allowCopy={true}
-            showTypeToggle
             initialBrowseGroupId={section.default_activity_group_id || null}
         />
     );
@@ -422,11 +421,10 @@ const SessionSection = ({
                             selectorContent
                         )
                     ) : (
-                        <AddItemButton
+                        <SessionAddActivityButton
+                            activityGoalScope={activityGoalScope}
                             onClick={() => setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: true }))}
-                        >
-                            + Add Activity
-                        </AddItemButton>
+                        />
                     )
                 )}
             </div>

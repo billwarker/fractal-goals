@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-export function useSessionDetailUiState({ isMobile, addActivity, setSidePaneMode }) {
+export function useSessionDetailUiState({ rootId, sessionId, isMobile, addActivity, setSidePaneMode }) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showBuilder, setShowBuilder] = useState(false);
     const [builderActivity, setBuilderActivity] = useState(null);
@@ -12,6 +12,12 @@ export function useSessionDetailUiState({ isMobile, addActivity, setSidePaneMode
     const [associationContext, setAssociationContext] = useState(null);
     const [isMobilePaneOpen, setIsMobilePaneOpen] = useState(false);
     const [showOptionsModal, setShowOptionsModal] = useState(false);
+    const [goalScopeState, setGoalScopeState] = useState(null);
+    const scopedGoal = goalScopeState
+        && goalScopeState.rootId === rootId
+        && goalScopeState.sessionId === sessionId
+        ? goalScopeState.goal
+        : null;
 
     const handleActivityFocus = (instance, setIndex = null) => {
         setSelectedActivity(instance);
@@ -51,6 +57,19 @@ export function useSessionDetailUiState({ isMobile, addActivity, setSidePaneMode
         setBuilderActivity(null);
     };
 
+    const handleToggleGoalScope = useCallback((goal) => {
+        if (!goal?.id) return;
+        setGoalScopeState((current) => (
+            current?.rootId === rootId
+            && current?.sessionId === sessionId
+            && String(current.goal?.id) === String(goal.id)
+                ? null
+                : { rootId, sessionId, goal }
+        ));
+    }, [rootId, sessionId]);
+
+    const clearGoalScope = useCallback(() => setGoalScopeState(null), []);
+
     useEffect(() => {
         if (isMobile) return undefined;
 
@@ -83,6 +102,9 @@ export function useSessionDetailUiState({ isMobile, addActivity, setSidePaneMode
         handleActivityCreated,
         showOptionsModal,
         setShowOptionsModal,
+        scopedGoal,
+        handleToggleGoalScope,
+        clearGoalScope,
     };
 }
 

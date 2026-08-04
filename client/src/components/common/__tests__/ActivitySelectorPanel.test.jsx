@@ -46,10 +46,9 @@ describe('ActivitySelectorPanel', () => {
             />,
         );
 
-        const toggle = screen.getByRole('tablist', { name: 'Definition type' });
-        const backButton = screen.getByRole('button', { name: /Back/ });
+        expect(screen.getByRole('tablist', { name: 'Definition type' })).toBeInTheDocument();
         expect(screen.queryByRole('heading', { name: 'Select Activity Group' })).not.toBeInTheDocument();
-        expect(toggle.compareDocumentPosition(backButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(screen.queryByRole('button', { name: /Back/ })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Select Scale Practice' })).toBeInTheDocument();
         expect(screen.queryByText('Ungrouped Circuit')).not.toBeInTheDocument();
 
@@ -75,6 +74,7 @@ describe('ActivitySelectorPanel', () => {
         expect(onSelectActivity).not.toHaveBeenCalled();
 
         fireEvent.click(screen.getByRole('button', { name: 'Technique' }));
+        expect(screen.getByRole('button', { name: /Back/ })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Select Technique Circuit' })).toBeInTheDocument();
         expect(screen.getByText('Circuit • 1 round')).toBeInTheDocument();
     });
@@ -93,10 +93,13 @@ describe('ActivitySelectorPanel', () => {
                 initialBrowseGroupId="group-warmup"
                 onClose={vi.fn()}
                 onSelectActivity={vi.fn()}
+                showTypeToggle
             />
         );
 
-        expect(screen.getByRole('heading', { name: 'Warm Up' })).toBeInTheDocument();
+        const typeToggle = screen.getByRole('tablist', { name: 'Definition type' });
+        const groupHeading = screen.getByRole('heading', { name: 'Warm Up' });
+        expect(typeToggle.compareDocumentPosition(groupHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         expect(screen.getAllByText('Warm Up')).toHaveLength(1);
         expect(screen.getByText('Wrist Circles')).toBeInTheDocument();
         expect(screen.queryByText('Repertoire Run')).not.toBeInTheDocument();

@@ -17,6 +17,8 @@ export function useSessionSidePaneViewModel({
     onOptions,
     mode,
     onModeChange,
+    activityGoalScope = null,
+    onGoalScopeToggle,
     readOnly = false,
     targetModal = null,
 }) {
@@ -58,6 +60,8 @@ export function useSessionSidePaneViewModel({
             onGoalCreated,
             readOnly,
             targetModal,
+            activityGoalScope,
+            onGoalScopeToggle,
         },
         timeline: {
             rootId,
@@ -67,11 +71,13 @@ export function useSessionSidePaneViewModel({
         },
     }), [
         addNote,
+        activityGoalScope,
         deleteNote,
         mode,
         notes,
         onGoalClick,
         onGoalCreated,
+        onGoalScopeToggle,
         onModeChange,
         onNoteAdded,
         onOptions,

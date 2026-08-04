@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react';
 
 import { ActivityPicker } from '../activityPicker';
+import Button from '../atoms/Button';
+import GoalIcon from '../atoms/GoalIcon';
+import { getGoalScopeEmptyState } from '../../utils/sessionActivityScope';
 import ViewToggleTabs from './ViewToggleTabs';
 import styles from './ActivitySelectorPanel.module.css';
 
@@ -52,6 +55,41 @@ function CircuitActivityList({ circuit }) {
     );
 }
 
+function GoalScopeIndicator({ activityGoalScope }) {
+    const scopedGoal = activityGoalScope?.goal;
+    if (!scopedGoal) return null;
+
+    return (
+        <div className={styles.scopeBanner} role="status">
+            <span className={styles.scopeIdentity}>
+                <GoalIcon
+                    shape={scopedGoal.scopePresentation?.icon || 'circle'}
+                    color={scopedGoal.scopePresentation?.color || 'var(--color-brand-primary)'}
+                    secondaryColor={scopedGoal.scopePresentation?.secondaryColor || 'var(--color-brand-secondary)'}
+                    isSmart={scopedGoal.is_smart}
+                    size={16}
+                />
+                <strong>{scopedGoal.name}</strong>
+            </span>
+            <span className={styles.scopeActions}>
+                {activityGoalScope.isError && (
+                    <Button type="button" size="sm" variant="secondary" onClick={activityGoalScope.onRetry}>
+                        Retry
+                    </Button>
+                )}
+                <Button
+                    type="button"
+                    className={styles.scopeClearButton}
+                    unstyled
+                    onClick={activityGoalScope.onClear}
+                >
+                    Clear scope
+                </Button>
+            </span>
+        </div>
+    );
+}
+
 export default function ActivitySelectorPanel({
     activities = [],
     circuits = [],
@@ -73,6 +111,7 @@ export default function ActivitySelectorPanel({
     title = 'Select Activity Group',
     searchPlaceholder = 'Search activities...',
     showTypeToggle = false,
+    activityGoalScope = null,
 }) {
     const [selectorView, setSelectorView] = useState('activities');
     const selectingCircuits = showTypeToggle && selectorView === 'circuits';
@@ -82,6 +121,8 @@ export default function ActivitySelectorPanel({
         type: getCircuitTypeLabel(circuit),
     })), [circuits]);
     const visibleItems = selectingCircuits ? circuitOptions : activities;
+    const scopedGoal = activityGoalScope?.goal || null;
+    const itemLabelPlural = selectingCircuits ? 'activity circuits' : 'activities';
 
     return (
         <ActivityPicker
@@ -91,8 +132,9 @@ export default function ActivitySelectorPanel({
             title={showTypeToggle ? '' : title}
             searchPlaceholder={selectingCircuits ? 'Search activity circuits...' : searchPlaceholder}
             itemLabelSingular={selectingCircuits ? 'activity circuit' : 'activity'}
-            itemLabelPlural={selectingCircuits ? 'activity circuits' : 'activities'}
+            itemLabelPlural={itemLabelPlural}
             ungroupedLabel={selectingCircuits ? 'Ungrouped Activity Circuits' : 'Ungrouped'}
+            emptyState={getGoalScopeEmptyState(activityGoalScope, itemLabelPlural)}
             selectionMode="single"
             allowActivitySelection
             allowGroupSelection={!selectingCircuits && allowGroupSelection}
@@ -104,19 +146,25 @@ export default function ActivitySelectorPanel({
             groupSelectedLabel={groupSelectedLabel}
             showFooter={false}
             variant="panel"
+            flatActivityList={Boolean(scopedGoal)}
             onClose={onClose}
             onCancel={onClose}
             onCreateActivity={onCreateActivityDefinition}
             onCopyActivity={onCopyActivityDefinition}
             canCopyActivity={canCopyActivity}
-            headerLeading={showTypeToggle ? (
-                <ViewToggleTabs
-                    className={styles.typeToggle}
-                    items={SELECTOR_VIEWS}
-                    value={selectorView}
-                    onChange={setSelectorView}
-                    ariaLabel="Definition type"
-                />
+            headerLeading={(showTypeToggle || scopedGoal) ? (
+                <div className={`${styles.pickerHeaderLeading} ${scopedGoal ? styles.pickerHeaderLeadingScoped : ''}`}>
+                    {showTypeToggle && (
+                    <ViewToggleTabs
+                        className={styles.typeToggle}
+                        items={SELECTOR_VIEWS}
+                        value={selectorView}
+                        onChange={setSelectorView}
+                        ariaLabel="Definition type"
+                    />
+                    )}
+                    <GoalScopeIndicator activityGoalScope={activityGoalScope} />
+                </div>
             ) : null}
             renderActivityDetails={selectingCircuits
                 ? (circuit) => <CircuitActivityList circuit={circuit} />

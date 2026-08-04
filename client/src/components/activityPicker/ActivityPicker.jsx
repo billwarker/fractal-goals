@@ -4,16 +4,14 @@ import ActivityPickerHeader from './ActivityPickerHeader';
 import {
     ROOT_KEY,
     buildActivityPickerModel,
+    formatActivityPickerSelectionSummary,
+    isActivityPickerEmpty,
+    resolveActivityPickerBrowseState,
+    toSelectionSet,
 } from './activityPickerUtils';
 import styles from './ActivityPicker.module.css';
 
-const COPY_MODE = 'copy';
-const PICK_MODE = 'pick';
-
-function toSet(value) {
-    return new Set(Array.isArray(value) ? value.filter(Boolean) : []);
-}
-
+const COPY_MODE = 'copy', PICK_MODE = 'pick';
 function ActivityPicker({
     activities = [],
     activityGroups = [],
@@ -22,6 +20,7 @@ function ActivityPicker({
     itemLabelSingular = 'activity',
     itemLabelPlural = 'activities',
     ungroupedLabel = 'Ungrouped',
+    emptyState = null,
     selectionMode = 'multiple',
     selectedActivityIds = [],
     selectedGroupIds = [],
@@ -37,7 +36,6 @@ function ActivityPicker({
     showSearch = true,
     showCloseButton = true,
     showPrimaryActions = true,
-    showRootBackButton = true,
     variant = 'panel',
     confirmLabel = 'Apply',
     cancelLabel = 'Cancel',
@@ -56,10 +54,11 @@ function ActivityPicker({
     extraActions = null,
     headerLeading = null,
     renderActivityDetails = null,
+    flatActivityList = false,
     registerFooterActions,
 }) {
-    const [pendingActivityIds, setPendingActivityIds] = useState(() => toSet(selectedActivityIds));
-    const [pendingGroupIds, setPendingGroupIds] = useState(() => toSet(selectedGroupIds));
+    const [pendingActivityIds, setPendingActivityIds] = useState(() => toSelectionSet(selectedActivityIds));
+    const [pendingGroupIds, setPendingGroupIds] = useState(() => toSelectionSet(selectedGroupIds));
     const [manualBrowseGroupId, setManualBrowseGroupId] = useState(undefined);
     const [searchText, setSearchText] = useState('');
     const [pickerMode, setPickerMode] = useState(PICK_MODE);
@@ -71,9 +70,9 @@ function ActivityPicker({
         () => buildActivityPickerModel(activities, activityGroups),
         [activities, activityGroups]
     );
-    const browseGroupId = manualBrowseGroupId === undefined
-        ? (initialBrowseGroupId && model.normalizedGroupMap[initialBrowseGroupId] ? initialBrowseGroupId : null)
-        : manualBrowseGroupId;
+    const { browseGroupId, currentGroups, currentActivities, rootUngroupedActivities } = resolveActivityPickerBrowseState(
+        model, { flatActivityList, manualBrowseGroupId, initialBrowseGroupId }
+    );
 
     const selectedActivities = useMemo(
         () => model.activities.filter((activity) => pendingActivityIds.has(activity.id)),
@@ -171,11 +170,6 @@ function ActivityPicker({
     }, []);
 
     const handleBack = () => {
-        if (!browseGroupId) {
-            onCancel?.();
-            onClose?.();
-            return;
-        }
         const parentId = model.normalizedGroupMap[browseGroupId]?.normalized_parent_id;
         setManualBrowseGroupId(parentId && parentId !== ROOT_KEY ? parentId : null);
     };
@@ -183,23 +177,15 @@ function ActivityPicker({
     const query = searchText.trim().toLowerCase();
     const isSearching = query.length > 0;
     const currentGroup = browseGroupId ? model.normalizedGroupMap[browseGroupId] : null;
-    const currentGroups = model.childGroupsByParent[browseGroupId || ROOT_KEY] || [];
-    const currentActivities = browseGroupId ? (model.activitiesByGroup[browseGroupId] || []) : [];
-    const rootUngroupedActivities = !browseGroupId ? model.ungroupedActivities : [];
     const searchResults = useMemo(() => {
         if (!isSearching) return [];
         return model.searchActivities(query);
     }, [isSearching, model, query]);
 
     const totalSelected = pendingActivityIds.size + pendingGroupIds.size;
-    const selectedSummary = totalSelected > 0
-        ? [
-            pendingActivityIds.size
-                ? `${pendingActivityIds.size} ${pendingActivityIds.size === 1 ? itemLabelSingular : itemLabelPlural}`
-                : null,
-            pendingGroupIds.size ? `${pendingGroupIds.size} group${pendingGroupIds.size === 1 ? '' : 's'}` : null,
-        ].filter(Boolean).join(', ')
-        : 'None selected';
+    const selectedSummary = formatActivityPickerSelectionSummary(
+        pendingActivityIds.size, pendingGroupIds.size, itemLabelSingular, itemLabelPlural
+    );
 
     useEffect(() => {
         if (!registerFooterActions) {
@@ -267,9 +253,11 @@ function ActivityPicker({
                 </span>
                 <div className={styles.activityContent}>
                     <span className={styles.activityName}>{isCopyMode ? `Copy ${activity.name}` : activity.name}</span>
-                    {(isSearching && groupBreadcrumb) || activity.type ? (
+                    {((isSearching || flatActivityList) && groupBreadcrumb) || activity.type ? (
                         <span className={styles.activityMeta}>
-                            {isSearching && groupBreadcrumb ? `${groupBreadcrumb}${activity.type ? ' / ' : ''}` : ''}
+                            {(isSearching || flatActivityList) && groupBreadcrumb
+                                ? `${groupBreadcrumb}${activity.type ? ' / ' : ''}`
+                                : ''}
                             {activity.type || ''}
                         </span>
                     ) : null}
@@ -319,10 +307,13 @@ function ActivityPicker({
         );
     };
 
-    const showEmpty = !isSearching
-        && currentGroups.length === 0
-        && currentActivities.length === 0
-        && rootUngroupedActivities.length === 0;
+    const showEmpty = isActivityPickerEmpty({
+        isSearching,
+        currentGroups,
+        currentActivities,
+        rootUngroupedActivities,
+        recursiveActivityCounts: model.recursiveActivityCounts,
+    });
 
     return (
         <div className={`${styles.picker} ${variant === 'panel' ? styles.panel : ''}`}>
@@ -333,9 +324,7 @@ function ActivityPicker({
                         displayTitle={displayTitle}
                         subtitle={subtitle}
                         isCopyMode={isCopyMode}
-                        showBackButton={Boolean(
-                            browseGroupId || (showRootBackButton && variant === 'panel' && (onCancel || onClose))
-                        )}
+                        showBackButton={Boolean(browseGroupId)}
                         onBack={handleBack}
                         showCloseButton={showCloseButton}
                         onClose={onClose}
@@ -383,7 +372,11 @@ function ActivityPicker({
                             </>
                         )}
 
-                        {showEmpty && <div className={styles.emptyState}>No {itemLabelPlural} found.</div>}
+                        {showEmpty && (
+                            <div className={styles.emptyState}>
+                                {emptyState || `No ${itemLabelPlural} found.`}
+                            </div>
+                        )}
                     </>
                 )}
 

@@ -163,10 +163,21 @@
     z-index: 0;
 }
 
-.sessionIconSlot > svg,
-.sessionIconSlot > span {
+.sessionIconSlot svg,
+.sessionIconSlot > span,
+.sessionIconButton {
     position: relative;
     z-index: 1;
+}
+
+.sessionIconButton {
+    border-radius: 999px;
+    color: inherit;
+}
+
+.sessionIconButton:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 3px;
 }
 
 .sessionIconSlotBranchActive::after {

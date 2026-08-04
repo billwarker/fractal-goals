@@ -676,7 +676,6 @@ const ActivityAssociator = ({
                         allowCopyActivity={Boolean(onCopyActivity)}
                         allowCreateGroup
                         showFooter={!useFooterAssociateAction}
-                        showRootBackButton={!useFooterAssociateAction}
                         registerFooterActions={useFooterAssociateAction ? registerPickerFooterActions : undefined}
                         title="Available Activities & Groups"
                         confirmLabel="Add Selected"

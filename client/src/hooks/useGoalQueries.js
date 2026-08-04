@@ -34,18 +34,24 @@ export function useFractalTree(rootId, options = {}) {
     });
 }
 
-export function useGoalAssociations(rootId, goalId) {
+export function useGoalActivities(rootId, goalId) {
     const isReady = Boolean(rootId && goalId);
 
-    const { data: activities = [], isLoading: isLoadingActivities } = useQuery({
+    return useQuery({
         queryKey: queryKeys.goalActivities(rootId, goalId),
         queryFn: async () => {
             const res = await fractalApi.getGoalActivities(rootId, goalId);
             return res.data || [];
         },
         enabled: isReady,
-        staleTime: 5 * 60 * 1000, // 5 minutes cache
+        staleTime: 5 * 60 * 1000,
     });
+}
+
+export function useGoalAssociations(rootId, goalId) {
+    const isReady = Boolean(rootId && goalId);
+
+    const { data: activities = [], isLoading: isLoadingActivities } = useGoalActivities(rootId, goalId);
 
     const { data: groups = [], isLoading: isLoadingGroups } = useQuery({
         queryKey: queryKeys.goalActivityGroups(rootId, goalId),

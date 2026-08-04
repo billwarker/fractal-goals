@@ -3,6 +3,51 @@ const UNGROUPED_KEY = '__ungrouped__';
 
 export { ROOT_KEY, UNGROUPED_KEY };
 
+export function toSelectionSet(value) {
+    return new Set(Array.isArray(value) ? value.filter(Boolean) : []);
+}
+
+export function isActivityPickerEmpty({
+    isSearching,
+    currentGroups,
+    currentActivities,
+    rootUngroupedActivities,
+    recursiveActivityCounts,
+}) {
+    if (isSearching || currentActivities.length > 0 || rootUngroupedActivities.length > 0) return false;
+    return !currentGroups.some((group) => (recursiveActivityCounts[group.id] || 0) > 0);
+}
+
+export function formatActivityPickerSelectionSummary(
+    activityCount,
+    groupCount,
+    itemLabelSingular,
+    itemLabelPlural
+) {
+    if (activityCount + groupCount === 0) return 'None selected';
+    return [
+        activityCount ? `${activityCount} ${activityCount === 1 ? itemLabelSingular : itemLabelPlural}` : null,
+        groupCount ? `${groupCount} group${groupCount === 1 ? '' : 's'}` : null,
+    ].filter(Boolean).join(', ');
+}
+
+export function resolveActivityPickerBrowseState(
+    model,
+    { flatActivityList, manualBrowseGroupId, initialBrowseGroupId }
+) {
+    const browseGroupId = flatActivityList ? null : manualBrowseGroupId === undefined
+        ? (initialBrowseGroupId && model.normalizedGroupMap[initialBrowseGroupId] ? initialBrowseGroupId : null)
+        : manualBrowseGroupId;
+    return {
+        browseGroupId,
+        currentGroups: flatActivityList ? [] : (model.childGroupsByParent[browseGroupId || ROOT_KEY] || []),
+        currentActivities: flatActivityList
+            ? sortByOrderThenName(model.activities)
+            : (browseGroupId ? (model.activitiesByGroup[browseGroupId] || []) : []),
+        rootUngroupedActivities: flatActivityList || browseGroupId ? [] : model.ungroupedActivities,
+    };
+}
+
 export function sortByOrderThenName(items = []) {
     return [...items].sort((a, b) => {
         if ((a?.sort_order || 0) !== (b?.sort_order || 0)) {

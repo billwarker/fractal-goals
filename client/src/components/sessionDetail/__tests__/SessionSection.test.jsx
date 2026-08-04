@@ -119,6 +119,21 @@ describe('SessionSection', () => {
         circuitDefinitionsState.definitions = [];
         sessionDataState.activityInstances = [];
         sessionDataState.localSessionData = null;
+        sessionDataState.activities = [
+            {
+                id: 'activity-1',
+                name: 'Scale Practice',
+                description: 'Ascending pattern',
+                group_id: 'group-1',
+                has_sets: false,
+                has_metrics: true,
+                metrics_multiplicative: false,
+                has_splits: false,
+                associated_goal_ids: ['goal-1'],
+                metric_definitions: [{ id: 'metric-1', name: 'Speed', unit: 'bpm' }],
+                split_definitions: [],
+            },
+        ];
         sessionDataState.groupedActivities = {
             'group-1': [sessionDataState.activities[0]],
         };
@@ -163,6 +178,27 @@ describe('SessionSection', () => {
             sectionIndex: 0,
         }));
         expect(addActivity).not.toHaveBeenCalled();
+    });
+
+    it('names and highlights the add action for the active goal scope', () => {
+        render(
+            <SessionSection
+                section={{ name: 'Main Practice', activity_ids: [] }}
+                sectionIndex={0}
+                onFocusActivity={vi.fn()}
+                selectedActivityId={null}
+                onOpenActivityBuilder={vi.fn()}
+                activityGoalScope={{
+                    goal: { id: 'goal-1', name: 'Technique Goal' },
+                    activityIds: ['activity-1'],
+                }}
+            />
+        );
+
+        const button = screen.getByRole('button', {
+            name: '+ Add Activity associated to Technique Goal',
+        });
+        expect(button.className).toMatch(/scopedButton/);
     });
 
     it('opens copy mode and passes a duplicated activity definition into the builder flow', () => {

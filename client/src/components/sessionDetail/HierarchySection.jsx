@@ -18,6 +18,9 @@ function HierarchySection({
     getGoalConnectorEdgeHighlightState,
     connectorHighlightMode,
     showGoalHighlightHalo,
+    onGoalIconClick,
+    isGoalIconSelected,
+    getGoalIconActionLabel,
     onStartSubGoalCreation,
     onOpenAssociate,
     onAddTargetForGoal,
@@ -57,6 +60,9 @@ function HierarchySection({
                 getGoalConnectorEdgeHighlightState={getGoalConnectorEdgeHighlightState}
                 connectorHighlightMode={connectorHighlightMode}
                 showGoalHighlightHalo={showGoalHighlightHalo}
+                onGoalIconClick={onGoalIconClick}
+                isGoalIconSelected={isGoalIconSelected}
+                getGoalIconActionLabel={getGoalIconActionLabel}
                 onStartSubGoalCreation={onStartSubGoalCreation}
                 onAddTargetForGoal={onAddTargetForGoal}
                 emptyState="No goals associated"

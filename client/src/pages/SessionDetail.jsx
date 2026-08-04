@@ -91,6 +91,7 @@ function SessionDetailContent() {
         handleDeleteSessionRequest,
         isSavingTemplate,
         isDuplicatingSession,
+        activityGoalScope,
     } = useSessionDetailController({ rootId, sessionId, navigate, isMobile });
     const isCompleted = Boolean(session?.attributes?.completed);
 
@@ -241,6 +242,7 @@ function SessionDetailContent() {
                             onUpdateNote={updateNote}
                             onDeleteNote={deleteNote}
                             onOpenGoals={handleOpenGoals}
+                            activityGoalScope={activityGoalScope}
                         />
                     ))}
                 </div>

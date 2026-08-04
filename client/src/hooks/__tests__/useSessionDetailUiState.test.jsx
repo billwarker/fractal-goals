@@ -41,4 +41,33 @@ describe('useSessionDetailUiState', () => {
         expect(result.current.showAssociationModal).toBe(true);
         expect(setSidePaneMode).not.toHaveBeenCalled();
     });
+
+    it('toggles one temporary goal scope and resets it across session routes', () => {
+        const baseProps = {
+            rootId: 'root-1',
+            sessionId: 'session-1',
+            isMobile: false,
+            addActivity: vi.fn(),
+            setSidePaneMode: vi.fn(),
+        };
+        const firstGoal = { id: 'goal-1', name: 'First' };
+        const secondGoal = { id: 'goal-2', name: 'Second' };
+        const { result, rerender } = renderHook(
+            ({ props }) => useSessionDetailUiState(props),
+            { initialProps: { props: baseProps } }
+        );
+
+        act(() => result.current.handleToggleGoalScope(firstGoal));
+        expect(result.current.scopedGoal).toBe(firstGoal);
+
+        act(() => result.current.handleToggleGoalScope(secondGoal));
+        expect(result.current.scopedGoal).toBe(secondGoal);
+
+        act(() => result.current.handleToggleGoalScope(secondGoal));
+        expect(result.current.scopedGoal).toBeNull();
+
+        act(() => result.current.handleToggleGoalScope(firstGoal));
+        rerender({ props: { ...baseProps, sessionId: 'session-2' } });
+        expect(result.current.scopedGoal).toBeNull();
+    });
 });

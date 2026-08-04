@@ -20,6 +20,8 @@ function SessionGoalHierarchyPanel({
     onGoalCreated,
     readOnly = false,
     targetModal = null,
+    activityGoalScope = null,
+    onGoalScopeToggle,
     className = '',
 }) {
     const {
@@ -147,6 +149,21 @@ function SessionGoalHierarchyPanel({
                         getGoalConnectorHighlightState={getGoalConnectorHighlightState}
                         getGoalConnectorEdgeHighlightState={getGoalConnectorEdgeHighlightState}
                         connectorHighlightMode="lineage"
+                        showGoalHighlightHalo
+                        onGoalIconClick={onGoalScopeToggle ? (goal) => onGoalScopeToggle({
+                            ...goal,
+                            scopePresentation: {
+                                icon: getGoalIcon(goal.type),
+                                color: getGoalColor(goal.type),
+                                secondaryColor: getGoalSecondaryColor(goal.type),
+                            },
+                        }) : undefined}
+                        isGoalIconSelected={(goal) => String(goal.id) === String(activityGoalScope?.goal?.id)}
+                        getGoalIconActionLabel={(goal, selected) => (
+                            selected
+                                ? `Clear activity scope for ${goal.name}`
+                                : `Scope activities to ${goal.name}`
+                        )}
                         onStartSubGoalCreation={readOnly ? undefined : handleStartSubGoalCreation}
                         scopedActivityName={scopedActivityName}
                     />

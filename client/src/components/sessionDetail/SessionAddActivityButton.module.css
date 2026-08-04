@@ -1,0 +1,38 @@
+.scopedButton {
+    border-color: color-mix(in srgb, var(--color-brand-secondary) 78%, var(--color-border));
+    background: color-mix(in srgb, var(--color-brand-secondary) 10%, transparent);
+    color: var(--color-text-primary);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-secondary) 18%, transparent);
+}
+
+.scopedButton:hover:not(:disabled) {
+    border-color: var(--color-brand-secondary);
+    background: color-mix(in srgb, var(--color-brand-secondary) 16%, transparent);
+}
+
+.scopedLabel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    max-width: 100%;
+}
+
+.scopedLabel strong {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-text-primary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+    .scopedLabel {
+        flex-wrap: wrap;
+    }
+
+    .scopedLabel strong {
+        max-width: 100%;
+        white-space: normal;
+    }
+}

@@ -106,6 +106,8 @@ function SessionSidePane({
                                 onGoalCreated={goals?.onGoalCreated}
                                 readOnly={goals?.readOnly}
                                 targetModal={goals?.targetModal}
+                                activityGoalScope={goals?.activityGoalScope}
+                                onGoalScopeToggle={goals?.onGoalScopeToggle}
                                 className={styles.detailsGoalHierarchy}
                             />
                         ) : (

@@ -1,8 +1,9 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import GoalIcon from '../atoms/GoalIcon';
 import { getTypeDisplayName } from '../../utils/goalHelpers';
 import { isExecutionGoalType } from '../../utils/goalNodeModel';
 import { formatLiteralDate } from '../../utils/dateUtils';
+import GoalIcon from '../atoms/GoalIcon';
+import GoalHierarchyIconAction from './GoalHierarchyIconAction';
 import styles from './GoalHierarchyList.module.css';
 
 function buildSessionHierarchyTree(nodes) {
@@ -61,6 +62,9 @@ function GoalHierarchyList({
     getGoalConnectorEdgeHighlightState,
     connectorHighlightMode = 'selected',
     showGoalHighlightHalo = false,
+    onGoalIconClick,
+    isGoalIconSelected,
+    getGoalIconActionLabel,
     getGoalLeftSlot,
     getScopedCharacteristics,
     getGoalColor,
@@ -323,7 +327,20 @@ function GoalHierarchyList({
         const originalNode = node.originalGoal || node;
         const isSelectable = isGoalSelectable ? isGoalSelectable(originalNode) : Boolean(onGoalClick);
         const branchHighlightState = getNodeHighlightState(node);
+        const iconSelected = Boolean(isGoalIconSelected?.(originalNode));
+        const showIconHalo = showGoalHighlightHalo && (
+            isGoalIconSelected ? iconSelected : Boolean(branchHighlightState)
+        );
         const metaLabel = getGoalMetaLabel ? getGoalMetaLabel(originalNode) : null;
+        const goalIcon = (
+            <GoalIcon
+                shape={getGoalIcon ? getGoalIcon(node.type) : getScopedCharacteristics(node.type)?.icon || 'circle'}
+                color={isCompleted ? completedColor : getGoalColor(node.type)}
+                secondaryColor={isCompleted ? completedSecondaryColor : getGoalSecondaryColor(node.type)}
+                isSmart={node.is_smart}
+                size={16}
+            />
+        );
         return (
             <div
                 key={node.id}
@@ -345,15 +362,16 @@ function GoalHierarchyList({
                     />
                     <div
                         ref={setIconRef(node.id)}
-                        className={`${styles.sessionIconSlot} ${showGoalHighlightHalo && branchHighlightState ? styles.sessionIconSlotBranchActive : ''}`}
+                        className={`${styles.sessionIconSlot} ${showIconHalo ? styles.sessionIconSlotBranchActive : ''}`}
                     >
-                        <GoalIcon
-                            shape={getGoalIcon ? getGoalIcon(node.type) : getScopedCharacteristics(node.type)?.icon || 'circle'}
-                            color={isCompleted ? completedColor : getGoalColor(node.type)}
-                            secondaryColor={isCompleted ? completedSecondaryColor : getGoalSecondaryColor(node.type)}
-                            isSmart={node.is_smart}
-                            size={16}
-                        />
+                        <GoalHierarchyIconAction
+                            goal={originalNode}
+                            selected={iconSelected}
+                            onClick={onGoalIconClick}
+                            getActionLabel={getGoalIconActionLabel}
+                        >
+                            {goalIcon}
+                        </GoalHierarchyIconAction>
                     </div>
                     <div className={styles.sessionNodeContent}>
                         <span
