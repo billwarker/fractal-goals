@@ -132,5 +132,7 @@ def downgrade():
             ],
         )
 
-    if not _has_column("notes", "set_index"):
-        op.add_column("notes", sa.Column("set_index", sa.Integer(), nullable=True))
+    # The canonical c6e8f1a3b5d7 schema already omits notes.set_index. The
+    # original circuit migration restores that legacy column when it is itself
+    # downgraded, so recreating it here makes a multi-revision downgrade try to
+    # add the same column twice.

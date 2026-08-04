@@ -8,11 +8,15 @@ Create Date: 2026-07-17
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 
 from alembic import op
 import sqlalchemy as sa
+
+
+logger = logging.getLogger("alembic.runtime.migration")
 
 
 revision = "5c7d9e1f3a2b"
@@ -45,6 +49,51 @@ def _nonnegative_int(value):
         return max(0, int(value or 0))
     except (TypeError, ValueError):
         return 0
+
+
+def _deduplicate_legacy_metric_values(bind):
+    """Keep the newest value for legacy result/metric/split collisions.
+
+    Older releases allowed more than one top-level metric row for the same
+    activity result. Circuit storage makes that identity explicit, so repair
+    historical collisions before installing the unique index. The ordering is
+    deterministic even when legacy timestamps are missing or tied.
+    """
+    result = bind.execute(
+        sa.text(
+            """
+            DELETE FROM metric_values
+            WHERE id IN (
+                SELECT id
+                FROM (
+                    SELECT
+                        id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY
+                                activity_instance_id,
+                                COALESCE(activity_set_id, ''),
+                                metric_definition_id,
+                                COALESCE(split_definition_id, '')
+                            ORDER BY
+                                updated_at DESC NULLS LAST,
+                                created_at DESC NULLS LAST,
+                                id DESC
+                        ) AS duplicate_rank
+                    FROM metric_values
+                ) AS ranked_metric_values
+                WHERE duplicate_rank > 1
+            )
+            """
+        )
+    )
+    removed_count = max(0, result.rowcount or 0)
+    if removed_count:
+        logger.warning(
+            "Reconciled %d duplicate legacy metric value row(s) before "
+            "creating uq_metric_values_result_metric_split",
+            removed_count,
+        )
+    return removed_count
 
 
 def _create_activity_sets():
@@ -82,6 +131,7 @@ def _create_activity_sets():
         ),
     )
     op.create_index("ix_metric_values_activity_set_id", "metric_values", ["activity_set_id"])
+    _deduplicate_legacy_metric_values(op.get_bind())
     op.create_index(
         "uq_metric_values_result_metric_split",
         "metric_values",
