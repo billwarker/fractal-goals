@@ -33,7 +33,9 @@ export function OnboardingProvider({ children }) {
         queryKey,
         queryFn: async () => (await authApi.getOnboarding(rootId)).data,
         enabled: Boolean(enabled && user?.id),
-        staleTime: 15_000,
+        // Relevant mutations explicitly invalidate active onboarding. A longer
+        // window prevents route/focus churn from repeatedly deriving history.
+        staleTime: 5 * 60_000,
     });
     // Observe the user's fractal summaries cache (owned by Selection/app header)
     // reactively so the root's level word is available once loaded, without

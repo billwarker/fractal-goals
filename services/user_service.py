@@ -1,6 +1,7 @@
 import uuid
 import logging
 
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -21,6 +22,47 @@ logger = logging.getLogger(__name__)
 ONBOARDING_PREFERENCE_KEY = "onboarding"
 ONBOARDING_ROOTS_PREFERENCE_KEY = "onboarding_by_root"
 ONBOARDING_VERSION = 3
+
+ONBOARDING_SUBSTEP_DEFAULTS = {
+    'break_it_down': {
+        'goal_detail_modal_opened': False,
+        'goal_timeline_viewed': False,
+        'goal_activities_viewed': False,
+        'goal_notes_viewed': False,
+        'child_goal_created': False,
+    },
+    'make_goal_smart': {
+        'specific': False,
+        'measurable': False,
+        'achievable': False,
+        'relevant': False,
+        'time_bound': False,
+        'review_badge': None,
+        'goal_id': None,
+    },
+    'create_activity_metric': {
+        'go_to_manage_activities': None,
+        'create_activity': False,
+        'associate_goal': False,
+        'create_activity_group': None,
+        'add_metric': False,
+        'refine_metrics': None,
+    },
+    'first_session': {
+        'create_template': False,
+        'create_session': False,
+        'add_activity': False,
+        'record_values': False,
+        'complete_instance': False,
+        'complete_session': False,
+    },
+    'schedule_program': {
+        'program_created': False,
+        'program_block_created': False,
+        'program_day_completed': False,
+        'calendar_day_modal_opened': False,
+    },
+}
 
 
 class UserService:
@@ -47,7 +89,7 @@ class UserService:
         logger.info("Updated preferences for user_id=%s", user.id)
         return serialize_user(user), None, 200
 
-    def _onboarding_progress(self, user_id: str, root_id: str | None = None) -> JsonDict:
+    def _load_onboarding_goals(self, user_id: str, root_id: str | None):
         roots_query = self.db_session.query(Goal.id).filter(
             Goal.owner_id == user_id,
             Goal.parent_id.is_(None),
@@ -56,6 +98,18 @@ class UserService:
         if root_id:
             roots_query = roots_query.filter(Goal.id == root_id)
         root_ids = [row[0] for row in roots_query.all()]
+        goals = []
+        if root_ids:
+            goals = self.db_session.query(Goal).options(
+                selectinload(Goal.targets_rel),
+                selectinload(Goal.associated_activities),
+                selectinload(Goal.associated_activity_groups),
+            ).filter(
+                Goal.root_id.in_(root_ids), Goal.deleted_at.is_(None),
+            ).all()
+        return root_ids, goals
+
+    def _onboarding_progress(self, root_ids: list[str], candidate_goals: list[Goal]) -> JsonDict:
         if not root_ids:
             return {
                 "break_it_down": False,
@@ -78,13 +132,6 @@ class UserService:
             Session.root_id.in_(root_ids), Session.deleted_at.is_(None), Session.completed.is_(True),
         ).first() is not None
         has_program = self.db_session.query(Program.id).filter(Program.root_id.in_(root_ids)).first() is not None
-        candidate_goals = self.db_session.query(Goal).options(
-            selectinload(Goal.targets_rel),
-            selectinload(Goal.associated_activities),
-            selectinload(Goal.associated_activity_groups),
-        ).filter(
-            Goal.root_id.in_(root_ids), Goal.deleted_at.is_(None),
-        ).all()
         has_smart_goal = any(all(calculate_smart_status(goal).values()) for goal in candidate_goals)
         return {
             "break_it_down": has_child,
@@ -94,15 +141,9 @@ class UserService:
             "make_goal_smart": has_smart_goal,
         }
 
-    def _onboarding_substeps(self, root_id: str | None, state: JsonDict) -> JsonDict:
+    def _onboarding_substeps(self, root_id: str | None, state: JsonDict, goals: list[Goal]) -> JsonDict:
         if not root_id:
             return {}
-
-        goals = self.db_session.query(Goal).options(
-            selectinload(Goal.targets_rel),
-            selectinload(Goal.associated_activities),
-            selectinload(Goal.associated_activity_groups),
-        ).filter(Goal.root_id == root_id, Goal.deleted_at.is_(None)).all()
         children = [goal for goal in goals if goal.parent_id is not None]
 
         best_smart_goal = None
@@ -112,29 +153,50 @@ class UserService:
             if sum(status.values()) > sum(best_smart_status.values()):
                 best_smart_goal, best_smart_status = goal, status
 
-        activities = self.db_session.query(ActivityDefinition).options(
-            selectinload(ActivityDefinition.metric_definitions),
-            selectinload(ActivityDefinition.associated_goals),
-        ).filter(ActivityDefinition.root_id == root_id, ActivityDefinition.deleted_at.is_(None)).all()
-        metrics = [
-            metric for activity in activities for metric in (activity.metric_definitions or [])
-            if metric.deleted_at is None and metric.is_active
-        ]
-        activity_groups = self.db_session.query(ActivityGroup).options(
-            selectinload(ActivityGroup.associated_goals),
-        ).filter(ActivityGroup.root_id == root_id, ActivityGroup.deleted_at.is_(None)).all()
-        instances = self.db_session.query(ActivityInstance).filter(
+        has_activity = self.db_session.query(ActivityDefinition.id).filter(
+            ActivityDefinition.root_id == root_id,
+            ActivityDefinition.deleted_at.is_(None),
+        ).first() is not None
+        has_activity_goal = self.db_session.query(ActivityDefinition.id).filter(
+            ActivityDefinition.root_id == root_id,
+            ActivityDefinition.deleted_at.is_(None),
+            ActivityDefinition.associated_goals.any(),
+        ).first() is not None
+        has_group_goal = self.db_session.query(ActivityGroup.id).filter(
+            ActivityGroup.root_id == root_id,
+            ActivityGroup.deleted_at.is_(None),
+            ActivityGroup.associated_goals.any(),
+        ).first() is not None
+        has_metric = self.db_session.query(MetricDefinition.id).join(
+            ActivityDefinition, ActivityDefinition.id == MetricDefinition.activity_id,
+        ).filter(
+            ActivityDefinition.root_id == root_id,
+            ActivityDefinition.deleted_at.is_(None),
+            MetricDefinition.deleted_at.is_(None),
+            MetricDefinition.is_active.is_(True),
+        ).first() is not None
+
+        instance_count, has_instance_data, has_completed_instance = self.db_session.query(
+            func.count(ActivityInstance.id),
+            func.bool_or(func.coalesce(func.compact_jsonb_octet_length(ActivityInstance.data), 0) > 2),
+            func.bool_or(ActivityInstance.completed.is_(True)),
+        ).filter(
             ActivityInstance.root_id == root_id,
             ActivityInstance.deleted_at.is_(None),
-        ).all()
-        instance_ids = [instance.id for instance in instances]
-        has_metric_values = bool(instance_ids) and self.db_session.query(MetricValue.id).filter(
-            MetricValue.activity_instance_id.in_(instance_ids)
+        ).one()
+        has_metric_values = self.db_session.query(MetricValue.id).join(
+            ActivityInstance, ActivityInstance.id == MetricValue.activity_instance_id,
+        ).filter(
+            ActivityInstance.root_id == root_id,
+            ActivityInstance.deleted_at.is_(None),
         ).first() is not None
-        sessions = self.db_session.query(Session).filter(
+        session_count, has_completed_session = self.db_session.query(
+            func.count(Session.id),
+            func.bool_or(Session.completed.is_(True)),
+        ).filter(
             Session.root_id == root_id,
             Session.deleted_at.is_(None),
-        ).all()
+        ).one()
         # New fractals are auto-seeded with the starter template, so "created a
         # template" means a user-authored (non-starter) template exists.
         has_custom_template = self.db_session.query(SessionTemplate.id).filter(
@@ -142,12 +204,14 @@ class UserService:
             SessionTemplate.deleted_at.is_(None),
             SessionTemplate.name != STARTER_TEMPLATE_NAME,
         ).first() is not None
-        programs = self.db_session.query(Program).options(
-            selectinload(Program.goals),
-            selectinload(Program.blocks).selectinload(ProgramBlock.days).selectinload(ProgramDay.templates),
-        ).filter(Program.root_id == root_id).all()
-        program_blocks = [block for program in programs for block in (program.blocks or [])]
-        program_days = [day for block in program_blocks for day in (block.days or [])]
+        has_program = self.db_session.query(Program.id).filter(Program.root_id == root_id).first() is not None
+        has_program_block = self.db_session.query(ProgramBlock.id).join(Program).filter(
+            Program.root_id == root_id,
+        ).first() is not None
+        has_completed_program_day = self.db_session.query(ProgramDay.id).join(ProgramBlock).join(Program).filter(
+            Program.root_id == root_id,
+            ProgramDay.is_completed.is_(True),
+        ).first() is not None
         visited = set(state.get('visited') or [])
 
         return {
@@ -165,27 +229,47 @@ class UserService:
             },
             'create_activity_metric': {
                 'go_to_manage_activities': None,
-                'create_activity': bool(activities),
-                'associate_goal': any(activity.associated_goals for activity in activities) or any(group.associated_goals for group in activity_groups),
+                'create_activity': has_activity,
+                'associate_goal': has_activity_goal or has_group_goal,
                 'create_activity_group': None,
-                'add_metric': bool(metrics),
+                'add_metric': has_metric,
                 'refine_metrics': None,
             },
             'first_session': {
                 'create_template': has_custom_template,
-                'create_session': bool(sessions),
-                'add_activity': bool(instances),
-                'record_values': has_metric_values or any(bool(instance.data) for instance in instances),
-                'complete_instance': any(instance.completed for instance in instances),
-                'complete_session': any(session.completed for session in sessions),
+                'create_session': bool(session_count),
+                'add_activity': bool(instance_count),
+                'record_values': has_metric_values or bool(has_instance_data),
+                'complete_instance': bool(has_completed_instance),
+                'complete_session': bool(has_completed_session),
             },
             'schedule_program': {
-                'program_created': bool(programs),
-                'program_block_created': bool(program_blocks),
-                'program_day_completed': any(day.is_completed for day in program_days),
+                'program_created': has_program,
+                'program_block_created': has_program_block,
+                'program_day_completed': has_completed_program_day,
                 'calendar_day_modal_opened': 'calendar_day_modal' in visited,
             },
         }
+
+    @staticmethod
+    def _persisted_onboarding_facts(state: JsonDict, *, root_id: str | None):
+        completed_steps = set(state.get('completed_steps') or [])
+        progress = {
+            step_id: step_id in completed_steps
+            for step_id in ONBOARDING_SUBSTEP_DEFAULTS
+        }
+        if not root_id:
+            return progress, {}
+
+        completed_substeps = state.get('completed_substeps') or {}
+        substeps = {}
+        for step_id, defaults in ONBOARDING_SUBSTEP_DEFAULTS.items():
+            completed = set(completed_substeps.get(step_id) or [])
+            substeps[step_id] = {
+                key: (value if value is None else key in completed)
+                for key, value in defaults.items()
+            }
+        return progress, substeps
 
     @staticmethod
     def _normalize_onboarding_state(raw) -> JsonDict:
@@ -283,10 +367,18 @@ class UserService:
         root_states = preferences.get(ONBOARDING_ROOTS_PREFERENCE_KEY) or {}
         raw_state = root_states.get(root_id) if root_id else preferences.get(ONBOARDING_PREFERENCE_KEY)
         state = self._normalize_onboarding_state(raw_state)
-        progress = self._onboarding_progress(user_id, root_id)
+        persisted_terminal = isinstance(raw_state, dict) and (
+            state["status"] == "dismissed"
+            or set(ONBOARDING_SUBSTEP_DEFAULTS).issubset(state.get("completed_steps") or [])
+        )
+        if persisted_terminal:
+            progress, substeps = self._persisted_onboarding_facts(state, root_id=root_id)
+        else:
+            root_ids, goals = self._load_onboarding_goals(user_id, root_id)
+            progress = self._onboarding_progress(root_ids, goals)
+            substeps = self._onboarding_substeps(root_id, state, goals)
         returning_user = state["status"] is None and not isinstance(raw_state, dict) and any(progress.values())
         effective_status = state["status"] or ("dismissed" if returning_user else "active")
-        substeps = self._onboarding_substeps(root_id, state)
         state, progress, substeps = self._merge_persisted_onboarding_achievements(state, progress, substeps)
         if root_id and isinstance(raw_state, dict) and state != self._normalize_onboarding_state(raw_state):
             root_states = dict(root_states)

@@ -14,9 +14,10 @@ describe('invalidateActivityGoalAssociationQueries', () => {
             goalId: 'goal-1',
         });
 
-        expect(invalidateQueries).toHaveBeenCalledWith({
+        expect(invalidateQueries).toHaveBeenCalledWith(expect.objectContaining({
             queryKey: queryKeys.onboardingRoot(),
-        });
+            predicate: expect.any(Function),
+        }));
     });
 
     it('does not invalidate anything without a query client or root', async () => {

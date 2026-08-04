@@ -77,7 +77,10 @@ describe('ActivitiesContext', () => {
             await result.current.createActivity('root-1', { name: 'Strength', metrics: [{ name: 'Reps' }] });
         });
 
-        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.onboardingRoot() });
+        expect(invalidateSpy).toHaveBeenCalledWith(expect.objectContaining({
+            queryKey: queryKeys.onboardingRoot(),
+            predicate: expect.any(Function),
+        }));
     });
 
     it('shows activity group create/update/delete success and error toasts', async () => {

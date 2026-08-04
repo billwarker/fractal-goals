@@ -28,7 +28,10 @@ describe('goalDetailQueryUtils', () => {
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.goalMetricsRoot() });
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.activities('root-1') });
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.fractalTree('root-1') });
-        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.onboardingRoot() });
+        expect(invalidateSpy).toHaveBeenCalledWith(expect.objectContaining({
+            queryKey: queryKeys.onboardingRoot(),
+            predicate: expect.any(Function),
+        }));
     });
 
     it('invalidates session-derived goal caches together', async () => {

@@ -139,6 +139,7 @@ Current SaaS/account pieces:
 - user profile, password, email, username, and preferences endpoints
 - membership tiers and quota limits for free/paid/legacy users
 - per-user app-data storage limits and usage reporting
+- Storage-quota accounting is egress-bounded: `QuotaService.get_storage_usage_bytes()` executes one PostgreSQL statement composed of scalar byte aggregates and never hydrates owned payload rows into the API process. Compact JSONB sizes are calculated authoritatively by the immutable, fixed-search-path `compact_jsonb_octet_length(jsonb)` database function (migration `e8a1c4f7b2d9`); application-side write checks use matching compact UTF-8 estimates. This keeps Supabase/Supavisor uncached egress constant per quota check as account history grows.
 - quota usage reporting in account settings
 - admin user management, invite-key generation, support access into user fractals, and grouped admin user actions for tier/quota updates, temporary passwords, suspend/reactivate, clearing login locks, role changes, soft delete, and hard delete; suspension is the admin-controlled `User.is_active=false` account state and blocks both new logins and existing token-authenticated access, while login locks are automatic failed-login lockouts tracked through `failed_login_count` / `locked_until`
 - admin quota editing consumes backend-owned tier default metadata so reset-to-default behavior stays aligned with quota enforcement

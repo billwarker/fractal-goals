@@ -1,8 +1,32 @@
+import importlib
 import uuid
+import json
 from datetime import datetime, timezone
 
-from models import ActivityDefinition, ActivityInstance, AppSetting, FractalMetricDefinition, Goal, Note, Session, SessionTemplate
-from services.quota_service import FREE_LIMITS, TIER_DEFAULT_LIMITS_SETTING_KEY, QuotaService
+from sqlalchemy import event, text
+
+from models import (
+    ActivityDefinition,
+    ActivityInstance,
+    AppSetting,
+    CircuitDefinition,
+    CircuitSlot,
+    FractalMetricDefinition,
+    Goal,
+    Note,
+    Session,
+    SessionTemplate,
+)
+from services.quota_service import (
+    FREE_LIMITS,
+    TIER_DEFAULT_LIMITS_SETTING_KEY,
+    QuotaService,
+)
+
+
+compact_jsonb_migration = importlib.import_module(
+    "migrations.versions.e8a1c4f7b2d9_add_compact_jsonb_octet_length"
+)
 
 
 def test_free_quota_usage_counts_owned_root_entities(db_session, test_user, sample_ultimate_goal):
@@ -224,3 +248,122 @@ def test_invalid_configured_tier_defaults_fall_back_to_builtins(db_session, test
     limits = QuotaService(db_session).get_effective_limits(test_user)
 
     assert limits["goals"] == FREE_LIMITS["goals"]
+
+
+def test_compact_jsonb_byte_function_matches_representative_python_estimates(db_session):
+    payloads = [
+        {},
+        [],
+        {"nested": [1, True, None, "commas, colons: and spaces", {"é": "雪"}]},
+        ["line\nbreak", "quote\"slash\\", 1.25],
+    ]
+
+    for payload in payloads:
+        database_size = db_session.execute(
+            text("SELECT compact_jsonb_octet_length(CAST(:payload AS jsonb))"),
+            {"payload": json.dumps(payload, ensure_ascii=False)},
+        ).scalar_one()
+        assert database_size == QuotaService._payload_size(payload)
+
+
+def test_compact_jsonb_migration_and_fresh_database_ddl_stay_identical():
+    from models.base import COMPACT_JSONB_OCTET_LENGTH_SQL
+
+    migration_sql = compact_jsonb_migration.COMPACT_JSONB_OCTET_LENGTH_SQL
+    assert migration_sql == COMPACT_JSONB_OCTET_LENGTH_SQL
+    assert "SET search_path = pg_catalog, public" in migration_sql
+
+
+def test_storage_usage_is_exact_and_executes_as_one_scalar_statement(
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+):
+    sample_ultimate_goal.description = "Unicode snow: 雪"
+    sample_ultimate_goal.relevance_statement = "Meaningful"
+    sample_ultimate_goal.progress_settings = {"mode": "weighted", "labels": ["é", "steady"]}
+    session = Session(
+        id=str(uuid.uuid4()),
+        owner_id=test_user.id,
+        root_id=sample_ultimate_goal.id,
+        name="Practice",
+        description="Structured work",
+        attributes={"session_data": {"sections": [{"name": "Warm-up"}]}},
+    )
+    activity = ActivityDefinition(
+        id=str(uuid.uuid4()),
+        root_id=sample_ultimate_goal.id,
+        name="Lift",
+        description="Heavy",
+    )
+    instance = ActivityInstance(
+        id=str(uuid.uuid4()),
+        root_id=sample_ultimate_goal.id,
+        session_id=session.id,
+        activity_definition_id=activity.id,
+        notes="Controlled",
+        data={"sets": [5, 5, 3]},
+    )
+    note = Note(
+        id=str(uuid.uuid4()),
+        root_id=sample_ultimate_goal.id,
+        context_type="root",
+        context_id=sample_ultimate_goal.id,
+        content="Remember 雪 and preserve every byte",
+    )
+    circuit = CircuitDefinition(
+        id=str(uuid.uuid4()),
+        root_id=sample_ultimate_goal.id,
+        name="Main circuit",
+        description="Two movements",
+    )
+    slots = [
+        CircuitSlot(
+            id=str(uuid.uuid4()),
+            definition=circuit,
+            activity_definition_id=activity.id,
+            sort_order=index,
+        )
+        for index in range(2)
+    ]
+    db_session.add_all([session, activity, instance, note, circuit, *slots])
+    db_session.commit()
+
+    expected = sum([
+        QuotaService._payload_size(
+            sample_ultimate_goal.name,
+            sample_ultimate_goal.description,
+            sample_ultimate_goal.relevance_statement,
+            sample_ultimate_goal.targets,
+            sample_ultimate_goal.progress_settings,
+            sample_ultimate_goal.completion_reason,
+        ),
+        QuotaService._payload_size(session.name, session.description, session.attributes),
+        QuotaService._payload_size(activity.name, activity.description),
+        QuotaService._payload_size(instance.notes, instance.data),
+        QuotaService._payload_size(note.content),
+        QuotaService._payload_size(
+            circuit.name,
+            circuit.description,
+            [{"activity_definition_id": slot.activity_definition_id} for slot in slots],
+        ),
+    ])
+
+    statements = []
+    engine = db_session.get_bind()
+    user_id = test_user.id
+
+    def capture_statement(_conn, _cursor, statement, _params, _context, _many):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture_statement)
+    try:
+        actual = QuotaService(db_session).get_storage_usage_bytes(user_id)
+    finally:
+        event.remove(engine, "before_cursor_execute", capture_statement)
+
+    assert actual == expected
+    assert len(statements) == 1
+    assert "compact_jsonb_octet_length" in statements[0]
+    assert "notes.content" in statements[0]
+    assert "notes_content" not in statements[0]

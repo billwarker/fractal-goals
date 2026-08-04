@@ -32,7 +32,6 @@ class _ProgramHelpersMixin:
             template_goal_load.selectinload(Goal.targets_rel).selectinload(Target.metric_conditions),
             template_goal_load.selectinload(Goal.associated_activities),
             template_goal_load.selectinload(Goal.associated_activity_groups),
-            template_goal_load.selectinload(Goal.sessions),
             day_load.selectinload(ProgramDay.completed_sessions),
             day_load.selectinload(ProgramDay.day_sessions),
         ]

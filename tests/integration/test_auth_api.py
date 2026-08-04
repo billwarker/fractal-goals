@@ -15,6 +15,7 @@ Tests cover:
 
 import pytest
 import json
+from sqlalchemy import event
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
 from models import PasswordResetToken, Program, ProgramBlock, ProgramDay, utc_now
@@ -622,6 +623,83 @@ class TestPreferencesEndpoint:
             'program_day_completed': True,
             'calendar_day_modal_opened': False,
         }
+
+    def test_onboarding_history_checks_return_scalars_instead_of_hydrating_payloads(
+        self,
+        db_session,
+        test_user,
+        sample_ultimate_goal,
+        sample_activity_instance,
+    ):
+        sample_activity_instance.data = {"large": "x" * 100_000}
+        db_session.commit()
+
+        user_id = test_user.id
+        root_id = sample_ultimate_goal.id
+        statements = []
+        engine = db_session.get_bind()
+
+        def capture_statement(_conn, _cursor, statement, _params, _context, _many):
+            statements.append(statement)
+
+        event.listen(engine, "before_cursor_execute", capture_statement)
+        try:
+            payload, error, status = UserService(db_session).get_onboarding(user_id, root_id)
+        finally:
+            event.remove(engine, "before_cursor_execute", capture_statement)
+
+        assert status == 200
+        assert error is None
+        assert payload['substeps']['first_session']['record_values'] is True
+        instance_queries = [sql for sql in statements if "FROM activity_instances" in sql]
+        session_queries = [sql for sql in statements if "FROM sessions" in sql]
+        assert instance_queries
+        assert session_queries
+        assert all("activity_instances_data" not in sql for sql in instance_queries)
+        assert all("sessions_attributes" not in sql for sql in session_queries)
+        assert any("compact_jsonb_octet_length" in sql for sql in instance_queries)
+
+    def test_dismissed_onboarding_uses_persisted_facts_without_history_queries(
+        self,
+        db_session,
+        test_user,
+        sample_ultimate_goal,
+    ):
+        root_id = sample_ultimate_goal.id
+        test_user.preferences = {
+            **(test_user.preferences or {}),
+            'onboarding_by_root': {
+                root_id: UserService._normalize_onboarding_state({
+                    'status': 'dismissed',
+                    'completed_steps': ['break_it_down'],
+                    'completed_substeps': {
+                        'break_it_down': ['child_goal_created'],
+                    },
+                }),
+            },
+        }
+        db_session.commit()
+        user_id = test_user.id
+        statements = []
+        engine = db_session.get_bind()
+
+        def capture_statement(_conn, _cursor, statement, _params, _context, _many):
+            statements.append(statement)
+
+        event.listen(engine, "before_cursor_execute", capture_statement)
+        try:
+            payload, error, status = UserService(db_session).get_onboarding(user_id, root_id)
+        finally:
+            event.remove(engine, "before_cursor_execute", capture_statement)
+
+        assert status == 200
+        assert error is None
+        assert payload['status'] == 'dismissed'
+        assert payload['steps']['break_it_down'] is True
+        assert payload['substeps']['break_it_down']['child_goal_created'] is True
+        assert not any("FROM activity_instances" in sql for sql in statements)
+        assert not any("FROM sessions" in sql for sql in statements)
+        assert not any("FROM programs" in sql for sql in statements)
 
     def test_onboarding_achievements_persist_after_qualifying_records_are_removed(
         self,

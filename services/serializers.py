@@ -699,7 +699,6 @@ def serialize_goal(goal, include_children=True):
             "paused_at": format_utc(getattr(goal, 'paused_at', None)),
             "associated_activity_ids": [a.id for a in goal.associated_activities] if goal.associated_activities else [],
             "associated_activity_group_ids": [g.id for g in goal.associated_activity_groups] if goal.associated_activity_groups else [],
-            "session_id": goal.sessions[0].id if goal.sessions else None,
             "progress_settings": getattr(goal, 'progress_settings', None),
         },
         "children": []

@@ -16,5 +16,8 @@ export function invalidateSessionLists(queryClient, rootId, queryKeys, options =
 }
 
 export function invalidateOnboardingProgress(queryClient, queryKeys) {
-    return queryClient.invalidateQueries({ queryKey: queryKeys.onboardingRoot() });
+    return queryClient.invalidateQueries({
+        queryKey: queryKeys.onboardingRoot(),
+        predicate: (query) => !['dismissed', 'completed'].includes(query.state.data?.status),
+    });
 }

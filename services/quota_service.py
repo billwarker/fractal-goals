@@ -4,7 +4,7 @@ from copy import deepcopy
 import json
 from typing import Optional, Sequence
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Text, cast, func, literal, or_, select
 
 from account_tiers import (
     DEFAULT_ACCOUNT_TIER,
@@ -19,9 +19,9 @@ from models import (
     ActivityGroup,
     ActivityInstance,
     CircuitDefinition,
+    CircuitSlot,
     AnalyticsDashboard,
     AppSetting,
-    EventLog,
     FractalMetricDefinition,
     Goal,
     MetricDefinition,
@@ -202,18 +202,39 @@ class QuotaService:
 
     @staticmethod
     def _payload_size(*values) -> int:
+        """Return the canonical logical UTF-8 byte size used by storage quotas.
+
+        JSON is compact and key-sorted for stable application-side estimates.
+        ``ensure_ascii=False`` keeps Unicode estimates aligned with stored
+        UTF-8 JSONB instead of charging non-ASCII text as six-byte
+        ``\\uXXXX`` escape sequences. PostgreSQL owns the authoritative total.
+        """
         total = 0
         for value in values:
             if value is None:
                 continue
             if isinstance(value, (dict, list)):
-                rendered = json.dumps(value, sort_keys=True, default=str, separators=(",", ":"))
+                rendered = json.dumps(
+                    value,
+                    sort_keys=True,
+                    default=str,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
             else:
                 rendered = str(value)
             total += len(rendered.encode("utf-8"))
         return total
 
     def get_storage_usage_bytes(self, user_id: str, root_ids: Optional[Sequence[str]] = None) -> int:
+        """Return quota-accounted bytes without transferring stored payloads.
+
+        This deliberately executes one statement whose scalar subqueries sum
+        bytes inside Postgres. The previous implementation hydrated every
+        owned row into the API process on each write, making uncached egress
+        proportional to account history and turning a few MB of stored notes
+        into hundreds of MB of daily database traffic.
+        """
         scoped_root_ids = list(dict.fromkeys(root_ids or []))
         if scoped_root_ids:
             roots = select(Goal.id).where(
@@ -231,70 +252,117 @@ class QuotaService:
             )
             goal_filter = Goal.owner_id == user_id
 
-        total = 0
-
-        for goal in self.db_session.query(Goal).filter(goal_filter, Goal.deleted_at.is_(None)).all():
-            total += self._payload_size(
-                goal.name, goal.description, goal.relevance_statement, goal.targets,
-                goal.progress_settings, goal.completion_reason,
+        def text_bytes(*columns):
+            return sum(
+                (func.coalesce(func.octet_length(cast(column, Text)), 0) for column in columns),
+                literal(0),
             )
 
-        for row in self.db_session.query(Session).filter(Session.root_id.in_(roots), Session.deleted_at.is_(None)).all():
-            total += self._payload_size(row.name, row.description, row.attributes)
+        def json_bytes(column):
+            return func.coalesce(func.compact_jsonb_octet_length(column), 0)
 
-        for row in self.db_session.query(ActivityGroup).filter(ActivityGroup.root_id.in_(roots), ActivityGroup.deleted_at.is_(None)).all():
-            total += self._payload_size(row.name, row.description)
+        def table_total(row_size, *criteria, select_from=None):
+            statement = select(func.coalesce(func.sum(row_size), 0))
+            if select_from is not None:
+                statement = statement.select_from(select_from)
+            if criteria:
+                statement = statement.where(*criteria)
+            return statement.scalar_subquery()
 
-        for row in self.db_session.query(ActivityDefinition).filter(ActivityDefinition.root_id.in_(roots), ActivityDefinition.deleted_at.is_(None)).all():
-            total += self._payload_size(row.name, row.description)
+        slot_count = select(func.count(CircuitSlot.id)).where(
+            CircuitSlot.circuit_definition_id == CircuitDefinition.id,
+        ).correlate(CircuitDefinition).scalar_subquery()
+        slot_payload_bytes = select(
+            func.coalesce(func.sum(func.compact_jsonb_octet_length(
+                func.jsonb_build_object("activity_definition_id", CircuitSlot.activity_definition_id)
+            )), 0)
+        ).where(
+            CircuitSlot.circuit_definition_id == CircuitDefinition.id,
+        ).correlate(CircuitDefinition).scalar_subquery()
+        compact_slot_list_bytes = (
+            literal(2)
+            + slot_payload_bytes
+            + func.greatest(slot_count - 1, 0)
+        )
 
-        for row in self.db_session.query(CircuitDefinition).filter(CircuitDefinition.root_id.in_(roots), CircuitDefinition.deleted_at.is_(None)).all():
-            total += self._payload_size(
-                row.name,
-                row.description,
-                [
-                    {
-                        "activity_definition_id": slot.activity_definition_id,
-                    }
-                    for slot in row.slots
-                ],
-            )
+        totals = [
+            table_total(
+                text_bytes(Goal.name, Goal.description, Goal.relevance_statement, Goal.completion_reason)
+                + json_bytes(Goal.targets)
+                + json_bytes(Goal.progress_settings),
+                goal_filter,
+                Goal.deleted_at.is_(None),
+            ),
+            table_total(
+                text_bytes(Session.name, Session.description) + json_bytes(Session.attributes),
+                Session.root_id.in_(roots), Session.deleted_at.is_(None),
+            ),
+            table_total(
+                text_bytes(ActivityGroup.name, ActivityGroup.description),
+                ActivityGroup.root_id.in_(roots), ActivityGroup.deleted_at.is_(None),
+            ),
+            table_total(
+                text_bytes(ActivityDefinition.name, ActivityDefinition.description),
+                ActivityDefinition.root_id.in_(roots), ActivityDefinition.deleted_at.is_(None),
+            ),
+            table_total(
+                text_bytes(CircuitDefinition.name, CircuitDefinition.description) + compact_slot_list_bytes,
+                CircuitDefinition.root_id.in_(roots), CircuitDefinition.deleted_at.is_(None),
+            ),
+            table_total(
+                text_bytes(ActivityInstance.notes) + json_bytes(ActivityInstance.data),
+                ActivityInstance.root_id.in_(roots), ActivityInstance.deleted_at.is_(None),
+            ),
+            table_total(
+                text_bytes(
+                    FractalMetricDefinition.name,
+                    FractalMetricDefinition.unit,
+                    FractalMetricDefinition.description,
+                ) + json_bytes(FractalMetricDefinition.predefined_values),
+                FractalMetricDefinition.root_id.in_(roots),
+                FractalMetricDefinition.deleted_at.is_(None),
+            ),
+            table_total(
+                text_bytes(MetricDefinition.name, MetricDefinition.unit, MetricDefinition.progress_aggregation),
+                MetricDefinition.root_id.in_(roots), MetricDefinition.deleted_at.is_(None),
+            ),
+            table_total(
+                text_bytes(SessionTemplate.name, SessionTemplate.description)
+                + json_bytes(SessionTemplate.template_data),
+                SessionTemplate.root_id.in_(roots), SessionTemplate.deleted_at.is_(None),
+            ),
+            table_total(
+                text_bytes(Note.content),
+                Note.root_id.in_(roots), Note.deleted_at.is_(None),
+            ),
+            table_total(
+                text_bytes(Program.name, Program.description, Program.color)
+                + json_bytes(Program.weekly_schedule),
+                Program.root_id.in_(roots),
+            ),
+            table_total(
+                text_bytes(ProgramBlock.name, ProgramBlock.color),
+                Program.root_id.in_(roots),
+                select_from=ProgramBlock.__table__.join(Program.__table__),
+            ),
+            table_total(
+                text_bytes(ProgramDay.name, ProgramDay.notes, ProgramDay.day_of_week),
+                Program.root_id.in_(roots),
+                select_from=ProgramDay.__table__.join(ProgramBlock.__table__).join(Program.__table__),
+            ),
+            table_total(
+                text_bytes(AnalyticsDashboard.name) + json_bytes(AnalyticsDashboard.layout),
+                AnalyticsDashboard.root_id.in_(roots), AnalyticsDashboard.deleted_at.is_(None),
+            ),
+            # EventLog rows are platform telemetry, not user-manageable content.
+            table_total(
+                text_bytes(Target.name, Target.type, Target.time_scope),
+                Target.root_id.in_(roots), Target.deleted_at.is_(None),
+            ),
+        ]
 
-        for row in self.db_session.query(ActivityInstance).filter(ActivityInstance.root_id.in_(roots), ActivityInstance.deleted_at.is_(None)).all():
-            total += self._payload_size(row.notes, row.data)
-
-        for row in self.db_session.query(FractalMetricDefinition).filter(FractalMetricDefinition.root_id.in_(roots), FractalMetricDefinition.deleted_at.is_(None)).all():
-            total += self._payload_size(row.name, row.unit, row.description, row.predefined_values)
-
-        for row in self.db_session.query(MetricDefinition).filter(MetricDefinition.root_id.in_(roots), MetricDefinition.deleted_at.is_(None)).all():
-            total += self._payload_size(row.name, row.unit, row.progress_aggregation)
-
-        for row in self.db_session.query(SessionTemplate).filter(SessionTemplate.root_id.in_(roots), SessionTemplate.deleted_at.is_(None)).all():
-            total += self._payload_size(row.name, row.description, row.template_data)
-
-        for row in self.db_session.query(Note).filter(Note.root_id.in_(roots), Note.deleted_at.is_(None)).all():
-            total += self._payload_size(row.content)
-
-        for row in self.db_session.query(Program).filter(Program.root_id.in_(roots)).all():
-            total += self._payload_size(row.name, row.description, row.weekly_schedule, row.color)
-
-        for row in self.db_session.query(ProgramBlock).join(Program).filter(Program.root_id.in_(roots)).all():
-            total += self._payload_size(row.name, row.color)
-
-        for row in self.db_session.query(ProgramDay).join(ProgramBlock).join(Program).filter(Program.root_id.in_(roots)).all():
-            total += self._payload_size(row.name, row.notes, row.day_of_week)
-
-        for row in self.db_session.query(AnalyticsDashboard).filter(AnalyticsDashboard.root_id.in_(roots), AnalyticsDashboard.deleted_at.is_(None)).all():
-            total += self._payload_size(row.name, row.layout)
-
-        # EventLog rows are intentionally excluded: event history is platform
-        # telemetry surfaced through the admin usage dashboard, not
-        # user-manageable content, so users do not pay storage quota for it.
-
-        for row in self.db_session.query(Target).filter(Target.root_id.in_(roots), Target.deleted_at.is_(None)).all():
-            total += self._payload_size(row.name, row.type, row.time_scope)
-
-        return int(total)
+        total = self.db_session.execute(select(sum(totals, literal(0)))).scalar_one()
+        return int(total or 0)
 
     def get_usage(self, user_id: str, root_ids: Optional[Sequence[str]] = None) -> JsonDict:
         scoped_root_ids = list(dict.fromkeys(root_ids or []))
