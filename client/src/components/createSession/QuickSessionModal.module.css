@@ -1,0 +1,41 @@
+.modal {
+    width: min(94vw, 1200px);
+}
+
+.body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.instructions {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 14px;
+}
+
+.footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--color-bg-card);
+}
+
+@media (max-width: 560px) {
+    .body {
+        padding: 0;
+    }
+
+    .footer {
+        padding-right: 0;
+        padding-left: 0;
+    }
+
+    .footer > button {
+        min-height: 44px;
+        height: auto;
+    }
+
+    .completeButton {
+        flex: 1;
+    }
+}

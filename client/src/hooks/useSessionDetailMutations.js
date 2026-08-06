@@ -7,7 +7,6 @@ import { formatError } from '../utils/mutationNotify';
 import { applyOptimisticQueryUpdate } from '../utils/optimisticQuery';
 import { fractalApi } from '../utils/api';
 import { invalidateOnboardingProgress, invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
-import { mergeUniqueIds } from '../utils/sessionGoalScope';
 import { queryKeys } from './queryKeys';
 import {
     formatGoalTypeLabel,
@@ -80,12 +79,15 @@ export function useSessionDetailMutations({
                     return [...previous, createdInstance];
                 });
             }
-            queryClient.invalidateQueries({ queryKey: sessionKey });
-            queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
+            const refreshes = [
+                queryClient.invalidateQueries({ queryKey: sessionKey }),
+                queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey }),
+            ];
             invalidateSessionListQueries();
             if (!variables?.suppressToast) {
                 notify.success('Activity added');
             }
+            return Promise.all(refreshes);
         },
         onError: (error) => {
             const status = error?.response?.status;
@@ -511,11 +513,6 @@ export function useSessionDetailMutations({
                 section_index: sectionIndex,
             });
             const newInstance = response.data;
-            const associatedGoalIds = mergeUniqueIds(
-                activityDefinition.associated_goal_ids || activityDefinition.goal_ids || [],
-                newInstance?.associated_goal_ids || newInstance?.goal_ids || []
-            );
-
             updateSessionDataDraft((currentData) => {
                 if (!currentData?.sections?.[sectionIndex]) return currentData;
                 const updatedData = { ...currentData };
@@ -530,28 +527,13 @@ export function useSessionDetailMutations({
                 return updatedData;
             });
 
-            queryClient.setQueryData(sessionGoalsViewKey, (previous) => {
-                if (!previous || typeof previous !== 'object') return previous;
-                const activityId = String(activityDefinition.id);
-                const previousActivityGoalIds = previous.activity_goal_ids_by_activity || {};
-
-                return {
-                    ...previous,
-                    session_activity_ids: mergeUniqueIds(previous.session_activity_ids, [activityId]),
-                    activity_goal_ids_by_activity: {
-                        ...previousActivityGoalIds,
-                        [activityId]: mergeUniqueIds(previousActivityGoalIds[activityId], associatedGoalIds),
-                    },
-                };
-            });
-
             setShowActivitySelector((previous) => ({ ...previous, [sectionIndex]: false }));
             return newInstance;
         } catch (error) {
             logError('Error adding activity:', error);
             throw error;
         }
-    }, [activities, addActivityMutation, queryClient, sessionGoalsViewKey, setShowActivitySelector, updateSessionDataDraft]);
+    }, [activities, addActivityMutation, setShowActivitySelector, updateSessionDataDraft]);
 
     const duplicateActivityInstance = useCallback(async (sectionIndex, sourceInstanceId, insertAfterIndex) => {
         const cachedInstances = queryClient.getQueryData(sessionActivitiesKey);

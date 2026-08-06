@@ -126,30 +126,54 @@ export function useSessionGoalsViewModel({
         return ancestorIds;
     }, [activeActivityDefId, normalizedTree, parentMap, selectedActivityGoalIds]);
 
-    // 2. Derive Session Hierarchy (everything)
-    const sessionHierarchy = useMemo(() => {
-        const nodeById = new Map(normalizedTree.map((node) => [String(node.id), node]));
-        const inScopeGoalIds = new Set();
-
+    const manualGoalIds = useMemo(
+        () => new Set((sessionGoalsView?.manual_goal_ids || []).map(String)),
+        [sessionGoalsView]
+    );
+    const evidenceGoalIds = useMemo(() => {
+        const direct = new Set();
         currentSessionActivityDefIds.forEach((activityDefId) => {
-            (activityGoalIdsByActivity[activityDefId] || []).forEach((goalId) => {
-                const normalizedGoalId = String(goalId);
-                const node = nodeById.get(normalizedGoalId);
-                if (node && !isPausedGoal(node)) {
-                    inScopeGoalIds.add(normalizedGoalId);
-                }
-            });
+            (activityGoalIdsByActivity[activityDefId] || []).forEach((goalId) => direct.add(String(goalId)));
         });
+        return collectIdsWithAncestors(direct, parentMap);
+    }, [activityGoalIdsByActivity, currentSessionActivityDefIds, parentMap]);
+    const completedEvidenceGoalIds = useMemo(() => {
+        const completedDefinitionIds = new Set(
+            (activityInstances || [])
+                .filter((instance) => instance?.completed && !instance?.deleted_at)
+                .map((instance) => String(instance.activity_definition_id || instance.activity_id || ''))
+                .filter(Boolean)
+        );
+        const direct = new Set();
+        completedDefinitionIds.forEach((activityDefId) => {
+            (activityGoalIdsByActivity[activityDefId] || []).forEach((goalId) => direct.add(String(goalId)));
+        });
+        return collectIdsWithAncestors(direct, parentMap);
+    }, [activityGoalIdsByActivity, activityInstances, parentMap]);
 
-        const lineageIds = collectIdsWithAncestors(inScopeGoalIds, parentMap);
-
+    // 2. Derive Session Hierarchy from the backend-pruned manual/evidence tree.
+    const sessionHierarchy = useMemo(() => {
+        const hasExplicitScopeContract = Array.isArray(sessionGoalsView?.manual_goal_ids)
+            || Array.isArray(sessionGoalsView?.automatic_goal_ids);
+        let visibleIds = null;
+        if (!hasExplicitScopeContract) {
+            const legacyEvidenceIds = new Set();
+            currentSessionActivityDefIds.forEach((activityDefId) => {
+                (activityGoalIdsByActivity[activityDefId] || []).forEach((goalId) => {
+                    const node = normalizedTree.find((candidate) => String(candidate.id) === String(goalId));
+                    if (node && !isPausedGoal(node)) legacyEvidenceIds.add(String(goalId));
+                });
+            });
+            visibleIds = collectIdsWithAncestors(legacyEvidenceIds, parentMap);
+        }
         return normalizedTree
-            .filter(node => lineageIds.has(String(node.id)))
+            .filter((node) => !isPausedGoal(node))
+            .filter((node) => !visibleIds || visibleIds.has(String(node.id)))
             .map(node => ({
                 ...node,
                 status: getGoalStatus(node, targetAchievements, achievedTargetIds)
             }));
-    }, [activityGoalIdsByActivity, currentSessionActivityDefIds, normalizedTree, parentMap, targetAchievements, achievedTargetIds]);
+    }, [activityGoalIdsByActivity, currentSessionActivityDefIds, normalizedTree, parentMap, sessionGoalsView, targetAchievements, achievedTargetIds]);
 
     // 3. Derive Activity Hierarchy (filtered by associated activity)
     const activityHierarchy = useMemo(() => {
@@ -238,6 +262,9 @@ export function useSessionGoalsViewModel({
         targetStatusById,
         selectedActivityGoalIds,
         selectedActivityAncestorIds,
+        manualGoalIds,
+        evidenceGoalIds,
+        completedEvidenceGoalIds,
         sessionActivityIds: currentSessionActivityDefIds,
     };
 }

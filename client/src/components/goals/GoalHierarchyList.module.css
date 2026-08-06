@@ -121,10 +121,46 @@
     stroke-linejoin: miter;
 }
 
-.sessionConnectorEdgeActive {
+.sessionConnectorEdgeActive,
+.sessionConnectorEdge_selected {
     stroke: var(--color-brand-secondary, #ff9f1a);
     stroke-width: 2;
     filter: drop-shadow(0 0 5px color-mix(in srgb, var(--color-brand-secondary, #ff9f1a) 48%, transparent));
+}
+
+.sessionConnectorEdge_dashed { stroke-dasharray: 5 5; }
+
+.sessionConnectorEdge_completed {
+    stroke: var(--color-active-branch-line, #60a5fa);
+    stroke-width: 2.25;
+    opacity: 0.88;
+    filter:
+        drop-shadow(0 0 2px color-mix(in srgb, var(--color-active-branch-line, #60a5fa) 55%, transparent))
+        drop-shadow(0 0 7px color-mix(in srgb, var(--color-active-branch-line, #60a5fa) 24%, transparent));
+}
+
+.sessionConnectorEdgeFlow {
+    fill: none;
+    stroke: var(--color-active-branch-line, #60a5fa);
+    stroke-width: 2;
+    stroke-dasharray: 7 15;
+    vector-effect: non-scaling-stroke;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.58;
+    filter:
+        drop-shadow(0 0 3px color-mix(in srgb, var(--color-active-branch-line, #60a5fa) 62%, transparent))
+        drop-shadow(0 0 8px color-mix(in srgb, var(--color-active-branch-line, #60a5fa) 28%, transparent));
+    animation: sessionLineageToRoot 1.25s linear infinite;
+}
+
+@keyframes sessionLineageToRoot {
+    from { stroke-dashoffset: 0; }
+    to { stroke-dashoffset: 22; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sessionConnectorEdgeFlow { animation: none; }
 }
 
 /* Left slot: absolutely positioned so it always sits at the same x coordinate

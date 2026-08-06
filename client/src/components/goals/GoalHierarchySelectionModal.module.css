@@ -27,3 +27,8 @@
 .primaryButton:hover {
     filter: brightness(0.96);
 }
+.error {
+    margin-top: 12px;
+    color: var(--color-brand-danger, #ff6b6b);
+    font-size: 13px;
+}

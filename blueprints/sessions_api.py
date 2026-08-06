@@ -13,6 +13,7 @@ from validators import (
     ActivityInstanceCreateSchema, ActivityInstanceUpdateSchema,
     ActivityMetricsUpdateSchema, ActivityReorderSchema,
     QuickSessionCompleteSchema,
+    SessionGoalScopePreviewSchema,
 )
 from blueprints.auth_api import token_required
 from blueprints.api_utils import get_db_session, parse_optional_pagination, etag_json_response, internal_error, require_owned_root
@@ -286,6 +287,29 @@ def create_fractal_session(current_user, root_id, validated_data):
         db_session.rollback()
         logger.exception("Error creating session")
         return internal_error(logger, "Error creating session")
+    finally:
+        db_session.close()
+
+
+@sessions_bp.route('/<root_id>/sessions/goal-scope-preview', methods=['POST'])
+@token_required
+@validate_request(SessionGoalScopePreviewSchema)
+def preview_session_goal_scope(current_user, root_id, validated_data):
+    db_session = get_db_session()
+    service = SessionService(db_session)
+    try:
+        result, error, status = service.preview_session_goal_scope(
+            root_id,
+            current_user.id,
+            validated_data,
+        )
+        if error:
+            return jsonify(error if isinstance(error, dict) else {"error": error}), status
+        return jsonify(result), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error previewing session goal scope")
+        return internal_error(logger, "Error previewing session goal scope")
     finally:
         db_session.close()
 

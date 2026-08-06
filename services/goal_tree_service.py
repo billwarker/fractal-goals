@@ -101,13 +101,21 @@ class GoalTreeService:
         if includes_source:
             session_goal_select = select(session_goals.c.goal_id, session_goals.c.association_source)
         session_goals_rows = self.db_session.execute(
-            session_goal_select.where(session_goals.c.session_id == session_id)
+            session_goal_select.where(
+                session_goals.c.session_id == session_id,
+                session_goals.c.deleted_at.is_(None),
+            )
         ).all()
         session_goal_ids = [row.goal_id for row in session_goals_rows]
         session_goal_sources = {
             row.goal_id: (getattr(row, 'association_source', None) if includes_source else None) or 'manual'
             for row in session_goals_rows
         }
+        manual_goal_ids = [
+            goal_id
+            for goal_id in session_goal_ids
+            if session_goal_sources.get(goal_id) == 'manual'
+        ]
 
         session_activity_instances = [
             instance
@@ -134,12 +142,12 @@ class GoalTreeService:
                     session_contribution_timestamp,
                 )
 
-        associated_goal_ids = {
+        automatic_goal_ids = {
             goal_id
             for goal_ids in activity_goal_ids_by_activity.values()
             for goal_id in goal_ids
         }
-        structural_goal_ids = set(session_goal_ids) | associated_goal_ids
+        structural_goal_ids = set(manual_goal_ids) | automatic_goal_ids
         visible_goal_ids = self._collect_goal_ids_with_ancestors(
             structural_goal_ids,
             goals_by_id
@@ -151,6 +159,8 @@ class GoalTreeService:
             goal_tree=pruned_goal_tree,
             session_goal_ids=session_goal_ids,
             session_goal_sources=session_goal_sources,
+            manual_goal_ids=manual_goal_ids,
+            automatic_goal_ids=sorted(automatic_goal_ids),
             session_activity_ids=session_activity_ids,
             activity_goal_ids_by_activity=activity_goal_ids_by_activity,
         )

@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
@@ -10,6 +11,10 @@ import HierarchySection from './HierarchySection';
 import TargetsSection from './TargetsSection';
 import styles from './SessionGoalHierarchyPanel.module.css';
 import { logError } from '../../utils/logger';
+import { fractalApi } from '../../utils/api';
+import { queryKeys } from '../../hooks/queryKeys';
+import { flattenGoals } from '../../utils/goalHelpers';
+import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 
 const GoalDetailModal = lazyWithRetry(() => import('../ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 const TargetAnalyticsModal = lazyWithRetry(() => import('../goalDetail/TargetAnalyticsModal'), 'components/goalDetail/TargetAnalyticsModal');
@@ -26,6 +31,7 @@ function SessionGoalHierarchyPanel({
 }) {
     const {
         rootId,
+        sessionId,
         session,
         localSessionData,
         activityInstances,
@@ -35,11 +41,22 @@ function SessionGoalHierarchyPanel({
         achievedTargetIds,
         sessionGoalsView,
     } = useActiveSessionData();
-    const { createGoal } = useActiveSessionActions();
+    const { createGoal, updateSession } = useActiveSessionActions();
+    const queryClient = useQueryClient();
     const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
 
     const [createSubGoalParent, setCreateSubGoalParent] = useState(null);
     const [activeTarget, setActiveTarget] = useState(null);
+    const [scopeModalOpen, setScopeModalOpen] = useState(false);
+    const { data: selectableGoalTree = null } = useQuery({
+        queryKey: queryKeys.goalsTree(rootId),
+        queryFn: async () => (await fractalApi.getGoals(rootId)).data || null,
+        enabled: Boolean(rootId && scopeModalOpen && !readOnly),
+    });
+    const selectableGoals = useMemo(
+        () => selectableGoalTree ? flattenGoals([selectableGoalTree]) : [],
+        [selectableGoalTree]
+    );
     const activeTargetGoalId = activeTarget?._goalId || null;
     const { deleteTarget } = useTargetMutations(rootId, activeTargetGoalId);
 
@@ -63,6 +80,9 @@ function SessionGoalHierarchyPanel({
         targetCards,
         selectedActivityGoalIds,
         selectedActivityAncestorIds,
+        manualGoalIds,
+        evidenceGoalIds,
+        completedEvidenceGoalIds,
     } = useSessionGoalsViewModel({
         session,
         sessionGoalsView,
@@ -97,6 +117,26 @@ function SessionGoalHierarchyPanel({
         const childId = String(childGoal.id);
         return selectedActivityGoalIds.has(childId) || selectedActivityAncestorIds.has(childId);
     }, [hasActivityHighlight, selectedActivityAncestorIds, selectedActivityGoalIds]);
+
+    const getGoalConnectorEdgeState = useCallback((_parentGoal, childGoal) => {
+        const childId = String(childGoal.id);
+        if (selectedActivityGoalIds.has(childId) || selectedActivityAncestorIds.has(childId)) return 'selected';
+        if (completedEvidenceGoalIds.has(childId)) return 'completed';
+        if (evidenceGoalIds.has(childId)) return 'solid';
+        return 'dashed';
+    }, [completedEvidenceGoalIds, evidenceGoalIds, selectedActivityAncestorIds, selectedActivityGoalIds]);
+
+    const handleApplyScope = useCallback(async (goalIds) => {
+        await updateSession({ goal_ids: goalIds });
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionGoalsView(rootId, sessionId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.session(rootId, sessionId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionsEvidenceGoalsRoot(rootId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionsFlowtreeMetricsRoot(rootId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalAnalytics(rootId) }),
+        ]);
+    }, [queryClient, rootId, sessionId, updateSession]);
 
     const handleStartSubGoalCreation = useCallback((node) => {
         setCreateSubGoalParent(node);
@@ -148,6 +188,7 @@ function SessionGoalHierarchyPanel({
                         getGoalBranchHighlightState={getGoalBranchHighlightState}
                         getGoalConnectorHighlightState={getGoalConnectorHighlightState}
                         getGoalConnectorEdgeHighlightState={getGoalConnectorEdgeHighlightState}
+                        getGoalConnectorEdgeState={getGoalConnectorEdgeState}
                         connectorHighlightMode="lineage"
                         showGoalHighlightHalo
                         onGoalIconClick={onGoalScopeToggle ? (goal) => onGoalScopeToggle({
@@ -166,6 +207,7 @@ function SessionGoalHierarchyPanel({
                         )}
                         onStartSubGoalCreation={readOnly ? undefined : handleStartSubGoalCreation}
                         scopedActivityName={scopedActivityName}
+                        onAdjustScope={!readOnly && !selectedActivity ? () => setScopeModalOpen(true) : undefined}
                     />
                     {displayHierarchy.length === 0 && (
                         <div className={styles.emptyState}>
@@ -225,6 +267,18 @@ function SessionGoalHierarchyPanel({
                 </React.Suspense>,
                 document.body
             )}
+            <GoalHierarchySelectionModal
+                isOpen={scopeModalOpen}
+                title="Adjust Session Goal Scope"
+                goals={selectableGoals}
+                selectedGoalIds={Array.from(manualGoalIds)}
+                lockedGoalIds={sessionGoalsView?.automatic_goal_ids || []}
+                lockedGoalLabel="Included by session activities"
+                highlightSelectionAncestors
+                connectorHighlightMode="lineage"
+                onClose={() => setScopeModalOpen(false)}
+                onConfirm={handleApplyScope}
+            />
         </>
     );
 }

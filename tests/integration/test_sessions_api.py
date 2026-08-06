@@ -37,6 +37,35 @@ class TestSessionListEndpoints:
         assert "sessions" in data
         assert isinstance(data["sessions"], list)
 
+    def test_goal_scope_preview_uses_canonical_effective_associations(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        sample_session_template,
+        sample_activity_definition,
+    ):
+        sample_session_template.template_data = json.dumps({
+            'sections': [{'name': 'Practice', 'exercises': [
+                {'activity_definition_id': sample_activity_definition.id}
+            ]}]
+        })
+        db_session.execute(activity_goal_associations.insert().values(
+            activity_id=sample_activity_definition.id,
+            goal_id=sample_goal_hierarchy['short_term'].id,
+        ))
+        db_session.commit()
+
+        response = authed_client.post(
+            f'/api/{sample_goal_hierarchy["ultimate"].id}/sessions/goal-scope-preview',
+            json={'template_id': sample_session_template.id},
+        )
+
+        assert response.status_code == 200
+        assert set(response.get_json()['automatic_goal_ids']) == {
+            goal.id for goal in sample_goal_hierarchy.values()
+        }
+
     def test_active_session_endpoint_returns_paused_session(
         self, authed_client, db_session, sample_ultimate_goal, test_user
     ):

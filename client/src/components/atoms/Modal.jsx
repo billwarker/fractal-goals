@@ -19,6 +19,7 @@ const Modal = ({
     size = 'md', // sm, md, lg, xl
     className = '',
     overlayClassName = '',
+    bodyClassName = '',
     showCloseButton = true,
     closeOnEsc = true,
     closeOnBackdrop = true,
@@ -26,6 +27,7 @@ const Modal = ({
 }) => {
     const dialogRef = useRef(null);
     const modalId = useId();
+    const titleId = `${modalId}-title`;
     const onCloseRef = useRef(onClose);
     const closeOnEscRef = useRef(closeOnEsc);
     useEffect(() => {
@@ -94,6 +96,7 @@ const Modal = ({
             onClose={onClose}
             aria-modal="true"
             role="dialog"
+            aria-labelledby={title ? titleId : undefined}
         >
             <div
                 ref={dialogRef}
@@ -104,7 +107,7 @@ const Modal = ({
                 <Card className={styles.content} padding="none">
                     <div className={styles.header}>
                         {title && (
-                            <Heading level={3} className={styles.title}>
+                            <Heading id={titleId} level={3} className={styles.title}>
                                 {title}
                             </Heading>
                         )}
@@ -113,7 +116,7 @@ const Modal = ({
                         )}
                     </div>
 
-                    <div className={styles.body}>
+                    <div className={`${styles.body} ${bodyClassName}`.trim()}>
                         {children}
                     </div>
                 </Card>

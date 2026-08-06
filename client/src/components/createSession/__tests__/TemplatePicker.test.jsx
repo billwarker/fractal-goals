@@ -57,4 +57,19 @@ describe('TemplatePicker', () => {
         expect(screen.getByText('Active Program')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /Show Archived/ })).not.toBeInTheDocument();
     });
+
+    it('wraps long template names within their cards', () => {
+        const longName = 'Solo Programming – Upper Body Day 3';
+        renderPicker([
+            {
+                id: 'template-long-name',
+                name: longName,
+                template_data: { sections: [{ name: 'Main' }] },
+            },
+        ]);
+
+        const badge = screen.getByTitle(longName);
+        expect(badge).toContainElement(screen.getByText(longName));
+        expect(badge.className).toContain('wrap');
+    });
 });

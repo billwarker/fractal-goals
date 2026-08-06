@@ -16,6 +16,7 @@ function HierarchySection({
     getGoalBranchHighlightState,
     getGoalConnectorHighlightState,
     getGoalConnectorEdgeHighlightState,
+    getGoalConnectorEdgeState,
     connectorHighlightMode,
     showGoalHighlightHalo,
     onGoalIconClick,
@@ -25,6 +26,7 @@ function HierarchySection({
     onOpenAssociate,
     onAddTargetForGoal,
     scopedActivityName = null,
+    onAdjustScope,
 }) {
     const label = scopedActivityName
         ? `Goals: ${scopedActivityName}`
@@ -44,6 +46,9 @@ function HierarchySection({
                         [edit]
                     </button>
                 )}
+                {type === 'session' && onAdjustScope && (
+                    <button type="button" className={styles.editLink} onClick={onAdjustScope}>Adjust scope</button>
+                )}
             </div>
             <GoalHierarchyList
                 variant="session"
@@ -58,6 +63,7 @@ function HierarchySection({
                 getGoalBranchHighlightState={getGoalBranchHighlightState}
                 getGoalConnectorHighlightState={getGoalConnectorHighlightState}
                 getGoalConnectorEdgeHighlightState={getGoalConnectorEdgeHighlightState}
+                getGoalConnectorEdgeState={getGoalConnectorEdgeState}
                 connectorHighlightMode={connectorHighlightMode}
                 showGoalHighlightHalo={showGoalHighlightHalo}
                 onGoalIconClick={onGoalIconClick}

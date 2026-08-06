@@ -12,7 +12,14 @@ export function getCurrentSessionInstanceIds(localSessionData) {
 
     return new Set(
         localSessionData.sections
-            .flatMap((section) => section?.activity_ids || [])
+            .flatMap((section) => {
+                if (Array.isArray(section?.items)) {
+                    return section.items
+                        .filter((item) => item?.type === 'activity')
+                        .map((item) => item.activity_instance_id);
+                }
+                return section?.activity_ids || [];
+            })
             .filter(Boolean)
             .map((instanceId) => String(instanceId))
     );

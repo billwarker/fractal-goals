@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import uuid
 
 from sqlalchemy import inspect, text
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
 import models
@@ -14,6 +14,7 @@ from models import (
     CircuitRoundMember,
     CircuitRun,
     CircuitRunSlot,
+    CircuitDefinition,
     Goal,
     Session,
     session_goals,
@@ -64,10 +65,18 @@ def _as_utc_datetime(value: datetime | None) -> datetime | None:
 
 
 class SessionLifecycleService:
-    def __init__(self, db_session, *, session_read_options_factory, derived_goals_resolver):
+    def __init__(
+        self,
+        db_session,
+        *,
+        session_read_options_factory,
+        derived_goals_resolver,
+        effective_activity_goals_resolver,
+    ):
         self.db_session = db_session
         self._session_read_options = session_read_options_factory
         self._derive_session_goals_from_activities = derived_goals_resolver
+        self._get_effective_activity_goals = effective_activity_goals_resolver
         self._session_goals_has_source = None
 
     def _recompute_and_attach_stats(self, session):
@@ -138,6 +147,117 @@ class SessionLifecycleService:
         if self._session_goals_supports_source():
             values['association_source'] = association_source
         return values
+
+    def _program_scope_goal_ids(self, root_id, program_day_id):
+        if not program_day_id:
+            return set(), None
+        program_day = self.db_session.query(models.ProgramDay).options(
+            joinedload(models.ProgramDay.block).joinedload(models.ProgramBlock.program)
+        ).filter(models.ProgramDay.id == program_day_id).first()
+        if (
+            not program_day
+            or not program_day.block
+            or not program_day.block.program
+            or program_day.block.program.root_id != root_id
+        ):
+            return None, "Invalid program day context for this fractal"
+        return _program_goal_ids(self.db_session, program_day.block.program.id), None
+
+    def _template_activity_definition_ids(self, root_id, template):
+        payload = models._safe_load_json(template.template_data, {})
+        activity_ids = set()
+        circuit_ids = set()
+        for section in payload.get('sections', []) if isinstance(payload, dict) else []:
+            for item in section.get('items') or section.get('exercises') or section.get('activities') or []:
+                if isinstance(item, dict) and item.get('type') == 'circuit':
+                    if item.get('circuit_definition_id'):
+                        circuit_ids.add(item['circuit_definition_id'])
+                    continue
+                activity_id = self._extract_activity_definition_id(item)
+                if activity_id:
+                    activity_ids.add(activity_id)
+
+        if circuit_ids:
+            circuits = self.db_session.query(CircuitDefinition).options(
+                selectinload(CircuitDefinition.slots)
+            ).filter(
+                CircuitDefinition.id.in_(circuit_ids),
+                CircuitDefinition.root_id == root_id,
+                CircuitDefinition.deleted_at.is_(None),
+            ).all()
+            if {circuit.id for circuit in circuits} != circuit_ids:
+                return None, "Template contains an unavailable activity circuit"
+            activity_ids.update(
+                slot.activity_definition_id
+                for circuit in circuits
+                for slot in circuit.slots
+            )
+        return activity_ids, None
+
+    def preview_goal_scope(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
+        root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
+        if not root:
+            return None, "Fractal not found or access denied", 404
+        template = self.db_session.query(models.SessionTemplate).filter(
+            models.SessionTemplate.id == data.get('template_id'),
+            models.SessionTemplate.root_id == root_id,
+            models.SessionTemplate.deleted_at.is_(None),
+        ).first()
+        if not template:
+            return None, "Template not found in this fractal", 404
+        if get_template_session_type(models._safe_load_json(template.template_data, {})) == SESSION_TYPE_QUICK:
+            return {"automatic_goal_ids": []}, None, 200
+
+        activity_ids, activity_error = self._template_activity_definition_ids(root_id, template)
+        if activity_error:
+            return None, activity_error, 409
+        program_goal_ids, program_error = self._program_scope_goal_ids(root_id, data.get('program_day_id'))
+        if program_error:
+            return None, program_error, 400
+
+        effective = self._get_effective_activity_goals(root_id, activity_ids)
+        automatic_goal_ids = {
+            goal.id
+            for goals in effective.values()
+            for goal in goals
+            if not goal.deleted_at and (not program_goal_ids or goal.id in program_goal_ids)
+        }
+        return {"automatic_goal_ids": sorted(automatic_goal_ids)}, None, 200
+
+    def _replace_manual_goal_scope(self, session, root_id, goal_ids):
+        requested_ids = set(goal_ids or [])
+        valid_goals = self.db_session.query(Goal).filter(
+            Goal.id.in_(requested_ids),
+            Goal.root_id == root_id,
+            Goal.deleted_at.is_(None),
+        ).all() if requested_ids else []
+        if {goal.id for goal in valid_goals} != requested_ids:
+            return "One or more goals were not found in this fractal"
+
+        delete_query = session_goals.delete().where(session_goals.c.session_id == session.id)
+        if self._session_goals_supports_source():
+            delete_query = delete_query.where(session_goals.c.association_source == 'manual')
+        self.db_session.execute(delete_query)
+
+        existing_ids = set(self.db_session.execute(
+            session_goals.select().with_only_columns(session_goals.c.goal_id).where(
+                session_goals.c.session_id == session.id
+            )
+        ).scalars())
+        rows = [
+            self._session_goal_insert_values(
+                session.id,
+                goal.id,
+                get_canonical_goal_type(goal),
+                'manual',
+            )
+            for goal in valid_goals
+            if goal.id not in existing_ids
+        ]
+        if rows:
+            self.db_session.execute(session_goals.insert(), rows)
+        self.db_session.expire(session, ['goals'])
+        return None
 
     @staticmethod
     def _finalize_paused_session_duration(session_obj, completion_time: datetime):
@@ -442,15 +562,6 @@ class SessionLifecycleService:
                     if 'estimated_duration_minutes' not in section and section.get('duration_minutes') is not None:
                         section['estimated_duration_minutes'] = section.get('duration_minutes')
 
-                for act in activities:
-                    for goal in act.associated_goals:
-                        if (
-                            goal.root_id == root_id and
-                            not goal.completed and
-                            not goal.deleted_at
-                        ):
-                            inherited_goal_map[goal.id] = goal
-
             if circuit_items:
                 from services.circuit_service import CircuitService
 
@@ -498,8 +609,24 @@ class SessionLifecycleService:
 
         new_session.attributes = copy.deepcopy(session_data_dict)
 
-        if not is_quick_template and program_day_id and program_goal_ids:
-            inherited_goal_map = {gid: g for gid, g in inherited_goal_map.items() if gid in program_goal_ids}
+        if not is_quick_template:
+            created_definition_ids = {
+                definition_id
+                for (definition_id,) in self.db_session.query(ActivityInstance.activity_definition_id).filter(
+                    ActivityInstance.session_id == new_session.id,
+                    ActivityInstance.deleted_at.is_(None),
+                ).all()
+                if definition_id
+            }
+            inherited_goal_map = {
+                goal.id: goal
+                for goals in self._get_effective_activity_goals(root_id, created_definition_ids).values()
+                for goal in goals
+                if (
+                    not goal.deleted_at
+                    and (not program_goal_ids or goal.id in program_goal_ids)
+                )
+            }
 
         manual_ids = set()
         manual_ids.update(data.get('parent_ids', []) or [])
@@ -843,6 +970,12 @@ class SessionLifecycleService:
         if 'session_data' in data:
             val = data['session_data']
             session.attributes = models._safe_load_json(val, val)
+
+        if 'goal_ids' in data:
+            goal_scope_error = self._replace_manual_goal_scope(session, root_id, data.get('goal_ids'))
+            if goal_scope_error:
+                self.db_session.rollback()
+                return None, goal_scope_error, 400
 
         should_recompute_completed_duration = (
             session.completed

@@ -82,6 +82,14 @@
     outline-offset: 2px;
 }
 
+.hideCompletedControl:has(input:disabled) {
+    cursor: default;
+}
+
+.hideCompletedControl:has(input:disabled) > span:first-of-type {
+    opacity: 0.72;
+}
+
 .treeFrame {
     max-height: min(58vh, 620px);
     overflow: auto;
@@ -112,9 +120,18 @@
 }
 
 .compactLayout {
+    --compact-control-width: 78px;
     height: 100%;
     min-height: 0;
     gap: 10px;
+}
+
+.compactLayout.noAncestorControls {
+    --compact-control-width: 50px;
+}
+
+.compactLayout.singleSelect {
+    --compact-control-width: 24px;
 }
 
 .compactLayout .optionsRow {
@@ -135,25 +152,17 @@
     max-height: none;
     flex: 1;
     min-height: 0;
-    padding: 8px 4px 8px 72px;
+    padding: 8px 4px 8px calc(var(--compact-control-width) + 18px);
 }
 
 .compactLayout .sessionTreeRow:first-child .sessionNodeContent {
     padding-right: 220px;
 }
 
-.compactLayout.noAncestorControls .treeFrame {
-    padding-left: 64px;
-}
-
 .compactLayout .controlRow {
     gap: 6px;
-    width: 54px;
+    width: var(--compact-control-width);
     transform: translateX(calc(-100% - 8px));
-}
-
-.compactLayout.noAncestorControls .controlRow {
-    width: 54px;
 }
 
 .compactLayout .sessionList {
@@ -179,6 +188,14 @@
     font-weight: 700;
     line-height: 1;
     cursor: pointer;
+}
+
+.lockedGoalMarker {
+    flex: 0 0 auto;
+    color: var(--color-brand-primary);
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1;
 }
 
 .controlLabel input {
@@ -303,11 +320,6 @@
 
     .noAncestorControls .treeFrame {
         padding-left: 110px;
-    }
-
-    .compactLayout .treeFrame,
-    .compactLayout.noAncestorControls .treeFrame {
-        padding-left: 64px;
     }
 
     .compactLayout .sessionTreeRow:first-child .sessionNodeContent {

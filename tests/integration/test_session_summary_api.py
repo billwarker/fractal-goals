@@ -263,7 +263,7 @@ class TestSessionSummaryApi:
         payload = json.loads(response.data)
         assert sample_goal_hierarchy['short_term'].id in payload['goal_ids']
 
-    def test_flowtree_metrics_ignore_completed_child_association(
+    def test_flowtree_metrics_include_effective_descendant_association(
         self,
         authed_client,
         db_session,
@@ -298,9 +298,9 @@ class TestSessionSummaryApi:
         )
         assert response.status_code == 200
         payload = json.loads(response.data)
-        assert payload['completed_sessions_count'] == 0
-        assert payload['completed_instances_count'] == 0
-        assert payload['total_instance_duration_seconds'] == 0
+        assert payload['completed_sessions_count'] == 1
+        assert payload['completed_instances_count'] == 1
+        assert payload['total_instance_duration_seconds'] == 420
 
     def test_flowtree_metrics_counts_activity_and_direct_goal_sessions(
         self,

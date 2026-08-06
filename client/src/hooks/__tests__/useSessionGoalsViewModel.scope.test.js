@@ -3,6 +3,34 @@ import { renderHook } from '@testing-library/react';
 import { useSessionGoalsViewModel } from '../useSessionGoalsViewModel';
 
 describe('useSessionGoalsViewModel activity scope filtering', () => {
+    it('derives manual and completed evidence lineages independently', () => {
+        const sessionGoalsView = {
+            goal_tree: {
+                id: 'root', name: 'Root', type: 'UltimateGoal', children: [
+                    { id: 'manual', name: 'Manual', type: 'LongTermGoal', children: [] },
+                    { id: 'evidence', name: 'Evidence', type: 'LongTermGoal', children: [] },
+                ],
+            },
+            manual_goal_ids: ['manual'],
+            automatic_goal_ids: ['evidence'],
+            session_goal_ids: ['manual'],
+            session_activity_ids: ['activity-1'],
+            activity_goal_ids_by_activity: { 'activity-1': ['evidence'] },
+        };
+        const { result } = renderHook(() => useSessionGoalsViewModel({
+            sessionGoalsView,
+            activityInstances: [{ id: 'instance-1', activity_definition_id: 'activity-1', completed: true }],
+            localSessionData: { sections: [{ activity_ids: ['instance-1'] }] },
+            selectedActivity: null,
+            targetAchievements: new Map(),
+            achievedTargetIds: new Set(),
+        }));
+
+        expect(result.current.manualGoalIds).toEqual(new Set(['manual']));
+        expect(result.current.evidenceGoalIds).toEqual(new Set(['evidence', 'root']));
+        expect(result.current.completedEvidenceGoalIds).toEqual(new Set(['evidence', 'root']));
+        expect(result.current.sessionHierarchy.map((goal) => goal.id)).toEqual(['root', 'manual', 'evidence']);
+    });
     it('excludes paused goals from the activity hierarchy', () => {
         const sessionGoalsView = {
             goal_tree: {

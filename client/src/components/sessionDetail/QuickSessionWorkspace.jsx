@@ -47,6 +47,7 @@ function QuickSessionWorkspace({
         [activityInstances, localSessionData?.activity_ids]
     );
     const completed = Boolean(session?.completed || session?.attributes?.completed);
+    const showActionBar = Boolean((completed && embedded && onStartAnother) || showCompletionAction);
     const quickSession = isQuickSession(session);
     const programInfo = session?.program_info || null;
     const sessionStart = session?.attributes?.session_start
@@ -124,7 +125,7 @@ function QuickSessionWorkspace({
                         </div>
                     </div>
 
-                    <div className={styles.actionBar}>
+                    {showActionBar && <div className={styles.actionBar}>
                         <div className={styles.actionGroup}>
                             {completed && embedded && onStartAnother && (
                                 <button
@@ -144,7 +145,7 @@ function QuickSessionWorkspace({
                                 />
                             )}
                         </div>
-                    </div>
+                    </div>}
                 </div>
 
                 <div className={styles.bodySection}>

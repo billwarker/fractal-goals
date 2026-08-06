@@ -85,7 +85,7 @@ function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate 
                 className={styles.card}
             >
                 <div className={styles.identity}>
-                    <SessionTemplateNameBadge entity={template} size="md" />
+                    <SessionTemplateNameBadge entity={template} size="md" wrap />
                     <div className={styles.pillRow}>
                         <SessionTemplateTypePill entity={template} size="sm" />
                         {template.is_archived ? <span className={styles.statusPill}>Archived</span> : null}

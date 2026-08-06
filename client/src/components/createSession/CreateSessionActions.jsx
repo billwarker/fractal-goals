@@ -10,42 +10,46 @@ function CreateSessionActions({
     selectedTemplate,
     selectedProgramDay,
     creating,
-    quickMode = false,
     onCreateSession,
+    scopeReady = true,
+    footerMode = false,
+    headerMode = false,
 }) {
-    const isDisabled = !selectedTemplate || creating;
+    const isDisabled = !selectedTemplate || creating || !scopeReady;
 
     return (
-        <StepContainer className={styles.container}>
-            <StepHeader stepNumber={2} title="Create Session" />
+        <StepContainer className={`${styles.container} ${footerMode ? styles.footerContainer : ''} ${headerMode ? styles.headerContainer : ''}`}>
+            {!headerMode && !footerMode && <StepHeader stepNumber={2} title="Create Session" />}
+            {footerMode && <h2 className={styles.footerTitle}>Create Session</h2>}
+
+            {selectedTemplate ? (
+                <SessionSummary
+                    selectedTemplate={selectedTemplate}
+                    selectedProgramDay={selectedProgramDay}
+                    compact={footerMode}
+                />
+            ) : null}
 
             <Button
                 onClick={onCreateSession}
                 disabled={isDisabled}
                 isLoading={creating}
                 variant="success"
-                size="lg"
+                size={headerMode || footerMode ? 'md' : 'lg'}
                 className={styles.button}
             >
-                {creating ? 'Creating...' : quickMode ? 'Start Quick Session' : 'Create Session'}
+                {creating ? 'Creating...' : 'Create Session'}
             </Button>
-
-            {selectedTemplate ? (
-                <SessionSummary
-                    selectedTemplate={selectedTemplate}
-                    selectedProgramDay={selectedProgramDay}
-                />
-            ) : null}
         </StepContainer>
     );
 }
 
-function SessionSummary({ selectedTemplate, selectedProgramDay }) {
+function SessionSummary({ selectedTemplate, selectedProgramDay, compact = false }) {
     return (
         <div className={styles.summary}>
             <div className={styles.summaryLine}>
                 <span>Creating:</span>
-                <SessionTemplateNameBadge entity={selectedTemplate} size="md" wrap />
+                <SessionTemplateNameBadge entity={selectedTemplate} size={compact ? 'sm' : 'md'} wrap />
                 {selectedProgramDay ? (
                     <span>
                         {' '}from <strong className={styles.accentText}>{selectedProgramDay.program_name}</strong>

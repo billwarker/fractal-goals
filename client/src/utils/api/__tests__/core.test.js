@@ -346,7 +346,6 @@ describe('api core auth refresh behavior', () => {
         expect(calls).toHaveLength(1);
         expect(calls[0].headers.get('X-CSRF-Token')).toBe('axios-headers-token');
     });
-
     it('attaches CSRF headers to every protected mutating API helper', async () => {
         document.cookie = 'fractal_csrf_token=all-mutators-token; path=/';
         const { axios } = await import('../core');
@@ -361,7 +360,6 @@ describe('api core auth refresh behavior', () => {
         const { globalApi } = await import('../globalApi');
         const calls = [];
         const originalAdapter = axios.defaults.adapter;
-
         const protectedMutations = [
             ['admin.createUser', () => adminApi.createUser({ email: 'a@example.com' })],
             ['admin.updateUser', () => adminApi.updateUser('user-1', { role: 'admin' })],
@@ -438,6 +436,7 @@ describe('api core auth refresh behavior', () => {
             ['programs.setProgramGoalDeadline', () => fractalProgramsApi.setProgramGoalDeadline('root-1', 'program-1', { goal_id: 'goal-1' })],
             ['programs.deleteBlockDay', () => fractalProgramsApi.deleteBlockDay('root-1', 'program-1', 'block-1', 'day-1')],
             ['sessions.createSession', () => fractalSessionsApi.createSession('root-1', { name: 'Session' })],
+            ['sessions.previewSessionGoalScope', () => fractalSessionsApi.previewSessionGoalScope('root-1', { template_id: 'template-1' })],
             ['sessions.completeQuickSession', () => fractalSessionsApi.completeQuickSession('root-1', { activities: [] })],
             ['sessions.updateSession', () => fractalSessionsApi.updateSession('root-1', 'session-1', { name: 'Session' })],
             ['sessions.deleteSession', () => fractalSessionsApi.deleteSession('root-1', 'session-1')],
@@ -567,6 +566,7 @@ describe('api core auth refresh behavior', () => {
             ['programs.setProgramGoalDeadline', 'post', '/root-1/programs/program-1/goal-deadlines', () => fractalProgramsApi.setProgramGoalDeadline('root-1', 'program-1', { goal_id: 'goal-1' })],
 
             ['sessions.createSession', 'post', '/root-1/sessions', () => fractalSessionsApi.createSession('root-1', { name: 'Session' })],
+            ['sessions.previewSessionGoalScope', 'post', '/root-1/sessions/goal-scope-preview', () => fractalSessionsApi.previewSessionGoalScope('root-1', { template_id: 'template-1' })],
             ['sessions.completeQuickSession', 'post', '/root-1/sessions/quick-complete', () => fractalSessionsApi.completeQuickSession('root-1', { activities: [] })],
             ['sessions.updateSession', 'put', '/root-1/sessions/session-1', () => fractalSessionsApi.updateSession('root-1', 'session-1', { name: 'Session' })],
             ['sessions.deleteSession', 'delete', '/root-1/sessions/session-1', () => fractalSessionsApi.deleteSession('root-1', 'session-1')],

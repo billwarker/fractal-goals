@@ -60,6 +60,7 @@ function GoalHierarchyList({
     getGoalBranchHighlightState,
     getGoalConnectorHighlightState,
     getGoalConnectorEdgeHighlightState,
+    getGoalConnectorEdgeState,
     connectorHighlightMode = 'selected',
     showGoalHighlightHalo = false,
     onGoalIconClick,
@@ -77,7 +78,6 @@ function GoalHierarchyList({
     emptyState = 'No goals associated',
 }) {
     const canAddChild = (goalType) => !isExecutionGoalType(goalType);
-
     const handleGoalClick = (node) => {
         if (!onGoalClick) {
             return;
@@ -87,7 +87,6 @@ function GoalHierarchyList({
         }
         onGoalClick(node.originalGoal || node);
     };
-
     const treeRoots = useMemo(() => buildSessionHierarchyTree(nodes), [nodes]);
     const listRef = useRef(null);
     const iconRefs = useRef(new Map());
@@ -224,6 +223,9 @@ function GoalHierarchyList({
                         : (childRow
                             ? Boolean(childRow.currentTopActive || childRow.currentHorizontalActive)
                             : false);
+                    const state = getGoalConnectorEdgeState
+                        ? (getGoalConnectorEdgeState(node.originalGoal || node, child.originalGoal || child) || 'dashed')
+                        : (active ? 'selected' : 'solid');
 
                     nextEdges.push({
                         key: `${node.id}-${child.id}`,
@@ -232,6 +234,7 @@ function GoalHierarchyList({
                         from,
                         to,
                         active,
+                        state,
                     });
                 });
             });
@@ -246,6 +249,7 @@ function GoalHierarchyList({
                     return !currentEdge
                         || currentEdge.key !== edge.key
                         || currentEdge.active !== edge.active
+                        || currentEdge.state !== edge.state
                         || currentEdge.from.x !== edge.from.x
                         || currentEdge.from.y !== edge.from.y
                         || currentEdge.to.x !== edge.to.x
@@ -260,7 +264,6 @@ function GoalHierarchyList({
         const timeoutIds = [];
         const scheduleMeasure = () => {
             measureConnectors();
-
             if (typeof requestAnimationFrame === 'function') {
                 const firstFrameId = requestAnimationFrame(() => {
                     measureConnectors();
@@ -269,7 +272,6 @@ function GoalHierarchyList({
                 });
                 frameIds.push(firstFrameId);
             }
-
             timeoutIds.push(window.setTimeout(measureConnectors, 80));
             timeoutIds.push(window.setTimeout(measureConnectors, 220));
         };
@@ -294,23 +296,26 @@ function GoalHierarchyList({
             modalElement?.removeEventListener('transitionend', scheduleMeasure);
             modalElement?.removeEventListener('animationend', scheduleMeasure);
         };
-    }, [getGoalConnectorEdgeHighlightState, rowById, sessionRows]);
+    }, [getGoalConnectorEdgeHighlightState, getGoalConnectorEdgeState, rowById, sessionRows]);
 
     const renderConnectorEdges = () => (
         <svg className={styles.sessionConnectorSvg} aria-hidden="true">
-            {connectorEdges.map(({ key, parentId, childId, from, to, active }) => {
+            {connectorEdges.map(({ key, parentId, childId, from, to, active, state }) => {
                 const midpointY = to.y;
                 const path = `M ${from.x} ${from.y} V ${midpointY} H ${to.x}`;
 
                 return (
-                    <path
-                        key={key}
-                        d={path}
-                        className={`${styles.sessionConnectorEdge} ${active ? styles.sessionConnectorEdgeActive : ''}`}
-                        data-connector-active={active ? 'true' : 'false'}
-                        data-parent-goal-id={parentId}
-                        data-child-goal-id={childId}
-                    />
+                    <React.Fragment key={key}>
+                        <path
+                            d={path}
+                            className={`${styles.sessionConnectorEdge} ${styles[`sessionConnectorEdge_${state}`] || ''}`}
+                            data-connector-active={active ? 'true' : 'false'}
+                            data-connector-state={state}
+                            data-parent-goal-id={parentId}
+                            data-child-goal-id={childId}
+                        />
+                        {state === 'completed' && <path d={path} className={styles.sessionConnectorEdgeFlow} />}
+                    </React.Fragment>
                 );
             })}
         </svg>

@@ -1,0 +1,90 @@
+.container {
+    min-width: 0;
+}
+
+.container.embedded {
+    margin: 0;
+    padding: 16px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.title {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 20px;
+}
+
+.optionalLabel {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.description {
+    margin: 0 0 4px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+}
+
+.descriptionStandalone {
+    margin-bottom: 12px;
+}
+
+.provenanceLegend {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin: 0 0 12px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.provenanceLegend > span:first-child {
+    color: var(--color-brand-primary);
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.selectorFrame {
+    height: min(68vh, 680px);
+    min-height: 360px;
+}
+
+.status {
+    padding: 18px;
+    color: var(--color-text-secondary);
+}
+
+.error {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    color: var(--color-brand-danger, #ff6b6b);
+}
+
+.error button {
+    border: 0;
+    background: none;
+    color: var(--color-brand-primary);
+    cursor: pointer;
+    font: inherit;
+}
+
+@media (max-width: 768px) {
+    .selectorFrame {
+        height: min(62vh, 560px);
+        min-height: 320px;
+    }
+}

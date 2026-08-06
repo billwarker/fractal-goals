@@ -5,9 +5,12 @@ import styles from './Modal.module.css';
  * Standardized ModalBody Component
  * Provides consistent padding and scrolling for the main content area of a Modal.
  */
-const ModalBody = ({ children, className = '', noPadding = false }) => {
+const ModalBody = ({ children, className = '', noPadding = false, ...props }) => {
     return (
-        <div className={`${styles.bodyWrapper} ${noPadding ? styles.noPadding : ''} ${className}`}>
+        <div
+            className={`${styles.bodyWrapper} ${noPadding ? styles.noPadding : ''} ${className}`}
+            {...props}
+        >
             {children}
         </div>
     );

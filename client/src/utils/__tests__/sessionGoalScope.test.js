@@ -20,6 +20,15 @@ describe('sessionGoalScope', () => {
         })).toEqual(new Set(['inst-1', 'inst-2']));
     });
 
+    it('collects visible instance ids from canonical typed section items', () => {
+        expect(getCurrentSessionInstanceIds({
+            sections: [{ items: [
+                { type: 'activity', activity_instance_id: 'inst-1' },
+                { type: 'circuit', circuit_run_id: 'circuit-1' },
+            ] }],
+        })).toEqual(new Set(['inst-1']));
+    });
+
     it('filters activity definitions through visible section instance ids', () => {
         expect(getCurrentSessionActivityDefIds({
             activityInstances: [

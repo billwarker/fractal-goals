@@ -3,7 +3,7 @@ import logging
 from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import selectinload, with_loader_criteria
 from models import (
-    ActivityDefinition, ActivityGroup, ActivityInstance, ActivitySet,
+    ActivityDefinition, ActivityInstance, ActivitySet,
     CircuitRun, CircuitRound, CircuitRoundMember,
     Goal, Target,
     MetricValue, ProgramBlock, ProgramDay, Session,
@@ -11,6 +11,8 @@ from models import (
 )
 import models
 from services.owned_entity_queries import get_owned_session
+from services.effective_goal_activities import resolve_effective_goals_by_activity
+from services.goal_loading import load_fractal_goals_for_serialization
 from services.service_types import JsonDict, ServiceResult
 from services.serializers import serialize_session
 from services.session_template_stats_service import SessionTemplateStatsService
@@ -58,6 +60,7 @@ class SessionService:
             self.db_session,
             session_read_options_factory=self._session_read_options,
             derived_goals_resolver=self._derive_session_goals_from_activities,
+            effective_activity_goals_resolver=self._get_effective_activity_goals,
         )
 
     @staticmethod
@@ -100,60 +103,15 @@ class SessionService:
         )
 
     def _get_effective_activity_goals(self, root_id, activity_def_ids) -> dict[str, list[Goal]]:
-        """Resolve direct and group-inherited goals for each activity definition."""
+        """Resolve canonical effective goals for each activity definition."""
         if not activity_def_ids:
             return {}
-
-        activities = self.db_session.query(ActivityDefinition).options(
-            selectinload(ActivityDefinition.associated_goals).selectinload(Goal.pause_intervals)
-        ).filter(
-            ActivityDefinition.id.in_(activity_def_ids),
-            ActivityDefinition.root_id == root_id,
-            ActivityDefinition.deleted_at == None
-        ).all()
-
-        groups_by_id = {
-            group.id: group
-            for group in self.db_session.query(ActivityGroup).options(
-                selectinload(ActivityGroup.associated_goals).selectinload(Goal.pause_intervals)
-            ).filter(
-                ActivityGroup.root_id == root_id,
-                ActivityGroup.deleted_at == None
-            ).all()
-        }
-
-        effective_goals_by_activity = {}
-        for activity in activities:
-            seen_goal_ids = set()
-            effective_goals = []
-
-            def append_goal(goal):
-                if not goal or goal.deleted_at or goal.root_id != root_id:
-                    return
-                if goal.id in seen_goal_ids:
-                    return
-                seen_goal_ids.add(goal.id)
-                effective_goals.append(goal)
-
-            for goal in activity.associated_goals or []:
-                append_goal(goal)
-
-            seen_group_ids = set()
-            current_group_id = activity.group_id
-            while current_group_id and current_group_id not in seen_group_ids:
-                seen_group_ids.add(current_group_id)
-                group = groups_by_id.get(current_group_id)
-                if not group:
-                    break
-
-                for goal in group.associated_goals or []:
-                    append_goal(goal)
-
-                current_group_id = group.parent_id
-
-            effective_goals_by_activity[activity.id] = effective_goals
-
-        return effective_goals_by_activity
+        goals_by_id = load_fractal_goals_for_serialization(
+            self.db_session,
+            root_id,
+            include_group_activities=True,
+        )
+        return resolve_effective_goals_by_activity(goals_by_id, activity_def_ids)
 
     def _derive_session_goals_from_activities(self, session_obj) -> list[Goal]:
         """Derive display goals from session activities when persisted links are missing."""
@@ -424,6 +382,9 @@ class SessionService:
 
     def create_completed_quick_session(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         return self._session_lifecycle_service().create_completed_quick_session(root_id, current_user_id, data)
+
+    def preview_session_goal_scope(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
+        return self._session_lifecycle_service().preview_goal_scope(root_id, current_user_id, data)
 
     def update_session(
         self,

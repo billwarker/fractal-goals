@@ -100,6 +100,12 @@ class SessionUpdateSchema(BaseModel):
     total_duration_seconds: Optional[int] = Field(None, ge=0)
     template_id: Optional[str] = None
     session_data: Optional[Dict[str, Any]] = None
+    goal_ids: Optional[List[str]] = None
+
+
+class SessionGoalScopePreviewSchema(BaseModel):
+    template_id: str = Field(..., min_length=1)
+    program_day_id: Optional[str] = None
 
 
 class SessionGoalAssociationSchema(BaseModel):
@@ -109,5 +115,4 @@ class SessionGoalAssociationSchema(BaseModel):
         'ImmediateGoal',
         pattern=r'^(UltimateGoal|LongTermGoal|MidTermGoal|ShortTermGoal|ImmediateGoal)$'
     )
-
 

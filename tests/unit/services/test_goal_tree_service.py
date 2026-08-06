@@ -71,9 +71,13 @@ def test_session_goal_payload_keeps_structural_ancestors_for_activity_derived_go
     assert error is None
     assert status == 200
     assert payload["session_goal_ids"] == []
-    assert payload["activity_goal_ids_by_activity"][sample_activity_definition.id] == [
-        sample_goal_hierarchy["short_term"].id
-    ]
+    assert set(payload["activity_goal_ids_by_activity"][sample_activity_definition.id]) == {
+        goal.id for goal in sample_goal_hierarchy.values()
+    }
+    assert payload["manual_goal_ids"] == []
+    assert set(payload["automatic_goal_ids"]) == {
+        goal.id for goal in sample_goal_hierarchy.values()
+    }
 
     tree_ids = _collect_tree_ids(payload["goal_tree"])
     assert sample_goal_hierarchy["ultimate"].id in tree_ids
@@ -119,12 +123,16 @@ def test_session_goal_payload_omits_completed_before_session_activity_associatio
     assert error is None
     assert status == 200
     assert payload["session_goal_ids"] == []
-    assert payload["activity_goal_ids_by_activity"][sample_activity_definition.id] == []
+    assert set(payload["activity_goal_ids_by_activity"][sample_activity_definition.id]) == {
+        sample_goal_hierarchy["ultimate"].id,
+        sample_goal_hierarchy["long_term"].id,
+        sample_goal_hierarchy["mid_term"].id,
+    }
 
     tree_ids = _collect_tree_ids(payload["goal_tree"])
     assert sample_goal_hierarchy["ultimate"].id in tree_ids
-    assert sample_goal_hierarchy["long_term"].id not in tree_ids
-    assert sample_goal_hierarchy["mid_term"].id not in tree_ids
+    assert sample_goal_hierarchy["long_term"].id in tree_ids
+    assert sample_goal_hierarchy["mid_term"].id in tree_ids
     assert sample_goal_hierarchy["short_term"].id not in tree_ids
 
 
@@ -164,9 +172,9 @@ def test_session_goal_payload_keeps_goal_completed_during_or_after_session(
 
     assert error is None
     assert status == 200
-    assert payload["activity_goal_ids_by_activity"][sample_activity_definition.id] == [
-        sample_goal_hierarchy["short_term"].id
-    ]
+    assert set(payload["activity_goal_ids_by_activity"][sample_activity_definition.id]) == {
+        goal.id for goal in sample_goal_hierarchy.values()
+    }
     tree_ids = _collect_tree_ids(payload["goal_tree"])
     assert sample_goal_hierarchy["short_term"].id in tree_ids
 
@@ -270,6 +278,7 @@ def test_session_goal_payload_includes_group_inherited_activity_associations(
     assert error is None
     assert status == 200
     assert payload["session_goal_ids"] == []
-    assert payload["activity_goal_ids_by_activity"][sample_activity_definition.id] == [
-        sample_goal_hierarchy["long_term"].id
-    ]
+    assert set(payload["activity_goal_ids_by_activity"][sample_activity_definition.id]) == {
+        sample_goal_hierarchy["ultimate"].id,
+        sample_goal_hierarchy["long_term"].id,
+    }

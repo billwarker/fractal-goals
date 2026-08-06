@@ -3,7 +3,8 @@ import json
 from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 
-from models import Goal, ActivityDefinition, ActivityGroup, ActivityInstance, Session, get_session_by_id
+from models import Goal, ActivityDefinition, ActivityGroup, ActivityInstance, Session, get_session_by_id, session_goals
+from sqlalchemy import select
 from services.session_service import SessionService
 
 @pytest.fixture
@@ -63,9 +64,9 @@ def test_derive_session_goals_from_activities(
     
     derived_goals = session_service._derive_session_goals_from_activities(session_obj)
     
-    assert len(derived_goals) == 1
-    assert derived_goals[0].id == sample_goal_hierarchy['short_term'].id
-    assert derived_goals[0].name == sample_goal_hierarchy['short_term'].name
+    assert {goal.id for goal in derived_goals} == {
+        goal.id for goal in sample_goal_hierarchy.values()
+    }
 
 
 def test_derive_session_goals_from_activities_includes_ancestor_group_associations(
@@ -111,7 +112,65 @@ def test_derive_session_goals_from_activities_includes_ancestor_group_associatio
     session_obj = get_session_by_id(db_session, sample_practice_session.id)
     derived_goals = session_service._derive_session_goals_from_activities(session_obj)
 
-    assert [goal.id for goal in derived_goals] == [sample_goal_hierarchy['long_term'].id]
+    assert {goal.id for goal in derived_goals} == {
+        sample_goal_hierarchy['ultimate'].id,
+        sample_goal_hierarchy['long_term'].id,
+    }
+
+
+def test_update_session_scope_replaces_manual_rows_and_preserves_activity_rows(
+    db_session, session_service, sample_practice_session, sample_goal_hierarchy, test_user
+):
+    automatic_id = sample_goal_hierarchy['short_term'].id
+    old_manual_id = sample_goal_hierarchy['mid_term'].id
+    new_manual_id = sample_goal_hierarchy['long_term'].id
+    db_session.execute(session_goals.insert(), [
+        {'session_id': sample_practice_session.id, 'goal_id': automatic_id, 'goal_type': 'ShortTermGoal', 'association_source': 'activity'},
+        {'session_id': sample_practice_session.id, 'goal_id': old_manual_id, 'goal_type': 'MidTermGoal', 'association_source': 'manual'},
+    ])
+    sample_practice_session.completed = True
+    db_session.commit()
+
+    result, error, status = session_service.update_session(
+        sample_practice_session.root_id,
+        sample_practice_session.id,
+        test_user.id,
+        {'goal_ids': [new_manual_id, new_manual_id]},
+    )
+
+    assert error is None
+    assert status == 200
+    rows = db_session.execute(select(
+        session_goals.c.goal_id, session_goals.c.association_source
+    ).where(session_goals.c.session_id == sample_practice_session.id)).all()
+    assert set(rows) == {(automatic_id, 'activity'), (new_manual_id, 'manual')}
+    assert result['completed'] is True
+
+
+def test_update_session_scope_omission_preserves_manual_rows(
+    db_session, session_service, sample_practice_session, sample_goal_hierarchy, test_user
+):
+    manual_id = sample_goal_hierarchy['mid_term'].id
+    db_session.execute(session_goals.insert().values(
+        session_id=sample_practice_session.id,
+        goal_id=manual_id,
+        goal_type='MidTermGoal',
+        association_source='manual',
+    ))
+    db_session.commit()
+
+    _, error, status = session_service.update_session(
+        sample_practice_session.root_id,
+        sample_practice_session.id,
+        test_user.id,
+        {'description': 'Still scoped'},
+    )
+
+    assert error is None
+    assert status == 200
+    assert db_session.execute(select(session_goals.c.goal_id).where(
+        session_goals.c.session_id == sample_practice_session.id
+    )).scalar_one() == manual_id
 
 # ==============================================================================
 # Create Session

@@ -152,6 +152,8 @@ def serialize_session_goals_view_payload(
     goal_tree,
     session_goal_ids,
     session_goal_sources,
+    manual_goal_ids,
+    automatic_goal_ids,
     session_activity_ids,
     activity_goal_ids_by_activity,
 ):
@@ -159,6 +161,8 @@ def serialize_session_goals_view_payload(
         "goal_tree": goal_tree,
         "session_goal_ids": list(session_goal_ids),
         "session_goal_sources": dict(session_goal_sources),
+        "manual_goal_ids": list(manual_goal_ids),
+        "automatic_goal_ids": list(automatic_goal_ids),
         "session_activity_ids": list(session_activity_ids),
         "activity_goal_ids_by_activity": dict(activity_goal_ids_by_activity),
     }

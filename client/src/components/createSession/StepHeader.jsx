@@ -9,7 +9,7 @@ function StepHeader({ stepNumber, title, subtitle }) {
     return (
         <div className={styles.header}>
             <h2 className={styles.title}>
-                <span className={styles.stepNumber}>{stepNumber}</span>
+                <span className={styles.stepNumber} aria-hidden="true">{stepNumber}</span>
                 {title}
             </h2>
             {subtitle && (

@@ -16,6 +16,7 @@ export const fractalSessionsApi = {
         axios.get(`${API_BASE}/${rootId}/sessions/flowtree-metrics${buildQueryString(options)}`),
     getSession: (rootId, sessionId) => axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}`),
     createSession: (rootId, data) => axios.post(`${API_BASE}/${rootId}/sessions`, data),
+    previewSessionGoalScope: (rootId, data) => axios.post(`${API_BASE}/${rootId}/sessions/goal-scope-preview`, data),
     completeQuickSession: (rootId, data) => axios.post(`${API_BASE}/${rootId}/sessions/quick-complete`, data),
     updateSession: (rootId, sessionId, data) => axios.put(`${API_BASE}/${rootId}/sessions/${sessionId}`, data),
     deleteSession: (rootId, sessionId) => axios.delete(`${API_BASE}/${rootId}/sessions/${sessionId}`),

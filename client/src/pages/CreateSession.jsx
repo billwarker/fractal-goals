@@ -1,11 +1,10 @@
 import { logError } from '../utils/logger';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from '../hooks/queryKeys';
 import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
-import { getLocalISOString } from '../utils/dateUtils';
 import { useCreateSessionPageData } from '../hooks/useCreateSessionPageData';
 import notify from '../utils/notify';
 import {
@@ -14,36 +13,23 @@ import {
     ProgramDayPicker,
     TemplatePicker,
     CreateSessionActions,
-    QuickSessionCompleteStep,
+    QuickSessionModal,
+    SessionGoalScopePanel,
 } from '../components/createSession';
 import LoadingState from '../components/common/LoadingState';
-import StepContainer from '../components/common/StepContainer';
-import { QuickSessionWorkspace } from '../components/sessionDetail';
-import { ActiveSessionProvider, QueuedQuickSessionProvider } from '../contexts/ActiveSessionContext';
+import { QueuedQuickSessionProvider } from '../contexts/ActiveSessionContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useActiveSession } from '../hooks/useSessionQueries';
+import useIsMobile from '../hooks/useIsMobile';
 import { isQuickSession } from '../utils/sessionRuntime';
+import { buildTemplateSessionPayload, extractActivityId } from '../utils/createSessionPayload';
 import PageHeader from '../components/layout/PageHeader';
+import HeaderButton from '../components/layout/HeaderButton';
+import Modal from '../components/atoms/Modal';
+import ModalBody from '../components/atoms/ModalBody';
 import headerStyles from '../components/layout/PageHeader.module.css';
 import styles from './CreateSession.module.css';
 import '../App.css';
-
-function extractActivityId(item) {
-    if (typeof item === 'string') return item;
-    if (!item || typeof item !== 'object') return null;
-    const direct =
-        item.activity_id ||
-        item.activity_definition_id ||
-        item.activityId ||
-        item.activityDefinitionId ||
-        item.definition_id ||
-        item.id;
-    if (direct) return direct;
-    if (item.activity && typeof item.activity === 'object') {
-        return item.activity.id || item.activity.activity_id || item.activity.activity_definition_id || null;
-    }
-    return null;
-}
 
 function buildDraftMetrics(definition, splitId = null) {
     const metrics = Array.isArray(definition?.metric_definitions) ? definition.metric_definitions : [];
@@ -158,89 +144,24 @@ function sanitizeSets(sets) {
     }));
 }
 
-function buildTemplateSessionPayload(template, selectedProgramDay) {
-    const quickTemplate = isQuickSession(template);
-    const sessionDataPayload = quickTemplate
-        ? {
-            template_id: template.id,
-            template_name: template.name,
-            template_color: template.template_color || template.template_data?.template_color,
-            session_type: 'quick',
-            program_context: null,
-        }
-        : {
-            template_id: template.id,
-            template_name: template.name,
-            template_color: template.template_color || template.template_data?.template_color,
-            session_type: 'normal',
-            program_context: selectedProgramDay ? {
-                program_id: selectedProgramDay.program_id,
-                program_name: selectedProgramDay.program_name,
-                block_id: selectedProgramDay.block_id,
-                block_name: selectedProgramDay.block_name,
-                day_id: selectedProgramDay.day_id,
-                day_name: selectedProgramDay.day_name,
-            } : null,
-            sections: (template.template_data?.sections || []).map((section) => {
-                const templateItems = section.items || section.activities || section.exercises || [];
-                const items = templateItems
-                    .map((item) => {
-                        if (item?.type === 'circuit' && item.circuit_definition_id) {
-                            return {
-                                type: 'circuit',
-                                circuit_definition_id: item.circuit_definition_id,
-                            };
-                        }
-                        const activityId = extractActivityId(item);
-                        if (!activityId) return null;
-                        const name = typeof item === 'object' ? item.name : null;
-                        return {
-                            type: 'activity',
-                            name: name || 'Activity',
-                            activity_definition_id: activityId,
-                        };
-                    })
-                    .filter(Boolean);
-
-                const sectionFields = { ...section };
-                delete sectionFields.activities;
-                delete sectionFields.exercises;
-                return {
-                    ...sectionFields,
-                    items,
-                    estimated_duration_minutes: section.estimated_duration_minutes || section.duration_minutes,
-                };
-            }),
-            total_duration_minutes: template.template_data?.total_duration_minutes || 0,
-        };
-
-    return {
-        name: template.name,
-        description: template.description || '',
-        template_id: template.id,
-        duration_minutes: quickTemplate ? 0 : (template.template_data?.total_duration_minutes || 0),
-        session_start: getLocalISOString(),
-        session_data: sessionDataPayload,
-    };
-}
-
 /**
  * Create Session Page
- * Enhanced flow: Select from program day OR select template → Associate with goal → Create session
+ * Select from a program day or template, optionally define goal scope, then create.
  * 
  * Refactored to use focused sub-components for each step:
  * - ProgramSelector (Step 0a): Choose program when multiple available
  * - SourceSelector (Step 0b): Choose between program days vs templates  
  * - ProgramDayPicker (Step 1): Select program day and session
  * - TemplatePicker (Step 1): Select template directly
- * - GoalAssociation (Step 2): Associate with STGs and IGs
- * - CreateSessionActions (Step 3): Create button and summary
+ * - SessionGoalScopePanel (optional): Add manual scope beside locked activity-derived goals
+ * - CreateSessionActions (Step 2): Create button and summary
  */
 function CreateSession() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const { user } = useAuth();
+    const isMobile = useIsMobile();
     const { data: existingActiveSession, isFetched: activeSessionFetched } = useActiveSession(user?.id, rootId);
     // Selection state
     const [selectedProgram, setSelectedProgram] = useState(null);
@@ -248,8 +169,10 @@ function CreateSession() {
     const [selectedProgramDay, setSelectedProgramDay] = useState(null);
     const [selectedProgramSession, setSelectedProgramSession] = useState(null);
     const [sessionSource, setSessionSource] = useState(null); // 'program' or 'template'
-    const [activeQuickSessionId, setActiveQuickSessionId] = useState(null);
     const [queuedQuickSession, setQueuedQuickSession] = useState(null);
+    const [quickSessionModalOpen, setQuickSessionModalOpen] = useState(false);
+    const [manualGoalIds, setManualGoalIds] = useState([]);
+    const [mobileGoalsOpen, setMobileGoalsOpen] = useState(false);
 
     // UI state
     const [creating, setCreating] = useState(false);
@@ -259,8 +182,24 @@ function CreateSession() {
         programsByName,
         activityDefinitions,
         activityGroups,
+        allGoals,
         loading,
     } = useCreateSessionPageData(rootId);
+
+    const selectedTemplateIsNormal = Boolean(selectedTemplate && !isQuickSession(selectedTemplate));
+    const scopePreviewQuery = useQuery({
+        queryKey: queryKeys.sessionGoalScopePreview(
+            rootId,
+            selectedTemplate?.id || null,
+            selectedProgramDay?.day_id || null,
+        ),
+        queryFn: async () => (await fractalApi.previewSessionGoalScope(rootId, {
+            template_id: selectedTemplate.id,
+            ...(selectedProgramDay?.day_id ? { program_day_id: selectedProgramDay.day_id } : {}),
+        })).data,
+        enabled: Boolean(rootId && selectedTemplate),
+        retry: false,
+    });
 
     useEffect(() => {
         if (!rootId) {
@@ -297,8 +236,9 @@ function CreateSession() {
 
     // Handler functions
     const handleSelectProgramDay = (programDay) => {
-        setActiveQuickSessionId(null);
+        setManualGoalIds([]);
         setQueuedQuickSession(null);
+        setQuickSessionModalOpen(false);
         setSelectedProgramDay(programDay);
         setSelectedProgramSession(null);
         setSelectedTemplate(null);
@@ -317,8 +257,9 @@ function CreateSession() {
     };
 
     const handleSelectProgramSession = (session) => {
-        setActiveQuickSessionId(null);
+        setManualGoalIds([]);
         setQueuedQuickSession(null);
+        setQuickSessionModalOpen(false);
         setSelectedProgramSession(session);
         setSelectedTemplate({
             id: session.template_id,
@@ -329,8 +270,9 @@ function CreateSession() {
     };
 
     const handleSelectSource = (source) => {
-        setActiveQuickSessionId(null);
+        setManualGoalIds([]);
         setQueuedQuickSession(null);
+        setQuickSessionModalOpen(false);
         setSelectedTemplate(null);
         setSelectedProgramDay(null);
         setSelectedProgramSession(null);
@@ -338,8 +280,9 @@ function CreateSession() {
     };
 
     const handleSelectProgram = (programName) => {
-        setActiveQuickSessionId(null);
+        setManualGoalIds([]);
         setQueuedQuickSession(null);
+        setQuickSessionModalOpen(false);
         setSelectedProgramDay(null);
         setSelectedProgramSession(null);
         setSelectedTemplate(null);
@@ -415,7 +358,7 @@ function CreateSession() {
 
         try {
             const quickTemplate = isQuickSession(template);
-            const sessionData = buildTemplateSessionPayload(template, selectedProgramDay);
+            const sessionData = buildTemplateSessionPayload(template, selectedProgramDay, manualGoalIds);
             const response = await fractalApi.createSession(rootId, sessionData);
             const createdSession = response.data;
 
@@ -449,6 +392,7 @@ function CreateSession() {
             document.activeElement.blur();
         }
         await Promise.resolve();
+        setCreating(true);
 
         try {
             const quickSessionPayload = {
@@ -470,30 +414,45 @@ function CreateSession() {
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivities(rootId, completedSession.id) });
 
             setQueuedQuickSession(null);
-            setActiveQuickSessionId(completedSession.id);
+            setQuickSessionModalOpen(false);
+            setSelectedTemplate(null);
             notify.success('Quick session completed.');
         } catch (err) {
             logError('Error completing queued quick session:', err);
             notify.error('Error completing quick session: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setCreating(false);
         }
     };
 
     const handleSelectTemplate = (template) => {
-        setActiveQuickSessionId(null);
+        setManualGoalIds([]);
         setSelectedTemplate(template);
         setSelectedProgramDay(null);
         setSelectedProgramSession(null);
         if (isQuickSession(template)) {
             setQueuedQuickSession(buildQueuedQuickSession(template, activityDefinitions));
-            notify.success('Quick session queued. Enter your values, then click "Complete Quick Session" to save it.');
+            setQuickSessionModalOpen(true);
             return;
         }
 
         setQueuedQuickSession(null);
+        setQuickSessionModalOpen(false);
+    };
+
+    const handleCloseQuickSessionModal = () => {
+        if (creating) return;
+        setQuickSessionModalOpen(false);
+        setQueuedQuickSession(null);
+        setSelectedTemplate(null);
     };
 
     const handleCreateSession = async () => {
         await createSessionFromTemplate(selectedTemplate);
+    };
+
+    const handleToggleMobileGoals = () => {
+        setMobileGoalsOpen((wasOpen) => !wasOpen);
     };
 
     // Loading state
@@ -514,12 +473,61 @@ function CreateSession() {
     const showProgramChoice = hasMultiplePrograms;
     const currentProgramDays = effectiveSelectedProgram ? (programsByName[effectiveSelectedProgram]?.days || []) : [];
     const quickTemplateSelected = Boolean(selectedTemplate && isQuickSession(selectedTemplate) && !selectedProgramDay);
+    const showCreationAction = !quickTemplateSelected;
+    const renderCreationAction = (placement) => {
+        const placementProps = placement === 'header'
+            ? { headerMode: true }
+            : { footerMode: true };
+
+        return (
+            <CreateSessionActions
+                selectedTemplate={selectedTemplate}
+                selectedProgramDay={selectedProgramDay}
+                creating={creating}
+                onCreateSession={handleCreateSession}
+                scopeReady={!selectedTemplateIsNormal || scopePreviewQuery.isSuccess}
+                {...placementProps}
+            />
+        );
+    };
+    const sessionGoalScopePanel = (
+        <SessionGoalScopePanel
+            goals={allGoals}
+            manualGoalIds={manualGoalIds}
+            automaticGoalIds={scopePreviewQuery.data?.automatic_goal_ids || []}
+            onChange={setManualGoalIds}
+            isLoading={Boolean(selectedTemplate) && scopePreviewQuery.isLoading}
+            error={selectedTemplate ? scopePreviewQuery.error : null}
+            onRetry={() => scopePreviewQuery.refetch()}
+            selectionDisabled={!selectedTemplateIsNormal}
+            readOnly={Boolean(selectedTemplate && isQuickSession(selectedTemplate))}
+            awaitingTemplate={!selectedTemplate}
+            embedded={isMobile}
+            hideHeading={isMobile}
+        />
+    );
 
     return (
         <div className={headerStyles.pageShell}>
             <PageHeader
                 title="Create Session"
                 subtitle="Select a template or program day to begin your session."
+                actions={isMobile ? (
+                    <HeaderButton
+                        variant="secondary"
+                        onClick={handleToggleMobileGoals}
+                        aria-expanded={mobileGoalsOpen}
+                        aria-controls="create-session-goals"
+                        aria-label={`${mobileGoalsOpen ? 'Hide' : 'Show'} Session Goals`}
+                    >
+                        Session Goals
+                    </HeaderButton>
+                ) : showCreationAction ? (
+                    <div className={styles.desktopHeaderAction}>
+                        {renderCreationAction('header')}
+                    </div>
+                ) : null}
+                className={styles.createSessionHeader}
             />
 
             <div className={`${headerStyles.scrollContent} ${headerStyles.gridContent} ${styles.content}`}>
@@ -545,78 +553,88 @@ function CreateSession() {
                     />
                 )}
 
-                {/* Step 1: Select Program Day */}
-                {(effectiveSessionSource === 'program' || (hasProgramDays && !hasTemplates)) && (
-                    <ProgramDayPicker
-                        programDays={currentProgramDays}
-                        selectedProgramDay={selectedProgramDay}
-                        selectedProgramSession={selectedProgramSession}
-                        hasTemplates={hasTemplates}
-                        onSelectProgramDay={handleSelectProgramDay}
-                        onSelectProgramSession={handleSelectProgramSession}
-                        onSwitchToTemplate={() => setSessionSource('template')}
+                <div className={styles.sessionWorkspaceLayout}>
+                    <div className={styles.requiredSessionFlow}>
+                        {/* Step 1: Select Program Day */}
+                        {(effectiveSessionSource === 'program' || (hasProgramDays && !hasTemplates)) && (
+                            <ProgramDayPicker
+                                programDays={currentProgramDays}
+                                selectedProgramDay={selectedProgramDay}
+                                selectedProgramSession={selectedProgramSession}
+                                hasTemplates={hasTemplates}
+                                onSelectProgramDay={handleSelectProgramDay}
+                                onSelectProgramSession={handleSelectProgramSession}
+                                onSwitchToTemplate={() => setSessionSource('template')}
+                            />
+                        )}
+
+                        {/* Step 1: Select Template */}
+                        {(effectiveSessionSource === 'template' || (!hasProgramDays && hasTemplates)) && (
+                            <TemplatePicker
+                                templates={templates}
+                                selectedTemplate={selectedTemplate}
+                                rootId={rootId}
+                                onSelectTemplate={handleSelectTemplate}
+                            />
+                        )}
+
+                    </div>
+
+                    {!isMobile && (
+                        <div className={styles.goalScopeColumn}>
+                            {sessionGoalScopePanel}
+                        </div>
+                    )}
+                </div>
+
+            </div>
+            </div>
+
+            {isMobile && showCreationAction && (
+                <footer className={styles.stickyActionFooter}>
+                    <div className={styles.stickyActionFooterInner}>
+                        {renderCreationAction('footer')}
+                    </div>
+                </footer>
+            )}
+
+            {queuedQuickSession && (
+                <QueuedQuickSessionProvider
+                    rootId={rootId}
+                    draftSession={queuedQuickSession}
+                    activityDefinitions={activityDefinitions}
+                    activityGroups={activityGroups}
+                    setDraftSession={setQueuedQuickSession}
+                >
+                    <QuickSessionModal
+                        isOpen={quickSessionModalOpen}
+                        templateName={selectedTemplate?.name}
+                        onClose={handleCloseQuickSessionModal}
+                        onComplete={completeQueuedQuickSession}
+                        isSubmitting={creating}
                     />
-                )}
+                </QueuedQuickSessionProvider>
+            )}
 
-                {/* Step 1: Select Template */}
-                {(effectiveSessionSource === 'template' || (!hasProgramDays && hasTemplates)) && (
-                    <TemplatePicker
-                        templates={templates}
-                        selectedTemplate={selectedTemplate}
-                        rootId={rootId}
-                        onSelectTemplate={handleSelectTemplate}
-                    />
-                )}
-
-                {quickTemplateSelected && creating && !activeQuickSessionId && !queuedQuickSession && (
-                    <StepContainer>
-                        <LoadingState label="Loading quick session..." />
-                    </StepContainer>
-                )}
-
-                {quickTemplateSelected && queuedQuickSession && !activeQuickSessionId && (
-                    <QueuedQuickSessionProvider
-                        rootId={rootId}
-                        draftSession={queuedQuickSession}
-                        activityDefinitions={activityDefinitions}
-                        activityGroups={activityGroups}
-                        setDraftSession={setQueuedQuickSession}
+            {isMobile && (
+                <Modal
+                    isOpen={mobileGoalsOpen}
+                    onClose={() => setMobileGoalsOpen(false)}
+                    title="Session Goals"
+                    size="xl"
+                    overlayClassName={styles.mobileGoalsOverlay}
+                    className={styles.mobileGoalsSheet}
+                    bodyClassName={styles.mobileGoalsModalBody}
+                >
+                    <ModalBody
+                        id="create-session-goals"
+                        noPadding
+                        className={styles.mobileGoalsBody}
                     >
-                        <QuickSessionWorkspace
-                            embedded
-                            showCompletionAction={false}
-                        />
-                        <QuickSessionCompleteStep
-                            onComplete={completeQueuedQuickSession}
-                            isLoading={creating}
-                        />
-                    </QueuedQuickSessionProvider>
-                )}
-
-                {quickTemplateSelected && activeQuickSessionId && (
-                    <ActiveSessionProvider rootId={rootId} sessionId={activeQuickSessionId}>
-                        <QuickSessionWorkspace
-                            embedded
-                            showCompletionAction={false}
-                            onStartAnother={() => {
-                                setActiveQuickSessionId(null);
-                                setQueuedQuickSession(buildQueuedQuickSession(selectedTemplate, activityDefinitions));
-                            }}
-                        />
-                    </ActiveSessionProvider>
-                )}
-
-                {!quickTemplateSelected && (
-                    <CreateSessionActions
-                        selectedTemplate={selectedTemplate}
-                        selectedProgramDay={selectedProgramDay}
-                        creating={creating}
-                        quickMode={isQuickSession(selectedTemplate)}
-                        onCreateSession={handleCreateSession}
-                    />
-                )}
-            </div>
-            </div>
+                        {sessionGoalScopePanel}
+                    </ModalBody>
+                </Modal>
+            )}
         </div>
     );
 }

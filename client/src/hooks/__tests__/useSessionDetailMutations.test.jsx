@@ -467,7 +467,7 @@ describe('useSessionDetailMutations', () => {
         expect(queryClient.getQueryData(queryKeys.sessionGoalsView('root-1', 'session-1')).goal_tree.children[0].description).toBe('New description');
     });
 
-    it('updates the session goals view cache when adding an associated activity', async () => {
+    it('refetches the canonical session goals view when adding an associated activity', async () => {
         const queryClient = new QueryClient({
             defaultOptions: {
                 queries: { retry: false },
@@ -497,6 +497,7 @@ describe('useSessionDetailMutations', () => {
                 draftState = typeof updater === 'function' ? updater(draftState) : updater;
             }),
         });
+        const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
 
         addActivityToSession.mockResolvedValueOnce({
             data: { id: 'inst-2', activity_definition_id: 'act-2' }
@@ -514,12 +515,8 @@ describe('useSessionDetailMutations', () => {
         expect(draftState.sections[0].items).toEqual([
             { type: 'activity', activity_instance_id: 'inst-2' },
         ]);
-        expect(queryClient.getQueryData(queryKeys.sessionGoalsView('root-1', 'session-1'))).toMatchObject({
-            session_activity_ids: ['act-2'],
-            session_goal_ids: [],
-            activity_goal_ids_by_activity: {
-                'act-2': ['goal-1'],
-            },
+        expect(invalidateQueries).toHaveBeenCalledWith({
+            queryKey: queryKeys.sessionGoalsView('root-1', 'session-1'),
         });
     });
 

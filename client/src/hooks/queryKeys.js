@@ -75,6 +75,9 @@ export const queryKeys = {
     sessionActivitiesRoot: (rootId) => ['session-activities', rootId],
     sessionGoalsView: (rootId, sessionId) => ['session-goals-view', rootId, sessionId],
     sessionGoalsViewRoot: (rootId) => ['session-goals-view', rootId],
+    sessionGoalScopePreview: (rootId, templateId, programDayId = null) => [
+        'session-goal-scope-preview', rootId, templateId, programDayId,
+    ],
     sessionNotes: (rootId, sessionId) => ['session-notes', rootId, sessionId],
     sessionNotesRoot: (rootId) => ['session-notes', rootId],
     sessionTemplates: (rootId) => ['session-templates', rootId],

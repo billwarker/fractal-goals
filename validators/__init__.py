@@ -70,6 +70,7 @@ from .sessions import (
     QuickSessionSetSchema,
     SessionCreateSchema,
     SessionGoalAssociationSchema,
+    SessionGoalScopePreviewSchema,
     SessionUpdateSchema,
 )
 from .activities import (
@@ -233,6 +234,7 @@ __all__ = [
     "QuickSessionSetSchema",
     "SessionCreateSchema",
     "SessionGoalAssociationSchema",
+    "SessionGoalScopePreviewSchema",
     "SessionTemplateCreateSchema",
     "SessionTemplateFromSessionSchema",
     "SessionTemplateUpdateSchema",

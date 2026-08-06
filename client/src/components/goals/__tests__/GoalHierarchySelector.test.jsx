@@ -28,6 +28,57 @@ describe('GoalHierarchySelector', () => {
         { id: 'goal-grandchild', name: 'Grandchild Goal', type: 'ShortTermGoal', parent_id: 'goal-child', childrenIds: [] },
     ];
 
+    it('keeps automatic goals locked and emits manual selections only', () => {
+        const handleSelectionChange = vi.fn();
+        render(
+            <GoalHierarchySelector
+                goals={goals}
+                selectedGoalIds={[]}
+                lockedGoalIds={['goal-child']}
+                lockedGoalLabel="Included by session activities"
+                onSelectionChange={handleSelectionChange}
+            />
+        );
+
+        expect(screen.getByLabelText('Child Goal, Included by session activities')).toBeDisabled();
+        expect(screen.getByText('Included by session activities')).toBeInTheDocument();
+        fireEvent.click(screen.getByLabelText('Select all descendants of Root Goal'));
+        expect(handleSelectionChange).toHaveBeenLastCalledWith(['goal-grandchild']);
+    });
+
+    it('keeps the direct-selection checkbox alongside both lineage controls in compact layouts', () => {
+        render(
+            <GoalHierarchySelector
+                goals={goals}
+                selectedGoalIds={[]}
+                onSelectionChange={vi.fn()}
+                compactLayout
+            />
+        );
+
+        const directSelection = screen.getByLabelText('Select Child Goal');
+        const controlRow = directSelection.closest('div');
+        expect(controlRow).toContainElement(screen.getByLabelText('Select all ancestors of Child Goal'));
+        expect(controlRow).toContainElement(screen.getByLabelText('Select all descendants of Child Goal'));
+        expect(controlRow.querySelectorAll('input')).toHaveLength(3);
+    });
+
+    it('can replace repeated locked-goal labels with an accessible marker', () => {
+        render(
+            <GoalHierarchySelector
+                goals={goals}
+                selectedGoalIds={[]}
+                lockedGoalIds={['goal-child']}
+                lockedGoalLabel="Included by template activities"
+                lockedGoalMarker="*"
+                onSelectionChange={vi.fn()}
+            />
+        );
+
+        expect(screen.getByLabelText('Included by template activities')).toHaveTextContent('*');
+        expect(screen.queryByText('Included by template activities')).not.toBeInTheDocument();
+    });
+
     it('hides the ancestor and descendant bulk controls in single select mode', () => {
         render(
             <GoalHierarchySelector
@@ -183,6 +234,62 @@ describe('GoalHierarchySelector', () => {
         expect(screen.getByText('Active Goal')).toBeInTheDocument();
         expect(screen.queryByText('Completed Goal')).not.toBeInTheDocument();
         expect(screen.queryByText('Status Completed Goal')).not.toBeInTheDocument();
+    });
+
+    it('can enforce completed-goal filtering for creation flows', () => {
+        render(
+            <GoalHierarchySelector
+                goals={[
+                    { id: 'active-goal', name: 'Active Goal', type: 'UltimateGoal' },
+                    { id: 'completed-goal', name: 'Completed Goal', type: 'LongTermGoal', completed: true },
+                ]}
+                selectedGoalIds={[]}
+                onSelectionChange={vi.fn()}
+                initialHideCompletedGoals
+                lockHideCompletedGoals
+            />
+        );
+
+        expect(screen.getByText('Active Goal')).toBeInTheDocument();
+        expect(screen.queryByText('Completed Goal')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Completed goals are hidden')).toBeChecked();
+        expect(screen.getByLabelText('Completed goals are hidden')).toBeDisabled();
+    });
+
+    it('can hide the completed-goal control while retaining the filter', () => {
+        render(
+            <GoalHierarchySelector
+                goals={[
+                    { id: 'active-goal', name: 'Active Goal', type: 'UltimateGoal' },
+                    { id: 'completed-goal', name: 'Completed Goal', type: 'LongTermGoal', completed: true },
+                ]}
+                selectedGoalIds={[]}
+                onSelectionChange={vi.fn()}
+                initialHideCompletedGoals
+                showHideCompletedControl={false}
+            />
+        );
+
+        expect(screen.getByText('Active Goal')).toBeInTheDocument();
+        expect(screen.queryByText('Completed Goal')).not.toBeInTheDocument();
+        expect(screen.queryByText('Hide completed goals')).not.toBeInTheDocument();
+    });
+
+    it('disables direct and lineage selection in read-only mode', () => {
+        const handleSelectionChange = vi.fn();
+        render(
+            <GoalHierarchySelector
+                goals={goals}
+                selectedGoalIds={[]}
+                onSelectionChange={handleSelectionChange}
+                selectionDisabled
+            />
+        );
+
+        expect(screen.getByLabelText('Select Root Goal')).toBeDisabled();
+        expect(screen.getByLabelText('Select all descendants of Root Goal')).toBeDisabled();
+        fireEvent.click(screen.getByText('Root Goal'));
+        expect(handleSelectionChange).not.toHaveBeenCalled();
     });
 
     it('uses the user completion colors for completed goals', () => {
