@@ -77,19 +77,19 @@ export function useSessionDraftAutosave({
     }, [normalizedSessionData]);
 
     const autoSaveQueue = useMemo(() => createAutoSaveQueue({
-        save: (nextData) => saveSessionData(nextData),
+        save: saveSessionData,
         onError: () => {
             setAutoSaveStatus('error');
             scheduleStatusClear(3000);
         },
     }), [saveSessionData, scheduleStatusClear, setAutoSaveStatus]);
 
-    /* eslint-disable react-hooks/set-state-in-effect -- Session identity and server acknowledgements drive this autosave state machine. */
     useEffect(() => {
         const sessionKey = `${rootId || ''}:${sessionId || ''}`;
         if (previousSessionKeyRef.current !== sessionKey) {
             previousSessionKeyRef.current = sessionKey;
             initializedRef.current = false;
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- A route identity change synchronously resets the prior session's draft.
             setSessionDataDraft(null);
             autoSaveQueue.reset();
             instanceQueuesRef.current.forEach((queue) => queue.reset());
@@ -116,6 +116,7 @@ export function useSessionDraftAutosave({
         if (!normalizedSessionData || initializedRef.current) return;
         autoSaveQueue.seed(normalizedSessionData);
         initializedRef.current = true;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Initialization gates autosave until the server snapshot has seeded the queue.
         setJustInitialized(true);
         if (initTimeoutRef.current) clearTimeout(initTimeoutRef.current);
         initTimeoutRef.current = setTimeout(() => {
@@ -135,11 +136,10 @@ export function useSessionDraftAutosave({
     useEffect(() => {
         if (!sessionDataDraft || !normalizedSessionData) return;
         if (areSessionDataEqual(sessionDataDraft, normalizedSessionData)) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- A server acknowledgement retires the matching optimistic draft.
             setSessionDataDraft(null);
         }
     }, [sessionDataDraft, normalizedSessionData]);
-    /* eslint-enable react-hooks/set-state-in-effect */
-
     useEffect(() => {
         const instanceQueues = instanceQueuesRef.current;
         return () => {

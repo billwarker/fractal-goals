@@ -66,7 +66,7 @@
 
 .autoSaveIndicator {
     position: fixed;
-    bottom: 24px;
+    bottom: 52px;
     right: 24px;
     z-index: 999;
     padding: 8px 14px;
@@ -207,7 +207,7 @@
 @media (max-width: 1024px) {
     .autoSaveIndicator {
         right: 16px;
-        bottom: 16px;
+        bottom: 52px;
     }
 }
 

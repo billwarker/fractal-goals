@@ -248,6 +248,12 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             scheduleStatusClear(3000);
         }
     });
+    const { mutateAsync: mutateSession } = updateSessionMutation;
+
+    const saveSessionData = useCallback(
+        (nextData) => mutateSession({ session_data: nextData }),
+        [mutateSession],
+    );
 
     const {
         setSessionDataDraft,
@@ -257,7 +263,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         rootId,
         sessionId,
         normalizedSessionData,
-        saveSessionData: (nextData) => updateSessionMutation.mutateAsync({ session_data: nextData }),
+        saveSessionData,
         setAutoSaveStatus,
         scheduleStatusClear,
         instanceQueuesRef,
