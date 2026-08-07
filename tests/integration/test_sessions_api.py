@@ -19,7 +19,8 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from models import (
-    ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, Session, SessionTemplate, Target,
+    ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, Session, SessionTemplate,
+    SessionWorkInterval, Target,
     activity_goal_associations, session_goals,
 )
 
@@ -959,6 +960,30 @@ class TestSessionActivityEndpoints:
         deleted_instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
         assert deleted_instance is not None
         assert deleted_instance.deleted_at is not None
+
+    def test_removing_a_running_activity_closes_its_work_interval(
+        self,
+        authed_client,
+        db_session,
+        sample_activity_instance,
+    ):
+        session = db_session.get(Session, sample_activity_instance.session_id)
+        root_id = session.root_id
+        instance_id = sample_activity_instance.id
+        assert authed_client.post(
+            f'/api/{root_id}/activity-instances/{instance_id}/start',
+        ).status_code == 200
+
+        response = authed_client.delete(
+            f'/api/{root_id}/sessions/{session.id}/activities/{instance_id}',
+        )
+
+        assert response.status_code == 200
+        db_session.expire_all()
+        assert db_session.query(SessionWorkInterval).filter_by(
+            session_id=session.id,
+            ended_at=None,
+        ).count() == 0
 
     def test_removed_activity_is_excluded_from_session_reads(self, authed_client, db_session, sample_activity_instance):
         """Soft-deleted activity instances should disappear from all session read payloads."""

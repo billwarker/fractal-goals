@@ -630,6 +630,9 @@ class TimerService:
             instance = self.db_session.get(ActivityInstance, paused_ordinary_instance_id)
             instance.is_paused = True
             instance.last_paused_at = now
+            # Closing the accruing interval recomputes historical boundaries, but
+            # the logical activity timer is only paused, not completed.
+            instance.time_stop = None
 
         active_runs = self.db_session.query(CircuitRun).filter(
             CircuitRun.session_id == session_id,
@@ -697,6 +700,10 @@ class TimerService:
             except WorkIntervalConflict:
                 self.db_session.rollback()
                 return None, "Session has more than one paused work item; resolve timer history before resuming", 409
+            # Repair both current and legacy pause/resume cycles where closing the
+            # prior interval left a stop boundary on a logically running timer.
+            instance.time_stop = None
+            instance.completed = False
 
         paused_runs = self.db_session.query(CircuitRun).filter(
             CircuitRun.session_id == session_id,

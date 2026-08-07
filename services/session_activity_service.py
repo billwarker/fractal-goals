@@ -14,6 +14,7 @@ from models import (
     MetricDefinition,
     MetricValue,
     Session,
+    SessionWorkInterval,
     session_goals,
     validate_root_goal,
 )
@@ -29,6 +30,7 @@ from services.serializers import serialize_activity_instance
 from services.service_types import JsonDict, ServiceResult
 from services.session_runtime import is_quick_session
 from services.session_template_stats_service import SessionTemplateStatsService
+from services.work_interval_service import WorkIntervalService, utc_now_naive
 
 
 class SessionActivityService:
@@ -179,7 +181,23 @@ class SessionActivityService:
             ActivityInstance.deleted_at == None,
         ).order_by(ActivityInstance.created_at).all()
 
-        return [serialize_activity_instance(inst) for inst in instances], None, 200
+        open_instance_ids = {
+            row[0]
+            for row in self.db_session.query(
+                SessionWorkInterval.activity_instance_id,
+            ).filter(
+                SessionWorkInterval.session_id == session_id,
+                SessionWorkInterval.ended_at.is_(None),
+            ).all()
+        }
+
+        return [
+            serialize_activity_instance(
+                inst,
+                has_open_work_interval=inst.id in open_instance_ids,
+            )
+            for inst in instances
+        ], None, 200
 
     def add_activity_to_session(self, root_id, session_id, current_user_id, data) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
@@ -393,6 +411,10 @@ class SessionActivityService:
         if not instance:
             return None, "Activity instance not found", 404
 
+        interval_service = WorkIntervalService(self.db_session)
+        open_interval = interval_service.get_open(session_id)
+        if open_interval and open_interval.activity_instance_id == instance_id:
+            interval_service.close(open_interval, ended_at=utc_now_naive())
         instance.deleted_at = models.utc_now()
         self._remove_instance_from_session_sections(session, instance_id)
         self.db_session.commit()

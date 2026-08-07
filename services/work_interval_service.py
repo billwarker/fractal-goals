@@ -34,10 +34,13 @@ class WorkIntervalService:
     def describe(interval):
         if not interval:
             return None
+        instance = getattr(interval, "activity_instance", None)
+        definition = getattr(instance, "definition", None) if instance else None
         return {
             "interval_id": interval.id,
             "activity_instance_id": interval.activity_instance_id,
             "activity_set_id": interval.activity_set_id,
+            "activity_name": getattr(definition, "name", None),
             "started_at": interval.started_at.isoformat() if interval.started_at else None,
         }
 

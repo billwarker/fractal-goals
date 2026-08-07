@@ -451,7 +451,7 @@ function SessionActivityItemView({
                                                 <PlayIcon size={13} />
                                                 <span>Start</span>
                                             </Button>
-                                            <TimerConflictAction extras={timerConflictExtras} onUpdate={onUpdate} onResolved={() => setTimerConflictExtras(null)} />
+                                            <TimerConflictAction conflict={timerConflictExtras} onUpdate={onUpdate} onResolved={() => setTimerConflictExtras(null)} />
                                             <Button
                                                 unstyled
                                                 onClick={(e) => {

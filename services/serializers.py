@@ -146,7 +146,7 @@ def serialize_fractal_metric(metric):
         "updated_at": format_utc(metric.updated_at),
     }
 
-def serialize_activity_instance(instance):
+def serialize_activity_instance(instance, *, has_open_work_interval=False):
     """Serialize an ActivityInstance object."""
     data_dict = _safe_load_json(instance.data, {})
     metric_values_list = [
@@ -176,7 +176,10 @@ def serialize_activity_instance(instance):
         "group_name": group_path,  # Now includes full path
         "created_at": format_utc(instance.created_at),
         "time_start": format_utc(instance.time_start),
-        "time_stop": format_utc(instance.time_stop),
+        # The open interval is the canonical source of live accrual. This also
+        # presents legacy pause/resume rows correctly if they retained a stale
+        # historical stop boundary.
+        "time_stop": None if has_open_work_interval else format_utc(instance.time_stop),
         "duration_seconds": instance.duration_seconds,
         "target_duration_seconds": getattr(instance, 'target_duration_seconds', None),
         "is_paused": getattr(instance, 'is_paused', False),

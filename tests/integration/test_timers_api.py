@@ -16,7 +16,7 @@ from uuid import uuid4
 
 from sqlalchemy.exc import IntegrityError
 
-from models import Goal, SessionTemplate
+from models import Goal, Session, SessionTemplate, SessionWorkInterval
 
 
 @pytest.mark.integration
@@ -86,6 +86,74 @@ class TestTimerStartStop:
         data = json.loads(response.data)
         assert data['time_start'] is not None
         assert data['time_stop'] is None
+
+    def test_pause_resume_keeps_the_logical_timer_visible(
+        self,
+        authed_client,
+        db_session,
+        sample_activity_instance,
+    ):
+        session = db_session.get(Session, sample_activity_instance.session_id)
+        root_id = session.root_id
+        instance_id = sample_activity_instance.id
+
+        started = authed_client.post(f'/api/{root_id}/activity-instances/{instance_id}/start')
+        assert started.status_code == 200
+
+        paused = authed_client.post(f'/api/{root_id}/timers/session/{session.id}/pause')
+        assert paused.status_code == 200
+        paused_instance = next(
+            item for item in paused.get_json()['activity_instances'] if item['id'] == instance_id
+        )
+        assert paused_instance['is_paused'] is True
+        assert paused_instance['time_stop'] is None
+        assert db_session.query(SessionWorkInterval).filter_by(
+            session_id=session.id,
+            ended_at=None,
+        ).count() == 0
+
+        resumed = authed_client.post(f'/api/{root_id}/timers/session/{session.id}/resume')
+        assert resumed.status_code == 200
+        resumed_instance = next(
+            item for item in resumed.get_json()['activity_instances'] if item['id'] == instance_id
+        )
+        assert resumed_instance['is_paused'] is False
+        assert resumed_instance['time_stop'] is None
+        assert resumed_instance['completed'] is False
+        assert db_session.query(SessionWorkInterval).filter_by(
+            session_id=session.id,
+            ended_at=None,
+        ).count() == 1
+
+        listed = authed_client.get(f'/api/{root_id}/sessions/{session.id}/activities')
+        listed_instance = next(item for item in listed.get_json() if item['id'] == instance_id)
+        assert listed_instance['time_stop'] is None
+
+    def test_open_interval_repairs_a_legacy_stale_stop_in_session_reads(
+        self,
+        authed_client,
+        db_session,
+        sample_activity_instance,
+    ):
+        session = db_session.get(Session, sample_activity_instance.session_id)
+        now = datetime.utcnow()
+        sample_activity_instance.time_start = now - timedelta(minutes=2)
+        sample_activity_instance.time_stop = now - timedelta(minutes=1)
+        db_session.add(SessionWorkInterval(
+            root_id=session.root_id,
+            session_id=session.id,
+            activity_instance_id=sample_activity_instance.id,
+            started_at=now,
+        ))
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{session.root_id}/sessions/{session.id}/activities',
+        )
+
+        assert response.status_code == 200
+        payload = next(item for item in response.get_json() if item['id'] == sample_activity_instance.id)
+        assert payload['time_stop'] is None
 
     def test_start_timer_persists_countdown_target(self, authed_client, db_session, sample_activity_instance):
         """Starting with a target duration stores countdown metadata."""
@@ -473,6 +541,7 @@ class TestConcurrentTimers:
         )
         assert conflict.status_code == 409
         assert conflict.get_json()['code'] == 'active_work_exists'
+        assert conflict.get_json()['active_work']['activity_name'] == sample_activity_definition.name
         switched = authed_client.post(
             f'/api/{root_id}/activity-instances/{instances[1]}/start',
             json={'switch': True},
