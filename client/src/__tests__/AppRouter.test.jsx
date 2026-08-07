@@ -9,12 +9,14 @@ const {
     getAllFractals,
     mockIsMobile,
     mockActiveSession,
+    mockRouteSession,
     mockRootGoal,
     mockUser,
 } = vi.hoisted(() => ({
     getAllFractals: vi.fn(),
     mockIsMobile: vi.fn(() => false),
     mockActiveSession: { current: null },
+    mockRouteSession: { current: null },
     mockRootGoal: {
         id: 'root-1',
         name: 'First Root',
@@ -38,6 +40,7 @@ vi.mock('../hooks/useSessionQueries', () => ({
     useActiveSession: (_userId, rootId) => ({
         data: mockActiveSession.byRoot?.[rootId] ?? mockActiveSession.current,
     }),
+    useSessionDetail: () => ({ data: mockRouteSession.current }),
 }));
 
 vi.mock('../contexts/AuthContext', () => ({
@@ -110,6 +113,7 @@ describe('NavigationHeader', () => {
         mockIsMobile.mockReturnValue(false);
         mockActiveSession.current = null;
         mockActiveSession.byRoot = null;
+        mockRouteSession.current = null;
         mockUser.current = { id: 'user-1', is_admin: false };
         getAllFractals.mockResolvedValue({
             data: [
@@ -239,6 +243,52 @@ describe('NavigationHeader', () => {
         expect(link).toHaveAttribute('href', '/root-1/session/session-8');
         expect(link).toHaveTextContent('SESSION PAUSED');
         expect(link.querySelector('[aria-label="Paused session"]')).not.toBeNull();
+    });
+
+    it('uses the queried root when an active-session payload omits redundant root_id', () => {
+        mockActiveSession.current = {
+            id: 'session-8',
+            is_paused: true,
+        };
+
+        renderHeader('/root-1/goals');
+
+        expect(screen.getByRole('link', { name: /session paused/i })).toHaveAttribute(
+            'href',
+            '/root-1/session/session-8',
+        );
+    });
+
+    it('uses the unfinished detail query when active-session state is temporarily unavailable', () => {
+        mockRouteSession.current = {
+            id: 'session-8',
+            root_id: 'root-1',
+            is_paused: true,
+            completed: false,
+        };
+
+        renderHeader('/root-1/session/session-8');
+
+        expect(screen.getByRole('link', { name: /session paused/i })).toHaveAttribute(
+            'href',
+            '/root-1/session/session-8',
+        );
+    });
+
+    it('does not treat a completed detail session as active', () => {
+        mockRouteSession.current = {
+            id: 'session-8',
+            root_id: 'root-1',
+            is_paused: false,
+            completed: true,
+        };
+
+        renderHeader('/root-1/session/session-8');
+
+        expect(screen.getByRole('link', { name: '+ ADD SESSION' })).toHaveAttribute(
+            'href',
+            '/root-1/create-session',
+        );
     });
 
     it('rechecks active-session state when switching fractals', async () => {

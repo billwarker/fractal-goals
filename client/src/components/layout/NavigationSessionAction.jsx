@@ -1,16 +1,27 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, matchPath, useLocation } from 'react-router-dom';
 
-import { useActiveSession } from '../../hooks/useSessionQueries';
+import { useActiveSession, useSessionDetail } from '../../hooks/useSessionQueries';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import styles from '../../AppRouter.module.css';
 
 function NavigationSessionAction({ rootId, userId, isMobile = false, onClick }) {
+    const location = useLocation();
     const { data: activeSession } = useActiveSession(userId, rootId);
-    const activePath = activeSession?.id && activeSession?.root_id
-        ? `/${activeSession.root_id}/session/${activeSession.id}`
+    const sessionRouteMatch = matchPath('/:routeRootId/session/:routeSessionId', location.pathname);
+    const routeRootId = sessionRouteMatch?.params?.routeRootId || null;
+    const routeSessionId = sessionRouteMatch?.params?.routeSessionId || null;
+    const { data: routeSession } = useSessionDetail(routeRootId, routeSessionId);
+    const routeSessionCompleted = routeSession?.completed ?? routeSession?.attributes?.completed;
+    const unfinishedRouteSession = routeSession?.id && routeSessionCompleted !== true
+        ? routeSession
         : null;
-    const isPaused = Boolean(activeSession?.is_paused ?? activeSession?.attributes?.is_paused);
+    const currentSession = activeSession || unfinishedRouteSession;
+    const currentSessionRootId = currentSession?.root_id || routeRootId || rootId;
+    const activePath = currentSession?.id && currentSessionRootId
+        ? `/${currentSessionRootId}/session/${currentSession.id}`
+        : null;
+    const isPaused = Boolean(currentSession?.is_paused ?? currentSession?.attributes?.is_paused);
     const label = activePath
         ? (isPaused ? 'SESSION PAUSED' : 'SESSION IN PROGRESS')
         : '+ ADD SESSION';
