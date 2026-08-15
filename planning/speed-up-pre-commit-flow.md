@@ -76,5 +76,6 @@ In [client/vitest.config.js](client/vitest.config.js): drop `fileParallelism: fa
 - Backend-only / nothing-staged commit: **~0.05s** (was ~115s)
 - Frontend commit touching one source file: **~6.5s** (related tests + responsive audit)
 - Full suite with `maxWorkers: 4`: **45–84s** (was ~115s serial); wall timeout lowered 240s → 180s
+- Related-test runs use **2 isolated threads** so unusually broad staged frontend diffs avoid repeated child-process startup and excessive fork pressure; full pre-push verification retains its proven 4-fork configuration. Typical small commits remain fast because only dependency-related files run.
 - Parallelism validation: one unreproduced failure on the first (cold) run, then 4 consecutive fully green runs; noted as a watch item in `client/vitest.config.js`
 - `pre-push` hook now installed (was missing), running full `verify`

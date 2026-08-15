@@ -9,8 +9,12 @@ const timeoutMs = Number.parseInt(process.env.VITEST_WALL_TIMEOUT_MS || '', 10) 
 // `--related <files...>` runs only tests importing the given source files
 // (vitest related); anything else falls through to a full `vitest run`.
 const cliArgs = process.argv.slice(2);
-const args = cliArgs[0] === '--related'
-    ? ['vitest', 'related', '--run', ...cliArgs.slice(1)]
+const isRelatedRun = cliArgs[0] === '--related';
+const args = isRelatedRun
+    // Related runs normally cover only a few files, but broad staged diffs can
+    // fan out across much of the suite. Threads avoid repeated child-process
+    // startup while retaining per-file isolation for these frontend/jsdom tests.
+    ? ['vitest', 'related', '--run', '--pool=threads', '--maxWorkers=2', ...cliArgs.slice(1)]
     : ['vitest', 'run', ...cliArgs];
 
 const child = spawn('npx', args, {
