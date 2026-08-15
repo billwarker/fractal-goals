@@ -717,14 +717,11 @@ function GoalDetailModalRenderSurface({
                 activityTemplate={activityBuilderTemplate}
                 onSuccess={async (newActivity) => {
                     if (newActivity && newActivity.id) {
-                        await attachInlineCreatedActivity(newActivity);
-                        if (goalId) {
-                            notify.success(`Associated "${newActivity.name}" with goal`);
+                        const attachment = await attachInlineCreatedActivity(newActivity);
+                        if (goalId && !attachment.associatedImmediately) {
+                            notify.error(`Created "${newActivity.name}", but could not associate it with this goal.`);
                         }
                     }
-                    setActivityBuilderTemplate(null);
-                    setIsActivityBuilderOpen(false);
-                    setViewState(activityBuilderReturnView);
                 }}
                 onCancel={() => {
                     setActivityBuilderTemplate(null);

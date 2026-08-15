@@ -1,11 +1,11 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { getTypeDisplayName } from '../../utils/goalHelpers';
 import { isExecutionGoalType } from '../../utils/goalNodeModel';
 import { formatLiteralDate } from '../../utils/dateUtils';
 import GoalIcon from '../atoms/GoalIcon';
 import GoalHierarchyIconAction from './GoalHierarchyIconAction';
+import useGoalHierarchyConnectors from './useGoalHierarchyConnectors';
 import styles from './GoalHierarchyList.module.css';
-
 function buildSessionHierarchyTree(nodes) {
     const nodeMap = new Map();
     const roots = [];
@@ -90,90 +90,98 @@ function GoalHierarchyList({
     const treeRoots = useMemo(() => buildSessionHierarchyTree(nodes), [nodes]);
     const listRef = useRef(null);
     const iconRefs = useRef(new Map());
-    const [connectorEdges, setConnectorEdges] = useState([]);
 
-    const getNodeHighlightState = (node) => {
+    const getNodeHighlightState = useCallback((node) => {
         const originalNode = node.originalGoal || node;
         return getGoalBranchHighlightState
             ? getGoalBranchHighlightState(originalNode)
             : (isGoalBranchHighlighted && isGoalBranchHighlighted(originalNode) ? 'active' : null);
-    };
+    }, [getGoalBranchHighlightState, isGoalBranchHighlighted]);
 
-    const nodeIsHighlighted = (node) => Boolean(getNodeHighlightState(node));
-
-    const nodeConnectorIsHighlighted = (node) => {
-        if (!getGoalConnectorHighlightState) {
-            return nodeIsHighlighted(node);
-        }
-        return Boolean(getGoalConnectorHighlightState(node.originalGoal || node));
-    };
-
-    const branchContainsHighlightedConnectorNode = (node) => {
-        if (nodeConnectorIsHighlighted(node)) {
-            return true;
-        }
-        return node.children.some(branchContainsHighlightedConnectorNode);
-    };
-
-    const nodeActivatesConnector = (node) => (
-        connectorHighlightMode === 'lineage'
-            ? branchContainsHighlightedConnectorNode(node)
-            : nodeConnectorIsHighlighted(node)
+    const nodeIsHighlighted = useCallback(
+        (node) => Boolean(getNodeHighlightState(node)),
+        [getNodeHighlightState]
     );
 
-    const subtreeHasActiveConnector = (node) => {
-        if (nodeActivatesConnector(node)) {
-            return true;
-        }
-        return node.children.some(subtreeHasActiveConnector);
-    };
-
-    const getLastActiveIndex = (treeNodes) => {
-        let lastActiveIndex = -1;
-        treeNodes.forEach((node, index) => {
-            if (subtreeHasActiveConnector(node)) {
-                lastActiveIndex = index;
+    const sessionRows = useMemo(() => {
+        function nodeConnectorIsHighlighted(node) {
+            if (!getGoalConnectorHighlightState) {
+                return nodeIsHighlighted(node);
             }
-        });
-        return lastActiveIndex;
-    };
+            return Boolean(getGoalConnectorHighlightState(node.originalGoal || node));
+        }
 
-    const flattenSessionTreeRows = (treeNodes, depth = 0, ancestorContinuations = []) => {
-        const lastActiveIndex = getLastActiveIndex(treeNodes);
+        function branchContainsHighlightedConnectorNode(node) {
+            return nodeConnectorIsHighlighted(node)
+                || node.children.some(branchContainsHighlightedConnectorNode);
+        }
 
-        return treeNodes.flatMap((node, index) => {
-            const isLastSibling = index === treeNodes.length - 1;
-            const row = {
-                node,
-                depth,
-                parentId: node.parent_id || null,
-                isLastSibling,
-                ancestorContinuations,
-                currentTopActive: depth > 0 && index <= lastActiveIndex,
-                currentBottomActive: depth > 0 && index < lastActiveIndex,
-                currentHorizontalActive: depth > 0 && subtreeHasActiveConnector(node),
-                childBottomActive: node.children.length > 0 && node.children.some(subtreeHasActiveConnector),
-            };
-            const childRows = node.children.length > 0
-                ? flattenSessionTreeRows(node.children, depth + 1, [
-                    ...ancestorContinuations,
-                    {
-                        continues: !isLastSibling,
-                        active: index < lastActiveIndex,
-                    },
-                ])
-                : [];
+        function nodeActivatesConnector(node) {
+            return connectorHighlightMode === 'lineage'
+                ? branchContainsHighlightedConnectorNode(node)
+                : nodeConnectorIsHighlighted(node);
+        }
 
-            return [row, ...childRows];
-        });
-    };
+        function subtreeHasActiveConnector(node) {
+            return nodeActivatesConnector(node)
+                || node.children.some(subtreeHasActiveConnector);
+        }
 
-    const sessionRows = flattenSessionTreeRows(treeRoots);
+        function getLastActiveIndex(treeNodes) {
+            let lastActiveIndex = -1;
+            treeNodes.forEach((node, index) => {
+                if (subtreeHasActiveConnector(node)) {
+                    lastActiveIndex = index;
+                }
+            });
+            return lastActiveIndex;
+        }
+
+        function flattenSessionTreeRows(treeNodes, depth = 0, ancestorContinuations = []) {
+            const lastActiveIndex = getLastActiveIndex(treeNodes);
+
+            return treeNodes.flatMap((node, index) => {
+                const isLastSibling = index === treeNodes.length - 1;
+                const row = {
+                    node,
+                    depth,
+                    parentId: node.parent_id || null,
+                    isLastSibling,
+                    ancestorContinuations,
+                    currentTopActive: depth > 0 && index <= lastActiveIndex,
+                    currentBottomActive: depth > 0 && index < lastActiveIndex,
+                    currentHorizontalActive: depth > 0 && subtreeHasActiveConnector(node),
+                    childBottomActive: node.children.length > 0 && node.children.some(subtreeHasActiveConnector),
+                };
+                const childRows = node.children.length > 0
+                    ? flattenSessionTreeRows(node.children, depth + 1, [
+                        ...ancestorContinuations,
+                        {
+                            continues: !isLastSibling,
+                            active: index < lastActiveIndex,
+                        },
+                    ])
+                    : [];
+
+                return [row, ...childRows];
+            });
+        }
+
+        return flattenSessionTreeRows(treeRoots);
+    }, [connectorHighlightMode, getGoalConnectorHighlightState, nodeIsHighlighted, treeRoots]);
 
     const rowById = useMemo(
         () => new Map(sessionRows.map((row) => [String(row.node.id), row])),
         [sessionRows]
     );
+    const connectorEdges = useGoalHierarchyConnectors({
+        listRef,
+        iconRefs,
+        sessionRows,
+        rowById,
+        getGoalConnectorEdgeHighlightState,
+        getGoalConnectorEdgeState,
+    });
 
     const setIconRef = (nodeId) => (element) => {
         const key = String(nodeId);
@@ -183,120 +191,6 @@ function GoalHierarchyList({
             iconRefs.current.delete(key);
         }
     };
-
-    useLayoutEffect(() => {
-        const listElement = listRef.current;
-        if (!listElement) {
-            return undefined;
-        }
-
-        const measureConnectors = () => {
-            const listRect = listElement.getBoundingClientRect();
-            const nextEdges = [];
-
-            sessionRows.forEach(({ node }) => {
-                const parentElement = iconRefs.current.get(String(node.id));
-                if (!parentElement) {
-                    return;
-                }
-
-                const parentRect = parentElement.getBoundingClientRect();
-                const from = {
-                    x: parentRect.left - listRect.left + (parentRect.width / 2),
-                    y: parentRect.top - listRect.top + (parentRect.height / 2),
-                };
-
-                node.children.forEach((child) => {
-                    const childElement = iconRefs.current.get(String(child.id));
-                    if (!childElement) {
-                        return;
-                    }
-
-                    const childRect = childElement.getBoundingClientRect();
-                    const to = {
-                        x: childRect.left - listRect.left + (childRect.width / 2),
-                        y: childRect.top - listRect.top + (childRect.height / 2),
-                    };
-                    const childRow = rowById.get(String(child.id));
-                    const active = getGoalConnectorEdgeHighlightState
-                        ? Boolean(getGoalConnectorEdgeHighlightState(node.originalGoal || node, child.originalGoal || child))
-                        : (childRow
-                            ? Boolean(childRow.currentTopActive || childRow.currentHorizontalActive)
-                            : false);
-                    const state = getGoalConnectorEdgeState
-                        ? (getGoalConnectorEdgeState(node.originalGoal || node, child.originalGoal || child) || 'dashed')
-                        : (active ? 'selected' : 'solid');
-
-                    nextEdges.push({
-                        key: `${node.id}-${child.id}`,
-                        parentId: node.id,
-                        childId: child.id,
-                        from,
-                        to,
-                        active,
-                        state,
-                    });
-                });
-            });
-
-            setConnectorEdges((currentEdges) => {
-                if (currentEdges.length !== nextEdges.length) {
-                    return nextEdges;
-                }
-
-                const hasChanged = nextEdges.some((edge, index) => {
-                    const currentEdge = currentEdges[index];
-                    return !currentEdge
-                        || currentEdge.key !== edge.key
-                        || currentEdge.active !== edge.active
-                        || currentEdge.state !== edge.state
-                        || currentEdge.from.x !== edge.from.x
-                        || currentEdge.from.y !== edge.from.y
-                        || currentEdge.to.x !== edge.to.x
-                        || currentEdge.to.y !== edge.to.y;
-                });
-
-                return hasChanged ? nextEdges : currentEdges;
-            });
-        };
-
-        const frameIds = [];
-        const timeoutIds = [];
-        const scheduleMeasure = () => {
-            measureConnectors();
-            if (typeof requestAnimationFrame === 'function') {
-                const firstFrameId = requestAnimationFrame(() => {
-                    measureConnectors();
-                    const secondFrameId = requestAnimationFrame(measureConnectors);
-                    frameIds.push(secondFrameId);
-                });
-                frameIds.push(firstFrameId);
-            }
-            timeoutIds.push(window.setTimeout(measureConnectors, 80));
-            timeoutIds.push(window.setTimeout(measureConnectors, 220));
-        };
-
-        scheduleMeasure();
-
-        const resizeObserver = typeof ResizeObserver !== 'undefined'
-            ? new ResizeObserver(scheduleMeasure)
-            : null;
-        resizeObserver?.observe(listElement);
-        iconRefs.current.forEach((element) => resizeObserver?.observe(element));
-        const modalElement = listElement.closest('[role="dialog"]') || listElement.closest('[class*="modal"]');
-        window.addEventListener('resize', scheduleMeasure);
-        modalElement?.addEventListener('transitionend', scheduleMeasure);
-        modalElement?.addEventListener('animationend', scheduleMeasure);
-
-        return () => {
-            frameIds.forEach((frameId) => cancelAnimationFrame(frameId));
-            timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
-            resizeObserver?.disconnect();
-            window.removeEventListener('resize', scheduleMeasure);
-            modalElement?.removeEventListener('transitionend', scheduleMeasure);
-            modalElement?.removeEventListener('animationend', scheduleMeasure);
-        };
-    }, [getGoalConnectorEdgeHighlightState, getGoalConnectorEdgeState, rowById, sessionRows]);
 
     const renderConnectorEdges = () => (
         <svg className={styles.sessionConnectorSvg} aria-hidden="true">

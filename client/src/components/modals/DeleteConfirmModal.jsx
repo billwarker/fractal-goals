@@ -7,7 +7,18 @@ import Input from '../atoms/Input';
 import { Text } from '../atoms/Typography';
 import { AlertTriangleIcon } from '../atoms/AppIcons';
 
-const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requireMatchingText, confirmText = 'Delete', overlayClassName = '' }) => {
+const DeleteConfirmModal = ({
+    isOpen,
+    onClose,
+    onConfirm,
+    title,
+    message,
+    requireMatchingText,
+    confirmText = 'Delete',
+    overlayClassName = '',
+    modalLayer = 'default',
+    stackLevel = 0,
+}) => {
     const [matchingText, setMatchingText] = useState('');
     const handleClose = () => {
         setMatchingText('');
@@ -28,6 +39,8 @@ const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, title, message, requir
             size="sm"
             showCloseButton={true}
             overlayClassName={overlayClassName}
+            layer={modalLayer}
+            stackLevel={stackLevel}
         >
             <ModalBody>
                 <div style={{ marginBottom: '15px' }}>

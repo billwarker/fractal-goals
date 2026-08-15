@@ -69,6 +69,7 @@ function GroupGoalSelectorModal({
     selectedGoalIds,
     onSave,
     groupName,
+    modalLayer,
 }) {
     const [draftGoalIds, setDraftGoalIds] = useState(selectedGoalIds);
 
@@ -90,6 +91,7 @@ function GroupGoalSelectorModal({
             title={`Link Goals${groupName ? `: ${groupName}` : ''}`}
             size="lg"
             stackLevel={2}
+            layer={modalLayer}
         >
             <ModalBody>
                 <GoalHierarchySelector
@@ -123,7 +125,7 @@ function GroupGoalSelectorModal({
     );
 }
 
-function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups, onSave }) {
+function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups, onSave, modalLayer }) {
     const { createActivityGroup, updateActivityGroup, setActivityGroupGoals } = useActivities();
     const initialState = buildInitialGroupFormState(editingGroup);
 
@@ -225,6 +227,7 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
             title={editingGroup ? 'Edit Group' : 'Create Group'}
             size="md"
             stackLevel={1}
+            layer={modalLayer}
         >
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <ModalBody>
@@ -323,12 +326,21 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
                 selectedGoalIds={selectedGoalIds}
                 onSave={setSelectedGoalIds}
                 groupName={name.trim()}
+                modalLayer={modalLayer}
             />
         </Modal>
     );
 }
 
-export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootId, activityGroups, onSave }) {
+export default function GroupBuilderModal({
+    isOpen,
+    onClose,
+    editingGroup,
+    rootId,
+    activityGroups,
+    onSave,
+    modalLayer = 'default',
+}) {
     if (!isOpen) {
         return null;
     }
@@ -342,6 +354,7 @@ export default function GroupBuilderModal({ isOpen, onClose, editingGroup, rootI
             rootId={rootId}
             activityGroups={activityGroups}
             onSave={onSave}
+            modalLayer={modalLayer}
         />
     );
 }

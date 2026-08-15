@@ -182,14 +182,39 @@ export function useGoalAssociationMutations({
         }
 
         if (goalId) {
+            const refreshInlineAssociations = async () => {
+                try {
+                    await refreshAssociations();
+                } catch (error) {
+                    // Persistence already succeeded; a later query refetch can repair
+                    // this non-fatal cache refresh failure.
+                    logError('Inline activity association cache refresh failed:', error);
+                }
+            };
             const existingGoalIds = [
                 ...(Array.isArray(newActivity.associated_goal_ids) ? newActivity.associated_goal_ids : []),
                 ...(Array.isArray(newActivity.associated_goals) ? newActivity.associated_goals.map((goal) => goal?.id) : []),
             ].filter(Boolean);
-            const nextGoalIds = Array.from(new Set([...existingGoalIds, goalId]));
-            await setActivityGoalIds(newActivity.id, nextGoalIds, { goalId, notify: false });
-            await refreshAssociations();
-            return { associatedImmediately: true };
+            const alreadyAssociated = existingGoalIds.some(
+                (existingGoalId) => String(existingGoalId) === String(goalId)
+            );
+
+            if (alreadyAssociated) {
+                await refreshInlineAssociations();
+                return { associatedImmediately: true, persistedDuringCreate: true };
+            }
+
+            // Compatibility fallback for older create responses or callers that do not
+            // include the goal in the activity-create payload.
+            const nextGoalIds = Array.from(new Set([...existingGoalIds, goalId].map(String)));
+            try {
+                await setActivityGoalIds(newActivity.id, nextGoalIds, { goalId, notify: false });
+                await refreshInlineAssociations();
+                return { associatedImmediately: true, persistedDuringCreate: false };
+            } catch (error) {
+                logError('Inline activity was created but could not be associated with the goal:', error);
+                return { associatedImmediately: false, persistedDuringCreate: false };
+            }
         }
 
         setAssociatedActivities((prev) => dedupeById([...prev, newActivity]));

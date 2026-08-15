@@ -11,13 +11,14 @@ import styles from './ActivityAssociationModal.module.css';
 /**
  * Modal for associating an activity with goals from the goal hierarchy.
  */
-const ActivityAssociationModal = ({
-    isOpen,
+const ActivityAssociationModalContent = ({
     onClose,
     onAssociate,
     goals = [],
     initialActivityName = '',
     initialSelectedGoalIds = [],
+    modalLayer = 'default',
+    stackLevel = 0,
 }) => {
     const [selectedGoalIds, setSelectedGoalIds] = useState(initialSelectedGoalIds);
     const initialGoalIds = useMemo(() => new Set(initialSelectedGoalIds), [initialSelectedGoalIds]);
@@ -62,10 +63,12 @@ const ActivityAssociationModal = ({
 
     return (
         <Modal
-            isOpen={isOpen}
+            isOpen
             onClose={onClose}
             title={`Associate "${initialActivityName}"`}
             size="lg"
+            layer={modalLayer}
+            stackLevel={stackLevel}
         >
             <ModalBody>
                 <GoalHierarchySelector
@@ -98,6 +101,17 @@ const ActivityAssociationModal = ({
                 </button>
             </ModalFooter>
         </Modal>
+    );
+};
+
+const ActivityAssociationModal = ({ isOpen, initialSelectedGoalIds = [], ...props }) => {
+    if (!isOpen) return null;
+
+    return (
+        <ActivityAssociationModalContent
+            {...props}
+            initialSelectedGoalIds={initialSelectedGoalIds.map(String)}
+        />
     );
 };
 

@@ -35,8 +35,9 @@ function ActivityBuilderForm({
     getGoalColor,
     getGoalIcon,
     onNameChange,
+    initialSelectedGoalIds = [], nestedModalLayer = 'default',
 }) {
-    const initialState = getInitialActivityBuilderState(editingActivity);
+    const initialState = getInitialActivityBuilderState(editingActivity, initialSelectedGoalIds);
     const [error, setError] = useState(null);
     const [creating, setCreating] = useState(false);
     const [pendingSubmission, setPendingSubmission] = useState(null);
@@ -198,9 +199,9 @@ function ActivityBuilderForm({
                 ? await updateActivity(rootId, editingActivity.id, payload)
                 : await createActivity(rootId, payload);
 
+            await onSave?.(result);
             resetForm();
             setCreating(false);
-            onSave?.(result);
             onClose();
         } catch (err) {
             logError(editingActivity ? 'Failed to update activity' : 'Failed to create activity', err);
@@ -405,7 +406,6 @@ function ActivityBuilderForm({
                         </Button>
                 </ModalFooter>
             </form>
-
             <DeleteConfirmModal
                 isOpen={showMetricWarning}
                 onClose={() => {
@@ -417,11 +417,11 @@ function ActivityBuilderForm({
                 title="Removing Metrics"
                 message={metricWarningMessage}
                 confirmText="Save Anyway"
+                modalLayer={nestedModalLayer} stackLevel={1}
             />
 
             {showAssociationModal && (
                 <ActivityAssociationModal
-                    key={`${editingActivity?.id || 'new'}:${selectedGoalIds.join(',')}`}
                     isOpen={showAssociationModal}
                     onClose={() => setShowAssociationModal(false)}
                     onAssociate={(newGoalIds) => {
@@ -430,6 +430,7 @@ function ActivityBuilderForm({
                     goals={allGoals}
                     initialActivityName={name}
                     initialSelectedGoalIds={selectedGoalIds}
+                    modalLayer={nestedModalLayer} stackLevel={1}
                 />
             )}
 
@@ -439,7 +440,7 @@ function ActivityBuilderForm({
                 editingGroup={null}
                 rootId={rootId}
                 activityGroups={activityGroups}
-                onSave={handleGroupCreated}
+                onSave={handleGroupCreated} modalLayer={nestedModalLayer}
             />
         </>
     );

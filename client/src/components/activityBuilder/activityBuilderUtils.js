@@ -130,7 +130,16 @@ export function buildGoalAssociationSummary(allGoals, selectedGoalIds) {
     }, {});
 }
 
-export function getInitialActivityBuilderState(editingActivity) {
+function mergeGoalIds(...goalIdLists) {
+    return Array.from(new Set(
+        goalIdLists
+            .flatMap((goalIds) => Array.isArray(goalIds) ? goalIds : [])
+            .filter(Boolean)
+            .map((goalId) => String(goalId))
+    ));
+}
+
+export function getInitialActivityBuilderState(editingActivity, initialSelectedGoalIds = []) {
     if (!editingActivity) {
         return {
             name: '',
@@ -141,7 +150,7 @@ export function getInitialActivityBuilderState(editingActivity) {
             hasSplits: false,
             splits: DEFAULT_SPLITS,
             groupId: '',
-            selectedGoalIds: [],
+            selectedGoalIds: mergeGoalIds(initialSelectedGoalIds),
             trackProgress: true,
             deltaDisplayMode: null,
         };
@@ -171,7 +180,7 @@ export function getInitialActivityBuilderState(editingActivity) {
             ? splitDefinitions.map((split) => ({ id: split.id, name: split.name }))
             : DEFAULT_SPLITS,
         groupId: editingActivity.group_id || '',
-        selectedGoalIds: editingActivity.associated_goal_ids || [],
+        selectedGoalIds: mergeGoalIds(editingActivity.associated_goal_ids, initialSelectedGoalIds),
         trackProgress: editingActivity.track_progress !== false,
         deltaDisplayMode: editingActivity.delta_display_mode || null,
     };

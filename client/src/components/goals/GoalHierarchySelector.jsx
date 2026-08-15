@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import GoalHierarchyList from './GoalHierarchyList';
@@ -91,11 +91,11 @@ function GoalHierarchySelector({
 
     const isSingleSelect = selectionMode === 'single';
 
-    const emitSelection = (nextIds) => {
+    const emitSelection = useCallback((nextIds) => {
         onSelectionChange?.(Array.from(new Set(nextIds)).filter(Boolean));
-    };
+    }, [onSelectionChange]);
 
-    const toggleGoal = (goalId) => {
+    const toggleGoal = useCallback((goalId) => {
         if (selectionDisabled || lockedIdSet.has(goalId)) return;
         const isCurrentlySelected = selectedIdSet.has(goalId);
 
@@ -119,9 +119,9 @@ function GoalHierarchySelector({
             next.add(goalId);
         }
         emitSelection(Array.from(next));
-    };
+    }, [emitSelection, isSingleSelect, lockedIdSet, selectedIdSet, selectionDisabled]);
 
-    const toggleRelatedGoals = (sourceId, relatedIds) => {
+    const toggleRelatedGoals = useCallback((sourceId, relatedIds) => {
         if (selectionDisabled || !relatedIds.length) {
             return;
         }
@@ -150,9 +150,9 @@ function GoalHierarchySelector({
             return nextConnectorIds;
         });
         emitSelection(Array.from(next));
-    };
+    }, [emitSelection, lockedIdSet, selectedIdSet, selectionDisabled]);
 
-    const getGoalLeftSlot = (goal) => {
+    const getGoalLeftSlot = useCallback((goal) => {
         const goalId = String(goal.id);
         const isLocked = lockedIdSet.has(goalId);
         const isSelected = effectiveSelectedIdSet.has(goalId);
@@ -212,9 +212,20 @@ function GoalHierarchySelector({
                 )}
             </div>
         );
-    };
+    }, [
+        childIdsByParent,
+        effectiveSelectedIdSet,
+        goalById,
+        isSingleSelect,
+        lockedGoalLabel,
+        lockedIdSet,
+        selectionDisabled,
+        showAncestorControls,
+        toggleGoal,
+        toggleRelatedGoals,
+    ]);
 
-    const getGoalBranchHighlightState = (goal) => {
+    const getGoalBranchHighlightState = useCallback((goal) => {
         if (effectiveSelectedIdSet.has(String(goal.id))) {
             return 'target';
         }
@@ -224,16 +235,16 @@ function GoalHierarchySelector({
         }
 
         return null;
-    };
+    }, [effectiveSelectedIdSet, highlightSelectionAncestors, selectedAncestorIdSet]);
 
-    const getGoalConnectorHighlightState = (goal) => {
+    const getGoalConnectorHighlightState = useCallback((goal) => {
         if (connectorHighlightMode === 'bulk') {
             return bulkConnectorGoalIds.has(String(goal.id));
         }
         return Boolean(getGoalBranchHighlightState(goal));
-    };
+    }, [bulkConnectorGoalIds, connectorHighlightMode, getGoalBranchHighlightState]);
 
-    const getGoalConnectorEdgeHighlightState = (parentGoal, childGoal) => {
+    const getGoalConnectorEdgeHighlightState = useCallback((parentGoal, childGoal) => {
         const parentId = String(parentGoal.id);
         const childId = String(childGoal.id);
 
@@ -246,9 +257,9 @@ function GoalHierarchySelector({
         }
 
         return effectiveSelectedIdSet.has(parentId) && effectiveSelectedIdSet.has(childId);
-    };
+    }, [bulkConnectorGoalIds, connectorHighlightMode, effectiveSelectedIdSet, selectedAncestorIdSet]);
 
-    const getGoalMetaLabel = (goal) => {
+    const getGoalMetaLabel = useCallback((goal) => {
         if (lockedIdSet.has(String(goal.id))) {
             if (lockedGoalMarker) {
                 return (
@@ -278,7 +289,15 @@ function GoalHierarchySelector({
         }
 
         return null;
-    };
+    }, [
+        childIdsByParent,
+        goalById,
+        lockedGoalLabel,
+        lockedGoalMarker,
+        lockedIdSet,
+        selectedIdSet,
+        showSelectionInheritanceMeta,
+    ]);
 
     return (
         <div

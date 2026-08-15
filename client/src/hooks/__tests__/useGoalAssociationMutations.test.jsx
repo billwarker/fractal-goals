@@ -7,6 +7,7 @@ import { useGoalAssociationMutations } from '../useGoalAssociationMutations';
 const setGoalAssociationsBatch = vi.fn();
 const setActivityGoals = vi.fn();
 const invalidateGoalAssociationQueries = vi.fn(() => Promise.resolve());
+const logError = vi.fn();
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
@@ -17,6 +18,10 @@ vi.mock('../../utils/api', () => ({
 
 vi.mock('../../components/goals/goalDetailQueryUtils', () => ({
     invalidateGoalAssociationQueries: (...args) => invalidateGoalAssociationQueries(...args),
+}));
+
+vi.mock('../../utils/logger', () => ({
+    logError: (...args) => logError(...args),
 }));
 
 function createWrapper(queryClient) {
@@ -117,6 +122,76 @@ describe('useGoalAssociationMutations', () => {
 
         expect(setActivityGoals).toHaveBeenCalledWith('root-1', 'activity-2', ['goal-other', 'goal-current']);
         expect(invalidateGoalAssociationQueries).toHaveBeenCalledWith(queryClient, 'root-1', 'goal-current');
+    });
+
+    it('does not rewrite goal associations already persisted by inline creation', async () => {
+        invalidateGoalAssociationQueries.mockRejectedValueOnce(new Error('temporary refresh failure'));
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            }
+        });
+
+        const { result } = renderHook(() => useGoalAssociationMutations({
+            rootId: 'root-1',
+            goalId: 'goal-current',
+            mode: 'edit',
+            isOpen: true,
+            activityGroupsRaw: [],
+            fetchedActivities: [],
+            fetchedGroups: [],
+        }), { wrapper: createWrapper(queryClient) });
+
+        let attachmentResult;
+        await act(async () => {
+            attachmentResult = await result.current.attachInlineCreatedActivity({
+                id: 'activity-2',
+                name: 'Inline Created',
+                associated_goal_ids: ['goal-current'],
+            });
+        });
+
+        expect(attachmentResult).toEqual({
+            associatedImmediately: true,
+            persistedDuringCreate: true,
+        });
+        expect(setActivityGoals).not.toHaveBeenCalled();
+        expect(invalidateGoalAssociationQueries).toHaveBeenCalledWith(queryClient, 'root-1', 'goal-current');
+    });
+
+    it('reports partial success when the compatibility association fallback fails', async () => {
+        setActivityGoals.mockRejectedValueOnce(new Error('association unavailable'));
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            }
+        });
+
+        const { result } = renderHook(() => useGoalAssociationMutations({
+            rootId: 'root-1',
+            goalId: 'goal-current',
+            mode: 'edit',
+            isOpen: true,
+            activityGroupsRaw: [],
+            fetchedActivities: [],
+            fetchedGroups: [],
+        }), { wrapper: createWrapper(queryClient) });
+
+        let attachmentResult;
+        await act(async () => {
+            attachmentResult = await result.current.attachInlineCreatedActivity({
+                id: 'activity-2',
+                name: 'Inline Created',
+                associated_goal_ids: [],
+            });
+        });
+
+        expect(attachmentResult).toEqual({
+            associatedImmediately: false,
+            persistedDuringCreate: false,
+        });
     });
 
     it('persists only direct activity associations when inherited activities are present', async () => {

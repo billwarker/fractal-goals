@@ -8,6 +8,11 @@ import ModalBackdrop from './ModalBackdrop';
 
 const openModalLevels = new Map();
 
+const MODAL_LAYER_DEFINITIONS = {
+    default: { baseZIndex: 'var(--z-modal)', priority: 0 },
+    top: { baseZIndex: 'var(--z-modal-top)', priority: 10000 },
+};
+
 /**
  * Standardized Modal Component
  */
@@ -24,12 +29,18 @@ const Modal = ({
     closeOnEsc = true,
     closeOnBackdrop = true,
     stackLevel = 0,
+    layer = 'default',
 }) => {
     const dialogRef = useRef(null);
     const modalId = useId();
     const titleId = `${modalId}-title`;
     const onCloseRef = useRef(onClose);
     const closeOnEscRef = useRef(closeOnEsc);
+    const layerDefinition = MODAL_LAYER_DEFINITIONS[layer] || MODAL_LAYER_DEFINITIONS.default;
+    const effectiveStackLevel = layerDefinition.priority + stackLevel;
+    const overlayStyle = layer !== 'default' || stackLevel > 0
+        ? { zIndex: `calc(${layerDefinition.baseZIndex} + ${stackLevel})` }
+        : undefined;
     useEffect(() => {
         onCloseRef.current = onClose;
         closeOnEscRef.current = closeOnEsc;
@@ -63,7 +74,7 @@ const Modal = ({
         };
 
         if (isOpen) {
-            openModalLevels.set(modalId, stackLevel);
+            openModalLevels.set(modalId, effectiveStackLevel);
             document.addEventListener('keydown', handleKeyDown);
             const previousOverflow = document.body.style.overflow;
             document.body.style.overflow = 'hidden';
@@ -84,14 +95,14 @@ const Modal = ({
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isOpen, modalId, stackLevel]);
+    }, [effectiveStackLevel, isOpen, modalId]);
 
     if (!isOpen) return null;
 
     const modalContent = (
         <ModalBackdrop
             className={`${styles.overlay} ${overlayClassName}`}
-            style={stackLevel > 0 ? { zIndex: `calc(var(--z-modal) + ${stackLevel})` } : undefined}
+            style={overlayStyle}
             closeOnBackdrop={closeOnBackdrop}
             onClose={onClose}
             aria-modal="true"

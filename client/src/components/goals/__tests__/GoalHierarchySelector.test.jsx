@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import GoalHierarchySelector from '../GoalHierarchySelector';
 
@@ -135,7 +135,7 @@ describe('GoalHierarchySelector', () => {
         expect(handleSelectionChange).toHaveBeenLastCalledWith(['goal-child', 'goal-root']);
     });
 
-    it('keeps filter-style connector highlighting scoped to explicitly selected goals', () => {
+    it('keeps filter-style connector highlighting scoped to explicitly selected goals', async () => {
         const { container } = render(
             <GoalHierarchySelector
                 goals={goals}
@@ -148,7 +148,9 @@ describe('GoalHierarchySelector', () => {
 
         const grandchildRow = screen.getByText('Grandchild Goal').closest('[data-goal-id]');
         expect(grandchildRow.querySelectorAll('[data-connector-active="true"]')).toHaveLength(0);
-        expect(container.querySelectorAll('[data-connector-active="true"]').length).toBeGreaterThan(0);
+        await waitFor(() => {
+            expect(container.querySelectorAll('[data-connector-active="true"]').length).toBeGreaterThan(0);
+        });
     });
 
     it('does not activate connectors for a direct filter-style child selection', () => {
@@ -311,7 +313,7 @@ describe('GoalHierarchySelector', () => {
         }));
     });
 
-    it('uses halos for direct filter selections and connector lines only for bulk controls', () => {
+    it('uses halos for direct filter selections and connector lines only for bulk controls', async () => {
         function FilterHarness() {
             const [selectedIds, setSelectedIds] = React.useState([]);
             return (
@@ -334,10 +336,12 @@ describe('GoalHierarchySelector', () => {
 
         fireEvent.click(screen.getByLabelText('Select all descendants of Child Goal'));
         expect(container.querySelectorAll('[class*="sessionIconSlotBranchActive"]')).toHaveLength(2);
-        expect(container.querySelectorAll('[data-connector-active="true"]').length).toBeGreaterThan(0);
+        await waitFor(() => {
+            expect(container.querySelectorAll('[data-connector-active="true"]').length).toBeGreaterThan(0);
+        });
     });
 
-    it('does not highlight ancestor lineage when selecting filter descendants', () => {
+    it('does not highlight ancestor lineage when selecting filter descendants', async () => {
         function FilterHarness() {
             const [selectedIds, setSelectedIds] = React.useState([]);
             return (
@@ -356,13 +360,15 @@ describe('GoalHierarchySelector', () => {
 
         fireEvent.click(screen.getByLabelText('Select all descendants of Child Goal'));
 
-        expect(container.querySelector('[data-parent-goal-id="goal-root"][data-child-goal-id="goal-child"]'))
-            .toHaveAttribute('data-connector-active', 'false');
-        expect(container.querySelector('[data-parent-goal-id="goal-child"][data-child-goal-id="goal-grandchild"]'))
-            .toHaveAttribute('data-connector-active', 'true');
+        await waitFor(() => {
+            expect(container.querySelector('[data-parent-goal-id="goal-root"][data-child-goal-id="goal-child"]'))
+                .toHaveAttribute('data-connector-active', 'false');
+            expect(container.querySelector('[data-parent-goal-id="goal-child"][data-child-goal-id="goal-grandchild"]'))
+                .toHaveAttribute('data-connector-active', 'true');
+        });
     });
 
-    it('keeps descendant connector highlighting when selecting the bulk source goal afterward', () => {
+    it('keeps descendant connector highlighting when selecting the bulk source goal afterward', async () => {
         function FilterHarness() {
             const [selectedIds, setSelectedIds] = React.useState([]);
             return (
@@ -380,15 +386,17 @@ describe('GoalHierarchySelector', () => {
         const { container } = render(<FilterHarness />);
 
         fireEvent.click(screen.getByLabelText('Select all descendants of Child Goal'));
-        expect(container.querySelector('[data-parent-goal-id="goal-child"][data-child-goal-id="goal-grandchild"]'))
-            .toHaveAttribute('data-connector-active', 'true');
+        await waitFor(() => {
+            expect(container.querySelector('[data-parent-goal-id="goal-child"][data-child-goal-id="goal-grandchild"]'))
+                .toHaveAttribute('data-connector-active', 'true');
+        });
 
         fireEvent.click(screen.getByLabelText('Select Child Goal'));
         expect(container.querySelector('[data-parent-goal-id="goal-child"][data-child-goal-id="goal-grandchild"]'))
             .toHaveAttribute('data-connector-active', 'true');
     });
 
-    it('can highlight inherited lineage for activity association mode', () => {
+    it('can highlight inherited lineage for activity association mode', async () => {
         const { container } = render(
             <GoalHierarchySelector
                 goals={goals}
@@ -400,12 +408,15 @@ describe('GoalHierarchySelector', () => {
             />
         );
 
-        expect(container.querySelectorAll('[data-connector-active="true"]').length).toBeGreaterThan(0);
-        expect(container.querySelector('[data-parent-goal-id="goal-root"][data-child-goal-id="goal-child"]'))
-            .toHaveAttribute('data-connector-active', 'true');
-        expect(container.querySelector('[data-parent-goal-id="goal-child"][data-child-goal-id="goal-grandchild"]'))
-            .toHaveAttribute('data-connector-active', 'true');
+        await waitFor(() => {
+            expect(container.querySelectorAll('[data-connector-active="true"]').length).toBeGreaterThan(0);
+            expect(container.querySelector('[data-parent-goal-id="goal-root"][data-child-goal-id="goal-child"]'))
+                .toHaveAttribute('data-connector-active', 'true');
+            expect(container.querySelector('[data-parent-goal-id="goal-child"][data-child-goal-id="goal-grandchild"]'))
+                .toHaveAttribute('data-connector-active', 'true');
+        });
     });
+
 });
     beforeEach(() => {
         goalIconSpy.mockClear();

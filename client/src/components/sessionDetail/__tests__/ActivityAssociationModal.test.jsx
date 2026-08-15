@@ -20,12 +20,29 @@ describe('ActivityAssociationModal', () => {
         { id: 'goal-2', name: 'Goal Two', type: 'ImmediateGoal' },
     ];
 
+    it('renders on the requested semantic layer above its parent workspace', () => {
+        render(
+            <ActivityAssociationModal
+                isOpen={true}
+                onClose={vi.fn()}
+                onAssociate={vi.fn(() => Promise.resolve(true))}
+                goals={goals}
+                initialActivityName="Metronome"
+                modalLayer="top"
+                stackLevel={1}
+            />
+        );
+
+        expect(screen.getByRole('dialog')).toHaveStyle({
+            zIndex: 'calc(var(--z-modal-top) + 1)',
+        });
+    });
+
     it('rehydrates selection from the latest initial goal ids when reopened', async () => {
         const onAssociate = vi.fn(() => Promise.resolve(true));
         const onClose = vi.fn();
         const view = render(
             <ActivityAssociationModal
-                key="goal-1"
                 isOpen={true}
                 onClose={onClose}
                 onAssociate={onAssociate}
@@ -42,7 +59,6 @@ describe('ActivityAssociationModal', () => {
 
         view.rerender(
             <ActivityAssociationModal
-                key="closed"
                 isOpen={false}
                 onClose={onClose}
                 onAssociate={onAssociate}
@@ -54,7 +70,6 @@ describe('ActivityAssociationModal', () => {
 
         view.rerender(
             <ActivityAssociationModal
-                key="goal-2"
                 isOpen={true}
                 onClose={onClose}
                 onAssociate={onAssociate}

@@ -144,6 +144,9 @@
   --z-modal-4: 3500;
   --z-toast: 4000;
   --z-tooltip: 4500;
+  /* Goal-detail workspaces sit above other app overlays; their child dialogs
+     add a small stack level to this semantic base. */
+  --z-modal-top: 6000;
   --panel-width-details: 390px;
   --surface-grid-size: 20px;
   --sheet-radius: var(--border-radius-xl);

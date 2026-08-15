@@ -9,7 +9,7 @@ import ActivityBuilderForm from '../activityBuilder/ActivityBuilderForm';
 import { flattenGoals } from '../activityBuilder/activityBuilderUtils';
 import styles from '../GoalDetailModal.module.css';
 
-function InlineActivityBuilderModal({ rootId, activityGroups = [], activityTemplate = null, onSuccess, onCancel }) {
+function InlineActivityBuilderModal({ rootId, goalId = null, activityGroups = [], activityTemplate = null, onSuccess, onCancel }) {
     const { createActivity, updateActivity } = useActivities();
     const { getGoalColor, getGoalIcon } = useGoalLevels();
     const { data: currentFractal } = useFractalTree(rootId);
@@ -41,6 +41,8 @@ function InlineActivityBuilderModal({ rootId, activityGroups = [], activityTempl
                     getGoalColor={getGoalColor}
                     getGoalIcon={getGoalIcon}
                     onNameChange={setDraftName}
+                    initialSelectedGoalIds={goalId ? [goalId] : []}
+                    nestedModalLayer="top"
                 />
             </div>
         </ModalBackdrop>

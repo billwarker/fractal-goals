@@ -102,4 +102,22 @@ describe('Modal', () => {
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(onOuterClose).toHaveBeenCalledTimes(1);
     });
+
+    it('resolves semantic top-layer z-indexes independently of ordinary modal levels', () => {
+        render(
+            <Modal
+                isOpen
+                onClose={() => {}}
+                title="Top-layer child"
+                layer="top"
+                stackLevel={1}
+            >
+                Child content
+            </Modal>
+        );
+
+        expect(screen.getByRole('dialog')).toHaveStyle({
+            zIndex: 'calc(var(--z-modal-top) + 1)',
+        });
+    });
 });
