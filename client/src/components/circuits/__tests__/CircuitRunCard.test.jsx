@@ -330,10 +330,65 @@ describe('CircuitRunCard', () => {
 
         await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({
             action: 'updateRunTiming',
+            inlineError: true,
             runId: 'run-1',
             value: { time_start: '2026-07-28T13:00:10.000Z' },
         }));
         expect(screen.getByRole('button', { name: 'Adjust stop time' })).toBeInTheDocument();
+    });
+
+    it('adjusts an active circuit start before a stop exists', async () => {
+        mutateAsync.mockResolvedValue({ data: run });
+        render(
+            <CircuitRunCard
+                rootId="root"
+                sessionId="session"
+                run={{
+                    ...run,
+                    status: 'active',
+                    time_start: '2026-07-28T13:00:00.000Z',
+                    time_stop: null,
+                    duration_seconds: null,
+                }}
+                itemNumber={3}
+                activityInstances={[]}
+                selectedCircuitItem={{ type: 'run', runId: 'run-1', id: 'run-1' }}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Adjust start time' }));
+        fireEvent.change(screen.getByLabelText('Relative start adjustment'), { target: { value: '-10M' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+
+        await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({
+            action: 'updateRunTiming',
+            inlineError: true,
+            runId: 'run-1',
+            value: { time_start: '2026-07-28T12:50:00.000Z' },
+        }));
+        await waitFor(() => expect(screen.queryByLabelText('Relative start adjustment')).not.toBeInTheDocument());
+    });
+
+    it('does not offer boundary corrections after a circuit has accumulated paused time', () => {
+        render(
+            <CircuitRunCard
+                rootId="root"
+                sessionId="session"
+                run={{
+                    ...run,
+                    status: 'completed',
+                    time_start: '2026-07-28T13:00:00.000Z',
+                    time_stop: '2026-07-28T13:01:30.000Z',
+                    total_paused_seconds: 15,
+                }}
+                itemNumber={3}
+                activityInstances={[]}
+                selectedCircuitItem={{ type: 'run', runId: 'run-1', id: 'run-1' }}
+            />,
+        );
+
+        expect(screen.queryByRole('button', { name: 'Adjust start time' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Adjust stop time' })).not.toBeInTheDocument();
     });
 
     it('removes a round from its top-right collection action', async () => {

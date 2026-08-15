@@ -34,6 +34,8 @@ class CircuitRunTimingOperations:
         return None
 
     def _historical_conflict(self, run, time_start, time_stop):
+        if time_stop <= time_start:
+            return None
         ordinary_overlap = self.db_session.query(SessionWorkInterval.id).filter(
             SessionWorkInterval.session_id == run.session_id,
             SessionWorkInterval.started_at < time_stop,
@@ -104,16 +106,33 @@ class CircuitRunTimingOperations:
             time_stop = parse_circuit_time(data["time_stop"]) if "time_stop" in data else run.time_stop
         except (TypeError, ValueError):
             return None, "Use a valid ISO date-time", 400
+        now = utc_now_naive()
         if time_stop and not time_start:
             return None, "Circuit stop requires a start time", 400
         if time_start and time_stop and time_stop < time_start:
             return None, "Stop must be after start", 400
+        if time_start and time_start > now:
+            return None, "Circuit start cannot be in the future", 400
+        if time_stop and time_stop > now:
+            return None, "Circuit stop cannot be in the future", 400
+        is_reset = not time_start and not time_stop
+        boundary_changed = (
+            ("time_start" in data and time_start != run.time_start)
+            or ("time_stop" in data and time_stop != run.time_stop)
+        )
+        if (run.total_paused_seconds or run.is_paused) and boundary_changed and not is_reset:
+            return None, (
+                "Reset the circuit before changing timing that contains paused work"
+            ), 409
         if session.completed and not (time_start and time_stop):
             return None, "Completed sessions cannot reset or restart circuit timers", 409
         if time_start and not time_stop:
             if session.is_paused:
                 return None, "Resume the session before starting a circuit", 409
             conflict = self._active_conflict(run)
+            if conflict:
+                return conflict
+            conflict = self._historical_conflict(run, time_start, now)
             if conflict:
                 return conflict
         elif time_start and time_stop:
@@ -162,6 +181,11 @@ class CircuitRunTimingOperations:
         now = utc_now_naive()
         if not run.time_start:
             run.time_start = now
+        if run.time_start > now:
+            return None, "Circuit start cannot be in the future", 409
+        conflict = self._historical_conflict(run, run.time_start, now)
+        if conflict:
+            return conflict
         finish_circuit_clock(run, now)
         run.status = "completed"
         run.completed_at = now

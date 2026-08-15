@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { formatForInput, localToISO } from '../../utils/dateUtils';
+import { formatForInput, localToISO, validateTimerRange } from '../../utils/dateUtils';
 import { formatAggValue } from '../../utils/progressAggregations';
 import { formatDuration } from '../../utils/sessionActivityMetrics';
 import Button from '../atoms/Button';
@@ -133,32 +133,16 @@ function SessionActivityItemView({
     };
 
     const getTimerRangeError = (target, isoValue) => {
-        const candidateTime = new Date(isoValue).getTime();
-        if (!Number.isFinite(candidateTime)) return 'Use YYYY-MM-DD HH:MM:SS';
-
-        if (target === 'start' && localStopTime) {
-            try {
-                const stopTime = new Date(localToISO(localStopTime, timezone)).getTime();
-                if (Number.isFinite(stopTime) && candidateTime > stopTime) {
-                    return 'Start must be before stop';
-                }
-            } catch {
-                return '';
-            }
+        try {
+            return validateTimerRange({
+                target,
+                candidateIso: isoValue,
+                startIso: localStartTime ? localToISO(localStartTime, timezone) : null,
+                stopIso: localStopTime ? localToISO(localStopTime, timezone) : null,
+            });
+        } catch {
+            return '';
         }
-
-        if (target === 'stop' && localStartTime) {
-            try {
-                const startTime = new Date(localToISO(localStartTime, timezone)).getTime();
-                if (Number.isFinite(startTime) && candidateTime < startTime) {
-                    return 'Stop must be after start';
-                }
-            } catch {
-                return '';
-            }
-        }
-
-        return '';
     };
 
     const handleCommitTimeInput = (event, target, field, setDraft) => {

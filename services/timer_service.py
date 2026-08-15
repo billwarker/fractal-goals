@@ -606,7 +606,11 @@ class TimerService:
         if not root:
             return None, "Fractal not found or access denied", 404
 
-        session = get_owned_session(self.db_session, root_id, session_id)
+        session = self.db_session.query(Session).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at.is_(None),
+        ).with_for_update().first()
         if not session:
             return None, "Session not found", 404
         quick_error = self._quick_session_timer_error(session)
@@ -637,7 +641,7 @@ class TimerService:
         active_runs = self.db_session.query(CircuitRun).filter(
             CircuitRun.session_id == session_id,
             CircuitRun.status == "active",
-        ).all()
+        ).with_for_update().all()
         for run in active_runs:
             run.status = "paused"
             run.is_paused = True
@@ -663,7 +667,11 @@ class TimerService:
         if not root:
             return None, "Fractal not found or access denied", 404
 
-        session = get_owned_session(self.db_session, root_id, session_id)
+        session = self.db_session.query(Session).filter(
+            Session.id == session_id,
+            Session.root_id == root_id,
+            Session.deleted_at.is_(None),
+        ).with_for_update().first()
         if not session:
             return None, "Session not found", 404
         quick_error = self._quick_session_timer_error(session)
@@ -708,7 +716,7 @@ class TimerService:
         paused_runs = self.db_session.query(CircuitRun).filter(
             CircuitRun.session_id == session_id,
             CircuitRun.status == "paused",
-        ).all()
+        ).with_for_update().all()
         for run in paused_runs:
             if run.last_paused_at:
                 run.total_paused_seconds += max(0, int((now - run.last_paused_at).total_seconds()))

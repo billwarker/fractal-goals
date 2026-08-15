@@ -57,7 +57,6 @@ class CircuitRunCreateSchema(BaseModel):
     circuit_definition_id: str = Field(..., min_length=1)
     section_index: Optional[int] = Field(None, ge=0)
     item_index: Optional[int] = Field(None, ge=0)
-    allow_archived: bool = False
 
 
 class CircuitRunTimingUpdateSchema(BaseModel):

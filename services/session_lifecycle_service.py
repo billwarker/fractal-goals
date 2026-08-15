@@ -593,10 +593,10 @@ class SessionLifecycleService:
                             'circuit_definition_id': circuit_definition_id,
                             'section_index': section_index,
                             'item_index': item_index,
-                            'allow_archived': bool(template),
                         },
                         commit=False,
                         emit=False,
+                        allow_archived=bool(template),
                     )
                     if circuit_error:
                         self.db_session.rollback()

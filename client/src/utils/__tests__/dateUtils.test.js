@@ -13,7 +13,8 @@ import {
     formatForInput,
     localToISO,
     parseRelativeTimeAdjustment,
-    applyRelativeTimeAdjustment
+    applyRelativeTimeAdjustment,
+    validateTimerRange,
 } from '../dateUtils';
 
 afterEach(() => {
@@ -212,5 +213,23 @@ describe('relative time adjustment parsing', () => {
     it('rejects invalid adjustment codes', () => {
         expect(() => parseRelativeTimeAdjustment('10M')).toThrow('Use +10M, -2H, or +30S');
         expect(() => parseRelativeTimeAdjustment('+1D')).toThrow('Use +10M, -2H, or +30S');
+    });
+
+    it('does not compare an active start adjustment with a missing stop', () => {
+        expect(validateTimerRange({
+            target: 'start',
+            candidateIso: '2026-07-04T13:11:14.000Z',
+            startIso: '2026-07-04T13:21:14.000Z',
+            stopIso: null,
+        })).toBe('');
+    });
+
+    it('still rejects an adjusted boundary that reverses a completed range', () => {
+        expect(validateTimerRange({
+            target: 'start',
+            candidateIso: '2026-07-04T13:31:14.000Z',
+            startIso: '2026-07-04T13:21:14.000Z',
+            stopIso: '2026-07-04T13:30:14.000Z',
+        })).toBe('Start must be before stop');
     });
 });

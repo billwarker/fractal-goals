@@ -498,6 +498,20 @@ export const applyRelativeTimeAdjustment = (localDateStr, adjustmentCode, timezo
     return adjustedDate.toISOString();
 };
 
+export const validateTimerRange = ({ target, candidateIso, startIso, stopIso }) => {
+    const candidate = new Date(candidateIso).getTime();
+    if (!Number.isFinite(candidate)) return 'Use YYYY-MM-DD HH:MM:SS';
+
+    const counterpartValue = target === 'start' ? stopIso : startIso;
+    if (!counterpartValue) return '';
+
+    const counterpart = new Date(counterpartValue).getTime();
+    if (!Number.isFinite(counterpart)) return '';
+    if (target === 'start' && candidate > counterpart) return 'Start must be before stop';
+    if (target === 'stop' && candidate < counterpart) return 'Stop must be after start';
+    return '';
+};
+
 /**
  * Create a Date object where the local time components match the wall time
  * in the specified timezone. This is useful when local formatting helpers

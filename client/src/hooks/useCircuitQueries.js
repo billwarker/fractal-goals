@@ -54,7 +54,7 @@ export function useCircuitRunActions(rootId, sessionId) {
         },
         onSuccess: async (response, variables) => {
             updateCircuitRunCache(queryClient, rootId, sessionId, variables.action, response);
-            await refreshCircuitSessionConsumers(queryClient, rootId, sessionId);
+            await refreshCircuitSessionConsumers(queryClient, rootId, sessionId, variables.action);
         },
     });
     return mutation;
@@ -75,7 +75,7 @@ export function useCreateCircuitRun(rootId, sessionId) {
         ),
         onSuccess: async (response) => {
             updateCircuitRunCache(queryClient, rootId, sessionId, 'createRun', response);
-            await refreshCircuitSessionConsumers(queryClient, rootId, sessionId);
+            await refreshCircuitSessionConsumers(queryClient, rootId, sessionId, 'createRun');
         },
     });
 }

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import uuid
 
 import pytest
@@ -342,6 +342,16 @@ def test_circuit_timing_adjustment_recalculates_duration_and_reset_restores_plan
     assert rejected.status_code == 400
     assert "after start" in rejected.get_json()["error"].lower()
 
+    persisted_run = db_session.get(CircuitRun, run_id)
+    persisted_run.total_paused_seconds = 30
+    db_session.commit()
+    paused_correction = authed_client.patch(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run_id}/timing",
+        json={"time_start": "2026-08-04T12:59:00.000Z"},
+    )
+    assert paused_correction.status_code == 409
+    assert "paused work" in paused_correction.get_json()["error"].lower()
+
     reset = authed_client.patch(
         f"/api/{sample_ultimate_goal.id}/circuit-runs/{run_id}/timing",
         json={"time_start": None, "time_stop": None},
@@ -414,6 +424,13 @@ def test_manual_circuit_timing_rejects_overlapping_work(
     assert circuit_overlap.status_code == 409
     assert "another circuit" in circuit_overlap.get_json()["error"].lower()
 
+    open_circuit_overlap = authed_client.patch(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{second['id']}/timing",
+        json={"time_start": "2026-08-04T13:30:00.000Z"},
+    )
+    assert open_circuit_overlap.status_code == 409
+    assert "another circuit" in open_circuit_overlap.get_json()["error"].lower()
+
     ordinary = ActivityInstance(
         root_id=sample_ultimate_goal.id,
         session_id=session.id,
@@ -440,6 +457,135 @@ def test_manual_circuit_timing_rejects_overlapping_work(
     )
     assert ordinary_overlap.status_code == 409
     assert "session item's work time" in ordinary_overlap.get_json()["error"]
+
+    open_range_overlap = authed_client.patch(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{second['id']}/timing",
+        json={"time_start": "2026-08-04T15:30:00.000Z"},
+    )
+    assert open_range_overlap.status_code == 409
+    assert "session item's work time" in open_range_overlap.get_json()["error"]
+
+
+def test_circuit_timing_rejects_future_boundaries_and_legacy_future_completion(
+    authed_client,
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+    sample_activity_definition,
+):
+    session = _session(db_session, sample_ultimate_goal, test_user)
+    non_set = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(
+        authed_client,
+        sample_ultimate_goal,
+        sample_activity_definition,
+        non_set,
+    )
+    run = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    ).get_json()
+    future_start = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    rejected = authed_client.patch(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/timing",
+        json={"time_start": future_start.isoformat()},
+    )
+    assert rejected.status_code == 400
+    assert "future" in rejected.get_json()["error"].lower()
+
+    future_stop = authed_client.patch(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/timing",
+        json={
+            "time_start": (future_start - timedelta(minutes=20)).isoformat(),
+            "time_stop": future_start.isoformat(),
+        },
+    )
+    assert future_stop.status_code == 400
+    assert "future" in future_stop.get_json()["error"].lower()
+
+    persisted_run = db_session.get(CircuitRun, run["id"])
+    persisted_run.status = "active"
+    persisted_run.time_start = future_start.replace(tzinfo=None)
+    db_session.commit()
+    completion = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/complete",
+    )
+    assert completion.status_code == 409
+    assert "future" in completion.get_json()["error"].lower()
+
+
+def test_archived_circuit_instantiation_is_internal_only_and_restore_rechecks_quota(
+    authed_client,
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+    sample_activity_definition,
+):
+    test_user.quota_overrides = {"circuits": 1}
+    db_session.commit()
+    session = _session(db_session, sample_ultimate_goal, test_user)
+    non_set = _non_set_activity(db_session, sample_ultimate_goal)
+    archived = _create_definition(
+        authed_client,
+        sample_ultimate_goal,
+        sample_activity_definition,
+        non_set,
+    )
+    assert authed_client.delete(
+        f"/api/{sample_ultimate_goal.id}/circuits/{archived['id']}"
+    ).status_code == 200
+
+    bypass = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={
+            "circuit_definition_id": archived["id"],
+            "section_index": 0,
+            "allow_archived": True,
+        },
+    )
+    assert bypass.status_code == 404
+
+    active = _create_definition(
+        authed_client,
+        sample_ultimate_goal,
+        sample_activity_definition,
+        non_set,
+    )
+    assert active["id"] != archived["id"]
+    restore = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/circuits/{archived['id']}/restore",
+    )
+    assert restore.status_code == 403
+    assert restore.get_json()["resource"] == "circuits"
+
+
+def test_restore_rechecks_storage_quota(
+    authed_client,
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+    sample_activity_definition,
+):
+    non_set = _non_set_activity(db_session, sample_ultimate_goal)
+    archived = _create_definition(
+        authed_client,
+        sample_ultimate_goal,
+        sample_activity_definition,
+        non_set,
+    )
+    assert authed_client.delete(
+        f"/api/{sample_ultimate_goal.id}/circuits/{archived['id']}"
+    ).status_code == 200
+    test_user.storage_limit_bytes = 1
+    db_session.commit()
+
+    restore = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/circuits/{archived['id']}/restore",
+    )
+
+    assert restore.status_code == 403
+    assert restore.get_json()["resource"] == "storage"
 
 
 def test_circuit_definition_rejects_excessive_generated_results(

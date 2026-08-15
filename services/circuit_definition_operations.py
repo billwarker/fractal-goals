@@ -229,6 +229,18 @@ class CircuitDefinitionOperations:
         definition = self.owner._definition(root_id, definition_id, include_archived=True)
         if not definition:
             return None, "Circuit not found", 404
+        if definition.deleted_at is None:
+            return serialize_circuit_definition(definition), None, 200
+        quota = QuotaService(self.db_session)
+        _, quota_error, quota_status = quota.check_available(user_id, "circuits")
+        if quota_error:
+            return None, quota_error, quota_status
+        _, storage_error, storage_status = quota.check_storage_available(
+            user_id,
+            self._definition_payload_size(quota, definition),
+        )
+        if storage_error:
+            return None, storage_error, storage_status
         definition.deleted_at = None
         definition.version += 1
         self.db_session.commit()

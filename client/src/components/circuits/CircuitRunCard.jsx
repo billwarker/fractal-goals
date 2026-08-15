@@ -92,7 +92,9 @@ export default function CircuitRunCard({
             await action.mutateAsync({ ...payload, runId: run.id });
             return true;
         } catch (requestError) {
-            setError(requestError?.response?.data?.error || requestError.message || 'Circuit action failed');
+            const message = requestError?.response?.data?.error || requestError.message || 'Circuit action failed';
+            if (payload.inlineError) return { error: message };
+            setError(message);
             return false;
         }
     };

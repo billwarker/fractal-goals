@@ -9,6 +9,7 @@ export default function useRelativeTimeAdjustment({ timezone, validate, onApply 
     const [activeTarget, setActiveTarget] = useState(null);
     const [drafts, setDrafts] = useState({ start: '', stop: '' });
     const [errors, setErrors] = useState({ start: '', stop: '' });
+    const [applyingTarget, setApplyingTarget] = useState(null);
     const panelRef = useRef(null);
 
     useEffect(() => {
@@ -38,7 +39,7 @@ export default function useRelativeTimeAdjustment({ timezone, validate, onApply 
         setErrors((current) => ({ ...current, [target]: '' }));
     };
 
-    const apply = (event, target, currentValue) => {
+    const apply = async (event, target, currentValue) => {
         event.stopPropagation();
         try {
             const isoValue = applyRelativeTimeAdjustment(currentValue, drafts[target], timezone);
@@ -47,15 +48,20 @@ export default function useRelativeTimeAdjustment({ timezone, validate, onApply 
                 setErrors((current) => ({ ...current, [target]: rangeError }));
                 return;
             }
-            onApply(target, isoValue);
+            setApplyingTarget(target);
+            const saved = await onApply(target, isoValue);
+            if (saved?.error) throw new Error(saved.error);
+            if (saved === false) throw new Error('Unable to save time adjustment');
             setActiveTarget(null);
             setDrafts((current) => ({ ...current, [target]: '' }));
             setErrors((current) => ({ ...current, [target]: '' }));
         } catch (error) {
             setErrors((current) => ({
                 ...current,
-                [target]: error?.message || 'Use +10M, -2H, or +30S',
+                [target]: error?.response?.data?.error || error?.message || 'Use +10M, -2H, or +30S',
             }));
+        } finally {
+            setApplyingTarget(null);
         }
     };
 
@@ -94,7 +100,7 @@ export default function useRelativeTimeAdjustment({ timezone, validate, onApply 
                             setErrors((current) => ({ ...current, [target]: '' }));
                         }}
                         onKeyDown={(event) => {
-                            if (event.key === 'Enter') apply(event, target, currentValue);
+                            if (event.key === 'Enter') void apply(event, target, currentValue);
                             if (event.key === 'Escape') {
                                 event.stopPropagation();
                                 setActiveTarget(null);
@@ -106,9 +112,10 @@ export default function useRelativeTimeAdjustment({ timezone, validate, onApply 
                         size="sm"
                         variant="secondary"
                         className={styles.timeAdjustmentApplyButton}
-                        onClick={(event) => apply(event, target, currentValue)}
+                        onClick={(event) => { void apply(event, target, currentValue); }}
+                        disabled={applyingTarget === target}
                     >
-                        Apply
+                        {applyingTarget === target ? 'Applying…' : 'Apply'}
                     </Button>
                 </div>
                 {errors[target] && (

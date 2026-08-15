@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { formatForInput } from '../../utils/dateUtils';
+import { formatForInput, validateTimerRange } from '../../utils/dateUtils';
 import { formatClockDuration } from '../../utils/sessionTime';
 import { ChevronDownIcon, ChevronUpIcon, PlayIcon } from '../atoms/AppIcons';
 import Button from '../atoms/Button';
@@ -50,19 +50,18 @@ export default function CircuitRunTimerControls({
     const actionsDisabled = disabled || pending;
     const localStartTime = formatForInput(run.time_start, timezone);
     const localStopTime = formatForInput(run.time_stop, timezone);
-    const getTimerRangeError = (target, isoValue) => {
-        const candidate = new Date(isoValue).getTime();
-        const counterpart = new Date(target === 'start' ? run.time_stop : run.time_start).getTime();
-        if (!Number.isFinite(candidate) || !Number.isFinite(counterpart)) return '';
-        if (target === 'start' && candidate > counterpart) return 'Start must be before stop';
-        if (target === 'stop' && candidate < counterpart) return 'Stop must be after start';
-        return '';
-    };
+    const getTimerRangeError = (target, candidateIso) => validateTimerRange({
+        target,
+        candidateIso,
+        startIso: run.time_start,
+        stopIso: run.time_stop,
+    });
     const relativeTimeAdjustment = useRelativeTimeAdjustment({
         timezone,
         validate: getTimerRangeError,
         onApply: (target, isoValue) => onAction({
             action: 'updateRunTiming',
+            inlineError: true,
             value: { [target === 'start' ? 'time_start' : 'time_stop']: isoValue },
         }),
     });
@@ -78,7 +77,8 @@ export default function CircuitRunTimerControls({
                 <div className={activityStyles.timerFieldContainer}>
                     <div className={activityStyles.timerLabelRow}>
                         <label className={activityStyles.timerLabel} htmlFor={`circuit-${run.id}-start`}>Start</label>
-                        {isSelected && run.time_start && relativeTimeAdjustment.renderToggle('start')}
+                        {isSelected && !actionsDisabled && !run.is_paused && !run.total_paused_seconds && run.time_start
+                            && relativeTimeAdjustment.renderToggle('start')}
                     </div>
                     <input
                         id={`circuit-${run.id}-start`}
@@ -95,7 +95,8 @@ export default function CircuitRunTimerControls({
                 <div className={activityStyles.timerFieldContainer}>
                     <div className={activityStyles.timerLabelRow}>
                         <label className={activityStyles.timerLabel} htmlFor={`circuit-${run.id}-stop`}>Stop</label>
-                        {isSelected && run.time_stop && relativeTimeAdjustment.renderToggle('stop')}
+                        {isSelected && !actionsDisabled && !run.is_paused && !run.total_paused_seconds && run.time_stop
+                            && relativeTimeAdjustment.renderToggle('stop')}
                     </div>
                     <input
                         id={`circuit-${run.id}-stop`}

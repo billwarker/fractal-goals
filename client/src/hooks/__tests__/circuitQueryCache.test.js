@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from '../queryKeys';
-import { updateCircuitRunCache } from '../circuitQueryCache';
+import { refreshCircuitSessionConsumers, updateCircuitRunCache } from '../circuitQueryCache';
 
 
 describe('circuitQueryCache', () => {
@@ -27,5 +27,21 @@ describe('circuitQueryCache', () => {
 
         updateCircuitRunCache(client, 'root', 'session', 'deleteRun', { data: { id: 'run-1' } });
         expect(client.getQueryData(key)).toEqual([{ id: 'run-2' }]);
+    });
+
+    it('invalidates the canonical run collection and dependent summaries', async () => {
+        const client = new QueryClient();
+        const runKey = queryKeys.sessionCircuitRuns('root', 'session');
+        const circuitKey = queryKeys.circuits('root');
+        const sessionsKey = queryKeys.sessions('root');
+        client.setQueryData(runKey, [{ id: 'run-1' }]);
+        client.setQueryData(circuitKey, [{ id: 'definition-1' }]);
+        client.setQueryData(sessionsKey, [{ id: 'session' }]);
+
+        await refreshCircuitSessionConsumers(client, 'root', 'session', 'completeRun');
+
+        expect(client.getQueryState(runKey)?.isInvalidated).toBe(true);
+        expect(client.getQueryState(circuitKey)?.isInvalidated).toBe(true);
+        expect(client.getQueryState(sessionsKey)?.isInvalidated).toBe(true);
     });
 });

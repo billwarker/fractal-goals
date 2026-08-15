@@ -255,7 +255,17 @@ class CircuitService:
         if rows:
             self.db_session.execute(session_goals.insert(), rows)
 
-    def create_run(self, root_id, session_id, user_id, data, *, commit=True, emit=True):
+    def create_run(
+        self,
+        root_id,
+        session_id,
+        user_id,
+        data,
+        *,
+        commit=True,
+        emit=True,
+        allow_archived=False,
+    ):
         if not self._owned_root(root_id, user_id):
             return None, "Fractal not found or access denied", 404
         session = self._locked_session(root_id, session_id)
@@ -268,7 +278,7 @@ class CircuitService:
         definition = self._definition(
             root_id,
             data.get("circuit_definition_id"),
-            include_archived=bool(data.get("allow_archived")),
+            include_archived=allow_archived,
         )
         if not definition:
             return None, "Circuit not found", 404

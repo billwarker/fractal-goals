@@ -14,6 +14,8 @@ const {
     updateActivityInstance,
     updateActivityMetrics,
     toggleGoalCompletion,
+    pauseSession,
+    resumeSession,
     notify,
 } = vi.hoisted(() => ({
     createGoal: vi.fn(),
@@ -23,6 +25,8 @@ const {
     updateActivityInstance: vi.fn(),
     updateActivityMetrics: vi.fn(),
     toggleGoalCompletion: vi.fn(),
+    pauseSession: vi.fn(),
+    resumeSession: vi.fn(),
     notify: {
         success: vi.fn(),
         error: vi.fn(),
@@ -38,6 +42,8 @@ vi.mock('../../utils/api', () => ({
         updateActivityInstance: (...args) => updateActivityInstance(...args),
         updateActivityMetrics: (...args) => updateActivityMetrics(...args),
         toggleGoalCompletion: (...args) => toggleGoalCompletion(...args),
+        pauseSession: (...args) => pauseSession(...args),
+        resumeSession: (...args) => resumeSession(...args),
     },
 }));
 
@@ -89,6 +95,32 @@ function createBaseOptions(queryClient, overrides = {}) {
 describe('useSessionDetailMutations', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+    });
+
+    it.each([
+        ['pauseSession', pauseSession],
+        ['resumeSession', resumeSession],
+    ])('invalidates circuit runs after %s', async (actionName, requestMock) => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+        requestMock.mockResolvedValueOnce({ data: { id: 'session-1' } });
+        const { result } = renderHook(
+            () => useSessionDetailMutations(createBaseOptions(queryClient)),
+            { wrapper: createWrapper(queryClient) },
+        );
+
+        await act(async () => {
+            await result.current[actionName]();
+        });
+
+        expect(invalidateQueries).toHaveBeenCalledWith({
+            queryKey: queryKeys.sessionCircuitRuns('root-1', 'session-1'),
+        });
     });
 
     it('invalidates the canonical goal and session query families when creating a goal', async () => {

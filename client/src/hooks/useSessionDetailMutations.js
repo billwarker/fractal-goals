@@ -158,6 +158,7 @@ export function useSessionDetailMutations({
         onSuccess: (response) => {
             queryClient.setQueryData(sessionKey, response.data);
             queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionCircuitRuns(rootId, sessionId) });
             invalidateSessionListQueries();
             notify.success('Session paused');
         },
@@ -171,6 +172,7 @@ export function useSessionDetailMutations({
         onSuccess: (response) => {
             queryClient.setQueryData(sessionKey, response.data);
             queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionCircuitRuns(rootId, sessionId) });
             invalidateSessionListQueries();
             notify.success('Session resumed');
         },
