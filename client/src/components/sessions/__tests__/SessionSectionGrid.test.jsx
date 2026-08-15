@@ -37,7 +37,7 @@ describe('SessionSectionGrid', () => {
                                     status: 'completed',
                                     completed_at: '2026-07-21T18:00:00Z',
                                     duration_seconds: 90,
-                                    planned_rounds: 1,
+                                    round_count: 1,
                                     slots: [
                                         { id: 'slot-1', activity_name: 'L-Sit Chin Ups' },
                                         { id: 'slot-2', activity_name: 'Dumbbell Bench Press' },
@@ -119,7 +119,7 @@ describe('SessionSectionGrid', () => {
                                 circuit: {
                                     id: 'circuit-1',
                                     name: 'Strength Pair',
-                                    planned_rounds: 1,
+                                    round_count: 1,
                                     slots: [
                                         {
                                             id: 'slot-1',

@@ -9,7 +9,7 @@ const run = {
     id: 'run-1',
     name: 'Conditioning',
     status: 'active',
-    planned_rounds: 1,
+    round_count: 1,
     duration_seconds: 30,
     slots: [
         {
@@ -86,6 +86,8 @@ describe('CircuitRunCard', () => {
         mutateAsync.mockResolvedValue({ data: run });
         render(<CircuitRunCard rootId="root" sessionId="session" run={run} itemNumber={3} activityInstances={[]} />);
 
+        expect(screen.getByText('1 round')).toBeInTheDocument();
+        expect(screen.queryByText('1 rounds')).not.toBeInTheDocument();
         expect(screen.getByText('Round 1')).toBeInTheDocument();
         expect(screen.getByText('#1.1')).toBeInTheDocument();
         expect(screen.getByText('#1.2')).toBeInTheDocument();
@@ -244,7 +246,7 @@ describe('CircuitRunCard', () => {
             <CircuitRunCard
                 rootId="root"
                 sessionId="session"
-                run={{ ...run, planned_rounds: 2, rounds: [...run.rounds, secondRound] }}
+                run={{ ...run, round_count: 2, rounds: [...run.rounds, secondRound] }}
                 itemNumber={3}
                 activityInstances={[]}
             />,
@@ -403,11 +405,12 @@ describe('CircuitRunCard', () => {
             <CircuitRunCard
                 rootId="root"
                 sessionId="session"
-                run={{ ...run, planned_rounds: 2, rounds: [...run.rounds, secondRound] }}
+                run={{ ...run, round_count: 2, rounds: [...run.rounds, secondRound] }}
                 itemNumber={3}
                 activityInstances={[]}
             />,
         );
+        expect(screen.getByText('2 rounds')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Remove round 1' }));
         await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith({
             action: 'removeRound',

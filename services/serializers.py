@@ -234,7 +234,6 @@ def serialize_circuit_definition(definition, instantiation_summary=None):
         "group_id": definition.group_id,
         "name": definition.name,
         "description": definition.description or "",
-        "planned_rounds": definition.planned_rounds,
         "version": definition.version,
         "archived": definition.deleted_at is not None,
         "deleted_at": format_utc(definition.deleted_at),
@@ -281,8 +280,6 @@ def serialize_circuit_run(run):
         "name": run.name,
         "description": run.description or "",
         "round_count": len(rounds),
-        # Compatibility field retained for existing clients and snapshots.
-        "planned_rounds": run.planned_rounds,
         "status": run.status,
         "time_start": format_utc(run.time_start),
         "time_stop": format_utc(run.time_stop),

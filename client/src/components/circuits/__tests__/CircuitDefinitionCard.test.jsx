@@ -20,7 +20,6 @@ const circuit = {
     id: 'circuit-1',
     name: 'Morning circuit',
     description: 'Start the day',
-    planned_rounds: 3,
     version: 2,
     group_id: 'group-1',
     instantiation_summary: {

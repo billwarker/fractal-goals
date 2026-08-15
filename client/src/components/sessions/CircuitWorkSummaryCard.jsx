@@ -59,7 +59,7 @@ const CircuitWorkSummaryCard = memo(function CircuitWorkSummaryCard({
         [activityInstances],
     );
     const rounds = circuit?.rounds || [];
-    const roundCount = circuit?.round_count ?? rounds.length ?? circuit?.planned_rounds ?? 0;
+    const roundCount = circuit?.round_count ?? rounds.length;
     const isCompleted = circuit?.status === 'completed' || Boolean(circuit?.completed_at);
     const isPaused = Boolean(circuit?.is_paused);
     const isInProgress = !isCompleted

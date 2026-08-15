@@ -1,7 +1,6 @@
 .form { display: grid; gap: 18px; }
 .form label { display: grid; gap: 6px; color: var(--color-text-secondary); font-size: 13px; font-weight: 600; }
 .form input, .form textarea, .form select { width: 100%; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-bg-input); color: var(--color-text-primary); padding: 10px 12px; font: inherit; }
-.settingsRow { display: grid; grid-template-columns: minmax(140px, 180px) minmax(0, 1fr); gap: 18px; align-items: start; }
 .slotHeader { display: flex; justify-content: space-between; align-items: end; gap: 16px; border-top: 1px solid var(--color-border); padding-top: 18px; }
 .slotHeader h4, .slotHeader p { margin: 0; }
 .slotHeader p { margin-top: 4px; color: var(--color-text-secondary); font-size: 12px; }
@@ -10,4 +9,4 @@
 .slotList li { display: flex; gap: 10px; align-items: stretch; min-width: 0; }
 .slotActions { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
 .error { margin: 0; color: var(--color-brand-danger); }
-@media (max-width: 720px) { .settingsRow { grid-template-columns: 1fr; } .slotHeader { align-items: stretch; flex-direction: column; } .slotList li { gap: 6px; } }
+@media (max-width: 720px) { .slotHeader { align-items: stretch; flex-direction: column; } .slotList li { gap: 6px; } }

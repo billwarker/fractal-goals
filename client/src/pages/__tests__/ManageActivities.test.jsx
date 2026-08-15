@@ -42,14 +42,12 @@ vi.mock('../../hooks/useCircuitQueries', () => ({
             {
                 id: 'circuit-1',
                 name: 'Morning Circuit',
-                planned_rounds: 3,
                 slots: [],
                 group_id: 'group-used',
             },
             {
                 id: 'circuit-2',
                 name: 'Ungrouped Circuit',
-                planned_rounds: 2,
                 slots: [],
                 group_id: null,
             },

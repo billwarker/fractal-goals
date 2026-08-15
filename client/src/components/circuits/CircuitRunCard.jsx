@@ -128,7 +128,12 @@ export default function CircuitRunCard({
     const isRunSelected = selectedCircuitItem?.type === 'run'
         && selectedCircuitItem.runId === run.id;
     const rounds = run.rounds || [];
+    const roundCount = run.round_count ?? rounds.length;
     const visibleRounds = rounds.slice(0, visibleRoundCount);
+    const hiddenRoundBatchSize = Math.min(
+        INITIAL_VISIBLE_ROUNDS,
+        Math.max(0, rounds.length - visibleRoundCount),
+    );
     const hasInstanceOptions = Boolean(onDuplicate || !disabled);
     const handleOptionAction = (event, action) => {
         event.stopPropagation();
@@ -242,7 +247,7 @@ export default function CircuitRunCard({
                         <div className={activityStyles.activityMetaLine}>
                             <span>Circuit</span>
                             <span className={activityStyles.activityMetaSeparator}>•</span>
-                            <span>{run.round_count ?? rounds.length} rounds</span>
+                            <span>{roundCount} {roundCount === 1 ? 'round' : 'rounds'}</span>
                         </div>
                         {run.description && <div className={activityStyles.activityDescription}>{run.description}</div>}
                     </div>
@@ -379,7 +384,7 @@ export default function CircuitRunCard({
                                 setVisibleRoundCount((count) => Math.min(count + INITIAL_VISIBLE_ROUNDS, rounds.length));
                             }}
                         >
-                            Show {Math.min(INITIAL_VISIBLE_ROUNDS, rounds.length - visibleRoundCount)} more rounds
+                            Show {hiddenRoundBatchSize} more {hiddenRoundBatchSize === 1 ? 'round' : 'rounds'}
                         </AddItemButton>
                     )}
                     {(circuitNotes.length > 0 || onAddNote) && (

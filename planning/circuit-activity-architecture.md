@@ -8,7 +8,7 @@ Use “Round” for one complete pass through the circuit. Set-based activities 
 
 ## Data Model and Migration
 
-- Add reusable `CircuitDefinition` and ordered `CircuitSlot` tables scoped to a fractal. Definitions contain name, description, planned rounds, lifecycle/version fields, and activity-definition slots. Slot labels and behavioral overrides are intentionally absent.
+- Add reusable `CircuitDefinition` and ordered `CircuitSlot` tables scoped to a fractal. Definitions contain name, description, lifecycle/version fields, and activity-definition slots. Execution always begins with one round; subsequent rounds are added explicitly to each run. Slot labels and behavioral overrides are intentionally absent.
 - Add snapshotted `CircuitRun`, `CircuitRunSlot`, `CircuitRound`, and `CircuitRoundMember` tables:
   - Runs retain their original name, configuration, activity behavior, and ordering after definition edits.
   - Round/member rows are structural and carry no lifecycle or timing state.
@@ -41,7 +41,7 @@ Use “Round” for one complete pass through the circuit. Set-based activities 
 - Add owned, root-scoped circuit definition endpoints for list, detail, create, atomic slot replacement/update, archive, and restore.
 - Add circuit-run endpoints for insertion into a session, detail, start/complete, timing adjustment, individual round addition/removal, and member metrics. Circuit pause/resume propagates exclusively through the parent session lifecycle.
 - Return typed session items and circuit-run projections with top-level timing plus structural slots, rounds, and member results. Round/member timing and lifecycle fields are absent.
-- Add a Circuits surface to Manage Activities with list cards and a builder for core fields, planned rounds, and ordered activity slots. Slots inherit their activity definition’s metrics and set behavior.
+- Add a Circuits surface to Manage Activities with list cards and a builder for core fields and ordered activity slots. Slots inherit their activity definition’s metrics and set behavior; round count is run-owned rather than definition-owned.
 - Extend session-template and live-session item pickers to add circuits as single ordered items.
 - Render a circuit as one expandable session item whose nested indexes use round/activity coordinates: Round 1 contains `1.1`, `1.2`, and `1.3`; Round 2 restarts the slot position as `2.1`, `2.2`, and `2.3`. The member's shared set-style metric row does not repeat another inner result index.
 - Provide synchronized Start, Stop, and Duration fields plus Start and Complete actions only on the circuit container. Parent-session pause displays the circuit as paused and parent-session resume continues it; there is no standalone circuit pause/resume action. Actions remain authoritative, while the shared relative-time adjustment is the sole timing-correction workflow.
@@ -70,7 +70,7 @@ Use “Round” for one complete pass through the circuit. Set-based activities 
 
 ## Assumptions and S+ Audit
 
-- V1 circuit definitions contain only name, description, planned rounds, an optional activity group, and ordered activity slots; timing targets, rest prescriptions, slot labels, and behavioral overrides are intentionally absent.
+- Circuit definitions contain only name, description, an optional activity group, and ordered activity slots; timing targets, round prescriptions, rest prescriptions, slot labels, and behavioral overrides are intentionally absent.
 - Existing templates reference definitions, while every session run snapshots them.
 - Current implementation quality is strong for ordinary activities but materially below the circuit requirement because sets and ordering are positional JSON and concurrent timers are supported.
 - The plan reaches S+ when there is one normalized set model, one typed session-item model, exactly one circuit timer owner, database-enforced structural invariants, complete migration coverage, and no legacy round/member timing paths.

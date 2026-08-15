@@ -11,16 +11,23 @@ MAX_CIRCUIT_RESULTS = 1000
 ESTIMATED_CIRCUIT_RESULT_BYTES = 512
 
 
-def validate_circuit_shape(round_count, slot_count):
-    if round_count > MAX_CIRCUIT_ROUNDS:
-        return (
-            f"A circuit cannot contain more than {MAX_CIRCUIT_ROUNDS} rounds"
-        )
+def validate_circuit_slot_count(slot_count):
     if slot_count > MAX_CIRCUIT_SLOTS:
         return (
             f"A circuit cannot contain more than {MAX_CIRCUIT_SLOTS} "
             "activity slots"
         )
+    return None
+
+
+def validate_circuit_shape(round_count, slot_count):
+    if round_count > MAX_CIRCUIT_ROUNDS:
+        return (
+            f"A circuit cannot contain more than {MAX_CIRCUIT_ROUNDS} rounds"
+        )
+    slot_error = validate_circuit_slot_count(slot_count)
+    if slot_error:
+        return slot_error
     result_count = round_count * slot_count
     if result_count > MAX_CIRCUIT_RESULTS:
         return (

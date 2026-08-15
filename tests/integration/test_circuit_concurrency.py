@@ -31,7 +31,6 @@ def _create_circuit_run(authed_client, db_session, root, user):
     db_session.commit()
     definition = authed_client.post(f"/api/{root.id}/circuits", json={
         "name": "Serialized circuit",
-        "planned_rounds": 1,
         "slots": [{"activity_definition_id": activity.id}],
     }).get_json()
     run = authed_client.post(

@@ -145,7 +145,6 @@ describe('SessionSection', () => {
             id: 'circuit-1',
             name: 'Technique Circuit',
             group_id: 'group-1',
-            planned_rounds: 3,
         }];
 
         const renderSection = () => (

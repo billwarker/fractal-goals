@@ -75,8 +75,6 @@ export default function CircuitDefinitionCard({ circuit, rootId, activities, act
                     {circuit.description && <p className={activityStyles.description}>{circuit.description}</p>}
                     <CatalogueUsageMetadata summary={circuit.instantiation_summary} />
                     <div className={styles.definitionMetadata}>
-                        <span>{circuit.planned_rounds} round{circuit.planned_rounds === 1 ? '' : 's'}</span>
-                        <span className={styles.metadataSeparator}>•</span>
                         <span>{circuit.slots?.length || 0} activit{circuit.slots?.length === 1 ? 'y' : 'ies'}</span>
                     </div>
                 </div>

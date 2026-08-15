@@ -15,13 +15,12 @@ describe('ActivitySelectorPanel', () => {
                         id: 'circuit-1',
                         name: 'Technique Circuit',
                         group_id: 'group-technique',
-                        planned_rounds: 1,
+                        slots: [{ id: 'slot-technique', activity: { name: 'Scales' } }],
                     },
                     {
                         id: 'circuit-2',
                         name: 'Ungrouped Circuit',
                         group_id: null,
-                        planned_rounds: 3,
                         slots: [
                             {
                                 id: 'slot-2',
@@ -57,7 +56,7 @@ describe('ActivitySelectorPanel', () => {
         expect(screen.queryByText('Scale Practice')).not.toBeInTheDocument();
         expect(screen.getByPlaceholderText('Search activity circuits...')).toBeInTheDocument();
         expect(screen.getByText('Ungrouped Activity Circuits')).toBeInTheDocument();
-        expect(screen.getByText('Circuit • 3 rounds')).toBeInTheDocument();
+        expect(screen.getByText('Circuit • 2 activities')).toBeInTheDocument();
         const circuitActivities = screen.getByRole('list', { name: 'Ungrouped Circuit activities' });
         expect(circuitActivities).toHaveTextContent('Scapular Pulls');
         expect(circuitActivities).toHaveTextContent('Keep the elbows straight.');
@@ -76,7 +75,7 @@ describe('ActivitySelectorPanel', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Technique' }));
         expect(screen.getByRole('button', { name: /Back/ })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Select Technique Circuit' })).toBeInTheDocument();
-        expect(screen.getByText('Circuit • 1 round')).toBeInTheDocument();
+        expect(screen.getByText('Circuit • 1 activity')).toBeInTheDocument();
     });
 
     it('opens directly inside the requested activity group', () => {

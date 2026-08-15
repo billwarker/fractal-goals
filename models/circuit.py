@@ -15,7 +15,6 @@ class CircuitDefinition(Base):
     group_id = Column(String, ForeignKey("activity_groups.id", ondelete="SET NULL"), nullable=True, index=True)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=False, default="", server_default="")
-    planned_rounds = Column(Integer, nullable=False, default=1, server_default="1")
     version = Column(Integer, nullable=False, default=1, server_default="1")
     created_at = Column(DateTime, nullable=False, default=utc_now, server_default=sa.func.now())
     updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now, server_default=sa.func.now())
@@ -30,8 +29,6 @@ class CircuitDefinition(Base):
     group = relationship("ActivityGroup", backref="circuits")
 
     __table_args__ = (
-        CheckConstraint("planned_rounds > 0", name="ck_circuit_definitions_planned_rounds_positive"),
-        CheckConstraint("planned_rounds <= 1000", name="ck_circuit_definitions_planned_rounds_max"),
         CheckConstraint("version > 0", name="ck_circuit_definitions_version_positive"),
         Index("ix_circuit_definitions_root_deleted", "root_id", "deleted_at"),
     )
@@ -81,7 +78,6 @@ class CircuitRun(Base):
     source_version = Column(Integer, nullable=True)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=False, default="", server_default="")
-    planned_rounds = Column(Integer, nullable=False)
     status = Column(String(16), nullable=False, default="planned", server_default="planned")
     time_start = Column(DateTime, nullable=True)
     time_stop = Column(DateTime, nullable=True)
@@ -109,8 +105,6 @@ class CircuitRun(Base):
     )
 
     __table_args__ = (
-        CheckConstraint("planned_rounds > 0", name="ck_circuit_runs_planned_rounds_positive"),
-        CheckConstraint("planned_rounds <= 1000", name="ck_circuit_runs_planned_rounds_max"),
         CheckConstraint(
             "status IN ('planned', 'active', 'paused', 'completed')",
             name="ck_circuit_runs_status",

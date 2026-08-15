@@ -8,13 +8,13 @@ describe('circuitQueryCache', () => {
     it('replaces a mutated circuit run without refetching the run collection', () => {
         const client = new QueryClient();
         const key = queryKeys.sessionCircuitRuns('root', 'session');
-        client.setQueryData(key, [{ id: 'run-1', planned_rounds: 1 }]);
+        client.setQueryData(key, [{ id: 'run-1', round_count: 1 }]);
 
         updateCircuitRunCache(client, 'root', 'session', 'addRound', {
-            data: { id: 'run-1', planned_rounds: 2 },
+            data: { id: 'run-1', round_count: 2 },
         });
 
-        expect(client.getQueryData(key)).toEqual([{ id: 'run-1', planned_rounds: 2 }]);
+        expect(client.getQueryData(key)).toEqual([{ id: 'run-1', round_count: 2 }]);
     });
 
     it('adds newly created runs and removes deleted runs', () => {

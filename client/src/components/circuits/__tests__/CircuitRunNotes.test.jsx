@@ -27,7 +27,7 @@ const run = {
     id: 'run-1',
     name: 'Conditioning',
     status: 'planned',
-    planned_rounds: 1,
+    round_count: 1,
     slots: [{
         id: 'slot-a',
         sort_order: 0,

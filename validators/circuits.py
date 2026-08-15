@@ -3,11 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .core import MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, sanitize_string
-from services.circuit_rules import (
-    MAX_CIRCUIT_ROUNDS,
-    MAX_CIRCUIT_SLOTS,
-    validate_circuit_shape,
-)
+from services.circuit_rules import MAX_CIRCUIT_SLOTS
 
 
 class CircuitSlotSchema(BaseModel):
@@ -20,7 +16,6 @@ class CircuitDefinitionCreateSchema(BaseModel):
 
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     description: Optional[str] = Field("", max_length=MAX_DESCRIPTION_LENGTH)
-    planned_rounds: int = Field(1, ge=1, le=MAX_CIRCUIT_ROUNDS)
     group_id: Optional[str] = None
     slots: List[CircuitSlotSchema] = Field(..., min_length=1, max_length=MAX_CIRCUIT_SLOTS)
 
@@ -29,20 +24,11 @@ class CircuitDefinitionCreateSchema(BaseModel):
     def clean_text(cls, value):
         return sanitize_string(value or "")
 
-    @model_validator(mode="after")
-    def enforce_result_limit(self):
-        error = validate_circuit_shape(self.planned_rounds, len(self.slots))
-        if error:
-            raise ValueError(error)
-        return self
-
-
 class CircuitDefinitionUpdateSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
-    planned_rounds: Optional[int] = Field(None, ge=1, le=MAX_CIRCUIT_ROUNDS)
     group_id: Optional[str] = None
     slots: Optional[List[CircuitSlotSchema]] = Field(None, min_length=1, max_length=MAX_CIRCUIT_SLOTS)
     version: Optional[int] = Field(None, ge=1)

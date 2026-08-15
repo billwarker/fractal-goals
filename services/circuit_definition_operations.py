@@ -2,7 +2,7 @@ from sqlalchemy import and_, case, func
 
 from models import CircuitDefinition, CircuitRun, CircuitSlot, Session
 from services.activity_group_service import validate_activity_group_id
-from services.circuit_rules import validate_circuit_shape
+from services.circuit_rules import validate_circuit_slot_count
 from services.events import Event, Events, event_bus
 from services.quota_service import QuotaService
 from services.serializers import format_utc, serialize_circuit_definition
@@ -91,9 +91,9 @@ class CircuitDefinitionOperations:
         slots, error = self.owner._validate_slots(root_id, data.get("slots"))
         if error:
             return None, error, 400
-        shape_error = validate_circuit_shape(fields["planned_rounds"], len(slots))
-        if shape_error:
-            return None, shape_error, 400
+        slot_error = validate_circuit_slot_count(len(slots))
+        if slot_error:
+            return None, slot_error, 400
         quota = QuotaService(self.db_session)
         _, quota_error, quota_status = quota.check_available(user_id, "circuits")
         if quota_error:
@@ -154,12 +154,11 @@ class CircuitDefinitionOperations:
             slots, error = self.owner._validate_slots(root_id, data.get("slots"))
             if error:
                 return None, error, 400
-        shape_error = validate_circuit_shape(
-            fields["planned_rounds"],
-            len(slots) if slots is not None else len(definition.slots),
+        slot_error = validate_circuit_slot_count(
+            len(slots) if slots is not None else len(definition.slots)
         )
-        if shape_error:
-            return None, shape_error, 400
+        if slot_error:
+            return None, slot_error, 400
         quota = QuotaService(self.db_session)
         current_size = self._definition_payload_size(quota, definition)
         next_size = quota._payload_size(
@@ -175,7 +174,6 @@ class CircuitDefinitionOperations:
                 return None, storage_error, storage_status
         definition.name = fields["name"]
         definition.description = fields["description"]
-        definition.planned_rounds = fields["planned_rounds"]
         if "group_id" in fields:
             definition.group_id = fields["group_id"]
         definition.version += 1

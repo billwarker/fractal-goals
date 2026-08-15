@@ -14,9 +14,7 @@ const SELECTOR_VIEWS = [
 ];
 
 function getCircuitTypeLabel(circuit) {
-    const plannedRounds = Number(circuit.planned_rounds);
-    if (!Number.isInteger(plannedRounds) || plannedRounds < 1) return 'Circuit';
-    return `Circuit • ${plannedRounds} ${plannedRounds === 1 ? 'round' : 'rounds'}`;
+    return `Circuit • ${circuit.slots?.length || 0} activit${circuit.slots?.length === 1 ? 'y' : 'ies'}`;
 }
 
 function CircuitActivityList({ circuit }) {

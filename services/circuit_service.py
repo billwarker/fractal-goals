@@ -136,18 +136,9 @@ class CircuitService:
         name = name.strip() if isinstance(name, str) else ""
         description = data.get("description", getattr(existing, "description", ""))
         description = description.strip() if isinstance(description, str) else ""
-        rounds = data.get("planned_rounds", getattr(existing, "planned_rounds", 1))
-        if isinstance(rounds, bool):
-            return None, "planned_rounds must be a positive integer"
-        try:
-            rounds = int(rounds)
-        except (TypeError, ValueError):
-            return None, "planned_rounds must be a positive integer"
         if not name:
             return None, "name is required"
-        if rounds <= 0:
-            return None, "planned_rounds must be a positive integer"
-        return {"name": name, "description": description, "planned_rounds": rounds}, None
+        return {"name": name, "description": description}, None
 
     def list_definitions(self, root_id, user_id, *, include_archived=False):
         return self.definition_operations.list(
@@ -284,14 +275,11 @@ class CircuitService:
             return None, "Circuit not found", 404
         if not definition.slots:
             return None, "Circuit has no activity slots", 409
-        result_count = definition.planned_rounds * len(definition.slots)
-        shape_error = validate_circuit_shape(definition.planned_rounds, len(definition.slots))
+        result_count = len(definition.slots)
+        shape_error = validate_circuit_shape(1, len(definition.slots))
         if shape_error:
             return None, shape_error, 409
-        required_instances = sum(
-            1 if slot.activity_definition.has_sets else definition.planned_rounds
-            for slot in definition.slots
-        )
+        required_instances = len(definition.slots)
         quota = QuotaService(self.db_session)
         _, quota_error, quota_status = quota.check_available(user_id, "activity_instances", required_instances)
         if quota_error:
@@ -305,7 +293,7 @@ class CircuitService:
                 [
                     {
                         "activity_definition_id": slot.activity_definition_id,
-                        "rounds": definition.planned_rounds,
+                        "rounds": 1,
                     }
                     for slot in definition.slots
                 ],
@@ -320,7 +308,6 @@ class CircuitService:
             source_version=definition.version,
             name=definition.name,
             description=definition.description,
-            planned_rounds=definition.planned_rounds,
         )
         self.db_session.add(run)
         self.db_session.flush()
@@ -347,8 +334,7 @@ class CircuitService:
                 run_slot.activity_instance_id = instance.id
             self.db_session.add(run_slot)
         self.db_session.flush()
-        for round_number in range(1, run.planned_rounds + 1):
-            self._create_round_occurrences(run, round_number)
+        self._create_round_occurrences(run, 1)
         self._attach_member_goals(session, definition, root_id)
         structure_error = append_circuit_run_item(
             session,

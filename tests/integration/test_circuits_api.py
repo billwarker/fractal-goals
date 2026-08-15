@@ -9,7 +9,6 @@ from models import (
     ActivityGroup,
     ActivityInstance,
     ActivitySet,
-    CircuitDefinition,
     CircuitRun,
     MetricDefinition,
     MetricValue,
@@ -54,7 +53,6 @@ def _create_definition(client, root, set_activity, non_set_activity):
     response = client.post(f"/api/{root.id}/circuits", json={
         "name": "Two-station circuit",
         "description": "Strength then conditioning",
-        "planned_rounds": 2,
         "slots": [
             {"activity_definition_id": set_activity.id},
             {"activity_definition_id": non_set_activity.id},
@@ -93,12 +91,16 @@ def test_circuit_snapshot_occurrences_typed_order_and_archive(
     }
     assert associated_goal.id in attached_goal_ids
     assert run["source_version"] == 1
+    assert run["round_count"] == 1
+    assert "planned_rounds" not in run
+    assert "planned_rounds" not in definition
+    second_round = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/rounds",
+    )
+    assert second_round.status_code == 201, second_round.get_json()
+    run = second_round.get_json()
     assert len(run["rounds"]) == 2
     assert [len(row["members"]) for row in run["rounds"]] == [2, 2]
-    assert authed_client.patch(
-        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/rounds",
-        json={"planned_rounds": 3},
-    ).status_code == 405
     assert authed_client.patch(
         f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/correction",
         json={"run": {"time_start": None, "time_stop": None}},
@@ -588,22 +590,29 @@ def test_restore_rechecks_storage_quota(
     assert restore.get_json()["resource"] == "storage"
 
 
-def test_circuit_definition_rejects_excessive_generated_results(
+def test_legacy_planned_rounds_field_cannot_change_initial_round_count(
     authed_client,
+    db_session,
+    test_user,
     sample_ultimate_goal,
     sample_activity_definition,
 ):
+    session = _session(db_session, sample_ultimate_goal, test_user)
     response = authed_client.post(f"/api/{sample_ultimate_goal.id}/circuits", json={
-        "name": "Excessive circuit",
-        "planned_rounds": 100,
-        "slots": [
-            {"activity_definition_id": sample_activity_definition.id}
-            for _ in range(11)
-        ],
+        "name": "Legacy planned circuit",
+        "planned_rounds": 3,
+        "slots": [{"activity_definition_id": sample_activity_definition.id}],
     })
 
-    assert response.status_code == 400
-    assert "1000" in str(response.get_json())
+    assert response.status_code == 201, response.get_json()
+    definition = response.get_json()
+    assert "planned_rounds" not in definition
+    run_response = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    )
+    assert run_response.status_code == 201, run_response.get_json()
+    assert run_response.get_json()["round_count"] == 1
 
 
 def test_quick_sessions_explicitly_reject_interactive_circuit_runs(
@@ -753,6 +762,11 @@ def test_remove_circuit_round_deletes_results_and_renumbers_remaining_rounds(
         f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
         json={"circuit_definition_id": definition["id"], "section_index": 0},
     ).get_json()
+    added = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/rounds",
+    )
+    assert added.status_code == 201, added.get_json()
+    run = added.get_json()
     removed_round = run["rounds"][0]
     removed_set_id = next(
         member["activity_set_id"] for member in removed_round["members"] if member["activity_set_id"]
@@ -788,7 +802,7 @@ def test_remove_circuit_round_deletes_results_and_renumbers_remaining_rounds(
     )
     assert response.status_code == 200, response.get_json()
     updated = response.get_json()
-    assert updated["planned_rounds"] == 1
+    assert updated["round_count"] == 1
     assert [row["round_number"] for row in updated["rounds"]] == [1]
 
     db_session.expire_all()
@@ -834,8 +848,8 @@ def test_circuit_rounds_remain_mutable_after_run_starts_and_completes(
     )
     assert response.status_code == 201, response.get_json()
     updated = response.get_json()
-    assert updated["planned_rounds"] == 3
-    assert [row["round_number"] for row in updated["rounds"]] == [1, 2, 3]
+    assert updated["round_count"] == 2
+    assert [row["round_number"] for row in updated["rounds"]] == [1, 2]
 
     added_round = updated["rounds"][-1]
     added_set_id = next(
@@ -849,7 +863,7 @@ def test_circuit_rounds_remain_mutable_after_run_starts_and_completes(
     db_session.expire_all()
     added_set = db_session.get(ActivitySet, added_set_id)
     added_instance = db_session.get(ActivityInstance, added_instance_id)
-    assert added_set.sort_order == 2
+    assert added_set.sort_order == 1
     assert added_set.status == "planned"
     assert added_instance.completed is False
     assert added_instance.time_start is None
@@ -865,7 +879,7 @@ def test_circuit_rounds_remain_mutable_after_run_starts_and_completes(
     )
     assert active_add_response.status_code == 201, active_add_response.get_json()
     active_updated = active_add_response.get_json()
-    assert active_updated["planned_rounds"] == 4
+    assert active_updated["round_count"] == 3
     active_added_round = active_updated["rounds"][-1]
     active_set_id = next(
         member["activity_set_id"] for member in active_added_round["members"] if member["activity_set_id"]
@@ -883,7 +897,7 @@ def test_circuit_rounds_remain_mutable_after_run_starts_and_completes(
         f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/rounds/{active_added_round['id']}",
     )
     assert active_delete_response.status_code == 200, active_delete_response.get_json()
-    assert active_delete_response.get_json()["planned_rounds"] == 3
+    assert active_delete_response.get_json()["round_count"] == 2
 
     completion = authed_client.post(
         f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/complete",
@@ -894,7 +908,7 @@ def test_circuit_rounds_remain_mutable_after_run_starts_and_completes(
     )
     assert completed_add_response.status_code == 201, completed_add_response.get_json()
     completed_updated = completed_add_response.get_json()
-    assert completed_updated["planned_rounds"] == 4
+    assert completed_updated["round_count"] == 3
     completed_added_round = completed_updated["rounds"][-1]
     completed_set_id = next(
         member["activity_set_id"]
@@ -914,7 +928,7 @@ def test_circuit_rounds_remain_mutable_after_run_starts_and_completes(
         f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/rounds/{completed_added_round['id']}",
     )
     assert completed_delete_response.status_code == 200, completed_delete_response.get_json()
-    assert completed_delete_response.get_json()["planned_rounds"] == 3
+    assert completed_delete_response.get_json()["round_count"] == 2
 
     session_completion = authed_client.put(
         f"/api/{sample_ultimate_goal.id}/sessions/{session.id}",
@@ -1122,7 +1136,6 @@ def test_circuit_definition_rejects_cross_fractal_activity(
     db_session.commit()
     response = authed_client.post(f"/api/{sample_ultimate_goal.id}/circuits", json={
         "name": "Invalid",
-        "planned_rounds": 1,
         "slots": [{"activity_definition_id": foreign_activity.id}],
     })
     assert response.status_code == 400
@@ -1219,7 +1232,7 @@ def test_template_snapshots_archived_circuit_in_typed_order(
     listed_items = listed_session["attributes"]["session_data"]["sections"][0]["items"]
     assert [item["type"] for item in listed_items] == ["activity", "circuit"]
     assert listed_items[1]["circuit"]["name"] == definition["name"]
-    assert len(listed_items[1]["circuit"]["rounds"]) == definition["planned_rounds"]
+    assert len(listed_items[1]["circuit"]["rounds"]) == 1
 
 
 def test_database_enforces_one_open_work_interval_per_session(
@@ -1249,21 +1262,10 @@ def test_database_enforces_circuit_shape_and_lifecycle_constraints(
     sample_ultimate_goal,
 ):
     session = _session(db_session, sample_ultimate_goal, test_user)
-    oversized_definition = CircuitDefinition(
-        root_id=sample_ultimate_goal.id,
-        name="Too many rounds",
-        planned_rounds=1001,
-    )
-    db_session.add(oversized_definition)
-    with pytest.raises(IntegrityError):
-        db_session.commit()
-    db_session.rollback()
-
     invalid_active_run = CircuitRun(
         root_id=sample_ultimate_goal.id,
         session_id=session.id,
         name="Invalid active circuit",
-        planned_rounds=1,
         status="active",
     )
     db_session.add(invalid_active_run)

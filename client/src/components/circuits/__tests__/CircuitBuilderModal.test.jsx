@@ -56,9 +56,9 @@ describe('CircuitBuilderModal', () => {
             />,
         );
 
-        const roundsField = screen.getByLabelText('Planned rounds');
         const groupField = screen.getByLabelText('Activity Group');
-        expect(roundsField.closest('label').parentElement).toBe(groupField.closest('label').parentElement);
+        expect(groupField).toBeInTheDocument();
+        expect(screen.queryByLabelText('Planned rounds')).not.toBeInTheDocument();
 
         fireEvent.change(screen.getByLabelText('Activity Group'), { target: { value: 'group-1' } });
         fireEvent.change(screen.getByText('Name').parentElement.querySelector('input'), { target: { value: 'Finisher' } });
@@ -67,5 +67,6 @@ describe('CircuitBuilderModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Save Circuit' }));
 
         await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ group_id: 'group-1' })));
+        expect(onSave.mock.calls[0][0]).not.toHaveProperty('planned_rounds');
     });
 });

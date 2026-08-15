@@ -31,7 +31,7 @@ const makeRun = (roundCount = 1) => ({
     id: 'run-1',
     name: 'Conditioning',
     status: 'active',
-    planned_rounds: roundCount,
+    round_count: roundCount,
     duration_seconds: 30,
     slots: [slot],
     rounds: Array.from({ length: roundCount }, (_, index) => makeRound(index + 1)),
@@ -39,6 +39,21 @@ const makeRun = (roundCount = 1) => ({
 
 describe('CircuitRunCard selection and scale behavior', () => {
     beforeEach(() => mutateAsync.mockReset());
+
+    it('uses singular round copy for the final hidden round', () => {
+        render(
+            <CircuitRunCard
+                rootId="root"
+                sessionId="session"
+                run={makeRun(11)}
+                itemNumber={1}
+                activityInstances={[]}
+            />,
+        );
+
+        expect(screen.getByRole('button', { name: 'Show 1 more round' })).toBeInTheDocument();
+        expect(screen.queryByText('Show 1 more rounds')).not.toBeInTheDocument();
+    });
 
     it.each([
         ['Enter'],

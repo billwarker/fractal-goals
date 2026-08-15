@@ -8,15 +8,14 @@ import RemoveButton from '../atoms/RemoveButton';
 import ActivitySelectorPanel from '../common/ActivitySelectorPanel';
 import { getGroupBreadcrumb, sortGroupsTreeOrder } from '../../utils/manageActivities';
 import CircuitActivityCard from './CircuitActivityCard';
-import { MAX_CIRCUIT_RESULTS, MAX_CIRCUIT_ROUNDS, MAX_CIRCUIT_SLOTS } from './circuitLimits';
+import { MAX_CIRCUIT_SLOTS } from './circuitLimits';
 import styles from './CircuitBuilderModal.module.css';
 
 
-const emptyDraft = { name: '', description: '', planned_rounds: 3, group_id: '', slots: [] };
+const emptyDraft = { name: '', description: '', group_id: '', slots: [] };
 const draftFromCircuit = (circuit) => circuit ? {
     name: circuit.name || '',
     description: circuit.description || '',
-    planned_rounds: circuit.planned_rounds || 1,
     group_id: circuit.group_id || '',
     version: circuit.version,
     slots: (circuit.slots || []).map((slot) => ({
@@ -60,7 +59,6 @@ export default function CircuitBuilderModal({ isOpen, onClose, circuit, isCopy =
     };
 
     const submit = async () => {
-        const roundCount = Number(draft.planned_rounds);
         if (!draft.name.trim()) {
             setError('Circuit name is required.');
             return;
@@ -69,20 +67,11 @@ export default function CircuitBuilderModal({ isOpen, onClose, circuit, isCopy =
             setError('Add at least one activity.');
             return;
         }
-        if (!Number.isInteger(roundCount) || roundCount < 1 || roundCount > MAX_CIRCUIT_ROUNDS) {
-            setError(`Planned rounds must be between 1 and ${MAX_CIRCUIT_ROUNDS}.`);
-            return;
-        }
-        if (roundCount * draft.slots.length > MAX_CIRCUIT_RESULTS) {
-            setError(`A circuit can generate at most ${MAX_CIRCUIT_RESULTS} round activities.`);
-            return;
-        }
         setError('');
         await onSave({
             ...draft,
             name: draft.name.trim(),
             description: draft.description.trim(),
-            planned_rounds: roundCount,
             group_id: draft.group_id || null,
             slots: draft.slots.map((slot) => ({
                 ...(slot.id ? { id: slot.id } : {}),
@@ -103,23 +92,17 @@ export default function CircuitBuilderModal({ isOpen, onClose, circuit, isCopy =
                         <span>Description</span>
                         <textarea value={draft.description} rows={3} onChange={(event) => setDraft({ ...draft, description: event.target.value })} />
                     </label>
-                    <div className={styles.settingsRow}>
-                        <label>
-                            <span>Planned rounds</span>
-                            <input type="number" min="1" max={MAX_CIRCUIT_ROUNDS} value={draft.planned_rounds} onChange={(event) => setDraft({ ...draft, planned_rounds: event.target.value })} />
-                        </label>
-                        <label>
-                            <span>Activity Group</span>
-                            <select value={draft.group_id} onChange={(event) => setDraft({ ...draft, group_id: event.target.value })}>
-                                <option value="">(No Group)</option>
-                                {sortGroupsTreeOrder(activityGroups || []).map((group) => (
-                                    <option key={group.id} value={group.id}>
-                                        {getGroupBreadcrumb(group.id, activityGroups)}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                    </div>
+                    <label>
+                        <span>Activity Group</span>
+                        <select value={draft.group_id} onChange={(event) => setDraft({ ...draft, group_id: event.target.value })}>
+                            <option value="">(No Group)</option>
+                            {sortGroupsTreeOrder(activityGroups || []).map((group) => (
+                                <option key={group.id} value={group.id}>
+                                    {getGroupBreadcrumb(group.id, activityGroups)}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
 
                     <div className={styles.slotHeader}>
                         <div>
