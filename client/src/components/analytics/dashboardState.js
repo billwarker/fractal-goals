@@ -23,7 +23,6 @@ export function getDefaultWindowState() {
         selectedCategory: null,
         selectedVisualization: null,
         selectedActivity: null,
-        selectedModeIds: [],
         selectedGoal: null,
         visualizationState: {},
         visualizationStateByKey: {},

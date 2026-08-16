@@ -135,6 +135,7 @@ describe('SessionActivityItem metric and timer editing', () => {
                 activityDefinition={{
                     id: 'activity-1',
                     name: 'Pull Up',
+                    tags: [{ id: 'available-tag', name: 'Available activity tag' }],
                     metric_definitions: [{ id: 'm1', name: 'Reps', unit: 'reps' }],
                     split_definitions: [],
                     has_sets: false,
@@ -148,6 +149,18 @@ describe('SessionActivityItem metric and timer editing', () => {
                 withTheme: false
             }
         );
+
+        const activityTags = screen.getByRole('group', { name: 'Activity tags' });
+        expect(activityTags.parentElement.nextElementSibling).toHaveTextContent('Start');
+        const addActivityTag = within(activityTags).getByRole('button', { name: 'Add tag' });
+        expect(addActivityTag).toBeEnabled();
+        expect(addActivityTag).toHaveTextContent('+Tag');
+        expect(within(activityTags).queryByText('Available activity tag')).not.toBeInTheDocument();
+
+        fireEvent.click(addActivityTag);
+        expect(within(activityTags).getByRole('dialog', { name: 'Choose activity tags' })).toBeInTheDocument();
+        expect(within(activityTags).getByText('Available activity tag')).toBeInTheDocument();
+        fireEvent.click(within(activityTags).getByRole('button', { name: 'Close tag picker' }));
 
         const input = screen.getByDisplayValue('5');
         fireEvent.change(input, { target: { value: '123' } });
@@ -1288,7 +1301,7 @@ describe('SessionActivityItem quick mode', () => {
         expect(screen.getByText('(last 185)')).toBeInTheDocument();
     });
 
-    it('hydrates persisted progress for completed activities after refresh', () => {
+    it('hydrates dynamic progress for completed activities after refresh', () => {
         useProgressComparison.mockReturnValue({
             progressComparison: {
                 is_first_instance: false,
@@ -1362,8 +1375,15 @@ describe('SessionActivityItem quick mode', () => {
                     session_id: 'session-1',
                     activity_definition_id: 'activity-1',
                     completed: true,
+                    tags: [{ id: 'parent-tag', name: 'Parent tag' }],
                     sets: [
-                        { instance_id: 'set-1', metrics: [{ metric_id: 'm1', value: '400' }] },
+                        {
+                            id: 'set-1',
+                            instance_id: 'set-1',
+                            tags: [{ id: 'set-tag', name: 'Set-specific tag' }],
+                            inherited_tags: [{ id: 'parent-tag', name: 'Parent tag' }],
+                            metrics: [{ metric_id: 'm1', value: '400' }],
+                        },
                         { instance_id: 'set-2', metrics: [{ metric_id: 'm1', value: '23' }] },
                     ],
                     time_start: '2026-04-10T17:38:58Z',
@@ -1376,6 +1396,11 @@ describe('SessionActivityItem quick mode', () => {
                     name: 'Bernth Pinky Control Exercise',
                     has_sets: true,
                     has_metrics: true,
+                    tags: [
+                        { id: 'parent-tag', name: 'Parent tag' },
+                        { id: 'set-tag', name: 'Set-specific tag' },
+                        { id: 'unused-tag', name: 'Available set tag' },
+                    ],
                     metric_definitions: [
                         {
                             id: 'm1',
@@ -1396,6 +1421,16 @@ describe('SessionActivityItem quick mode', () => {
         );
 
         expect(screen.getAllByText('(▲15%)')).toHaveLength(1);
+        const firstSetRow = screen.getByText('#1').parentElement;
+        const setTags = within(firstSetRow).getByRole('group', { name: 'Set tags' });
+        expect(setTags.parentElement.parentElement.nextElementSibling).toHaveAccessibleName('Remove set');
+        expect(within(setTags).getByText('Set-specific tag')).toBeInTheDocument();
+        expect(within(setTags).queryByText('Parent tag')).not.toBeInTheDocument();
+        expect(within(setTags).queryByText('Available set tag')).not.toBeInTheDocument();
+
+        fireEvent.click(within(setTags).getByRole('button', { name: 'Add tag' }));
+        expect(within(setTags).getByText('Available set tag')).toBeInTheDocument();
+        expect(within(setTags).queryByText('Parent tag')).not.toBeInTheDocument();
     });
 
     it('uses the lower-is-better best-set anchor when placing max hints across set rows', () => {

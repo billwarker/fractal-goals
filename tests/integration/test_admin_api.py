@@ -22,7 +22,6 @@ from models import (
     MetricDefinition,
     MetricValue,
     Note,
-    ProgressRecord,
     Program,
     Session,
     SessionTemplate,
@@ -447,7 +446,6 @@ def admin_landing_fractal(db_session, admin_user):
                     'selectedCategory': 'sessions',
                     'selectedVisualization': 'sessionTrends',
                     'selectedActivity': None,
-                    'selectedModeIds': [],
                     'selectedGoal': None,
                     'visualizationState': {'grain': 'week', 'metrics': ['sessions', 'duration']},
                     'visualizationStateByKey': {
@@ -895,29 +893,6 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
         metric_definition_id=hidden_metric.id,
         value=7,
     )
-    progress_record = ProgressRecord(
-        id=str(uuid.uuid4()),
-        root_id=root.id,
-        activity_definition_id=hidden_activity.id,
-        activity_instance_id=analytics_instance.id,
-        session_id=analytics_session.id,
-        is_first_instance=False,
-        has_change=True,
-        has_improvement=True,
-        has_regression=False,
-        comparison_type='flat_metrics',
-        metric_comparisons=[{
-            'metric_id': hidden_metric.id,
-            'metric_name': hidden_metric.name,
-            'previous_value': 6,
-            'current_value': 7,
-            'pct_change': 16.7,
-            'improved': True,
-            'regressed': False,
-        }],
-        derived_summary={},
-        created_at=datetime(2025, 12, 20, 9, 16),
-    )
     program = Program(
         id=str(uuid.uuid4()),
         root_id=root.id,
@@ -942,7 +917,6 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
                 'selectedCategory': 'activities',
                 'selectedVisualization': 'metricProgress',
                 'selectedActivity': {'id': hidden_activity.id, 'name': hidden_activity.name},
-                'selectedModeIds': [],
                 'selectedGoal': None,
                 'visualizationState': {'metric': hidden_metric.id},
                 'visualizationStateByKey': {
@@ -963,7 +937,6 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
         analytics_session,
         analytics_instance,
         hidden_metric_value,
-        progress_record,
         program,
         analytics_view,
     ])
@@ -998,7 +971,8 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
     analytics_instances = public_example['analytics_activity_instances'][hidden_activity.id]
     assert analytics_instances[0]['id'] == analytics_instance.id
     assert analytics_instances[0]['session_name'] == 'Analytics-only Session'
-    assert analytics_instances[0]['progress_comparison']['metric_comparisons'][0]['pct_change'] == 16.7
+    assert analytics_instances[0]['progress_comparison']['included'] is True
+    assert analytics_instances[0]['progress_comparison']['is_first_instance'] is True
 
 
 @pytest.mark.integration

@@ -16,6 +16,9 @@ from validators import (
     ActivityGoalsSetSchema,
     GoalAssociationBatchSchema, GroupReorderSchema,
     FractalMetricCreateSchema, FractalMetricUpdateSchema,
+    ActivityTagCreateSchema, ActivityTagUpdateSchema, ActivityTagAssignmentSchema,
+    ActivityProgressViewCreateSchema, ActivityProgressViewUpdateSchema,
+    ActivityProgressViewActivateSchema, ActivityProgressQuerySchema,
 )
 from blueprints.auth_api import token_required
 from blueprints.api_utils import get_db_session, parse_optional_pagination, require_owned_root, etag_json_response, internal_error
@@ -30,6 +33,7 @@ from services.activity_service import (
     ActivityService,
 )
 from services.progress_service import ProgressService
+from services.activity_progress_view_service import ActivityProgressViewService
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +95,213 @@ def _parse_activity_payload(schema_class):
             }),
             400,
         )
+
+
+def _service_response(payload, error, status):
+    if error:
+        body = {"error": error}
+        if payload is not None:
+            body["details"] = payload
+        return jsonify(body), status
+    return jsonify(payload), status
+
+
+# ============================================================================
+# ACTIVITY TAGS AND SAVED PROGRESS VIEWS
+# ============================================================================
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/tags', methods=['GET'])
+@token_required
+def list_activity_tags(current_user, root_id, activity_id):
+    session = get_db_session()
+    try:
+        include_archived = request.args.get('include_archived', 'true').lower() != 'false'
+        return _service_response(*ActivityProgressViewService(session).list_tags(
+            root_id, activity_id, current_user.id, include_archived=include_archived
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/tags', methods=['POST'])
+@token_required
+@validate_request(ActivityTagCreateSchema)
+def create_activity_tag(current_user, root_id, activity_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityProgressViewService(session).create_tag(
+            root_id, activity_id, current_user.id, validated_data
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/tags/<tag_id>', methods=['PUT'])
+@token_required
+@validate_request(ActivityTagUpdateSchema)
+def update_activity_tag(current_user, root_id, activity_id, tag_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityProgressViewService(session).update_tag(
+            root_id, activity_id, tag_id, current_user.id, validated_data
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/tags/<tag_id>', methods=['DELETE'])
+@token_required
+def archive_activity_tag(current_user, root_id, activity_id, tag_id):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityProgressViewService(session).archive_tag(
+            root_id, activity_id, tag_id, current_user.id
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activity-instances/<instance_id>/tags', methods=['PUT'])
+@token_required
+@validate_request(ActivityTagAssignmentSchema)
+def replace_activity_instance_tags(current_user, root_id, instance_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityProgressViewService(session).replace_instance_tags(
+            root_id, instance_id, current_user.id, validated_data['tag_ids']
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activity-sets/<set_id>/tags', methods=['PUT'])
+@token_required
+@validate_request(ActivityTagAssignmentSchema)
+def replace_activity_set_tags(current_user, root_id, set_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityProgressViewService(session).replace_set_tags(
+            root_id, set_id, current_user.id, validated_data['tag_ids']
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/progress-views', methods=['GET'])
+@token_required
+def list_activity_progress_views(current_user, root_id, activity_id):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityProgressViewService(session).list_views(
+            root_id, activity_id, current_user.id
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/progress-views', methods=['POST'])
+@token_required
+@validate_request(ActivityProgressViewCreateSchema)
+def create_activity_progress_view(current_user, root_id, activity_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityProgressViewService(session).create_view(
+            root_id, activity_id, current_user.id, validated_data
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/progress-views/<view_id>', methods=['PUT'])
+@token_required
+@validate_request(ActivityProgressViewUpdateSchema)
+def update_activity_progress_view(current_user, root_id, activity_id, view_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityProgressViewService(session).update_view(
+            root_id, activity_id, view_id, current_user.id, validated_data
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/progress-views/<view_id>', methods=['DELETE'])
+@token_required
+def delete_activity_progress_view(current_user, root_id, activity_id, view_id):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityProgressViewService(session).delete_view(
+            root_id, activity_id, view_id, current_user.id
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/active-progress-view', methods=['PUT'])
+@token_required
+@validate_request(ActivityProgressViewActivateSchema)
+def activate_activity_progress_view(current_user, root_id, activity_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityProgressViewService(session).activate_view(
+            root_id, activity_id, current_user.id, validated_data.get('view_id')
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/progress-timeline', methods=['GET'])
+@token_required
+def get_activity_progress_timeline(current_user, root_id, activity_id):
+    session = get_db_session()
+    try:
+        if not require_owned_root(session, root_id, current_user.id):
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+        if not get_owned_activity_definition(session, root_id, activity_id):
+            return jsonify({"error": "Activity not found"}), 404
+        limit = min(max(request.args.get('limit', 20, type=int), 1), 100)
+        offset = max(request.args.get('offset', 0, type=int), 0)
+        try:
+            payload = ProgressService(session).get_progress_timeline(
+                activity_id,
+                root_id,
+                limit=limit,
+                offset=offset,
+                exclude_session_id=request.args.get('exclude_session_id'),
+                view_id=request.args.get('view_id') or None,
+            )
+        except ValueError as error:
+            return jsonify({"error": str(error)}), 400
+        return jsonify(payload)
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/progress-query', methods=['POST'])
+@token_required
+@validate_request(ActivityProgressQuerySchema)
+def query_activity_progress(current_user, root_id, activity_id, validated_data):
+    session = get_db_session()
+    try:
+        if not require_owned_root(session, root_id, current_user.id):
+            return jsonify({"error": "Fractal not found or access denied"}), 404
+        if not get_owned_activity_definition(session, root_id, activity_id):
+            return jsonify({"error": "Activity not found"}), 404
+        try:
+            payload = ProgressService(session).get_progress_timeline(
+                activity_id,
+                root_id,
+                limit=validated_data['limit'],
+                offset=validated_data['offset'],
+                exclude_session_id=validated_data.get('exclude_session_id'),
+                view_id=validated_data.get('view_id'),
+                config=validated_data.get('config'),
+            )
+        except ValueError as error:
+            return jsonify({"error": str(error)}), 400
+        return jsonify(payload)
+    finally:
+        session.close()
 
 # ============================================================================
 # ============================================================================
@@ -306,6 +517,7 @@ def get_activities(current_user, root_id):
             selectinload(ActivityDefinition.metric_definitions).selectinload(MetricDefinition.fractal_metric),
             selectinload(ActivityDefinition.split_definitions),
             selectinload(ActivityDefinition.associated_goals),
+            selectinload(ActivityDefinition.tags),
         ).filter_by(root_id=root_id).filter(
             ActivityDefinition.deleted_at.is_(None)
         ).order_by(ActivityDefinition.name)
@@ -615,33 +827,6 @@ def get_activity_progress_history(current_user, root_id, activity_def_id):
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error getting activity progress history")
-        return internal_error(logger, "Activity API request failed")
-    finally:
-        session.close()
-
-
-@activities_bp.route('/<root_id>/progress/recompute-all', methods=['POST'])
-@token_required
-def recompute_all_progress(current_user, root_id):
-    """Bulk recompute all progress records for a root goal.
-
-    Deletes and rebuilds ProgressRecords for every activity definition
-    in the root. Returns the count of activity definitions processed.
-    """
-    session = get_db_session()
-    try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({'error': 'Root goal not found'}), 404
-
-        service = ProgressService(session)
-        result = service.recompute_progress_for_root(root_id)
-        session.commit()
-        return jsonify(result), 200
-
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error during bulk progress recompute")
         return internal_error(logger, "Activity API request failed")
     finally:
         session.close()

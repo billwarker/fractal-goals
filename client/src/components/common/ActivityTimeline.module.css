@@ -13,6 +13,11 @@
     border: 1px solid var(--color-border);
 }
 
+.timelineCardExcluded {
+    opacity: .55;
+    border-style: dashed;
+}
+
 .timelineCardGoalTimeline {
     min-width: 0;
 }

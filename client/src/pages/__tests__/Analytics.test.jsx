@@ -140,7 +140,6 @@ describe('Analytics page', () => {
                         selectedActivity: null,
                         selectedCategory: null,
                         selectedGoal: null,
-                        selectedModeIds: [],
                         selectedVisualization: null,
                         visualizationState: {},
                         visualizationStateByKey: {},

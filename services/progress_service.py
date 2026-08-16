@@ -1,42 +1,93 @@
 """
 Progress Service
 
-Computes and persists progress comparisons for activity instances.
+Computes progress comparisons on demand from canonical activity data.
 Compares a completed activity instance against the most recent prior
 completed instance of the same activity from a different session.
 """
 
 import logging
+import json
 from typing import Optional
 
-from models import ActivityInstance, ActivityDefinition, MetricDefinition, ProgressRecord, Session, Goal
+from sqlalchemy import func
+from sqlalchemy.orm import joinedload, selectinload
+
+from models import (
+    ActivityDefinition,
+    ActivityInstance,
+    ActivityProgressView,
+    ActivitySet,
+    ActivityTag,
+    Goal,
+    MetricDefinition,
+    Note,
+    Session,
+)
 from services.activity_instance_data import load_instance_sets, resolve_metric_id
+from services.activity_progress_view_service import (
+    ActivityProgressViewService,
+    EMPTY_PROGRESS_VIEW_CONFIG,
+    normalize_progress_view_config,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def serialize_progress_record(record: ProgressRecord) -> dict:
-    """Serialize a ProgressRecord to a JSON-safe dict."""
-    return {
-        'id': record.id,
-        'activity_instance_id': record.activity_instance_id,
-        'activity_definition_id': record.activity_definition_id,
-        'session_id': record.session_id,
-        'previous_instance_id': record.previous_instance_id,
-        'is_first_instance': record.is_first_instance,
-        'has_change': record.has_change,
-        'has_improvement': record.has_improvement,
-        'has_regression': record.has_regression,
-        'comparison_type': record.comparison_type,
-        'metric_comparisons': record.metric_comparisons,
-        'derived_summary': record.derived_summary,
-        'created_at': record.created_at.isoformat() if record.created_at else None,
-    }
 
 
 class ProgressService:
     def __init__(self, db_session):
         self.db = db_session
+        self._calculation_config = dict(EMPTY_PROGRESS_VIEW_CONFIG)
+        self._comparison_cache = {}
+        self._root_settings_cache = {}
+
+    @staticmethod
+    def _matches_tag_config(tag_ids, config) -> bool:
+        present = set(tag_ids or [])
+        required = set(config.get('all_tag_ids') or [])
+        alternatives = set(config.get('any_tag_ids') or [])
+        excluded = set(config.get('none_tag_ids') or [])
+        return required.issubset(present) and (not alternatives or bool(present & alternatives)) and not bool(present & excluded)
+
+    @staticmethod
+    def _instance_tag_ids(instance) -> set[str]:
+        return {tag.id for tag in (getattr(instance, 'tags', None) or [])}
+
+    def _sets_for_instance(self, instance: ActivityInstance) -> list:
+        serialized = [
+            {**payload, '_progress_set_index': index}
+            for index, payload in enumerate(load_instance_sets(instance))
+        ]
+        config = self._calculation_config
+        if not any(config.get(key) for key in ('all_tag_ids', 'any_tag_ids', 'none_tag_ids')):
+            return serialized
+        inherited = self._instance_tag_ids(instance)
+        rows = list(getattr(instance, 'sets', None) or [])
+        filtered = []
+        for index, payload in enumerate(serialized):
+            row = rows[index] if index < len(rows) else None
+            direct = {tag.id for tag in (getattr(row, 'tags', None) or [])}
+            if self._matches_tag_config(inherited | direct, config):
+                filtered.append(payload)
+        return filtered
+
+    def _instance_included(self, instance: ActivityInstance) -> bool:
+        config = self._calculation_config
+        if not any(config.get(key) for key in ('all_tag_ids', 'any_tag_ids', 'none_tag_ids')):
+            return True
+        if getattr(instance.definition, 'has_sets', False) or getattr(instance, 'sets', None):
+            return bool(self._sets_for_instance(instance))
+        return self._matches_tag_config(self._instance_tag_ids(instance), config)
+
+    def _resolve_calculation_config(self, instance, *, view_id=None, config=None):
+        if config is not None:
+            normalized, error = ActivityProgressViewService(self.db)._validate_config_tags(instance.definition, config)
+        else:
+            normalized, error = ActivityProgressViewService(self.db).resolve_config(
+                instance.definition,
+                view_id=view_id,
+            )
+        return normalized, error
 
     @staticmethod
     def _coerce_numeric(value) -> Optional[float]:
@@ -57,77 +108,19 @@ class ProgressService:
         return (
             self.db.query(ActivityInstance)
             .join(Session, ActivityInstance.session_id == Session.id)
+            .options(
+                joinedload(ActivityInstance.definition).selectinload(ActivityDefinition.metric_definitions),
+                joinedload(ActivityInstance.session).joinedload(Session.template),
+                selectinload(ActivityInstance.tags),
+                selectinload(ActivityInstance.metric_values),
+                selectinload(ActivityInstance.sets).selectinload(ActivitySet.tags),
+                selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values),
+            )
             .filter(
                 ActivityInstance.deleted_at == None,
                 Session.deleted_at == None,
             )
         )
-
-    def _previous_instance_query(
-        self,
-        activity_definition_id: str,
-        root_id: str,
-        exclude_session_id: str,
-        before_created_at,
-    ):
-        return (
-            self._active_instances_query()
-            .filter(
-                ActivityInstance.activity_definition_id == activity_definition_id,
-                ActivityInstance.root_id == root_id,
-                ActivityInstance.session_id != exclude_session_id,
-                ActivityInstance.created_at < before_created_at,
-            )
-            .order_by(ActivityInstance.created_at.desc())
-        )
-
-    def get_previous_instance(
-        self,
-        current_instance: ActivityInstance,
-    ) -> Optional[ActivityInstance]:
-        """Find the most recent comparable ActivityInstance from a different session.
-
-        Prefer completed instances for persisted comparisons, but fall back to the
-        latest prior session instance with data so live hints can still show when
-        historical sessions were not explicitly completed.
-        """
-        completed_instance = (
-            self._previous_instance_query(
-                current_instance.activity_definition_id,
-                current_instance.root_id,
-                current_instance.session_id,
-                current_instance.created_at,
-            )
-            .filter(ActivityInstance.completed == True)
-            .first()
-        )
-        if completed_instance:
-            return completed_instance
-
-        return (
-            self._previous_instance_query(
-                current_instance.activity_definition_id,
-                current_instance.root_id,
-                current_instance.session_id,
-                current_instance.created_at,
-            )
-            .first()
-        )
-
-    def _get_progress_record(self, activity_instance_id: str) -> Optional[ProgressRecord]:
-        return (
-            self.db.query(ProgressRecord)
-            .filter_by(activity_instance_id=activity_instance_id)
-            .first()
-        )
-
-    def _ensure_progress_record(self, instance: ActivityInstance) -> Optional[ProgressRecord]:
-        existing = self._get_progress_record(instance.id)
-        if existing:
-            return existing
-        if not instance.completed:
-            return None
-        return self.compute_final_progress(instance.id)
 
     def _get_active_instance(self, activity_instance_id: str) -> Optional[ActivityInstance]:
         return (
@@ -138,10 +131,15 @@ class ProgressService:
 
     def _get_root_progress_settings(self, root_id: str) -> dict:
         """Return progress_settings dict for the root goal, or {} if not set."""
+        if root_id in self._root_settings_cache:
+            return self._root_settings_cache[root_id]
         root = self.db.query(Goal).filter_by(id=root_id).first()
         if root and root.progress_settings and isinstance(root.progress_settings, dict):
-            return root.progress_settings
-        return {}
+            settings = root.progress_settings
+        else:
+            settings = {}
+        self._root_settings_cache[root_id] = settings
+        return settings
 
     def _is_progress_enabled(self, root_id: str) -> bool:
         """Return False only if progress_settings.enabled is explicitly False."""
@@ -219,7 +217,7 @@ class ProgressService:
         If no metric is flagged, falls back to the first metric in the list.
         If no sets exist, returns None.
         """
-        sets = load_instance_sets(instance)
+        sets = self._sets_for_instance(instance)
         if not sets:
             return None
 
@@ -286,10 +284,12 @@ class ProgressService:
         pct_change = (delta / previous_value * 100) if previous_value != 0 else None
         improved = (delta > 0 and higher_is_better) or (delta < 0 and not higher_is_better)
         regressed = (delta < 0 and higher_is_better) or (delta > 0 and not higher_is_better)
+        current_sets = self._sets_for_instance(current_instance)
+        previous_sets = self._sets_for_instance(previous_instance)
         return [{
-            'set_index': current_best_index,
+            'set_index': current_sets[current_best_index]['_progress_set_index'],
             'comparison_basis': 'best_set',
-            'previous_set_index': previous_best_index,
+            'previous_set_index': previous_sets[previous_best_index]['_progress_set_index'],
             'current_value': current_value,
             'previous_value': previous_value,
             'delta': delta,
@@ -304,7 +304,7 @@ class ProgressService:
         metric_def: MetricDefinition,
     ) -> list:
         """Return a list of (set_index, numeric_value) for each set that has this metric."""
-        sets = load_instance_sets(instance)
+        sets = self._sets_for_instance(instance)
         result = []
         for set_index, s in enumerate(sets):
             for m in s.get('metrics', []):
@@ -312,7 +312,7 @@ class ProgressService:
                 if mid == metric_def.id:
                     v = self._coerce_numeric(m.get('value'))
                     if v is not None:
-                        result.append((set_index, v))
+                        result.append((s.get('_progress_set_index', set_index), v))
         return result
 
     def _build_set_comparisons(
@@ -383,7 +383,7 @@ class ProgressService:
         'yield' is handled separately via _resolve_yield.
         Returns None if no data is available.
         """
-        sets = load_instance_sets(instance)
+        sets = self._sets_for_instance(instance)
 
         if aggregation == 'last':
             # For set-based activities always read from sets so the value
@@ -465,7 +465,7 @@ class ProgressService:
           - best_set_yield: yield value of the best set (None if not multiplicative)
           - best_set_values: {metric_id: value} for all metrics in the best set
         """
-        sets = load_instance_sets(instance)
+        sets = self._sets_for_instance(instance)
 
         result = {
             'additive_totals': {},
@@ -524,7 +524,10 @@ class ProgressService:
                         break
                     product *= val
                 if set_complete:
-                    yield_per_set.append({'set_index': set_index, 'yield': product})
+                    yield_per_set.append({
+                        'set_index': s.get('_progress_set_index', set_index),
+                        'yield': product,
+                    })
                     total_yield += product
                     has_any_yield = True
             if has_any_yield:
@@ -552,7 +555,9 @@ class ProgressService:
             anchor = next((md for md in metric_defs if md.is_best_set_metric), None)
 
             if anchor is not None:
-                result['best_set_index'] = self._find_best_set_index(instance, metric_defs)
+                best_position = self._find_best_set_index(instance, metric_defs)
+                if best_position is not None:
+                    result['best_set_index'] = sets[best_position].get('_progress_set_index', best_position)
             elif has_yield and result['yield_per_set']:
                 # Best set = highest yield set
                 best = max(result['yield_per_set'], key=lambda x: x['yield'])
@@ -561,12 +566,19 @@ class ProgressService:
                 result['best_set_yield'] = best['yield']
             elif metric_defs:
                 # Single/non-multiplicative: best by first metric's higher_is_better
-                primary = metric_defs[0]
-                result['best_set_index'] = self._find_best_set_index(instance, metric_defs)
+                best_position = self._find_best_set_index(instance, metric_defs)
+                if best_position is not None:
+                    result['best_set_index'] = sets[best_position].get('_progress_set_index', best_position)
 
             # Populate best_set_values
-            if result['best_set_index'] is not None and result['best_set_index'] < len(sets):
-                best_s = sets[result['best_set_index']]
+            best_s = next(
+                (
+                    row for position, row in enumerate(sets)
+                    if row.get('_progress_set_index', position) == result['best_set_index']
+                ),
+                None,
+            )
+            if best_s is not None:
                 for m in best_s.get('metrics', []):
                     mid = resolve_metric_id(m)
                     v = self._coerce_numeric(m.get('value'))
@@ -609,7 +621,7 @@ class ProgressService:
         mult_defs = metric_defs
         used_ids = [md.id for md in mult_defs]
 
-        sets = load_instance_sets(instance)
+        sets = self._sets_for_instance(instance)
 
         if sets:
             # Per-set multiplication then sum across sets.
@@ -701,7 +713,7 @@ class ProgressService:
         has_regression = False
         has_change = False
 
-        curr_sets = load_instance_sets(current_instance)
+        curr_sets = self._sets_for_instance(current_instance)
         has_sets = bool(curr_sets)
 
         # Yield is derived only when every tracked metric is multiplicative.
@@ -899,11 +911,160 @@ class ProgressService:
     # Public API
     # ------------------------------------------------------------------
 
-    def compute_live_comparison(self, activity_instance_id: str) -> Optional[dict]:
+    def _comparison_payload(self, instance, activity_def, previous, *, view_id, config):
+        self._calculation_config = config
+        if not self._instance_included(instance):
+            return {
+                'activity_instance_id': instance.id,
+                'activity_definition_id': instance.activity_definition_id,
+                'session_id': instance.session_id,
+                'previous_instance_id': None,
+                'included': False,
+                'is_first_instance': False,
+                'has_change': False,
+                'has_improvement': False,
+                'has_regression': False,
+                'comparison_type': 'excluded',
+                'metric_comparisons': [],
+                'derived_summary': {'summary_line': 'Excluded from current progress view'},
+                'progress_view_id': view_id,
+                'progress_view_config': config,
+            }
+
+        metric_defs = [
+            metric for metric in activity_def.metric_definitions
+            if metric.deleted_at is None and metric.is_active
+        ]
+        comparison = self._build_comparison(
+            instance,
+            previous,
+            metric_defs,
+            activity_def,
+            self._get_root_progress_settings(instance.root_id),
+        )
+        metric_comparisons, derived_summary, improved, regressed, changed, comparison_type = comparison
+        return {
+            'activity_instance_id': instance.id,
+            'activity_definition_id': instance.activity_definition_id,
+            'session_id': instance.session_id,
+            'previous_instance_id': previous.id if previous else None,
+            'included': True,
+            'is_first_instance': previous is None,
+            'has_change': changed,
+            'has_improvement': improved,
+            'has_regression': regressed,
+            'comparison_type': comparison_type,
+            'metric_comparisons': metric_comparisons,
+            'derived_summary': derived_summary,
+            'progress_view_id': view_id,
+            'progress_view_config': config,
+        }
+
+    def _build_activity_comparison_map(self, activity_def, config, view_id, instances):
+        signature = json.dumps(config, sort_keys=True, separators=(',', ':'))
+        cache_key = (activity_def.id, view_id, signature)
+        if cache_key in self._comparison_cache:
+            return self._comparison_cache[cache_key]
+        included = []
+        results = {}
+        self._calculation_config = config
+        for instance in instances:
+            if not self._instance_included(instance):
+                results[instance.id] = self._comparison_payload(
+                    instance, activity_def, None, view_id=view_id, config=config,
+                )
+                continue
+            eligible = [row for row in included if row.session_id != instance.session_id]
+            previous = next((row for row in reversed(eligible) if row.completed), None)
+            if previous is None and eligible:
+                previous = eligible[-1]
+            results[instance.id] = self._comparison_payload(
+                instance, activity_def, previous, view_id=view_id, config=config,
+            )
+            included.append(instance)
+        self._comparison_cache[cache_key] = results
+        return results
+
+    def _activity_comparison_map(self, activity_def, config, view_id):
+        """Build an activity's comparison chain once, in canonical time order."""
+        effective_time = func.coalesce(
+            ActivityInstance.time_stop,
+            Session.session_start,
+            ActivityInstance.created_at,
+        )
+        instances = (
+            self._active_instances_query()
+            .filter(
+                ActivityInstance.activity_definition_id == activity_def.id,
+                ActivityInstance.root_id == activity_def.root_id,
+            )
+            .order_by(effective_time.asc(), ActivityInstance.id.asc())
+            .all()
+        )
+        return self._build_activity_comparison_map(activity_def, config, view_id, instances)
+
+    def compute_comparisons_for_instances(self, instances) -> dict:
+        """Batch active-view comparisons for session and analytics read models."""
+        targets = [instance for instance in instances if instance and instance.deleted_at is None]
+        if not targets:
+            return {}
+        activities = {instance.definition.id: instance.definition for instance in targets if instance.definition}
+        active_ids = {
+            activity.active_progress_view_id
+            for activity in activities.values()
+            if activity.active_progress_view_id
+        }
+        active_views = {}
+        if active_ids:
+            active_views = {
+                view.id: view
+                for view in self.db.query(ActivityProgressView).filter(
+                    ActivityProgressView.id.in_(active_ids),
+                    ActivityProgressView.deleted_at.is_(None),
+                ).all()
+            }
+        enabled_roots = {
+            root_id: self._is_progress_enabled(root_id)
+            for root_id in {activity.root_id for activity in activities.values()}
+        }
+        effective_time = func.coalesce(
+            ActivityInstance.time_stop,
+            Session.session_start,
+            ActivityInstance.created_at,
+        )
+        histories = (
+            self._active_instances_query()
+            .filter(
+                ActivityInstance.activity_definition_id.in_(activities),
+                ActivityInstance.root_id.in_({activity.root_id for activity in activities.values()}),
+            )
+            .order_by(ActivityInstance.activity_definition_id, effective_time.asc(), ActivityInstance.id.asc())
+            .all()
+        )
+        histories_by_activity = {}
+        for instance in histories:
+            histories_by_activity.setdefault(instance.activity_definition_id, []).append(instance)
+
+        results = {}
+        for activity in activities.values():
+            if not enabled_roots.get(activity.root_id, True):
+                continue
+            view = active_views.get(activity.active_progress_view_id)
+            config = normalize_progress_view_config(view.config if view else EMPTY_PROGRESS_VIEW_CONFIG)
+            comparison_map = self._build_activity_comparison_map(
+                activity,
+                config,
+                view.id if view else None,
+                histories_by_activity.get(activity.id, []),
+            )
+            results.update(comparison_map)
+        return {instance.id: results.get(instance.id) for instance in targets}
+
+    def compute_live_comparison(self, activity_instance_id: str, *, view_id=None, config=None) -> Optional[dict]:
         """Compute a progress comparison without persisting it.
 
-        Returns a dict with the same shape as a ProgressRecord payload,
-        or None if the instance is not found or progress is disabled.
+        Returns a comparison payload, or ``None`` when the instance is missing
+        or progress is disabled for its fractal.
         """
         instance = self._get_active_instance(activity_instance_id)
         if not instance:
@@ -918,188 +1079,20 @@ class ProgressService:
         if not activity_def:
             return None
 
-        metric_defs = [
-            md for md in activity_def.metric_definitions
-            if md.deleted_at is None and md.is_active
-        ]
-
-        root_progress_settings = self._get_root_progress_settings(instance.root_id)
-        previous = self.get_previous_instance(instance)
-
-        is_first_instance = previous is None
-
-        metric_comparisons, derived_summary, has_improvement, has_regression, has_change, comparison_type = (
-            self._build_comparison(instance, previous, metric_defs, activity_def, root_progress_settings)
+        resolved_config, config_error = self._resolve_calculation_config(
+            instance,
+            view_id=view_id,
+            config=config,
         )
-
-        return {
-            'activity_instance_id': activity_instance_id,
-            'activity_definition_id': instance.activity_definition_id,
-            'session_id': instance.session_id,
-            'previous_instance_id': previous.id if previous else None,
-            'is_first_instance': is_first_instance,
-            'has_change': has_change,
-            'has_improvement': has_improvement,
-            'has_regression': has_regression,
-            'comparison_type': comparison_type,
-            'metric_comparisons': metric_comparisons,
-            'derived_summary': derived_summary,
-        }
+        if config_error:
+            return None
+        normalized = normalize_progress_view_config(resolved_config)
+        selected_view_id = view_id if view_id is not None else activity_def.active_progress_view_id
+        return self._activity_comparison_map(activity_def, normalized, selected_view_id).get(instance.id)
 
     def get_progress_for_instance(self, activity_instance_id: str) -> Optional[dict]:
-        """Return persisted progress when available, else compute a live comparison."""
-        existing = self._get_progress_record(activity_instance_id)
-        if existing:
-            return serialize_progress_record(existing)
+        """Calculate progress from canonical activity data and the active saved view."""
         return self.compute_live_comparison(activity_instance_id)
-
-    def recompute_progress_for_instance(self, activity_instance_id: str) -> Optional[ProgressRecord]:
-        """Replace any persisted ProgressRecord for this instance with a fresh computation."""
-        existing = self._get_progress_record(activity_instance_id)
-        if existing is not None:
-            self.db.delete(existing)
-            self.db.flush()
-        return self.compute_final_progress(activity_instance_id)
-
-    def compute_final_progress(self, activity_instance_id: str) -> Optional[ProgressRecord]:
-        """Compute and persist a ProgressRecord. Idempotent.
-
-        If a record already exists for this activity_instance_id, return it
-        without recomputing. Returns the ProgressRecord or None.
-        """
-        existing = self._get_progress_record(activity_instance_id)
-        if existing:
-            return existing
-
-        instance = self._get_active_instance(activity_instance_id)
-        if not instance or not instance.completed:
-            return None
-
-        if not self._is_progress_enabled(instance.root_id):
-            return None
-
-        activity_def = self.db.query(ActivityDefinition).filter_by(
-            id=instance.activity_definition_id
-        ).first()
-        if not activity_def:
-            return None
-
-        metric_defs = [
-            md for md in activity_def.metric_definitions
-            if md.deleted_at is None and md.is_active
-        ]
-
-        root_progress_settings = self._get_root_progress_settings(instance.root_id)
-        previous = self.get_previous_instance(instance)
-
-        is_first_instance = previous is None
-
-        metric_comparisons, derived_summary, has_improvement, has_regression, has_change, comparison_type = (
-            self._build_comparison(instance, previous, metric_defs, activity_def, root_progress_settings)
-        )
-
-        record = ProgressRecord(
-            root_id=instance.root_id,
-            activity_definition_id=instance.activity_definition_id,
-            activity_instance_id=activity_instance_id,
-            session_id=instance.session_id,
-            previous_instance_id=previous.id if previous else None,
-            is_first_instance=is_first_instance,
-            has_change=has_change,
-            has_improvement=has_improvement,
-            has_regression=has_regression,
-            comparison_type=comparison_type,
-            metric_comparisons=metric_comparisons,
-            derived_summary=derived_summary,
-        )
-        self.db.add(record)
-        try:
-            self.db.flush()
-        except Exception:
-            logger.exception("Error persisting ProgressRecord for instance %s", activity_instance_id)
-            self.db.rollback()
-            return None
-
-        return record
-
-    def compute_progress_for_session(self, session_id: str) -> None:
-        """Compute and persist ProgressRecords for every completed activity instance in the session."""
-        instances = (
-            self._active_instances_query()
-            .filter(
-                ActivityInstance.session_id == session_id,
-                ActivityInstance.completed == True,
-            )
-            .all()
-        )
-        for instance in instances:
-            try:
-                self.compute_final_progress(instance.id)
-            except Exception:
-                logger.exception(
-                    "Error computing progress for instance %s in session %s",
-                    instance.id,
-                    session_id,
-                )
-
-    def recompute_progress_for_activity(self, activity_definition_id: str, root_id: str) -> None:
-        """Rebuild the full persisted progress timeline for one activity definition."""
-        self.db.query(ProgressRecord).filter(
-            ProgressRecord.activity_definition_id == activity_definition_id,
-            ProgressRecord.root_id == root_id,
-        ).delete(synchronize_session=False)
-        self.db.flush()
-
-        instances = (
-            self._active_instances_query()
-            .filter(
-                ActivityInstance.activity_definition_id == activity_definition_id,
-                ActivityInstance.root_id == root_id,
-                ActivityInstance.completed == True,
-            )
-            .order_by(ActivityInstance.created_at.asc())
-            .all()
-        )
-        for instance in instances:
-            self.compute_final_progress(instance.id)
-
-    def recompute_progress_for_root(self, root_id: str) -> dict:
-        """Rebuild progress records for every active activity definition in a root."""
-        activity_defs = (
-            self.db.query(ActivityDefinition)
-            .filter(
-                ActivityDefinition.root_id == root_id,
-                ActivityDefinition.deleted_at == None,
-            )
-            .all()
-        )
-
-        recomputed = 0
-        failures = []
-        for activity_def in activity_defs:
-            savepoint = self.db.begin_nested()
-            try:
-                self.recompute_progress_for_activity(activity_def.id, root_id)
-                savepoint.commit()
-                recomputed += 1
-            except Exception as exc:
-                savepoint.rollback()
-                logger.exception(
-                    "Error recomputing progress for activity %s in root %s",
-                    activity_def.id,
-                    root_id,
-                )
-                failures.append({
-                    'activity_definition_id': activity_def.id,
-                    'activity_name': activity_def.name,
-                    'error': str(exc),
-                })
-
-        return {
-            'recomputed': recomputed,
-            'failed': failures,
-            'total': len(activity_defs),
-        }
 
     def get_progress_history(
         self,
@@ -1108,6 +1101,8 @@ class ProgressService:
         limit: int = 20,
         offset: int = 0,
         exclude_session_id: str | None = None,
+        view_id: str | None = None,
+        config: dict | None = None,
     ) -> list:
         """Return paginated progress history aligned to activity history cards."""
         query = self._active_instances_query().filter(
@@ -1119,7 +1114,10 @@ class ProgressService:
 
         instances = (
             query
-            .order_by(ActivityInstance.created_at.desc())
+            .order_by(
+                func.coalesce(ActivityInstance.time_stop, Session.session_start, ActivityInstance.created_at).desc(),
+                ActivityInstance.id.desc(),
+            )
             .offset(offset)
             .limit(limit)
             .all()
@@ -1127,34 +1125,116 @@ class ProgressService:
 
         records = []
         for instance in instances:
-            if instance.completed:
-                record = self._ensure_progress_record(instance)
-            else:
-                record = self.compute_live_comparison(instance.id)
+            record = self.compute_live_comparison(instance.id, view_id=view_id, config=config)
             if record:
                 records.append(record)
 
-        return [
-            serialize_progress_record(r) if isinstance(r, ProgressRecord) else r
-            for r in records
-        ]
+        return records
+
+    def get_progress_timeline(
+        self,
+        activity_definition_id: str,
+        root_id: str,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        exclude_session_id: str | None = None,
+        view_id: str | None = None,
+        config: dict | None = None,
+    ) -> dict:
+        from services.activity_progress_view_service import serialize_activity_tag, serialize_progress_view
+        from services.view_serializers import serialize_activity_history_entry
+
+        activity = self.db.query(ActivityDefinition).filter(
+            ActivityDefinition.id == activity_definition_id,
+            ActivityDefinition.root_id == root_id,
+            ActivityDefinition.deleted_at.is_(None),
+        ).first()
+        if not activity:
+            return {"items": [], "total": 0}
+
+        if config is not None:
+            resolved_config, config_error = ActivityProgressViewService(self.db)._validate_config_tags(activity, config)
+        else:
+            resolved_config, config_error = ActivityProgressViewService(self.db).resolve_config(
+                activity,
+                view_id=view_id,
+            )
+        if config_error:
+            raise ValueError(config_error)
+        normalized_config = normalize_progress_view_config(resolved_config)
+        selected_view_id = view_id if view_id is not None else activity.active_progress_view_id
+        comparison_map = self._activity_comparison_map(activity, normalized_config, selected_view_id)
+
+        query = self._active_instances_query().filter(
+            ActivityInstance.activity_definition_id == activity.id,
+            ActivityInstance.root_id == root_id,
+        )
+        if exclude_session_id:
+            query = query.filter(ActivityInstance.session_id != exclude_session_id)
+        effective_time = func.coalesce(ActivityInstance.time_stop, Session.session_start, ActivityInstance.created_at)
+        all_instances = query.order_by(effective_time.desc(), ActivityInstance.id.desc()).all()
+        total = len(all_instances)
+        included_count = sum(
+            1 for instance in all_instances
+            if comparison_map.get(instance.id, {}).get("included", True)
+        )
+        instances = all_instances[offset:offset + limit]
+        notes = []
+        instance_ids = [instance.id for instance in instances]
+        if instance_ids:
+            notes = self.db.query(Note).filter(
+                Note.activity_instance_id.in_(instance_ids),
+                Note.deleted_at.is_(None),
+            ).order_by(Note.pinned_at.desc().nullslast(), Note.created_at.desc()).all()
+        notes_by_instance = {}
+        for note in notes:
+            notes_by_instance.setdefault(note.activity_instance_id, []).append(note)
+        items = []
+        for instance in instances:
+            comparison = comparison_map.get(instance.id)
+            payload = serialize_activity_history_entry(instance, notes_by_instance.get(instance.id, []))
+            payload["progress_comparison"] = comparison
+            payload["included"] = comparison is not None and comparison.get("included", True)
+            items.append(payload)
+
+        tags = self.db.query(ActivityTag).filter(
+            ActivityTag.activity_definition_id == activity.id,
+        ).order_by(ActivityTag.deleted_at.asc(), ActivityTag.sort_order, ActivityTag.name).all()
+        views = self.db.query(ActivityProgressView).filter(
+            ActivityProgressView.activity_definition_id == activity.id,
+            ActivityProgressView.deleted_at.is_(None),
+        ).order_by(ActivityProgressView.updated_at.desc()).all()
+        return {
+            "activity_definition_id": activity.id,
+            "active_view_id": activity.active_progress_view_id,
+            "selected_view_id": selected_view_id,
+            "tags": [serialize_activity_tag(tag) for tag in tags],
+            "views": [serialize_progress_view(view) for view in views],
+            "items": items,
+            "included_count": included_count,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }
 
     def get_progress_summary_for_session(self, session_id: str) -> list:
-        """Return list of ProgressRecord dicts for all completed instances in a session."""
+        """Return dynamic comparisons for completed instances in a session."""
         instances = (
             self._active_instances_query()
             .filter(
                 ActivityInstance.session_id == session_id,
                 ActivityInstance.completed == True,
             )
-            .order_by(ActivityInstance.created_at.desc())
+            .order_by(
+                func.coalesce(ActivityInstance.time_stop, Session.session_start, ActivityInstance.created_at).desc(),
+                ActivityInstance.id.desc(),
+            )
             .all()
         )
 
-        records = []
-        for instance in instances:
-            record = self._ensure_progress_record(instance)
-            if record:
-                records.append(record)
-
-        return [serialize_progress_record(r) for r in records]
+        return [
+            record
+            for instance in instances
+            if (record := self.compute_live_comparison(instance.id)) is not None
+        ]

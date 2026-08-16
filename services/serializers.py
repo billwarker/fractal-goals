@@ -12,7 +12,7 @@ from .session_runtime import (
     get_template_color,
     get_template_session_type,
 )
-from .progress_service import serialize_progress_record
+from .activity_progress_view_service import serialize_activity_tag
 
 def format_utc(dt):
     """Format a datetime or date object to ISO string with UTC indicator."""
@@ -111,6 +111,9 @@ def serialize_metric_value(metric):
 
 
 def serialize_activity_set(activity_set):
+    direct_tags = list(getattr(activity_set, 'tags', None) or [])
+    inherited_tags = list(getattr(getattr(activity_set, 'activity_instance', None), 'tags', None) or [])
+    effective_by_id = {tag.id: tag for tag in [*inherited_tags, *direct_tags]}
     return {
         "id": activity_set.id,
         "sort_order": activity_set.sort_order,
@@ -121,6 +124,9 @@ def serialize_activity_set(activity_set):
         "metrics": [serialize_metric_value(metric) for metric in (activity_set.metric_values or [])],
         "created_at": format_utc(activity_set.created_at),
         "updated_at": format_utc(activity_set.updated_at),
+        "tags": [serialize_activity_tag(tag) for tag in direct_tags],
+        "inherited_tags": [serialize_activity_tag(tag) for tag in inherited_tags],
+        "effective_tags": [serialize_activity_tag(tag) for tag in effective_by_id.values()],
     }
 
 def serialize_fractal_metric(metric):
@@ -193,7 +199,8 @@ def serialize_activity_instance(instance, *, has_open_work_interval=False):
         "data": data_dict,
         "metric_values": metric_values_list,
         "metrics": metric_values_list,  # Frontend alias
-        "progress_comparison": serialize_progress_record(instance.progress_record) if getattr(instance, 'progress_record', None) else None,
+        "tags": [serialize_activity_tag(tag) for tag in (getattr(instance, 'tags', None) or [])],
+        "progress_comparison": getattr(instance, '_dynamic_progress', None),
     }
 
 
@@ -222,7 +229,8 @@ def serialize_activity_instance_for_analytics(instance, *, session_name=None, se
         "sets": normalized_sets,
         "metric_values": metric_values_list,
         "metrics": metric_values_list,
-        "progress_comparison": serialize_progress_record(instance.progress_record) if getattr(instance, 'progress_record', None) else None,
+        "tags": [serialize_activity_tag(tag) for tag in (getattr(instance, 'tags', None) or [])],
+        "progress_comparison": getattr(instance, '_dynamic_progress', None),
     }
 
 
@@ -910,6 +918,12 @@ def serialize_activity_definition(activity):
         "track_progress": activity.track_progress,
         "progress_aggregation": activity.progress_aggregation,
         "delta_display_mode": activity.delta_display_mode,
+        "active_progress_view_id": getattr(activity, 'active_progress_view_id', None),
+        "tags": [
+            serialize_activity_tag(tag)
+            for tag in (getattr(activity, 'tags', None) or [])
+            if tag.deleted_at is None
+        ],
         "created_at": format_utc(activity.created_at),
         "metric_definitions": [serialize_metric_definition(m) for m in activity.metric_definitions if not m.deleted_at],
         "split_definitions": [serialize_split_definition(s) for s in activity.split_definitions if not s.deleted_at],

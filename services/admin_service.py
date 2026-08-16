@@ -36,7 +36,6 @@ from models import (
     ProgramBlock,
     ProgramDay,
     ProgramDaySession,
-    ProgressRecord,
     Session,
     SessionTemplate,
     SessionTemplateStats,
@@ -429,7 +428,6 @@ class AdminService:
             self.db_session.execute(delete(TargetMetricCondition).where(TargetMetricCondition.target_id.in_(target_ids)))
         self._delete_for_roots(Target, root_ids)
 
-        self._delete_for_roots(ProgressRecord, root_ids)
         metric_ids = [
             row[0] for row in self.db_session.query(MetricDefinition.id).filter(
                 MetricDefinition.root_id.in_(root_ids)

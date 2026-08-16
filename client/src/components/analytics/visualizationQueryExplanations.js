@@ -218,7 +218,7 @@ function metricProgress(context) {
             dataset: 'metric_values + activity_instances + metric_definitions',
             chartFields: ['instance_date', 'metric_name', 'pct_change'],
             aggregation: 'percent change from previous tracked metric value',
-            notes: ['The chart prefers persisted progress comparisons when present; this SQL mirrors the equivalent ordered metric calculation.'],
+            notes: ['The chart uses the activity’s active progress view; this SQL shows the equivalent unfiltered ordered metric calculation.'],
         }),
     };
 }

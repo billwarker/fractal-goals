@@ -124,7 +124,7 @@ function resolveActivityInstances(example, activity) {
                         value: metric.value,
                     };
                 }),
-                progress_comparison: instance.progress_comparison || instance.progress_record || null,
+                progress_comparison: instance.progress_comparison || null,
             }))
     )).sort((left, right) => (
         new Date(right.session_date || 0).getTime() - new Date(left.session_date || 0).getTime()

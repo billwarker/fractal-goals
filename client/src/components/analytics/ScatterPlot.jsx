@@ -91,13 +91,13 @@ function ScatterPlot({
     // Collect data points from instances
     const dataPoints = [];
     instances.forEach(instance => {
-        const modeNames = Array.isArray(instance.modes) && instance.modes.length > 0
-            ? instance.modes.map((m) => m.name).join(', ')
+        const tagNames = Array.isArray(instance.tags) && instance.tags.length > 0
+            ? instance.tags.map((tag) => tag.name).join(', ')
             : null;
         const basePoint = {
             session_name: instance.session_name,
             session_date: instance.session_date,
-            mode_label: modeNames,
+            tag_label: tagNames,
         };
 
         // For activities with sets
@@ -201,7 +201,7 @@ function ScatterPlot({
         session_date: p.session_date,
         aggregation: p.aggregation,
         set_number: p.set_number,
-        mode_label: p.mode_label,
+        tag_label: p.tag_label,
     })));
 
     const chartData = {
@@ -247,8 +247,8 @@ function ScatterPlot({
                             lines.push(`${point.densityCount} entries at this point`);
                         }
 
-                        if (point.mode_label) {
-                            lines.push(`Mode: ${point.mode_label}`);
+                        if (point.tag_label) {
+                            lines.push(`Tags: ${point.tag_label}`);
                         }
 
                         return lines;

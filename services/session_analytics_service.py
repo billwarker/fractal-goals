@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
 import models
-from models import ActivityDefinition, ActivityInstance, Goal, MetricValue, Session, session_goals, validate_root_goal
+from models import ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, Session, session_goals, validate_root_goal
 from services.serializers import (
     format_utc,
     serialize_activity_instance_for_analytics,
@@ -15,6 +15,7 @@ from services.service_types import JsonDict, ServiceResult
 from services.session_filters import normalize_id_list, session_duration_seconds_from_row
 from services.session_template_stats_service import SessionTemplateStatsService
 from services.goal_contribution import as_utc_datetime, resolve_contribution_goal
+from services.progress_service import ProgressService
 
 
 MAX_FLOWTREE_WINDOW_DAYS = 90
@@ -53,7 +54,9 @@ class SessionAnalyticsService:
             joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split),
-            joinedload(ActivityInstance.progress_record),
+            selectinload(ActivityInstance.tags),
+            selectinload(ActivityInstance.sets).selectinload(ActivitySet.tags),
+            selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.definition),
         )
 
     @staticmethod
@@ -148,11 +151,14 @@ class SessionAnalyticsService:
             ).all()
 
             persisted_session_ids = set()
+            progress = ProgressService(self.db_session)
+            comparisons = progress.compute_comparisons_for_instances(activity_instances)
             for instance in activity_instances:
                 if not instance.activity_definition_id:
                     continue
 
                 persisted_session_ids.add(instance.session_id)
+                instance._dynamic_progress = comparisons.get(instance.id)
                 session_meta = session_lookup.get(instance.session_id) or {}
                 serialized_instance = serialize_activity_instance_for_analytics(
                     instance,

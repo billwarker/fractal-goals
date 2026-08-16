@@ -8,43 +8,6 @@
     overflow: hidden;
 }
 
-.timelineModeToggle {
-    display: flex;
-    width: calc(100% - (var(--spacing-lg, 16px) * 2));
-    gap: 4px;
-    padding: 3px;
-    margin: var(--spacing-lg, 16px) var(--spacing-lg, 16px) 0;
-    border: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
-    border-radius: 6px;
-    background: color-mix(in srgb, var(--color-bg-secondary) 72%, var(--color-bg-app));
-    box-sizing: border-box;
-    flex-shrink: 0;
-}
-
-.timelineModeButton {
-    flex: 1;
-    min-height: 24px;
-    padding: 3px 12px;
-    border: none;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--color-text-secondary);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
-}
-
-.timelineModeButton:hover {
-    background: color-mix(in srgb, var(--color-bg-card) 55%, transparent);
-    color: var(--color-text-primary);
-}
-
-.timelineModeButtonActive {
-    background: var(--color-bg-card);
-    color: var(--color-text-primary);
-}
-
 .timelineSelector {
     display: flex;
     flex-direction: column;
@@ -81,6 +44,100 @@
     min-height: 0;
     overflow-y: auto;
     padding: 0 var(--spacing-lg, 16px);
+}
+
+.progressViewControls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-secondary);
+}
+
+.progressViewToolbar,
+.progressViewActions,
+.saveAsField {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.progressViewToolbar label,
+.logicBucket legend {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.progressViewToolbar select,
+.saveAsField input {
+    min-height: 32px;
+    padding: 5px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+}
+
+.cohortCount {
+    margin-left: auto;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.logicBuckets {
+    display: grid;
+    gap: 8px;
+}
+
+.logicBucket {
+    min-width: 0;
+    margin: 0;
+    padding: 8px;
+    border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.tagChoices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.tagChoice {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 7px;
+    border: 1px solid var(--tag-color, var(--color-border));
+    border-radius: 999px;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.tagChoice input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.tagChoiceSelected {
+    background: color-mix(in srgb, var(--tag-color, var(--color-brand-primary)) 20%, transparent);
+    color: var(--color-text-primary);
+}
+
+.tagChoice:focus-within {
+    outline: 2px solid var(--color-focus-ring, var(--color-brand-primary));
+    outline-offset: 1px;
+}
+
+.noTags {
+    color: var(--color-text-muted);
+    font-size: 12px;
 }
 
 .timelineSection {
@@ -128,7 +185,4 @@
         gap: 12px;
     }
 
-    .timelineModeToggle {
-        margin-top: var(--spacing-md, 12px);
-    }
 }

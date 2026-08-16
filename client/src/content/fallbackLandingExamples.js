@@ -66,7 +66,7 @@ const fallbackLandingExamples = [{
             window_states: {
                 'window-1': {
                     selectedCategory: 'sessions', selectedVisualization: 'sessionTrends',
-                    selectedActivity: null, selectedModeIds: [], selectedGoal: null,
+                    selectedActivity: null, selectedGoal: null,
                     visualizationState: { grain: 'week', metrics: ['sessions', 'duration'] },
                     visualizationStateByKey: {
                         'sessions:sessionTrends': { grain: 'week', metrics: ['sessions', 'duration'] },

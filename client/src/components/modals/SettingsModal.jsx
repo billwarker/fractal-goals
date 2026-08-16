@@ -40,7 +40,6 @@ const SettingsModalInner = ({ onClose }) => {
     const isMobile = useIsMobile();
     const onboarding = useOptionalOnboarding();
     const [availableTimezones] = useState(getAvailableTimezones);
-    const [recomputeLoading, setRecomputeLoading] = useState(false);
     const [accountUsage, setAccountUsage] = useState(null);
     const [accountUsageLoading, setAccountUsageLoading] = useState(false);
     const [availableFractals, setAvailableFractals] = useState([]);
@@ -80,26 +79,6 @@ const SettingsModalInner = ({ onClose }) => {
             });
         } catch (err) {
             notify.error(`Failed to update active goal window: ${formatError(err)}`);
-        }
-    };
-
-    const handleRecomputeAll = async () => {
-        if (!activeRootId) return;
-        setRecomputeLoading(true);
-        try {
-            const res = await fractalApi.recomputeAllProgress(activeRootId);
-            const failedCount = Array.isArray(res?.data?.failed) ? res.data.failed.length : 0;
-            if (failedCount > 0) {
-                notify.error(
-                    `Progress recalculated for ${res.data.recomputed} activities, ${failedCount} failed`
-                );
-            } else {
-                notify.success(`Progress recalculated for ${res.data.recomputed} activities`);
-            }
-        } catch (err) {
-            notify.error(`Failed to recalculate progress: ${formatError(err)}`);
-        } finally {
-            setRecomputeLoading(false);
         }
     };
 
@@ -411,18 +390,6 @@ const SettingsModalInner = ({ onClose }) => {
                                                 </select>
                                             </div>
 
-                                            <div className={styles.themeRow}>
-                                                <button
-                                                    onClick={handleRecomputeAll}
-                                                    disabled={recomputeLoading || !progressEnabled}
-                                                    className={styles.secondaryButton}
-                                                >
-                                                    {recomputeLoading ? 'Recalculating…' : 'Recalculate All Progress'}
-                                                </button>
-                                                <span className={`${styles.checkboxDescription} ${styles.descriptionSpacing}`}>
-                                                    Rebuilds all progress records from scratch using current activity data
-                                                </span>
-                                            </div>
                                         </div>
                                     </section>
                                 )}

@@ -38,7 +38,6 @@ from models import (
     ProgramBlock,
     ProgramDay,
     ProgramDaySession,
-    ProgressRecord,
     Session,
     SessionWorkInterval,
     SessionTemplate,
@@ -556,12 +555,6 @@ def _datasets() -> dict[str, AnalyticsDataset]:
             tenant_policy=_root_policy(SplitDefinition.root_id),
             soft_delete_field=SplitDefinition.deleted_at,
             default_sort=(("order", "asc"),),
-        ),
-        _model_dataset(
-            ProgressRecord,
-            tenant_policy=_root_policy(ProgressRecord.root_id),
-            default_sort=(("created_at", "desc"),),
-            chart_families=("table", "bar"),
         ),
         _model_dataset(
             GoalPauseInterval,

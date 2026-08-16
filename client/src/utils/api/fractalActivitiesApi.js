@@ -36,6 +36,30 @@ export const fractalActivitiesApi = {
         axios.get(`${API_BASE}/${rootId}/activity-instances/${instanceId}/progress`),
     getActivityProgressHistory: (rootId, activityDefId, params = {}) =>
         axios.get(`${API_BASE}/${rootId}/activities/${activityDefId}/progress-history`, { params }),
-    recomputeAllProgress: (rootId) =>
-        axios.post(`${API_BASE}/${rootId}/progress/recompute-all`),
+    getActivityTags: (rootId, activityId, params = {}) =>
+        axios.get(`${API_BASE}/${rootId}/activities/${activityId}/tags`, { params }),
+    createActivityTag: (rootId, activityId, data) =>
+        axios.post(`${API_BASE}/${rootId}/activities/${activityId}/tags`, data),
+    updateActivityTag: (rootId, activityId, tagId, data) =>
+        axios.put(`${API_BASE}/${rootId}/activities/${activityId}/tags/${tagId}`, data),
+    archiveActivityTag: (rootId, activityId, tagId) =>
+        axios.delete(`${API_BASE}/${rootId}/activities/${activityId}/tags/${tagId}`),
+    replaceActivityInstanceTags: (rootId, instanceId, tagIds) =>
+        axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}/tags`, { tag_ids: tagIds }),
+    replaceActivitySetTags: (rootId, setId, tagIds) =>
+        axios.put(`${API_BASE}/${rootId}/activity-sets/${setId}/tags`, { tag_ids: tagIds }),
+    getActivityProgressViews: (rootId, activityId) =>
+        axios.get(`${API_BASE}/${rootId}/activities/${activityId}/progress-views`),
+    createActivityProgressView: (rootId, activityId, data) =>
+        axios.post(`${API_BASE}/${rootId}/activities/${activityId}/progress-views`, data),
+    updateActivityProgressView: (rootId, activityId, viewId, data) =>
+        axios.put(`${API_BASE}/${rootId}/activities/${activityId}/progress-views/${viewId}`, data),
+    deleteActivityProgressView: (rootId, activityId, viewId) =>
+        axios.delete(`${API_BASE}/${rootId}/activities/${activityId}/progress-views/${viewId}`),
+    activateActivityProgressView: (rootId, activityId, viewId) =>
+        axios.put(`${API_BASE}/${rootId}/activities/${activityId}/active-progress-view`, { view_id: viewId }),
+    getActivityProgressTimeline: (rootId, activityId, params = {}) =>
+        axios.get(`${API_BASE}/${rootId}/activities/${activityId}/progress-timeline`, { params }),
+    queryActivityProgress: (rootId, activityId, data) =>
+        axios.post(`${API_BASE}/${rootId}/activities/${activityId}/progress-query`, data),
 };

@@ -83,7 +83,6 @@ export function ActivityTimelineList({
                         || progressByInstanceId?.get(instance.activity_instance_id)
                         || progressByInstanceId?.get(instance.instance_id)
                         || instance.progress_comparison
-                        || instance.progress_record
                         || null
                     }
                     formatDate={formatDate}
@@ -162,6 +161,7 @@ export function ActivityTimelineCard({
     const displayTime = showTime ? formatTime(displayTimestamp, timezone) : null;
     const sessionTemplateName = instance.session_template_name || instance.session_name;
     const sessionTemplateColor = instance.session_template_color || instance.template_color;
+    const isExcluded = instance.included === false || progressRecord?.included === false;
 
     const progressComparisons = Array.isArray(progressRecord?.metric_comparisons)
         ? progressRecord.metric_comparisons
@@ -258,7 +258,7 @@ export function ActivityTimelineCard({
     };
 
     return (
-        <div className={`${styles.timelineCard} ${isGoalTimeline ? styles.timelineCardGoalTimeline : ''}`}>
+        <div className={`${styles.timelineCard} ${isGoalTimeline ? styles.timelineCardGoalTimeline : ''} ${isExcluded ? styles.timelineCardExcluded : ''}`}>
             {isGoalTimeline ? (
                 <div className={styles.timelineCardHeader}>
                     {instance.session_name ? (
@@ -296,7 +296,7 @@ export function ActivityTimelineCard({
             ) : (
                 <>
                     <div className={styles.timelineCardHeader}>
-                        <span className={styles.timelineCardDate}>{displayDate}</span>
+                        <span className={styles.timelineCardDate}>{displayDate}{isExcluded ? ' · Excluded' : ''}</span>
                         {duration && (
                             <span className={styles.timelineCardDuration}>
                                 <ClockIcon size={13} />

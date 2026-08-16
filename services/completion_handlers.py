@@ -195,12 +195,6 @@ def handle_session_completed(event: Event):
             pending_events=pending_events,
         )
 
-        # Compute and persist progress records for all completed instances
-        try:
-            ProgressService(db_session).compute_progress_for_session(session_id)
-        except Exception as progress_err:
-            logger.warning("Error computing progress for session %s: %s", session_id, progress_err)
-
         db_session.commit()
         _emit_pending_events(pending_events)
 
@@ -587,8 +581,6 @@ def handle_activity_metrics_updated(event: Event):
     instance_id = event.data.get('instance_id')
     root_id = event.data.get('root_id')
     session_id = event.data.get('session_id')
-    activity_definition_id = event.data.get('activity_definition_id')
-
     if not all([instance_id, root_id, session_id]):
         return
 
@@ -609,14 +601,9 @@ def handle_activity_metrics_updated(event: Event):
         )
         comparison = None
         try:
-            progress_service = ProgressService(db_session)
-            if activity_definition_id:
-                progress_service.recompute_progress_for_activity(activity_definition_id, root_id)
-            else:
-                progress_service.recompute_progress_for_instance(instance_id)
-            comparison = progress_service.get_progress_for_instance(instance_id)
+            comparison = ProgressService(db_session).get_progress_for_instance(instance_id)
         except Exception as progress_err:
-            logger.warning("Error recomputing persisted progress timeline for instance %s: %s", instance_id, progress_err)
+            logger.warning("Error calculating dynamic progress for instance %s: %s", instance_id, progress_err)
 
         db_session.commit()
         _emit_pending_events(pending_events)
@@ -627,39 +614,6 @@ def handle_activity_metrics_updated(event: Event):
     finally:
         _close_if_owned(db_session, owns_session)
 
-
-@event_bus.on(Events.SESSION_DELETED)
-def handle_session_deleted(event: Event):
-    """Recompute progress timelines for activities affected by a deleted session."""
-    session_id = event.data.get('session_id')
-    root_id = event.data.get('root_id')
-    if not all([session_id, root_id]):
-        return
-
-    db_session, owns_session = _resolve_db_session(event)
-    try:
-        activity_ids = [
-            activity_id
-            for (activity_id,) in (
-                db_session.query(ActivityInstance.activity_definition_id)
-                .filter(
-                    ActivityInstance.session_id == session_id,
-                    ActivityInstance.deleted_at == None,
-                )
-                .distinct()
-                .all()
-            )
-            if activity_id
-        ]
-        progress_service = ProgressService(db_session)
-        for activity_id in activity_ids:
-            progress_service.recompute_progress_for_activity(activity_id, root_id)
-        db_session.commit()
-    except Exception as exc:
-        db_session.rollback()
-        logger.exception("Error recomputing progress after session deletion: %s", exc)
-    finally:
-        _close_if_owned(db_session, owns_session)
 
 def _run_evaluation_for_instance(db_session, instance, session_id, root_id, pending_events=None):
     """Refactored core evaluation logic to be reused between event handlers."""
@@ -740,17 +694,11 @@ def handle_activity_instance_completed(event: Event):
 @event_bus.on(Events.ACTIVITY_INSTANCE_DELETED)
 def handle_activity_instance_deleted(event: Event):
     """
-    When an activity instance is deleted:
-    - revert any targets achieved by it
-    - recompute progress history so downstream records rebase against the next
-      available previous instance
+    When an activity instance is deleted, revert targets achieved by it.
     """
     instance_id = event.data.get('instance_id')
     if not instance_id:
         return
-
-    activity_definition_id = event.data.get('activity_definition_id')
-    root_id = event.data.get('root_id')
 
     db_session, owns_session = _resolve_db_session(event)
     pending_events = []
@@ -763,21 +711,6 @@ def handle_activity_instance_deleted(event: Event):
         logger.exception(f"Error handling activity instance deletion: {e}")
     finally:
         _close_if_owned(db_session, owns_session)
-
-    if activity_definition_id and root_id:
-        recompute_db, owns_recompute = _resolve_db_session(event)
-        try:
-            ProgressService(recompute_db).recompute_progress_for_activity(activity_definition_id, root_id)
-            recompute_db.commit()
-        except Exception:
-            recompute_db.rollback()
-            logger.exception(
-                "Error recomputing progress after instance deletion: activity=%s root=%s",
-                activity_definition_id,
-                root_id,
-            )
-        finally:
-            _close_if_owned(recompute_db, owns_recompute)
 
 def _revert_achievements_for_instance(db_session, instance_id: str, pending_events=None):
     """Internal helper to find and revert targets tied to an instance."""

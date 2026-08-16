@@ -89,6 +89,14 @@ from .activities import (
     MetricValueSchema,
     SplitDefinitionSchema,
     TimerActivityInstanceManualUpdateSchema,
+    ActivityTagCreateSchema,
+    ActivityTagUpdateSchema,
+    ActivityTagAssignmentSchema,
+    ActivityProgressViewCreateSchema,
+    ActivityProgressViewUpdateSchema,
+    ActivityProgressViewActivateSchema,
+    ActivityProgressQuerySchema,
+    ProgressViewConfigSchema,
 )
 from .fractal_metrics import (
     FractalMetricCreateSchema,

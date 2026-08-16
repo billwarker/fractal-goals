@@ -109,7 +109,7 @@ function ActivityProgressSummary({ sets, activityDefinition, progressComparison,
     const metricDefs = useMemo(() => activityDefinition?.metric_definitions || [], [activityDefinition?.metric_definitions]);
     const trackedMetricDefs = useMemo(() => filterTrackedMetricDefs(metricDefs), [metricDefs]);
 
-    // Use precomputed value if provided, then stored record, then compute client-side
+    // Use the server-calculated active-view summary, with a local raw-data fallback.
     const autoAgg = useMemo(() => {
         if (precomputedAutoAgg) return precomputedAutoAgg;
         const fromRecord = progressComparison?.derived_summary?.auto_aggregations;

@@ -1,25 +1,23 @@
 import React from 'react';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import TimelinePanel from '../TimelinePanel';
 
-const useActivityHistory = vi.fn(() => ({
-    history: [],
-    loading: false,
-    error: null,
-}));
-const useProgressHistory = vi.fn(() => ({
-    progressHistory: [],
+const useActivityProgressTimeline = vi.fn(() => ({
+    data: { items: [], tags: [], views: [], active_view_id: null, included_count: 0, total: 0 },
     isLoading: false,
     error: null,
 }));
+const createView = vi.fn();
+const updateView = vi.fn();
+const deleteView = vi.fn();
+const activateView = vi.fn();
 
-vi.mock('../../../hooks/useActivityHistory', () => ({
-    useActivityHistory: (...args) => useActivityHistory(...args),
-}));
-
-vi.mock('../../../hooks/useProgressHistory', () => ({
-    useProgressHistory: (...args) => useProgressHistory(...args),
+vi.mock('../../../hooks/useActivityProgressViews', () => ({
+    useActivityProgressTimeline: (...args) => useActivityProgressTimeline(...args),
+    useActivityProgressViewMutations: () => ({
+        createView, updateView, deleteView, activateView, isPending: false,
+    }),
 }));
 
 vi.mock('../NoteTimeline', () => ({
@@ -47,15 +45,13 @@ const sessionActivityDefs = [
 
 describe('TimelinePanel', () => {
     beforeEach(() => {
-        useActivityHistory.mockClear();
-        useProgressHistory.mockClear();
-        useActivityHistory.mockReturnValue({
-            history: [],
-            loading: false,
-            error: null,
-        });
-        useProgressHistory.mockReturnValue({
-            progressHistory: [],
+        useActivityProgressTimeline.mockClear();
+        createView.mockReset().mockResolvedValue({});
+        updateView.mockReset().mockResolvedValue({});
+        deleteView.mockReset().mockResolvedValue({});
+        activateView.mockReset().mockResolvedValue({});
+        useActivityProgressTimeline.mockReturnValue({
+            data: { items: [], tags: [], views: [], active_view_id: null, included_count: 0, total: 0 },
             isLoading: false,
             error: null,
         });
@@ -77,11 +73,11 @@ describe('TimelinePanel', () => {
             }
         );
 
-        expect(screen.getByRole('combobox')).toHaveValue('activity-def-2');
-        expect(useActivityHistory).toHaveBeenCalledWith('root-1', 'activity-def-2', 'session-1', { limit: 10 });
-        expect(useProgressHistory).toHaveBeenCalledWith('root-1', 'activity-def-2', {
-            limit: 10,
+        expect(screen.getByLabelText('Select Activity:')).toHaveValue('activity-def-2');
+        expect(useActivityProgressTimeline).toHaveBeenCalledWith('root-1', 'activity-def-2', {
             excludeSessionId: 'session-1',
+            draftConfig: null,
+            limit: 20,
         });
     });
 
@@ -101,7 +97,7 @@ describe('TimelinePanel', () => {
             }
         );
 
-        const select = screen.getByRole('combobox');
+        const select = screen.getByLabelText('Select Activity:');
         expect(select).toHaveValue('activity-def-1');
 
         fireEvent.change(select, { target: { value: 'activity-def-2' } });
@@ -116,7 +112,7 @@ describe('TimelinePanel', () => {
             />
         );
 
-        expect(screen.getByRole('combobox')).toHaveValue('activity-def-1');
+        expect(screen.getByLabelText('Select Activity:')).toHaveValue('activity-def-1');
     });
 
     it('keeps session notes out of the activity timeline view', () => {
@@ -148,9 +144,66 @@ describe('TimelinePanel', () => {
         expect(screen.queryByText('Keep the wrist relaxed')).not.toBeInTheDocument();
     });
 
+    it('keeps All History immutable and creates an activated saved view through Save as', async () => {
+        useActivityProgressTimeline.mockReturnValue({
+            data: {
+                items: [],
+                tags: [{ id: 'tag-1', name: 'Competition', archived: false }],
+                views: [],
+                active_view_id: null,
+                included_count: 0,
+                total: 0,
+            },
+            isLoading: false,
+            error: null,
+        });
+        renderWithProviders(
+            <TimelinePanel rootId="root-1" sessionId="session-1" selectedActivity={null} sessionActivityDefs={sessionActivityDefs} />,
+            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
+        );
+
+        expect(screen.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+        fireEvent.click(screen.getAllByText('Competition')[0]);
+        fireEvent.click(screen.getByRole('button', { name: 'Save as…' }));
+        fireEvent.change(screen.getByLabelText('Progress view name'), { target: { value: 'Meet prep' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+        await waitFor(() => expect(createView).toHaveBeenCalledWith({
+            name: 'Meet prep',
+            config: expect.objectContaining({ all_tag_ids: ['tag-1'] }),
+            activate: true,
+        }));
+    });
+
+    it('saves a draft with the selected view version', async () => {
+        useActivityProgressTimeline.mockReturnValue({
+            data: {
+                items: [],
+                tags: [{ id: 'tag-1', name: 'Competition', archived: false }],
+                views: [{ id: 'view-1', name: 'Meet prep', version: 4, config: { all_tag_ids: [], any_tag_ids: [], none_tag_ids: [] } }],
+                active_view_id: 'view-1',
+                included_count: 0,
+                total: 0,
+            },
+            isLoading: false,
+            error: null,
+        });
+        renderWithProviders(
+            <TimelinePanel rootId="root-1" sessionId="session-1" selectedActivity={null} sessionActivityDefs={sessionActivityDefs} />,
+            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
+        );
+        fireEvent.click(screen.getAllByText('Competition')[0]);
+        fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+        await waitFor(() => expect(updateView).toHaveBeenCalledWith({
+            viewId: 'view-1',
+            version: 4,
+            config: expect.objectContaining({ all_tag_ids: ['tag-1'] }),
+        }));
+    });
+
     it('renders saved progress indicators alongside timeline metrics', () => {
-        useActivityHistory.mockReturnValue({
-            history: [
+        useActivityProgressTimeline.mockReturnValue({
+            data: { items: [
                 {
                     id: 'instance-1',
                     created_at: '2026-04-10T12:00:00.000Z',
@@ -159,26 +212,21 @@ describe('TimelinePanel', () => {
                     ],
                     sets: [],
                     notes: [],
+                    progress_comparison: {
+                        activity_instance_id: 'instance-1',
+                        included: true,
+                        metric_comparisons: [
+                            {
+                                metric_id: 'm1',
+                                metric_name: 'Quality',
+                                pct_change: 10,
+                                improved: true,
+                                regressed: false,
+                            },
+                        ],
+                    },
                 },
-            ],
-            loading: false,
-            error: null,
-        });
-        useProgressHistory.mockReturnValue({
-            progressHistory: [
-                {
-                    activity_instance_id: 'instance-1',
-                    metric_comparisons: [
-                        {
-                            metric_id: 'm1',
-                            metric_name: 'Quality',
-                            pct_change: 10,
-                            improved: true,
-                            regressed: false,
-                        },
-                    ],
-                },
-            ],
+            ], tags: [], views: [], active_view_id: null, included_count: 1, total: 1 },
             isLoading: false,
             error: null,
         });
@@ -209,8 +257,8 @@ describe('TimelinePanel', () => {
     });
 
     it('uses progress tone, not delta sign, for absolute timeline indicators', () => {
-        useActivityHistory.mockReturnValue({
-            history: [
+        useActivityProgressTimeline.mockReturnValue({
+            data: { items: [
                 {
                     id: 'instance-1',
                     created_at: '2026-04-10T12:00:00.000Z',
@@ -219,26 +267,21 @@ describe('TimelinePanel', () => {
                     ],
                     sets: [],
                     notes: [],
+                    progress_comparison: {
+                        activity_instance_id: 'instance-1',
+                        included: true,
+                        metric_comparisons: [
+                            {
+                                metric_id: 'm1',
+                                metric_name: 'Time',
+                                delta: -5,
+                                improved: true,
+                                regressed: false,
+                            },
+                        ],
+                    },
                 },
-            ],
-            loading: false,
-            error: null,
-        });
-        useProgressHistory.mockReturnValue({
-            progressHistory: [
-                {
-                    activity_instance_id: 'instance-1',
-                    metric_comparisons: [
-                        {
-                            metric_id: 'm1',
-                            metric_name: 'Time',
-                            delta: -5,
-                            improved: true,
-                            regressed: false,
-                        },
-                    ],
-                },
-            ],
+            ], tags: [], views: [], active_view_id: null, included_count: 1, total: 1 },
             isLoading: false,
             error: null,
         });
@@ -270,8 +313,8 @@ describe('TimelinePanel', () => {
     });
 
     it('renders activity history with the current session-template badge color', () => {
-        useActivityHistory.mockReturnValue({
-            history: [{
+        useActivityProgressTimeline.mockReturnValue({
+            data: { items: [{
                 id: 'instance-history-1',
                 session_name: 'Historical Session',
                 session_template_name: 'Simple Empty Template',
@@ -281,8 +324,9 @@ describe('TimelinePanel', () => {
                 metric_values: [],
                 sets: [],
                 notes: [],
-            }],
-            loading: false,
+                progress_comparison: { included: true, metric_comparisons: [] },
+            }], tags: [], views: [], active_view_id: null, included_count: 1, total: 1 },
+            isLoading: false,
             error: null,
         });
 

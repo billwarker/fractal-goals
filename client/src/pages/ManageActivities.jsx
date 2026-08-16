@@ -7,6 +7,7 @@ import ActivityBuilder from '../components/ActivityBuilder';
 import ActivityCard from '../components/ActivityCard';
 
 import ManageMetricsModal from '../components/modals/ManageMetricsModal';
+import ManageActivityTagsModal from '../components/modals/ManageActivityTagsModal';
 
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import GroupBuilderModal from '../components/modals/GroupBuilderModal';
@@ -58,6 +59,7 @@ function ManageActivities() {
     const [editingGroup, setEditingGroup] = useState(null);
     const [groupToDelete, setGroupToDelete] = useState(null);
     const [showMetricsModal, setShowMetricsModal] = useState(false);
+    const [showTagsModal, setShowTagsModal] = useState(false);
     const [showCircuitBuilder, setShowCircuitBuilder] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -460,6 +462,9 @@ function ManageActivities() {
                         <HeaderButton className={styles.headerControl} variant="secondary" onClick={() => setShowMetricsModal(true)}>
                             Manage Metrics
                         </HeaderButton>
+                        <HeaderButton className={styles.headerControl} variant="secondary" onClick={() => setShowTagsModal(true)}>
+                            Manage Tags
+                        </HeaderButton>
                         <ManageActivitiesCreateMenu
                             onCreateActivity={handleCreateClick}
                             onCreateGroup={handleCreateGroup}
@@ -605,6 +610,14 @@ function ManageActivities() {
                 onClose={() => setShowMetricsModal(false)}
                 rootId={rootId}
             />
+            {showTagsModal ? (
+                <ManageActivityTagsModal
+                    isOpen
+                    onClose={() => setShowTagsModal(false)}
+                    rootId={rootId}
+                    activities={activities}
+                />
+            ) : null}
 
         </div>
     );

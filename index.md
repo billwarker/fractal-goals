@@ -47,6 +47,8 @@ The backend is split into:
 
 Migration health note: revisions `c6e8f1a3b5d7` and `d7f9a2c4e6b8` close the model/schema drift exposed during the circuit hardening pass. They remove the obsolete visualization-annotation and note set-index shapes, normalize JSON-backed analytics and goal settings to PostgreSQL JSONB, restore missing indexes, align defaults/nullability/composite indexes, and make early circuit-rollout databases converge on the canonical cascade and NULL-equal metric-result uniqueness rules. The rollout reconciliation deterministically retains the most recently updated metric value if a legacy database contains duplicates that the old NULL-distinct constraint allowed. Both incremental downgrade/upgrade and fresh zero-to-head replays pass on an isolated PostgreSQL database, and `alembic check` reports no pending operations. Backend CI now provisions PostgreSQL and gates every model or migration change on upgrade-to-head, schema-drift detection, one-step downgrade/re-upgrade reversibility, and a final drift check.
 
+Revision `a2c4e6f8b1d3` contracts the progress rebuild: it introduces activity tags, instance/set tag junctions, saved progress views and the active-view pointer, then drops the obsolete `progress_records` snapshot table after all readers switch to dynamic calculation. A fresh zero-to-head upgrade, model drift check, and one-step downgrade/re-upgrade pass on PostgreSQL.
+
 The intended backend flow is:
 
 `request -> blueprint -> validation -> service -> serializer -> response`
@@ -473,29 +475,38 @@ Progress comparisons are a first-class activity/session feature.
 
 They support:
 
-- persisted `ProgressRecord` history for completed instances
-- live comparison hints while a session is still in progress
+- on-demand comparisons over canonical activity instances, normalized sets, and metric values; no progress snapshot table or recomputation workflow remains
+- activity-owned tags assigned directly to instances or sets; instance tags are inherited by every set at calculation time and are never copied
+- any number of named, versioned saved progress views per activity using structured `All of` / `Any of` / `None of` tag predicates
+- one activity-wide active saved view, with an implicit immutable **All History** view represented by a null active pointer
+- server-calculated inline draft previews that never mutate the active view; Save as creates and activates a new view, and deleting the active view atomically falls back to All History
+- explicit excluded-current comparisons with no deltas, while raw instance metrics and muted timeline rows remain visible
+- canonical effective-time ordering with ID tie-breaking and the rule that a predecessor comes from another session
+- live comparison hints while a session is still in progress, filtered by the same active view as completed history
 - activity-level and metric-level aggregation configuration
-- root-level progress settings and full-root recomputation
-- historical progress APIs for session and activity views
+- root-level progress enablement and percent/absolute display settings
+- a consolidated activity timeline contract plus dynamically calculated compatibility APIs for instance progress, activity history, and session summaries
+
+Archived tags retain their historical assignments and saved-view meaning. They can be retained on an existing assignment but cannot be newly assigned. Session list/detail, circuits, and `activities:metricProgress` receive the same active-view comparison payload. Timeline calculations batch each activity history and build its comparison chain once, avoiding per-row predecessor queries.
 
 Key backend pieces:
 
 - `services/progress_service.py`
-- `services/completion_handlers.py`
+- `services/activity_progress_view_service.py`
 - `blueprints/activities_api.py`
 - `blueprints/sessions_api.py`
-- `blueprints/timers_api.py`
+- `models/activity.py` (`ActivityTag`, tag junctions, `ActivityProgressView`, and the activity active-view pointer)
 
 Key frontend pieces:
 
 - `client/src/hooks/useProgressComparison.js`
-- `client/src/hooks/useProgressHistory.js`
-- `client/src/hooks/useSessionProgressSummary.js`
+- `client/src/hooks/useActivityProgressViews.js`
 - `client/src/hooks/useRootProgressSettings.js`
 - `client/src/components/sessionDetail/SessionActivityItem.jsx`
 - `client/src/components/sessionDetail/SessionActivityItemView.jsx`
 - `client/src/components/sessionDetail/TimelinePanel.jsx`
+- `client/src/components/sessionDetail/ActivityTagEditor.jsx`
+- `client/src/components/modals/ManageActivityTagsModal.jsx`
 - `client/src/components/modals/SettingsModal.jsx`
 
 ### Programs and Templates
@@ -609,7 +620,7 @@ Activity analytics note:
 
 - Activity trend analytics are consolidated under `activities:activityTrends`, a mixed chart where completed activity instances render as bars and activity duration renders as a line on a separate y-axis.
 - Activity totals live under `activities:activityFrequency` and can switch between completed instance counts and duration. Retired line graph, time-per-activity, personal-best, and metric-volume panel ids are migrated to the consolidated activity visualizations.
-- Individual activity metric analytics include `activities:metricTrends`, which plots up to two selected activity metrics as lines over time, and `activities:metricProgress`, which renders persisted progress-comparison percent improvement bars for progress-tracked metrics.
+- Individual activity metric analytics include `activities:metricTrends`, which plots up to two selected activity metrics as lines over time, and `activities:metricProgress`, which renders active-view dynamic percent-improvement bars for progress-tracked metrics.
 - When global filters resolve to exactly one activity or goal, single-selection analytics panels use that scoped item as their effective selected activity/goal. Multi-item global scopes continue to filter aggregate panels without pretending there is a single selected item.
 - Analytics panels now use the app-wide graph-paper visual model: a bounded 20px cell grid using `--color-grid`, with panel geometry stored in whole cells. Only the selected panel can be dragged or resized; selected panels drag from any non-interactive panel space and resize from any edge or corner. Blank graph-paper clicks, including gaps between absolute-positioned panels, clear panel selection. Panel moves preserve dropped positions instead of auto-compacting upward, reject drag/resize proposals that would overlap another panel with a red conflict highlight, rescale proportionally when the filters pane changes workspace bounds, and persist saved-view workspace bounds so restored views scale into the current open/closed filters workspace. Restored views render only after the fitted layout has settled, avoiding visible load-time resize artifacts. A legacy restore fallback expands views that were saved at roughly one filters-pane width narrower than the current closed-pane workspace. The standard Cmd/Ctrl+Shift+D red debug outline remains available around the analytics workspace. The first empty-view panel defaults to the full measured workspace, and layout migration preserves older split-pane saved views.
 - The saved analytics modal separates analytics views from analytics dashboards, supports search by name or displayed update date, and highlights rows/buttons on hover or keyboard focus.

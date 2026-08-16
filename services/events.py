@@ -269,6 +269,14 @@ class Events:
     ACTIVITY_CREATED = 'activity.created'
     ACTIVITY_UPDATED = 'activity.updated'
     ACTIVITY_DELETED = 'activity.deleted'
+    ACTIVITY_TAG_CREATED = 'activity_tag.created'
+    ACTIVITY_TAG_UPDATED = 'activity_tag.updated'
+    ACTIVITY_TAG_ARCHIVED = 'activity_tag.archived'
+    ACTIVITY_TAG_ASSIGNMENTS_UPDATED = 'activity_tag.assignments_updated'
+    ACTIVITY_PROGRESS_VIEW_CREATED = 'activity_progress_view.created'
+    ACTIVITY_PROGRESS_VIEW_UPDATED = 'activity_progress_view.updated'
+    ACTIVITY_PROGRESS_VIEW_ACTIVATED = 'activity_progress_view.activated'
+    ACTIVITY_PROGRESS_VIEW_DELETED = 'activity_progress_view.deleted'
 
     # Circuit definition and execution events
     CIRCUIT_CREATED = 'circuit.created'
@@ -283,11 +291,6 @@ class Events:
     CIRCUIT_ROUND_ADDED = 'circuit_round.added'
     CIRCUIT_ROUND_DELETED = 'circuit_round.deleted'
     ACTIVITY_SET_UPDATED = 'activity_set.updated'
-
-    # Activity Mode events
-    ACTIVITY_MODE_CREATED = 'activity_mode.created'
-    ACTIVITY_MODE_UPDATED = 'activity_mode.updated'
-    ACTIVITY_MODE_DELETED = 'activity_mode.deleted'
 
     # Fractal Metric events
     FRACTAL_METRIC_CREATED = 'fractal_metric.created'

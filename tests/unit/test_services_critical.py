@@ -446,7 +446,7 @@ class TestCompletionHandlerPublicFlow:
         assert fake_db.committed is True
         assert fake_db.closed is True
 
-    def test_handle_activity_metrics_updated_recomputes_completed_instance(self, monkeypatch):
+    def test_handle_activity_metrics_updated_refreshes_completed_instance_targets(self, monkeypatch):
         instance = SimpleNamespace(completed=True)
         fake_db = _fake_db_session(instance)
         reverted = []

@@ -737,7 +737,7 @@ class TestProgressService:
         assert result['metric_comparisons'][0]['previous_value'] == 220.0
         assert result['metric_comparisons'][0]['current_value'] is None
 
-    def test_recompute_progress_for_activity_rebases_downstream_instances(self, db_session, sample_ultimate_goal):
+    def test_dynamic_progress_rebases_downstream_instances_immediately(self, db_session, sample_ultimate_goal):
         activity, metrics = _build_activity_with_metrics(
             db_session,
             sample_ultimate_goal.id,
@@ -790,13 +790,11 @@ class TestProgressService:
         db_session.commit()
 
         service = ProgressService(db_session)
-        service.recompute_progress_for_activity(activity.id, sample_ultimate_goal.id)
-
         middle_metric = next(metric for metric in middle_instance.metric_values if metric.metric_definition_id == metrics[0].id)
         middle_metric.value = 130
         db_session.commit()
 
-        service.recompute_progress_for_activity(activity.id, sample_ultimate_goal.id)
+        service = ProgressService(db_session)
         latest_progress = service.get_progress_for_instance(latest_instance.id)
 
         assert latest_progress['previous_instance_id'] == middle_instance.id

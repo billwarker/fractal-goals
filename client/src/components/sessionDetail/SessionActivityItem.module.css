@@ -92,6 +92,10 @@
     max-width: 100%;
 }
 
+.activityIdentityText {
+    min-width: 0;
+}
+
 .activityName {
     font-weight: bold;
     font-size: 16px;
@@ -237,6 +241,13 @@
     min-width: 0;
     align-items: flex-end;
     flex-wrap: nowrap;
+}
+
+.instanceTagsSlot {
+    display: flex;
+    align-self: flex-end;
+    justify-content: flex-end;
+    flex: 0 0 auto;
 }
 
 .timerActionColumn {
@@ -581,6 +592,13 @@
     padding-left: 36px;
 }
 
+.progressExcluded {
+    margin: 2px 0 8px;
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-style: italic;
+}
+
 .setsContainer {
     display: flex;
     flex-direction: column;
@@ -614,6 +632,21 @@
     align-items: center;
     gap: 10px;
     min-width: 0;
+}
+
+.setTagsSlot {
+    display: flex;
+    justify-content: flex-end;
+    flex: 0 0 auto;
+}
+
+.setTrailingControls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex: 0 0 auto;
+    margin-left: auto;
 }
 
 .setYield {
@@ -925,6 +958,15 @@
         gap: 12px;
     }
 
+    .setTrailingControls {
+        grid-column: 2 / 4;
+        grid-row: 2;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-left: 0;
+    }
+
     .removeSetButton {
         grid-column: 3;
         grid-row: 1;
@@ -932,10 +974,7 @@
         padding-top: 6px;
     }
 
-    /* Yield drops below the metrics, full width, left-aligned — no longer squishing horizontally */
     .setYield {
-        grid-column: 2 / 4;
-        grid-row: 2;
         min-width: 0;
         text-align: left;
         padding-right: 0;
@@ -1091,6 +1130,15 @@
         gap: 12px;
     }
 
+    .setTrailingControls {
+        grid-column: 2 / 4;
+        grid-row: 2;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-left: 0;
+    }
+
     .removeSetButton {
         grid-column: 3;
         grid-row: 1;
@@ -1098,10 +1146,7 @@
         padding-top: 6px;
     }
 
-    /* Yield drops below the metrics, full width, left-aligned — no longer squishing horizontally */
     .setYield {
-        grid-column: 2 / 4;
-        grid-row: 2;
         min-width: 0;
         text-align: left;
         padding-right: 0;

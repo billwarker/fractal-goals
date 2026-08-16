@@ -181,7 +181,6 @@ function ProfileWindow({
             selectedCategory: null,
             selectedVisualization: null,
             selectedActivity: null,
-            selectedModeIds: [],
             selectedGoal: null,
         });
     };

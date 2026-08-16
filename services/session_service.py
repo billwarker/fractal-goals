@@ -23,6 +23,7 @@ from services.session_activity_service import SessionActivityService
 from services.session_analytics_service import SessionAnalyticsService
 from services.session_lifecycle_service import SessionLifecycleService
 from services.session_structure import extract_activity_definition_id
+from services.progress_service import ProgressService
 logger = logging.getLogger(__name__)
 
 def _program_goal_ids(db_session, program_id) -> set[str]:
@@ -95,7 +96,8 @@ class SessionService:
             selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.definition),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.split),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.progress_record),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.tags),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.tags),
             selectinload(Session.circuit_runs).selectinload(CircuitRun.slots),
             selectinload(Session.circuit_runs).selectinload(CircuitRun.rounds).selectinload(CircuitRound.members),
             selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program),
@@ -112,6 +114,18 @@ class SessionService:
             include_group_activities=True,
         )
         return resolve_effective_goals_by_activity(goals_by_id, activity_def_ids)
+
+    def _attach_dynamic_progress(self, sessions):
+        progress = ProgressService(self.db_session)
+        instances = [
+            instance
+            for session in sessions
+            for instance in (session.activity_instances or [])
+            if instance.deleted_at is None
+        ]
+        comparisons = progress.compute_comparisons_for_instances(instances)
+        for instance in instances:
+            instance._dynamic_progress = comparisons.get(instance.id)
 
     def _derive_session_goals_from_activities(self, session_obj) -> list[Goal]:
         """Derive display goals from session activities when persisted links are missing."""
@@ -283,6 +297,7 @@ class SessionService:
             sessions_q = sessions_q.offset(offset).limit(limit)
 
         sessions = sessions_q.all()
+        self._attach_dynamic_progress(sessions)
         self._attach_completed_goals(sessions)
         return [serialize_session(s) for s in sessions], None, 200
 
@@ -300,6 +315,7 @@ class SessionService:
             return None, "Session not found", 404
 
         self._attach_completed_goals([session])
+        self._attach_dynamic_progress([session])
 
         # Backward-compatible fallback for sessions created without persisted links.
         if not session.goals:

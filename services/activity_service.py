@@ -397,11 +397,6 @@ class ActivityService:
         if 'goal_ids' in data:
             self.db_session.expire(activity, ['associated_goals'])
 
-        progress_affecting_keys = {'track_progress', 'progress_aggregation', 'metrics'}
-        if progress_affecting_keys.intersection(data.keys()):
-            from services.progress_service import ProgressService
-            ProgressService(self.db_session).recompute_progress_for_activity(activity.id, root_id)
-
         event_bus.emit(Event(Events.ACTIVITY_UPDATED, {
             'activity_id': activity.id,
             'activity_name': activity.name,

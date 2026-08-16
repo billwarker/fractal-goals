@@ -15,6 +15,7 @@ import NoteTimeline from './NoteTimeline';
 import SessionActivityProgressSummary, { SummaryDelta } from './SessionActivityProgressSummary';
 import TimerConflictAction, { startTimerWithConflict } from './TimerConflictAction';
 import useRelativeTimeAdjustment from './useRelativeTimeAdjustment';
+import ActivityTagEditor from './ActivityTagEditor';
 import {
     SessionItemCard,
     SessionItemHeader,
@@ -28,6 +29,7 @@ import {
 import styles from './SessionActivityItem.module.css';
 
 function SessionActivityItemView({
+    rootId,
     handleActivityCardClick,
     isSelected,
     isDragging,
@@ -203,113 +205,115 @@ function SessionActivityItemView({
                         }}
                         className={styles.activityNameContainer}
                     >
-                        <div className={`${styles.activityName} ${styles.activityNameFlex}`}>
-                            <span className={styles.activityNameFlex}>
-                                {def.name}
-                                {!activityDefinition && <DeletedBadge />}
-                            </span>
-                            {isSelected && (
-                                <div className={styles.activityHeaderActions}>
-                                    {onOpenActivityBuilder && activityDefinition?.id && (
-                                        <button
-                                            type="button"
-                                            className={styles.editDefinitionButton}
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                onOpenActivityBuilder(activityDefinition);
-                                            }}
-                                            title="Edit activity definition"
-                                            aria-label={`Edit ${def.name}`}
-                                        >
-                                            <EditPencilIcon size={14} />
-                                        </button>
-                                    )}
-                                    {hasInstanceOptions && (
-                                        <div className={styles.instanceOptionsWrapper} ref={optionsRef}>
-                                            <button
-                                                type="button"
-                                                className={styles.editDefinitionButton}
-                                                onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    setIsOptionsOpen((open) => !open);
-                                                }}
-                                                title="Activity options"
-                                                aria-label={`${def.name} options`}
-                                                aria-expanded={isOptionsOpen}
-                                                aria-haspopup="menu"
-                                            >
-                                                ···
-                                            </button>
-                                            {isOptionsOpen && (
-                                                <DropdownMenu
-                                                    className={styles.instanceOptionsMenu}
-                                                    aria-label={`${def.name} activity options`}
+                            <div className={styles.activityIdentityText}>
+                                <div className={`${styles.activityName} ${styles.activityNameFlex}`}>
+                                    <span className={styles.activityNameFlex}>
+                                        {def.name}
+                                        {!activityDefinition && <DeletedBadge />}
+                                    </span>
+                                    {isSelected && (
+                                        <div className={styles.activityHeaderActions}>
+                                            {onOpenActivityBuilder && activityDefinition?.id && (
+                                                <button
+                                                    type="button"
+                                                    className={styles.editDefinitionButton}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        onOpenActivityBuilder(activityDefinition);
+                                                    }}
+                                                    title="Edit activity definition"
+                                                    aria-label={`Edit ${def.name}`}
                                                 >
-                                                    {onDuplicate && (
-                                                        <DropdownMenuItem
-                                                            onClick={(event) => handleOptionAction(event, onDuplicate)}
+                                                    <EditPencilIcon size={14} />
+                                                </button>
+                                            )}
+                                            {hasInstanceOptions && (
+                                                <div className={styles.instanceOptionsWrapper} ref={optionsRef}>
+                                                    <button
+                                                        type="button"
+                                                        className={styles.editDefinitionButton}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            setIsOptionsOpen((open) => !open);
+                                                        }}
+                                                        title="Activity options"
+                                                        aria-label={`${def.name} options`}
+                                                        aria-expanded={isOptionsOpen}
+                                                        aria-haspopup="menu"
+                                                    >
+                                                        ···
+                                                    </button>
+                                                    {isOptionsOpen && (
+                                                        <DropdownMenu
+                                                            className={styles.instanceOptionsMenu}
+                                                            aria-label={`${def.name} activity options`}
                                                         >
-                                                            Duplicate instance
-                                                        </DropdownMenuItem>
+                                                            {onDuplicate && (
+                                                                <DropdownMenuItem
+                                                                    onClick={(event) => handleOptionAction(event, onDuplicate)}
+                                                                >
+                                                                    Duplicate instance
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {showCopyPreviousValuesOption && (
+                                                                <DropdownMenuItem
+                                                                    disabled={copyPreviousValuesDisabled}
+                                                                    onClick={(event) => handleOptionAction(event, onCopyPreviousValues)}
+                                                                >
+                                                                    {copyPreviousValuesLabel}
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {onClearValues && (
+                                                                <DropdownMenuItem
+                                                                    onClick={(event) => handleOptionAction(event, onClearValues)}
+                                                                >
+                                                                    Clear logged values
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {onDelete && !quickMode && (
+                                                                <DropdownMenuItem
+                                                                    danger
+                                                                    onClick={(event) => handleOptionAction(event, onDelete)}
+                                                                >
+                                                                    Delete from session
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                        </DropdownMenu>
                                                     )}
-                                                    {showCopyPreviousValuesOption && (
-                                                        <DropdownMenuItem
-                                                            disabled={copyPreviousValuesDisabled}
-                                                            onClick={(event) => handleOptionAction(event, onCopyPreviousValues)}
-                                                        >
-                                                            {copyPreviousValuesLabel}
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    {onClearValues && (
-                                                        <DropdownMenuItem
-                                                            onClick={(event) => handleOptionAction(event, onClearValues)}
-                                                        >
-                                                            Clear logged values
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    {onDelete && !quickMode && (
-                                                        <DropdownMenuItem
-                                                            danger
-                                                            onClick={(event) => handleOptionAction(event, onDelete)}
-                                                        >
-                                                            Delete from session
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                </DropdownMenu>
+                                                </div>
                                             )}
                                         </div>
                                     )}
                                 </div>
-                            )}
-                        </div>
-                        {(groupLabel || averageDuration) && (
-                            <div className={styles.activityMetaLine}>
-                                {groupLabel && (
-                                    <span className={styles.activityGroupLabel}>{groupLabel}</span>
+                                {(groupLabel || averageDuration) && (
+                                    <div className={styles.activityMetaLine}>
+                                        {groupLabel && (
+                                            <span className={styles.activityGroupLabel}>{groupLabel}</span>
+                                        )}
+                                        {groupLabel && averageDuration && (
+                                            <span className={styles.activityMetaSeparator}>•</span>
+                                        )}
+                                        {averageDuration && (
+                                            <span
+                                                className={styles.activityAverage}
+                                                title={`Average based on ${averageDuration.sampleCount} completed activity instances`}
+                                            >
+                                                Avg {averageDuration.label}
+                                            </span>
+                                        )}
+                                    </div>
                                 )}
-                                {groupLabel && averageDuration && (
-                                    <span className={styles.activityMetaSeparator}>•</span>
-                                )}
-                                {averageDuration && (
-                                    <span
-                                        className={styles.activityAverage}
-                                        title={`Average based on ${averageDuration.sampleCount} completed activity instances`}
-                                    >
-                                        Avg {averageDuration.label}
-                                    </span>
+                                {def.description && (
+                                    <div className={styles.activityDescription} title={def.description}>
+                                        <Linkify
+                                            className={styles.activityDescriptionContent}
+                                            linkClassName={styles.activityDescriptionLink}
+                                        >
+                                            {def.description}
+                                        </Linkify>
+                                    </div>
                                 )}
                             </div>
-                        )}
-                        {def.description && (
-                            <div className={styles.activityDescription} title={def.description}>
-                                <Linkify
-                                    className={styles.activityDescriptionContent}
-                                    linkClassName={styles.activityDescriptionLink}
-                                >
-                                    {def.description}
-                                </Linkify>
-                            </div>
-                        )}
                     </div>
                 </SessionItemHeaderLeft>
 
@@ -330,6 +334,17 @@ function SessionActivityItemView({
                         <div className={styles.actionStack}>
                             <SessionItemTimerControls>
                                 <SessionItemTimerMeta>
+                                    {activityDefinition?.id ? (
+                                        <div className={styles.instanceTagsSlot}>
+                                            <ActivityTagEditor
+                                                rootId={rootId}
+                                                activityId={activityDefinition.id}
+                                                instanceId={exercise.id}
+                                                availableTags={activityDefinition.tags || []}
+                                                tags={exercise.tags || []}
+                                            />
+                                        </div>
+                                    ) : null}
                                     {/* DateTime Start Field */}
                                     <div className={styles.timerFieldContainer}>
                                         <div className={styles.timerLabelRow}>
@@ -513,6 +528,10 @@ function SessionActivityItemView({
                 )}
             </SessionItemHeader>
 
+            {activeProgress?.included === false ? (
+                <div className={styles.progressExcluded}>Excluded from the active progress view. Metrics remain available as raw session data.</div>
+            ) : null}
+
             {/* Content Area */}
             <div className={styles.contentArea}>
 
@@ -613,21 +632,39 @@ function SessionActivityItemView({
                                                 })()}
                                             </div>
                                         )}
+
                                     </div>
 
-                                    {yieldBySetIndex?.[setIdx] != null && (
-                                        <span className={styles.setYield}>
-                                            Yield: {formatAggValue(yieldBySetIndex[setIdx])}
-                                            {!activeProgress?.is_first_instance && prevYieldBySetIndex?.[setIdx] != null && (
-                                                <SummaryDelta
-                                                    current={yieldBySetIndex[setIdx]}
-                                                    previous={prevYieldBySetIndex[setIdx]}
-                                                    higherIsBetter
-                                                    styles={styles}
-                                                    displayMode={deltaDisplayMode}
-                                                />
+                                    {(yieldBySetIndex?.[setIdx] != null || (!quickMode && activityDefinition?.id && set.id)) && (
+                                        <div className={styles.setTrailingControls}>
+                                            {yieldBySetIndex?.[setIdx] != null && (
+                                                <span className={styles.setYield}>
+                                                    Yield: {formatAggValue(yieldBySetIndex[setIdx])}
+                                                    {!activeProgress?.is_first_instance && prevYieldBySetIndex?.[setIdx] != null && (
+                                                        <SummaryDelta
+                                                            current={yieldBySetIndex[setIdx]}
+                                                            previous={prevYieldBySetIndex[setIdx]}
+                                                            higherIsBetter
+                                                            styles={styles}
+                                                            displayMode={deltaDisplayMode}
+                                                        />
+                                                    )}
+                                                </span>
                                             )}
-                                        </span>
+
+                                            {!quickMode && activityDefinition?.id && set.id ? (
+                                                <div className={styles.setTagsSlot}>
+                                                    <ActivityTagEditor
+                                                        rootId={rootId}
+                                                        activityId={activityDefinition.id}
+                                                        setId={set.id}
+                                                        availableTags={activityDefinition.tags || []}
+                                                        tags={set.tags || []}
+                                                        inheritedTags={set.inherited_tags ?? exercise.tags ?? []}
+                                                    />
+                                                </div>
+                                            ) : null}
+                                        </div>
                                     )}
 
                                     <button onClick={() => handleRemoveSet(setIdx)} className={styles.removeSetButton} aria-label="Remove set">

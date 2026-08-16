@@ -588,7 +588,6 @@ class LandingPublishService:
             "metric_values",
             "metrics",
             "progress_comparison",
-            "progress_record",
             "target_value",
             "value",
             "operator",
@@ -1111,7 +1110,6 @@ class LandingPublishService:
             selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
             selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
             selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
-            selectinload(ActivityInstance.progress_record),
         ).filter(
             ActivityInstance.root_id == root.id,
             ActivityInstance.activity_definition_id.in_(activity_ids),

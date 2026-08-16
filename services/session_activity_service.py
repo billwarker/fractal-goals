@@ -31,6 +31,7 @@ from services.service_types import JsonDict, ServiceResult
 from services.session_runtime import is_quick_session
 from services.session_template_stats_service import SessionTemplateStatsService
 from services.work_interval_service import WorkIntervalService, utc_now_naive
+from services.progress_service import ProgressService
 
 
 class SessionActivityService:
@@ -191,13 +192,16 @@ class SessionActivityService:
             ).all()
         }
 
-        return [
-            serialize_activity_instance(
+        progress = ProgressService(self.db_session)
+        comparisons = progress.compute_comparisons_for_instances(instances)
+        payload = []
+        for inst in instances:
+            inst._dynamic_progress = comparisons.get(inst.id)
+            payload.append(serialize_activity_instance(
                 inst,
                 has_open_work_interval=inst.id in open_instance_ids,
-            )
-            for inst in instances
-        ], None, 200
+            ))
+        return payload, None, 200
 
     def add_activity_to_session(self, root_id, session_id, current_user_id, data) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)

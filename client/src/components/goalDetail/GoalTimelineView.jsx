@@ -228,7 +228,7 @@ function normalizeTimelineEntry(item, goalLevelHelpers, currentGoal = null) {
         metrics: visibleMetrics,
         activityInstance,
         activityDef: payload.activity_definition || null,
-        progressRecord: payload.progress_comparison || payload.progress_record || null,
+        progressRecord: payload.progress_comparison || null,
         iconConfig: resolveGoalIconConfig({
             item,
             goalLevel,

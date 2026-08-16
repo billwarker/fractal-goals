@@ -25,7 +25,7 @@ function comparisonMetricId(comparison) {
 }
 
 function getProgressComparisons(instance) {
-    const record = instance?.progress_comparison || instance?.progress_record;
+    const record = instance?.progress_comparison;
     return Array.isArray(record?.metric_comparisons) ? record.metric_comparisons : [];
 }
 
@@ -50,7 +50,7 @@ function progressValue(comparison) {
     return 0;
 }
 
-function EmptyMetricProgress({ children = 'Metric progress appears once persisted progress comparisons exist for this activity.' }) {
+function EmptyMetricProgress({ children = 'Metric progress appears once two included activity instances can be compared.' }) {
     return <EmptyState compact description={children} />;
 }
 

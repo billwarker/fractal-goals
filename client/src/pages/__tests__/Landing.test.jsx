@@ -207,7 +207,6 @@ const publishedExamples = {
                             selectedCategory: 'sessions',
                             selectedVisualization: 'sessionTrends',
                             selectedActivity: null,
-                            selectedModeIds: [],
                             selectedGoal: null,
                             visualizationState: { grain: 'week', metrics: ['sessions'] },
                             visualizationStateByKey: {
@@ -578,7 +577,6 @@ describe('Landing', () => {
                             selectedCategory: 'activities',
                             selectedVisualization: 'activityTrends',
                             selectedActivity: null,
-                            selectedModeIds: [],
                             selectedGoal: null,
                             visualizationState: { metrics: ['duration'] },
                             visualizationStateByKey: {

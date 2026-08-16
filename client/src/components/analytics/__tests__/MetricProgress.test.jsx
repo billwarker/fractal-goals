@@ -29,7 +29,7 @@ describe('MetricProgressChart', () => {
         barChart.mockClear();
     });
 
-    it('builds percent-improvement rows from persisted progress comparisons', () => {
+    it('builds percent-improvement rows from dynamic progress comparisons', () => {
         expect(buildMetricProgressRows({
             selectedMetricId: 'm1',
             instances: [

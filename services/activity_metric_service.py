@@ -317,19 +317,6 @@ class ActivityMetricService:
 
         metric._activity_count = self._activity_count_for_metric(metric.id)
 
-        progress_affecting_keys = {'higher_is_better', 'default_progress_aggregation', 'is_multiplicative'}
-        if progress_affecting_keys.intersection(data.keys()):
-            from services.progress_service import ProgressService
-            ps = ProgressService(self.db_session)
-            affected_activity_ids = [
-                row[0] for row in self.db_session.query(MetricDefinition.activity_id).filter(
-                    MetricDefinition.fractal_metric_id == metric_id,
-                    MetricDefinition.deleted_at.is_(None),
-                ).distinct().all()
-            ]
-            for activity_id in affected_activity_ids:
-                ps.recompute_progress_for_activity(activity_id, root_id)
-
         event_bus.emit(Event(Events.FRACTAL_METRIC_UPDATED, {
             'metric_id': metric.id,
             'name': metric.name,

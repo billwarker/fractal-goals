@@ -10,7 +10,73 @@ from .core import (
     MAX_DESCRIPTION_LENGTH,
     VALID_PROGRESS_AGGREGATIONS,
     sanitize_string,
+    HEX_COLOR_RE,
 )
+
+
+class ActivityTagCreateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
+    color: Optional[str] = Field(None, max_length=7)
+    sort_order: Optional[int] = Field(None, ge=0)
+
+    @field_validator('name')
+    @classmethod
+    def sanitize_name(cls, value: str) -> str:
+        return sanitize_string(value)
+
+    @field_validator('color')
+    @classmethod
+    def validate_color(cls, value: Optional[str]) -> Optional[str]:
+        if value in (None, ''):
+            return None
+        if not HEX_COLOR_RE.match(value):
+            raise ValueError('color must be a valid #RRGGBB hex color')
+        return value
+
+
+class ActivityTagUpdateSchema(ActivityTagCreateSchema):
+    name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
+
+
+class ActivityTagAssignmentSchema(BaseModel):
+    tag_ids: List[str] = Field(default_factory=list)
+
+
+class ProgressViewConfigSchema(BaseModel):
+    schema_version: int = Field(1, ge=1, le=1)
+    all_tag_ids: List[str] = Field(default_factory=list)
+    any_tag_ids: List[str] = Field(default_factory=list)
+    none_tag_ids: List[str] = Field(default_factory=list)
+
+
+class ActivityProgressViewCreateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
+    config: ProgressViewConfigSchema = Field(default_factory=ProgressViewConfigSchema)
+    activate: bool = True
+
+
+class ActivityProgressViewUpdateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    version: int = Field(..., ge=1)
+    name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
+    config: Optional[ProgressViewConfigSchema] = None
+
+
+class ActivityProgressViewActivateSchema(BaseModel):
+    view_id: Optional[str] = None
+
+
+class ActivityProgressQuerySchema(BaseModel):
+    view_id: Optional[str] = None
+    config: Optional[ProgressViewConfigSchema] = None
+    limit: int = Field(20, ge=1, le=100)
+    offset: int = Field(0, ge=0)
+    exclude_session_id: Optional[str] = None
 
 class ActivityInstanceCreateSchema(BaseModel):
     """Schema for creating an activity instance in a session."""
@@ -253,4 +319,3 @@ class ActivityGoalsSetSchema(BaseModel):
 class GroupReorderSchema(BaseModel):
     """Schema for reordering activity groups."""
     group_ids: List[str] = Field(..., min_length=1)
-

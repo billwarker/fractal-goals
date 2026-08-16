@@ -12,7 +12,6 @@ from models import (
     Goal,
     MetricDefinition,
     MetricValue,
-    ProgressRecord,
     Session,
 )
 
@@ -187,7 +186,7 @@ class TestProgressApi:
         assert summary_response.status_code == 404
         assert summary_response.get_json()['error'] == 'Session not found'
 
-    def test_instance_progress_prefers_persisted_record(self, authed_client, db_session, sample_activity_definition, sample_practice_session):
+    def test_instance_progress_is_calculated_without_a_persisted_snapshot(self, authed_client, db_session, sample_activity_definition, sample_practice_session):
         instance = ActivityInstance(
             id=str(uuid4()),
             root_id=sample_practice_session.root_id,
@@ -203,22 +202,6 @@ class TestProgressApi:
         db_session.add(instance)
         db_session.flush()
 
-        record = ProgressRecord(
-            id=str(uuid4()),
-            root_id=sample_practice_session.root_id,
-            activity_definition_id=sample_activity_definition.id,
-            activity_instance_id=instance.id,
-            session_id=sample_practice_session.id,
-            is_first_instance=False,
-            has_change=True,
-            has_improvement=True,
-            has_regression=False,
-            comparison_type='flat_metrics',
-            metric_comparisons=[],
-            derived_summary={'summary_line': 'Persisted summary'},
-            created_at=datetime(2026, 4, 1, tzinfo=timezone.utc),
-        )
-        db_session.add(record)
         db_session.commit()
 
         response = authed_client.get(
@@ -227,9 +210,9 @@ class TestProgressApi:
 
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload['id'] == record.id
-        assert payload['derived_summary']['summary_line'] == 'Persisted summary'
-        assert payload['created_at'] is not None
+        assert payload['activity_instance_id'] == instance.id
+        assert payload['included'] is True
+        assert payload['is_first_instance'] is True
 
     def test_instance_progress_returns_null_when_root_progress_is_disabled(self, authed_client, db_session, sample_ultimate_goal):
         root_id = sample_ultimate_goal.id
@@ -272,7 +255,7 @@ class TestProgressApi:
         assert response.status_code == 200
         assert response.get_json() is None
 
-    def test_completed_metric_updates_refresh_persisted_progress(self, authed_client, db_session, sample_ultimate_goal):
+    def test_completed_metric_updates_refresh_dynamic_progress(self, authed_client, db_session, sample_ultimate_goal):
         root_id = sample_ultimate_goal.id
         activity = ActivityDefinition(
             id=str(uuid4()),
@@ -357,32 +340,6 @@ class TestProgressApi:
                 value=105,
             ),
         ])
-        stale_record = ProgressRecord(
-            id=str(uuid4()),
-            root_id=root_id,
-            activity_definition_id=activity.id,
-            activity_instance_id=current_instance.id,
-            session_id=current_session.id,
-            previous_instance_id=prev_instance.id,
-            is_first_instance=False,
-            has_change=True,
-            has_improvement=True,
-            has_regression=False,
-            comparison_type='flat_metrics',
-            metric_comparisons=[{
-                'metric_id': metric.id,
-                'metric_name': 'Speed',
-                'current_value': 105,
-                'previous_value': 100,
-                'delta': 5,
-                'pct_change': 5.0,
-                'improved': True,
-                'regressed': False,
-            }],
-            derived_summary={'summary_line': 'Speed up 5.0%'},
-            created_at=datetime(2026, 4, 10, 10, 6, tzinfo=timezone.utc),
-        )
-        db_session.add(stale_record)
         db_session.commit()
 
         response = authed_client.put(
@@ -539,7 +496,7 @@ class TestProgressApi:
         history_payload = history_response.get_json()
         assert [entry['id'] for entry in history_payload] == [instance_a.id]
 
-    def test_completed_set_updates_return_and_persist_progress(self, authed_client, db_session, sample_ultimate_goal):
+    def test_completed_set_updates_return_dynamic_progress(self, authed_client, db_session, sample_ultimate_goal):
         root_id = sample_ultimate_goal.id
         activity = ActivityDefinition(
             id=str(uuid4()),

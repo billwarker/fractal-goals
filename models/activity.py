@@ -5,30 +5,6 @@ import uuid
 from .base import Base, utc_now, JSON_TYPE
 
 
-class ProgressRecord(Base):
-    __tablename__ = 'progress_records'
-
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
-    activity_definition_id = Column(String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), nullable=False)
-    activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False, unique=True)
-    session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=False)
-    previous_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True)
-    is_first_instance = Column(Boolean, default=False, nullable=False, server_default=sa.text('false'))
-    has_change = Column(Boolean, default=False, nullable=False, server_default=sa.text('false'))
-    has_improvement = Column(Boolean, default=False, nullable=False, server_default=sa.text('false'))
-    has_regression = Column(Boolean, default=False, nullable=False, server_default=sa.text('false'))
-    comparison_type = Column(String, nullable=True)  # 'flat_metrics' | 'set_metrics' | 'yield' | 'first_instance'
-    metric_comparisons = Column(JSON_TYPE, nullable=True)  # list of per-metric dicts
-    derived_summary = Column(JSON_TYPE, nullable=True)  # UI-facing aggregates
-    created_at = Column(DateTime, default=utc_now)
-
-    __table_args__ = (
-        sa.Index('ix_progress_records_root_activity_created', 'root_id', 'activity_definition_id', 'created_at'),
-        sa.Index('ix_progress_records_session', 'session_id'),
-    )
-
-
 class FractalMetricDefinition(Base):
     __tablename__ = 'fractal_metric_definitions'
 
@@ -98,10 +74,33 @@ class ActivityDefinition(Base):
     track_progress = Column(Boolean, nullable=True)       # null → treat as True (backward compat)
     progress_aggregation = Column(String, nullable=True)  # 'last' | 'sum' | 'max' | 'yield'
     delta_display_mode = Column(String(16), nullable=True)  # null = inherit from root; 'percent' | 'absolute'
+    active_progress_view_id = Column(
+        String,
+        ForeignKey(
+            'activity_progress_views.id',
+            ondelete='SET NULL',
+            use_alter=True,
+            name='fk_activity_definitions_active_progress_view_id',
+        ),
+        nullable=True,
+        index=True,
+    )
 
     group = relationship("ActivityGroup", backref="activities")
     metric_definitions = relationship("MetricDefinition", backref="activity_definition", cascade="all, delete-orphan")
     split_definitions = relationship("SplitDefinition", backref="activity_definition", cascade="all, delete-orphan")
+    tags = relationship("ActivityTag", back_populates="activity_definition", cascade="all, delete-orphan")
+    progress_views = relationship(
+        "ActivityProgressView",
+        back_populates="activity_definition",
+        cascade="all, delete-orphan",
+        foreign_keys="ActivityProgressView.activity_definition_id",
+    )
+    active_progress_view = relationship(
+        "ActivityProgressView",
+        foreign_keys=[active_progress_view_id],
+        post_update=True,
+    )
     
     associated_goals = relationship(
         "Goal",
@@ -150,6 +149,117 @@ class SplitDefinition(Base):
     deleted_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
+
+class ActivityTag(Base):
+    __tablename__ = 'activity_tags'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    activity_definition_id = Column(
+        String,
+        ForeignKey('activity_definitions.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    name = Column(String, nullable=False)
+    color = Column(String(7), nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0, server_default='0')
+    created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
+    deleted_at = Column(DateTime, nullable=True)
+
+    activity_definition = relationship("ActivityDefinition", back_populates="tags")
+
+    __table_args__ = (
+        sa.Index(
+            'uq_activity_tags_active_name',
+            'activity_definition_id',
+            sa.func.lower(name),
+            unique=True,
+            postgresql_where=sa.text('deleted_at IS NULL'),
+        ),
+        sa.CheckConstraint(
+            "color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$'",
+            name='ck_activity_tags_color',
+        ),
+    )
+
+
+class ActivityProgressView(Base):
+    __tablename__ = 'activity_progress_views'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    activity_definition_id = Column(
+        String,
+        ForeignKey('activity_definitions.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    name = Column(String, nullable=False)
+    config = Column(JSON_TYPE, nullable=False, default=dict, server_default=sa.text("'{}'::jsonb"))
+    version = Column(Integer, nullable=False, default=1, server_default='1')
+    created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
+    deleted_at = Column(DateTime, nullable=True)
+
+    activity_definition = relationship(
+        "ActivityDefinition",
+        back_populates="progress_views",
+        foreign_keys=[activity_definition_id],
+    )
+
+    __table_args__ = (
+        sa.Index(
+            'uq_activity_progress_views_active_name',
+            'activity_definition_id',
+            sa.func.lower(name),
+            unique=True,
+            postgresql_where=sa.text('deleted_at IS NULL'),
+        ),
+        sa.CheckConstraint('version > 0', name='ck_activity_progress_views_version_positive'),
+    )
+
+
+class ActivityInstanceTag(Base):
+    __tablename__ = 'activity_instance_tags'
+
+    activity_instance_id = Column(
+        String,
+        ForeignKey('activity_instances.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    activity_tag_id = Column(
+        String,
+        ForeignKey('activity_tags.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
+
+    __table_args__ = (
+        sa.Index('ix_activity_instance_tags_tag', 'activity_tag_id', 'activity_instance_id'),
+    )
+
+
+class ActivitySetTag(Base):
+    __tablename__ = 'activity_set_tags'
+
+    activity_set_id = Column(
+        String,
+        ForeignKey('activity_sets.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    activity_tag_id = Column(
+        String,
+        ForeignKey('activity_tags.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
+
+    __table_args__ = (
+        sa.Index('ix_activity_set_tags_tag', 'activity_tag_id', 'activity_set_id'),
+    )
+
 class ActivityInstance(Base):
     __tablename__ = 'activity_instances'
 
@@ -179,14 +289,12 @@ class ActivityInstance(Base):
     )
     work_intervals = relationship("SessionWorkInterval", back_populates="activity_instance")
     definition = relationship("ActivityDefinition")
-    progress_record = relationship(
-        "ProgressRecord",
-        primaryjoin="ActivityInstance.id == ProgressRecord.activity_instance_id",
-        foreign_keys="[ProgressRecord.activity_instance_id]",
-        uselist=False,
-        lazy="noload",
+    tags = relationship(
+        "ActivityTag",
+        secondary="activity_instance_tags",
+        lazy="selectin",
+        order_by="ActivityTag.sort_order, ActivityTag.name",
     )
-
     completed = Column(Boolean, default=False)
     notes = Column(String, nullable=True)
     data = Column(JSON_TYPE, nullable=True)
@@ -236,6 +344,12 @@ class ActivitySet(Base):
         back_populates="activity_set",
         uselist=False,
         foreign_keys="CircuitRoundMember.activity_set_id",
+    )
+    tags = relationship(
+        "ActivityTag",
+        secondary="activity_set_tags",
+        lazy="selectin",
+        order_by="ActivityTag.sort_order, ActivityTag.name",
     )
 
     __table_args__ = (

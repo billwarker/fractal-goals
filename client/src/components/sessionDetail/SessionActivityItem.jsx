@@ -682,6 +682,7 @@ function SessionActivityItem({
 
     return (
         <SessionActivityItemView
+            rootId={rootId}
             handleActivityCardClick={handleActivityCardClick}
             isSelected={isSelected}
             isDragging={isDragging}

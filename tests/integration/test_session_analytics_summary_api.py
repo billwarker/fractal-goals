@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from models import ActivityInstance, MetricDefinition, MetricValue, ProgressRecord, Session
+from models import ActivityInstance, MetricDefinition, MetricValue, Session
 
 
 @pytest.mark.integration
@@ -40,30 +40,6 @@ def test_session_analytics_summary_returns_lightweight_sessions_and_activity_ins
         value=185,
     )
     db_session.add(metric_value)
-    progress_record = ProgressRecord(
-        id=str(uuid4()),
-        root_id=root_id,
-        activity_definition_id=sample_activity_definition.id,
-        activity_instance_id=sample_activity_instance.id,
-        session_id=sample_practice_session.id,
-        is_first_instance=False,
-        has_change=True,
-        has_improvement=True,
-        has_regression=False,
-        comparison_type='flat_metrics',
-        metric_comparisons=[{
-            "metric_id": sample_activity_definition.metric_definitions[0].id,
-            "metric_name": sample_activity_definition.metric_definitions[0].name,
-            "previous_value": 175,
-            "current_value": 185,
-            "pct_change": 5.7,
-            "improved": True,
-            "regressed": False,
-        }],
-        derived_summary={},
-        created_at=datetime(2026, 3, 8, 10, 5, tzinfo=timezone.utc),
-    )
-    db_session.add(progress_record)
 
     legacy_session = Session(
         owner_id=sample_practice_session.owner_id,
@@ -116,7 +92,9 @@ def test_session_analytics_summary_returns_lightweight_sessions_and_activity_ins
     assert persisted_instance['session_id'] == sample_practice_session.id
     assert persisted_instance['session_name'] == sample_practice_session.name
     assert persisted_instance['metrics'][0]['metric_id'] == sample_activity_definition.metric_definitions[0].id
-    assert persisted_instance['progress_comparison']['metric_comparisons'][0]['pct_change'] == 5.7
+    assert persisted_instance['progress_comparison']['included'] is True
+    assert persisted_instance['progress_comparison']['is_first_instance'] is True
+    assert persisted_instance['progress_comparison']['metric_comparisons'] == []
     assert legacy_instance['session_id'] == legacy_session.id
     assert legacy_instance['activity_definition_id'] == sample_activity_definition.id
 
