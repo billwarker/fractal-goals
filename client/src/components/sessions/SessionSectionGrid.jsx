@@ -93,6 +93,7 @@ const SectionColumn = memo(function SectionColumn({
                                     circuit={item.circuit}
                                     activities={activities}
                                     activityInstances={activityInstances}
+                                    deltaDisplayMode={deltaDisplayMode}
                                 />
                             );
                         }

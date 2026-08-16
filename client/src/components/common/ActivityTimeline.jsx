@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { ClockIcon } from '../atoms/AppIcons';
 import MarkdownNoteContent from '../notes/MarkdownNoteContent';
+import ActivityTagBadges from './ActivityTagBadges';
 import SessionTemplateNameBadge from './SessionTemplateNameBadge';
 import {
     canComputeYield,
@@ -349,6 +350,12 @@ export function ActivityTimelineCard({
                 </div>
             )}
 
+            <ActivityTagBadges
+                tags={instance.tags}
+                className={styles.timelineInstanceTags}
+                ariaLabel="Activity tags"
+            />
+
             {sets.length > 0 && (
                 <div className={styles.timelineCardSets}>
                     {sets.map((set, idx) => (
@@ -378,6 +385,11 @@ export function ActivityTimelineCard({
                                     );
                                 })}
                             </div>
+                            <ActivityTagBadges
+                                tags={set.tags}
+                                className={styles.timelineSetTags}
+                                ariaLabel={`Set ${idx + 1} tags`}
+                            />
                             {yieldBySetIndex?.[idx] != null && (() => {
                                 const currYield = yieldBySetIndex[idx];
                                 const prevYield = prevYieldBySetIndex?.[idx];

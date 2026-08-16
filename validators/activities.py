@@ -4,7 +4,7 @@ Re-exported by the validators package __init__, so existing
 `from validators import <Schema>` imports keep working.
 """
 from typing import Optional, List, Any, Dict
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from .core import (
     MAX_NAME_LENGTH,
     MAX_DESCRIPTION_LENGTH,
@@ -14,8 +14,23 @@ from .core import (
 )
 
 
+MAX_PROGRESS_TAG_IDS = 100
+MAX_ENTITY_ID_LENGTH = 64
+
+
+def _normalized_entity_ids(values: List[str]) -> List[str]:
+    normalized = []
+    for raw_value in values:
+        value = str(raw_value).strip()
+        if not value or len(value) > MAX_ENTITY_ID_LENGTH or any(character.isspace() for character in value):
+            raise ValueError('tag IDs must be non-empty identifiers of at most 64 characters')
+        if value not in normalized:
+            normalized.append(value)
+    return normalized
+
+
 class ActivityTagCreateSchema(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
 
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     color: Optional[str] = Field(None, max_length=7)
@@ -41,18 +56,45 @@ class ActivityTagUpdateSchema(ActivityTagCreateSchema):
 
 
 class ActivityTagAssignmentSchema(BaseModel):
-    tag_ids: List[str] = Field(default_factory=list)
+    model_config = ConfigDict(extra='forbid')
+    tag_ids: List[str] = Field(default_factory=list, max_length=MAX_PROGRESS_TAG_IDS)
+    version: Optional[int] = Field(None, ge=1)
+
+    @field_validator('tag_ids')
+    @classmethod
+    def validate_tag_ids(cls, values: List[str]) -> List[str]:
+        return _normalized_entity_ids(values)
 
 
 class ProgressViewConfigSchema(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     schema_version: int = Field(1, ge=1, le=1)
-    all_tag_ids: List[str] = Field(default_factory=list)
-    any_tag_ids: List[str] = Field(default_factory=list)
-    none_tag_ids: List[str] = Field(default_factory=list)
+    all_tag_ids: List[str] = Field(default_factory=list, max_length=MAX_PROGRESS_TAG_IDS)
+    any_tag_ids: List[str] = Field(default_factory=list, max_length=MAX_PROGRESS_TAG_IDS)
+    none_tag_ids: List[str] = Field(default_factory=list, max_length=MAX_PROGRESS_TAG_IDS)
+
+    @field_validator('all_tag_ids', 'any_tag_ids', 'none_tag_ids')
+    @classmethod
+    def validate_tag_ids(cls, values: List[str]) -> List[str]:
+        return _normalized_entity_ids(values)
+
+    @model_validator(mode='after')
+    def reject_overlapping_buckets(self):
+        buckets = {
+            'All of': set(self.all_tag_ids),
+            'Any of': set(self.any_tag_ids),
+            'None of': set(self.none_tag_ids),
+        }
+        names = list(buckets)
+        for index, left_name in enumerate(names):
+            for right_name in names[index + 1:]:
+                if buckets[left_name] & buckets[right_name]:
+                    raise ValueError(f'A tag cannot appear in both {left_name} and {right_name}')
+        return self
 
 
 class ActivityProgressViewCreateSchema(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
 
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     config: ProgressViewConfigSchema = Field(default_factory=ProgressViewConfigSchema)
@@ -60,7 +102,7 @@ class ActivityProgressViewCreateSchema(BaseModel):
 
 
 class ActivityProgressViewUpdateSchema(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
 
     version: int = Field(..., ge=1)
     name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
@@ -68,10 +110,12 @@ class ActivityProgressViewUpdateSchema(BaseModel):
 
 
 class ActivityProgressViewActivateSchema(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     view_id: Optional[str] = None
 
 
 class ActivityProgressQuerySchema(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     view_id: Optional[str] = None
     config: Optional[ProgressViewConfigSchema] = None
     limit: int = Field(20, ge=1, le=100)

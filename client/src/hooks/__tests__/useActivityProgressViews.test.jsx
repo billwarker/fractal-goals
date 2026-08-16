@@ -42,9 +42,17 @@ describe('useActivityTagMutations', () => {
             'root-1',
             'instance-1',
             ['tag-1'],
+            undefined,
         );
         expect(invalidateSpy).toHaveBeenCalledWith({
             queryKey: queryKeys.sessionActivitiesRoot('root-1'),
+        });
+        expect(invalidateSpy).toHaveBeenCalledWith({
+            queryKey: queryKeys.activityTags('root-1', 'activity-1'),
+        });
+        expect(invalidateSpy).toHaveBeenCalledWith({
+            queryKey: queryKeys.activityProgressTimelineRoot('root-1', 'activity-1'),
+            refetchType: 'all',
         });
     });
 });

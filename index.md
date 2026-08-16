@@ -47,7 +47,9 @@ The backend is split into:
 
 Migration health note: revisions `c6e8f1a3b5d7` and `d7f9a2c4e6b8` close the model/schema drift exposed during the circuit hardening pass. They remove the obsolete visualization-annotation and note set-index shapes, normalize JSON-backed analytics and goal settings to PostgreSQL JSONB, restore missing indexes, align defaults/nullability/composite indexes, and make early circuit-rollout databases converge on the canonical cascade and NULL-equal metric-result uniqueness rules. The rollout reconciliation deterministically retains the most recently updated metric value if a legacy database contains duplicates that the old NULL-distinct constraint allowed. Both incremental downgrade/upgrade and fresh zero-to-head replays pass on an isolated PostgreSQL database, and `alembic check` reports no pending operations. Backend CI now provisions PostgreSQL and gates every model or migration change on upgrade-to-head, schema-drift detection, one-step downgrade/re-upgrade reversibility, and a final drift check.
 
-Revision `a2c4e6f8b1d3` contracts the progress rebuild: it introduces activity tags, instance/set tag junctions, saved progress views and the active-view pointer, then drops the obsolete `progress_records` snapshot table after all readers switch to dynamic calculation. A fresh zero-to-head upgrade, model drift check, and one-step downgrade/re-upgrade pass on PostgreSQL.
+Revision `a2c4e6f8b1d3` contracts the progress rebuild: it introduces activity tags, instance/set tag junctions, saved progress views and the active-view pointer, then drops the obsolete `progress_records` snapshot table after all readers switch to dynamic calculation. Corrective revision `b3d5f7a9c2e4` adds optimistic versions for instance/set tag assignment, partial indexes for active tag/view and history access, database-enforced root/activity ownership for tag junctions and active-view pointers, and safely contracts any head-stamped rollout database that retained the obsolete snapshot table. Fresh zero-to-head, model drift, and one-step downgrade/re-upgrade checks pass on an isolated PostgreSQL database. Applying `b3d5f7a9c2e4` to an existing database that still contains `progress_records` is intentionally destructive to those obsolete snapshots and must be treated as an explicit rollout decision.
+
+Revision `c4e6a8b1d3f5` reconciles databases that were stamped at `b3d5f7a9c2e4` while missing its assignment-version columns or partial indexes. It uses idempotent PostgreSQL DDL, preserves all user data, and makes startup recovery safe for both complete and partially applied rollout states.
 
 The intended backend flow is:
 
@@ -477,9 +479,12 @@ They support:
 
 - on-demand comparisons over canonical activity instances, normalized sets, and metric values; no progress snapshot table or recomputation workflow remains
 - activity-owned tags assigned directly to instances or sets; instance tags are inherited by every set at calculation time and are never copied
+- direct tags are visible on session cards, session-detail timeline rows, quick-session cards, and circuit work summaries; instance tags render once at the parent level and set rows show direct set tags only after their metrics
 - any number of named, versioned saved progress views per activity using structured `All of` / `Any of` / `None of` tag predicates
 - one activity-wide active saved view, with an implicit immutable **All History** view represented by a null active pointer
 - server-calculated inline draft previews that never mutate the active view; Save as creates and activates a new view, and deleting the active view atomically falls back to All History
+- optimistic version checks protect both saved-view edits and rapid instance/set assignment replacement; conflicts preserve the local draft and offer reload or Save as recovery
+- a collapsed-by-default timeline view control that expands into an incremental predicate editor; `All of`, `Any of`, and `None of` operators are added or removed individually instead of rendering empty buckets
 - explicit excluded-current comparisons with no deltas, while raw instance metrics and muted timeline rows remain visible
 - canonical effective-time ordering with ID tie-breaking and the rule that a predecessor comes from another session
 - live comparison hints while a session is still in progress, filtered by the same active view as completed history
@@ -487,7 +492,7 @@ They support:
 - root-level progress enablement and percent/absolute display settings
 - a consolidated activity timeline contract plus dynamically calculated compatibility APIs for instance progress, activity history, and session summaries
 
-Archived tags retain their historical assignments and saved-view meaning. They can be retained on an existing assignment but cannot be newly assigned. Session list/detail, circuits, and `activities:metricProgress` receive the same active-view comparison payload. Timeline calculations batch each activity history and build its comparison chain once, avoiding per-row predecessor queries.
+Archived tags retain their historical assignments and saved-view meaning. They can be retained on an existing assignment but cannot be newly assigned, and may be restored from tag management. Session list/detail, circuits, and `activities:metricProgress` receive the same active-view comparison payload. Timeline history uses offset-based incremental loading; calculation filters and counts in SQL, fetches lightweight identities for ordering, and eager-loads only the visible page plus required predecessors. Session summaries batch target activities instead of issuing per-instance comparison queries.
 
 Key backend pieces:
 

@@ -1,16 +1,33 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 
 const invalidateProgress = (queryClient, rootId, activityId) => Promise.all([
-    queryClient.invalidateQueries({ queryKey: queryKeys.activityProgressViews(rootId, activityId) }),
-    queryClient.invalidateQueries({ queryKey: queryKeys.activityProgressTimeline(rootId, activityId) }),
+    queryClient.invalidateQueries({
+        queryKey: queryKeys.activityProgressTimelineRoot(rootId, activityId),
+        refetchType: 'all',
+    }),
     queryClient.invalidateQueries({ queryKey: queryKeys.progressRoot() }),
     queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) }),
     queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivitiesRoot(rootId) }),
     queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) }),
 ]);
+
+const invalidateTagsAndProgress = (queryClient, rootId, activityId) => Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.activityTags(rootId, activityId) }),
+    invalidateProgress(queryClient, rootId, activityId),
+]);
+
+export function progressPreviewSignature(config) {
+    if (!config) return null;
+    return JSON.stringify({
+        schema_version: 1,
+        all_tag_ids: [...(config.all_tag_ids || [])].sort(),
+        any_tag_ids: [...(config.any_tag_ids || [])].sort(),
+        none_tag_ids: [...(config.none_tag_ids || [])].sort(),
+    });
+}
 
 export function useActivityTags(rootId, activityId, { includeArchived = true } = {}) {
     return useQuery({
@@ -30,25 +47,43 @@ export function useActivityProgressTimeline(rootId, activityId, {
     draftConfig = null,
     limit = 20,
 } = {}) {
-    const previewKey = draftConfig ? JSON.stringify(draftConfig) : null;
-    return useQuery({
+    const previewKey = progressPreviewSignature(draftConfig);
+    return useInfiniteQuery({
         queryKey: [...queryKeys.activityProgressTimeline(rootId, activityId, excludeSessionId), limit, previewKey],
         enabled: Boolean(rootId && activityId),
-        queryFn: async () => {
+        initialPageParam: 0,
+        queryFn: async ({ pageParam }) => {
             if (draftConfig) {
                 const response = await fractalApi.queryActivityProgress(rootId, activityId, {
                     config: draftConfig,
                     exclude_session_id: excludeSessionId,
                     limit,
-                    offset: 0,
+                    offset: pageParam,
                 });
                 return response.data;
             }
             const response = await fractalApi.getActivityProgressTimeline(rootId, activityId, {
                 exclude_session_id: excludeSessionId,
                 limit,
+                offset: pageParam,
             });
             return response.data;
+        },
+        getNextPageParam: (lastPage) => {
+            const nextOffset = Number(lastPage?.offset || 0) + (lastPage?.items?.length || 0);
+            return nextOffset < Number(lastPage?.total || 0) ? nextOffset : undefined;
+        },
+        select: (result) => {
+            const firstPage = result.pages[0] || {};
+            return {
+                ...result,
+                pages: result.pages,
+                pageParams: result.pageParams,
+                combined: {
+                    ...firstPage,
+                    items: result.pages.flatMap((page) => page.items || []),
+                },
+            };
         },
     });
 }
@@ -74,7 +109,7 @@ export function useActivityProgressViewMutations(rootId, activityId) {
 
 export function useActivityTagMutations(rootId, activityId) {
     const queryClient = useQueryClient();
-    const invalidate = () => invalidateProgress(queryClient, rootId, activityId);
+    const invalidate = () => invalidateTagsAndProgress(queryClient, rootId, activityId);
     const create = useMutation({
         mutationFn: (data) => fractalApi.createActivityTag(rootId, activityId, data),
         onSuccess: invalidate,
@@ -87,20 +122,25 @@ export function useActivityTagMutations(rootId, activityId) {
         mutationFn: (tagId) => fractalApi.archiveActivityTag(rootId, activityId, tagId),
         onSuccess: invalidate,
     });
+    const restore = useMutation({
+        mutationFn: (tagId) => fractalApi.restoreActivityTag(rootId, activityId, tagId),
+        onSuccess: invalidate,
+    });
     const assignInstance = useMutation({
-        mutationFn: ({ instanceId, tagIds }) => fractalApi.replaceActivityInstanceTags(rootId, instanceId, tagIds),
+        mutationFn: ({ instanceId, tagIds, version }) => fractalApi.replaceActivityInstanceTags(rootId, instanceId, tagIds, version),
         onSuccess: invalidate,
     });
     const assignSet = useMutation({
-        mutationFn: ({ setId, tagIds }) => fractalApi.replaceActivitySetTags(rootId, setId, tagIds),
+        mutationFn: ({ setId, tagIds, version }) => fractalApi.replaceActivitySetTags(rootId, setId, tagIds, version),
         onSuccess: invalidate,
     });
     return {
         createTag: (data) => create.mutateAsync(data),
         updateTag: (data) => update.mutateAsync(data),
         archiveTag: (tagId) => archive.mutateAsync(tagId),
+        restoreTag: (tagId) => restore.mutateAsync(tagId),
         assignInstanceTags: (data) => assignInstance.mutateAsync(data),
         assignSetTags: (data) => assignSet.mutateAsync(data),
-        isPending: create.isPending || update.isPending || archive.isPending || assignInstance.isPending || assignSet.isPending,
+        isPending: create.isPending || update.isPending || archive.isPending || restore.isPending || assignInstance.isPending || assignSet.isPending,
     };
 }

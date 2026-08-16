@@ -60,6 +60,16 @@ def test_saved_progress_view_lifecycle_and_non_mutating_preview(
     )
     assert assigned.status_code == 200
 
+    session_payload = authed_client.get(
+        f'/api/{root_id}/sessions/{sample_activity_instance.session_id}/activities'
+    ).get_json()
+    serialized_instance = next(item for item in session_payload if item['id'] == sample_activity_instance.id)
+    assert [item['id'] for item in serialized_instance['tags']] == [tag['id']]
+    serialized_set = next(item for item in serialized_instance['sets'] if item['id'] == activity_set.id)
+    assert serialized_set['tags'] == []
+    assert [item['id'] for item in serialized_set['inherited_tags']] == [tag['id']]
+    assert [item['id'] for item in serialized_set['effective_tags']] == [tag['id']]
+
     created = authed_client.post(
         f'/api/{root_id}/activities/{activity_id}/progress-views',
         json={
@@ -76,6 +86,7 @@ def test_saved_progress_view_lifecycle_and_non_mutating_preview(
     assert timeline.status_code == 200
     assert timeline.get_json()['active_view_id'] == view['id']
     assert timeline.get_json()['items'][0]['included'] is True
+    assert [item['id'] for item in timeline.get_json()['items'][0]['tags']] == [tag['id']]
 
     preview = authed_client.post(
         f'/api/{root_id}/activities/{activity_id}/progress-query',
@@ -174,3 +185,103 @@ def test_set_tag_filter_uses_only_matching_sets_and_preserves_source_index(
     auto = progress['derived_summary']['auto_aggregations']
     assert auto['additive_totals'][metric.id] == 20
     assert auto['best_set_index'] == 1
+
+
+@pytest.mark.integration
+def test_multiple_saved_views_config_round_trip_activation_and_assignment_versions(
+    authed_client,
+    db_session,
+    sample_activity_definition,
+    sample_activity_instance,
+):
+    root_id = sample_activity_definition.root_id
+    activity_id = sample_activity_definition.id
+    tags = []
+    for name in ('Competition', 'Heavy'):
+        response = authed_client.post(
+            f'/api/{root_id}/activities/{activity_id}/tags',
+            json={'name': name},
+        )
+        assert response.status_code == 201
+        tags.append(response.get_json())
+
+    assigned = authed_client.put(
+        f'/api/{root_id}/activity-instances/{sample_activity_instance.id}/tags',
+        json={'tag_ids': [tags[0]['id']], 'version': 1},
+    )
+    assert assigned.status_code == 200
+    assert assigned.get_json()['version'] == 2
+    stale = authed_client.put(
+        f'/api/{root_id}/activity-instances/{sample_activity_instance.id}/tags',
+        json={'tag_ids': [tags[1]['id']], 'version': 1},
+    )
+    assert stale.status_code == 409
+    assert stale.get_json()['details']['version'] == 2
+
+    first = authed_client.post(
+        f'/api/{root_id}/activities/{activity_id}/progress-views',
+        json={'name': 'Meet prep', 'config': {'all_tag_ids': [tags[0]['id']]}, 'activate': True},
+    )
+    assert first.status_code == 201
+    first_view = first.get_json()
+    second = authed_client.post(
+        f'/api/{root_id}/activities/{activity_id}/progress-views',
+        json={'name': 'Heavy days', 'config': {'all_tag_ids': [tags[1]['id']]}, 'activate': False},
+    )
+    assert second.status_code == 201
+    second_view = second.get_json()
+    duplicate = authed_client.post(
+        f'/api/{root_id}/activities/{activity_id}/progress-views',
+        json={'name': 'MEET PREP'},
+    )
+    assert duplicate.status_code == 409
+
+    updated = authed_client.put(
+        f'/api/{root_id}/activities/{activity_id}/progress-views/{first_view["id"]}',
+        json={
+            'version': first_view['version'],
+            'config': {'none_tag_ids': [tags[0]['id']]},
+        },
+    )
+    assert updated.status_code == 200
+    updated_view = updated.get_json()
+    assert updated_view['config']['none_tag_ids'] == [tags[0]['id']]
+    assert updated_view['version'] == first_view['version'] + 1
+
+    listed = authed_client.get(f'/api/{root_id}/activities/{activity_id}/progress-views')
+    assert listed.status_code == 200
+    listed_by_id = {view['id']: view for view in listed.get_json()['views']}
+    assert listed_by_id[first_view['id']]['config']['none_tag_ids'] == [tags[0]['id']]
+    timeline = authed_client.get(f'/api/{root_id}/activities/{activity_id}/progress-timeline')
+    assert timeline.get_json()['items'][0]['included'] is False
+
+    activated = authed_client.put(
+        f'/api/{root_id}/activities/{activity_id}/active-progress-view',
+        json={'view_id': second_view['id']},
+    )
+    assert activated.status_code == 200
+    assert activated.get_json()['active_view_id'] == second_view['id']
+    deleted_inactive = authed_client.delete(
+        f'/api/{root_id}/activities/{activity_id}/progress-views/{first_view["id"]}'
+    )
+    assert deleted_inactive.status_code == 200
+    assert deleted_inactive.get_json()['active_view_id'] == second_view['id']
+
+    overlap = authed_client.post(
+        f'/api/{root_id}/activities/{activity_id}/progress-query',
+        json={'config': {'all_tag_ids': [tags[0]['id']], 'none_tag_ids': [tags[0]['id']]}},
+    )
+    assert overlap.status_code == 400
+
+    archived = authed_client.delete(f'/api/{root_id}/activities/{activity_id}/tags/{tags[0]["id"]}')
+    assert archived.status_code == 200
+    duplicate_archived_name = authed_client.post(
+        f'/api/{root_id}/activities/{activity_id}/tags',
+        json={'name': 'competition'},
+    )
+    assert duplicate_archived_name.status_code == 409
+    restored = authed_client.post(
+        f'/api/{root_id}/activities/{activity_id}/tags/{tags[0]["id"]}/restore'
+    )
+    assert restored.status_code == 200
+    assert restored.get_json()['archived'] is False

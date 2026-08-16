@@ -177,4 +177,31 @@ describe('ActivityCard', () => {
         expect(screen.getByText('(+5)')).toBeInTheDocument();
         expect(screen.queryByText('(▲3.7%)')).not.toBeInTheDocument();
     });
+
+    it('shows activity tags once and direct set tags after metrics', () => {
+        render(
+            <ActivityCard
+                activity={{
+                    type: 'activity',
+                    name: 'Bench Press',
+                    completed: true,
+                    tags: [{ id: 'parent', name: 'Meet prep', color: '#3366AA' }],
+                    sets: [{
+                        metrics: [{ metric_id: 'weight', value: 135 }],
+                        tags: [{ id: 'direct', name: 'Heavy', color: '#AA6633' }],
+                        inherited_tags: [{ id: 'parent', name: 'Meet prep', color: '#3366AA' }],
+                    }],
+                    metrics: [],
+                }}
+                activityDefinition={{
+                    metric_definitions: [{ id: 'weight', name: 'Weight', unit: 'lbs' }],
+                    split_definitions: [],
+                }}
+            />,
+        );
+
+        expect(screen.getByLabelText('Activity tags')).toHaveTextContent('Meet prep');
+        expect(screen.getByLabelText('Set 1 tags')).toHaveTextContent('Heavy');
+        expect(screen.getAllByText('Meet prep')).toHaveLength(1);
+    });
 });

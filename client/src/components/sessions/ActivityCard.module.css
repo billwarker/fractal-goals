@@ -71,6 +71,10 @@
     font-family: var(--font-family-mono);
 }
 
+.activityTags {
+    margin-top: 3px;
+}
+
 /* Activity Data / Metrics */
 .activityData {
     margin-top: 4px;
@@ -95,6 +99,11 @@
 
 .setRowStart {
     align-items: flex-start;
+}
+
+.setTags {
+    margin-left: auto;
+    justify-content: flex-end;
 }
 
 .setLabel {
@@ -178,25 +187,6 @@
     font-size: 11px;
     color: var(--color-brand-success);
     font-style: italic;
-}
-
-.progressHint {
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-    margin-left: 4px;
-}
-
-.progressHintImproved {
-    color: var(--color-brand-success);
-}
-
-.progressHintRegressed {
-    color: var(--color-brand-danger);
-}
-
-.progressHintNeutral {
-    color: var(--color-text-muted);
 }
 
 .progressHintPrevious {

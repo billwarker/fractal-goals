@@ -3,7 +3,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useGoals } from '../../contexts/GoalsContext';
-import { authApi, fractalApi, globalApi } from '../../utils/api';
+import { authApi, globalApi } from '../../utils/api';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import GoalCharacteristicsSettings from '../GoalCharacteristicsSettings';

@@ -115,6 +115,25 @@
     padding: 2px 0 8px;
 }
 
+.pickerSearch {
+    width: 100%;
+    min-height: 32px;
+    margin-bottom: 6px;
+    padding: 5px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: 12px;
+}
+
+.pickerSearch:focus {
+    border-color: var(--color-brand-primary);
+    outline: 2px solid color-mix(in srgb, var(--color-brand-primary) 32%, transparent);
+    outline-offset: 1px;
+}
+
 .pickerOption {
     display: flex;
     align-items: center;

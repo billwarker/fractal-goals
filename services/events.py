@@ -272,6 +272,7 @@ class Events:
     ACTIVITY_TAG_CREATED = 'activity_tag.created'
     ACTIVITY_TAG_UPDATED = 'activity_tag.updated'
     ACTIVITY_TAG_ARCHIVED = 'activity_tag.archived'
+    ACTIVITY_TAG_RESTORED = 'activity_tag.restored'
     ACTIVITY_TAG_ASSIGNMENTS_UPDATED = 'activity_tag.assignments_updated'
     ACTIVITY_PROGRESS_VIEW_CREATED = 'activity_progress_view.created'
     ACTIVITY_PROGRESS_VIEW_UPDATED = 'activity_progress_view.updated'

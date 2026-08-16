@@ -44,12 +44,12 @@ export const fractalActivitiesApi = {
         axios.put(`${API_BASE}/${rootId}/activities/${activityId}/tags/${tagId}`, data),
     archiveActivityTag: (rootId, activityId, tagId) =>
         axios.delete(`${API_BASE}/${rootId}/activities/${activityId}/tags/${tagId}`),
-    replaceActivityInstanceTags: (rootId, instanceId, tagIds) =>
-        axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}/tags`, { tag_ids: tagIds }),
-    replaceActivitySetTags: (rootId, setId, tagIds) =>
-        axios.put(`${API_BASE}/${rootId}/activity-sets/${setId}/tags`, { tag_ids: tagIds }),
-    getActivityProgressViews: (rootId, activityId) =>
-        axios.get(`${API_BASE}/${rootId}/activities/${activityId}/progress-views`),
+    restoreActivityTag: (rootId, activityId, tagId) =>
+        axios.post(`${API_BASE}/${rootId}/activities/${activityId}/tags/${tagId}/restore`),
+    replaceActivityInstanceTags: (rootId, instanceId, tagIds, version = null) =>
+        axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}/tags`, { tag_ids: tagIds, ...(version ? { version } : {}) }),
+    replaceActivitySetTags: (rootId, setId, tagIds, version = null) =>
+        axios.put(`${API_BASE}/${rootId}/activity-sets/${setId}/tags`, { tag_ids: tagIds, ...(version ? { version } : {}) }),
     createActivityProgressView: (rootId, activityId, data) =>
         axios.post(`${API_BASE}/${rootId}/activities/${activityId}/progress-views`, data),
     updateActivityProgressView: (rootId, activityId, viewId, data) =>

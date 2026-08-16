@@ -10,7 +10,7 @@ import logging
 import json
 from typing import Optional
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, not_, or_, true
 from sqlalchemy.orm import joinedload, selectinload
 
 from models import (
@@ -121,6 +121,91 @@ class ProgressService:
                 Session.deleted_at == None,
             )
         )
+
+    @staticmethod
+    def _effective_time_expression():
+        return func.coalesce(
+            ActivityInstance.time_stop,
+            Session.session_start,
+            ActivityInstance.created_at,
+        )
+
+    def _active_instance_identity_query(self):
+        return (
+            self.db.query(
+                ActivityInstance.id,
+                ActivityInstance.session_id,
+                ActivityInstance.completed,
+                self._effective_time_expression().label('effective_time'),
+            )
+            .join(Session, ActivityInstance.session_id == Session.id)
+            .filter(ActivityInstance.deleted_at.is_(None), Session.deleted_at.is_(None))
+        )
+
+    @staticmethod
+    def _tag_membership_clause(tag_id, *, include_set_tags):
+        inherited = ActivityInstance.tags.any(ActivityTag.id == tag_id)
+        if not include_set_tags:
+            return inherited
+        direct = ActivitySet.tags.any(ActivityTag.id == tag_id)
+        return or_(inherited, direct)
+
+    def _included_instance_clause(self, activity_def, config):
+        """Return the SQL predicate matching the in-memory tag semantics."""
+        if not any(config.get(key) for key in ('all_tag_ids', 'any_tag_ids', 'none_tag_ids')):
+            return true()
+
+        if activity_def.has_sets:
+            set_clauses = [
+                self._tag_membership_clause(tag_id, include_set_tags=True)
+                for tag_id in config.get('all_tag_ids') or []
+            ]
+            any_clauses = [
+                self._tag_membership_clause(tag_id, include_set_tags=True)
+                for tag_id in config.get('any_tag_ids') or []
+            ]
+            none_clauses = [
+                self._tag_membership_clause(tag_id, include_set_tags=True)
+                for tag_id in config.get('none_tag_ids') or []
+            ]
+            if any_clauses:
+                set_clauses.append(or_(*any_clauses))
+            if none_clauses:
+                set_clauses.append(not_(or_(*none_clauses)))
+            return ActivityInstance.sets.any(and_(*set_clauses))
+
+        clauses = [
+            self._tag_membership_clause(tag_id, include_set_tags=False)
+            for tag_id in config.get('all_tag_ids') or []
+        ]
+        any_clauses = [
+            self._tag_membership_clause(tag_id, include_set_tags=False)
+            for tag_id in config.get('any_tag_ids') or []
+        ]
+        none_clauses = [
+            self._tag_membership_clause(tag_id, include_set_tags=False)
+            for tag_id in config.get('none_tag_ids') or []
+        ]
+        if any_clauses:
+            clauses.append(or_(*any_clauses))
+        if none_clauses:
+            clauses.append(not_(or_(*none_clauses)))
+        return and_(*clauses)
+
+    @staticmethod
+    def _predecessor_ids_for_targets(included_rows, target_ids):
+        target_ids = set(target_ids)
+        predecessors = {}
+        prior_rows = []
+        for row in included_rows:
+            if row.id in target_ids:
+                eligible = [candidate for candidate in prior_rows if candidate.session_id != row.session_id]
+                previous = next((candidate for candidate in reversed(eligible) if candidate.completed), None)
+                if previous is None and eligible:
+                    previous = eligible[-1]
+                predecessors[row.id] = previous.id if previous else None
+            prior_rows.append(row)
+        return predecessors
 
     def _get_active_instance(self, activity_instance_id: str) -> Optional[ActivityInstance]:
         return (
@@ -1005,7 +1090,10 @@ class ProgressService:
 
     def compute_comparisons_for_instances(self, instances) -> dict:
         """Batch active-view comparisons for session and analytics read models."""
-        targets = [instance for instance in instances if instance and instance.deleted_at is None]
+        target_ids = [instance.id for instance in instances if instance and instance.deleted_at is None]
+        if not target_ids:
+            return {}
+        targets = self._active_instances_query().filter(ActivityInstance.id.in_(target_ids)).all()
         if not targets:
             return {}
         activities = {instance.definition.id: instance.definition for instance in targets if instance.definition}
@@ -1027,37 +1115,74 @@ class ProgressService:
             root_id: self._is_progress_enabled(root_id)
             for root_id in {activity.root_id for activity in activities.values()}
         }
-        effective_time = func.coalesce(
-            ActivityInstance.time_stop,
-            Session.session_start,
-            ActivityInstance.created_at,
-        )
-        histories = (
-            self._active_instances_query()
-            .filter(
-                ActivityInstance.activity_definition_id.in_(activities),
-                ActivityInstance.root_id.in_({activity.root_id for activity in activities.values()}),
-            )
-            .order_by(ActivityInstance.activity_definition_id, effective_time.asc(), ActivityInstance.id.asc())
-            .all()
-        )
-        histories_by_activity = {}
-        for instance in histories:
-            histories_by_activity.setdefault(instance.activity_definition_id, []).append(instance)
-
-        results = {}
+        configs_by_activity = {}
+        view_ids_by_activity = {}
+        included_scope_clauses = []
         for activity in activities.values():
             if not enabled_roots.get(activity.root_id, True):
                 continue
             view = active_views.get(activity.active_progress_view_id)
             config = normalize_progress_view_config(view.config if view else EMPTY_PROGRESS_VIEW_CONFIG)
-            comparison_map = self._build_activity_comparison_map(
-                activity,
-                config,
-                view.id if view else None,
-                histories_by_activity.get(activity.id, []),
+            configs_by_activity[activity.id] = config
+            view_ids_by_activity[activity.id] = view.id if view else None
+            included_scope_clauses.append(
+                and_(
+                    ActivityInstance.activity_definition_id == activity.id,
+                    ActivityInstance.root_id == activity.root_id,
+                    self._included_instance_clause(activity, config),
+                )
             )
-            results.update(comparison_map)
+
+        included_rows = []
+        if included_scope_clauses:
+            included_rows = (
+                self._active_instance_identity_query()
+                .filter(or_(*included_scope_clauses))
+                .add_columns(ActivityInstance.activity_definition_id)
+                .order_by(
+                    ActivityInstance.activity_definition_id,
+                    self._effective_time_expression().asc(),
+                    ActivityInstance.id.asc(),
+                )
+                .all()
+            )
+        rows_by_activity = {}
+        for row in included_rows:
+            rows_by_activity.setdefault(row.activity_definition_id, []).append(row)
+
+        predecessor_ids = {}
+        included_ids = set()
+        target_ids_by_activity = {}
+        for target in targets:
+            target_ids_by_activity.setdefault(target.activity_definition_id, []).append(target.id)
+        for activity_id, rows in rows_by_activity.items():
+            included_ids.update(row.id for row in rows)
+            predecessor_ids.update(
+                self._predecessor_ids_for_targets(rows, target_ids_by_activity.get(activity_id, []))
+            )
+
+        required_previous_ids = {instance_id for instance_id in predecessor_ids.values() if instance_id}
+        previous_by_id = {}
+        if required_previous_ids:
+            previous_by_id = {
+                instance.id: instance
+                for instance in self._active_instances_query().filter(ActivityInstance.id.in_(required_previous_ids)).all()
+            }
+
+        results = {}
+        for target in targets:
+            activity = activities[target.activity_definition_id]
+            config = configs_by_activity.get(activity.id)
+            if config is None:
+                continue
+            previous_id = predecessor_ids.get(target.id) if target.id in included_ids else None
+            results[target.id] = self._comparison_payload(
+                target,
+                activity,
+                previous_by_id.get(previous_id),
+                view_id=view_ids_by_activity.get(activity.id),
+                config=config,
+            )
         return {instance.id: results.get(instance.id) for instance in targets}
 
     def compute_live_comparison(self, activity_instance_id: str, *, view_id=None, config=None) -> Optional[dict]:
@@ -1105,31 +1230,20 @@ class ProgressService:
         config: dict | None = None,
     ) -> list:
         """Return paginated progress history aligned to activity history cards."""
-        query = self._active_instances_query().filter(
-            ActivityInstance.activity_definition_id == activity_definition_id,
-            ActivityInstance.root_id == root_id,
+        timeline = self.get_progress_timeline(
+            activity_definition_id,
+            root_id,
+            limit=limit,
+            offset=offset,
+            exclude_session_id=exclude_session_id,
+            view_id=view_id,
+            config=config,
         )
-        if exclude_session_id:
-            query = query.filter(ActivityInstance.session_id != exclude_session_id)
-
-        instances = (
-            query
-            .order_by(
-                func.coalesce(ActivityInstance.time_stop, Session.session_start, ActivityInstance.created_at).desc(),
-                ActivityInstance.id.desc(),
-            )
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
-
-        records = []
-        for instance in instances:
-            record = self.compute_live_comparison(instance.id, view_id=view_id, config=config)
-            if record:
-                records.append(record)
-
-        return records
+        return [
+            item['progress_comparison']
+            for item in timeline.get('items', [])
+            if item.get('progress_comparison') is not None
+        ]
 
     def get_progress_timeline(
         self,
@@ -1164,22 +1278,56 @@ class ProgressService:
             raise ValueError(config_error)
         normalized_config = normalize_progress_view_config(resolved_config)
         selected_view_id = view_id if view_id is not None else activity.active_progress_view_id
-        comparison_map = self._activity_comparison_map(activity, normalized_config, selected_view_id)
-
-        query = self._active_instances_query().filter(
+        base_identity_query = self._active_instance_identity_query().filter(
             ActivityInstance.activity_definition_id == activity.id,
             ActivityInstance.root_id == root_id,
         )
         if exclude_session_id:
-            query = query.filter(ActivityInstance.session_id != exclude_session_id)
-        effective_time = func.coalesce(ActivityInstance.time_stop, Session.session_start, ActivityInstance.created_at)
-        all_instances = query.order_by(effective_time.desc(), ActivityInstance.id.desc()).all()
-        total = len(all_instances)
-        included_count = sum(
-            1 for instance in all_instances
-            if comparison_map.get(instance.id, {}).get("included", True)
+            base_identity_query = base_identity_query.filter(ActivityInstance.session_id != exclude_session_id)
+
+        total = base_identity_query.count()
+        included_clause = self._included_instance_clause(activity, normalized_config)
+        included_count = base_identity_query.filter(included_clause).count()
+        included_rows = (
+            base_identity_query
+            .filter(included_clause)
+            .order_by(self._effective_time_expression().asc(), ActivityInstance.id.asc())
+            .all()
         )
-        instances = all_instances[offset:offset + limit]
+        page_query = self._active_instances_query().filter(
+            ActivityInstance.activity_definition_id == activity.id,
+            ActivityInstance.root_id == root_id,
+        )
+        if exclude_session_id:
+            page_query = page_query.filter(ActivityInstance.session_id != exclude_session_id)
+        instances = (
+            page_query
+            .order_by(self._effective_time_expression().desc(), ActivityInstance.id.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+        predecessor_ids = self._predecessor_ids_for_targets(included_rows, [instance.id for instance in instances])
+        needed_previous_ids = {row_id for row_id in predecessor_ids.values() if row_id}
+        previous_by_id = {}
+        if needed_previous_ids:
+            previous_by_id = {
+                instance.id: instance
+                for instance in self._active_instances_query().filter(ActivityInstance.id.in_(needed_previous_ids)).all()
+            }
+
+        comparison_map = {}
+        self._calculation_config = normalized_config
+        included_ids = {row.id for row in included_rows}
+        for instance in instances:
+            previous_id = predecessor_ids.get(instance.id) if instance.id in included_ids else None
+            comparison_map[instance.id] = self._comparison_payload(
+                instance,
+                activity,
+                previous_by_id.get(previous_id),
+                view_id=selected_view_id,
+                config=normalized_config,
+            )
         notes = []
         instance_ids = [instance.id for instance in instances]
         if instance_ids:
@@ -1233,8 +1381,5 @@ class ProgressService:
             .all()
         )
 
-        return [
-            record
-            for instance in instances
-            if (record := self.compute_live_comparison(instance.id)) is not None
-        ]
+        comparisons = self.compute_comparisons_for_instances(instances)
+        return [comparisons[instance.id] for instance in instances if comparisons.get(instance.id) is not None]

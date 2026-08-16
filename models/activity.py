@@ -178,6 +178,13 @@ class ActivityTag(Base):
             unique=True,
             postgresql_where=sa.text('deleted_at IS NULL'),
         ),
+        sa.Index(
+            'ix_activity_tags_activity_order_active',
+            'activity_definition_id',
+            'sort_order',
+            'name',
+            postgresql_where=sa.text('deleted_at IS NULL'),
+        ),
         sa.CheckConstraint(
             "color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$'",
             name='ck_activity_tags_color',
@@ -215,6 +222,12 @@ class ActivityProgressView(Base):
             'activity_definition_id',
             sa.func.lower(name),
             unique=True,
+            postgresql_where=sa.text('deleted_at IS NULL'),
+        ),
+        sa.Index(
+            'ix_activity_progress_views_active_activity_updated',
+            'activity_definition_id',
+            'updated_at',
             postgresql_where=sa.text('deleted_at IS NULL'),
         ),
         sa.CheckConstraint('version > 0', name='ck_activity_progress_views_version_positive'),
@@ -279,6 +292,7 @@ class ActivityInstance(Base):
     deleted_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     sort_order = Column(Integer, default=0)
+    tag_assignment_version = Column(Integer, nullable=False, default=1, server_default='1')
 
     metric_values = relationship("MetricValue", backref="activity_instance", cascade="all, delete-orphan")
     sets = relationship(
@@ -304,6 +318,7 @@ class ActivityInstance(Base):
             'target_duration_seconds IS NULL OR target_duration_seconds > 0',
             name='ck_activity_instances_target_duration_positive',
         ),
+        sa.CheckConstraint('tag_assignment_version > 0', name='ck_activity_instances_tag_assignment_version_positive'),
         sa.Index('ix_activity_instances_session_deleted', 'session_id', 'deleted_at'),
         sa.Index(
             'ix_activity_instances_root_deleted_activity_session',
@@ -311,6 +326,15 @@ class ActivityInstance(Base):
             'deleted_at',
             'activity_definition_id',
             'session_id',
+        ),
+        sa.Index(
+            'ix_activity_instances_progress_history',
+            'activity_definition_id',
+            'root_id',
+            'time_stop',
+            'created_at',
+            'id',
+            postgresql_where=sa.text('deleted_at IS NULL'),
         ),
     )
 
@@ -331,6 +355,7 @@ class ActivitySet(Base):
     notes = Column(String, nullable=True)
     created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
+    tag_assignment_version = Column(Integer, nullable=False, default=1, server_default='1')
 
     activity_instance = relationship("ActivityInstance", back_populates="sets")
     metric_values = relationship(
@@ -359,6 +384,7 @@ class ActivitySet(Base):
             name='ck_activity_sets_status',
         ),
         sa.CheckConstraint('duration_seconds >= 0', name='ck_activity_sets_duration_nonnegative'),
+        sa.CheckConstraint('tag_assignment_version > 0', name='ck_activity_sets_tag_assignment_version_positive'),
         sa.UniqueConstraint('activity_instance_id', 'sort_order', name='uq_activity_sets_instance_order'),
     )
 

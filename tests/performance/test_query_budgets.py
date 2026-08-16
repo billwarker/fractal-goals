@@ -443,6 +443,64 @@ def test_get_session_activities_query_budget(authed_client, query_counter, sampl
 
 
 @pytest.mark.integration
+def test_tag_filtered_progress_timeline_query_budget(
+    authed_client,
+    db_session,
+    query_counter,
+    sample_practice_session,
+    sample_activity_definition,
+    sample_activity_instance,
+):
+    """Saved-view timelines keep a constant query budget as history grows."""
+    root_id = sample_practice_session.root_id
+    activity_id = sample_activity_definition.id
+    tag = authed_client.post(
+        f"/api/{root_id}/activities/{activity_id}/tags",
+        json={"name": "Competition"},
+    ).get_json()
+    authed_client.put(
+        f"/api/{root_id}/activity-instances/{sample_activity_instance.id}/tags",
+        json={"tag_ids": [tag["id"]]},
+    )
+    authed_client.post(
+        f"/api/{root_id}/activities/{activity_id}/progress-views",
+        json={"name": "Competition only", "config": {"all_tag_ids": [tag["id"]]}},
+    )
+
+    for index in range(40):
+        session = PracticeSession(
+            id=str(uuid.uuid4()),
+            owner_id=sample_practice_session.owner_id,
+            root_id=root_id,
+            name=f"History {index}",
+            session_start=datetime.now(timezone.utc) - timedelta(days=index + 1),
+            completed=True,
+        )
+        db_session.add(session)
+        db_session.flush()
+        db_session.add(ActivityInstance(
+            id=str(uuid.uuid4()),
+            session_id=session.id,
+            activity_definition_id=activity_id,
+            root_id=root_id,
+            completed=True,
+        ))
+    db_session.commit()
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{root_id}/activities/{activity_id}/progress-timeline?limit=20&offset=0",
+    )
+
+    assert_response_budget(response, max_bytes=180_000, max_ms=900, elapsed_ms=elapsed_ms)
+    payload = response.get_json()
+    assert payload["total"] == 41
+    assert len(payload["items"]) == 20
+    assert query_counter["total"] <= 22
+
+
+@pytest.mark.integration
 def test_publish_landing_examples_query_budget(client, query_counter, landing_publish_budget_dataset):
     """Landing snapshot publish should batch goal tree enrichment instead of querying per goal."""
     admin = landing_publish_budget_dataset["admin"]

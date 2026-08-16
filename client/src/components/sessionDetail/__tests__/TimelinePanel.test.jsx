@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import TimelinePanel from '../TimelinePanel';
 
@@ -14,6 +14,7 @@ const deleteView = vi.fn();
 const activateView = vi.fn();
 
 vi.mock('../../../hooks/useActivityProgressViews', () => ({
+    progressPreviewSignature: (config) => config ? JSON.stringify(config) : null,
     useActivityProgressTimeline: (...args) => useActivityProgressTimeline(...args),
     useActivityProgressViewMutations: () => ({
         createView, updateView, deleteView, activateView, isPending: false,
@@ -144,6 +145,24 @@ describe('TimelinePanel', () => {
         expect(screen.queryByText('Keep the wrist relaxed')).not.toBeInTheDocument();
     });
 
+    it('starts collapsed and adds progress operators incrementally', () => {
+        renderWithProviders(
+            <TimelinePanel rootId="root-1" sessionId="session-1" selectedActivity={null} sessionActivityDefs={sessionActivityDefs} />,
+            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
+        );
+
+        expect(screen.getByLabelText('Progress view')).toHaveValue('');
+        expect(screen.queryByRole('button', { name: 'Save', exact: true })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Expand progress view editor' }));
+        expect(screen.getByText('No tag operators. This view includes all history.')).toBeInTheDocument();
+        expect(screen.queryByRole('group', { name: 'All of tags' })).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: '+ Add operator' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Any of' }));
+        expect(screen.getByRole('group', { name: 'Any of tags' })).toBeInTheDocument();
+        expect(screen.queryByRole('group', { name: 'All of tags' })).not.toBeInTheDocument();
+    });
+
     it('keeps All History immutable and creates an activated saved view through Save as', async () => {
         useActivityProgressTimeline.mockReturnValue({
             data: {
@@ -162,8 +181,11 @@ describe('TimelinePanel', () => {
             { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
         );
 
+        fireEvent.click(screen.getByRole('button', { name: 'Expand progress view editor' }));
         expect(screen.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-        fireEvent.click(screen.getAllByText('Competition')[0]);
+        fireEvent.click(screen.getByRole('button', { name: '+ Add operator' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'All of' }));
+        fireEvent.click(within(screen.getByRole('group', { name: 'All of tags' })).getByText('Competition'));
         fireEvent.click(screen.getByRole('button', { name: 'Save as…' }));
         fireEvent.change(screen.getByLabelText('Progress view name'), { target: { value: 'Meet prep' } });
         fireEvent.click(screen.getByRole('button', { name: 'Create' }));
@@ -192,13 +214,68 @@ describe('TimelinePanel', () => {
             <TimelinePanel rootId="root-1" sessionId="session-1" selectedActivity={null} sessionActivityDefs={sessionActivityDefs} />,
             { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
         );
-        fireEvent.click(screen.getAllByText('Competition')[0]);
+        fireEvent.click(screen.getByRole('button', { name: 'Expand progress view editor' }));
+        fireEvent.click(screen.getByRole('button', { name: '+ Add operator' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'All of' }));
+        fireEvent.click(within(screen.getByRole('group', { name: 'All of tags' })).getByText('Competition'));
         fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
         await waitFor(() => expect(updateView).toHaveBeenCalledWith({
             viewId: 'view-1',
             version: 4,
             config: expect.objectContaining({ all_tag_ids: ['tag-1'] }),
         }));
+    });
+
+    it('preserves a local draft when a saved view has a version conflict', async () => {
+        updateView.mockRejectedValueOnce({
+            response: {
+                status: 409,
+                data: { details: { current: { version: 7, config: { all_tag_ids: [], any_tag_ids: ['tag-1'], none_tag_ids: [] } } } },
+            },
+        });
+        useActivityProgressTimeline.mockReturnValue({
+            data: {
+                items: [],
+                tags: [{ id: 'tag-1', name: 'Competition', archived: false }],
+                views: [{ id: 'view-1', name: 'Meet prep', version: 4, config: { all_tag_ids: [], any_tag_ids: [], none_tag_ids: [] } }],
+                active_view_id: 'view-1', included_count: 0, total: 0,
+            },
+            isLoading: false,
+            error: null,
+        });
+        renderWithProviders(
+            <TimelinePanel rootId="root-1" sessionId="session-1" selectedActivity={null} sessionActivityDefs={sessionActivityDefs} />,
+            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Expand progress view editor' }));
+        fireEvent.click(screen.getByRole('button', { name: '+ Add operator' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'All of' }));
+        fireEvent.click(within(screen.getByRole('group', { name: 'All of tags' })).getByText('Competition'));
+        fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('version 7');
+        expect(within(screen.getByRole('group', { name: 'All of tags' })).getByRole('checkbox')).toBeChecked();
+        expect(screen.getByRole('button', { name: 'Save draft as…' })).toBeInTheDocument();
+    });
+
+    it('loads older timeline pages on demand', () => {
+        const fetchNextPage = vi.fn();
+        useActivityProgressTimeline.mockReturnValue({
+            data: { items: [], tags: [], views: [], active_view_id: null, included_count: 20, total: 42 },
+            isLoading: false,
+            error: null,
+            hasNextPage: true,
+            fetchNextPage,
+            isFetchingNextPage: false,
+        });
+        renderWithProviders(
+            <TimelinePanel rootId="root-1" sessionId="session-1" selectedActivity={null} sessionActivityDefs={sessionActivityDefs} />,
+            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Load older history' }));
+        expect(fetchNextPage).toHaveBeenCalledTimes(1);
     });
 
     it('renders saved progress indicators alongside timeline metrics', () => {

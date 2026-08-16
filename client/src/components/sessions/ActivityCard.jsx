@@ -19,6 +19,8 @@ import {
     formatAggValue,
 } from '../../utils/progressAggregations';
 import styles from './ActivityCard.module.css';
+import ActivityTagBadges from '../common/ActivityTagBadges';
+import ProgressHint from '../common/ProgressHint';
 
 /**
  * Helper to get metric definition info
@@ -27,78 +29,6 @@ function getMetricInfo(metricId, activityDefinition) {
     if (!activityDefinition) return { name: '', unit: '' };
     const metric = activityDefinition.metric_definitions?.find(md => md.id === metricId);
     return metric || { name: '', unit: '' };
-}
-
-function formatProgressValue(comparison, displayMode = 'percent') {
-    if (!comparison) return null;
-    if (displayMode === 'absolute') {
-        if (comparison.delta == null) return null;
-        const delta = Number(comparison.delta);
-        const magnitude = Math.abs(delta);
-        const formatted = Number.isInteger(magnitude) ? String(magnitude) : magnitude.toFixed(1).replace(/\.0$/, '');
-        if (delta > 0) return `+${formatted}`;
-        if (delta < 0) return `-${formatted}`;
-        return '0';
-    }
-    if (comparison.pct_change != null) {
-        const magnitude = Math.abs(comparison.pct_change);
-        const formatted = Number.isInteger(magnitude) ? String(magnitude) : magnitude.toFixed(1).replace(/\.0$/, '');
-        if (comparison.improved) return `▲${formatted}%`;
-        if (comparison.regressed) return `▼${formatted}%`;
-        return '0%';
-    }
-    if (comparison.delta == null) return null;
-    const delta = Number(comparison.delta);
-    const magnitude = Math.abs(delta);
-    const formatted = Number.isInteger(magnitude) ? String(magnitude) : magnitude.toFixed(1).replace(/\.0$/, '');
-    if (delta > 0) return `+${formatted}`;
-    if (delta < 0) return `-${formatted}`;
-    return '0';
-}
-
-function ProgressHint({ metricId, setIndex = null, progressComparison, displayMode = 'percent' }) {
-    if (!progressComparison || progressComparison.is_first_instance) return null;
-
-    const metricComp = progressComparison.metric_comparisons?.find(
-        (mc) => mc.metric_id === metricId
-    );
-    if (!metricComp) return null;
-
-    // For set rows: prefer per-set data, fall back to aggregate on all sets
-    if (setIndex != null) {
-        const setComps = metricComp.set_comparisons;
-        if (Array.isArray(setComps) && setComps.length > 0) {
-            const setComp = setComps.find((sc) => sc.set_index === setIndex);
-            if (!setComp || setComp.previous_value == null) return null;
-            const value = formatProgressValue(setComp, displayMode);
-            if (!value) return null;
-            const cls = setComp.improved
-                ? styles.progressHintImproved
-                : setComp.regressed
-                    ? styles.progressHintRegressed
-                    : styles.progressHintNeutral;
-            return <span className={`${styles.progressHint} ${cls}`}>({value})</span>;
-        }
-        // No per-set data (older record) — show aggregate hint on every set row
-        const value = formatProgressValue(metricComp, displayMode);
-        if (!value) return null;
-        const cls = metricComp.improved
-            ? styles.progressHintImproved
-            : metricComp.regressed
-                ? styles.progressHintRegressed
-                : styles.progressHintNeutral;
-        return <span className={`${styles.progressHint} ${cls}`}>({value})</span>;
-    }
-
-    // Single metric (no sets)
-    const value = formatProgressValue(metricComp, displayMode);
-    if (!value) return null;
-    const cls = metricComp.improved
-        ? styles.progressHintImproved
-        : metricComp.regressed
-            ? styles.progressHintRegressed
-            : styles.progressHintNeutral;
-    return <span className={`${styles.progressHint} ${cls}`}>({value})</span>;
 }
 
 /**
@@ -275,6 +205,7 @@ function SetRow({ set, setIdx, activityDefinition, hasSplits, progressComparison
                         );
                     })}
                 </div>
+                <ActivityTagBadges tags={set.tags} className={styles.setTags} ariaLabel={`Set ${setIdx + 1} tags`} />
             </div>
         );
     }
@@ -298,6 +229,7 @@ function SetRow({ set, setIdx, activityDefinition, hasSplits, progressComparison
                     </div>
                 );
             })}
+            <ActivityTagBadges tags={set.tags} className={styles.setTags} ariaLabel={`Set ${setIdx + 1} tags`} />
             {setYield != null && (
                 <span className={styles.setYieldInline}>= {formatAggValue(setYield)}</span>
             )}
@@ -451,6 +383,7 @@ const ActivityCard = memo(function ActivityCard({
                             </div>
                         )}
                     </div>
+                    <ActivityTagBadges tags={activity.tags} className={styles.activityTags} ariaLabel="Activity tags" />
 
                     {/* Activity Data Display */}
                     {isActivity && (

@@ -223,4 +223,61 @@ describe('SessionSectionGrid', () => {
         expect(screen.getByText('Arm Circles')).toBeInTheDocument();
         expect(screen.getByText('5 min (planned)')).toBeInTheDocument();
     });
+
+    it('renders hierarchical circuit tags once and active-view progress hints', () => {
+        render(
+            <SessionSectionGrid
+                deltaDisplayMode="percent"
+                sections={[{
+                    name: 'Work',
+                    items: [{
+                        type: 'circuit',
+                        circuit: {
+                            id: 'circuit-1',
+                            name: 'Tagged circuit',
+                            slots: [{
+                                id: 'slot-1',
+                                activity_definition_id: 'activity-1',
+                                activity_instance_id: 'instance-1',
+                                activity_name: 'Press',
+                            }],
+                            rounds: [{
+                                id: 'round-1',
+                                round_number: 1,
+                                members: [{
+                                    id: 'member-1',
+                                    circuit_run_slot_id: 'slot-1',
+                                    activity_set_id: 'set-1',
+                                }],
+                            }],
+                        },
+                    }],
+                }]}
+                activities={[{
+                    id: 'activity-1',
+                    metric_definitions: [{ id: 'metric-reps', name: 'Reps', unit: 'Count' }],
+                }]}
+                activityInstances={[{
+                    id: 'instance-1',
+                    tags: [{ id: 'tag-parent', name: 'Meet prep' }],
+                    sets: [{
+                        id: 'set-1',
+                        tags: [{ id: 'tag-set', name: 'Heavy' }],
+                        metrics: [{ metric_id: 'metric-reps', value: 8 }],
+                    }],
+                    progress_comparison: {
+                        included: true,
+                        metric_comparisons: [{
+                            metric_id: 'metric-reps',
+                            set_comparisons: [{ set_index: 0, previous_value: 6, pct_change: 33, improved: true }],
+                        }],
+                    },
+                }]}
+            />,
+        );
+
+        expect(screen.getAllByText('Meet prep')).toHaveLength(1);
+        expect(screen.getAllByText('Heavy')).toHaveLength(1);
+        expect(screen.getByText('(▲33%)')).toBeInTheDocument();
+    });
 });

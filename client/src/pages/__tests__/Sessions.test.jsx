@@ -119,6 +119,22 @@ describe('Sessions page data loading', () => {
         expect(getSessionActivities).not.toHaveBeenCalled();
     });
 
+    it('does not misreport a failed sessions request as an empty account', async () => {
+        getSessions.mockRejectedValue(new Error('server unavailable'));
+        getActivities.mockResolvedValue({ data: [] });
+
+        renderWithProviders(<Sessions />, {
+            route: '/root-1/sessions',
+            path: '/:rootId/sessions',
+            withTimezone: false,
+            withTheme: false,
+        });
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('Sessions could not be loaded');
+        expect(screen.queryByText(/No sessions found/)).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    });
+
     it('renders session cards while activity reference data is still loading', async () => {
         getSessions.mockResolvedValue({
             data: {

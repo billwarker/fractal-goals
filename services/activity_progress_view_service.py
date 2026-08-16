@@ -14,6 +14,7 @@ from models import (
 from services.owned_entity_queries import get_owned_activity_definition, get_owned_activity_instance
 from services.quota_service import QuotaService
 from services.events import Event, Events, event_bus
+from services.ops_log import log_ops_event
 
 
 EMPTY_PROGRESS_VIEW_CONFIG = {
@@ -84,6 +85,12 @@ class ActivityProgressViewService:
         quota = QuotaService(self.db)
         return quota.check_storage_available(user_id, quota._payload_size(*values))
 
+    def _storage_delta_check(self, user_id, old_values, new_values):
+        quota = QuotaService(self.db)
+        old_size = quota._payload_size(*old_values)
+        new_size = quota._payload_size(*new_values)
+        return quota.check_storage_available(user_id, max(0, new_size - old_size))
+
     def _validate_config_tags(self, activity, config, *, include_archived=True):
         normalized = normalize_progress_view_config(config)
         tag_ids = {
@@ -129,10 +136,10 @@ class ActivityProgressViewService:
         existing = self.db.query(ActivityTag).filter(
             ActivityTag.activity_definition_id == activity.id,
             func.lower(ActivityTag.name) == name.lower(),
-            ActivityTag.deleted_at.is_(None),
         ).first()
         if existing:
-            return None, "A tag with this name already exists for this activity", 409
+            suffix = "; restore the archived tag instead" if existing.deleted_at is not None else ""
+            return None, f"A tag with this name already exists for this activity{suffix}", 409
         sort_order = data.get("sort_order")
         if sort_order is None:
             maximum = self.db.query(func.max(ActivityTag.sort_order)).filter(
@@ -167,10 +174,10 @@ class ActivityProgressViewService:
         ).first()
         if not tag:
             return None, "Tag not found", 404
-        _, quota_error, quota_status = self._storage_check(
-            user_id,
-            data.get("name"),
-            data.get("color"),
+        next_name = data.get("name") if data.get("name") is not None else tag.name
+        next_color = data.get("color") if "color" in data else tag.color
+        _, quota_error, quota_status = self._storage_delta_check(
+            user_id, (tag.name, tag.color), (next_name, next_color),
         )
         if quota_error:
             return None, quota_error, quota_status
@@ -180,7 +187,6 @@ class ActivityProgressViewService:
                 ActivityTag.activity_definition_id == activity.id,
                 ActivityTag.id != tag.id,
                 func.lower(ActivityTag.name) == name.lower(),
-                ActivityTag.deleted_at.is_(None),
             ).first()
             if conflict:
                 return None, "A tag with this name already exists for this activity", 409
@@ -212,6 +218,34 @@ class ActivityProgressViewService:
         self._emit(Events.ACTIVITY_TAG_ARCHIVED, root_id=root_id, activity_id=activity.id, activity_tag_id=tag.id, name=tag.name)
         return {"message": "Tag archived", "id": tag.id}, None, 200
 
+    def restore_tag(self, root_id, activity_id, tag_id, user_id):
+        activity = self._activity(root_id, activity_id, user_id)
+        if not activity:
+            return None, "Activity not found", 404
+        tag = self.db.query(ActivityTag).filter(
+            ActivityTag.id == tag_id,
+            ActivityTag.activity_definition_id == activity.id,
+            ActivityTag.deleted_at.is_not(None),
+        ).first()
+        if not tag:
+            return None, "Archived tag not found", 404
+        conflict = self.db.query(ActivityTag.id).filter(
+            ActivityTag.activity_definition_id == activity.id,
+            ActivityTag.id != tag.id,
+            func.lower(ActivityTag.name) == tag.name.lower(),
+            ActivityTag.deleted_at.is_(None),
+        ).first()
+        if conflict:
+            return None, "An active tag with this name already exists", 409
+        _, quota_error, quota_status = self._storage_check(user_id, tag.name, tag.color)
+        if quota_error:
+            return None, quota_error, quota_status
+        tag.deleted_at = None
+        tag.updated_at = utc_now()
+        self.db.commit()
+        self._emit(Events.ACTIVITY_TAG_RESTORED, root_id=root_id, activity_id=activity.id, activity_tag_id=tag.id, name=tag.name)
+        return serialize_activity_tag(tag), None, 200
+
     def _assignable_tags(self, activity, tag_ids, *, retained_archived_ids=()):
         normalized = list(dict.fromkeys(tag_ids or []))
         if not normalized:
@@ -228,12 +262,30 @@ class ActivityProgressViewService:
         by_id = {tag.id: tag for tag in tags}
         return [by_id[tag_id] for tag_id in normalized], None
 
-    def replace_instance_tags(self, root_id, instance_id, user_id, tag_ids):
+    def replace_instance_tags(self, root_id, instance_id, user_id, tag_ids, *, version=None):
         if not self._owned_root(root_id, user_id):
             return None, "Activity instance not found", 404
         instance = get_owned_activity_instance(self.db, root_id, instance_id)
         if not instance:
             return None, "Activity instance not found", 404
+        instance = self.db.query(ActivityInstance).filter(
+            ActivityInstance.id == instance.id,
+            ActivityInstance.deleted_at.is_(None),
+        ).with_for_update().one()
+        if version is not None and instance.tag_assignment_version != version:
+            log_ops_event(
+                "activity_tag.assignment_conflict",
+                level="warning",
+                root_id=root_id,
+                activity_id=instance.activity_definition_id,
+                instance_id=instance.id,
+                requested_version=version,
+                current_version=instance.tag_assignment_version,
+            )
+            return {
+                "current": [serialize_activity_tag(tag) for tag in instance.tags],
+                "version": instance.tag_assignment_version,
+            }, "Tag assignments were changed elsewhere", 409
         tags, error = self._assignable_tags(
             instance.definition,
             tag_ids,
@@ -242,20 +294,39 @@ class ActivityProgressViewService:
         if error:
             return None, error, 400
         instance.tags = tags
+        instance.tag_assignment_version += 1
         self.db.commit()
         self._emit(Events.ACTIVITY_TAG_ASSIGNMENTS_UPDATED, root_id=root_id, activity_id=instance.activity_definition_id, instance_id=instance.id, tag_ids=[tag.id for tag in tags])
-        return [serialize_activity_tag(tag) for tag in instance.tags], None, 200
+        return {
+            "tags": [serialize_activity_tag(tag) for tag in instance.tags],
+            "version": instance.tag_assignment_version,
+        }, None, 200
 
-    def replace_set_tags(self, root_id, set_id, user_id, tag_ids):
+    def replace_set_tags(self, root_id, set_id, user_id, tag_ids, *, version=None):
         if not self._owned_root(root_id, user_id):
             return None, "Activity set not found", 404
         activity_set = self.db.query(ActivitySet).join(ActivityInstance).filter(
             ActivitySet.id == set_id,
             ActivityInstance.root_id == root_id,
             ActivityInstance.deleted_at.is_(None),
-        ).first()
+        ).with_for_update().first()
         if not activity_set:
             return None, "Activity set not found", 404
+        if version is not None and activity_set.tag_assignment_version != version:
+            log_ops_event(
+                "activity_tag.assignment_conflict",
+                level="warning",
+                root_id=root_id,
+                activity_id=activity_set.activity_instance.activity_definition_id,
+                instance_id=activity_set.activity_instance_id,
+                activity_set_id=activity_set.id,
+                requested_version=version,
+                current_version=activity_set.tag_assignment_version,
+            )
+            return {
+                "current": [serialize_activity_tag(tag) for tag in activity_set.tags],
+                "version": activity_set.tag_assignment_version,
+            }, "Tag assignments were changed elsewhere", 409
         tags, error = self._assignable_tags(
             activity_set.activity_instance.definition,
             tag_ids,
@@ -264,9 +335,13 @@ class ActivityProgressViewService:
         if error:
             return None, error, 400
         activity_set.tags = tags
+        activity_set.tag_assignment_version += 1
         self.db.commit()
         self._emit(Events.ACTIVITY_TAG_ASSIGNMENTS_UPDATED, root_id=root_id, activity_id=activity_set.activity_instance.activity_definition_id, instance_id=activity_set.activity_instance_id, activity_set_id=activity_set.id, tag_ids=[tag.id for tag in tags])
-        return [serialize_activity_tag(tag) for tag in activity_set.tags], None, 200
+        return {
+            "tags": [serialize_activity_tag(tag) for tag in activity_set.tags],
+            "version": activity_set.tag_assignment_version,
+        }, None, 200
 
     def list_views(self, root_id, activity_id, user_id):
         activity = self._activity(root_id, activity_id, user_id)
@@ -327,14 +402,16 @@ class ActivityProgressViewService:
         if not view:
             return None, "Progress view not found", 404
         if view.version != data["version"]:
+            log_ops_event(
+                "activity_progress_view.version_conflict",
+                level="warning",
+                root_id=root_id,
+                activity_id=activity.id,
+                progress_view_id=view.id,
+                requested_version=data["version"],
+                current_version=view.version,
+            )
             return {"current": serialize_progress_view(view)}, "Progress view was changed elsewhere", 409
-        _, quota_error, quota_status = self._storage_check(
-            user_id,
-            data.get("name"),
-            data.get("config"),
-        )
-        if quota_error:
-            return None, quota_error, quota_status
         updates = {}
         if data.get("name") is not None:
             name = data["name"].strip()
@@ -352,6 +429,15 @@ class ActivityProgressViewService:
             if error:
                 return None, error, 400
             updates["config"] = config
+        next_name = updates.get("name", view.name)
+        next_config = updates.get("config", normalize_progress_view_config(view.config))
+        _, quota_error, quota_status = self._storage_delta_check(
+            user_id,
+            (view.name, normalize_progress_view_config(view.config)),
+            (next_name, next_config),
+        )
+        if quota_error:
+            return None, quota_error, quota_status
         updates.update(version=data["version"] + 1, updated_at=utc_now())
         changed = self.db.query(ActivityProgressView).filter(
             ActivityProgressView.id == view.id,
@@ -361,6 +447,15 @@ class ActivityProgressViewService:
         if changed != 1:
             self.db.rollback()
             current = self._view(activity, view_id)
+            log_ops_event(
+                "activity_progress_view.version_conflict",
+                level="warning",
+                root_id=root_id,
+                activity_id=activity.id,
+                progress_view_id=view_id,
+                requested_version=data["version"],
+                current_version=current.version if current else None,
+            )
             return {"current": serialize_progress_view(current)} if current else None, "Progress view was changed elsewhere", 409
         try:
             self.db.commit()

@@ -401,6 +401,7 @@ describe('api core auth refresh behavior', () => {
             ['activities.createActivityTag', () => fractalActivitiesApi.createActivityTag('root-1', 'activity-1', { name: 'Competition' })],
             ['activities.updateActivityTag', () => fractalActivitiesApi.updateActivityTag('root-1', 'activity-1', 'tag-1', { name: 'Meet' })],
             ['activities.archiveActivityTag', () => fractalActivitiesApi.archiveActivityTag('root-1', 'activity-1', 'tag-1')],
+            ['activities.restoreActivityTag', () => fractalActivitiesApi.restoreActivityTag('root-1', 'activity-1', 'tag-1')],
             ['activities.replaceActivityInstanceTags', () => fractalActivitiesApi.replaceActivityInstanceTags('root-1', 'instance-1', ['tag-1'])],
             ['activities.replaceActivitySetTags', () => fractalActivitiesApi.replaceActivitySetTags('root-1', 'set-1', ['tag-1'])],
             ['activities.createActivityProgressView', () => fractalActivitiesApi.createActivityProgressView('root-1', 'activity-1', { name: 'Meet' })],

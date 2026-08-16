@@ -105,7 +105,9 @@ export const queryKeys = {
     progressHistoryRoot: (activityDefId) => ['progress', 'history', activityDefId],
     sessionProgressSummary: (sessionId) => ['progress', 'session', sessionId],
     activityTags: (rootId, activityId) => ['activity-tags', rootId, activityId],
-    activityProgressViews: (rootId, activityId) => ['activity-progress-views', rootId, activityId],
+    activityProgressTimelineRoot: (rootId, activityId) => [
+        'activity-progress-timeline', rootId, activityId,
+    ],
     activityProgressTimeline: (rootId, activityId, sessionId = null) => [
         'activity-progress-timeline', rootId, activityId, sessionId,
     ],

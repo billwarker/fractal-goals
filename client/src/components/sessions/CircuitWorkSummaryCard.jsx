@@ -2,6 +2,8 @@ import React, { memo, useMemo } from 'react';
 
 import { formatShortDuration } from '../../hooks/useSessionDuration';
 import CompletionCheckBadge from '../common/CompletionCheckBadge';
+import ActivityTagBadges from '../common/ActivityTagBadges';
+import ProgressHint from '../common/ProgressHint';
 import activityStyles from './ActivityCard.module.css';
 import styles from './CircuitWorkSummaryCard.module.css';
 
@@ -35,6 +37,7 @@ function getMetricDisplay(metric, activityDefinition) {
     if (!metricName || value === null || value === undefined || value === '') return null;
     return {
         id: metric.id || `${metricId || metricName}-${metric.split_id || 'unsplit'}`,
+        metricId,
         label: splitName ? `${splitName} - ${metricName}` : metricName,
         value,
         unit: metric.unit || metricDefinition?.unit || '',
@@ -45,6 +48,7 @@ const CircuitWorkSummaryCard = memo(function CircuitWorkSummaryCard({
     circuit,
     activities = [],
     activityInstances = [],
+    deltaDisplayMode = 'percent',
 }) {
     const slotsById = useMemo(
         () => new Map((circuit?.slots || []).map((slot) => [slot.id, slot])),
@@ -69,6 +73,7 @@ const CircuitWorkSummaryCard = memo(function CircuitWorkSummaryCard({
     if (isPaused) statusLabel = 'Paused circuit';
     else if (isCompleted) statusLabel = 'Completed circuit';
     else if (isInProgress) statusLabel = 'In-progress circuit';
+    const renderedInstanceTags = new Set();
 
     return (
         <article className={`${activityStyles.activityCard} ${activityStyles.activityCardInstance}`}>
@@ -129,6 +134,16 @@ const CircuitWorkSummaryCard = memo(function CircuitWorkSummaryCard({
                                                         activityInstancesById,
                                                     ).map((metric) => getMetricDisplay(metric, activityDefinition))
                                                         .filter(Boolean);
+                                                    const activityInstanceId = member.activity_instance_id || slot?.activity_instance_id;
+                                                    const activityInstance = activityInstancesById.get(activityInstanceId);
+                                                    const setIndex = member.activity_set_id
+                                                        ? activityInstance?.sets?.findIndex((set) => set.id === member.activity_set_id)
+                                                        : null;
+                                                    const directSetTags = setIndex != null && setIndex >= 0
+                                                        ? activityInstance?.sets?.[setIndex]?.tags || []
+                                                        : [];
+                                                    const showInstanceTags = activityInstance && !renderedInstanceTags.has(activityInstance.id);
+                                                    if (showInstanceTags) renderedInstanceTags.add(activityInstance.id);
 
                                                     return (
                                                         <li
@@ -139,7 +154,11 @@ const CircuitWorkSummaryCard = memo(function CircuitWorkSummaryCard({
                                                                 {roundNumber}.{memberIndex + 1}
                                                             </span>
                                                             <span className={styles.memberContent}>
-                                                                <span className={styles.memberName}>{memberName}</span>
+                                                                <span className={styles.memberName}>
+                                                                    {memberName}
+                                                                    {activityInstance?.progress_comparison?.included === false ? ' · Excluded' : ''}
+                                                                </span>
+                                                                {showInstanceTags ? <ActivityTagBadges tags={activityInstance.tags} ariaLabel={`${memberName} activity tags`} /> : null}
                                                                 {metrics.length > 0 && (
                                                                     <span
                                                                         className={styles.metrics}
@@ -156,10 +175,17 @@ const CircuitWorkSummaryCard = memo(function CircuitWorkSummaryCard({
                                                                                 <span className={activityStyles.metricValue}>
                                                                                     {metric.value}{metric.unit ? ` ${metric.unit}` : ''}
                                                                                 </span>
+                                                                                <ProgressHint
+                                                                                    metricId={metric.metricId}
+                                                                                    setIndex={setIndex >= 0 ? setIndex : null}
+                                                                                    progressComparison={activityInstance?.progress_comparison}
+                                                                                    displayMode={deltaDisplayMode}
+                                                                                />
                                                                             </span>
                                                                         ))}
                                                                     </span>
                                                                 )}
+                                                                <ActivityTagBadges tags={directSetTags} ariaLabel={`${memberName} set tags`} />
                                                             </span>
                                                         </li>
                                                     );

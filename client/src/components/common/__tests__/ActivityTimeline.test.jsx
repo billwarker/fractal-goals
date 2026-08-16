@@ -140,4 +140,30 @@ describe('ActivityTimelineCard', () => {
         expect(screen.queryByText(/Total yield:/i)).not.toBeInTheDocument();
         expect(screen.getByText(/Set 1/)).toBeInTheDocument();
     });
+
+    it('shows instance tags once and only direct tags on each set', () => {
+        renderWithProviders(
+            <ActivityTimelineCard
+                instance={{
+                    id: 'instance-1',
+                    session_date: '2026-06-02T12:00:00.000Z',
+                    metric_values: [],
+                    tags: [{ id: 'parent', name: 'Competition', color: '#3366AA' }],
+                    sets: [{
+                        metrics: [{ metric_id: 'reps', value: 5 }],
+                        tags: [{ id: 'direct', name: 'Heavy', color: '#AA6633' }],
+                        inherited_tags: [{ id: 'parent', name: 'Competition', color: '#3366AA' }],
+                    }],
+                    notes: [],
+                }}
+                activityDef={{ metric_definitions: [{ id: 'reps', name: 'Reps', unit: 'Count' }] }}
+                timezone="UTC"
+            />,
+            { withAuth: false, withGoalLevels: false, withTheme: false, withTimezone: false },
+        );
+
+        expect(screen.getByLabelText('Activity tags')).toHaveTextContent('Competition');
+        expect(screen.getByLabelText('Set 1 tags')).toHaveTextContent('Heavy');
+        expect(screen.getAllByText('Competition')).toHaveLength(1);
+    });
 });

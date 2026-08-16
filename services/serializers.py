@@ -124,6 +124,7 @@ def serialize_activity_set(activity_set):
         "metrics": [serialize_metric_value(metric) for metric in (activity_set.metric_values or [])],
         "created_at": format_utc(activity_set.created_at),
         "updated_at": format_utc(activity_set.updated_at),
+        "tag_assignment_version": activity_set.tag_assignment_version,
         "tags": [serialize_activity_tag(tag) for tag in direct_tags],
         "inherited_tags": [serialize_activity_tag(tag) for tag in inherited_tags],
         "effective_tags": [serialize_activity_tag(tag) for tag in effective_by_id.values()],
@@ -200,6 +201,7 @@ def serialize_activity_instance(instance, *, has_open_work_interval=False):
         "metric_values": metric_values_list,
         "metrics": metric_values_list,  # Frontend alias
         "tags": [serialize_activity_tag(tag) for tag in (getattr(instance, 'tags', None) or [])],
+        "tag_assignment_version": instance.tag_assignment_version,
         "progress_comparison": getattr(instance, '_dynamic_progress', None),
     }
 

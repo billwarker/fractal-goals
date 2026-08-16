@@ -1,0 +1,26 @@
+.list {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.tag {
+    --badge-bg: color-mix(in srgb, var(--activity-tag-color, var(--color-brand-primary)) 14%, transparent);
+    --badge-border: color-mix(in srgb, var(--activity-tag-color, var(--color-border)) 66%, var(--color-border));
+    --badge-color: var(--color-text-secondary);
+    min-height: 20px;
+    max-width: 180px;
+    padding: 2px 7px;
+    overflow: hidden;
+    font-size: 10px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.archived {
+    border-style: dashed;
+    opacity: 0.72;
+}

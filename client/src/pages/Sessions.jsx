@@ -82,6 +82,8 @@ function Sessions() {
         data: sessionsPages,
         isLoading: sessionsLoading,
         isFetching: sessionsFetching,
+        error: sessionsError,
+        refetch: refetchSessions,
         fetchNextPage,
         hasNextPage,
         isFetchingNextPage,
@@ -348,6 +350,15 @@ function Sessions() {
                 <div className={styles.sessionsList}>
                     {sessionsLoading || (sessionsFetching && !isFetchingNextPage) ? (
                         <LoadingState label="Loading session data..." className={styles.loadingContainer} />
+                    ) : sessionsError ? (
+                        <EmptyState
+                            className={styles.emptyState}
+                            role="alert"
+                            title="Sessions could not be loaded"
+                            description="Your sessions are still stored. Retry the request or refresh the page."
+                            actionLabel="Retry"
+                            onAction={() => refetchSessions()}
+                        />
                     ) : visibleSessions.length === 0 ? (
                         <EmptyState
                             className={styles.emptyState}

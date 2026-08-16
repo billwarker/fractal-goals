@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 
 import { useActivityTagMutations, useActivityTags } from '../../hooks/useActivityProgressViews';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import Button from '../atoms/Button';
+import ConfirmationModal from '../ConfirmationModal';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import styles from './ManageActivityTagsModal.module.css';
@@ -16,15 +17,12 @@ export default function ManageActivityTagsModal({ isOpen, onClose, rootId, activ
     const [color, setColor] = useState(DEFAULT_COLOR);
     const [sortOrder, setSortOrder] = useState('');
     const [editingId, setEditingId] = useState(null);
-    const selectedId = activityId || activities[0]?.id || '';
+    const [archiveTarget, setArchiveTarget] = useState(null);
+    const selectedId = activities.some((activity) => activity.id === activityId)
+        ? activityId
+        : activities[0]?.id || '';
     const { data: tags = [], isLoading } = useActivityTags(rootId, selectedId);
-    const { createTag, updateTag, archiveTag, isPending } = useActivityTagMutations(rootId, selectedId);
-
-    useEffect(() => {
-        if (selectedId && !activities.some((activity) => activity.id === selectedId)) {
-            setActivityId(activities[0]?.id || '');
-        }
-    }, [activities, selectedId]);
+    const { createTag, updateTag, archiveTag, restoreTag, isPending } = useActivityTagMutations(rootId, selectedId);
 
     const resetForm = () => {
         setEditingId(null);
@@ -55,12 +53,20 @@ export default function ManageActivityTagsModal({ isOpen, onClose, rootId, activ
     };
 
     const archive = async (tag) => {
-        if (!window.confirm(`Archive “${tag.name}”? Existing history and saved views will keep using it.`)) return;
         try {
             await archiveTag(tag.id);
             if (editingId === tag.id) resetForm();
         } catch (error) {
             notify.error(`Failed to archive tag: ${formatError(error)}`);
+        }
+    };
+
+    const restore = async (tag) => {
+        try {
+            await restoreTag(tag.id);
+            notify.success(`Restored “${tag.name}”`);
+        } catch (error) {
+            notify.error(`Failed to restore tag: ${formatError(error)}`);
         }
     };
 
@@ -93,8 +99,8 @@ export default function ManageActivityTagsModal({ isOpen, onClose, rootId, activ
                                             <span className={styles.order}>#{tag.sort_order + 1}</span>
                                             {!tag.archived ? <>
                                                 <button type="button" onClick={() => edit(tag)}>Edit</button>
-                                                <button type="button" onClick={() => archive(tag)}>Archive</button>
-                                            </> : null}
+                                                <button type="button" onClick={() => setArchiveTarget(tag)}>Archive</button>
+                                            </> : <button type="button" onClick={() => restore(tag)}>Restore</button>}
                                         </li>
                                     ))}
                                     {!tags.length ? <li className={styles.empty}>No tags for this activity yet.</li> : null}
@@ -104,6 +110,14 @@ export default function ManageActivityTagsModal({ isOpen, onClose, rootId, activ
                     )}
                 </div>
             </ModalBody>
+            <ConfirmationModal
+                isOpen={Boolean(archiveTarget)}
+                onClose={() => setArchiveTarget(null)}
+                onConfirm={() => archiveTarget && archive(archiveTarget)}
+                title="Archive tag?"
+                message={`Archive “${archiveTarget?.name || 'this tag'}”? Existing history and saved views will keep using it, and you can restore it later.`}
+                confirmText="Archive tag"
+            />
         </Modal>
     );
 }

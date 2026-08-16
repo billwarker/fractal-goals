@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 import logging
+from time import perf_counter
 import models
 from pydantic import ValidationError
 from sqlalchemy.orm import selectinload
@@ -34,6 +35,7 @@ from services.activity_service import (
 )
 from services.progress_service import ProgressService
 from services.activity_progress_view_service import ActivityProgressViewService
+from services.ops_log import log_ops_event
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +163,18 @@ def archive_activity_tag(current_user, root_id, activity_id, tag_id):
         session.close()
 
 
+@activities_bp.route('/<root_id>/activities/<activity_id>/tags/<tag_id>/restore', methods=['POST'])
+@token_required
+def restore_activity_tag(current_user, root_id, activity_id, tag_id):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityProgressViewService(session).restore_tag(
+            root_id, activity_id, tag_id, current_user.id
+        ))
+    finally:
+        session.close()
+
+
 @activities_bp.route('/<root_id>/activity-instances/<instance_id>/tags', methods=['PUT'])
 @token_required
 @validate_request(ActivityTagAssignmentSchema)
@@ -168,7 +182,7 @@ def replace_activity_instance_tags(current_user, root_id, instance_id, validated
     session = get_db_session()
     try:
         return _service_response(*ActivityProgressViewService(session).replace_instance_tags(
-            root_id, instance_id, current_user.id, validated_data['tag_ids']
+            root_id, instance_id, current_user.id, validated_data['tag_ids'], version=validated_data.get('version')
         ))
     finally:
         session.close()
@@ -181,7 +195,7 @@ def replace_activity_set_tags(current_user, root_id, set_id, validated_data):
     session = get_db_session()
     try:
         return _service_response(*ActivityProgressViewService(session).replace_set_tags(
-            root_id, set_id, current_user.id, validated_data['tag_ids']
+            root_id, set_id, current_user.id, validated_data['tag_ids'], version=validated_data.get('version')
         ))
     finally:
         session.close()
@@ -282,6 +296,7 @@ def get_activity_progress_timeline(current_user, root_id, activity_id):
 @validate_request(ActivityProgressQuerySchema)
 def query_activity_progress(current_user, root_id, activity_id, validated_data):
     session = get_db_session()
+    started_at = perf_counter()
     try:
         if not require_owned_root(session, root_id, current_user.id):
             return jsonify({"error": "Fractal not found or access denied"}), 404
@@ -299,6 +314,16 @@ def query_activity_progress(current_user, root_id, activity_id, validated_data):
             )
         except ValueError as error:
             return jsonify({"error": str(error)}), 400
+        elapsed_ms = round((perf_counter() - started_at) * 1000, 1)
+        log_ops_event(
+            "activity_progress_view.preview_calculated",
+            level="warning" if elapsed_ms >= 500 else "info",
+            root_id=root_id,
+            activity_id=activity_id,
+            elapsed_ms=elapsed_ms,
+            returned_items=len(payload.get("items", [])),
+            total=payload.get("total", 0),
+        )
         return jsonify(payload)
     finally:
         session.close()
