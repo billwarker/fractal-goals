@@ -3,12 +3,32 @@ import { resolve } from 'node:path';
 
 const checks = [
   {
+    file: 'src/App.css',
+    patterns: [
+      /\.content-container\s*\{[^}]*background-color:\s*var\(--color-bg-app\);[^}]*background-image:[^}]*linear-gradient\(var\(--color-grid\)/s,
+    ],
+    forbiddenPatterns: [
+      /\.main-content(?:\.with-window)?\s*\{/,
+    ],
+  },
+  {
     file: 'src/app-shell-and-session.css',
     patterns: [/\.top-nav-links/, /\.page-container/, /@media\s*\(max-width:\s*768px\)/],
+    forbiddenPatterns: [/linear-gradient\(var\(--color-grid\)/],
   },
   {
     file: 'src/pages/SessionDetail.module.css',
-    patterns: [/\.mobileBottomDock/, /\.mobilePaneSheet/, /@media\s*\(max-width:\s*768px\)/],
+    patterns: [
+      /\.sessionDetailContainer\s*\{[^}]*background:\s*transparent;/s,
+      /\.sessionMainContent\s*\{[^}]*background:\s*transparent;/s,
+      /\.mobileBottomDock/,
+      /\.mobilePaneSheet/,
+      /@media\s*\(max-width:\s*768px\)/,
+    ],
+    forbiddenPatterns: [
+      /linear-gradient\(var\(--color-grid\)/,
+      /background(?:-color)?:\s*var\(--color-bg-app\)/,
+    ],
   },
   {
     file: 'src/pages/Sessions.module.css',
@@ -100,6 +120,13 @@ for (const check of checks) {
   for (const pattern of check.patterns) {
     if (!pattern.test(content)) {
       console.error(`[responsive-audit] ${check.file} missing pattern: ${pattern}`);
+      hasFailure = true;
+    }
+  }
+
+  for (const pattern of check.forbiddenPatterns || []) {
+    if (pattern.test(content)) {
+      console.error(`[responsive-audit] ${check.file} contains forbidden pattern: ${pattern}`);
       hasFailure = true;
     }
   }

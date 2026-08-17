@@ -2,103 +2,6 @@
 .page-reveal { animation: pageReveal var(--duration-slow) var(--ease-out) both; }
 @keyframes pageReveal { from { opacity: 0; transform: translateY(12px); } }
 @media (prefers-reduced-motion: reduce) { .page-reveal { animation: none; } }
-/* Connection View */
-.connection-view {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    background: var(--color-bg-app);
-    /* Grid Pattern */
-    background-image:
-        linear-gradient(var(--color-grid) 1px, transparent 1px),
-        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
-    background-size: 20px 20px;
-}
-
-.connection-header {
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    background: rgba(37, 37, 38, 0.95);
-    padding: 15px 30px;
-    border-radius: 8px;
-    border: 2px solid var(--color-border);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-}
-
-.connection-header h2 {
-    margin: 0;
-    color: var(--color-mode-sets);
-    font-size: 1.3rem;
-}
-
-.close-connection-btn {
-    background: var(--color-brand-danger);
-    color: white;
-    border: 1px solid var(--color-border-btn);
-    padding: 10px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.95rem;
-    transition: background 0.2s, transform 0.2s;
-}
-
-.close-connection-btn:hover {
-    background: var(--color-brand-danger-hover);
-    transform: scale(1.05);
-}
-
-.connection-view svg {
-    width: 100%;
-    height: 100%;
-}
-
-/* Animate connection lines */
-.connection-view line {
-    animation: dash 2s linear infinite;
-}
-
-@keyframes dash {
-    to {
-        stroke-dashoffset: -24;
-    }
-}
-
-/* Subtle glow for practice session circle */
-.connection-view circle[fill="#ff9800"] {
-    filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.6));
-}
-
-/* Goal circles - subtle styling */
-.connection-view circle[fill="#4caf50"] {
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
-}
-
-/* Clear Session Button */
-.clear-session-btn {
-    background: var(--color-brand-danger);
-    color: white;
-    border: 1px solid var(--color-border-btn);
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.9rem;
-    transition: background 0.2s, transform 0.2s;
-    margin-left: 15px;
-}
-
-.clear-session-btn:hover {
-    background: var(--color-brand-danger-hover);
-    transform: scale(1.05);
-}
-
 /* Sidebar Expansion */
 .sidebar {
     transition: width 0.3s ease;
@@ -525,17 +428,6 @@
     padding: 20px;
     display: flex;
     flex-direction: column;
-}
-
-/* Layout Adjustment for Window */
-.main-content {
-    flex: 1;
-    transition: width 0.3s ease, flex-basis 0.3s ease;
-}
-
-.main-content.with-window {
-    flex: 0 0 67vw;
-    width: 67vw;
 }
 
 /* Fractal Selection Grid (Restored & Centered) */
