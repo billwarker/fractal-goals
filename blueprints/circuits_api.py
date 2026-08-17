@@ -13,6 +13,7 @@ from validators import (
     CircuitMemberMetricsUpdateSchema,
     CircuitRunCreateSchema,
     CircuitRunTimingUpdateSchema,
+    CircuitScopeTagMutationSchema,
 )
 
 
@@ -225,4 +226,28 @@ def update_circuit_member_metrics(current_user, root_id, run_id, member_id):
             data["metrics"],
         ),
         "Error updating circuit member metrics",
+    )
+
+
+@circuits_bp.route("/<root_id>/circuit-runs/<run_id>/tags", methods=["PATCH"])
+@token_required
+def mutate_circuit_run_tag(current_user, root_id, run_id):
+    data, error = _validated(CircuitScopeTagMutationSchema)
+    if error:
+        return error
+    return _execute(
+        lambda service: service.mutate_run_tag(root_id, run_id, current_user.id, data),
+        "Error updating circuit tags",
+    )
+
+
+@circuits_bp.route("/<root_id>/circuit-runs/<run_id>/rounds/<round_id>/tags", methods=["PATCH"])
+@token_required
+def mutate_circuit_round_tag(current_user, root_id, run_id, round_id):
+    data, error = _validated(CircuitScopeTagMutationSchema)
+    if error:
+        return error
+    return _execute(
+        lambda service: service.mutate_round_tag(root_id, run_id, round_id, current_user.id, data),
+        "Error updating circuit round tags",
     )

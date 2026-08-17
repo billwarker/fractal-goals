@@ -16,6 +16,7 @@ import styles from './SessionActivityItem.module.css';
  * Progress summary shown below sets: additive totals, yield, best set.
  */
 function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, displayMode = 'percent' }) {
+    const isExcluded = activeProgress?.included === false;
     const trackedMetricDefs = useMemo(() => filterTrackedMetricDefs(metricDefs), [metricDefs]);
     const autoAgg = useMemo(() => {
         const fromRecord = activeProgress?.derived_summary?.auto_aggregations;
@@ -25,14 +26,14 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, disp
         return computeAutoAggregations(sets, trackedMetricDefs);
     }, [activeProgress, sets, trackedMetricDefs]);
 
-    if (!autoAgg) return null;
+    if (!autoAgg && !isExcluded) return null;
 
     const yieldEligible = canComputeYield(trackedMetricDefs);
-    const hasYield = yieldEligible && autoAgg.total_yield != null;
-    const hasAdditive = Object.keys(autoAgg.additive_totals).length > 0;
-    const hasBestSet = autoAgg.best_set_index != null;
+    const hasYield = Boolean(autoAgg) && yieldEligible && autoAgg.total_yield != null;
+    const hasAdditive = Boolean(autoAgg) && Object.keys(autoAgg.additive_totals).length > 0;
+    const hasBestSet = Boolean(autoAgg) && autoAgg.best_set_index != null;
 
-    if (!hasYield && !hasAdditive && !hasBestSet) return null;
+    if (!hasYield && !hasAdditive && !hasBestSet && !isExcluded) return null;
 
     // Previous total yield for delta display
     const prevYield = (() => {
@@ -86,6 +87,11 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, disp
                             · Best: Set {autoAgg.best_set_index + 1} {bestSetLabel}
                         </span>
                     )}
+                </div>
+            )}
+            {isExcluded && (
+                <div className={styles.progressExcluded}>
+                    Excluded from the active progress view. Metrics remain available as raw session data.
                 </div>
             )}
         </div>

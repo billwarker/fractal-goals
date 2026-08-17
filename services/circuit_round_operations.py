@@ -54,6 +54,7 @@ class CircuitRoundOperations:
         added_round = self.owner._create_round_occurrences(
             run, next_round_number, completed=run.status == "completed"
         )
+        self.owner.tag_operations.inherit_run_tags(run, added_round)
         self.db_session.commit()
         event_bus.emit(Event(Events.CIRCUIT_ROUND_ADDED, {
             "circuit_run_id": run.id,

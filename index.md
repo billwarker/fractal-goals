@@ -51,6 +51,8 @@ Revision `a2c4e6f8b1d3` contracts the progress rebuild: it introduces activity t
 
 Revision `c4e6a8b1d3f5` reconciles databases that were stamped at `b3d5f7a9c2e4` while missing its assignment-version columns or partial indexes. It uses idempotent PostgreSQL DDL, preserves all user data, and makes startup recovery safe for both complete and partially applied rollout states.
 
+Revisions `d5f7a9c2e4b6` and `e6a8c1d3f5b7` add persisted circuit-run and round tag scopes plus assignment-provenance protection. Scope rows preserve the logical bulk operation and future-round inheritance, while the canonical activity-owned `ActivityTag` and instance/set junction rows remain the only inputs to dynamic progress calculation.
+
 The intended backend flow is:
 
 `request -> blueprint -> validation -> service -> serializer -> response`
@@ -320,6 +322,14 @@ Session activity placement contract:
 - removing an activity marks the instance deleted and removes its typed item; activity instances and circuit runs remain the canonical payload sources
 - circuit definitions are reusable and soft-deleted, while each run snapshots its definition name, slot order, full metric/split schema, activity metadata, and source version so historical entry and display survive later metric renames, archival, definition edits, or circuit archival. Archived definitions can be instantiated only by the internal template-snapshot path; direct circuit-run requests cannot opt back into archived definitions, and restore rechecks both circuit-count and storage quotas.
 - one circuit round represents one pass through all slots. A set-based slot uses one shared activity instance with a stable normalized `activity_set` per round; a non-set slot creates one activity instance per round
+- circuit-run tags are logical, persisted scopes materialized onto every set-based slot's parent activity instance and every non-set round activity instance. New rounds inherit all active circuit-run scopes atomically
+- round tags materialize directly onto each set result for set-based slots and each activity instance for setless slots. They do not duplicate circuit-run tags on sets because parent-instance tags already inherit hierarchically. The service creates a same-named activity-owned tag for each participating definition when missing, retains existing per-definition colors, rejects archived-name reuse, and preserves assignments that predated a removed scope. Scope-owned activity tags cannot be renamed or archived until the owning scopes are removed, and descendant assignment endpoints reject attempts to remove scope-owned tags
+- circuit/round tag mutations lock the owning session, run, and canonical target rows in deterministic order, commit all definitions and assignments atomically, and invalidate session, activity, timeline, analytics, and progress consumers together
+- circuit members consume the same dynamically calculated `progress_comparison` payload as ordinary activities on both Sessions summaries and Session Detail. Set-based slots select the comparison by the round's canonical set index, setless slots use their round-owned activity instance, excluded members are labelled without a delta, and metric edits/completion refresh the shared activity-instance and progress query families rather than maintaining a circuit-specific progress model
+- ordinary activity exclusion messaging belongs to the progress-summary section alongside Total yield/Best set rather than the identity header. Setless or non-aggregatable activities retain an excluded-only summary row so raw metrics remain visible without losing cohort status
+- narrow activity-instance and circuit cards use the card's inline-size container rather than viewport width to select one shared mobile hierarchy: identity and selected-card actions, timer metadata, lifecycle actions, then results. Tag assignments remain visible but read-only unless their exact owning scope is selected: activity for instance tags, set for direct-set tags, circuit for run tags, round for round tags, and member for circuit member or nested-set tags. A selected activity or circuit header places `+ Tag` immediately after Edit and Options and before assigned tags; the controls remain one vertically aligned action row on desktop and mobile. Selecting a parent never exposes mutation controls for all of its descendants. Timer metadata uses three columns when the card is at least 540px wide and one column below that; lifecycle actions use an auto-fitting minimum-width grid so two- and three-control states remain balanced and stack only when necessary. Metric units and progress move beneath their value input instead of occupying a clipping-prone fixed side track, progress summaries wrap, and circuit round/member controls retain compact header ownership
+- editable activity-instance, set, circuit, and round tag controls share one actual-width overflow policy. Assigned tags remain individually removable while they fit; before they can overflow into activity identity, metrics, or timer controls, the list becomes one count badge (`N tags`) while the tag picker remains available for inspecting and changing every assignment. Both the count badge and picker control stay right-anchored as the available width changes, and top-level activity/circuit controls align with the timer-input row rather than its labels. Tag editors use a stable zero flex basis and an overflow-release margin so near-boundary measurements cannot oscillate between individual and summary rendering
+- circuit cards remain expanded and expose no collapse/expand control; rounds, notes, and the add-round action remain visible subject only to progressive round rendering and permissions
 - `session_work_intervals` is the exclusive work-time ledger for ordinary activity timers. Circuit children never create work intervals, and an active or paused circuit and an ordinary activity timer are mutually exclusive within a session
 - the circuit run is the sole circuit timer owner (`time_start`, `time_stop`, paused duration, and `duration_seconds`). Rounds are structural containers only, while their members retain metric/set results with `ActivityInstance.time_start`, `time_stop`, and `duration_seconds` always `NULL`
 - manual circuit timing is checked against ordinary work intervals and every other circuit range, including open ranges and the final range at completion, so relative adjustments cannot create double-counted work. Future boundaries are rejected before persistence. Because circuit runs currently retain aggregate paused duration rather than individual pause intervals, a run containing paused work must be reset before its timing boundaries can be changed.
@@ -341,6 +351,7 @@ Key backend pieces:
 - `services/timer_service.py`
 - `services/circuit_service.py`
 - `services/circuit_metric_service.py` (immutable activity-schema snapshots and identity-preserving nested metric reconciliation)
+- `services/circuit_tag_operations.py` (atomic logical scopes, per-definition tag creation, materialization, removal provenance, and new-round inheritance)
 - `services/circuit_session_items.py` (typed circuit placement/removal within session section JSON)
 - `services/activity_set_service.py`
 - `services/work_interval_service.py`
@@ -367,6 +378,7 @@ Key frontend pieces:
 - `client/src/components/common/TimelineShell.jsx`
 - `client/src/components/circuits/CircuitBuilderModal.jsx`
 - `client/src/components/circuits/CircuitRunCard.jsx`
+- `client/src/components/circuits/CircuitScopeTagEditor.jsx`
 
 Session detail goal hierarchy contract:
 

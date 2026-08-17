@@ -26,6 +26,8 @@ const SUMMARY_ACTIONS = new Set([
     'resetRun',
     'addRound',
     'removeRound',
+    'updateRunTag',
+    'updateRoundTag',
 ]);
 
 export function refreshCircuitSessionConsumers(queryClient, rootId, sessionId, action) {
@@ -35,6 +37,8 @@ export function refreshCircuitSessionConsumers(queryClient, rootId, sessionId, a
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivities(rootId, sessionId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionProgressSummary(sessionId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.progressRoot() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) }),
+        queryClient.invalidateQueries({ queryKey: ['activity-progress-timeline', rootId] }),
         queryClient.invalidateQueries({ queryKey: queryKeys.goalAnalytics(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsEvidenceGoalsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsFlowtreeMetricsRoot(rootId) }),

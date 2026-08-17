@@ -17,7 +17,7 @@ from .activity import (
 )
 from .circuit import (
     CircuitDefinition, CircuitSlot, CircuitRun, CircuitRunSlot,
-    CircuitRound, CircuitRoundMember, SessionWorkInterval,
+    CircuitRound, CircuitRoundMember, CircuitScopeTag, SessionWorkInterval,
 )
 from .session import (
     Session, SessionTemplate, SessionTemplateStats, TemplateSectionStats, ActivityDurationStats,

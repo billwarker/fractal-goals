@@ -1,7 +1,18 @@
 import uuid
 
 import sqlalchemy as sa
-from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 
 from .base import Base, JSON_TYPE, utc_now
@@ -103,6 +114,12 @@ class CircuitRun(Base):
         cascade="all, delete-orphan",
         order_by="CircuitRound.round_number",
     )
+    scope_tags = relationship(
+        "CircuitScopeTag",
+        back_populates="run",
+        cascade="all, delete-orphan",
+        order_by="CircuitScopeTag.sort_order, CircuitScopeTag.name",
+    )
 
     __table_args__ = (
         CheckConstraint(
@@ -186,10 +203,80 @@ class CircuitRound(Base):
         cascade="all, delete-orphan",
         order_by="CircuitRoundMember.sort_order",
     )
+    scope_tags = relationship(
+        "CircuitScopeTag",
+        back_populates="round",
+        cascade="all, delete-orphan",
+        order_by="CircuitScopeTag.sort_order, CircuitScopeTag.name",
+    )
 
     __table_args__ = (
         CheckConstraint("round_number > 0", name="ck_circuit_rounds_number_positive"),
         UniqueConstraint("circuit_run_id", "round_number", name="uq_circuit_rounds_run_number"),
+    )
+
+
+class CircuitScopeTag(Base):
+    """A logical tag applied across a circuit run or one of its rounds.
+
+    Activity-owned ``ActivityTag`` rows remain the canonical progress tags.
+    This row preserves the bulk scope so future rounds can inherit run tags.
+    """
+
+    __tablename__ = "circuit_scope_tags"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey("goals.id", ondelete="CASCADE"), nullable=False, index=True)
+    circuit_run_id = Column(
+        String,
+        ForeignKey("circuit_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    circuit_round_id = Column(
+        String,
+        ForeignKey("circuit_rounds.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    name = Column(String, nullable=False)
+    color = Column(String(7), nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0, server_default="0")
+    preserved_target_keys = Column(JSON_TYPE, nullable=False, default=list, server_default=sa.text("'[]'::jsonb"))
+    created_at = Column(DateTime, nullable=False, default=utc_now, server_default=sa.func.now())
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=utc_now,
+        onupdate=utc_now,
+        server_default=sa.func.now(),
+    )
+
+    run = relationship("CircuitRun", back_populates="scope_tags")
+    round = relationship("CircuitRound", back_populates="scope_tags")
+
+    __table_args__ = (
+        Index(
+            "uq_circuit_scope_tags_run_name",
+            "circuit_run_id",
+            sa.func.lower(name),
+            unique=True,
+            postgresql_where=sa.text("circuit_round_id IS NULL"),
+            sqlite_where=sa.text("circuit_round_id IS NULL"),
+        ),
+        Index(
+            "uq_circuit_scope_tags_round_name",
+            "circuit_round_id",
+            sa.func.lower(name),
+            unique=True,
+            postgresql_where=sa.text("circuit_round_id IS NOT NULL"),
+            sqlite_where=sa.text("circuit_round_id IS NOT NULL"),
+        ),
+        CheckConstraint(
+            "color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$'",
+            name="ck_circuit_scope_tags_color",
+        ),
+        CheckConstraint("sort_order >= 0", name="ck_circuit_scope_tags_sort_order_nonnegative"),
     )
 
 

@@ -22,6 +22,7 @@ from services.circuit_metric_service import CircuitMetricService
 from services.circuit_definition_operations import CircuitDefinitionOperations
 from services.circuit_round_operations import CircuitRoundOperations
 from services.circuit_run_timing_operations import CircuitRunTimingOperations
+from services.circuit_tag_operations import CircuitTagOperations
 from services.circuit_session_items import append_circuit_run_item, remove_circuit_run_item
 from services.events import Event, Events, event_bus
 from services.owned_entity_queries import get_owned_activity_definition, get_owned_session
@@ -44,6 +45,7 @@ class CircuitService:
         self.definition_operations = CircuitDefinitionOperations(self)
         self.round_operations = CircuitRoundOperations(self)
         self.timing_operations = CircuitRunTimingOperations(self)
+        self.tag_operations = CircuitTagOperations(self)
 
     @staticmethod
     def _definition_options():
@@ -66,8 +68,20 @@ class CircuitService:
     @staticmethod
     def _run_options():
         return (
-            selectinload(CircuitRun.slots),
+            selectinload(CircuitRun.scope_tags),
+            selectinload(CircuitRun.slots)
+            .selectinload(CircuitRunSlot.activity_instance)
+            .selectinload(ActivityInstance.tags),
             selectinload(CircuitRun.rounds).selectinload(CircuitRound.members),
+            selectinload(CircuitRun.rounds).selectinload(CircuitRound.scope_tags),
+            selectinload(CircuitRun.rounds)
+            .selectinload(CircuitRound.members)
+            .selectinload(CircuitRoundMember.activity_set)
+            .selectinload(ActivitySet.tags),
+            selectinload(CircuitRun.rounds)
+            .selectinload(CircuitRound.members)
+            .selectinload(CircuitRoundMember.activity_instance)
+            .selectinload(ActivityInstance.tags),
             selectinload(CircuitRun.rounds)
             .selectinload(CircuitRound.members)
             .selectinload(CircuitRoundMember.activity_set)
@@ -505,6 +519,12 @@ class CircuitService:
 
     def delete_round(self, root_id, run_id, round_id, user_id):
         return self.round_operations.delete(root_id, run_id, round_id, user_id)
+
+    def mutate_run_tag(self, root_id, run_id, user_id, data):
+        return self.tag_operations.mutate(root_id, run_id, user_id, data)
+
+    def mutate_round_tag(self, root_id, run_id, round_id, user_id, data):
+        return self.tag_operations.mutate(root_id, run_id, user_id, data, round_id=round_id)
 
     def complete_run(self, root_id, run_id, user_id):
         return self.timing_operations.complete(root_id, run_id, user_id)

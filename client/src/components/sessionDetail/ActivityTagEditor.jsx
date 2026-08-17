@@ -1,16 +1,29 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useActivityTagMutations } from '../../hooks/useActivityProgressViews';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
+import Badge from '../atoms/Badge';
 import Button from '../atoms/Button';
 import CloseButton from '../atoms/CloseButton';
+import useTagCountOverflow from './useTagCountOverflow';
 import styles from './ActivityTagEditor.module.css';
 
-function ActivityTagEditor({ rootId, activityId, instanceId = null, setId = null, assignmentVersion = 1, availableTags = [], tags = [], inheritedTags = [] }) {
+function ActivityTagEditor({
+    className = '',
+    rootId,
+    activityId,
+    instanceId = null,
+    setId = null,
+    assignmentVersion = 1,
+    availableTags = [],
+    tags = [],
+    inheritedTags = [],
+    editable = true,
+    triggerFirst = false,
+}) {
     const assignmentKey = setId || instanceId;
     const editorRef = useRef(null);
-    const triggerRef = useRef(null);
     const pickerRef = useRef(null);
     const searchRef = useRef(null);
     const assignmentQueueRef = useRef(Promise.resolve());
@@ -37,16 +50,24 @@ function ActivityTagEditor({ rootId, activityId, instanceId = null, setId = null
     const assignableTags = localTags.filter((tag) => !tag.archived && !inheritedIds.has(tag.id));
     const filteredAssignableTags = assignableTags.filter((tag) => tag.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
     const selectedTags = localTags.filter((tag) => selectedIds.includes(tag.id) && !inheritedIds.has(tag.id));
+    const tagOverflow = useTagCountOverflow(selectedTags, editable);
 
     useEffect(() => {
         assignmentVersionRef.current = assignmentVersion;
     }, [assignmentKey, assignmentVersion]);
 
-    const closePicker = ({ restoreFocus = true } = {}) => {
+    useEffect(() => {
+        if (!editable && isPickerOpen) {
+            setIsPickerOpen(false);
+            setSearch('');
+        }
+    }, [editable, isPickerOpen]);
+
+    const closePicker = useCallback(({ restoreFocus = true } = {}) => {
         setIsPickerOpen(false);
         setSearch('');
-        if (restoreFocus) requestAnimationFrame(() => triggerRef.current?.focus());
-    };
+        if (restoreFocus) requestAnimationFrame(() => tagOverflow.triggerRef.current?.focus());
+    }, [tagOverflow.triggerRef]);
 
     useEffect(() => {
         if (!isPickerOpen) return undefined;
@@ -76,7 +97,7 @@ function ActivityTagEditor({ rootId, activityId, instanceId = null, setId = null
             document.removeEventListener('pointerdown', closeOnOutsideClick);
             document.removeEventListener('keydown', closeOnEscape);
         };
-    }, [assignableTags.length, isPickerOpen]);
+    }, [assignableTags.length, closePicker, isPickerOpen]);
 
     const persist = async (nextIds) => {
         const generation = assignmentGenerationRef.current + 1;
@@ -124,43 +145,65 @@ function ActivityTagEditor({ rootId, activityId, instanceId = null, setId = null
             notify.error(`Failed to create tag: ${formatError(error)}`);
         }
     };
+    const addTagTrigger = editable ? (
+        <Button
+            variant="secondary"
+            size="sm"
+            className={styles.addTag}
+            ref={tagOverflow.triggerRef}
+            disabled={isPending}
+            aria-label="Add tag"
+            aria-expanded={isPickerOpen}
+            aria-haspopup="dialog"
+            onClick={() => (isPickerOpen ? closePicker() : setIsPickerOpen(true))}
+        >
+            <span className={styles.addTagIcon} aria-hidden="true">+</span>
+            Tag
+        </Button>
+    ) : null;
 
     return (
         <div
-            className={`${styles.editor} ${setId ? styles.setEditor : styles.instanceEditor}`}
+            className={`${styles.editor} ${setId ? styles.setEditor : styles.instanceEditor} ${className}`}
             ref={editorRef}
             role="group"
             aria-label={setId ? 'Set tags' : 'Activity tags'}
             onClick={(event) => event.stopPropagation()}
         >
-            <div className={styles.tags}>
-                {selectedTags.map((tag) => (
+            <div className={styles.tags} ref={tagOverflow.containerRef}>
+                {triggerFirst ? addTagTrigger : null}
+                <span className={styles.measure} ref={tagOverflow.measureRef} aria-hidden="true">
+                    {selectedTags.map((tag) => (
+                        <span
+                            key={`measure-${tag.id}`}
+                            className={`${styles.tag} ${styles.selected} ${styles.measureItem}`}
+                            data-tag-label={`${tag.name}${tag.archived ? ' (archived)' : ''}`}
+                        />
+                    ))}
+                </span>
+                {tagOverflow.isSummaryVisible && selectedTags.length > 0 ? (
+                    <Badge
+                        size="sm"
+                        className={`${styles.tag} ${styles.selected} ${styles.summary}`}
+                        aria-label={`${tagOverflow.countLabel} assigned`}
+                        title={selectedTags.map((tag) => tag.name).join(', ')}
+                    >
+                        {tagOverflow.countLabel}
+                    </Badge>
+                ) : selectedTags.map((tag) => (
                     <label key={tag.id} className={`${styles.tag} ${selectedIds.includes(tag.id) ? styles.selected : ''}`} style={tag.color ? { '--tag-color': tag.color } : undefined}>
                         <input
                             type="checkbox"
                             checked={selectedIds.includes(tag.id)}
-                            disabled={isPending}
+                            disabled={isPending || !editable}
                             onChange={() => void persist(selectedIds.includes(tag.id) ? selectedIds.filter((id) => id !== tag.id) : [...selectedIds, tag.id]).catch(() => undefined)}
                         />
                         {tag.name}{tag.archived ? ' (archived)' : ''}
                     </label>
                 ))}
-                <Button
-                    variant="secondary"
-                    size="sm"
-                    className={styles.addTag}
-                    ref={triggerRef}
-                    disabled={isPending}
-                    aria-label="Add tag"
-                    aria-expanded={isPickerOpen}
-                    aria-haspopup="dialog"
-                    onClick={() => (isPickerOpen ? closePicker() : setIsPickerOpen(true))}
-                >
-                    <span className={styles.addTagIcon} aria-hidden="true">+</span>
-                    Tag
-                </Button>
+                {triggerFirst ? null : addTagTrigger}
             </div>
-            {isPickerOpen && (
+            {editable && isPickerOpen && (
                 <div ref={pickerRef} className={styles.picker} role="dialog" aria-modal="true" aria-label={setId ? 'Choose set tags' : 'Choose activity tags'}>
                     <div className={styles.pickerHeader}>
                         <span>Choose tags</span>

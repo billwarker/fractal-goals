@@ -4,10 +4,12 @@
     align-items: center;
     gap: 6px;
     flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .instanceEditor {
-    flex: 0 1 auto;
+    flex: 1 1 0;
     justify-content: flex-end;
 }
 
@@ -15,11 +17,35 @@
     padding: 0;
 }
 
+.scopeEditor {
+    flex: 1 1 58px;
+    min-width: 58px;
+}
+
 .tags {
+    position: relative;
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 5px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.measure {
+    position: absolute;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    width: max-content;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.measureItem::before {
+    content: attr(data-tag-label);
 }
 
 .tag {
@@ -41,6 +67,13 @@
 .selected {
     background: color-mix(in srgb, var(--tag-color, var(--color-brand-primary)) 22%, transparent);
     color: var(--color-text-primary);
+}
+
+.summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .addTag {

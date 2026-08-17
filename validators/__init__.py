@@ -153,6 +153,7 @@ from .circuits import (
     CircuitMemberMetricsUpdateSchema,
     CircuitRunCreateSchema,
     CircuitRunTimingUpdateSchema,
+    CircuitScopeTagMutationSchema,
     CircuitSlotSchema,
 )
 
@@ -172,6 +173,7 @@ __all__ = [
     "CircuitMemberMetricsUpdateSchema",
     "CircuitRunCreateSchema",
     "CircuitRunTimingUpdateSchema",
+    "CircuitScopeTagMutationSchema",
     "CircuitSlotSchema",
     "AdminBetaSignupStatusSchema",
     "AdminFeatureFlagsUpdateSchema",

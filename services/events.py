@@ -291,6 +291,7 @@ class Events:
     CIRCUIT_RUN_TIMING_UPDATED = 'circuit_run.timing_updated'
     CIRCUIT_ROUND_ADDED = 'circuit_round.added'
     CIRCUIT_ROUND_DELETED = 'circuit_round.deleted'
+    CIRCUIT_SCOPE_TAG_UPDATED = 'circuit_scope_tag.updated'
     ACTIVITY_SET_UPDATED = 'activity_set.updated'
 
     # Fractal Metric events

@@ -118,6 +118,15 @@
     align-items: center;
     gap: 6px;
     flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.activityHeaderActions .headerScopeControl {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 58px;
+    max-width: 100%;
 }
 
 .activityLabel {
@@ -241,13 +250,6 @@
     min-width: 0;
     align-items: flex-end;
     flex-wrap: nowrap;
-}
-
-.instanceTagsSlot {
-    display: flex;
-    align-self: flex-end;
-    justify-content: flex-end;
-    flex: 0 0 auto;
 }
 
 .timerActionColumn {
@@ -593,7 +595,7 @@
 }
 
 .progressExcluded {
-    margin: 2px 0 8px;
+    margin: 3px 0 0;
     color: var(--color-text-muted);
     font-size: 11px;
     font-style: italic;
@@ -637,7 +639,9 @@
 .setTagsSlot {
     display: flex;
     justify-content: flex-end;
-    flex: 0 0 auto;
+    flex: 1 1 58px;
+    min-width: 58px;
+    max-width: 100%;
 }
 
 .setTrailingControls {
@@ -924,175 +928,52 @@
     }
 
     .activityHeaderRight {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
         width: 100%;
         min-width: 0;
         flex: 1 1 auto;
-        flex-wrap: nowrap;
-        gap: 6px;
-    }
-
-    .timerControlsGrid {
-        width: 100%;
-    }
-
-    /* Set row becomes: [#] [metrics]  then  [yield] on its own row below */
-    .setRow {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
-        align-items: start;
-        column-gap: 8px;
-        row-gap: 8px;
-    }
-
-    .setNumber {
-        grid-column: 1;
-        grid-row: 1;
-        padding-top: 6px;
-    }
-
-    .setMetricsContent {
-        grid-column: 2;
-        grid-row: 1;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 12px;
-    }
-
-    .setTrailingControls {
-        grid-column: 2 / 4;
-        grid-row: 2;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 8px;
-        margin-left: 0;
-    }
-
-    .removeSetButton {
-        grid-column: 3;
-        grid-row: 1;
-        margin-left: 0;
-        padding-top: 6px;
-    }
-
-    .setYield {
-        min-width: 0;
-        text-align: left;
-        padding-right: 0;
-        white-space: normal;
-    }
-
-    /* Metric row: fixed tracks so every (independent) row grid aligns identically */
-    .metricInputContainer {
-        display: grid;
-        grid-template-columns: 64px minmax(0, 1fr) 64px;
-        width: 100%;
-        column-gap: 12px;
-        row-gap: 4px;
-        align-items: center;
-    }
-
-    .metricLabel,
-    .metricLabelLarge {
-        max-width: 100%;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        line-height: 1.2;
-    }
-
-    .metricInput {
-        width: 100%;
-        min-width: 0;
-        max-width: none;
-    }
-
-    .metricValueControl {
-        width: 100%;
-    }
-
-    .metricMeta,
-    .metricMetaLarge {
-        justify-self: start;
-        gap: 6px;
-        flex-wrap: nowrap;
-        white-space: nowrap;
-    }
-
-    .metricUnit,
-    .metricUnitLarge {
-        white-space: nowrap;
-    }
-
-    .singleMetricGroupContent {
-        display: grid;
-        grid-template-columns: 1fr;
         gap: 10px;
     }
 
-    /* Split groups stack their label above the metric rows */
-    .splitContainer {
+    .actionStack {
         width: 100%;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
-    }
-
-    .splitLabel {
-        min-width: 0;
-    }
-
-    /* Stacked layout: drop the left divider/indent on cascade buttons */
-    .cascadeButtonsContainer {
-        margin-left: 0;
-        padding-left: 0;
-        border-left: none;
-        flex-wrap: wrap;
-    }
-}
-
-@media (max-width: 768px) {
-    .activityCard {
-        padding: 12px;
-    }
-
-    .activityHeader {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-        padding-right: 30px;
-    }
-
-    .activityHeaderLeft {
-        align-items: flex-start;
-    }
-
-    .activityHeaderRight {
-        width: 100%;
-        min-width: 0;
-        flex: 1 1 auto;
-        flex-wrap: nowrap;
-        gap: 6px;
     }
 
     .timerControlsGrid {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) 120px;
-        gap: 8px;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
         width: 100%;
     }
 
     .timerMetaColumn {
-        flex-direction: column;
-        gap: 6px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
         align-items: stretch;
+        width: 100%;
+    }
+
+    .activityNameFlex {
+        flex-wrap: wrap;
+    }
+
+    .activityHeaderActions {
+        flex-wrap: nowrap;
+        align-items: center;
     }
 
     .timerActionColumn {
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr));
+        gap: 8px;
         align-items: stretch;
+        width: 100%;
     }
 
-    .timerInput {
+    .timerInput,
+    .durationDisplay {
         width: 100%;
         min-width: 0;
     }
@@ -1153,22 +1034,21 @@
         white-space: normal;
     }
 
-    /* Metric row: fixed tracks so every (independent) row grid aligns identically */
+    /* Keep the value prominent and move units/progress below it so neither clips. */
     .metricInputContainer {
         display: grid;
-        grid-template-columns: 64px minmax(0, 1fr) 64px;
+        grid-template-columns: minmax(72px, max-content) minmax(0, 1fr);
         width: 100%;
         column-gap: 12px;
-        row-gap: 4px;
+        row-gap: 6px;
         align-items: center;
     }
 
     .metricLabel,
     .metricLabelLarge {
         max-width: 100%;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        white-space: normal;
+        overflow-wrap: anywhere;
         line-height: 1.2;
     }
 
@@ -1184,10 +1064,12 @@
 
     .metricMeta,
     .metricMetaLarge {
+        grid-column: 2;
+        grid-row: 2;
         justify-self: start;
         gap: 6px;
-        flex-wrap: nowrap;
-        white-space: nowrap;
+        flex-wrap: wrap;
+        white-space: normal;
     }
 
     .metricUnit,
@@ -1232,6 +1114,28 @@
 
     .singleMetricGroup {
         width: 100%;
+    }
+
+    .progressSummaryRow {
+        flex-wrap: wrap;
+        row-gap: 4px;
+    }
+
+    .progressSummaryBestSetInline {
+        flex-basis: 100%;
+        margin-left: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    .activityCard {
+        padding: 12px;
+    }
+}
+
+@container (min-width: 540px) and (max-width: 760px) {
+    .timerMetaColumn {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 

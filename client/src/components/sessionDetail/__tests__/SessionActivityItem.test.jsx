@@ -2,7 +2,6 @@ import React from 'react';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import SessionActivityItem from '../SessionActivityItem';
-
 const {
     updateInstance,
     updateTimer,
@@ -120,7 +119,7 @@ describe('SessionActivityItem metric and timer editing', () => {
                     duration_seconds: 0
                 }}
                 onFocus={vi.fn()}
-                isSelected={false}
+                isSelected
                 onReorder={vi.fn()}
                 canMoveUp={false}
                 canMoveDown={false}
@@ -151,9 +150,8 @@ describe('SessionActivityItem metric and timer editing', () => {
         );
 
         const activityTags = screen.getByRole('group', { name: 'Activity tags' });
-        expect(activityTags.parentElement.nextElementSibling).toHaveTextContent('Start');
+        expect(within(activityTags.parentElement).getByRole('button', { name: 'Pull Up options' })).toBeInTheDocument();
         const addActivityTag = within(activityTags).getByRole('button', { name: 'Add tag' });
-        expect(addActivityTag).toBeEnabled();
         expect(addActivityTag).toHaveTextContent('+Tag');
         expect(within(activityTags).queryByText('Available activity tag')).not.toBeInTheDocument();
 
@@ -1081,6 +1079,7 @@ describe('SessionActivityItem quick mode', () => {
         expect(screen.getByTitle('Start timer')).toBeInTheDocument();
         expect(screen.getByTitle('Instant complete (0s duration)')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Delete activity' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Add tag' })).not.toBeInTheDocument();
     });
 
     it('starts countdown mode when a valid MM:SS target is entered', () => {
@@ -1390,7 +1389,7 @@ describe('SessionActivityItem quick mode', () => {
                     time_stop: '2026-04-10T17:39:58Z',
                     duration_seconds: 60,
                 }}
-                isSelected={false}
+                isSelected
                 activityDefinition={{
                     id: 'activity-1',
                     name: 'Bernth Pinky Control Exercise',
@@ -1422,17 +1421,17 @@ describe('SessionActivityItem quick mode', () => {
 
         expect(screen.getAllByText('(▲15%)')).toHaveLength(1);
         const firstSetRow = screen.getByText('#1').parentElement;
+        fireEvent.click(firstSetRow);
         const setTags = within(firstSetRow).getByRole('group', { name: 'Set tags' });
         expect(setTags.parentElement.parentElement.nextElementSibling).toHaveAccessibleName('Remove set');
         expect(within(setTags).getByText('Set-specific tag')).toBeInTheDocument();
         expect(within(setTags).queryByText('Parent tag')).not.toBeInTheDocument();
         expect(within(setTags).queryByText('Available set tag')).not.toBeInTheDocument();
-
+        expect(within(screen.getByText('#2').parentElement).queryByRole('button', { name: 'Add tag' })).not.toBeInTheDocument();
         fireEvent.click(within(setTags).getByRole('button', { name: 'Add tag' }));
         expect(within(setTags).getByText('Available set tag')).toBeInTheDocument();
         expect(within(setTags).queryByText('Parent tag')).not.toBeInTheDocument();
     });
-
     it('uses the lower-is-better best-set anchor when placing max hints across set rows', () => {
         useProgressComparison.mockReturnValue({
             progressComparison: {
@@ -1463,6 +1462,7 @@ describe('SessionActivityItem quick mode', () => {
                     completed: false,
                     sets: [
                         {
+                            id: 'set-1',
                             instance_id: 'set-1',
                             metrics: [
                                 { metric_id: 'm1', value: '60' },
@@ -1515,8 +1515,8 @@ describe('SessionActivityItem quick mode', () => {
 
         const setRows = screen.getAllByText(/^#\d+$/).map((label) => label.parentElement);
         expect(setRows).toHaveLength(2);
+        expect(screen.queryByRole('button', { name: 'Add tag' })).not.toBeInTheDocument();
         expect(within(setRows[0]).queryByText('(last 7)')).not.toBeInTheDocument();
         expect(within(setRows[1]).getByText('(last 7)')).toBeInTheDocument();
     });
-
 });

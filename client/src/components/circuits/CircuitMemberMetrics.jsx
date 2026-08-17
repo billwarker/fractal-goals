@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
+import { resolveEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
+import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
 import { normalizeMetricValueForStorage } from '../../utils/sessionActivityMetrics';
+import ProgressHint from '../common/ProgressHint';
 import MetricValueEditor from '../sessionDetail/MetricValueEditor';
 import activityStyles from '../sessionDetail/SessionActivityItem.module.css';
 import styles from './CircuitRunCard.module.css';
@@ -11,7 +14,8 @@ const resolveMetricId = (metric) => metric?.metric_id || metric?.metric_definiti
 const resolveSplitId = (metric) => metric?.split_id || metric?.split_definition_id || null;
 const EMPTY_METRICS = [];
 
-export default function CircuitMemberMetrics({ memberId, definition, metrics = EMPTY_METRICS, disabled, saving, onSave }) {
+export default function CircuitMemberMetrics({ memberId, rootId, definition, metrics = EMPTY_METRICS, disabled, saving, progress, onSave }) {
+    const { progressSettings } = useRootProgressSettings(rootId);
     const [drafts, setDrafts] = useState({});
     const [localMetrics, setLocalMetrics] = useState(metrics);
     const localMetricsRef = useRef(metrics);
@@ -96,6 +100,14 @@ export default function CircuitMemberMetrics({ memberId, definition, metrics = E
                     inputClassName={`${activityStyles.metricInput} ${isSplitMetric ? activityStyles.metricInputSmall : activityStyles.metricInputLarge}`}
                     metaClassName={isSplitMetric ? activityStyles.metricMeta : activityStyles.metricMetaLarge}
                     unitClassName={isSplitMetric ? activityStyles.metricUnit : activityStyles.metricUnitLarge}
+                    progress={(
+                        <ProgressHint
+                            metricId={metric.id}
+                            setIndex={progress?.setIndex}
+                            progressComparison={progress?.comparison}
+                            displayMode={resolveEffectiveDeltaDisplayMode(definition, progressSettings)}
+                        />
+                    )}
                     disabled={disabled || saving}
                     inputId={inputId}
                     onDraftChange={(value) => setDrafts((previous) => ({ ...previous, [key]: value }))}

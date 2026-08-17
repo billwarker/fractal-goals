@@ -8,6 +8,11 @@ from models import (
     ActivityProgressView,
     ActivitySet,
     ActivityTag,
+    CircuitRound,
+    CircuitRoundMember,
+    CircuitRun,
+    CircuitRunSlot,
+    CircuitScopeTag,
     Goal,
     utc_now,
 )
@@ -90,6 +95,15 @@ class ActivityProgressViewService:
         old_size = quota._payload_size(*old_values)
         new_size = quota._payload_size(*new_values)
         return quota.check_storage_available(user_id, max(0, new_size - old_size))
+
+    def _circuit_scope_uses_tag(self, tag):
+        return self.db.query(CircuitScopeTag.id).join(
+            CircuitRunSlot,
+            CircuitRunSlot.circuit_run_id == CircuitScopeTag.circuit_run_id,
+        ).filter(
+            CircuitRunSlot.activity_definition_id == tag.activity_definition_id,
+            func.lower(CircuitScopeTag.name) == tag.name.lower(),
+        ).first() is not None
 
     def _validate_config_tags(self, activity, config, *, include_archived=True):
         normalized = normalize_progress_view_config(config)
@@ -183,6 +197,8 @@ class ActivityProgressViewService:
             return None, quota_error, quota_status
         if "name" in data and data["name"] is not None:
             name = data["name"].strip()
+            if name != tag.name and self._circuit_scope_uses_tag(tag):
+                return None, "Tags used by a circuit or round scope cannot be renamed", 409
             conflict = self.db.query(ActivityTag.id).filter(
                 ActivityTag.activity_definition_id == activity.id,
                 ActivityTag.id != tag.id,
@@ -213,6 +229,8 @@ class ActivityProgressViewService:
         ).first()
         if not tag:
             return None, "Tag not found", 404
+        if self._circuit_scope_uses_tag(tag):
+            return None, "Tags used by a circuit or round scope cannot be archived", 409
         tag.deleted_at = utc_now()
         self.db.commit()
         self._emit(Events.ACTIVITY_TAG_ARCHIVED, root_id=root_id, activity_id=activity.id, activity_tag_id=tag.id, name=tag.name)
@@ -262,6 +280,57 @@ class ActivityProgressViewService:
         by_id = {tag.id: tag for tag in tags}
         return [by_id[tag_id] for tag_id in normalized], None
 
+    def _required_scope_tag_ids(self, target, activity_definition_id):
+        if isinstance(target, ActivitySet):
+            names = self.db.query(CircuitScopeTag.name).join(
+                CircuitRound,
+                CircuitRound.id == CircuitScopeTag.circuit_round_id,
+            ).join(
+                CircuitRoundMember,
+                CircuitRoundMember.circuit_round_id == CircuitRound.id,
+            ).filter(
+                CircuitRoundMember.activity_set_id == target.id,
+            ).all()
+        else:
+            parent_names = self.db.query(CircuitScopeTag.name).join(
+                CircuitRun,
+                CircuitRun.id == CircuitScopeTag.circuit_run_id,
+            ).join(
+                CircuitRunSlot,
+                CircuitRunSlot.circuit_run_id == CircuitRun.id,
+            ).filter(
+                CircuitRunSlot.activity_instance_id == target.id,
+                CircuitScopeTag.circuit_round_id.is_(None),
+            )
+            member_names = self.db.query(CircuitScopeTag.name).join(
+                CircuitRound,
+                CircuitRound.circuit_run_id == CircuitScopeTag.circuit_run_id,
+            ).join(
+                CircuitRoundMember,
+                CircuitRoundMember.circuit_round_id == CircuitRound.id,
+            ).filter(
+                CircuitRoundMember.activity_instance_id == target.id,
+                (CircuitScopeTag.circuit_round_id.is_(None))
+                | (CircuitScopeTag.circuit_round_id == CircuitRound.id),
+            )
+            names = parent_names.union(member_names).all()
+        normalized_names = {name.lower() for (name,) in names}
+        if not normalized_names:
+            return set()
+        return {
+            tag_id
+            for (tag_id,) in self.db.query(ActivityTag.id).filter(
+                ActivityTag.activity_definition_id == activity_definition_id,
+                func.lower(ActivityTag.name).in_(normalized_names),
+            ).all()
+        }
+
+    def _scope_removal_error(self, target, activity_definition_id, requested_ids):
+        required_ids = self._required_scope_tag_ids(target, activity_definition_id)
+        if required_ids.issubset(set(requested_ids or [])):
+            return None
+        return "Circuit- or round-owned tags must be removed from their scope control"
+
     def replace_instance_tags(self, root_id, instance_id, user_id, tag_ids, *, version=None):
         if not self._owned_root(root_id, user_id):
             return None, "Activity instance not found", 404
@@ -286,6 +355,14 @@ class ActivityProgressViewService:
                 "current": [serialize_activity_tag(tag) for tag in instance.tags],
                 "version": instance.tag_assignment_version,
             }, "Tag assignments were changed elsewhere", 409
+        scope_error = self._scope_removal_error(
+            instance, instance.activity_definition_id, tag_ids,
+        )
+        if scope_error:
+            return {
+                "current": [serialize_activity_tag(tag) for tag in instance.tags],
+                "version": instance.tag_assignment_version,
+            }, scope_error, 409
         tags, error = self._assignable_tags(
             instance.definition,
             tag_ids,
@@ -327,6 +404,16 @@ class ActivityProgressViewService:
                 "current": [serialize_activity_tag(tag) for tag in activity_set.tags],
                 "version": activity_set.tag_assignment_version,
             }, "Tag assignments were changed elsewhere", 409
+        scope_error = self._scope_removal_error(
+            activity_set,
+            activity_set.activity_instance.activity_definition_id,
+            tag_ids,
+        )
+        if scope_error:
+            return {
+                "current": [serialize_activity_tag(tag) for tag in activity_set.tags],
+                "version": activity_set.tag_assignment_version,
+            }, scope_error, 409
         tags, error = self._assignable_tags(
             activity_set.activity_instance.definition,
             tag_ids,

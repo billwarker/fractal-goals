@@ -108,10 +108,11 @@ describe('GoalModal', () => {
         const card = longTermLabel.closest('div');
         fireEvent.click(card);
         expect(screen.getByRole('radio', { name: /Long Term/ })).toBeChecked();
-        const pathCountBeforeHover = document.querySelectorAll('svg path').length;
         const previewButton = screen.getByRole('button', { name: 'Preview SMART goal styling' });
         fireEvent.mouseEnter(previewButton);
-        expect(document.querySelectorAll('svg path').length).toBeGreaterThan(pathCountBeforeHover);
+        screen.getAllByRole('button', { name: /Choose .* icon/ }).forEach((iconButton) => {
+            expect(iconButton.querySelector('svg style')).toBeInTheDocument();
+        });
     });
 
     it('randomizes all four level colors as valid distinct hex values', () => {

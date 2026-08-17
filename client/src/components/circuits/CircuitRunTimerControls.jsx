@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatForInput, validateTimerRange } from '../../utils/dateUtils';
 import { formatClockDuration } from '../../utils/sessionTime';
-import { ChevronDownIcon, ChevronUpIcon, PlayIcon } from '../atoms/AppIcons';
+import { PlayIcon } from '../atoms/AppIcons';
 import Button from '../atoms/Button';
 import {
     SessionItemTimerActions,
@@ -34,9 +34,7 @@ export default function CircuitRunTimerControls({
     disabled,
     pending,
     isSelected,
-    expanded,
     onAction,
-    onToggleExpanded,
 }) {
     const { timezone } = useTimezone();
     const [now, setNow] = useState(() => new Date());
@@ -204,17 +202,6 @@ export default function CircuitRunTimerControls({
                         ↺ Reset
                     </Button>
                 )}
-                <Button
-                    size="sm"
-                    variant="secondary"
-                    className={activityStyles.editDefinitionButton}
-                    aria-label={expanded ? 'Collapse details' : 'Expand details'}
-                    aria-expanded={expanded}
-                    onClick={onToggleExpanded}
-                    title={expanded ? 'Collapse details' : 'Expand details'}
-                >
-                    {expanded ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
-                </Button>
             </SessionItemTimerActions>
         </SessionItemTimerControls>
     );

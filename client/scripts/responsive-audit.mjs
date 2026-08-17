@@ -19,6 +19,25 @@ const checks = [
     patterns: [/\.cardHeaderTitleLink/, /width:\s*100%/, /\.cardHeaderTitleTemplate/, /min-width:\s*0/],
   },
   {
+    file: 'src/components/sessionDetail/SessionActivityItem.module.css',
+    patterns: [
+      /@container\s*\(max-width:\s*760px\)/,
+      /\.timerControlsGrid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
+      /\.timerActionColumn\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(120px,\s*100%\),\s*1fr\)\);/s,
+      /\.metricMeta,\s*\.metricMetaLarge\s*\{[^}]*grid-column:\s*2;[^}]*grid-row:\s*2;/s,
+      /\.progressSummaryRow\s*\{[^}]*flex-wrap:\s*wrap;/s,
+    ],
+  },
+  {
+    file: 'src/components/circuits/CircuitRunCard.module.css',
+    patterns: [
+      /@container\s*\(max-width:\s*760px\)/,
+      /\.runScopeControl\s*\{[^}]*min-width:\s*58px;[^}]*max-width:\s*100%;/s,
+      /\.roundHeader\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto;/s,
+      /\.memberHeader\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto;/s,
+    ],
+  },
+  {
     file: 'src/pages/Logs.css',
     patterns: [/\.logs-grid-header/, /\.log-item/, /@media\s*\(max-width:\s*768px\)/],
   },

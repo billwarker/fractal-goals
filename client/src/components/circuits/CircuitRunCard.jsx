@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-
 import { useCircuitRunActions } from '../../hooks/useCircuitQueries';
 import { EditPencilIcon } from '../atoms/AppIcons';
 import AddItemButton from '../atoms/AddItemButton';
@@ -14,11 +13,15 @@ import {
     SessionItemOrderRail,
 } from '../sessionDetail/SessionItemCardPrimitives';
 import activityStyles from '../sessionDetail/SessionActivityItem.module.css';
-import ActivityTagEditor from '../sessionDetail/ActivityTagEditor';
-import NoteQuickAdd from '../sessionDetail/NoteQuickAdd';
-import NoteTimeline from '../sessionDetail/NoteTimeline';
 import CircuitMemberMetrics from './CircuitMemberMetrics';
+import {
+    CircuitMemberTagEditor,
+    CircuitRoundTagControl,
+    CircuitRunTagControl,
+    collectCircuitAvailableTags,
+} from './CircuitTagControls';
 import CircuitRunTimerControls from './CircuitRunTimerControls';
+import CircuitRunNotes from './CircuitRunNotes';
 import { getCircuitNotes, getCircuitNoteTarget } from './circuitNoteTarget';
 import styles from './CircuitRunCard.module.css';
 
@@ -55,13 +58,16 @@ export default function CircuitRunCard({
 }) {
     const action = useCircuitRunActions(rootId, sessionId);
     const [error, setError] = useState('');
-    const [expanded, setExpanded] = useState(true);
     const [visibleRoundCount, setVisibleRoundCount] = useState(INITIAL_VISIBLE_ROUNDS);
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
     const optionsRef = useRef(null);
     const slotById = useMemo(() => new Map((run.slots || []).map((slot) => [slot.id, slot])), [run.slots]);
     const instanceById = useMemo(() => new Map((activityInstances || []).map((instance) => [instance.id, instance])), [activityInstances]);
     const definitionById = useMemo(() => new Map((activityDefinitions || []).map((definition) => [definition.id, definition])), [activityDefinitions]);
+    const circuitAvailableTags = useMemo(
+        () => collectCircuitAvailableTags(activityDefinitions, run.slots),
+        [activityDefinitions, run.slots],
+    );
     const noteTarget = useMemo(
         () => getCircuitNoteTarget(run, selectedCircuitItem, sessionId),
         [run, selectedCircuitItem, sessionId],
@@ -141,12 +147,6 @@ export default function CircuitRunCard({
         setIsOptionsOpen(false);
         action?.();
     };
-    const handleAddNote = async (content) => {
-        if (!content.trim() || !onAddNote) return;
-        await onAddNote({ ...noteTarget.payload, content: content.trim() });
-        onNoteCreated?.();
-    };
-
     return (
         <SessionItemCard
             as="article"
@@ -181,9 +181,9 @@ export default function CircuitRunCard({
                     <div className={activityStyles.activityNameContainer}>
                         <div className={`${activityStyles.activityName} ${activityStyles.activityNameFlex}`}>
                             <span>{run.name}</span>
-                            {isRunSelected && (
+                            {(isRunSelected || (run.tags || []).length > 0) && (
                                 <div className={activityStyles.activityHeaderActions}>
-                                    {onEditDefinition && (
+                                    {isRunSelected && onEditDefinition && (
                                         <IconButton
                                             size="sm"
                                             variant="subtle"
@@ -198,7 +198,7 @@ export default function CircuitRunCard({
                                             <EditPencilIcon size={14} />
                                         </IconButton>
                                     )}
-                                    {hasInstanceOptions && (
+                                    {isRunSelected && hasInstanceOptions && (
                                         <div className={activityStyles.instanceOptionsWrapper} ref={optionsRef}>
                                             <IconButton
                                                 size="sm"
@@ -242,6 +242,14 @@ export default function CircuitRunCard({
                                             )}
                                         </div>
                                     )}
+                                    <CircuitRunTagControl
+                                        className={`${activityStyles.headerScopeControl} ${styles.runScopeControl}`}
+                                        run={run}
+                                        availableTags={circuitAvailableTags}
+                                        disabled={disabled}
+                                        editable={isRunSelected}
+                                        onPerform={perform}
+                                    />
                                 </div>
                             )}
                         </div>
@@ -259,15 +267,12 @@ export default function CircuitRunCard({
                         disabled={disabled}
                         pending={action.isPending}
                         isSelected={isRunSelected}
-                        expanded={expanded}
                         onAction={perform}
-                        onToggleExpanded={() => setExpanded((value) => !value)}
                     />
                 </SessionItemHeaderRight>
             </SessionItemHeader>
 
-            {expanded && (
-                <div className={styles.rounds} aria-label="Circuit rounds">
+            <div className={styles.rounds} aria-label="Circuit rounds">
                     {visibleRounds.map((round) => {
                         const isRoundSelected = selectedCircuitItem?.type === 'round'
                             && selectedCircuitItem.runId === run.id
@@ -294,19 +299,28 @@ export default function CircuitRunCard({
                                     <span className={styles.roundNumber}>#{round.round_number}</span>
                                     <div className={styles.roundTitle}><strong>Round {round.round_number}</strong></div>
                                 </div>
-                                {!disabled && (
-                                    <RemoveButton
-                                        aria-label={`Remove round ${round.round_number}`}
-                                        title={(run.rounds || []).length <= 1
-                                            ? 'A circuit must keep at least one round'
-                                            : `Remove round ${round.round_number}`}
-                                        disabled={(run.rounds || []).length <= 1 || action.isPending}
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            perform({ action: 'removeRound', roundId: round.id });
-                                        }}
+                                <div className={styles.roundActions}>
+                                    <CircuitRoundTagControl
+                                        round={round}
+                                        availableTags={circuitAvailableTags}
+                                        disabled={disabled}
+                                        editable={isRoundSelected}
+                                        onPerform={perform}
                                     />
-                                )}
+                                    {!disabled && (
+                                        <RemoveButton
+                                            aria-label={`Remove round ${round.round_number}`}
+                                            title={(run.rounds || []).length <= 1
+                                                ? 'A circuit must keep at least one round'
+                                                : `Remove round ${round.round_number}`}
+                                            disabled={(run.rounds || []).length <= 1 || action.isPending}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                perform({ action: 'removeRound', roundId: round.id });
+                                            }}
+                                        />
+                                    )}
+                                </div>
                             </div>
                             <ol className={styles.members}>
                                 {(round.members || []).map((member) => {
@@ -326,18 +340,14 @@ export default function CircuitRunCard({
                                         && selectedCircuitItem.runId === run.id
                                         && selectedCircuitItem.id === member.id;
                                     const tagEditor = instance && currentDefinition ? (
-                                        <ActivityTagEditor
+                                        <CircuitMemberTagEditor
                                             rootId={rootId}
-                                            activityId={currentDefinition.id}
-                                            instanceId={activitySet ? null : instance.id}
-                                            setId={activitySet?.id || null}
-                                            assignmentVersion={activitySet
-                                                ? activitySet.tag_assignment_version
-                                                : instance.tag_assignment_version}
-                                            availableTags={currentDefinition.tags || []}
-                                            tags={activitySet ? activitySet.tags || [] : instance.tags || []}
-                                            inheritedTags={activitySet ? instance.tags || [] : []}
-                                        />
+                                            definition={currentDefinition}
+                                            instance={instance}
+                                            activitySet={activitySet}
+                                            runTags={run.tags}
+                                            roundTags={round.tags}
+                                            editable={isMemberSelected} />
                                     ) : null;
                                     return (
                                         <SessionItemCard
@@ -367,7 +377,10 @@ export default function CircuitRunCard({
                                                     <div
                                                         className={`${activityStyles.activityNameContainer} ${styles.memberIdentity}`}
                                                     >
-                                                        <span className={`${activityStyles.activityName} ${styles.memberName}`}>{slot?.activity_name || 'Activity'}</span>
+                                                        <span className={`${activityStyles.activityName} ${styles.memberName}`}>
+                                                            <span>{slot?.activity_name || 'Activity'}</span>
+                                                            {instance?.progress_comparison?.included === false ? <span className={styles.memberExcluded}>Excluded</span> : null}
+                                                        </span>
                                                     </div>
                                                 </SessionItemHeaderLeft>
                                                 {!activitySet && tagEditor ? (
@@ -377,10 +390,12 @@ export default function CircuitRunCard({
                                             {slot?.has_metrics && definition && (
                                                 <CircuitMemberMetrics
                                                     memberId={member.id}
+                                                    rootId={rootId}
                                                     definition={definition}
                                                     metrics={metrics}
                                                     disabled={disabled}
                                                     saving={action.isPending}
+                                                    progress={{ comparison: instance?.progress_comparison, setIndex }}
                                                     onSave={(nextMetrics) => perform({
                                                         action: 'updateMemberMetrics',
                                                         memberId: member.id,
@@ -389,7 +404,7 @@ export default function CircuitRunCard({
                                                 />
                                             )}
                                             {activitySet && tagEditor ? (
-                                                <div className={styles.memberTags}>{tagEditor}</div>
+                                                <div className={styles.memberScopeControl}>{tagEditor}</div>
                                             ) : null}
                                         </SessionItemCard>
                                     );
@@ -408,28 +423,14 @@ export default function CircuitRunCard({
                             Show {hiddenRoundBatchSize} more {hiddenRoundBatchSize === 1 ? 'round' : 'rounds'}
                         </AddItemButton>
                     )}
-                    {(circuitNotes.length > 0 || onAddNote) && (
-                        <div className={styles.notesSection} aria-label={`${noteTarget.label} notes`}>
-                            {circuitNotes.length > 0 && (
-                                <div className={styles.notesTimeline}>
-                                    <NoteTimeline
-                                        notes={circuitNotes}
-                                        onUpdate={onUpdateNote}
-                                        onDelete={onDeleteNote}
-                                        minimal={false}
-                                        showTypePill
-                                    />
-                                </div>
-                            )}
-                            {onAddNote && (
-                                <NoteQuickAdd
-                                    key={`${noteTarget.kind}:${noteTarget.payload.context_id}:${noteTarget.payload.activity_set_id || ''}`}
-                                    onSubmit={handleAddNote}
-                                    placeholder={noteTarget.placeholder}
-                                />
-                            )}
-                        </div>
-                    )}
+                    <CircuitRunNotes
+                        notes={circuitNotes}
+                        noteTarget={noteTarget}
+                        onAddNote={onAddNote}
+                        onUpdateNote={onUpdateNote}
+                        onDeleteNote={onDeleteNote}
+                        onNoteCreated={onNoteCreated}
+                    />
                     {!disabled && (
                         <AddItemButton
                             onClick={(event) => {
@@ -441,8 +442,7 @@ export default function CircuitRunCard({
                             + Add Round
                         </AddItemButton>
                     )}
-                </div>
-            )}
+            </div>
             {error && <p className={styles.error} role="alert">{error}</p>}
         </SessionItemCard>
     );

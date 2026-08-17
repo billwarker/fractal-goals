@@ -211,9 +211,9 @@ function SessionActivityItemView({
                                         {def.name}
                                         {!activityDefinition && <DeletedBadge />}
                                     </span>
-                                    {isSelected && (
+                                    {(isSelected || (exercise.tags || []).length > 0) && (
                                         <div className={styles.activityHeaderActions}>
-                                            {onOpenActivityBuilder && activityDefinition?.id && (
+                                            {isSelected && onOpenActivityBuilder && activityDefinition?.id && (
                                                 <button
                                                     type="button"
                                                     className={styles.editDefinitionButton}
@@ -227,7 +227,7 @@ function SessionActivityItemView({
                                                     <EditPencilIcon size={14} />
                                                 </button>
                                             )}
-                                            {hasInstanceOptions && (
+                                            {isSelected && hasInstanceOptions && (
                                                 <div className={styles.instanceOptionsWrapper} ref={optionsRef}>
                                                     <button
                                                         type="button"
@@ -282,6 +282,19 @@ function SessionActivityItemView({
                                                     )}
                                                 </div>
                                             )}
+                                            {!quickMode && activityDefinition?.id && (
+                                                <ActivityTagEditor
+                                                    className={styles.headerScopeControl}
+                                                    rootId={rootId}
+                                                    activityId={activityDefinition.id}
+                                                    instanceId={exercise.id}
+                                                    assignmentVersion={exercise.tag_assignment_version}
+                                                    availableTags={activityDefinition.tags || []}
+                                                    tags={exercise.tags || []}
+                                                    editable={isSelected}
+                                                    triggerFirst
+                                                />
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -334,18 +347,6 @@ function SessionActivityItemView({
                         <div className={styles.actionStack}>
                             <SessionItemTimerControls>
                                 <SessionItemTimerMeta>
-                                    {activityDefinition?.id ? (
-                                        <div className={styles.instanceTagsSlot}>
-                                            <ActivityTagEditor
-                                                rootId={rootId}
-                                                activityId={activityDefinition.id}
-                                                instanceId={exercise.id}
-                                                assignmentVersion={exercise.tag_assignment_version}
-                                                availableTags={activityDefinition.tags || []}
-                                                tags={exercise.tags || []}
-                                            />
-                                        </div>
-                                    ) : null}
                                     {/* DateTime Start Field */}
                                     <div className={styles.timerFieldContainer}>
                                         <div className={styles.timerLabelRow}>
@@ -529,10 +530,6 @@ function SessionActivityItemView({
                 )}
             </SessionItemHeader>
 
-            {activeProgress?.included === false ? (
-                <div className={styles.progressExcluded}>Excluded from the active progress view. Metrics remain available as raw session data.</div>
-            ) : null}
-
             {/* Content Area */}
             <div className={styles.contentArea}>
 
@@ -663,6 +660,7 @@ function SessionActivityItemView({
                                                         availableTags={activityDefinition.tags || []}
                                                         tags={set.tags || []}
                                                         inheritedTags={set.inherited_tags ?? exercise.tags ?? []}
+                                                        editable={isSelected && selectedSetIndex === setIdx}
                                                     />
                                                 </div>
                                             ) : null}
@@ -746,6 +744,15 @@ function SessionActivityItemView({
                             {quickMode ? 'Mark this activity complete when finished.' : 'Track activity based on completion checkbox above.'}
                         </div>
                     )
+                )}
+
+                {!hasSets && (
+                    <SessionActivityProgressSummary
+                        sets={[]}
+                        metricDefs={def.metric_definitions}
+                        activeProgress={activeProgress}
+                        displayMode={deltaDisplayMode}
+                    />
                 )}
 
                 {/* Quick Note Add */}

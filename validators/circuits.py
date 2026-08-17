@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .core import MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, sanitize_string
+from .core import HEX_COLOR_RE, MAX_DESCRIPTION_LENGTH, MAX_NAME_LENGTH, sanitize_string
 from services.circuit_rules import MAX_CIRCUIT_SLOTS
 
 
@@ -23,6 +23,7 @@ class CircuitDefinitionCreateSchema(BaseModel):
     @classmethod
     def clean_text(cls, value):
         return sanitize_string(value or "")
+
 
 class CircuitDefinitionUpdateSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -64,3 +65,25 @@ class CircuitMemberMetricSchema(BaseModel):
 
 class CircuitMemberMetricsUpdateSchema(BaseModel):
     metrics: List[CircuitMemberMetricSchema] = Field(default_factory=list, max_length=100)
+
+
+class CircuitScopeTagMutationSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+
+    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
+    color: Optional[str] = Field(None, max_length=7)
+    assigned: bool = True
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value):
+        return sanitize_string(value)
+
+    @field_validator("color")
+    @classmethod
+    def validate_color(cls, value):
+        if value in (None, ""):
+            return None
+        if not HEX_COLOR_RE.match(value):
+            raise ValueError("color must be a valid #RRGGBB hex color")
+        return value

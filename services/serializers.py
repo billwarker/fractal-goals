@@ -279,6 +279,14 @@ def serialize_work_interval(interval):
 
 
 def serialize_circuit_run(run):
+    def serialize_scope_tag(tag):
+        return {
+            "id": tag.id,
+            "name": tag.name,
+            "color": tag.color,
+            "sort_order": tag.sort_order,
+        }
+
     slots = sorted(run.slots or [], key=lambda slot: slot.sort_order)
     rounds = sorted(run.rounds or [], key=lambda item: item.round_number)
     return {
@@ -300,6 +308,13 @@ def serialize_circuit_run(run):
         "completed_at": format_utc(run.completed_at),
         "created_at": format_utc(run.created_at),
         "updated_at": format_utc(run.updated_at),
+        "tags": [
+            serialize_scope_tag(tag)
+            for tag in sorted(
+                (tag for tag in (run.scope_tags or []) if tag.circuit_round_id is None),
+                key=lambda tag: (tag.sort_order, tag.name.casefold()),
+            )
+        ],
         "slots": [
             {
                 "id": slot.id,
@@ -318,6 +333,13 @@ def serialize_circuit_run(run):
             {
                 "id": circuit_round.id,
                 "round_number": circuit_round.round_number,
+                "tags": [
+                    serialize_scope_tag(tag)
+                    for tag in sorted(
+                        (circuit_round.scope_tags or []),
+                        key=lambda tag: (tag.sort_order, tag.name.casefold()),
+                    )
+                ],
                 "members": [
                     {
                         "id": member.id,

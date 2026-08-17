@@ -24,4 +24,12 @@ export const fractalCircuitsApi = {
         `${API_BASE}/${rootId}/circuit-runs/${runId}/members/${memberId}/metrics`,
         { metrics },
     ),
+    updateCircuitRunTag: (rootId, runId, data) => axios.patch(
+        `${API_BASE}/${rootId}/circuit-runs/${runId}/tags`,
+        data,
+    ),
+    updateCircuitRoundTag: (rootId, runId, roundId, data) => axios.patch(
+        `${API_BASE}/${rootId}/circuit-runs/${runId}/rounds/${roundId}/tags`,
+        data,
+    ),
 };

@@ -7,6 +7,7 @@ const replaceActivitySetTags = vi.fn();
 vi.mock('../../../hooks/useCircuitQueries', () => ({
     useCircuitRunActions: () => ({ mutateAsync, isPending: false }),
 }));
+vi.mock('../../../hooks/useRootProgressSettings', () => ({ useRootProgressSettings: () => ({ progressSettings: { delta_display_mode: 'percent' } }) }));
 vi.mock('../../../utils/api', () => ({
     fractalApi: {
         replaceActivityInstanceTags: (...args) => replaceActivityInstanceTags(...args),
@@ -14,7 +15,6 @@ vi.mock('../../../utils/api', () => ({
     },
 }));
 import CircuitRunCard from '../CircuitRunCard';
-
 function render(ui) {
     const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -66,7 +66,7 @@ describe('CircuitRunCard', () => {
         replaceActivitySetTags.mockReset().mockResolvedValue({ data: { tags: [], version: 5 } });
     });
 
-    it('edits activity-owned instance and direct set tags on circuit members', async () => {
+    it('edits tags only on the selected circuit member', async () => {
         const activityTags = [
             { id: 'tag-parent', name: 'Meet prep', archived: false },
             { id: 'tag-heavy', name: 'Heavy', archived: false },
@@ -97,27 +97,18 @@ describe('CircuitRunCard', () => {
                     },
                     { id: 'instance-b', tag_assignment_version: 2, tags: [activityTags[2]], sets: [] },
                 ]}
-            />,
+                selectedCircuitItem={{ type: 'member', runId: 'run-1', id: 'member-b' }} />
         );
 
         const setTags = screen.getByRole('group', { name: 'Set tags' });
         expect(within(setTags).getByText('Heavy')).toBeInTheDocument();
         expect(within(setTags).queryByText('Meet prep')).not.toBeInTheDocument();
-        fireEvent.click(within(setTags).getByRole('button', { name: 'Add tag' }));
-        const setPicker = within(setTags).getByRole('dialog', { name: 'Choose set tags' });
-        const competitionOption = within(setPicker).getByText('Competition');
-        expect(competitionOption).toBeInTheDocument();
-        expect(within(setPicker).queryByText('Meet prep')).not.toBeInTheDocument();
-        fireEvent.click(competitionOption);
-        await waitFor(() => expect(replaceActivitySetTags).toHaveBeenCalledWith(
-            'root',
-            'set-a',
-            ['tag-heavy', 'tag-new'],
-            4,
-        ));
+        expect(within(setTags).queryByRole('button', { name: 'Add tag' })).not.toBeInTheDocument();
+        expect(within(setTags).getByRole('checkbox')).toBeDisabled();
 
         const instanceTags = screen.getByRole('group', { name: 'Activity tags' });
         expect(within(instanceTags).getByText('Competition')).toBeInTheDocument();
+        expect(within(instanceTags).getByRole('button', { name: 'Add tag' })).toBeInTheDocument();
         fireEvent.click(within(instanceTags).getByText('Competition'));
         await waitFor(() => expect(replaceActivityInstanceTags).toHaveBeenCalledWith(
             'root',
@@ -179,6 +170,7 @@ describe('CircuitRunCard', () => {
         expect(screen.queryByRole('button', { name: /start round/i })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Skip' })).not.toBeInTheDocument();
         expect(screen.getAllByText('Duration')).toHaveLength(1);
+        expect(screen.queryByRole('button', { name: /add .*tags/i })).not.toBeInTheDocument();
     });
 
     it('shows the shared start, stop, and duration fields before a circuit starts', () => {
@@ -195,6 +187,7 @@ describe('CircuitRunCard', () => {
                 }}
                 itemNumber={3}
                 activityInstances={[]}
+                selectedCircuitItem={{ type: 'run', runId: 'run-1', id: 'run-1' }}
             />,
         );
 
@@ -207,8 +200,7 @@ describe('CircuitRunCard', () => {
         expect(completeButton).toBeEnabled();
         expect(startButton.className).toMatch(/startButton/);
         expect(completeButton.className).toMatch(/completeButton/);
-        expect(startButton.className).not.toMatch(/secondary/);
-        expect(completeButton.className).not.toMatch(/secondary/);
+        expect(screen.getAllByRole('button', { name: /add .*tags/i })).toHaveLength(1);
     });
 
     it('reflects completed circuit timestamps and duration in the shared timer fields', () => {
@@ -342,12 +334,11 @@ describe('CircuitRunCard', () => {
         expect(screen.queryByText('#3.1')).not.toBeInTheDocument();
     });
 
-    it('collapses rounds while preserving the circuit clock', () => {
-        mutateAsync.mockResolvedValue({ data: run });
+    it('keeps circuit rounds visible without a collapse control', () => {
         render(<CircuitRunCard rootId="root" sessionId="session" run={run} itemNumber={3} activityInstances={[]} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Collapse details' }));
-        expect(screen.queryByText('Round 1')).not.toBeInTheDocument();
+        expect(screen.getByText('Round 1')).toBeInTheDocument();
         expect(screen.getByText('Duration')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /collapse details|expand details/i })).not.toBeInTheDocument();
     });
 
     it('does not expose the removed completed-run history correction workflow', () => {
