@@ -22,12 +22,12 @@ function SessionDetailPaneLayout({
 
             {isMobile && isMobilePaneOpen && (
                 <ModalBackdrop
-                    className={styles.mobilePaneOverlay}
+                    className={`${styles.mobilePaneOverlay} mobile-sheet-backdrop-enter`}
                     onClose={onCloseMobilePane}
                     role="presentation"
                 >
                     <div
-                        className={styles.mobilePaneSheet}
+                        className={`${styles.mobilePaneSheet} mobile-sheet-enter`}
                         onClick={(event) => event.stopPropagation()}
                     >
                         <div className={styles.mobilePaneHeader}>

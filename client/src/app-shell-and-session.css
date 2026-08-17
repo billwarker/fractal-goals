@@ -2,6 +2,34 @@
 .page-reveal { animation: pageReveal var(--duration-slow) var(--ease-out) both; }
 @keyframes pageReveal { from { opacity: 0; transform: translateY(12px); } }
 @media (prefers-reduced-motion: reduce) { .page-reveal { animation: none; } }
+
+@keyframes mobileSheetSlideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0.6;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes mobileSheetBackdropFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (max-width: 768px) {
+    .mobile-sheet-enter {
+        animation: mobileSheetSlideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .mobile-sheet-backdrop-enter {
+        animation: mobileSheetBackdropFadeIn 0.2s ease;
+    }
+}
+
 /* Sidebar Expansion */
 .sidebar {
     transition: width 0.3s ease;

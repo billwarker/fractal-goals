@@ -99,9 +99,9 @@
     position: fixed;
     top: 0;
     right: 0;
-    bottom: var(--mobile-dock-reserved-space, 0);
+    bottom: var(--mobile-session-footer-height, 0px);
     left: 0;
-    z-index: 1300;
+    z-index: calc(var(--z-sheet) + 1);
     background: rgba(7, 12, 18, 0.58);
     display: grid;
     align-items: end;
@@ -206,7 +206,7 @@
 
 @media (max-width: 768px) {
     .sessionDetailContainer {
-        --mobile-dock-reserved-space: calc(76px + env(safe-area-inset-bottom));
+        --mobile-session-footer-height: calc(68px + env(safe-area-inset-bottom, 0px));
         display: block;
         height: auto;
         min-height: calc(var(--app-viewport-height, 100vh) - var(--app-nav-height, 0px));
@@ -215,7 +215,7 @@
 
     .sessionMainContent {
         padding: var(--spacing-lg);
-        padding-bottom: 96px;
+        padding-bottom: calc(var(--mobile-session-footer-height) + var(--spacing-lg));
     }
 
     .sessionSidebarSticky {
@@ -225,20 +225,22 @@
 
     .mobileBottomDock {
         position: fixed;
-        left: 12px;
-        right: 12px;
-        bottom: max(10px, env(safe-area-inset-bottom));
-        z-index: 1400;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: calc(var(--z-sheet) + 2);
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
-        padding: 8px;
-        padding-bottom: calc(8px + env(safe-area-inset-bottom));
+        box-sizing: border-box;
+        height: var(--mobile-session-footer-height);
+        padding-top: 8px;
+        padding-right: max(var(--spacing-md), env(safe-area-inset-right, 0px));
+        padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom, 0px));
+        padding-left: max(var(--spacing-md), env(safe-area-inset-left, 0px));
         background: var(--color-bg-elevated);
-        border: 1px solid var(--color-border);
-        border-radius: var(--border-radius-lg);
-        box-shadow: var(--shadow-md);
-        backdrop-filter: blur(8px);
+        border-top: 1px solid var(--color-border);
+        box-shadow: 0 -8px 24px color-mix(in srgb, var(--color-bg-app) 45%, transparent);
     }
 
     .mobileDockTab {
@@ -259,14 +261,14 @@
     }
 
     .autoSaveIndicator {
-        bottom: 84px;
+        bottom: calc(var(--mobile-session-footer-height) + var(--spacing-sm));
     }
 }
 
 @media (max-width: 640px) {
     .sessionMainContent {
         padding: var(--spacing-md);
-        padding-bottom: 96px;
+        padding-bottom: calc(var(--mobile-session-footer-height) + var(--spacing-md));
         gap: var(--spacing-lg);
     }
 

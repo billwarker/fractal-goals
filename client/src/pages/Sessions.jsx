@@ -417,13 +417,13 @@ function Sessions() {
 
             {isFiltersPaneOpen && isMobile && (
                 <ModalBackdrop
-                    className={styles.sheetBackdrop}
+                    className={`${styles.sheetBackdrop} mobile-sheet-backdrop-enter`}
                     onClose={() => setIsFiltersPaneOpen(false)}
                     aria-hidden="true"
                 />
             )}
             {isFiltersPaneOpen && (
-                <div className={styles.rightPanel}>
+                <div className={`${styles.rightPanel} mobile-sheet-enter`}>
                     <SessionsQuerySidebar
                         filters={filters}
                         visibleSessionsCount={visibleSessions.length}

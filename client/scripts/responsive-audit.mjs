@@ -13,7 +13,13 @@ const checks = [
   },
   {
     file: 'src/app-shell-and-session.css',
-    patterns: [/\.top-nav-links/, /\.page-container/, /@media\s*\(max-width:\s*768px\)/],
+    patterns: [
+      /\.top-nav-links/,
+      /\.page-container/,
+      /\.mobile-sheet-enter\s*\{[^}]*animation:\s*mobileSheetSlideUp 0\.28s cubic-bezier\(0\.32, 0\.72, 0, 1\);/s,
+      /\.mobile-sheet-backdrop-enter\s*\{[^}]*animation:\s*mobileSheetBackdropFadeIn 0\.2s ease;/s,
+      /@media\s*\(max-width:\s*768px\)/,
+    ],
     forbiddenPatterns: [/linear-gradient\(var\(--color-grid\)/],
   },
   {
@@ -21,8 +27,11 @@ const checks = [
     patterns: [
       /\.sessionDetailContainer\s*\{[^}]*background:\s*transparent;/s,
       /\.sessionMainContent\s*\{[^}]*background:\s*transparent;/s,
-      /\.mobileBottomDock/,
+      /--mobile-session-footer-height:\s*calc\(68px \+ env\(safe-area-inset-bottom, 0px\)\);/,
+      /\.mobileBottomDock\s*\{[^}]*right:\s*0;[^}]*bottom:\s*0;[^}]*left:\s*0;[^}]*z-index:\s*calc\(var\(--z-sheet\) \+ 2\);[^}]*height:\s*var\(--mobile-session-footer-height\);[^}]*border-top:/s,
+      /\.mobilePaneOverlay\s*\{[^}]*bottom:\s*var\(--mobile-session-footer-height, 0px\);[^}]*z-index:\s*calc\(var\(--z-sheet\) \+ 1\);/s,
       /\.mobilePaneSheet/,
+      /padding-bottom:\s*calc\(var\(--mobile-session-footer-height\) \+ var\(--spacing-(?:lg|md)\)\);/,
       /@media\s*\(max-width:\s*768px\)/,
     ],
     forbiddenPatterns: [
@@ -31,11 +40,33 @@ const checks = [
       /\.mobileSession(?:Header|Title|Status|Meta)/,
       /\.mobileOpenPaneButton/,
       /padding-top:\s*84px/,
+      /--mobile-dock-reserved-space/,
+      /z-index:\s*(?:1300|1400)/,
+    ],
+  },
+  {
+    file: 'src/components/ActivityBuilder.module.css',
+    patterns: [
+      /\.actionBtn\s*\{[^}]*flex:\s*1;[^}]*min-width:\s*0;/s,
+      /@media\s*\(max-width:\s*768px\)\s*\{[^}]*\.actionsRow\s*\{[^}]*flex-direction:\s*row;[^}]*gap:\s*var\(--spacing-sm\);/s,
+    ],
+    forbiddenPatterns: [
+      /\.actionsRow\s*\{[^}]*flex-direction:\s*column(?:-reverse)?;/s,
+      /\.actionsRow\s*\{[^}]*(?:background|box-shadow)\s*:/s,
     ],
   },
   {
     file: 'src/pages/Sessions.module.css',
     patterns: [/\.pageContainer/, /\.rightPanel/, /@media\s*\(max-width:\s*768px\)/],
+    forbiddenPatterns: [/@keyframes\s+(?:sheetSlideUp|backdropFadeIn)/],
+  },
+  {
+    file: 'src/pages/Sessions.jsx',
+    patterns: [/mobile-sheet-enter/, /mobile-sheet-backdrop-enter/],
+  },
+  {
+    file: 'src/components/sessionDetail/SessionDetailPaneLayout.jsx',
+    patterns: [/mobile-sheet-enter/, /mobile-sheet-backdrop-enter/],
   },
   {
     file: 'src/components/sessions/SessionCardExpanded.module.css',

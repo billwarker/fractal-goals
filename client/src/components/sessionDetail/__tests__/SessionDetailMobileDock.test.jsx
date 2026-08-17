@@ -14,7 +14,9 @@ describe('SessionDetailMobileDock', () => {
             />
         );
 
+        expect(screen.getByRole('contentinfo', { name: 'Session detail views' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Goals' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Details' })).toHaveAttribute('aria-pressed', 'true');
         expect(screen.getByRole('button', { name: 'Details' }).className).toMatch(/mobileDockTabActive/);
 
         fireEvent.click(screen.getByRole('button', { name: 'Timeline' }));
