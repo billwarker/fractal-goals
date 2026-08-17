@@ -228,6 +228,15 @@ class QuotaService:
             total += len(rendered.encode("utf-8"))
         return total
 
+    @staticmethod
+    def payload_size(*values) -> int:
+        """Public alias for the canonical storage-quota size estimate.
+
+        New callers should use this instead of ``_payload_size``; the private
+        name is retained for the existing call sites that predate it.
+        """
+        return QuotaService._payload_size(*values)
+
     def get_storage_usage_bytes(self, user_id: str, root_ids: Optional[Sequence[str]] = None) -> int:
         """Return quota-accounted bytes without transferring stored payloads.
 

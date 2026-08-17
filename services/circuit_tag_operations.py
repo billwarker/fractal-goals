@@ -41,19 +41,33 @@ class CircuitTagOperations:
             for member in sorted(circuit_round.members, key=lambda row: row.sort_order)
         ]
 
+    @staticmethod
+    def _run_scope_round_targets(circuit_round):
+        """Run-scope targets within one round: setless members only.
+
+        Set-based slots are tagged on their parent activity instance instead,
+        because instance tags already inherit to every set at calculation time.
+        Materializing them onto sets as well would both duplicate the tag and
+        strand it, since run-scope removal only walks parent instances.
+        """
+        return [
+            (member.activity_instance, member.run_slot.activity_definition_id)
+            for member in sorted(circuit_round.members, key=lambda row: row.sort_order)
+            if not member.activity_set_id
+        ]
+
     def _run_targets(self, run):
+        members_by_slot = {}
+        for circuit_round in sorted(run.rounds, key=lambda row: row.round_number):
+            for member in circuit_round.members:
+                members_by_slot.setdefault(member.circuit_run_slot_id, []).append(member)
         targets = []
         for slot in sorted(run.slots, key=lambda row: row.sort_order):
             if slot.has_sets:
                 targets.append((slot.activity_instance, slot.activity_definition_id))
                 continue
-            for circuit_round in sorted(run.rounds, key=lambda row: row.round_number):
-                member = next(
-                    (row for row in circuit_round.members if row.circuit_run_slot_id == slot.id),
-                    None,
-                )
-                if member:
-                    targets.append((member.activity_instance, slot.activity_definition_id))
+            for member in members_by_slot.get(slot.id, []):
+                targets.append((member.activity_instance, slot.activity_definition_id))
         return targets
 
     def _locked_targets(self, raw_targets):
@@ -109,7 +123,7 @@ class CircuitTagOperations:
         quota = QuotaService(self.db)
         _, error, status = quota.check_storage_available(
             user_id,
-            quota._payload_size(scope_storage_values, *[(name, color) for _ in missing]),
+            quota.payload_size(scope_storage_values, *[(name, color) for _ in missing]),
         )
         if error:
             return None, [], error, status
@@ -311,16 +325,47 @@ class CircuitTagOperations:
 
         return serialize_circuit_run(self.owner._run(root_id, run.id)), None, 200
 
-    def inherit_run_tags(self, run, circuit_round):
-        """Apply persisted run scopes to a newly-created round before commit."""
+    def inherit_run_tags(self, run, circuit_round, user_id=None):
+        """Apply persisted run scopes to a newly-created round before commit.
+
+        Mirrors ``_run_targets`` semantics exactly: only setless members are
+        materialized, so a scope produces the same assignments whether the round
+        existed when it was applied or was added afterwards.
+        """
         scopes = [scope for scope in run.scope_tags if scope.circuit_round_id is None]
         if not scopes:
-            return
-        targets = self._round_targets(circuit_round)
+            return None, None, 200
+        targets = self._run_scope_round_targets(circuit_round)
+        if not targets:
+            return None, None, 200
+        definition_ids = {definition_id for _, definition_id in targets}
         for scope in scopes:
             by_definition = self._tags_by_definition(
                 run.root_id,
-                {definition_id for _, definition_id in targets},
+                definition_ids,
                 self._normalized_name(scope.name),
             )
-            self._assign(targets, by_definition)
+            if any(tag.deleted_at is not None for tag in by_definition.values()):
+                return (
+                    None,
+                    "An archived tag with this name must be restored before it can be assigned",
+                    409,
+                )
+            # A definition without a matching tag simply has nothing to inherit.
+            inheritable = [
+                (target, definition_id)
+                for target, definition_id in targets
+                if definition_id in by_definition
+            ]
+            if not inheritable:
+                continue
+            if user_id is not None:
+                quota = QuotaService(self.db)
+                _, error, status = quota.check_storage_available(
+                    user_id,
+                    quota.payload_size(*[(scope.name, scope.color) for _ in inheritable]),
+                )
+                if error:
+                    return None, error, status
+            self._assign(inheritable, by_definition)
+        return None, None, 200

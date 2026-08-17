@@ -47,7 +47,34 @@ describe('circuit scope tag controls', () => {
         await waitFor(() => expect(onPerform).toHaveBeenCalledWith({
             action: 'updateRoundTag',
             roundId: 'round-1',
-            value: { name: 'Sprint', color: null, assigned: true },
+            value: { name: 'Sprint', color: '#64748B', assigned: true },
+            inlineError: true,
+        }));
+    });
+
+    it('creates a logical tag with the chosen color', async () => {
+        const onPerform = vi.fn().mockResolvedValue(true);
+        render(
+            <CircuitRunTagControl
+                run={{ id: 'run-1', tags: [] }}
+                availableTags={[]}
+                onPerform={onPerform}
+            />,
+        );
+
+        const control = screen.getByRole('group', { name: 'Circuit tags' });
+        fireEvent.click(within(control).getByRole('button', { name: 'Add circuit tags' }));
+        fireEvent.change(within(control).getByRole('textbox', { name: 'New circuit tags name' }), {
+            target: { value: 'Competition' },
+        });
+        fireEvent.change(within(control).getByLabelText('New circuit tags color'), {
+            target: { value: '#ff0000' },
+        });
+        fireEvent.click(within(control).getByRole('button', { name: 'Create' }));
+
+        await waitFor(() => expect(onPerform).toHaveBeenCalledWith({
+            action: 'updateRunTag',
+            value: { name: 'Competition', color: '#FF0000', assigned: true },
             inlineError: true,
         }));
     });

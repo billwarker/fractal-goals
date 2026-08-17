@@ -191,6 +191,121 @@ def test_circuit_and_round_tags_materialize_hierarchically_and_survive_new_round
     )
 
 
+def test_run_scope_materializes_identically_for_existing_and_inherited_rounds(
+    authed_client,
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+    sample_activity_definition,
+):
+    """A run scope must produce the same assignments regardless of round age.
+
+    Set-based slots are tagged on their parent instance only; materializing the
+    tag onto per-round sets as well would duplicate it and strand it, because
+    run-scope removal only walks parent instances.
+    """
+    session = _session(db_session, sample_ultimate_goal, test_user)
+    non_set = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(
+        authed_client, sample_ultimate_goal, sample_activity_definition, non_set,
+    )
+    run = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    ).get_json()
+
+    applied = authed_client.patch(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/tags",
+        json={"name": "Competition", "assigned": True},
+    )
+    assert applied.status_code == 200, applied.get_json()
+    run = applied.get_json()
+    existing_set_id = next(
+        member["activity_set_id"]
+        for member in run["rounds"][0]["members"]
+        if member["activity_set_id"]
+    )
+
+    added = authed_client.post(f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/rounds")
+    assert added.status_code == 201, added.get_json()
+    run = added.get_json()
+    second_round = run["rounds"][1]
+    inherited_set_id = next(
+        member["activity_set_id"]
+        for member in second_round["members"]
+        if member["activity_set_id"]
+    )
+    inherited_setless_id = next(
+        member["activity_instance_id"]
+        for member in second_round["members"]
+        if member["activity_instance_id"]
+    )
+
+    db_session.expire_all()
+    existing_set_tags = [tag.name for tag in db_session.get(ActivitySet, existing_set_id).tags]
+    inherited_set_tags = [tag.name for tag in db_session.get(ActivitySet, inherited_set_id).tags]
+    assert existing_set_tags == inherited_set_tags == []
+    # The setless member still inherits, matching _run_targets semantics.
+    assert [
+        tag.name for tag in db_session.get(ActivityInstance, inherited_setless_id).tags
+    ] == ["Competition"]
+
+    # Removal must leave nothing stranded on either round.
+    removed = authed_client.patch(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/tags",
+        json={"name": "Competition", "assigned": False},
+    )
+    assert removed.status_code == 200, removed.get_json()
+    db_session.expire_all()
+    assert db_session.get(ActivitySet, inherited_set_id).tags == []
+    assert db_session.get(ActivityInstance, inherited_setless_id).tags == []
+
+
+def test_inherited_run_scope_rejects_archived_tag_and_rolls_back_round(
+    authed_client,
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+    sample_activity_definition,
+):
+    """Round inheritance enforces the same archived-tag guard as the mutate path."""
+    session = _session(db_session, sample_ultimate_goal, test_user)
+    non_set = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(
+        authed_client, sample_ultimate_goal, sample_activity_definition, non_set,
+    )
+    run = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    ).get_json()
+    applied = authed_client.patch(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/tags",
+        json={"name": "Competition", "assigned": True},
+    )
+    assert applied.status_code == 200, applied.get_json()
+
+    # Archive the setless activity's tag directly; the scope guard covers the
+    # API path, so bypass it to simulate a tag archived before the scope existed.
+    archived_tag = db_session.query(ActivityTag).filter_by(
+        root_id=sample_ultimate_goal.id,
+        activity_definition_id=non_set.id,
+        name="Competition",
+    ).one()
+    archived_tag.deleted_at = datetime.now(timezone.utc)
+    db_session.commit()
+
+    before = db_session.query(CircuitRun).filter_by(id=run["id"]).one()
+    rounds_before = len(before.rounds)
+
+    blocked = authed_client.post(f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/rounds")
+    assert blocked.status_code == 409, blocked.get_json()
+    assert "archived" in blocked.get_json()["error"].lower()
+
+    db_session.expire_all()
+    after = db_session.query(CircuitRun).filter_by(id=run["id"]).one()
+    assert len(after.rounds) == rounds_before, "rejected round must be rolled back"
+
+
 def test_circuit_scope_tags_validate_ownership_archives_and_round_membership(
     authed_client,
     db_session,

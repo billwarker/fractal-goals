@@ -8,6 +8,8 @@ import CloseButton from '../atoms/CloseButton';
 import useTagCountOverflow from '../sessionDetail/useTagCountOverflow';
 import styles from '../sessionDetail/ActivityTagEditor.module.css';
 
+const DEFAULT_TAG_COLOR = '#64748B';
+
 
 function CircuitScopeTagEditor({
     className = '',
@@ -23,6 +25,7 @@ function CircuitScopeTagEditor({
     const pickerRef = useRef(null);
     const [isOpen, setIsOpen] = useState(false);
     const [name, setName] = useState('');
+    const [color, setColor] = useState(DEFAULT_TAG_COLOR);
     const [search, setSearch] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const selectedNames = useMemo(
@@ -88,12 +91,13 @@ function CircuitScopeTagEditor({
         };
     }, [close, isOpen]);
 
-    const persist = async (tagName, assigned, color = null) => {
+    const persist = async (tagName, assigned, tagColor = null) => {
         setIsSaving(true);
         try {
-            const result = await onChange({ name: tagName, color, assigned });
+            const result = await onChange({ name: tagName, color: tagColor, assigned });
             if (result?.error) throw new Error(result.error);
             setName('');
+            setColor(DEFAULT_TAG_COLOR);
         } catch (error) {
             notify.error(`Failed to update ${scopeLabel.toLocaleLowerCase()}: ${formatError(error)}`);
         } finally {
@@ -218,13 +222,20 @@ function CircuitScopeTagEditor({
                             value={name}
                             onChange={(event) => setName(event.target.value)}
                             onKeyDown={(event) => {
-                                if (event.key === 'Enter' && name.trim()) void persist(name.trim(), true);
+                                if (event.key === 'Enter' && name.trim()) void persist(name.trim(), true, color);
                             }}
+                        />
+                        <input
+                            type="color"
+                            className={styles.creatorColor}
+                            aria-label={`New ${scopeLabel.toLocaleLowerCase()} color`}
+                            value={color}
+                            onChange={(event) => setColor(event.target.value.toUpperCase())}
                         />
                         <Button
                             size="sm"
                             disabled={!name.trim() || disabled || isSaving}
-                            onClick={() => void persist(name.trim(), true)}
+                            onClick={() => void persist(name.trim(), true, color)}
                         >
                             Create
                         </Button>

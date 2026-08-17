@@ -230,6 +230,14 @@
     outline: none;
 }
 
+.creatorColor {
+    flex: 0 0 auto;
+    width: 32px;
+    min-width: 32px;
+    padding: 2px;
+    cursor: pointer;
+}
+
 .tag:focus-within {
     outline: 2px solid var(--color-focus-ring, var(--color-brand-primary));
     outline-offset: 1px;

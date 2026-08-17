@@ -88,12 +88,12 @@ class ActivityProgressViewService:
 
     def _storage_check(self, user_id, *values):
         quota = QuotaService(self.db)
-        return quota.check_storage_available(user_id, quota._payload_size(*values))
+        return quota.check_storage_available(user_id, quota.payload_size(*values))
 
     def _storage_delta_check(self, user_id, old_values, new_values):
         quota = QuotaService(self.db)
-        old_size = quota._payload_size(*old_values)
-        new_size = quota._payload_size(*new_values)
+        old_size = quota.payload_size(*old_values)
+        new_size = quota.payload_size(*new_values)
         return quota.check_storage_available(user_id, max(0, new_size - old_size))
 
     def _circuit_scope_uses_tag(self, tag):
