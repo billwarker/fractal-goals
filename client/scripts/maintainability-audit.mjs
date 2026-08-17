@@ -134,6 +134,18 @@ const importOrderExceptions = new Set([
 const checks = [
   {
     type: 'no-substring',
+    file: 'src/pages/SessionDetail.jsx',
+    substrings: ['SessionDetailMobileChrome'],
+    reason: 'Mobile Session Detail should begin with session content instead of restoring the retired summary header.',
+  },
+  {
+    type: 'no-substring',
+    file: 'src/components/sessionDetail/index.js',
+    substrings: ['SessionDetailMobileChrome'],
+    reason: 'The retired mobile session summary header must not return through the session-detail barrel.',
+  },
+  {
+    type: 'no-substring',
     file: 'src/components/sessionDetail/index.js',
     substrings: ['SessionControls'],
     reason: 'Legacy SessionControls export should remain removed.',

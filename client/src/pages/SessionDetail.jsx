@@ -2,7 +2,6 @@ import React, { useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import SessionSection from '../components/sessionDetail/SessionSection';
 import {
-    SessionDetailMobileChrome,
     SessionDetailMobileDock,
     SessionDetailModals,
     SessionDetailPaneLayout,
@@ -54,7 +53,6 @@ function SessionDetailContent() {
         localSessionData,
         updateGoal,
         toggleGoalCompletion,
-        calculateTotalDuration,
         showDeleteConfirm,
         setShowDeleteConfirm,
         showBuilder,
@@ -211,21 +209,11 @@ function SessionDetailContent() {
         );
     }
 
-    const totalDuration = calculateTotalDuration();
     const selectedModeLabel = sidePaneMode.charAt(0).toUpperCase() + sidePaneMode.slice(1);
 
     return (
         <div className={styles.sessionDetailContainer}>
             <div className={styles.sessionMainContent}>
-                {isMobile && (
-                    <SessionDetailMobileChrome
-                        sessionName={session?.name}
-                        isCompleted={isCompleted}
-                        totalDuration={totalDuration}
-                        selectedModeLabel={selectedModeLabel}
-                        onOpenPane={() => setIsMobilePaneOpen(true)}
-                    />
-                )}
                 <div className={styles.sessionSectionsList}>
                     {localSessionData.sections?.map((section, sectionIndex) => (
                         <SessionSection

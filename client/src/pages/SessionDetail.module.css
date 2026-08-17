@@ -20,10 +20,6 @@
     background: transparent;
 }
 
-.mobileSessionHeader {
-    display: none;
-}
-
 .sessionSidebarWrapper {
     width: 390px;
     min-width: 0;
@@ -219,75 +215,12 @@
 
     .sessionMainContent {
         padding: var(--spacing-lg);
-        padding-top: 84px;
         padding-bottom: 96px;
     }
 
     .sessionSidebarSticky {
         height: auto;
         position: static;
-    }
-
-    .mobileSessionHeader {
-        display: grid;
-        gap: var(--spacing-sm);
-        background: linear-gradient(160deg, var(--color-bg-card), var(--color-bg-card-alt));
-        border: 1px solid var(--color-border);
-        border-radius: var(--border-radius-lg);
-        box-shadow: var(--shadow-sm);
-        padding: var(--spacing-lg);
-    }
-
-    .mobileSessionTitleRow {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: var(--spacing-sm);
-    }
-
-    .mobileSessionTitle {
-        margin: 0;
-        font-size: var(--font-size-xl);
-        line-height: 1.2;
-    }
-
-    .mobileSessionStatus {
-        font-size: var(--font-size-xs);
-        font-weight: 700;
-        color: var(--color-text-muted);
-        border: 1px solid var(--color-border);
-        padding: 3px 8px;
-        border-radius: 999px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        white-space: nowrap;
-    }
-
-    .mobileSessionStatusDone {
-        color: var(--color-brand-success);
-        border-color: var(--color-brand-success);
-        background: rgba(59, 197, 124, 0.1);
-    }
-
-    .mobileSessionMeta {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: var(--spacing-sm);
-        color: var(--color-text-secondary);
-        font-family: var(--font-family-mono);
-        font-size: var(--font-size-sm);
-    }
-
-    .mobileOpenPaneButton {
-        border: 1px solid var(--color-brand-primary);
-        background: rgba(79, 156, 249, 0.12);
-        color: var(--color-brand-primary);
-        border-radius: var(--border-radius-sm);
-        font-size: var(--font-size-sm);
-        font-weight: 600;
-        padding: 6px 10px;
-        cursor: pointer;
     }
 
     .mobileBottomDock {

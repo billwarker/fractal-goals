@@ -3,7 +3,6 @@
  */
 
 export { default as SessionSidePane } from './SessionSidePane';
-export { default as SessionDetailMobileChrome } from './SessionDetailMobileChrome';
 export { default as SessionDetailMobileDock } from './SessionDetailMobileDock';
 export { default as SessionDetailModals } from './SessionDetailModals';
 export { default as SessionDetailPaneLayout } from './SessionDetailPaneLayout';

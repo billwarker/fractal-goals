@@ -28,6 +28,9 @@ const checks = [
     forbiddenPatterns: [
       /linear-gradient\(var\(--color-grid\)/,
       /background(?:-color)?:\s*var\(--color-bg-app\)/,
+      /\.mobileSession(?:Header|Title|Status|Meta)/,
+      /\.mobileOpenPaneButton/,
+      /padding-top:\s*84px/,
     ],
   },
   {
