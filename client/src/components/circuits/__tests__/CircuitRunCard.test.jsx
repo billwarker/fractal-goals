@@ -1,10 +1,28 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render as testingLibraryRender, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 const mutateAsync = vi.fn();
+const replaceActivityInstanceTags = vi.fn();
+const replaceActivitySetTags = vi.fn();
 vi.mock('../../../hooks/useCircuitQueries', () => ({
     useCircuitRunActions: () => ({ mutateAsync, isPending: false }),
 }));
+vi.mock('../../../utils/api', () => ({
+    fractalApi: {
+        replaceActivityInstanceTags: (...args) => replaceActivityInstanceTags(...args),
+        replaceActivitySetTags: (...args) => replaceActivitySetTags(...args),
+    },
+}));
 import CircuitRunCard from '../CircuitRunCard';
+
+function render(ui) {
+    const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    return testingLibraryRender(
+        <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+    );
+}
 const run = {
     id: 'run-1',
     name: 'Conditioning',
@@ -42,7 +60,72 @@ const definitions = [{
     split_definitions: [],
 }];
 describe('CircuitRunCard', () => {
-    beforeEach(() => mutateAsync.mockReset());
+    beforeEach(() => {
+        mutateAsync.mockReset();
+        replaceActivityInstanceTags.mockReset().mockResolvedValue({ data: { tags: [], version: 3 } });
+        replaceActivitySetTags.mockReset().mockResolvedValue({ data: { tags: [], version: 5 } });
+    });
+
+    it('edits activity-owned instance and direct set tags on circuit members', async () => {
+        const activityTags = [
+            { id: 'tag-parent', name: 'Meet prep', archived: false },
+            { id: 'tag-heavy', name: 'Heavy', archived: false },
+            { id: 'tag-new', name: 'Competition', archived: false },
+        ];
+        render(
+            <CircuitRunCard
+                rootId="root"
+                sessionId="session"
+                run={{
+                    ...run,
+                    slots: [
+                        run.slots[0],
+                        { ...run.slots[1], activity_definition_id: 'activity-b', activity_instance_id: 'instance-b' },
+                    ],
+                }}
+                itemNumber={1}
+                activityDefinitions={[
+                    { ...definitions[0], tags: activityTags },
+                    { id: 'activity-b', name: 'Burpee', tags: activityTags, metric_definitions: [] },
+                ]}
+                activityInstances={[
+                    {
+                        id: 'instance-a',
+                        tag_assignment_version: 3,
+                        tags: [activityTags[0]],
+                        sets: [{ id: 'set-a', tag_assignment_version: 4, tags: [activityTags[1]], metrics: [] }],
+                    },
+                    { id: 'instance-b', tag_assignment_version: 2, tags: [activityTags[2]], sets: [] },
+                ]}
+            />,
+        );
+
+        const setTags = screen.getByRole('group', { name: 'Set tags' });
+        expect(within(setTags).getByText('Heavy')).toBeInTheDocument();
+        expect(within(setTags).queryByText('Meet prep')).not.toBeInTheDocument();
+        fireEvent.click(within(setTags).getByRole('button', { name: 'Add tag' }));
+        const setPicker = within(setTags).getByRole('dialog', { name: 'Choose set tags' });
+        const competitionOption = within(setPicker).getByText('Competition');
+        expect(competitionOption).toBeInTheDocument();
+        expect(within(setPicker).queryByText('Meet prep')).not.toBeInTheDocument();
+        fireEvent.click(competitionOption);
+        await waitFor(() => expect(replaceActivitySetTags).toHaveBeenCalledWith(
+            'root',
+            'set-a',
+            ['tag-heavy', 'tag-new'],
+            4,
+        ));
+
+        const instanceTags = screen.getByRole('group', { name: 'Activity tags' });
+        expect(within(instanceTags).getByText('Competition')).toBeInTheDocument();
+        fireEvent.click(within(instanceTags).getByText('Competition'));
+        await waitFor(() => expect(replaceActivityInstanceTags).toHaveBeenCalledWith(
+            'root',
+            'instance-b',
+            [],
+            2,
+        ));
+    });
 
     it('renders the immutable activity schema captured by the circuit run', () => {
         render(

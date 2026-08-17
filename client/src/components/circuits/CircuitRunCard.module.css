@@ -82,6 +82,12 @@
     background: var(--color-bg-card-alt);
 }
 
+.memberTags {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 8px;
+}
+
 .memberHeader {
     align-items: center;
     gap: 8px;

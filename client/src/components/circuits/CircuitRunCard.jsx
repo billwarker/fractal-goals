@@ -14,6 +14,7 @@ import {
     SessionItemOrderRail,
 } from '../sessionDetail/SessionItemCardPrimitives';
 import activityStyles from '../sessionDetail/SessionActivityItem.module.css';
+import ActivityTagEditor from '../sessionDetail/ActivityTagEditor';
 import NoteQuickAdd from '../sessionDetail/NoteQuickAdd';
 import NoteTimeline from '../sessionDetail/NoteTimeline';
 import CircuitMemberMetrics from './CircuitMemberMetrics';
@@ -324,6 +325,20 @@ export default function CircuitRunCard({
                                     const isMemberSelected = selectedCircuitItem?.type === 'member'
                                         && selectedCircuitItem.runId === run.id
                                         && selectedCircuitItem.id === member.id;
+                                    const tagEditor = instance && currentDefinition ? (
+                                        <ActivityTagEditor
+                                            rootId={rootId}
+                                            activityId={currentDefinition.id}
+                                            instanceId={activitySet ? null : instance.id}
+                                            setId={activitySet?.id || null}
+                                            assignmentVersion={activitySet
+                                                ? activitySet.tag_assignment_version
+                                                : instance.tag_assignment_version}
+                                            availableTags={currentDefinition.tags || []}
+                                            tags={activitySet ? activitySet.tags || [] : instance.tags || []}
+                                            inheritedTags={activitySet ? instance.tags || [] : []}
+                                        />
+                                    ) : null;
                                     return (
                                         <SessionItemCard
                                             as="li"
@@ -355,6 +370,9 @@ export default function CircuitRunCard({
                                                         <span className={`${activityStyles.activityName} ${styles.memberName}`}>{slot?.activity_name || 'Activity'}</span>
                                                     </div>
                                                 </SessionItemHeaderLeft>
+                                                {!activitySet && tagEditor ? (
+                                                    <SessionItemHeaderRight>{tagEditor}</SessionItemHeaderRight>
+                                                ) : null}
                                             </SessionItemHeader>
                                             {slot?.has_metrics && definition && (
                                                 <CircuitMemberMetrics
@@ -370,6 +388,9 @@ export default function CircuitRunCard({
                                                     })}
                                                 />
                                             )}
+                                            {activitySet && tagEditor ? (
+                                                <div className={styles.memberTags}>{tagEditor}</div>
+                                            ) : null}
                                         </SessionItemCard>
                                     );
                                 })}

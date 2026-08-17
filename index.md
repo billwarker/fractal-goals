@@ -479,7 +479,7 @@ They support:
 
 - on-demand comparisons over canonical activity instances, normalized sets, and metric values; no progress snapshot table or recomputation workflow remains
 - activity-owned tags assigned directly to instances or sets; instance tags are inherited by every set at calculation time and are never copied
-- direct tags are visible on session cards, session-detail timeline rows, quick-session cards, and circuit work summaries; instance tags render once at the parent level and set rows show direct set tags only after their metrics
+- direct tags are visible on session cards, session-detail timeline rows, quick-session cards, and circuit work summaries; interactive circuit members expose the same activity-owned instance/set tag editor as standalone work; instance tags render once at the parent level and set rows show direct set tags only after their metrics
 - any number of named, versioned saved progress views per activity using structured `All of` / `Any of` / `None of` tag predicates
 - one activity-wide active saved view, with an implicit immutable **All History** view represented by a null active pointer
 - server-calculated inline draft previews that never mutate the active view; Save as creates and activates a new view, and deleting the active view atomically falls back to All History
