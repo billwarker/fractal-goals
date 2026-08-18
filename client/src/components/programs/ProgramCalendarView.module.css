@@ -118,6 +118,33 @@
     align-items: center;
 }
 
+.mobileControlRow,
+.mobileNavigation {
+    display: none;
+}
+
+.mobileNavButton {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.mobileNavButton:hover {
+    background: var(--color-bg-hover);
+}
+
+.mobileNavButton:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 2px;
+}
+
 /* Base style for custom buttons */
 .customBtn {
     height: 34px;
@@ -411,24 +438,46 @@
 @media (max-width: 768px) {
     .calendarContainer {
         min-height: 640px;
-        height: 640px;
+        height: auto;
         padding: 12px;
     }
 
+    .mobileControlRow {
+        display: flex;
+        width: 100%;
+        min-height: 44px;
+        margin-bottom: 8px;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .mobileNavigation {
+        display: flex;
+        flex: 0 0 auto;
+        gap: 6px;
+    }
+
     .headerActions {
-        position: absolute;
-        top: 12px;
-        right: 12px;
+        position: static;
         width: auto;
-        margin-bottom: 0;
+        min-height: 44px;
+        margin: 0 0 0 auto;
         justify-content: flex-end;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
+        flex: 0 1 auto;
     }
 
     .customBtn {
-        height: 32px;
+        min-height: 44px;
+        height: 44px;
         padding: 0 10px;
         font-size: 11px;
+    }
+
+    .selectionLabel {
+        min-height: 44px;
     }
 
     :global(.fc-header-toolbar) {
@@ -453,8 +502,8 @@
     }
 
     :global(.fc-toolbar-chunk:first-child) {
-        min-height: 32px !important;
-        padding-right: 116px !important;
+        min-height: 44px !important;
+        padding-right: 0 !important;
     }
 
     :global(.fc-toolbar-chunk:nth-child(2)) {
@@ -462,8 +511,19 @@
         justify-content: center !important;
     }
 
+    .calendarContainerMobileToolbar :global(.fc-header-toolbar) {
+        align-items: center !important;
+        gap: 0 !important;
+    }
+
+    .calendarContainerMobileToolbar :global(.fc-toolbar-chunk:first-child),
+    .calendarContainerMobileToolbar :global(.fc-toolbar-chunk:last-child) {
+        display: none !important;
+    }
+
     :global(.fc-button) {
-        height: 32px !important;
+        min-height: 44px !important;
+        height: 44px !important;
         padding: 0 10px !important;
         font-size: 11px !important;
     }

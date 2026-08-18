@@ -257,34 +257,72 @@ function ProgramCalendarView({
         onTodayClick?.();
     };
 
+    const handlePreviousClick = () => {
+        calendarRef.current?.getApi().prev();
+    };
+
+    const handleNextClick = () => {
+        calendarRef.current?.getApi().next();
+    };
+
+    const blockControls = showBlockControls && !readOnly ? (
+        <div className={styles.headerActions}>
+            <button
+                type="button"
+                onClick={() => setBlockCreationMode(!blockCreationMode)}
+                className={`${styles.customBtn} ${styles.createModeBtn} ${blockCreationMode ? styles.createModeBtnActive : ''}`}
+            >
+                {blockCreationMode ? 'Multi-Day Select On' : (isMobile ? 'Select Days' : 'Select Multiple Days')}
+            </button>
+            {selectedRangeLabel ? (
+                <span className={styles.selectionLabel}>{selectedRangeLabel}</span>
+            ) : null}
+            {showAddBlockButton ? (
+                <button
+                    type="button"
+                    onClick={onAddBlockClick}
+                    className={`${styles.customBtn} ${styles.addBlockBtn}`}
+                >
+                    + Add Block
+                </button>
+            ) : null}
+        </div>
+    ) : null;
+
+    const useMobileToolbar = isMobile && !compact;
+
     return (
         <div
             ref={calendarContainerRef}
-            className={`${styles.calendarContainer} ${compact ? styles.calendarContainerCompact : ''}`}
+            className={`${styles.calendarContainer} ${compact ? styles.calendarContainerCompact : ''} ${useMobileToolbar ? styles.calendarContainerMobileToolbar : ''}`}
             onClick={readOnly ? undefined : onCalendarBackgroundClick}
         >
-            {/* Block creation controls - positioned at top right of calendar area */}
-            {showBlockControls && !readOnly ? (
-                <div className={styles.headerActions}>
-                    <button
-                        onClick={() => setBlockCreationMode(!blockCreationMode)}
-                        className={`${styles.customBtn} ${styles.createModeBtn} ${blockCreationMode ? styles.createModeBtnActive : ''}`}
-                    >
-                        {blockCreationMode ? 'Multi-Day Select On' : (isMobile ? 'Select Days' : 'Select Multiple Days')}
-                    </button>
-                    {selectedRangeLabel ? (
-                        <span className={styles.selectionLabel}>{selectedRangeLabel}</span>
-                    ) : null}
-                    {showAddBlockButton ? (
+            {useMobileToolbar ? (
+                <div className={styles.mobileControlRow}>
+                    <div className={styles.mobileNavigation} aria-label="Calendar navigation">
                         <button
-                            onClick={onAddBlockClick}
-                            className={`${styles.customBtn} ${styles.addBlockBtn}`}
+                            type="button"
+                            className={styles.mobileNavButton}
+                            aria-label="Previous month"
+                            onClick={handlePreviousClick}
                         >
-                            + Add Block
+                            ‹
                         </button>
-                    ) : null}
+                        <button
+                            type="button"
+                            className={styles.mobileNavButton}
+                            aria-label="Next month"
+                            onClick={handleNextClick}
+                        >
+                            ›
+                        </button>
+                        <button type="button" className={styles.mobileNavButton} onClick={handleTodayClick}>
+                            Today
+                        </button>
+                    </div>
+                    {blockControls}
                 </div>
-            ) : null}
+            ) : blockControls}
 
             <FullCalendar
                 ref={calendarRef}
@@ -296,7 +334,9 @@ function ProgramCalendarView({
                         click: handleTodayClick,
                     },
                 }}
-                headerToolbar={{ left: 'prev,next contextualToday', center: 'title', right: '' }}
+                headerToolbar={useMobileToolbar
+                    ? { left: '', center: 'title', right: '' }
+                    : { left: 'prev,next contextualToday', center: 'title', right: '' }}
                 initialDate={initialDate}
                 events={calendarEvents}
                 height={compact ? '100%' : (isMobile ? 560 : '100%')}

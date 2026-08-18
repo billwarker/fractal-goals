@@ -89,6 +89,7 @@ export default function ProgramSidePane({
                 )}
             >
                 <ViewToggleTabs
+                    className={styles.sidePaneViewToggle}
                     items={[
                         { value: 'details', label: 'Details' },
                         { value: 'goals', label: 'Goals' },

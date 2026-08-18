@@ -6,7 +6,7 @@ import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import ProgramBlockView from '../components/programs/ProgramBlockView';
 import ProgramCalendarView from '../components/programs/ProgramCalendarView';
-import ProgramSidePane from '../components/programs/ProgramSidePane';
+import ResponsiveProgramSidePane from '../components/programs/ResponsiveProgramSidePane';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/atoms/Modal';
 import PageHeader from '../components/layout/PageHeader';
@@ -48,15 +48,6 @@ function dateInProgram(dateStr, program) {
 }
 
 function getProgramStatus(program, today) {
-    const start = getDatePart(program.start_date);
-    const end = getDatePart(program.end_date);
-
-    if (start && today < start) return 'upcoming';
-    if (end && today > end) return 'completed';
-    return 'active';
-}
-
-function getProgramBucket(program, today) {
     const start = getDatePart(program.start_date);
     const end = getDatePart(program.end_date);
 
@@ -299,7 +290,7 @@ function ProgramCalendarPage() {
         };
 
         programs.forEach((program) => {
-            const bucket = getProgramBucket(program, todayInTimezone);
+            const bucket = getProgramStatus(program, todayInTimezone);
             const matchesQuery = !normalizedQuery
                 || program.name.toLowerCase().includes(normalizedQuery)
                 || `${formatLiteralDate(program.start_date)} ${formatLiteralDate(program.end_date)}`.toLowerCase().includes(normalizedQuery);
@@ -771,8 +762,7 @@ function ProgramCalendarPage() {
                     <PageHeader
                         title={pageTitle}
                         subtitle={pageSubtitle}
-                        hideTitleOnMobile={false}
-                        compactMobileContext
+                        hideTitleOnMobile
                         actions={viewActions}
                     />
 
@@ -824,24 +814,24 @@ function ProgramCalendarPage() {
                     </div>
                 </div>
 
-                {isSidePaneVisible ? (
-                    <ProgramSidePane
-                        program={displayProgram}
-                        goals={displayGoals}
-                        onCreate={() => openCreateProgram()}
-                        onCollapse={() => setIsSidePaneVisible(false)}
-                        view={sidePaneView}
-                        onViewChange={setSidePaneView}
-                        programMetrics={programMetrics}
-                        activeBlock={activeBlock}
-                        blockMetrics={blockMetrics}
-                        programGoalSeeds={hierarchyGoalSeeds}
-                        onGoalClick={openGoalModal}
-                        notesQuery={programNotesQuery}
-                        notes={programNotes}
-                        onCreateNote={handleCreateProgramNote}
-                    />
-                ) : null}
+                <ResponsiveProgramSidePane
+                    isMobile={isMobile}
+                    isVisible={isSidePaneVisible}
+                    onClose={() => setIsSidePaneVisible(false)}
+                    program={displayProgram}
+                    goals={displayGoals}
+                    onCreate={() => openCreateProgram()}
+                    view={sidePaneView}
+                    onViewChange={setSidePaneView}
+                    programMetrics={programMetrics}
+                    activeBlock={activeBlock}
+                    blockMetrics={blockMetrics}
+                    programGoalSeeds={hierarchyGoalSeeds}
+                    onGoalClick={openGoalModal}
+                    notesQuery={programNotesQuery}
+                    notes={programNotes}
+                    onCreateNote={handleCreateProgramNote}
+                />
             </div>
 
             <ProgramBuilder

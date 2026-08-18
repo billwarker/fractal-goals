@@ -97,7 +97,43 @@ const checks = [
   },
   {
     file: 'src/pages/ProgramCalendarPage.module.css',
-    patterns: [/\.workspace/, /\.header/, /@media\s*\(max-width:\s*980px\)/],
+    patterns: [
+      /\.container\s*\{[^}]*background:\s*transparent;/s,
+      /\.workspace\s*\{[^}]*background:\s*transparent;/s,
+      /\.calendarPanel\s*\{[^}]*background:\s*transparent;/s,
+      /@media\s*\(max-width:\s*768px\)\s*\{[^}]*\.mobileSidePaneBackdrop\s*\{[^}]*position:\s*fixed;[^}]*z-index:\s*calc\(var\(--z-sheet\) \+ 1\);/s,
+      /\.mobileSidePaneSheet\s*\{[^}]*height:\s*min\(82dvh, 760px\);[^}]*padding-bottom:\s*env\(safe-area-inset-bottom, 0px\);/s,
+      /\.sidePaneViewToggle :global\(button\[role="tab"\]\)\s*\{[^}]*min-height:\s*44px;/s,
+      /@media\s*\(max-width:\s*980px\)/,
+    ],
+    forbiddenPatterns: [
+      /linear-gradient\(var\(--color-grid\)/,
+    ],
+  },
+  {
+    file: 'src/pages/ProgramCalendarPage.jsx',
+    patterns: [/ResponsiveProgramSidePane/, /<PageHeader[\s\S]*?hideTitleOnMobile[\s\S]*?actions=\{viewActions\}/],
+    forbiddenPatterns: [/className=\{styles\.programPageHeader\}/, /compactMobileContext/],
+  },
+  {
+    file: 'src/components/programs/ProgramMobileSidePane.jsx',
+    patterns: [/createPortal\(sheet, document\.body\)/, /mobile-sheet-enter/, /mobile-sheet-backdrop-enter/, /aria-modal="true"/],
+  },
+  {
+    file: 'src/components/programs/ProgramCalendarView.module.css',
+    patterns: [
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.calendarContainer\s*\{[^}]*min-height:\s*640px;[^}]*height:\s*auto;/,
+      /\.mobileControlRow\s*\{[^}]*display:\s*flex;[^}]*justify-content:\s*space-between;[^}]*flex-wrap:\s*wrap;/s,
+      /\.calendarContainerMobileToolbar :global\(\.fc-toolbar-chunk:first-child\),[\s\S]*?:global\(\.fc-toolbar-chunk:last-child\)\s*\{[^}]*display:\s*none !important;/,
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.headerActions\s*\{[^}]*position:\s*static;[^}]*min-height:\s*44px;/,
+      /\.customBtn\s*\{[^}]*min-height:\s*44px;/s,
+      /:global\(\.fc-button\)\s*\{[^}]*min-height:\s*44px !important;/s,
+    ],
+    forbiddenPatterns: [/padding-right:\s*116px/, /\n\s+height:\s*640px;/],
+  },
+  {
+    file: 'src/components/layout/HeaderButton.module.css',
+    patterns: [/@media\s*\(max-width:\s*768px\)\s*\{[^}]*\.button\s*\{[^}]*min-height:\s*44px;/s],
   },
   {
     file: 'src/components/landing/LandingFeaturesSection.module.css',

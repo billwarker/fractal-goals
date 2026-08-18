@@ -1,8 +1,16 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ProgramCalendarView from '../ProgramCalendarView';
+
+const { mockCalendarApi } = vi.hoisted(() => ({
+    mockCalendarApi: {
+        next: vi.fn(),
+        prev: vi.fn(),
+        today: vi.fn(),
+    },
+}));
 
 vi.mock('@fullcalendar/daygrid', () => ({ default: {} }));
 vi.mock('@fullcalendar/interaction', () => ({ default: {} }));
@@ -14,9 +22,7 @@ vi.mock('@fullcalendar/react', async () => {
         const dayRef = ReactModule.useRef(null);
 
         ReactModule.useImperativeHandle(ref, () => ({
-            getApi: () => ({
-                today: vi.fn(),
-            }),
+            getApi: () => mockCalendarApi,
         }));
 
         ReactModule.useEffect(() => {
@@ -37,10 +43,13 @@ vi.mock('@fullcalendar/react', async () => {
                 data-expand-rows={String(Boolean(props.expandRows))}
                 data-day-max-events={String(props.dayMaxEvents)}
                 data-selectable={String(Boolean(props.selectable))}
+                data-header-left={props.headerToolbar.left}
             >
-                <button type="button" onClick={props.customButtons.contextualToday.click}>
-                    Today
-                </button>
+                {props.headerToolbar.left.includes('contextualToday') ? (
+                    <button type="button" onClick={props.customButtons.contextualToday.click}>
+                        Today
+                    </button>
+                ) : null}
                 <div ref={dayRef} data-testid="mock-day-cell" className="fc-daygrid-day" data-date="2026-05-17">
                     <div className="fc-daygrid-day-frame" />
                 </div>
@@ -79,6 +88,10 @@ function renderCalendar(overrides = {}) {
     };
 }
 
+beforeEach(() => {
+    vi.clearAllMocks();
+});
+
 describe('ProgramCalendarView', () => {
     it('renders block labels from metadata and selects the whole block when clicked', async () => {
         const { props } = renderCalendar();
@@ -101,6 +114,21 @@ describe('ProgramCalendarView', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Today' }));
 
         expect(props.onTodayClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses one mobile control row and drives calendar navigation through the API', () => {
+        const { props } = renderCalendar({ isMobile: true });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Today' }));
+
+        expect(mockCalendarApi.prev).toHaveBeenCalledTimes(1);
+        expect(mockCalendarApi.next).toHaveBeenCalledTimes(1);
+        expect(mockCalendarApi.today).toHaveBeenCalledTimes(1);
+        expect(props.onTodayClick).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole('button', { name: 'Select Days' })).toBeInTheDocument();
+        expect(screen.getByTestId('mock-calendar')).toHaveAttribute('data-header-left', '');
     });
 
     it('expands rows and disables editing affordances in compact read-only mode', () => {
