@@ -1034,7 +1034,7 @@
         white-space: normal;
     }
 
-    /* Keep the value prominent and move units/progress below it so neither clips. */
+    /* Keep unit/history context with the label so the value column stays clean. */
     .metricInputContainer {
         display: grid;
         grid-template-columns: minmax(72px, max-content) minmax(0, 1fr);
@@ -1064,7 +1064,7 @@
 
     .metricMeta,
     .metricMetaLarge {
-        grid-column: 2;
+        grid-column: 1;
         grid-row: 2;
         justify-self: start;
         gap: 6px;
