@@ -129,7 +129,48 @@ export function isGoalInProgramWindow(goal, startDate, endDate) {
 }
 
 function uniqueIds(ids = []) {
-    return Array.from(new Set((ids || []).filter(Boolean)));
+    return Array.from(new Set((ids || []).map((id) => String(id)).filter(Boolean)));
+}
+
+export function getProgramStatus(program, referenceDate) {
+    const today = getProgramDatePart(referenceDate);
+    const start = getProgramDatePart(program?.start_date);
+    const end = getProgramDatePart(program?.end_date);
+
+    if (!today || !start || !end) return 'inactive';
+    if (today < start) return 'upcoming';
+    if (today > end) return 'completed';
+    return 'active';
+}
+
+export function isProgramActive(program, referenceDate) {
+    return getProgramStatus(program, referenceDate) === 'active';
+}
+
+export function getActivePrograms(programs = [], referenceDate) {
+    return (programs || [])
+        .filter((program) => isProgramActive(program, referenceDate))
+        .sort((left, right) => {
+            const startComparison = (getProgramDatePart(left?.start_date) || '')
+                .localeCompare(getProgramDatePart(right?.start_date) || '');
+            if (startComparison !== 0) return startComparison;
+            const nameComparison = String(left?.name || '').localeCompare(String(right?.name || ''));
+            if (nameComparison !== 0) return nameComparison;
+            return String(left?.id || '').localeCompare(String(right?.id || ''));
+        });
+}
+
+export function collectProgramGoalIds(program) {
+    const blockGoalIds = (program?.blocks || []).flatMap((block) => [
+        ...(block?.goal_ids || []),
+        ...(block?.days || []).flatMap((day) => day?.goal_ids || []),
+    ]);
+
+    return uniqueIds([
+        ...(program?.goal_ids || []),
+        ...(program?.selected_goals || []),
+        ...blockGoalIds,
+    ]);
 }
 
 function getGoalId(goal) {

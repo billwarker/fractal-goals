@@ -1,6 +1,38 @@
 import { buildGraphPresentation } from '../flowTreeGraphUtils';
 
 describe('buildGraphPresentation', () => {
+    it('limits the graph to an explicit program lineage scope', () => {
+        const treeData = {
+            id: 'root-1',
+            name: 'Root Goal',
+            type: 'UltimateGoal',
+            children: [
+                {
+                    id: 'program-parent',
+                    name: 'Program Parent',
+                    type: 'LongTermGoal',
+                    children: [{ id: 'program-child', name: 'Program Child', type: 'MidTermGoal', children: [] }],
+                },
+                { id: 'outside', name: 'Outside Goal', type: 'LongTermGoal', children: [] },
+            ],
+        };
+
+        const graph = buildGraphPresentation({
+            treeData,
+            onNodeClick: () => {},
+            onAddChild: () => {},
+            selectedNodeId: null,
+            completedGoalColor: '#FFD700',
+            viewSettings: {},
+            allowedGoalIds: new Set(['root-1', 'program-parent', 'program-child']),
+            programs: [],
+            isMobile: false,
+        });
+
+        expect(graph.nodes.map((node) => node.id)).toEqual(['root-1', 'program-parent', 'program-child']);
+        expect(graph.edges.map((edge) => edge.id)).toEqual(['root-1-program-parent', 'program-parent-program-child']);
+    });
+
     it('defaults FlowTree presentation nodes to tree layout mode', () => {
         const treeData = {
             id: 'root-1',

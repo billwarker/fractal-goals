@@ -29,6 +29,7 @@ import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
 import { createProgramCalendarContext, programCalendarContextReducer } from '../utils/programCalendarContext';
 import { getProgramColor } from '../utils/programViewModel';
+import { getProgramStatus, isProgramActive } from '../utils/programGoalWindow';
 import styles from './ProgramCalendarPage.module.css';
 
 const ProgramBlockModal = lazyWithRetry(() => import('../components/modals/ProgramBlockModal'), 'components/modals/ProgramBlockModal');
@@ -39,21 +40,6 @@ const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalD
 function getDatePart(dateValue) {
     if (!dateValue) return null;
     return String(dateValue).split('T')[0];
-}
-
-function dateInProgram(dateStr, program) {
-    const start = getDatePart(program.start_date);
-    const end = getDatePart(program.end_date);
-    return Boolean(start && end && dateStr >= start && dateStr <= end);
-}
-
-function getProgramStatus(program, today) {
-    const start = getDatePart(program.start_date);
-    const end = getDatePart(program.end_date);
-
-    if (start && today < start) return 'upcoming';
-    if (end && today > end) return 'completed';
-    return 'active';
 }
 
 function dateRangesOverlap(startA, endA, startB, endB) {
@@ -135,7 +121,7 @@ function ProgramCalendarPage() {
     } = useProgramsCalendarData(rootId, { getGoalColor, getGoalTextColor, timezone });
 
     const activeProgramId = useMemo(
-        () => programs.find((program) => dateInProgram(todayInTimezone, program))?.id || null,
+        () => programs.find((program) => isProgramActive(program, todayInTimezone))?.id || null,
         [programs, todayInTimezone],
     );
     const selectedProgramId = contextProgramId !== undefined ? contextProgramId : (programId || activeProgramId);
@@ -314,7 +300,7 @@ function ProgramCalendarPage() {
         : null;
     const selectedDateText = formatLiteralDate(contextDate);
     const contextBlock = displayProgram
-        ? sortedBlocks.find((block) => dateInProgram(contextDate, block))
+        ? sortedBlocks.find((block) => isProgramActive(block, contextDate))
         : null;
     const contextBlockColor = contextBlock?.color || 'var(--color-brand-primary)';
     const pageTitleParts = [
@@ -403,8 +389,8 @@ function ProgramCalendarPage() {
             isRangeSelection
             && program
             && getProgramStatus(program, todayInTimezone) !== 'completed'
-            && dateInProgram(startDate, program)
-            && dateInProgram(endDate, program)
+            && isProgramActive(program, startDate)
+            && isProgramActive(program, endDate)
             && !(program.blocks || []).some((block) =>
                 dateRangesOverlap(startDate, endDate, getDatePart(block.start_date), getDatePart(block.end_date))
             )
@@ -430,7 +416,7 @@ function ProgramCalendarPage() {
 
     const handleDateClick = (info) => {
         const clickedDate = info.dateStr;
-        const program = programs.find((candidate) => dateInProgram(clickedDate, candidate));
+        const program = programs.find((candidate) => isProgramActive(candidate, clickedDate));
         const clickedProgramId = program?.id || null;
         const currentProgramId = selectedProgramId || null;
 
@@ -500,7 +486,7 @@ function ProgramCalendarPage() {
     const handleDateSelectForContext = (info) => {
         const clickedDate = info.startStr;
         const selectionEndDate = subtractDaysToDateString(info.endStr, 1);
-        const program = programs.find((candidate) => dateInProgram(clickedDate, candidate));
+        const program = programs.find((candidate) => isProgramActive(candidate, clickedDate));
 
         if (blockCreationMode) {
             info.view.calendar.unselect();
@@ -517,7 +503,7 @@ function ProgramCalendarPage() {
     };
 
     const resetCalendarContextToToday = () => {
-        const program = programs.find((candidate) => dateInProgram(todayInTimezone, candidate));
+        const program = programs.find((candidate) => isProgramActive(candidate, todayInTimezone));
         dispatchCalendarContext({
             type: 'reset_today',
             date: todayInTimezone,

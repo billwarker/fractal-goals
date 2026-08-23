@@ -144,6 +144,7 @@ export const convertTreeToFlow = (
         hideCompletedGoals = false,
         hiddenInactiveGoalIds = null,
         activeLineageIds = new Set(),
+        allowedGoalIds = null,
     } = {}
 ) => {
     const nodes = [];
@@ -161,6 +162,7 @@ export const convertTreeToFlow = (
         if (!nodeId) return;
 
         if (addedNodeIds.has(nodeId)) return;
+        if (allowedGoalIds && !allowedGoalIds.has(nodeId)) return;
         if (lineagePath && !lineagePath.has(nodeId)) return;
         if (hideCompletedGoals && Boolean(node.attributes?.completed || node.completed)) return;
         if (hiddenInactiveGoalIds?.has(nodeId) && !activeLineageIds.has(nodeId)) return;
@@ -238,6 +240,7 @@ export const buildGraphPresentation = ({
     activities,
     activityGroups,
     programs,
+    allowedGoalIds = null,
     isMobile,
     layoutMode = 'tree',
 }) => {
@@ -265,6 +268,7 @@ export const buildGraphPresentation = ({
             hideCompletedGoals: normalizedSettings.hideCompletedGoals,
             hiddenInactiveGoalIds: normalizedSettings.hideInactiveGoals ? inactiveNodeIds : null,
             activeLineageIds,
+            allowedGoalIds,
         }
     );
 

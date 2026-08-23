@@ -124,6 +124,26 @@
     gap: 0;
 }
 
+.flowtree-program-scope-context {
+    position: absolute;
+    top: 20px;
+    left: calc(100% + 20px);
+    max-width: min(320px, calc(100vw - 420px));
+    overflow: hidden;
+    color: var(--flowtree-program-color, var(--color-brand-primary));
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 20px;
+    text-overflow: ellipsis;
+    text-shadow: 0 0 9px color-mix(in srgb, var(--flowtree-program-color, var(--color-brand-primary)) 38%, transparent);
+    white-space: nowrap;
+}
+
+.flowtree-program-scope-label {
+    color: var(--flowtree-program-color, var(--color-brand-primary));
+    font-weight: 700;
+}
+
 .flowtree-options-surface {
     margin-top: 0;
     padding-top: 20px;
@@ -508,6 +528,13 @@
     .flowtree-options-pane-mobile {
         transform: scale(0.94);
         transform-origin: top left;
+    }
+
+    .flowtree-program-scope-context {
+        position: static;
+        order: 1;
+        max-width: 100%;
+        margin-top: 20px;
     }
 
     .type-to-zoom-palette {

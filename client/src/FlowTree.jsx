@@ -107,6 +107,8 @@ const FlowTree = React.forwardRef(({
     activities = EMPTY_ARRAY,
     activityGroups = EMPTY_ARRAY,
     programs = EMPTY_ARRAY,
+    allowedGoalIds = null,
+    scopedProgramName = null,
     viewSettings = DEFAULT_VIEW_SETTINGS,
     onNodeClick,
     onAddChild,
@@ -152,6 +154,7 @@ const FlowTree = React.forwardRef(({
             activities,
             activityGroups,
             programs,
+            allowedGoalIds,
             isMobile,
             layoutMode,
         });
@@ -168,13 +171,21 @@ const FlowTree = React.forwardRef(({
         activities,
         activityGroups,
         programs,
+        allowedGoalIds,
         isMobile,
         layoutMode,
     ]);
-
     const [nodes, setNodes, onNodesChange] = useNodesState(graphNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(graphEdges);
-    const showNoActiveGoalsMessage = Boolean(viewSettings?.hideInactiveGoals) && nodes.length === 0;
+    const showEmptyScopedProgramMessage = Boolean(scopedProgramName) && nodes.length === 0;
+    const showNoActiveGoalsMessage = !showEmptyScopedProgramMessage
+        && Boolean(viewSettings?.hideInactiveGoals)
+        && nodes.length === 0;
+    const emptyState = showEmptyScopedProgramMessage
+        ? { title: `No visible goals in ${scopedProgramName}`, description: 'Show inactive or completed goals, or associate goals with this program.' }
+        : (showNoActiveGoalsMessage
+            ? { title: 'No active goals in this view', description: 'Show inactive goals or add a smaller goal beneath your ultimate goal to keep building the tree.' }
+            : null);
     const renderedNodeSignature = useMemo(
         () => nodes.map((node) => node.id).join('|'),
         [nodes]
@@ -383,11 +394,11 @@ const FlowTree = React.forwardRef(({
             >
             </ReactFlow>
 
-            {showNoActiveGoalsMessage && (
+            {emptyState && (
                 <EmptyState
                     className={styles.emptyState}
-                    title="No active goals in this view"
-                    description="Show inactive goals or add a smaller goal beneath your ultimate goal to keep building the tree."
+                    title={emptyState.title}
+                    description={emptyState.description}
                 />
             )}
 

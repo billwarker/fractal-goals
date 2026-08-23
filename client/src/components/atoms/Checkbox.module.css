@@ -124,6 +124,12 @@
     background: color-mix(in srgb, var(--color-brand-primary, var(--color-primary)) 14%, transparent);
 }
 
+:global(.flowtree-program-scope-check).container .input:checked~.checkmark,
+:global(.flowtree-program-scope-check).container:hover .input:checked~.checkmark {
+    border-color: var(--flowtree-program-color, var(--color-brand-primary));
+    background: color-mix(in srgb, var(--flowtree-program-color, var(--color-brand-primary)) 14%, transparent);
+}
+
 :global(.flowtree-options-check).container .checkmark:after {
     left: 7px;
     top: 3px;

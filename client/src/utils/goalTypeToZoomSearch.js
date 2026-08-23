@@ -38,6 +38,7 @@ export function getVisibleGoalSearchCandidates(treeData, {
     selectedNodeId = null,
     hideCompletedGoals = false,
     hiddenInactiveGoalIds = null,
+    allowedGoalIds = null,
 } = {}) {
     if (!treeData) return [];
 
@@ -51,6 +52,7 @@ export function getVisibleGoalSearchCandidates(treeData, {
         const nodeId = toId(getGoalNodeId(normalizedNode));
         if (!nodeId) return;
 
+        if (allowedGoalIds && !allowedGoalIds.has(nodeId)) return;
         if (selectedLineage && !selectedLineage.has(nodeId)) return;
         if (hideCompletedGoals && Boolean(normalizedNode.completed)) return;
         if (hiddenInactiveGoalIds?.has(nodeId)) return;

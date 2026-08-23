@@ -69,6 +69,53 @@ describe('FlowTreeOptionsPane surface controls', () => {
         expect(screen.getByLabelText('Show metrics overlay')).toBeInTheDocument();
     });
 
+    it('renders mutually exclusive active-program scope controls and colored context', () => {
+        const onProgramScopeChange = vi.fn();
+        const { rerender } = render(<FlowTreeOptionsPane
+            isMobile={false}
+            isMinimized={false}
+            onToggleMinimized={vi.fn()}
+            goalsViewMode="tree"
+            onGoalsViewModeChange={vi.fn()}
+            viewSettings={{
+                fadeInactiveBranches: false,
+                hideInactiveGoals: false,
+                hideCompletedGoals: false,
+                showMetricsOverlay: false,
+            }}
+            onToggleViewSetting={() => vi.fn()}
+            activePrograms={[
+                { id: 'program-1', name: 'Strength', displayColor: '#ef476f' },
+                { id: 'program-2', name: 'Mobility', displayColor: '#3a86ff' },
+            ]}
+            scopedProgramId="program-1"
+            onProgramScopeChange={onProgramScopeChange}
+        />);
+
+        expect(screen.getByLabelText('Scope to Strength')).toBeChecked();
+        expect(screen.getByLabelText('Scope to Mobility')).not.toBeChecked();
+        expect(screen.getByTitle('Goal tree scoped to Strength').style.getPropertyValue('--flowtree-program-color')).toBe('#ef476f');
+
+        fireEvent.click(screen.getByLabelText('Scope to Mobility'));
+        expect(onProgramScopeChange).toHaveBeenCalledWith('program-2');
+
+        rerender(<FlowTreeOptionsPane
+            isMobile={false}
+            isMinimized
+            onToggleMinimized={vi.fn()}
+            goalsViewMode="tree"
+            onGoalsViewModeChange={vi.fn()}
+            viewSettings={{}}
+            onToggleViewSetting={() => vi.fn()}
+            activePrograms={[{ id: 'program-1', name: 'Strength', displayColor: '#ef476f' }]}
+            scopedProgramId="program-1"
+            onProgramScopeChange={onProgramScopeChange}
+        />);
+
+        expect(screen.getByTitle('Goal tree scoped to Strength')).toBeInTheDocument();
+        expect(screen.queryByLabelText('Scope to Strength')).not.toBeInTheDocument();
+    });
+
     it('shows desktop/mobile surface config targets in configure mode', () => {
         const props = renderPane();
 

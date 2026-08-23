@@ -46,6 +46,16 @@ export const getLineagePath = (treeData, targetNodeId) => {
     return lineageIds;
 };
 
+export const getGoalLineageScope = (treeData, targetNodeIds = []) => {
+    const scopeIds = new Set();
+
+    (targetNodeIds || []).forEach((targetNodeId) => {
+        getLineagePath(treeData, targetNodeId).forEach((goalId) => scopeIds.add(goalId));
+    });
+
+    return scopeIds;
+};
+
 export const buildTreeMaps = (treeData) => {
     const parentById = new Map();
     const childrenById = new Map();

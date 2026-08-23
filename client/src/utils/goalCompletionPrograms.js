@@ -1,25 +1,13 @@
 import { flattenGoalTree } from './goalNodeModel';
-import { expandProgramGoalIds, getProgramDatePart } from './programGoalWindow';
+import {
+    collectProgramGoalIds,
+    expandProgramGoalIds,
+    getProgramDatePart,
+    isProgramActive,
+} from './programGoalWindow';
 
 function toId(value) {
     return value == null ? null : String(value);
-}
-
-function uniqueIds(ids = []) {
-    return Array.from(new Set(ids.map(toId).filter(Boolean)));
-}
-
-function collectProgramGoalIds(program) {
-    const blockGoalIds = (program?.blocks || []).flatMap((block) => [
-        ...(block.goal_ids || []),
-        ...(block.days || []).flatMap((day) => day.goal_ids || []),
-    ]);
-
-    return uniqueIds([
-        ...(program?.goal_ids || []),
-        ...(program?.selected_goals || []),
-        ...blockGoalIds,
-    ]);
 }
 
 function buildChildrenById(treeData) {
@@ -43,14 +31,6 @@ function dateFallsInProgram(dateValue, program) {
     const end = getProgramDatePart(program?.end_date);
 
     return Boolean(date && start && end && date >= start && date <= end);
-}
-
-function isProgramActive(program, referenceDate = new Date()) {
-    if (program?.is_active === true) {
-        return true;
-    }
-
-    return dateFallsInProgram(referenceDate, program);
 }
 
 function programContainsGoal(program, goalId, childrenById) {

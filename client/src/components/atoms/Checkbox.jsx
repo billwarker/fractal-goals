@@ -11,6 +11,7 @@ const Checkbox = ({
     disabled = false,
     className = '',
     id,
+    containerStyle,
     ...props
 }) => {
     const generatedId = useId();
@@ -20,6 +21,7 @@ const Checkbox = ({
         <label
             htmlFor={inputId}
             className={`${styles.container} ${disabled ? styles.disabled : ''} ${className}`}
+            style={containerStyle}
         >
             <input
                 id={inputId}

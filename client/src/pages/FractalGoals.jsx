@@ -8,7 +8,7 @@ import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
 import { useGoals } from '../contexts/GoalsContext';
 import { useDebug } from '../contexts/DebugContext';
 import { useAuth } from '../contexts/AuthContext';
-import { buildTreeMaps, getLineagePath } from '../components/flowTree/flowTreeTreeUtils';
+import { buildTreeMaps, getGoalLineageScope, getLineagePath } from '../components/flowTree/flowTreeTreeUtils';
 import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { getActiveGoalWindowDaysFromSettings, getInactiveNodeIds } from '../hooks/useFlowTreeMetrics';
@@ -24,9 +24,18 @@ import {
     shouldIgnoreTypeToZoomKey,
 } from '../utils/typeToZoomInput';
 import { usePrograms } from '../hooks/useProgramQueries';
+import {
+    removeLocalStorageValue,
+    useFlowTreePreferences,
+    writeLocalStorageValue,
+} from '../hooks/useFlowTreePreferences';
+import { useTimezone } from '../contexts/TimezoneContext';
 import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../hooks/useFeatureFlags';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
+import { getISOYMDInTimezone } from '../utils/dateUtils';
+import { collectProgramGoalIds, getActivePrograms } from '../utils/programGoalWindow';
+import { getProgramColor } from '../utils/programViewModel';
 import PageSurface from '../components/surface/PageSurface';
 import { usePageSurfaces } from '../hooks/usePageSurfaceQueries';
 import {
@@ -41,68 +50,10 @@ import '../App.css';
 import './FractalGoals.css';
 import '../components/surface/PageSurface.css';
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
-const FLOWTREE_SETTINGS_STORAGE_KEY = 'flowtree-view-settings';
-const FLOWTREE_SETTINGS_STORAGE_VERSION = 1;
-const DEFAULT_VIEW_SETTINGS = {
-    fadeInactiveBranches: false,
-    hideInactiveGoals: false,
-    hideCompletedGoals: false,
-    showMetricsOverlay: false,
-};
 const EMPTY_ARRAY = [];
 const TYPE_TO_ZOOM_IDLE_MS = 2000;
 const TYPE_TO_ZOOM_LOCKED_IDLE_MS = 10000;
 const FLOWTREE_SCOPE_TRANSITION_MS = 160;
-
-function readLocalStorageValue(key) {
-    const storage = globalThis.localStorage;
-    if (typeof storage?.getItem !== 'function') return null;
-    try {
-        return storage.getItem(key);
-    } catch {
-        return null;
-    }
-}
-
-function writeLocalStorageValue(key, value) {
-    const storage = globalThis.localStorage;
-    if (typeof storage?.setItem !== 'function') return;
-    try {
-        storage.setItem(key, value);
-    } catch {
-        // Optional preferences should not interrupt rendering in restricted storage contexts.
-    }
-}
-
-function removeLocalStorageValue(key) {
-    const storage = globalThis.localStorage;
-    if (typeof storage?.removeItem !== 'function') return;
-    try {
-        storage.removeItem(key);
-    } catch {
-        // Optional preferences should not interrupt rendering in restricted storage contexts.
-    }
-}
-
-function normalizeStoredFlowTreeSettings(rawValue) {
-    if (!rawValue) return null;
-    const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
-    const storedViewSettings = parsed?.viewSettings || parsed;
-    const viewSettings = {};
-    for (const key of Object.keys(DEFAULT_VIEW_SETTINGS)) {
-        if (typeof storedViewSettings?.[key] === 'boolean') {
-            viewSettings[key] = storedViewSettings[key];
-        }
-    }
-    const goalsViewMode = parsed?.goalsViewMode === 'tree' || parsed?.goalsViewMode === 'hierarchy'
-        ? parsed.goalsViewMode
-        : null;
-    return {
-        goalsViewMode,
-        viewSettings,
-        hasSettings: goalsViewMode || Object.keys(viewSettings).length > 0,
-    };
-}
 
 function FractalGoals() {
     const hideCompletedTooltip = 'Hides completed goals from the fractal tree.';
@@ -112,6 +63,7 @@ function FractalGoals() {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
+    const { timezone } = useTimezone();
     const {
         createGoal,
         updateGoal,
@@ -134,16 +86,20 @@ function FractalGoals() {
     const { flags } = useFeatureFlags();
     const showSurfaceConfiguration = isFeatureEnabled(flags, FEATURE_FLAGS.goalSurfaceConfiguration);
     const isMobile = useIsMobile();
-    const [goalsViewMode, setGoalsViewMode] = useState(() => (getIsMobileViewport() ? 'hierarchy' : 'tree'));
-    const flowTreeSettingsStorageKey = useMemo(
-        () => rootId ? `${FLOWTREE_SETTINGS_STORAGE_KEY}:${user?.id || 'anonymous'}:${rootId}` : null,
-        [rootId, user?.id]
-    );
-    const legacyFlowTreeSettingsStorageKey = useMemo(
-        () => rootId ? `${FLOWTREE_SETTINGS_STORAGE_KEY}:${rootId}` : null,
-        [rootId]
-    );
-    const { programs = EMPTY_ARRAY } = usePrograms(rootId);
+    const {
+        goalsViewMode,
+        scopedProgramId,
+        setGoalsViewMode,
+        setScopedProgramId,
+        setViewSettings,
+        shouldPreservePreferencesRef: shouldPreserveFlowTreePreferencesRef,
+        viewSettings,
+    } = useFlowTreePreferences({
+        rootId,
+        userId: user?.id,
+        defaultGoalsViewMode: getIsMobileViewport() ? 'hierarchy' : 'tree',
+    });
+    const { programs = EMPTY_ARRAY, isLoading: programsLoading } = usePrograms(rootId);
     const loading = goalsLoading || activitiesLoading || activityGroupsLoading || evidenceLoading;
     const [sidebarMode, setSidebarMode] = useState(null);
     const [viewingGoal, setViewingGoal] = useState(null);
@@ -153,7 +109,6 @@ function FractalGoals() {
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
     const [alertData, setAlertData] = useState({ isOpen: false, title: '', message: '' });
-    const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
 
     // --- Configurable page surface state ---
     const { surfaces, createSurface, updateSurface, setDefaultSurface, deleteSurface } = usePageSurfaces(rootId, 'goals', {
@@ -176,14 +131,31 @@ function FractalGoals() {
     const typeToZoomIdleTimerRef = useRef(null);
     const flowTreeRef = useRef(null);
     const flowTreeScopeTransitionTimerRef = useRef(null);
-    const shouldPreserveFlowTreePreferencesRef = useRef(false);
-    const [hasHydratedFlowTreeSettings, setHasHydratedFlowTreeSettings] = useState(false);
     const selectedNodeId = viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null;
     const evidenceGoalIds = useMemo(() => {
         if (!evidenceData) return null;
         return new Set((evidenceData.goal_ids || []).map((goalId) => String(goalId)));
     }, [evidenceData]);
     const flowtreeMaps = useMemo(() => buildTreeMaps(fractalData), [fractalData]);
+    const todayInTimezone = useMemo(
+        () => getISOYMDInTimezone(new Date(), timezone || 'UTC'),
+        [timezone]
+    );
+    const activePrograms = useMemo(
+        () => getActivePrograms(programs, todayInTimezone).map((program, index) => ({
+            ...program,
+            displayColor: getProgramColor(program, index),
+        })),
+        [programs, todayInTimezone]
+    );
+    const scopedProgram = useMemo(
+        () => activePrograms.find((program) => String(program.id) === String(scopedProgramId)) || null,
+        [activePrograms, scopedProgramId]
+    );
+    const programScopeGoalIds = useMemo(() => {
+        if (!scopedProgram || !fractalData) return null;
+        return getGoalLineageScope(fractalData, collectProgramGoalIds(scopedProgram));
+    }, [fractalData, scopedProgram]);
     const surfaceGoals = useMemo(
         () => Array.from(flowtreeMaps.nodeById.values()),
         [flowtreeMaps.nodeById]
@@ -201,11 +173,17 @@ function FractalGoals() {
         const filterHiddenInactive = (ids) => (
             hiddenInactiveGoalIds ? ids.filter((id) => !hiddenInactiveGoalIds.has(id)) : ids
         );
-        if (selectedNodeId) {
-            return filterHiddenInactive(Array.from(getLineagePath(fractalData, selectedNodeId)));
-        }
-        return filterHiddenInactive(Array.from(flowtreeMaps.nodeById.keys()));
-    }, [flowtreeMaps, fractalData, hiddenInactiveGoalIds, selectedNodeId]);
+        const scopedIds = programScopeGoalIds || new Set(flowtreeMaps.nodeById.keys());
+        const selectedLineageIds = selectedNodeId ? getLineagePath(fractalData, selectedNodeId) : null;
+        const ids = Array.from(scopedIds).filter((id) => (
+            (!selectedLineageIds || selectedLineageIds.has(id))
+            && (!viewSettings.hideCompletedGoals || !(
+                flowtreeMaps.nodeById.get(id)?.attributes?.completed
+                || flowtreeMaps.nodeById.get(id)?.completed
+            ))
+        ));
+        return filterHiddenInactive(ids);
+    }, [flowtreeMaps, fractalData, hiddenInactiveGoalIds, programScopeGoalIds, selectedNodeId, viewSettings.hideCompletedGoals]);
     const { data: flowtreeMetricsSummary } = useFlowtreeSessionMetrics(
         rootId,
         visibleGoalIds,
@@ -216,8 +194,9 @@ function FractalGoals() {
             selectedNodeId,
             hideCompletedGoals: viewSettings.hideCompletedGoals,
             hiddenInactiveGoalIds,
+            allowedGoalIds: programScopeGoalIds,
         })
-    ), [fractalData, hiddenInactiveGoalIds, selectedNodeId, viewSettings.hideCompletedGoals]);
+    ), [fractalData, hiddenInactiveGoalIds, programScopeGoalIds, selectedNodeId, viewSettings.hideCompletedGoals]);
     const typeToZoomResults = useMemo(() => (
         getGoalSearchMatches(typeToZoomCandidates, typeToZoomQuery)
     ), [typeToZoomCandidates, typeToZoomQuery]);
@@ -262,44 +241,11 @@ function FractalGoals() {
     }, [rootId, navigate, setActiveRootId, user?.id]);
 
     useEffect(() => {
-        shouldPreserveFlowTreePreferencesRef.current = false;
-        setHasHydratedFlowTreeSettings(false);
-        if (!flowTreeSettingsStorageKey) {
-            setHasHydratedFlowTreeSettings(true);
-            return;
+        if (programsLoading || !scopedProgramId) return;
+        if (!activePrograms.some((program) => String(program.id) === String(scopedProgramId))) {
+            setScopedProgramId(null);
         }
-
-        try {
-            const raw = readLocalStorageValue(flowTreeSettingsStorageKey)
-                || readLocalStorageValue(legacyFlowTreeSettingsStorageKey);
-            const normalized = normalizeStoredFlowTreeSettings(raw);
-            if (normalized?.hasSettings) {
-                shouldPreserveFlowTreePreferencesRef.current = true;
-                if (Object.keys(normalized.viewSettings).length > 0) {
-                    setViewSettings((prev) => ({
-                        ...prev,
-                        ...normalized.viewSettings,
-                    }));
-                }
-                if (normalized.goalsViewMode) {
-                    setGoalsViewMode(normalized.goalsViewMode);
-                }
-            }
-        } catch {
-            // Ignore stale or malformed preference data.
-        } finally {
-            setHasHydratedFlowTreeSettings(true);
-        }
-    }, [flowTreeSettingsStorageKey, legacyFlowTreeSettingsStorageKey]);
-
-    useEffect(() => {
-        if (!flowTreeSettingsStorageKey || !hasHydratedFlowTreeSettings) return;
-        writeLocalStorageValue(flowTreeSettingsStorageKey, JSON.stringify({
-            version: FLOWTREE_SETTINGS_STORAGE_VERSION,
-            goalsViewMode,
-            viewSettings,
-        }));
-    }, [flowTreeSettingsStorageKey, goalsViewMode, hasHydratedFlowTreeSettings, viewSettings]);
+    }, [activePrograms, programsLoading, scopedProgramId, setScopedProgramId]);
 
     const isSidebarOpen = showGoalModal || !!sidebarMode;
     const surfaceViewMode = isSidebarOpen && !isMobile ? 'scoped' : 'overview';
@@ -321,7 +267,13 @@ function FractalGoals() {
         if (treeView.mode === 'tree' || treeView.mode === 'hierarchy') {
             setGoalsViewMode(treeView.mode);
         }
-    }, [configViewportIsMobile, surfaceViewMode]);
+    }, [
+        configViewportIsMobile,
+        setGoalsViewMode,
+        setViewSettings,
+        shouldPreserveFlowTreePreferencesRef,
+        surfaceViewMode,
+    ]);
 
     // Load the default surface (if any) into the working config when surfaces
     // resolve, and hydrate the tree's view settings from its tree panel. On
@@ -558,7 +510,7 @@ function FractalGoals() {
         shouldPreserveFlowTreePreferencesRef.current = true;
         setGoalsViewMode(mode);
         if (isConfigureMode) setIsSurfaceDirty(true);
-    }, [isConfigureMode]);
+    }, [isConfigureMode, setGoalsViewMode, shouldPreserveFlowTreePreferencesRef]);
 
     useEffect(() => {
         if (!isTypeToZoomOpen || !typeToZoomQuery) return undefined;
@@ -770,6 +722,13 @@ function FractalGoals() {
         setViewingGoal(null);
     }, []);
 
+    useEffect(() => {
+        if (!selectedNodeId || !programScopeGoalIds) return;
+        if (!programScopeGoalIds.has(String(selectedNodeId))) {
+            handleCloseGoalDetails();
+        }
+    }, [handleCloseGoalDetails, programScopeGoalIds, selectedNodeId]);
+
     if (rootId && location.pathname !== `/${rootId}/goals`) {
         return null;
     }
@@ -806,6 +765,21 @@ function FractalGoals() {
                 ...prev,
                 [settingKey]: nextChecked
             }));
+            setFlowTreeScopeTransitionKey((prev) => prev + 1);
+            flowTreeScopeTransitionTimerRef.current = null;
+        }, FLOWTREE_SCOPE_TRANSITION_MS);
+    };
+    const handleProgramScopeChange = (programId) => {
+        const nextProgramId = programId == null ? null : String(programId);
+        if (nextProgramId === scopedProgramId) return;
+
+        clearTypeToZoomSearch();
+        flowTreeRef.current?.startFadeOut?.();
+        if (flowTreeScopeTransitionTimerRef.current) {
+            clearTimeout(flowTreeScopeTransitionTimerRef.current);
+        }
+        flowTreeScopeTransitionTimerRef.current = setTimeout(() => {
+            setScopedProgramId(nextProgramId);
             setFlowTreeScopeTransitionKey((prev) => prev + 1);
             flowTreeScopeTransitionTimerRef.current = null;
         }, FLOWTREE_SCOPE_TRANSITION_MS);
@@ -848,6 +822,9 @@ function FractalGoals() {
                         inactiveBranchTooltip={inactiveBranchTooltip}
                         hideInactiveTooltip={hideInactiveTooltip}
                         hideCompletedTooltip={hideCompletedTooltip}
+                        activePrograms={activePrograms}
+                        scopedProgramId={scopedProgramId}
+                        onProgramScopeChange={handleProgramScopeChange}
                         isConfigureMode={showSurfaceConfiguration && isConfigureMode}
                         onToggleConfigureMode={showSurfaceConfiguration ? handleEnterConfigureMode : null}
                         onCancelConfigureMode={handleCancelConfigureMode}
@@ -904,6 +881,8 @@ function FractalGoals() {
                                 activities={activities}
                                 activityGroups={activityGroups}
                                 programs={programs}
+                                allowedGoalIds={programScopeGoalIds}
+                                scopedProgramName={scopedProgram?.name || null}
                                 viewSettings={viewSettings}
                                 scopeTransitionKey={flowTreeScopeTransitionKey}
                                 onNodeClick={handleGoalNameClick}

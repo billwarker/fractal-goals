@@ -13,6 +13,7 @@ import {
     sortProgramBlocks,
 } from '../../utils/programViewModel';
 import { flattenGoalTree } from '../../utils/goalNodeModel';
+import { getProgramStatus } from '../../utils/programGoalWindow';
 import { overlapsDateWindow } from './landingFeatureModel';
 import styles from './LandingFeaturesSection.module.css';
 
@@ -37,15 +38,6 @@ function formatDate(value) {
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function getProgramStatus(program) {
-    const today = new Date().toISOString().slice(0, 10);
-    const start = getDatePart(program?.start_date);
-    const end = getDatePart(program?.end_date);
-    if (start && today < start) return 'Upcoming';
-    if (end && today > end) return 'Completed';
-    return 'Active';
-}
-
 function findBlockForDate(program, dateValue) {
     const datePart = getDatePart(dateValue);
     if (!datePart) return null;
@@ -64,6 +56,8 @@ export default function LandingFeaturePrograms({ example, program, windowStart, 
     const [viewMode, setViewMode] = useState('calendar');
     const [isSidePaneVisible, setIsSidePaneVisible] = useState(true);
     const [sidePaneView, setSidePaneView] = useState('details');
+    const programStatus = getProgramStatus(program, new Date());
+    const programStatusLabel = `${programStatus.charAt(0).toUpperCase()}${programStatus.slice(1)}`;
     const goals = useMemo(
         () => flattenGoalTree(example.tree).map(normalizeGoal).filter(Boolean),
         [example.tree]
@@ -120,7 +114,7 @@ export default function LandingFeaturePrograms({ example, program, windowStart, 
                             </h3>
                             <div className={styles.programPreviewMeta}>
                                 <span>{formatDate(program.start_date)} - {formatDate(program.end_date)}</span>
-                                <span className={styles.programStatusBadge}>{getProgramStatus(program)}</span>
+                                <span className={styles.programStatusBadge}>{programStatusLabel}</span>
                                 {focusedBlock ? (
                                     <span
                                         className={styles.programBlockBadge}

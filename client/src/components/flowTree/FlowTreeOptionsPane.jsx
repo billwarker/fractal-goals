@@ -62,6 +62,9 @@ export default function FlowTreeOptionsPane({
     inactiveBranchTooltip,
     hideInactiveTooltip,
     hideCompletedTooltip,
+    activePrograms = [],
+    scopedProgramId = null,
+    onProgramScopeChange,
     isConfigureMode = false,
     onToggleConfigureMode,
     onCancelConfigureMode,
@@ -94,8 +97,19 @@ export default function FlowTreeOptionsPane({
         setSurfaceNameDraft('');
         setIsNamingSurface(false);
     };
+    const scopedProgram = activePrograms.find((program) => String(program.id) === String(scopedProgramId)) || null;
     return (
         <div className={`flowtree-options-pane ${isMobile ? 'flowtree-options-pane-mobile' : ''} ${isMinimized ? 'flowtree-options-pane-minimized' : ''}`}>
+            {scopedProgram && (
+                <div
+                    className="flowtree-program-scope-context"
+                    style={{ '--flowtree-program-color': scopedProgram.displayColor }}
+                    title={`Goal tree scoped to ${scopedProgram.name}`}
+                    aria-live="polite"
+                >
+                    {scopedProgram.name}
+                </div>
+            )}
             <div className="flowtree-options-header">
                 <div className="flowtree-options-title">
                     {goalsViewMode === 'hierarchy' ? 'Hierarchy View' : 'Tree View'}
@@ -143,6 +157,27 @@ export default function FlowTreeOptionsPane({
                         checked={viewSettings.showMetricsOverlay}
                         onChange={onToggleViewSetting('showMetricsOverlay')}
                     />
+                    {activePrograms.map((program) => {
+                        const isScoped = String(scopedProgramId) === String(program.id);
+                        return (
+                            <Checkbox
+                                key={program.id}
+                                className="flowtree-options-check flowtree-program-scope-check"
+                                containerStyle={{ '--flowtree-program-color': program.displayColor }}
+                                label={(
+                                    <span
+                                        className="flowtree-program-scope-label"
+                                        style={{ '--flowtree-program-color': program.displayColor }}
+                                        title={`Only show goals in ${program.name}, including their ancestors and descendants.`}
+                                    >
+                                        Scope to {program.name}
+                                    </span>
+                                )}
+                                checked={isScoped}
+                                onChange={() => onProgramScopeChange?.(isScoped ? null : program.id)}
+                            />
+                        );
+                    })}
                     {onToggleConfigureMode && (
                         <div className="flowtree-options-surface">
                             {isConfigureMode && (
