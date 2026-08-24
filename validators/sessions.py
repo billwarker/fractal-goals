@@ -115,4 +115,3 @@ class SessionGoalAssociationSchema(BaseModel):
         'ImmediateGoal',
         pattern=r'^(UltimateGoal|LongTermGoal|MidTermGoal|ShortTermGoal|ImmediateGoal)$'
     )
-

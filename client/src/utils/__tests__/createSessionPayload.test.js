@@ -62,4 +62,29 @@ describe('buildTemplateSessionPayload', () => {
             day_date: '2026-08-23',
         });
     });
+
+    it('snapshots active program context without inventing a program day', () => {
+        const payload = buildTemplateSessionPayload({
+            id: 'template-1', name: 'Practice', template_data: { session_type: 'normal' },
+        }, {
+            program_id: 'program-1',
+            program_name: 'Q4 2026',
+            program_color: '#ef4444',
+            block_id: 'block-1',
+            block_name: 'Month 1',
+            block_color: '#d946ef',
+            goal_scope_enabled: true,
+        });
+
+        expect(payload.session_data.program_context).toEqual({
+            program_id: 'program-1',
+            program_name: 'Q4 2026',
+            program_color: '#ef4444',
+            block_id: 'block-1',
+            block_name: 'Month 1',
+            block_color: '#d946ef',
+            goal_scope_enabled: true,
+        });
+        expect(payload.session_data.program_context).not.toHaveProperty('day_id');
+    });
 });

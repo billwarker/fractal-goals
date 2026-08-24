@@ -120,7 +120,11 @@ class TestSessionListEndpoints:
                 'session_data': {
                     'program_context': {
                         'program_id': program.id,
-                        'day_id': day.id,
+                        'program_name': 'Untrusted name',
+                        'program_color': '#000000',
+                        'block_id': block.id,
+                        'block_name': 'Untrusted block',
+                        'goal_scope_enabled': True,
                     },
                 },
             },
@@ -133,10 +137,10 @@ class TestSessionListEndpoints:
             'block_id': block.id,
             'block_name': 'Block',
             'block_color': '#d946ef',
-            'day_id': day.id,
-            'day_name': 'Today',
-            'day_number': 1,
-            'day_date': now.date().isoformat(),
+            'day_id': None,
+            'day_name': None,
+            'day_number': None,
+            'day_date': None,
         }
         persisted = db_session.query(Session).filter_by(id=created.get_json()['id']).one()
         assert persisted.attributes['program_context']['off_program_goal_ids'] == [off_program]

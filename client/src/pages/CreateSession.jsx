@@ -80,6 +80,7 @@ function CreateSession() {
         templates,
         programDays,
         programsById,
+        activeProgram,
         activityDefinitions,
         activityGroups,
         allGoals,
@@ -88,19 +89,6 @@ function CreateSession() {
     } = useCreateSessionPageData(rootId, todayISO);
 
     const selectedTemplateIsNormal = Boolean(selectedTemplate && !isQuickSession(selectedTemplate));
-    const scopePreviewQuery = useQuery({
-        queryKey: queryKeys.sessionGoalScopePreview(
-            rootId,
-            selectedTemplate?.id || null,
-            selectedProgramDay?.day_id || null,
-        ),
-        queryFn: async () => (await fractalApi.previewSessionGoalScope(rootId, {
-            template_id: selectedTemplate.id,
-            ...(selectedProgramDay?.day_id ? { program_day_id: selectedProgramDay.day_id } : {}),
-        })).data,
-        enabled: Boolean(rootId && selectedTemplate),
-        retry: false,
-    });
 
     useEffect(() => {
         if (!rootId) {
@@ -243,7 +231,11 @@ function CreateSession() {
 
         try {
             const quickTemplate = isQuickSession(template);
-            const sessionData = buildTemplateSessionPayload(template, selectedProgramDay, manualGoalIds);
+            const sessionData = buildTemplateSessionPayload(
+                template,
+                programContext ? { ...programContext, goal_scope_enabled: programScopeEnabled } : null,
+                manualGoalIds,
+            );
             const response = await fractalApi.createSession(rootId, sessionData);
             const createdSession = response.data;
 
@@ -325,17 +317,42 @@ function CreateSession() {
 
     const quickTemplateSelected = Boolean(selectedTemplate && isQuickSession(selectedTemplate) && !selectedProgramDay);
     const {
-        todayProgramView, primaryTodayProgramDay, programScopeAvailable,
+        todayProgramView, primaryTodayProgramDay, programContext, programScopeAvailable,
         programScopeEnabled, scopedGoals, offScopeManualGoalIds, setScopeEnabled,
     } = useCreateSessionProgramContext({
-        rootId, userId: user?.id, programDays, selectedProgramDay,
+        rootId, userId: user?.id, todayISO, programDays, selectedProgramDay, activeProgram,
         goalTree, allGoals, manualGoalIds, quickTemplateSelected,
+    });
+    const scopePreviewQuery = useQuery({
+        queryKey: queryKeys.sessionGoalScopePreview(
+            rootId,
+            selectedTemplate?.id || null,
+            programScopeEnabled ? programContext?.day_id || null : null,
+        ),
+        queryFn: async () => (await fractalApi.previewSessionGoalScope(rootId, {
+            template_id: selectedTemplate.id,
+            ...(programScopeEnabled && programContext?.day_id
+                ? { program_day_id: programContext.day_id }
+                : {}),
+        })).data,
+        enabled: Boolean(rootId && selectedTemplate),
+        retry: false,
     });
     const { deepLinkNotice, setDeepLinkNotice } = useCreateSessionAutoSelection({
         loading, programDays, searchParams, setSearchParams, sessionSource,
         setSelectedProgramId, setSessionSource, setSelectedProgramDay,
         setSelectedProgramSession, setSelectedTemplate,
     });
+    const visibleGoalIds = useMemo(
+        () => new Set(scopedGoals.map((goal) => String(goal.id ?? goal.attributes?.id))),
+        [scopedGoals],
+    );
+    const visibleAutomaticGoalIds = useMemo(
+        () => (scopePreviewQuery.data?.automatic_goal_ids || []).filter(
+            (goalId) => !programScopeEnabled || visibleGoalIds.has(String(goalId)),
+        ),
+        [programScopeEnabled, scopePreviewQuery.data?.automatic_goal_ids, visibleGoalIds],
+    );
 
     const handleJumpToProgramDay = () => {
         if (!primaryTodayProgramDay) return;
@@ -397,7 +414,7 @@ function CreateSession() {
         <SessionGoalScopePanel
             goals={scopedGoals}
             manualGoalIds={manualGoalIds}
-            automaticGoalIds={scopePreviewQuery.data?.automatic_goal_ids || []}
+            automaticGoalIds={visibleAutomaticGoalIds}
             onChange={setManualGoalIds}
             isLoading={Boolean(selectedTemplate) && scopePreviewQuery.isLoading}
             error={selectedTemplate ? scopePreviewQuery.error : null}
@@ -410,8 +427,8 @@ function CreateSession() {
             programScopeAvailable={programScopeAvailable}
             programScopeEnabled={programScopeEnabled}
             onProgramScopeChange={setScopeEnabled}
-            programName={selectedProgramDay?.program_name}
-            programColor={selectedProgramDay?.program_color}
+            programName={programContext?.program_name}
+            programColor={programContext?.program_color}
             offScopeGoalCount={offScopeManualGoalIds.length}
             onClearOffScopeGoals={() => setManualGoalIds((current) => (
                 current.filter((goalId) => !offScopeManualGoalIds.includes(goalId))
@@ -433,7 +450,15 @@ function CreateSession() {
                             name={selectedProgramDay.program_name}
                             color={selectedProgramDay.program_color}
                         /></>
-                    : 'Select a template or program day to begin your session.'}
+                    : programContext
+                        ? <>In {programContext.block_name ? <><strong
+                            className={styles.selectedBlockName}
+                            style={{ color: programContext.block_color || programContext.program_color }}
+                        >{programContext.block_name}</strong>{' '}· </> : null}<ProgramName
+                            name={programContext.program_name}
+                            color={programContext.program_color}
+                        /></>
+                        : 'Select a template or program day to begin your session.'}
                 actions={isMobile ? (
                     <HeaderButton
                         variant="secondary"
@@ -443,8 +468,8 @@ function CreateSession() {
                         aria-label={`${mobileGoalsOpen ? 'Hide' : 'Show'} Session Goals`}
                     >
                         {programScopeEnabled ? <>Session Goals · <ProgramName
-                            name={selectedProgramDay?.program_name}
-                            color={selectedProgramDay?.program_color}
+                            name={programContext?.program_name}
+                            color={programContext?.program_color}
                         /></> : 'Session Goals'}
                     </HeaderButton>
                 ) : showCreationAction ? (

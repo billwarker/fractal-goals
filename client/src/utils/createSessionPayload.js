@@ -44,23 +44,31 @@ export function buildTemplateSessionPayload(template, selectedProgramDay, goalId
         template_name: template.name,
         template_color: template.template_color || template.template_data?.template_color,
     };
+    const programContext = selectedProgramDay ? {
+        program_id: selectedProgramDay.program_id,
+        program_name: selectedProgramDay.program_name,
+        program_color: selectedProgramDay.program_color,
+        ...(selectedProgramDay.block_id ? {
+            block_id: selectedProgramDay.block_id,
+            block_name: selectedProgramDay.block_name,
+            block_color: selectedProgramDay.block_color,
+        } : {}),
+        ...(selectedProgramDay.day_id ? {
+            day_id: selectedProgramDay.day_id,
+            day_name: selectedProgramDay.day_name,
+            day_number: selectedProgramDay.day_number,
+            day_date: selectedProgramDay.day_date,
+        } : {}),
+        ...(typeof selectedProgramDay.goal_scope_enabled === 'boolean'
+            ? { goal_scope_enabled: selectedProgramDay.goal_scope_enabled }
+            : {}),
+    } : null;
     const sessionDataPayload = quickTemplate
         ? { ...shared, session_type: 'quick', program_context: null }
         : {
             ...shared,
             session_type: 'normal',
-            program_context: selectedProgramDay ? {
-                program_id: selectedProgramDay.program_id,
-                program_name: selectedProgramDay.program_name,
-                program_color: selectedProgramDay.program_color,
-                block_id: selectedProgramDay.block_id,
-                block_name: selectedProgramDay.block_name,
-                block_color: selectedProgramDay.block_color,
-                day_id: selectedProgramDay.day_id,
-                day_name: selectedProgramDay.day_name,
-                day_number: selectedProgramDay.day_number,
-                day_date: selectedProgramDay.day_date,
-            } : null,
+            program_context: programContext,
             sections: (template.template_data?.sections || []).map(normalizeSection),
             total_duration_minutes: template.template_data?.total_duration_minutes || 0,
         };

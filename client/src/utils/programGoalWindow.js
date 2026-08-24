@@ -160,6 +160,24 @@ export function getActivePrograms(programs = [], referenceDate) {
         });
 }
 
+export function getActiveProgramBlock(program, referenceDate) {
+    const day = getProgramDatePart(referenceDate);
+    if (!day) return null;
+
+    return [...(program?.blocks || [])]
+        .filter((block) => {
+            const start = getProgramDatePart(block?.start_date);
+            const end = getProgramDatePart(block?.end_date);
+            return Boolean(start && end && start <= day && day <= end);
+        })
+        .sort((left, right) => {
+            const startComparison = (getProgramDatePart(left?.start_date) || '')
+                .localeCompare(getProgramDatePart(right?.start_date) || '');
+            if (startComparison !== 0) return startComparison;
+            return String(left?.id || '').localeCompare(String(right?.id || ''));
+        })[0] || null;
+}
+
 export function collectProgramGoalIds(program) {
     const blockGoalIds = (program?.blocks || []).flatMap((block) => [
         ...(block?.goal_ids || []),

@@ -6,6 +6,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import CreateSession from '../CreateSession';
 
 const completeQuickSession = vi.fn();
+const previewSessionGoalScope = vi.fn();
 const mockIsMobile = vi.hoisted(() => ({ value: false }));
 const mockPageData = vi.hoisted(() => ({ value: null }));
 const goalScopeProps = vi.hoisted(() => vi.fn());
@@ -71,7 +72,7 @@ vi.mock('../../components/createSession', () => ({
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
-        previewSessionGoalScope: vi.fn().mockResolvedValue({ data: { automatic_goal_ids: [] } }),
+        previewSessionGoalScope: (...args) => previewSessionGoalScope(...args),
         completeQuickSession: (...args) => completeQuickSession(...args),
     },
 }));
@@ -110,6 +111,7 @@ describe('CreateSession quick-session flow', () => {
             templates: [quickTemplate],
             programDays: [],
             programsById: {},
+            activeProgram: null,
             activityDefinitions: [{ id: 'activity-1', name: 'Bodyweight' }],
             activityGroups: [],
             allGoals: [],
@@ -117,6 +119,7 @@ describe('CreateSession quick-session flow', () => {
             loading: false,
         };
         completeQuickSession.mockResolvedValue({ data: { id: 'completed-quick-1' } });
+        previewSessionGoalScope.mockResolvedValue({ data: { automatic_goal_ids: [] } });
         vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'uuid-1') });
     });
 
@@ -207,6 +210,54 @@ describe('CreateSession quick-session flow', () => {
             manualGoalIds: ['child'],
             goals: [{ id: 'root' }, { id: 'child' }, { id: 'leaf' }, { id: 'other' }],
             programScopeEnabled: false,
+        })));
+    });
+
+    it('keeps active program identity and goal scoping when no day is scheduled today', async () => {
+        previewSessionGoalScope.mockResolvedValueOnce({
+            data: { automatic_goal_ids: ['child', 'other'] },
+        });
+        mockPageData.value = {
+            ...mockPageData.value,
+            templates: [{ id: 'normal-1', name: 'Open Practice', template_data: { sections: [] } }],
+            activeProgram: {
+                id: 'program-1',
+                name: 'Q4 2026',
+                color: '#ef4444',
+                start_date: '2026-08-01',
+                end_date: '2026-08-31',
+                goal_ids: ['child'],
+                blocks: [{
+                    id: 'block-1', name: 'Month 1', color: '#d946ef',
+                    start_date: '2026-08-01', end_date: '2026-08-31',
+                }],
+            },
+            goalTree: { id: 'root', children: [{ id: 'child', children: [] }, { id: 'other', children: [] }] },
+            allGoals: [{ id: 'root' }, { id: 'child' }, { id: 'other' }],
+        };
+
+        renderPage();
+
+        expect(screen.getByText((_, element) => (
+            element.tagName === 'P' && element.textContent === 'In Month 1 · Q4 2026'
+        ))).toBeInTheDocument();
+        expect(screen.getByText('Month 1')).toHaveStyle({ color: '#d946ef' });
+        expect(screen.getByText('Q4 2026')).toHaveStyle({ color: '#ef4444' });
+        await waitFor(() => expect(goalScopeProps).toHaveBeenLastCalledWith(expect.objectContaining({
+            programScopeAvailable: true,
+            programScopeEnabled: true,
+            programName: 'Q4 2026',
+            programColor: '#ef4444',
+            goals: [{ id: 'root' }, { id: 'child' }],
+        })));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Select Weigh Myself' }));
+        await waitFor(() => expect(previewSessionGoalScope).toHaveBeenCalledWith(
+            'root-1',
+            { template_id: 'normal-1' },
+        ));
+        await waitFor(() => expect(goalScopeProps).toHaveBeenLastCalledWith(expect.objectContaining({
+            automaticGoalIds: ['child'],
         })));
     });
 

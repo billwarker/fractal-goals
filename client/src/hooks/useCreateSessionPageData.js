@@ -3,7 +3,9 @@ import { useQueries } from '@tanstack/react-query';
 
 import { fractalApi } from '../utils/api';
 import { flattenGoals } from '../utils/goalHelpers';
+import { getActivePrograms } from '../utils/programGoalWindow';
 import { queryKeys } from './queryKeys';
+import { fetchPrograms } from './useProgramQueries';
 import { fetchSessionTemplates } from './useSessionTemplateQueries';
 
 function dedupeProgramDays(programDays) {
@@ -64,6 +66,11 @@ export function useCreateSessionPageData(rootId, todayISO) {
                 enabled: Boolean(rootId),
             },
             {
+                queryKey: queryKeys.programs(rootId),
+                queryFn: () => fetchPrograms(rootId),
+                enabled: Boolean(rootId),
+            },
+            {
                 queryKey: queryKeys.activities(rootId),
                 queryFn: async () => {
                     const response = await fractalApi.getActivities(rootId);
@@ -86,6 +93,7 @@ export function useCreateSessionPageData(rootId, todayISO) {
         templatesQuery,
         goalTreeQuery,
         programDaysQuery,
+        programsQuery,
         activitiesQuery,
         activityGroupsQuery,
     ] = results;
@@ -104,6 +112,10 @@ export function useCreateSessionPageData(rootId, todayISO) {
         () => groupProgramDaysById(programDays),
         [programDays]
     );
+    const activeProgram = useMemo(
+        () => getActivePrograms(programsQuery.data || [], todayISO)[0] || null,
+        [programsQuery.data, todayISO]
+    );
 
     return {
         templates: templatesQuery.data || [],
@@ -111,6 +123,7 @@ export function useCreateSessionPageData(rootId, todayISO) {
         allGoals,
         programDays,
         programsById,
+        activeProgram,
         activityDefinitions: activitiesQuery.data || [],
         activityGroups: activityGroupsQuery.data || [],
         loading: results.some((result) => result.isLoading),

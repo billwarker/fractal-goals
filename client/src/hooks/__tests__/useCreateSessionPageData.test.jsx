@@ -8,6 +8,7 @@ import { queryKeys } from '../queryKeys';
 const getSessionTemplates = vi.fn();
 const getGoals = vi.fn();
 const getActiveProgramDays = vi.fn();
+const getPrograms = vi.fn();
 const getActivities = vi.fn();
 const getActivityGroups = vi.fn();
 
@@ -16,6 +17,7 @@ vi.mock('../../utils/api', () => ({
         getSessionTemplates: (...args) => getSessionTemplates(...args),
         getGoals: (...args) => getGoals(...args),
         getActiveProgramDays: (...args) => getActiveProgramDays(...args),
+        getPrograms: (...args) => getPrograms(...args),
         getActivities: (...args) => getActivities(...args),
         getActivityGroups: (...args) => getActivityGroups(...args),
     },
@@ -82,6 +84,14 @@ describe('useCreateSessionPageData', () => {
                 },
             ],
         });
+        getPrograms.mockResolvedValueOnce({
+            data: [{
+                id: 'program-1',
+                name: 'Program A',
+                start_date: '2026-08-01',
+                end_date: '2026-08-31',
+            }],
+        });
         getActivities.mockResolvedValueOnce({ data: [{ id: 'activity-1', name: 'Scales' }] });
         getActivityGroups.mockResolvedValueOnce({ data: [{ id: 'group-1', name: 'Technique' }] });
 
@@ -103,6 +113,7 @@ describe('useCreateSessionPageData', () => {
             children: [{ id: 'goal-1', name: 'Child Goal', children: [] }],
         });
         expect(queryClient.getQueryData(queryKeys.activeProgramDays('root-1', '2026-08-23'))).toHaveLength(3);
+        expect(queryClient.getQueryData(queryKeys.programs('root-1'))).toHaveLength(1);
         expect(queryClient.getQueryData(queryKeys.activities('root-1'))).toEqual([
             { id: 'activity-1', name: 'Scales' },
         ]);
@@ -114,8 +125,33 @@ describe('useCreateSessionPageData', () => {
         expect(Object.keys(result.current.programsById)).toEqual(['program-1', 'program-2']);
         expect(result.current.programsById['program-1'].days).toHaveLength(2);
         expect(result.current.programsById['program-1'].program_color).toBe('#22c55e');
+        expect(result.current.activeProgram?.id).toBe('program-1');
         expect(result.current.goalTree.id).toBe('root-1');
         expect(result.current.allGoals.map((goal) => goal.id)).toEqual(['root-1', 'goal-1']);
         expect(getActiveProgramDays).toHaveBeenCalledWith('root-1', '2026-08-23');
+    });
+
+    it('retains the underway program when no program day is scheduled today', async () => {
+        const queryClient = createQueryClient();
+        getSessionTemplates.mockResolvedValueOnce({ data: [] });
+        getGoals.mockResolvedValueOnce({ data: null });
+        getActiveProgramDays.mockResolvedValueOnce({ data: [] });
+        getPrograms.mockResolvedValueOnce({ data: [{
+            id: 'program-1', name: 'Q4 2026', color: '#ef4444',
+            start_date: '2026-08-01', end_date: '2026-08-31',
+        }] });
+        getActivities.mockResolvedValueOnce({ data: [] });
+        getActivityGroups.mockResolvedValueOnce({ data: [] });
+
+        const { result } = renderHook(
+            () => useCreateSessionPageData('root-1', '2026-08-23'),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(result.current.programDays).toEqual([]);
+        expect(result.current.activeProgram).toEqual(expect.objectContaining({
+            id: 'program-1', name: 'Q4 2026', color: '#ef4444',
+        }));
     });
 });

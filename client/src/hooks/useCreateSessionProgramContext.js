@@ -2,22 +2,42 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { getGoalLineageScope } from '../components/flowTree/flowTreeTreeUtils';
 import { buildTodayProgramDayView, programSessionToTemplate } from '../utils/createSessionProgramDay';
+import { getActiveProgramBlock } from '../utils/programGoalWindow';
 import { useCreateSessionPreferences } from './useCreateSessionPreferences';
 
 export function useCreateSessionProgramContext({
-    rootId, userId, programDays, selectedProgramDay,
+    rootId, userId, todayISO, programDays, selectedProgramDay, activeProgram,
     goalTree, allGoals, manualGoalIds, quickTemplateSelected,
 }) {
     const { isProgramScopeEnabled, setProgramScopeEnabled, isHydrated } = useCreateSessionPreferences({ rootId, userId });
     const todayProgramView = useMemo(() => buildTodayProgramDayView(programDays), [programDays]);
-    const programScopeAvailable = Boolean(selectedProgramDay) && !quickTemplateSelected;
-    const programScopeEnabled = Boolean(
-        isHydrated && programScopeAvailable && isProgramScopeEnabled(selectedProgramDay?.program_id),
+    const activeBlock = useMemo(
+        () => getActiveProgramBlock(activeProgram, todayISO),
+        [activeProgram, todayISO],
     );
-    const seedIds = useMemo(() => [
-        ...(selectedProgramDay?.program_goal_ids || []),
-        ...(selectedProgramDay?.block_goal_ids || []),
-    ].map(String), [selectedProgramDay]);
+    const programContext = useMemo(() => {
+        if (selectedProgramDay) return selectedProgramDay;
+        if (!activeProgram) return null;
+        return {
+            program_id: activeProgram.id,
+            program_name: activeProgram.name,
+            program_color: activeProgram.color,
+            program_goal_ids: activeProgram.goal_ids || activeProgram.selected_goals || [],
+            ...(activeBlock ? {
+                block_id: activeBlock.id,
+                block_name: activeBlock.name,
+                block_color: activeBlock.color || activeProgram.color,
+            } : {}),
+        };
+    }, [activeBlock, activeProgram, selectedProgramDay]);
+    const programScopeAvailable = Boolean(programContext) && !quickTemplateSelected;
+    const programScopeEnabled = Boolean(
+        isHydrated && programScopeAvailable && isProgramScopeEnabled(programContext?.program_id),
+    );
+    const seedIds = useMemo(
+        () => (programContext?.program_goal_ids || []).map(String),
+        [programContext],
+    );
     const scopeGoalIds = useMemo(
         () => programScopeEnabled && goalTree
             ? getGoalLineageScope(goalTree, [...new Set(seedIds)])
@@ -36,11 +56,12 @@ export function useCreateSessionProgramContext({
             : [],
         [manualGoalIds, scopeGoalIds],
     );
-    const setScopeEnabled = (enabled) => setProgramScopeEnabled(selectedProgramDay?.program_id, enabled);
+    const setScopeEnabled = (enabled) => setProgramScopeEnabled(programContext?.program_id, enabled);
 
     return {
         todayProgramView, primaryTodayProgramDay: todayProgramView.days[0] || null,
-        programScopeAvailable, programScopeEnabled, scopedGoals, offScopeManualGoalIds, setScopeEnabled,
+        programContext, programScopeAvailable, programScopeEnabled,
+        scopedGoals, offScopeManualGoalIds, setScopeEnabled,
     };
 }
 

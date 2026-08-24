@@ -148,20 +148,21 @@ class SessionLifecycleService:
             values['association_source'] = association_source
         return values
 
-    def _program_scope_goal_ids(self, root_id, program_day_id):
-        if not program_day_id:
-            return set(), None
-        program_day = self.db_session.query(models.ProgramDay).options(
-            joinedload(models.ProgramDay.block).joinedload(models.ProgramBlock.program)
-        ).filter(models.ProgramDay.id == program_day_id).first()
-        if (
-            not program_day
-            or not program_day.block
-            or not program_day.block.program
-            or program_day.block.program.root_id != root_id
-        ):
-            return None, "Invalid program day context for this fractal"
-        return _program_goal_ids(self.db_session, program_day.block.program.id), None
+    def _program_scope_goal_ids(self, root_id, program_day_id=None):
+        if program_day_id:
+            program_day = self.db_session.query(models.ProgramDay).options(
+                joinedload(models.ProgramDay.block).joinedload(models.ProgramBlock.program)
+            ).filter(models.ProgramDay.id == program_day_id).first()
+            if (
+                not program_day
+                or not program_day.block
+                or not program_day.block.program
+                or program_day.block.program.root_id != root_id
+            ):
+                return None, "Invalid program day context for this fractal"
+            return _program_goal_ids(self.db_session, program_day.block.program.id), None
+
+        return None, None
 
     def _template_activity_definition_ids(self, root_id, template):
         payload = models._safe_load_json(template.template_data, {})
@@ -211,7 +212,10 @@ class SessionLifecycleService:
         activity_ids, activity_error = self._template_activity_definition_ids(root_id, template)
         if activity_error:
             return None, activity_error, 409
-        program_goal_ids, program_error = self._program_scope_goal_ids(root_id, data.get('program_day_id'))
+        program_goal_ids, program_error = self._program_scope_goal_ids(
+            root_id,
+            program_day_id=data.get('program_day_id'),
+        )
         if program_error:
             return None, program_error, 400
 
@@ -220,11 +224,11 @@ class SessionLifecycleService:
             goal.id
             for goals in effective.values()
             for goal in goals
-            if not goal.deleted_at and (not program_goal_ids or goal.id in program_goal_ids)
+            if not goal.deleted_at and (program_goal_ids is None or goal.id in program_goal_ids)
         }
         return {
             "automatic_goal_ids": sorted(automatic_goal_ids),
-            "program_scope_goal_ids": sorted(program_goal_ids),
+            "program_scope_goal_ids": sorted(program_goal_ids or set()),
         }, None, 200
 
     def _replace_manual_goal_scope(self, session, root_id, goal_ids):
@@ -381,9 +385,10 @@ class SessionLifecycleService:
         template_session_type = get_template_session_type(session_data_dict)
 
         program_day_id = None
-        program_goal_ids = set()
+        program_goal_ids = None
         if new_session.attributes:
             program_context = session_data_dict.get('program_context')
+            goal_scope_enabled = not isinstance(program_context, dict) or program_context.get('goal_scope_enabled') is not False
             if program_context and 'day_id' in program_context:
                 requested_day_id = program_context['day_id']
                 p_day = self.db_session.query(models.ProgramDay).options(
@@ -394,9 +399,40 @@ class SessionLifecycleService:
                 if p_day and p_day.block and p_day.block.program and p_day.block.program.root_id == root_id:
                     program_day_id = requested_day_id
                     new_session.program_day_id = program_day_id
-                    program_goal_ids = _program_goal_ids(self.db_session, p_day.block.program.id)
+                    program_context['program_id'] = p_day.block.program.id
+                    program_context['program_name'] = p_day.block.program.name
+                    program_context['program_color'] = p_day.block.program.color
+                    program_context['block_id'] = p_day.block.id
+                    program_context['block_name'] = p_day.block.name
+                    program_context['block_color'] = p_day.block.color or p_day.block.program.color
+                    program_context['day_name'] = p_day.name
+                    program_context['day_number'] = p_day.day_number
+                    if goal_scope_enabled:
+                        program_goal_ids = _program_goal_ids(self.db_session, p_day.block.program.id)
                 else:
                     return None, "Invalid program day context for this fractal", 400
+            elif program_context and program_context.get('program_id'):
+                requested_program_id = program_context['program_id']
+                program = self.db_session.query(models.Program).filter(
+                    models.Program.id == requested_program_id,
+                    models.Program.root_id == root_id,
+                ).first()
+                if not program:
+                    return None, "Invalid program context for this fractal", 400
+                if goal_scope_enabled:
+                    program_goal_ids = _program_goal_ids(self.db_session, program.id)
+                program_context['program_name'] = program.name
+                program_context['program_color'] = program.color
+                if program_context.get('block_id'):
+                    block = next(
+                        (candidate for candidate in (program.blocks or [])
+                         if candidate.id == program_context['block_id']),
+                        None,
+                    )
+                    if not block:
+                        return None, "Invalid program block context for this program", 400
+                    program_context['block_name'] = block.name
+                    program_context['block_color'] = block.color or program.color
 
         if new_session.template_id:
             template = self.db_session.query(models.SessionTemplate).filter(
@@ -627,7 +663,7 @@ class SessionLifecycleService:
                 for goal in goals
                 if (
                     not goal.deleted_at
-                    and (not program_goal_ids or goal.id in program_goal_ids)
+                    and (program_goal_ids is None or goal.id in program_goal_ids)
                 )
             }
 
@@ -637,7 +673,7 @@ class SessionLifecycleService:
         if data.get('parent_id'):
             manual_ids.add(data.get('parent_id'))
 
-        if program_day_id and isinstance(session_data_dict.get('program_context'), dict):
+        if program_goal_ids is not None and isinstance(session_data_dict.get('program_context'), dict):
             session_data_dict['program_context']['off_program_goal_ids'] = sorted(manual_ids - program_goal_ids)
             new_session.attributes = copy.deepcopy(session_data_dict)
 

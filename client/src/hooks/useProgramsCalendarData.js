@@ -1,20 +1,17 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { fractalApi } from '../utils/api';
 import { flattenGoals } from '../utils/goalHelpers';
 import { buildProgramBlockLabels, buildProgramsCalendarEvents } from '../utils/programViewModel';
 import { queryKeys } from './queryKeys';
 import { useFractalTree } from './useGoalQueries';
+import { fetchPrograms } from './useProgramQueries';
 
 export function useProgramsCalendarData(rootId, { getGoalColor, getGoalTextColor, timezone } = {}) {
     const programsQuery = useQuery({
         queryKey: queryKeys.programs(rootId),
         enabled: Boolean(rootId),
-        queryFn: async () => {
-            const response = await fractalApi.getPrograms(rootId);
-            return response.data || [];
-        },
+        queryFn: () => fetchPrograms(rootId),
     });
 
     const goalsQuery = useFractalTree(rootId);

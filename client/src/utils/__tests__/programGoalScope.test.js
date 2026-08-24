@@ -1,6 +1,7 @@
 import { getGoalLineageScope } from '../../components/flowTree/flowTreeTreeUtils';
 import {
     collectProgramGoalIds,
+    getActiveProgramBlock,
     getActivePrograms,
     getProgramStatus,
 } from '../programGoalWindow';
@@ -52,5 +53,15 @@ describe('program goal-tree scope', () => {
         expect(getProgramStatus(programs[2], '2026-08-23')).toBe('completed');
         expect(getProgramStatus(programs[3], '2026-08-23')).toBe('upcoming');
         expect(getActivePrograms(programs, '2026-08-23').map((program) => program.id)).toEqual(['a', 'b']);
+    });
+
+    it('resolves the current block using the same inclusive reference date', () => {
+        const program = { blocks: [
+            { id: 'past', start_date: '2026-08-01', end_date: '2026-08-22' },
+            { id: 'current', start_date: '2026-08-23T00:00:00Z', end_date: '2026-08-30T00:00:00Z' },
+        ] };
+
+        expect(getActiveProgramBlock(program, '2026-08-23')?.id).toBe('current');
+        expect(getActiveProgramBlock(program, '2026-08-31')).toBeNull();
     });
 });
