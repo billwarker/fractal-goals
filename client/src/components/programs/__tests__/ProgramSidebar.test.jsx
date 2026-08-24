@@ -3,18 +3,25 @@ import { fireEvent, screen } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import ProgramSidebar from '../ProgramSidebar';
 
+vi.mock('../../atoms/GoalIcon', () => ({
+    default: ({ color, secondaryColor }) => (
+        <svg data-testid="goal-icon" data-color={color} data-secondary-color={secondaryColor} />
+    ),
+}));
+
 vi.mock('../../../contexts/GoalLevelsContext', async (importOriginal) => {
     const actual = await importOriginal();
     return {
         ...actual,
         useGoalLevels: () => ({
             getGoalColor: (type) => {
+                if (type === 'Completed') return '#abcdef';
                 if (type === 'MidTermGoal') return '#3b82f6';
                 if (type === 'ShortTermGoal') return '#14b8a6';
                 if (type === 'ImmediateGoal') return '#ef4444';
                 return '#94a3b8';
             },
-            getGoalSecondaryColor: () => '#0f172a',
+            getGoalSecondaryColor: (type) => type === 'Completed' ? '#654321' : '#0f172a',
             getGoalIcon: () => 'circle',
             getLevelByName: () => ({ icon: 'circle' }),
         }),
@@ -110,6 +117,10 @@ describe('ProgramSidebar', () => {
         expect(screen.getByText('Mid Goal')).toBeInTheDocument();
         expect(screen.getByText('Short Goal')).toBeInTheDocument();
         expect(screen.getByText('Immediate Goal')).toBeInTheDocument();
+        const completedRow = screen.getByText('Immediate Goal').closest('[data-goal-id="immediate"]');
+        const completedIcon = completedRow.querySelector('[data-testid="goal-icon"]');
+        expect(completedIcon).toHaveAttribute('data-color', '#abcdef');
+        expect(completedIcon).toHaveAttribute('data-secondary-color', '#654321');
 
         fireEvent.click(screen.getByText('Immediate Goal'));
         expect(onGoalClick).toHaveBeenCalledWith(byId.immediate);

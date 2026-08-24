@@ -96,8 +96,8 @@ function ProgramSidebar({
                             getGoalColor={getGoalColor}
                             getGoalSecondaryColor={getGoalSecondaryColor}
                             getGoalIcon={getGoalIcon}
-                            completedColor="var(--color-brand-success)"
-                            completedSecondaryColor="var(--color-brand-success)"
+                            completedColor={getGoalColor('Completed')}
+                            completedSecondaryColor={getGoalSecondaryColor('Completed')}
                             emptyState="No goals associated"
                         />
                     </div>
