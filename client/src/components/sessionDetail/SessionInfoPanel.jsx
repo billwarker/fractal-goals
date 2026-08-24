@@ -38,6 +38,12 @@ function SessionInfoPanel() {
     const [saving, setSaving] = useState(false);
     const { timezone } = useTimezone();
     const templateColor = getTemplateColor(session);
+    const programInfo = session?.program_info || null;
+    const programDayNumberLabel = programInfo?.day_number ? `Day ${programInfo.day_number}` : null;
+    const programDayLabel = [
+        programDayNumberLabel,
+        programInfo?.day_name && programInfo.day_name !== programDayNumberLabel ? programInfo.day_name : null,
+    ].filter(Boolean).join(' — ');
 
     const formatDate = (dateString) => {
         if (!dateString) return '—';
@@ -134,37 +140,42 @@ function SessionInfoPanel() {
                         </span>
                     </div>
                 )}
-                {session.program_info && (
+                {programInfo ? (
                     <div className={styles.sessionInfoRow}>
                         <span className={styles.label}>Program:</span>
-                        <Link
-                            to={`/${rootId}/programs/${session.program_info.program_id}`}
-                            className={`${styles.value} ${styles.link}`}
+                        <span
+                            className={styles.programContextValue}
+                            data-testid="program-context"
+                            style={{
+                                '--session-program-color': programInfo.program_color || 'var(--color-brand-primary)',
+                                '--session-block-color': programInfo.block_color || 'var(--color-brand-primary)',
+                            }}
                         >
-                            {session.program_info.program_name}
-                        </Link>
+                            {programInfo.program_name ? (
+                                programInfo.program_id ? (
+                                    <Link
+                                        to={`/${rootId}/programs/${programInfo.program_id}`}
+                                        className={`${styles.value} ${styles.link} ${styles.programValue}`}
+                                    >
+                                        {programInfo.program_name}
+                                    </Link>
+                                ) : <span className={styles.programValue}>{programInfo.program_name}</span>
+                            ) : null}
+                            {programInfo.block_name ? (
+                                <>{programInfo.program_name ? <span className={styles.contextSeparator}>·</span> : null}<span className={styles.blockValue}>{programInfo.block_name}</span></>
+                            ) : null}
+                            {programDayLabel ? (
+                                <>{programInfo.program_name || programInfo.block_name ? <span className={styles.contextSeparator}>·</span> : null}<span className={styles.blockValue}>{programDayLabel}</span></>
+                            ) : null}
+                        </span>
                     </div>
-                )}
+                ) : null}
             </div>
 
             {/* Expandable details */}
             {isExpanded && (
                 <>
                     <div className={styles.sessionInfoDetails}>
-                        <div className={styles.sessionInfoRow}>
-                            <span className={styles.label}>Template:</span>
-                            {sessionData?.template_name ? (
-                                <SessionTemplateNameBadge
-                                    name={sessionData.template_name}
-                                    color={templateColor}
-                                    size="sm"
-                                    wrap
-                                />
-                            ) : (
-                                <span className={styles.value}>—</span>
-                            )}
-                        </div>
-
                         {/* Session Start */}
                         <div className={styles.sessionInfoRow}>
                             <span className={styles.label}>Started:</span>

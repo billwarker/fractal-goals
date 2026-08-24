@@ -32,4 +32,34 @@ describe('buildTemplateSessionPayload', () => {
         expect(payload).not.toHaveProperty('goal_ids');
         expect(payload.session_data.session_type).toBe('quick');
     });
+
+    it('snapshots complete program, block, and day display context', () => {
+        const payload = buildTemplateSessionPayload({
+            id: 'template-1', name: 'Practice', template_data: { session_type: 'normal' },
+        }, {
+            program_id: 'program-1',
+            program_name: 'Q4 2026',
+            program_color: '#22c55e',
+            block_id: 'block-1',
+            block_name: 'Month 1',
+            block_color: '#d946ef',
+            day_id: 'day-1',
+            day_name: 'Sunday Practice',
+            day_number: 1,
+            day_date: '2026-08-23',
+        });
+
+        expect(payload.session_data.program_context).toEqual({
+            program_id: 'program-1',
+            program_name: 'Q4 2026',
+            program_color: '#22c55e',
+            block_id: 'block-1',
+            block_name: 'Month 1',
+            block_color: '#d946ef',
+            day_id: 'day-1',
+            day_name: 'Sunday Practice',
+            day_number: 1,
+            day_date: '2026-08-23',
+        });
+    });
 });

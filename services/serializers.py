@@ -524,6 +524,31 @@ def _apply_template_metadata(session, session_data, template_payload):
         session_data["session_type"] = get_template_session_type(template_payload)
 
 
+def _serialize_session_program_info(session, session_data):
+    context = session_data.get("program_context") if isinstance(session_data, dict) else None
+    context = context if isinstance(context, dict) else {}
+    day = getattr(session, "program_day", None)
+    block = getattr(day, "block", None) if day else None
+    program = getattr(block, "program", None) if block else None
+
+    if not (program or block or day or context):
+        return None
+
+    program_info = {
+        "program_id": getattr(program, "id", None) or context.get("program_id"),
+        "program_name": getattr(program, "name", None) or context.get("program_name"),
+        "program_color": getattr(program, "color", None) or context.get("program_color"),
+        "block_id": getattr(block, "id", None) or context.get("block_id"),
+        "block_name": getattr(block, "name", None) or context.get("block_name"),
+        "block_color": getattr(block, "color", None) or context.get("block_color"),
+        "day_id": getattr(day, "id", None) or context.get("day_id"),
+        "day_name": getattr(day, "name", None) or context.get("day_name"),
+        "day_number": getattr(day, "day_number", None) or context.get("day_number"),
+        "day_date": format_utc(getattr(day, "date", None)) or context.get("day_date"),
+    }
+    return program_info if any(program_info.values()) else None
+
+
 def _extract_legacy_activity_definition_id(item):
     if isinstance(item, str):
         return item
@@ -853,23 +878,9 @@ def serialize_session(session):
         completed_goals_payload.append(serialize_goal(goal, include_children=False))
     result["completed_goals"] = completed_goals_payload
 
-    # Add Program Info if associated
-    if hasattr(session, 'program_day') and session.program_day:
-        day = session.program_day
-        block = day.block if hasattr(day, 'block') else None
-        if block:
-            program = block.program if hasattr(block, 'program') else None
-            if program:
-                result["program_info"] = {
-                    "program_id": program.id,
-                    "program_name": program.name,
-                    "program_color": getattr(program, 'color', None),
-                    "block_id": block.id,
-                    "block_name": block.name,
-                    "block_color": getattr(block, 'color', None),
-                    "day_id": day.id,
-                    "day_name": day.name
-                }
+    program_info = _serialize_session_program_info(session, session_data)
+    if program_info:
+        result["program_info"] = program_info
     
     return result
 

@@ -80,6 +80,7 @@ class TestSessionListEndpoints:
         program = Program(
             root_id=root_id,
             name='Scoped program',
+            color='#22c55e',
             start_date=now,
             end_date=now + timedelta(days=7),
             weekly_schedule={},
@@ -89,12 +90,13 @@ class TestSessionListEndpoints:
         block = ProgramBlock(
             program_id=program.id,
             name='Block',
+            color='#d946ef',
             start_date=now.date(),
             end_date=(now + timedelta(days=7)).date(),
         )
         db_session.add(block)
         db_session.flush()
-        day = ProgramDay(block_id=block.id, date=now.date(), name='Today')
+        day = ProgramDay(block_id=block.id, date=now.date(), day_number=1, name='Today')
         db_session.add(day)
         db_session.flush()
         in_program = sample_goal_hierarchy['mid_term'].id
@@ -124,6 +126,18 @@ class TestSessionListEndpoints:
             },
         )
         assert created.status_code == 201
+        assert created.get_json()['program_info'] == {
+            'program_id': program.id,
+            'program_name': 'Scoped program',
+            'program_color': '#22c55e',
+            'block_id': block.id,
+            'block_name': 'Block',
+            'block_color': '#d946ef',
+            'day_id': day.id,
+            'day_name': 'Today',
+            'day_number': 1,
+            'day_date': now.date().isoformat(),
+        }
         persisted = db_session.query(Session).filter_by(id=created.get_json()['id']).one()
         assert persisted.attributes['program_context']['off_program_goal_ids'] == [off_program]
 

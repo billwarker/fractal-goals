@@ -175,6 +175,40 @@ class TestSession:
         assert session_dict['template_color'] == '#22c55e'
         assert session_dict['attributes']['session_data']['template_color'] == '#22c55e'
 
+    def test_session_serialization_falls_back_to_snapshotted_program_context(
+        self,
+        db_session,
+        sample_practice_session,
+    ):
+        sample_practice_session.attributes = json.dumps({
+            'program_context': {
+                'program_id': 'program-1',
+                'program_name': 'Q4 2026',
+                'program_color': '#22c55e',
+                'block_id': 'block-1',
+                'block_name': 'Month 1',
+                'block_color': '#d946ef',
+                'day_id': 'day-1',
+                'day_name': 'Sunday Practice',
+                'day_number': 1,
+                'day_date': '2026-08-23',
+            },
+        })
+        db_session.commit()
+
+        assert serialize_session(sample_practice_session)['program_info'] == {
+            'program_id': 'program-1',
+            'program_name': 'Q4 2026',
+            'program_color': '#22c55e',
+            'block_id': 'block-1',
+            'block_name': 'Month 1',
+            'block_color': '#d946ef',
+            'day_id': 'day-1',
+            'day_name': 'Sunday Practice',
+            'day_number': 1,
+            'day_date': '2026-08-23',
+        }
+
 @pytest.mark.unit
 class TestActivityDefinition:
     """Test ActivityDefinition model functionality."""

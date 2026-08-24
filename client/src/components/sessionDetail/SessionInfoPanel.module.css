@@ -97,6 +97,36 @@
     text-decoration: underline;
 }
 
+.programValue {
+    color: var(--session-program-color, var(--color-brand-primary));
+}
+
+.blockValue {
+    color: var(--session-block-color, var(--color-brand-primary));
+}
+
+.programContextValue {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.programContextValue > span,
+.programContextValue > a {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.contextSeparator {
+    flex: 0 0 auto;
+    color: var(--color-text-muted);
+}
+
 .sessionInfoGoals {
     margin-top: 10px;
     padding-top: 10px;
