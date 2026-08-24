@@ -16,6 +16,7 @@ from services.owned_entity_queries import get_owned_program
 from services.serializers import format_utc, serialize_program_day, serialize_goal
 from services.session_runtime import get_template_color
 from services.session_service import SessionService
+from services.program_scope import resolve_program_scopes
 
 logger = logging.getLogger(__name__)
 
@@ -454,9 +455,17 @@ class _ProgramDaysMixin:
         current_user_id: str | None = None,
         *,
         target_date: date | None = None,
+        timezone_name: str | None = None,
     ) -> List[Dict]:
         cls._require_root_access(session, root_id, current_user_id)
-        today = target_date or date.today()
+        if target_date:
+            today = target_date
+        else:
+            try:
+                zone = ZoneInfo(timezone_name or "UTC")
+            except ZoneInfoNotFoundError:
+                raise ValueError("Invalid timezone")
+            today = datetime.now(zone).date()
         day_start = datetime.combine(today, time.min)
         next_day_start = day_start + timedelta(days=1)
         
@@ -476,8 +485,10 @@ class _ProgramDaysMixin:
         ).all()
         
         result = []
+        scopes = resolve_program_scopes(session, root_id, [program.id for program in active_programs])
         
         for program in active_programs:
+            program_scope = scopes.get(program.id)
             for block in program.blocks:
                 if block.start_date and block.end_date:
                     if block.start_date <= today <= block.end_date:
@@ -516,6 +527,8 @@ class _ProgramDaysMixin:
                                     "block_name": block.name,
                                     "block_color": block.color,
                                     "program_goal_ids": [g.id for g in program.goals],
+                                    "scope_seed_goal_ids": sorted(getattr(program_scope, "seed_goal_ids", ()) or ()),
+                                    "scope_goal_ids": sorted(getattr(program_scope, "goal_ids", ()) or ()),
                                     "block_goal_ids": [g.id for g in block.goals],
                                     "day_id": day.id,
                                     "day_name": day.name,

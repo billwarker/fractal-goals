@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 from models import Program, ProgramBlock, ProgramDay, ProgramDayTemplate, Goal, SessionTemplate, Target, validate_root_goal, program_goals, program_block_goals
 from services import event_bus
 from services.goal_service import GoalService, sync_goal_targets
+from services.program_scope import resolve_program_scope
 
 logger = logging.getLogger(__name__)
 from services.program_service_errors import ProgramServiceValidationError
@@ -231,48 +232,12 @@ class _ProgramHelpersMixin:
             raise ValueError("completion_min_templates cannot exceed the number of selected templates")
 
     @classmethod
-    def _collect_goal_descendant_ids(cls, session, root_id: str, seed_goal_ids: List[str]) -> set[str]:
-        normalized_seed_ids = list(dict.fromkeys(seed_goal_ids or []))
-        if not normalized_seed_ids:
-            return set()
-
-        goal_rows = session.query(Goal.id, Goal.parent_id).filter(
-            Goal.root_id == root_id,
-            Goal.deleted_at == None
-        ).all()
-
-        children_by_parent: Dict[str | None, List[str]] = {}
-        for goal_id, parent_id in goal_rows:
-            children_by_parent.setdefault(parent_id, []).append(goal_id)
-
-        visited: set[str] = set()
-        stack = list(normalized_seed_ids)
-        while stack:
-            goal_id = stack.pop()
-            if not goal_id or goal_id in visited:
-                continue
-            visited.add(goal_id)
-            stack.extend(children_by_parent.get(goal_id, []))
-
-        return visited
-
-    @classmethod
     def _program_scope_goal_ids(cls, session, program: Program, root_id: str) -> set[str]:
-        return cls._collect_goal_descendant_ids(
-            session,
-            root_id,
-            [goal.id for goal in (program.goals or [])],
-        )
+        return set(resolve_program_scope(session, root_id, program.id).goal_ids)
 
     @classmethod
     def _program_allowed_goal_ids(cls, session, program: Program, root_id: str) -> set[str]:
-        scope_goal_ids = cls._program_scope_goal_ids(session, program, root_id)
-        block_goal_ids = {
-            goal.id
-            for block in (program.blocks or [])
-            for goal in (block.goals or [])
-        }
-        return scope_goal_ids | block_goal_ids
+        return cls._program_scope_goal_ids(session, program, root_id)
 
     @classmethod
     def _validate_goal_in_program_scope(cls, session, program: Program, root_id: str, goal_id: str):

@@ -27,6 +27,8 @@ class Session(Base):
     
     template_id = Column(String, ForeignKey('session_templates.id'), nullable=True, index=True)
     program_day_id = Column(String, ForeignKey('program_days.id'), nullable=True, index=True)
+    program_id = Column(String, ForeignKey('programs.id', ondelete='SET NULL'), nullable=True, index=True)
+    program_block_id = Column(String, ForeignKey('program_blocks.id', ondelete='SET NULL'), nullable=True, index=True)
     
     attributes = Column(JSON_TYPE, nullable=True)
     
@@ -45,6 +47,11 @@ class Session(Base):
             'root_id',
             'deleted_at',
             sa.text('COALESCE(session_start, created_at) DESC'),
+        ),
+        sa.Index(
+            'ix_sessions_program_effective_start',
+            'program_id',
+            sa.text('COALESCE(session_start, completed_at, created_at)'),
         ),
         sa.Index(
             'uq_sessions_one_active_per_owner_root',

@@ -684,7 +684,7 @@ function getDaysBetween(dateValue, targetValue) {
     return Math.ceil((target.getTime() - start.getTime()) / 86400000);
 }
 
-export function buildProgramMetrics({ program, sessions = [], programDaysMap, attachedGoalIds, getGoalDetails, timezone }) {
+export function buildDemoProgramMetrics({ program, sessions = [], programDaysMap, attachedGoalIds, getGoalDetails, timezone }) {
     if (!program) {
         return null;
     }
@@ -822,7 +822,7 @@ export function buildProgramSidePaneData({ program, goals = [], attachedGoalIds,
     });
 
     return {
-        programMetrics: buildProgramMetrics({
+        programMetrics: buildDemoProgramMetrics({
             program,
             sessions,
             programDaysMap,

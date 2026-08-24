@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
-from datetime import date
+from datetime import date, datetime
 import logging
+import time
 import models
 from sqlalchemy.exc import SQLAlchemyError
 from models import get_session
@@ -23,6 +24,8 @@ from services.programs import ProgramService, ProgramServiceValidationError
 from blueprints.auth_api import token_required
 from blueprints.api_utils import get_db_session, internal_error, parse_optional_pagination, etag_json_response
 from services import event_bus, Event, Events
+from services.program_metrics_service import ProgramMetricsService
+from services.session_filters import resolve_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +35,14 @@ programs_bp = Blueprint('programs', __name__, url_prefix='/api')
 
 def _program_service_error_response(error: ProgramServiceValidationError):
     return jsonify(error.payload if isinstance(error.payload, dict) else {"error": str(error)}), error.status_code
+
+
+def _request_timezone_and_date():
+    timezone_name = request.args.get("timezone") or "UTC"
+    zone = resolve_timezone(timezone_name)
+    if zone is None:
+        return None, None
+    return timezone_name, datetime.now(zone).date()
 
 # ============================================================================
 # PROGRAM ENDPOINTS
@@ -43,7 +54,10 @@ def get_programs(current_user, root_id):
     """Get all training programs for a fractal if owned by user."""
     session = get_db_session()
     try:
-        programs = ProgramService.get_programs(session, root_id, current_user.id)
+        timezone_name, as_of = _request_timezone_and_date()
+        if timezone_name is None:
+            return jsonify({"error": "Invalid timezone"}), 400
+        programs = ProgramService.get_programs(session, root_id, current_user.id, as_of=as_of)
         limit, offset = parse_optional_pagination(request, max_limit=200)
         if limit is not None:
             programs = programs[offset: offset + limit]
@@ -64,16 +78,80 @@ def get_program(current_user, root_id, program_id):
     """Get a specific training program if owned by user."""
     session = get_db_session()
     try:
-        program = ProgramService.get_program(session, root_id, program_id, current_user.id)
+        timezone_name, as_of = _request_timezone_and_date()
+        if timezone_name is None:
+            return jsonify({"error": "Invalid timezone"}), 400
+        program = ProgramService.get_program(session, root_id, program_id, current_user.id, as_of=as_of)
         if program is None:
             return jsonify({"error": "Program not found"}), 404
-        return jsonify(program)
+        return etag_json_response(program)
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error getting program")
         return internal_error(logger, "Program API request failed")
+    finally:
+        session.close()
+
+
+@programs_bp.route('/<root_id>/programs/<program_id>/metrics', methods=['GET'])
+@token_required
+def get_program_metrics(current_user, root_id, program_id):
+    session = get_db_session()
+    started = time.perf_counter()
+    try:
+        payload, error, status = ProgramMetricsService(session).get_program_metrics(
+            root_id,
+            program_id,
+            current_user.id,
+            timezone_name=request.args.get('timezone'),
+            range_start=request.args.get('range_start'),
+            range_end=request.args.get('range_end'),
+        )
+        if error:
+            return jsonify({"error": error}), status
+        response = etag_json_response(payload)
+        logger.info(
+            "program_metrics_response program_id=%s calculation_version=%s response_bytes=%s request_ms=%.2f",
+            program_id, payload.get("calculation_version"), len(response.get_data()),
+            (time.perf_counter() - started) * 1000,
+        )
+        return response
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Error calculating program metrics")
+        return internal_error(logger, "Program metrics request failed")
+    finally:
+        session.close()
+
+
+@programs_bp.route('/<root_id>/programs/metrics/comparison', methods=['GET'])
+@token_required
+def get_program_metrics_comparison(current_user, root_id):
+    session = get_db_session()
+    started = time.perf_counter()
+    try:
+        payload, error, status = ProgramMetricsService(session).get_program_comparison(
+            root_id,
+            current_user.id,
+            anchor_program_id=request.args.get('anchor_program_id'),
+            limit=request.args.get('limit', 5),
+            timezone_name=request.args.get('timezone'),
+        )
+        if error:
+            return jsonify({"error": error}), status
+        response = etag_json_response(payload)
+        logger.info(
+            "program_metrics_comparison_response program_count=%s calculation_version=%s response_bytes=%s request_ms=%.2f",
+            len(payload.get("programs", [])), payload.get("calculation_version"), len(response.get_data()),
+            (time.perf_counter() - started) * 1000,
+        )
+        return response
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Error calculating program metrics comparison")
+        return internal_error(logger, "Program metrics comparison request failed")
     finally:
         session.close()
 
@@ -355,6 +433,7 @@ def get_active_program_days(current_user, root_id):
             root_id,
             current_user.id,
             target_date=target_date,
+            timezone_name=request.args.get("timezone"),
         )
         return jsonify(days or [])
     except ValueError as e:

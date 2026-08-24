@@ -280,6 +280,12 @@ def _datasets() -> dict[str, AnalyticsDataset]:
         Session.duration_minutes * 60,
         0,
     )
+    session_effective_at = func.coalesce(Session.session_start, Session.completed_at, Session.created_at)
+    activity_effective_at = func.coalesce(
+        ActivityInstance.time_stop,
+        ActivityInstance.updated_at,
+        ActivityInstance.created_at,
+    )
     activity_completed_int = case((ActivityInstance.completed.is_(True), 1), else_=0)
     goal_completed_int = case((Goal.completed.is_(True), 1), else_=0)
 
@@ -301,6 +307,7 @@ def _datasets() -> dict[str, AnalyticsDataset]:
                 "session_start": _field("session_start", "Started", "datetime", Session.session_start),
                 "completed_at": _field("completed_at", "Completed At", "datetime", Session.completed_at),
                 "created_at": _field("created_at", "Created", "datetime", Session.created_at),
+                "effective_at": _field("effective_at", "Effective At", "datetime", session_effective_at),
                 "completed": _field("completed", "Completed", "boolean", Session.completed),
                 "attributes": _field("attributes", "Attributes", "json", Session.attributes, filterable=False, sortable=False),
                 "duration_seconds": _field("duration_seconds", "Duration Seconds", "number", session_duration, aggs=("sum", "avg", "min", "max")),
@@ -365,6 +372,7 @@ def _datasets() -> dict[str, AnalyticsDataset]:
                 "created_at": _field("created_at", "Created", "datetime", ActivityInstance.created_at),
                 "time_start": _field("time_start", "Started", "datetime", ActivityInstance.time_start),
                 "time_stop": _field("time_stop", "Stopped", "datetime", ActivityInstance.time_stop),
+                "effective_at": _field("effective_at", "Effective At", "datetime", activity_effective_at),
                 "completed": _field("completed", "Completed", "boolean", ActivityInstance.completed),
                 "duration_seconds": _field("duration_seconds", "Duration Seconds", "number", func.coalesce(ActivityInstance.duration_seconds, 0), aggs=("sum", "avg", "min", "max")),
                 "completed_count": _field("completed_count", "Completed Count", "number", activity_completed_int, aggs=("sum",)),
@@ -750,6 +758,28 @@ def _datasets() -> dict[str, AnalyticsDataset]:
 DATASETS = _datasets()
 
 
+def get_analytics_dataset(dataset_id: str) -> AnalyticsDataset:
+    """Return a governed dataset definition for internal analytics consumers."""
+    return DATASETS[dataset_id]
+
+
+def build_scoped_dataset_query(db_session, dataset_id: str, root_ids, current_user_id):
+    """Build the canonical tenant- and soft-delete-scoped dataset query.
+
+    Fixed product analytics such as Program Insights may add bounded filters
+    and projections to this query without duplicating the analytics engine's
+    ownership and deletion policies or going through the public query-spec API.
+    """
+    dataset = get_analytics_dataset(dataset_id)
+    query = db_session.query().select_from(dataset.base_model)
+    for model, on_clause in dataset.joins:
+        query = query.join(model, on_clause)
+    query = query.filter(dataset.tenant_policy(db_session, list(root_ids or []), current_user_id))
+    if dataset.soft_delete_field is not None:
+        query = query.filter(dataset.soft_delete_field.is_(None))
+    return query
+
+
 def _json_value(value):
     if isinstance(value, (datetime, date)):
         return format_utc(value)
@@ -1100,12 +1130,9 @@ class AnalyticsEngineService:
 
     def _execute_query(self, current_user_id, root_ids, query_spec) -> ServiceResult[JsonDict]:
         dataset = DATASETS[query_spec["dataset"]]
-        query = self.db_session.query().select_from(dataset.base_model)
-        for model, on_clause in dataset.joins:
-            query = query.join(model, on_clause)
-        query = query.filter(dataset.tenant_policy(self.db_session, root_ids, current_user_id))
-        if dataset.soft_delete_field is not None:
-            query = query.filter(dataset.soft_delete_field.is_(None))
+        query = build_scoped_dataset_query(
+            self.db_session, dataset.id, root_ids, current_user_id
+        )
         for filter_spec in query_spec["filters"]:
             query = query.filter(self._build_filter(dataset, filter_spec))
 
@@ -1215,12 +1242,9 @@ class AnalyticsEngineService:
         ctes = []
         for dataset in DATASETS.values():
             columns = [field.expression.label(field_id) for field_id, field in dataset.fields.items()]
-            query = self.db_session.query(*columns).select_from(dataset.base_model)
-            for model, on_clause in dataset.joins:
-                query = query.join(model, on_clause)
-            query = query.filter(dataset.tenant_policy(self.db_session, root_ids, current_user_id))
-            if dataset.soft_delete_field is not None:
-                query = query.filter(dataset.soft_delete_field.is_(None))
+            query = build_scoped_dataset_query(
+                self.db_session, dataset.id, root_ids, current_user_id
+            ).with_entities(*columns)
             sql = str(query.statement.compile(bind=bind, compile_kwargs={"literal_binds": True}))
             ctes.append(f"{dataset.id} AS ({sql})")
         return "WITH " + ", ".join(ctes)

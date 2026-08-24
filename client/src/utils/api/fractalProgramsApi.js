@@ -1,8 +1,14 @@
 import { API_BASE, axios } from './core';
 
 export const fractalProgramsApi = {
-    getPrograms: (rootId) => axios.get(`${API_BASE}/${rootId}/programs`),
-    getProgram: (rootId, programId) => axios.get(`${API_BASE}/${rootId}/programs/${programId}`),
+    getPrograms: (rootId, params) => axios.get(`${API_BASE}/${rootId}/programs`, params ? { params } : undefined),
+    getProgram: (rootId, programId, params) => axios.get(`${API_BASE}/${rootId}/programs/${programId}`, params ? { params } : undefined),
+    getProgramMetrics: (rootId, programId, params = {}) => axios.get(
+        `${API_BASE}/${rootId}/programs/${programId}/metrics`, { params },
+    ),
+    getProgramMetricsComparison: (rootId, params = {}) => axios.get(
+        `${API_BASE}/${rootId}/programs/metrics/comparison`, { params },
+    ),
     createProgram: (rootId, data) => axios.post(`${API_BASE}/${rootId}/programs`, data),
     updateProgram: (rootId, programId, data) => axios.put(`${API_BASE}/${rootId}/programs/${programId}`, data),
     deleteProgram: (rootId, programId) => axios.delete(`${API_BASE}/${rootId}/programs/${programId}`),

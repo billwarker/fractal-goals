@@ -151,11 +151,12 @@ export function getActivePrograms(programs = [], referenceDate) {
     return (programs || [])
         .filter((program) => isProgramActive(program, referenceDate))
         .sort((left, right) => {
-            const startComparison = (getProgramDatePart(left?.start_date) || '')
-                .localeCompare(getProgramDatePart(right?.start_date) || '');
+            const startComparison = (getProgramDatePart(right?.start_date) || '')
+                .localeCompare(getProgramDatePart(left?.start_date) || '');
             if (startComparison !== 0) return startComparison;
-            const nameComparison = String(left?.name || '').localeCompare(String(right?.name || ''));
-            if (nameComparison !== 0) return nameComparison;
+            const createdComparison = String(right?.created_at || '')
+                .localeCompare(String(left?.created_at || ''));
+            if (createdComparison !== 0) return createdComparison;
             return String(left?.id || '').localeCompare(String(right?.id || ''));
         });
 }
@@ -303,7 +304,10 @@ export function buildProgramGoalScope({
     goals = [],
     getGoalDetails,
 } = {}) {
-    const programGoalIds = program?.goal_ids || [];
+    const canonicalScopeGoalIds = Array.isArray(program?.scope_goal_ids)
+        ? uniqueIds(program.scope_goal_ids)
+        : null;
+    const programGoalIds = canonicalScopeGoalIds || collectProgramGoalIds(program);
     const startDate = program?.start_date || null;
     const endDate = program?.end_date || null;
     const goalById = buildProgramGoalLookup(goals);
@@ -317,8 +321,11 @@ export function buildProgramGoalScope({
     const expandAssociatedGoalIds = (goalIds = []) => expandProgramGoalIds(goalIds, childrenById, {
         shouldIncludeGoal: isGoalIdInProgramWindow,
     });
+    const metricScopeGoalIds = canonicalScopeGoalIds
+        ? canonicalScopeGoalIds.filter(isGoalIdInProgramWindow)
+        : expandAssociatedGoalIds(programGoalIds);
     const programScopeGoalIds = deriveProgramHierarchySeedIds(
-        expandAssociatedGoalIds(programGoalIds),
+        metricScopeGoalIds,
         childrenById,
     );
     const buildScopedGoalTree = (goalId, seenIds = new Set()) => {
@@ -355,5 +362,6 @@ export function buildProgramGoalScope({
         hierarchyGoalSeeds,
         hierarchySeedIds: programScopeGoalIds,
         programScopeGoalIds,
+        metricScopeGoalIds,
     };
 }

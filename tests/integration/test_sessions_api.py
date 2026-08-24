@@ -100,7 +100,8 @@ class TestSessionListEndpoints:
         db_session.add(day)
         db_session.flush()
         in_program = sample_goal_hierarchy['mid_term'].id
-        off_program = sample_goal_hierarchy['short_term'].id
+        descendant = sample_goal_hierarchy['short_term'].id
+        off_program = sample_goal_hierarchy['long_term'].id
         db_session.execute(program_goals.insert().values(program_id=program.id, goal_id=in_program))
         db_session.commit()
 
@@ -109,7 +110,7 @@ class TestSessionListEndpoints:
             json={'template_id': sample_session_template.id, 'program_day_id': day.id},
         )
         assert preview.status_code == 200
-        assert preview.get_json()['program_scope_goal_ids'] == [in_program]
+        assert preview.get_json()['program_scope_goal_ids'] == sorted([in_program, descendant])
 
         created = authed_client.post(
             f'/api/{root_id}/sessions',

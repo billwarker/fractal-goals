@@ -113,6 +113,7 @@ class ProgramDay(Base):
     goals = relationship(
         "Goal",
         secondary="program_day_goals",
+        secondaryjoin="and_(Goal.id == program_day_goals.c.goal_id, program_day_goals.c.deleted_at == None)",
         backref="program_days",
         viewonly=True
     )

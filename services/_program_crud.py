@@ -14,6 +14,7 @@ from services import event_bus, Event, Events
 from services.owned_entity_queries import get_owned_program
 from services.quota_service import QuotaService
 from services.serializers import serialize_program, serialize_program_block
+from services.program_scope import resolve_program_scope, resolve_program_scopes
 
 logger = logging.getLogger(__name__)
 from services.program_service_errors import ProgramServiceValidationError
@@ -21,16 +22,17 @@ from services.program_service_errors import ProgramServiceValidationError
 
 class _ProgramCrudMixin:
     @classmethod
-    def get_programs(cls, session, root_id: str, current_user_id: str | None = None) -> List[Dict]:
+    def get_programs(cls, session, root_id: str, current_user_id: str | None = None, *, as_of=None) -> List[Dict]:
         cls._require_root_access(session, root_id, current_user_id)
 
         programs = session.query(Program).options(
             *cls._program_serializer_load_options()
         ).filter_by(root_id=root_id).all()
-        return [serialize_program(program) for program in programs]
+        scopes = resolve_program_scopes(session, root_id, [program.id for program in programs])
+        return [serialize_program(program, scope=scopes.get(program.id), as_of=as_of) for program in programs]
 
     @classmethod
-    def get_program(cls, session, root_id: str, program_id: str, current_user_id: str | None = None) -> Optional[Dict]:
+    def get_program(cls, session, root_id: str, program_id: str, current_user_id: str | None = None, *, as_of=None) -> Optional[Dict]:
         cls._require_root_access(session, root_id, current_user_id)
 
         program = session.query(Program).options(
@@ -39,7 +41,7 @@ class _ProgramCrudMixin:
         if not program:
             return None
         
-        return serialize_program(program)
+        return serialize_program(program, scope=resolve_program_scope(session, root_id, program.id), as_of=as_of)
 
     @classmethod
     def create_block(cls, session, root_id: str, program_id: str, data: Dict, current_user_id: str | None = None) -> Dict:
@@ -170,7 +172,10 @@ class _ProgramCrudMixin:
             'root_id': root_id
         }, source='cls.create_program'))
         
-        return serialize_program(new_program)
+        return serialize_program(
+            new_program,
+            scope=resolve_program_scope(session, root_id, new_program.id),
+        )
 
     @classmethod
     def update_program(cls, session, root_id: str, program_id: str, validated_data: Dict, current_user_id: str | None = None) -> Optional[Dict]:
@@ -219,7 +224,10 @@ class _ProgramCrudMixin:
             'updated_fields': list(validated_data.keys())
         }, source='cls.update_program'))
         
-        return serialize_program(program)
+        return serialize_program(
+            program,
+            scope=resolve_program_scope(session, root_id, program.id),
+        )
 
     @classmethod
     def delete_program(cls, session, root_id: str, program_id: str, current_user_id: str | None = None) -> Dict:

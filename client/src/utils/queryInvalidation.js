@@ -12,6 +12,7 @@ export function invalidateSessionLists(queryClient, rootId, queryKeys, options =
         queryKeys.sessions(rootId),
         queryKeys.sessionsAll(rootId),
         queryKeys.sessionsPaginated(rootId),
+        queryKeys.programMetricsRoot(rootId),
     ], options);
 }
 

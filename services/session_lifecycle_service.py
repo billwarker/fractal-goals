@@ -36,17 +36,7 @@ from services.session_runtime import (
 )
 from services.session_structure import build_duplicate_session_data, extract_activity_definition_id
 from services.session_template_stats_service import SessionTemplateStatsService
-
-
-def _program_goal_ids(db_session, program_id) -> set[str]:
-    if not program_id:
-        return set()
-    return set(
-        db_session.execute(
-            text("SELECT goal_id FROM program_goals WHERE program_id = :program_id"),
-            {'program_id': program_id}
-        ).scalars().all()
-    )
+from services.program_scope import resolve_program_scope
 
 
 def _parse_iso_datetime_strict(value) -> datetime | None:
@@ -160,7 +150,9 @@ class SessionLifecycleService:
                 or program_day.block.program.root_id != root_id
             ):
                 return None, "Invalid program day context for this fractal"
-            return _program_goal_ids(self.db_session, program_day.block.program.id), None
+            return set(resolve_program_scope(
+                self.db_session, root_id, program_day.block.program.id
+            ).goal_ids), None
 
         return None, None
 
@@ -399,6 +391,8 @@ class SessionLifecycleService:
                 if p_day and p_day.block and p_day.block.program and p_day.block.program.root_id == root_id:
                     program_day_id = requested_day_id
                     new_session.program_day_id = program_day_id
+                    new_session.program_id = p_day.block.program.id
+                    new_session.program_block_id = p_day.block.id
                     program_context['program_id'] = p_day.block.program.id
                     program_context['program_name'] = p_day.block.program.name
                     program_context['program_color'] = p_day.block.program.color
@@ -408,7 +402,9 @@ class SessionLifecycleService:
                     program_context['day_name'] = p_day.name
                     program_context['day_number'] = p_day.day_number
                     if goal_scope_enabled:
-                        program_goal_ids = _program_goal_ids(self.db_session, p_day.block.program.id)
+                        program_goal_ids = set(resolve_program_scope(
+                            self.db_session, root_id, p_day.block.program.id
+                        ).goal_ids)
                 else:
                     return None, "Invalid program day context for this fractal", 400
             elif program_context and program_context.get('program_id'):
@@ -420,9 +416,12 @@ class SessionLifecycleService:
                 if not program:
                     return None, "Invalid program context for this fractal", 400
                 if goal_scope_enabled:
-                    program_goal_ids = _program_goal_ids(self.db_session, program.id)
+                    program_goal_ids = set(resolve_program_scope(
+                        self.db_session, root_id, program.id
+                    ).goal_ids)
                 program_context['program_name'] = program.name
                 program_context['program_color'] = program.color
+                new_session.program_id = program.id
                 if program_context.get('block_id'):
                     block = next(
                         (candidate for candidate in (program.blocks or [])
@@ -433,6 +432,7 @@ class SessionLifecycleService:
                         return None, "Invalid program block context for this program", 400
                     program_context['block_name'] = block.name
                     program_context['block_color'] = block.color or program.color
+                    new_session.program_block_id = block.id
 
         if new_session.template_id:
             template = self.db_session.query(models.SessionTemplate).filter(

@@ -43,6 +43,7 @@ export function useCreateActivity(rootId) {
         mutationFn: (payload) => fractalApi.createActivity(rootId, payload),
         onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) });
             await invalidateOnboardingProgress(queryClient, queryKeys);
         }
     });
@@ -54,6 +55,7 @@ export function useDeleteActivity(rootId) {
         mutationFn: (activityId) => fractalApi.deleteActivity(rootId, activityId),
         onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) });
             await invalidateOnboardingProgress(queryClient, queryKeys);
         }
     });

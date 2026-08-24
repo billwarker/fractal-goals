@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy import func, inspect, text
+from sqlalchemy import func, inspect
 from sqlalchemy.orm import selectinload, with_loader_criteria
 from models import (
     ActivityDefinition, ActivityInstance, ActivitySet,
@@ -24,17 +24,8 @@ from services.session_analytics_service import SessionAnalyticsService
 from services.session_lifecycle_service import SessionLifecycleService
 from services.session_structure import extract_activity_definition_id
 from services.progress_service import ProgressService
+from services.program_scope import resolve_program_scope
 logger = logging.getLogger(__name__)
-
-def _program_goal_ids(db_session, program_id) -> set[str]:
-    if not program_id:
-        return set()
-    return set(
-        db_session.execute(
-            text("SELECT goal_id FROM program_goals WHERE program_id = :program_id"),
-            {'program_id': program_id}
-        ).scalars().all()
-    )
 
 class SessionService:
     def __init__(self, db_session):
@@ -150,7 +141,9 @@ class SessionService:
         # Program scoping applies only when program has selected goals.
         program_goal_ids = set()
         if getattr(session_obj, 'program_day', None) and session_obj.program_day.block and session_obj.program_day.block.program:
-            program_goal_ids = _program_goal_ids(self.db_session, session_obj.program_day.block.program.id)
+            program_goal_ids = set(resolve_program_scope(
+                self.db_session, session_obj.root_id, session_obj.program_day.block.program.id
+            ).goal_ids)
 
         derived = {}
         for goals in activity_goals.values():

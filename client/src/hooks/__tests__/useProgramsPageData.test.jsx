@@ -56,7 +56,7 @@ describe('useProgramsCalendarData', () => {
             expect(result.current.loading).toBe(false);
         });
 
-        expect(queryClient.getQueryData(queryKeys.programs('root-1'))).toEqual([
+        expect(queryClient.getQueryData(queryKeys.programs('root-1', 'UTC'))).toEqual([
             { id: 'program-1', name: 'Base' },
         ]);
         expect(queryClient.getQueryData(queryKeys.fractalTree('root-1'))).toEqual({

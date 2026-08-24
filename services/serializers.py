@@ -535,10 +535,10 @@ def _serialize_session_program_info(session, session_data):
         return None
 
     program_info = {
-        "program_id": getattr(program, "id", None) or context.get("program_id"),
+        "program_id": getattr(program, "id", None) or getattr(session, "program_id", None) or context.get("program_id"),
         "program_name": getattr(program, "name", None) or context.get("program_name"),
         "program_color": getattr(program, "color", None) or context.get("program_color"),
-        "block_id": getattr(block, "id", None) or context.get("block_id"),
+        "block_id": getattr(block, "id", None) or getattr(session, "program_block_id", None) or context.get("block_id"),
         "block_name": getattr(block, "name", None) or context.get("block_name"),
         "block_color": getattr(block, "color", None) or context.get("block_color"),
         "day_id": getattr(day, "id", None) or context.get("day_id"),
@@ -806,6 +806,8 @@ def serialize_session(session):
         "total_paused_seconds": getattr(session, 'total_paused_seconds', 0),
         "template_id": session.template_id,
         "program_day_id": session.program_day_id,
+        "program_id": getattr(session, 'program_id', None),
+        "program_block_id": getattr(session, 'program_block_id', None),
         "completed": session.completed,
         "completed_at": format_utc(session.completed_at),
         "created_at": format_utc(session.created_at),
@@ -901,6 +903,8 @@ def serialize_program_day_session_light(session):
         "total_duration_seconds": session.total_duration_seconds,
         "template_id": session.template_id,
         "program_day_id": session.program_day_id,
+        "program_id": getattr(session, 'program_id', None),
+        "program_block_id": getattr(session, 'program_block_id', None),
         "completed": session.completed,
         "completed_at": format_utc(session.completed_at),
         "created_at": format_utc(session.created_at),
@@ -1026,11 +1030,11 @@ def serialize_session_template(template):
         "goals": [serialize_goal(g, include_children=False) for g in template.goals] if hasattr(template, 'goals') else []
     }
 
-def serialize_program(program):
+def serialize_program(program, *, scope=None, as_of=None):
     """Serialize a Program object."""
     # Build weekly_schedule from relational blocks (Source of Truth)
     schedule_from_db = [serialize_program_block(b) for b in (program.blocks or [])]
-    today = date.today()
+    today = as_of or date.today()
     start_date = getattr(program, 'start_date', None)
     end_date = getattr(program, 'end_date', None)
     start_day = start_date.date() if hasattr(start_date, 'date') else start_date
@@ -1054,6 +1058,8 @@ def serialize_program(program):
         "blocks": schedule_from_db,
         "goal_ids": [g.id for g in (program.goals or [])],
         "selected_goals": [g.id for g in (program.goals or [])],  # Keep both for safety
+        "scope_seed_goal_ids": sorted(getattr(scope, "seed_goal_ids", ()) or ()),
+        "scope_goal_ids": sorted(getattr(scope, "goal_ids", ()) or ()),
         "created_at": format_utc(program.created_at),
         "updated_at": format_utc(program.updated_at)
     }

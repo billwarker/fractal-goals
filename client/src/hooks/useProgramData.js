@@ -7,7 +7,7 @@ import { flattenProgramSessions } from '../utils/programViewModel';
 import { queryKeys } from './queryKeys';
 import { useFractalTree } from './useGoalQueries';
 
-export function useProgramData(rootId, programId) {
+export function useProgramData(rootId, programId, timezone = null) {
     const queryClient = useQueryClient();
 
     const invalidateQueryList = useCallback((queryKeyFactories) => {
@@ -18,9 +18,9 @@ export function useProgramData(rootId, programId) {
 
     // 1. Program Query
     const programQuery = useQuery({
-        queryKey: queryKeys.program(rootId, programId),
+        queryKey: queryKeys.program(rootId, programId, timezone),
         queryFn: async () => {
-            const res = await fractalApi.getProgram(rootId, programId);
+            const res = await fractalApi.getProgram(rootId, programId, timezone ? { timezone } : undefined);
             return res.data;
         },
         enabled: !!rootId && !!programId,
@@ -76,6 +76,7 @@ export function useProgramData(rootId, programId) {
             queryKeys.program(rootId, programId),
             queryKeys.programs(rootId),
             queryKeys.activeProgramDays(rootId),
+            queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, programId, rootId]);
 
@@ -84,6 +85,7 @@ export function useProgramData(rootId, programId) {
             queryKeys.goalsTree(rootId),
             queryKeys.program(rootId, programId),
             queryKeys.programs(rootId),
+            queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, programId, rootId]);
 
@@ -94,6 +96,7 @@ export function useProgramData(rootId, programId) {
             queryKeys.sessions(rootId),
             queryKeys.sessionsAll(rootId),
             queryKeys.activeProgramDays(rootId),
+            queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, programId, rootId]);
 
@@ -107,6 +110,7 @@ export function useProgramData(rootId, programId) {
             queryKeys.sessions(rootId),
             queryKeys.sessionsAll(rootId),
             queryKeys.activeProgramDays(rootId),
+            queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, rootId, programId]);
 

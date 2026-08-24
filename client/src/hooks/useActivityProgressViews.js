@@ -12,6 +12,7 @@ const invalidateProgress = (queryClient, rootId, activityId) => Promise.all([
     queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) }),
     queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivitiesRoot(rootId) }),
     queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
 ]);
 
 const invalidateTagsAndProgress = (queryClient, rootId, activityId) => Promise.all([

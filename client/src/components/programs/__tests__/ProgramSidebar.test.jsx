@@ -22,6 +22,36 @@ vi.mock('../../../contexts/GoalLevelsContext', async (importOriginal) => {
 });
 
 describe('ProgramSidebar', () => {
+    it('renders the authoritative program summary metrics in the sidepane', () => {
+        renderWithProviders(
+            <ProgramSidebar
+                programMetrics={{
+                    calculation_version: 'program_metrics_v1',
+                    adherence: { mode: 'scheduled', rate: 0.75, current_streak: 4 },
+                    alignment: { duration_seconds: { rate: 0.6 } },
+                    program: { progress: { rate: 0.25 } },
+                    blocks: [],
+                }}
+                activeBlock={null}
+                blockMetrics={null}
+                programGoalSeeds={[]}
+                onGoalClick={vi.fn()}
+                getGoalDetails={() => null}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        expect(screen.getByText('75% Adherence')).toBeInTheDocument();
+        expect(screen.getByText('Alignment:').closest('div')).toHaveTextContent('Alignment: 60%');
+        expect(screen.getByText('Current streak:').closest('div')).toHaveTextContent('Current streak: 4 days');
+        expect(screen.getByText('Program progress:').closest('div')).toHaveTextContent('Program progress: 25%');
+    });
+
     it('renders flattened hierarchy cards and forwards clicks with full goal payloads', () => {
         const onGoalClick = vi.fn();
         const nestedGoal = {

@@ -15,6 +15,7 @@ export function invalidateGoalAssociationQueries(queryClient, rootId, goalId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.goalMetricsRoot() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(rootId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
         // Associating an activity/group to a goal flips SMART "Achievable"
         // and the step-2 "Associate it to a goal" onboarding substep.
         invalidateOnboardingProgress(queryClient, queryKeys),

@@ -1,0 +1,28 @@
+.insights { display: grid; gap: 16px; padding: 16px; color: var(--color-text-primary); }
+.header { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
+.header h2, .header p, .card h3 { margin: 0; }
+.header p, .semantics, .legend { color: var(--color-text-secondary); font-size: 13px; }
+.rangeNav { display: flex; gap: 8px; }
+.strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-border); }
+.strip > div { padding: 12px; background: var(--color-bg-card); }
+.strip dt { color: var(--color-text-secondary); font-size: 12px; }
+.strip dd { margin: 4px 0 0; font-size: 20px; font-weight: 700; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.card { min-width: 0; padding: 16px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg-card); }
+.card h3 { margin-bottom: 12px; }
+.heatmap { display: grid; grid-template-columns: repeat(auto-fill, minmax(13px, 1fr)); gap: 3px; }
+.heatmap span { min-height: 18px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 3px; }
+.scheduled_met { background: #2f9e68; } .scheduled_missed { background: #d16969; background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgba(0,0,0,.18) 3px 5px); }
+.unscheduled_evidence { background: #4c83c3; } .rest { background: var(--color-bg-secondary); } .upcoming { background: transparent; border-style: dashed !important; }
+.legend { margin-top: 8px; }
+.notice { padding: 10px 12px; border-left: 3px solid var(--color-brand-primary); background: var(--color-bg-secondary); }
+.tableWrap { max-width: 100%; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 8px; border-bottom: 1px solid var(--color-border); text-align: left; }
+th { color: var(--color-text-secondary); }
+.goalCell { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.goalIcon { flex: 0 0 auto; }
+.state { padding: 40px 16px; text-align: center; color: var(--color-text-secondary); }
+@media (max-width: 720px) { .grid { grid-template-columns: 1fr; } .strip { grid-template-columns: repeat(2, 1fr); } .header { align-items: stretch; flex-direction: column; } }
+@media (max-width: 360px) { .insights { padding: 10px; } .strip { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .insights * { scroll-behavior: auto !important; transition: none !important; } }

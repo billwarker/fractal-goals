@@ -201,7 +201,7 @@ describe('CreateSession quick-session flow', () => {
 
         await waitFor(() => expect(screen.getByText(/Program picker: Push \/ Push Session/)).toBeInTheDocument());
         await waitFor(() => expect(goalScopeProps).toHaveBeenLastCalledWith(expect.objectContaining({
-            goals: [{ id: 'root' }, { id: 'child' }, { id: 'leaf' }],
+            goals: [{ id: 'child' }, { id: 'leaf' }],
             programScopeEnabled: true,
         })));
         fireEvent.click(screen.getByRole('button', { name: 'Select child goal' }));
@@ -248,7 +248,7 @@ describe('CreateSession quick-session flow', () => {
             programScopeEnabled: true,
             programName: 'Q4 2026',
             programColor: '#ef4444',
-            goals: [{ id: 'root' }, { id: 'child' }],
+            goals: [{ id: 'child' }],
         })));
 
         fireEvent.click(screen.getByRole('button', { name: 'Select Weigh Myself' }));

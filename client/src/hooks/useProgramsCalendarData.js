@@ -9,9 +9,9 @@ import { fetchPrograms } from './useProgramQueries';
 
 export function useProgramsCalendarData(rootId, { getGoalColor, getGoalTextColor, timezone } = {}) {
     const programsQuery = useQuery({
-        queryKey: queryKeys.programs(rootId),
+        queryKey: queryKeys.programs(rootId, timezone || 'UTC'),
         enabled: Boolean(rootId),
-        queryFn: () => fetchPrograms(rootId),
+        queryFn: () => fetchPrograms(rootId, timezone || 'UTC'),
     });
 
     const goalsQuery = useFractalTree(rootId);

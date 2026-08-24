@@ -211,6 +211,7 @@ function CreateSession() {
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsSearch(rootId), refetchType: 'inactive' });
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsHeatmap(rootId), refetchType: 'inactive' });
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId), refetchType: 'inactive' });
+        queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.activeSessionRoot() });
         // Advances the onboarding "Create your first session" step.
         invalidateOnboardingProgress(queryClient, queryKeys);

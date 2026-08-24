@@ -49,6 +49,7 @@ export function useSessionDetailMutations({
         invalidateQueryKeys(queryClient, [
             queryKeys.sessionsEvidenceGoalsRoot(rootId),
             queryKeys.sessionsFlowtreeMetricsRoot(rootId),
+            queryKeys.programMetricsRoot(rootId),
         ]);
     }, [queryClient, rootId]);
 

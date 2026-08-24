@@ -99,16 +99,8 @@ describe('useProgramDetailViewModel', () => {
         expect(result.current.activeBlock?.id).toBe('block-active');
         expect(result.current.attachBlock?.id).toBe('block-active');
         expect(result.current.blockGoalsByBlockId.get('block-active').map((goal) => goal.id)).toEqual(['goal-parent', 'goal-child']);
-        expect(result.current.programMetrics).toMatchObject({
-            completedSessions: 1,
-            scheduledSessions: 1,
-            totalGoals: 2,
-        });
-        expect(result.current.blockMetrics).toMatchObject({
-            totalGoals: 2,
-            goalsMet: 1,
-            completedSessions: 1,
-        });
+        expect(result.current.programMetrics).toBeUndefined();
+        expect(result.current.blockMetrics).toBeUndefined();
         expect(result.current.calendarEvents.some((event) => event.id === 'block-bg-block-active')).toBe(true);
         expect(result.current.calendarEvents.some((event) => event.extendedProps?.type === 'block_label')).toBe(false);
         expect(result.current.blockLabels.map((label) => label.id)).toEqual(['block-label-block-active', 'block-label-block-late']);

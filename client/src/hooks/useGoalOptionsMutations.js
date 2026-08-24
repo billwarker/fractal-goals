@@ -16,6 +16,7 @@ export function useGoalOptionsMutations(rootId, goalId) {
             queryClient.invalidateQueries({ queryKey: queryKeys.goalsForSelection(rootId) }),
             queryClient.invalidateQueries({ queryKey: queryKeys.goalMetrics(goalId) }),
             queryClient.invalidateQueries({ queryKey: queryKeys.eligibleMoveParents(rootId, goalId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
         ]);
     }, [goalId, queryClient, rootId]);
 

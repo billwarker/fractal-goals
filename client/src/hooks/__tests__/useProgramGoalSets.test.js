@@ -80,7 +80,7 @@ describe('useProgramGoalSets', () => {
 
         expect(result.current.directAssociatedGoalIds).toEqual(['program-root', 'shared-child', 'block-only']);
         expect(Array.from(result.current.attachedGoalIds)).toEqual(['program-root', 'shared-child', 'grandchild', 'sibling-child', 'block-only']);
-        expect(result.current.hierarchySeedIds).toEqual(['program-root']);
+        expect(result.current.hierarchySeedIds).toEqual(['program-root', 'block-only']);
         expect(result.current.attachableBlockGoalIds).toEqual(['program-root', 'shared-child', 'grandchild', 'sibling-child', 'block-only']);
         expect(result.current.attachableBlockGoals.map((goal) => goal.id)).toEqual(['program-root', 'shared-child', 'grandchild', 'sibling-child', 'block-only']);
         expect(result.current.blockGoalIds).toEqual(['shared-child', 'block-only']);

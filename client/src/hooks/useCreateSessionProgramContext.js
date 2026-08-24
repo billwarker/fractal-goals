@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { getGoalLineageScope } from '../components/flowTree/flowTreeTreeUtils';
 import { buildTodayProgramDayView, programSessionToTemplate } from '../utils/createSessionProgramDay';
 import { getActiveProgramBlock } from '../utils/programGoalWindow';
+import { getProgramMetricScopeGoalIds } from '../utils/programScope';
 import { useCreateSessionPreferences } from './useCreateSessionPreferences';
 
 export function useCreateSessionProgramContext({
@@ -23,6 +23,12 @@ export function useCreateSessionProgramContext({
             program_name: activeProgram.name,
             program_color: activeProgram.color,
             program_goal_ids: activeProgram.goal_ids || activeProgram.selected_goals || [],
+            ...(Array.isArray(activeProgram.scope_seed_goal_ids) ? {
+                scope_seed_goal_ids: activeProgram.scope_seed_goal_ids,
+            } : {}),
+            ...(Array.isArray(activeProgram.scope_goal_ids) ? {
+                scope_goal_ids: activeProgram.scope_goal_ids,
+            } : {}),
             ...(activeBlock ? {
                 block_id: activeBlock.id,
                 block_name: activeBlock.name,
@@ -34,15 +40,11 @@ export function useCreateSessionProgramContext({
     const programScopeEnabled = Boolean(
         isHydrated && programScopeAvailable && isProgramScopeEnabled(programContext?.program_id),
     );
-    const seedIds = useMemo(
-        () => (programContext?.program_goal_ids || []).map(String),
-        [programContext],
-    );
     const scopeGoalIds = useMemo(
         () => programScopeEnabled && goalTree
-            ? getGoalLineageScope(goalTree, [...new Set(seedIds)])
+            ? getProgramMetricScopeGoalIds(programContext, goalTree)
             : null,
-        [goalTree, programScopeEnabled, seedIds],
+        [goalTree, programContext, programScopeEnabled],
     );
     const scopedGoals = useMemo(
         () => scopeGoalIds

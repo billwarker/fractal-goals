@@ -757,6 +757,47 @@ def test_get_programs_query_budget(authed_client, query_counter, sample_program_
 
 
 @pytest.mark.integration
+def test_get_program_metrics_query_and_response_budget(authed_client, query_counter, sample_program_tree):
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{sample_program_tree.root_id}/programs/{sample_program_tree.id}/metrics?timezone=UTC",
+    )
+
+    assert_response_budget(response, max_bytes=1_048_576, max_ms=750, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 8
+
+
+@pytest.mark.integration
+def test_get_program_metrics_comparison_query_budget(
+    authed_client, db_session, query_counter, sample_program_tree
+):
+    now = datetime.now(timezone.utc)
+    sample_program_tree.start_date = now - timedelta(days=30)
+    sample_program_tree.end_date = now - timedelta(days=20)
+    for index in range(4):
+        db_session.add(Program(
+            root_id=sample_program_tree.root_id,
+            name=f"Ended program {index}",
+            start_date=now - timedelta(days=100 + index * 20),
+            end_date=now - timedelta(days=90 + index * 20),
+            weekly_schedule=[],
+        ))
+    db_session.commit()
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{sample_program_tree.root_id}/programs/metrics/comparison"
+        f"?timezone=UTC&anchor_program_id={sample_program_tree.id}&limit=5",
+    )
+
+    assert_response_budget(response, max_bytes=1_048_576, max_ms=1_500, elapsed_ms=elapsed_ms)
+    assert response.get_json()["programs"][0]["program_id"] == sample_program_tree.id
+    assert query_counter["total"] <= 10
+
+
+@pytest.mark.integration
 def test_get_fractals_query_budget(authed_client, query_counter, sample_goal_hierarchy):
     query_counter["total"] = 0
     response, elapsed_ms = timed_get(authed_client, "/api/fractals")

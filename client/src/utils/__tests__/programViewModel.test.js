@@ -5,7 +5,7 @@ import {
     buildProgramDayOccurrences,
     buildProgramBlockLabels,
     buildProgramCalendarEvents,
-    buildProgramMetrics,
+    buildDemoProgramMetrics,
     buildProgramSidePaneData,
     buildProgramsCalendarEvents,
     getProgramColor,
@@ -249,7 +249,7 @@ describe('programViewModel calendar builders', () => {
             ['daily-day', { ...dailyProgram.blocks[0].days[0], blockId: 'block-1' }],
         ]);
 
-        const programMetrics = buildProgramMetrics({
+        const programMetrics = buildDemoProgramMetrics({
             program: dailyProgram,
             sessions,
             programDaysMap,
@@ -306,7 +306,7 @@ describe('programViewModel calendar builders', () => {
             ['stacked-day', { ...multiTemplateProgram.blocks[0].days[0], blockId: 'block-1' }],
         ]);
 
-        const partialMetrics = buildProgramMetrics({
+        const partialMetrics = buildDemoProgramMetrics({
             program: multiTemplateProgram,
             sessions: [
                 {
@@ -326,7 +326,7 @@ describe('programViewModel calendar builders', () => {
 
         expect(partialMetrics.completedProgramDays).toBe(0);
 
-        const completeMetrics = buildProgramMetrics({
+        const completeMetrics = buildDemoProgramMetrics({
             program: multiTemplateProgram,
             sessions: [
                 {
@@ -381,7 +381,7 @@ describe('programViewModel calendar builders', () => {
             ['flex-day', { ...flexibleProgram.blocks[0].days[0], blockId: 'block-1' }],
         ]);
 
-        const requiredOnlyMetrics = buildProgramMetrics({
+        const requiredOnlyMetrics = buildDemoProgramMetrics({
             program: flexibleProgram,
             sessions: [
                 {
@@ -401,7 +401,7 @@ describe('programViewModel calendar builders', () => {
 
         expect(requiredOnlyMetrics.completedProgramDays).toBe(0);
 
-        const thresholdMetrics = buildProgramMetrics({
+        const thresholdMetrics = buildDemoProgramMetrics({
             program: flexibleProgram,
             sessions: [
                 {

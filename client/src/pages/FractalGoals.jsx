@@ -8,7 +8,7 @@ import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
 import { useGoals } from '../contexts/GoalsContext';
 import { useDebug } from '../contexts/DebugContext';
 import { useAuth } from '../contexts/AuthContext';
-import { buildTreeMaps, getGoalLineageScope, getLineagePath } from '../components/flowTree/flowTreeTreeUtils';
+import { buildTreeMaps, getLineagePath } from '../components/flowTree/flowTreeTreeUtils';
 import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { getActiveGoalWindowDaysFromSettings, getInactiveNodeIds } from '../hooks/useFlowTreeMetrics';
@@ -34,7 +34,8 @@ import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../hooks/useFe
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { getISOYMDInTimezone } from '../utils/dateUtils';
-import { collectProgramGoalIds, getActivePrograms } from '../utils/programGoalWindow';
+import { getActivePrograms } from '../utils/programGoalWindow';
+import { buildProgramRenderScopeGoalIds, getProgramMetricScopeGoalIds } from '../utils/programScope';
 import { getProgramColor } from '../utils/programViewModel';
 import PageSurface from '../components/surface/PageSurface';
 import { usePageSurfaces } from '../hooks/usePageSurfaceQueries';
@@ -99,7 +100,7 @@ function FractalGoals() {
         userId: user?.id,
         defaultGoalsViewMode: getIsMobileViewport() ? 'hierarchy' : 'tree',
     });
-    const { programs = EMPTY_ARRAY, isLoading: programsLoading } = usePrograms(rootId);
+    const { programs = EMPTY_ARRAY, isLoading: programsLoading } = usePrograms(rootId, timezone || 'UTC');
     const loading = goalsLoading || activitiesLoading || activityGroupsLoading || evidenceLoading;
     const [sidebarMode, setSidebarMode] = useState(null);
     const [viewingGoal, setViewingGoal] = useState(null);
@@ -154,7 +155,10 @@ function FractalGoals() {
     );
     const programScopeGoalIds = useMemo(() => {
         if (!scopedProgram || !fractalData) return null;
-        return getGoalLineageScope(fractalData, collectProgramGoalIds(scopedProgram));
+        return buildProgramRenderScopeGoalIds(
+            fractalData,
+            getProgramMetricScopeGoalIds(scopedProgram, fractalData),
+        );
     }, [fractalData, scopedProgram]);
     const surfaceGoals = useMemo(
         () => Array.from(flowtreeMaps.nodeById.values()),

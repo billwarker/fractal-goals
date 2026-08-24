@@ -69,8 +69,19 @@ export const queryKeys = {
     landingExamples: () => ['public', 'landing-examples'],
     logsInfinite: (rootId, pageSize = 50) => ['logs', rootId, 'infinite', pageSize],
     logsInfiniteRoot: (rootId) => ['logs', rootId, 'infinite'],
-    program: (rootId, programId) => ['program', rootId, programId],
-    programs: (rootId) => ['programs', rootId],
+    program: (rootId, programId, timezone = null) => timezone
+        ? ['program', rootId, programId, { timezone }]
+        : ['program', rootId, programId],
+    programs: (rootId, timezone = null) => timezone
+        ? ['programs', rootId, { timezone }]
+        : ['programs', rootId],
+    programMetricsRoot: (rootId) => ['program-metrics', rootId],
+    programMetrics: (rootId, programId, timezone, rangeStart = null, rangeEnd = null) => [
+        'program-metrics', rootId, programId, { timezone, rangeStart, rangeEnd },
+    ],
+    programMetricsComparison: (rootId, anchorProgramId, timezone, limit = 5) => [
+        'program-metrics', rootId, 'comparison', { anchorProgramId, timezone, limit },
+    ],
     session: (rootId, sessionId) => ['session', rootId, sessionId],
     sessionRoot: (rootId) => ['session', rootId],
     sessionActivities: (rootId, sessionId) => ['session-activities', rootId, sessionId],

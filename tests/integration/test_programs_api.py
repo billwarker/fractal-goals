@@ -152,6 +152,14 @@ class TestProgramCRUD:
         assert row['program_goal_ids'] == [sample_goal_hierarchy['mid_term'].id]
         assert row['program_color'] == '#22c55e'
         assert row['block_goal_ids'] == [sample_goal_hierarchy['short_term'].id]
+        assert row['scope_seed_goal_ids'] == sorted([
+            sample_goal_hierarchy['mid_term'].id,
+            sample_goal_hierarchy['short_term'].id,
+        ])
+        assert row['scope_goal_ids'] == sorted([
+            sample_goal_hierarchy['mid_term'].id,
+            sample_goal_hierarchy['short_term'].id,
+        ])
         assert row['completion_min_templates'] == 1
         assert row['completed_session_count'] == 0
         assert row['completed_template_ids'] == []
@@ -180,6 +188,27 @@ class TestProgramCRUD:
         data = json.loads(response.data)
         assert data['id'] == program_id
         assert data['name'] == sample_program['name']
+        assert 'scope_seed_goal_ids' in data
+        assert 'scope_goal_ids' in data
+
+    def test_program_metrics_contract_etag_and_validation(
+        self, authed_client, sample_ultimate_goal, sample_program
+    ):
+        url = f'/api/{sample_ultimate_goal.id}/programs/{sample_program["id"]}/metrics'
+        response = authed_client.get(f'{url}?timezone=UTC')
+        assert response.status_code == 200
+        assert response.headers.get('ETag')
+        payload = response.get_json()
+        assert payload['calculation_version'] == 1
+        assert payload['window']['timezone'] == 'UTC'
+        assert payload['semantics'] == {
+            'attribution': 'current_state',
+            'data_layer': 'analytics_engine',
+            'effort_allocation': 'equal_split',
+            'execution_linkage': 'explicit',
+        }
+        assert authed_client.get(f'{url}?timezone=Not/AZone').status_code == 400
+        assert authed_client.get(f'{url}?range_start=2026-01-01').status_code == 400
 
     def test_program_goals_do_not_auto_populate_block_goal_ids(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
         """Program-level goals should not appear as direct block associations."""

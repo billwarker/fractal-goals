@@ -3,10 +3,8 @@ import { useMemo } from 'react';
 import {
     buildBlockGoalsByBlockId,
     buildProgramBlockLabels,
-    buildBlockMetrics,
     buildProgramCalendarEvents,
     buildProgramDaysMap,
-    buildProgramMetrics,
     sortProgramBlocks,
 } from '../utils/programViewModel';
 import { isBlockActive } from '../utils/programUtils.jsx';
@@ -49,15 +47,6 @@ export function useProgramDetailViewModel({
         program,
     }), [program]);
 
-    const programMetrics = useMemo(() => buildProgramMetrics({
-        program,
-        sessions,
-        programDaysMap,
-        attachedGoalIds,
-        getGoalDetails,
-        timezone,
-    }), [attachedGoalIds, getGoalDetails, program, programDaysMap, sessions, timezone]);
-
     const activeBlock = useMemo(() => {
         return program?.blocks?.find((block) => isBlockActive(block)) || null;
     }, [program?.blocks]);
@@ -73,15 +62,6 @@ export function useProgramDetailViewModel({
         associatedGoals,
     }), [associatedGoals, sortedBlocks]);
 
-    const blockMetrics = useMemo(() => buildBlockMetrics({
-        activeBlock,
-        sessions,
-        program,
-        programDaysMap,
-        blockGoalsByBlockId,
-        timezone,
-    }), [activeBlock, blockGoalsByBlockId, program, programDaysMap, sessions, timezone]);
-
     const attachBlock = useMemo(() => {
         return sortedBlocks.find((block) => block.id === attachBlockId) || null;
     }, [attachBlockId, sortedBlocks]);
@@ -90,9 +70,7 @@ export function useProgramDetailViewModel({
         sortedBlocks,
         calendarEvents,
         blockLabels,
-        programMetrics,
         activeBlock,
-        blockMetrics,
         attachBlock,
         programDaysMap,
         blockGoalsByBlockId,

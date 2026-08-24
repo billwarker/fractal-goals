@@ -2,10 +2,12 @@ import React, { Suspense, useEffect, useMemo, useReducer, useState } from 'react
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import EmptyState from '../components/common/EmptyState';
+import ViewToggleTabs from '../components/common/ViewToggleTabs';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import ProgramBlockView from '../components/programs/ProgramBlockView';
 import ProgramCalendarView from '../components/programs/ProgramCalendarView';
+import ProgramInsights from '../components/programs/ProgramInsights';
 import ResponsiveProgramSidePane from '../components/programs/ResponsiveProgramSidePane';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/atoms/Modal';
@@ -20,6 +22,7 @@ import { useProgramDetailController } from '../hooks/useProgramDetailController'
 import { useProgramDetailMutations } from '../hooks/useProgramDetailMutations';
 import { useProgramDetailViewModel } from '../hooks/useProgramDetailViewModel';
 import { useProgramGoalSets } from '../hooks/useProgramGoalSets';
+import { useProgramMetrics, useProgramMetricsComparison } from '../hooks/useProgramMetrics';
 import { useNotesPageQuery } from '../hooks/useNotesPageQuery';
 import { useProgramsCalendarData } from '../hooks/useProgramsCalendarData';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
@@ -37,6 +40,7 @@ const ProgramDayModal = lazyWithRetry(() => import('../components/modals/Program
 const AttachGoalModal = lazyWithRetry(() => import('../components/modals/AttachGoalModal'), 'components/modals/AttachGoalModal');
 const DayViewModal = lazyWithRetry(() => import('../components/modals/DayViewModal'), 'components/modals/DayViewModal');
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
+const PROGRAM_VIEW_ITEMS = ['calendar', 'blocks', 'insights'].map((value) => ({ value, label: `${value[0].toUpperCase()}${value.slice(1)}` }));
 function getDatePart(dateValue) {
     if (!dateValue) return null;
     return String(dateValue).split('T')[0];
@@ -101,6 +105,8 @@ function ProgramCalendarPage() {
         pendingBlockSelection,
     } = calendarContext;
     const [viewMode, setViewMode] = useState(programId ? 'blocks' : 'calendar');
+    const [metricsRange, setMetricsRange] = useState(null);
+    const [comparisonEnabled, setComparisonEnabled] = useState(false);
     const [isSidePaneVisible, setIsSidePaneVisible] = useState(() => {
         return !getIsMobileViewport();
     });
@@ -142,9 +148,16 @@ function ProgramCalendarPage() {
         refreshData,
         refreshers,
         getGoalDetails,
-    } = useProgramData(rootId, selectedProgramId);
+    } = useProgramData(rootId, selectedProgramId, timezone || 'UTC');
 
     const displayProgram = detailedProgram || selectedProgram;
+    const metricsQuery = useProgramMetrics(rootId, displayProgram?.id, timezone, metricsRange);
+    const comparisonQuery = useProgramMetricsComparison(
+        rootId,
+        displayProgram?.id,
+        timezone,
+        comparisonEnabled && metricsQuery.data?.program?.status === 'ended',
+    );
     const displayGoals = detailGoals?.length ? detailGoals : goals;
     const programNoteFilters = useMemo(() => ({
         context_types: ['program'],
@@ -214,9 +227,7 @@ function ProgramCalendarPage() {
 
     const {
         sortedBlocks,
-        programMetrics,
         activeBlock,
-        blockMetrics,
         attachBlock,
         blockGoalsByBlockId,
     } = useProgramDetailViewModel({
@@ -231,6 +242,9 @@ function ProgramCalendarPage() {
         attachedGoalIds,
         hierarchyGoalSeeds,
     });
+    const activeBlockMetrics = metricsQuery.data?.blocks?.find(
+        (block) => block.block_id === activeBlock?.id,
+    ) || null;
 
     const {
         saveBlock,
@@ -338,12 +352,12 @@ function ProgramCalendarPage() {
                         {getStatusLabel(displayProgramStatus)}
                     </span>
                 ) : null}
-                {blockMetrics ? (
+                {activeBlockMetrics ? (
                     <span
                         className={styles.blockBadge}
-                        style={{ borderColor: blockMetrics.color, color: blockMetrics.color, background: `color-mix(in srgb, ${blockMetrics.color} 14%, transparent)` }}
+                        style={{ borderColor: activeBlockMetrics.color, color: activeBlockMetrics.color, background: `color-mix(in srgb, ${activeBlockMetrics.color} 14%, transparent)` }}
                     >
-                        {blockMetrics.name}
+                        {activeBlockMetrics.name}
                     </span>
                 ) : null}
                 {selectedRangeText ? <span>Selected {selectedRangeText}</span> : null}
@@ -710,20 +724,12 @@ function ProgramCalendarPage() {
 
     const viewActions = displayProgram ? (
         <>
-            <div className={styles.viewToggle} aria-label="Program view">
-                <button
-                    className={`${styles.toggleButton} ${viewMode === 'calendar' ? styles.toggleButtonActive : ''}`}
-                    onClick={() => setViewMode('calendar')}
-                >
-                    Calendar
-                </button>
-                <button
-                    className={`${styles.toggleButton} ${viewMode === 'blocks' ? styles.toggleButtonActive : ''}`}
-                    onClick={() => setViewMode('blocks')}
-                >
-                    Blocks
-                </button>
-            </div>
+            <ViewToggleTabs
+                items={PROGRAM_VIEW_ITEMS}
+                value={viewMode}
+                onChange={setViewMode}
+                ariaLabel="Program view"
+            />
             <HeaderButton variant="secondary" onClick={() => setIsProgramOptionsOpen(true)}>
                 Program Options
             </HeaderButton>
@@ -754,7 +760,17 @@ function ProgramCalendarPage() {
                     />
 
                     <div className={`${styles.calendarPanel} ${viewMode === 'blocks' ? styles.blocksModePanel : ''}`}>
-                        {loading || (viewMode === 'blocks' && detailLoading) ? (
+                        {viewMode === 'insights' ? (
+                            <ProgramInsights
+                                metrics={metricsQuery.data}
+                                loading={metricsQuery.isLoading}
+                                error={metricsQuery.error}
+                                onRangeChange={setMetricsRange}
+                                comparison={comparisonQuery.data}
+                                comparisonLoading={comparisonQuery.isLoading}
+                                onLoadComparison={() => setComparisonEnabled(true)}
+                            />
+                        ) : loading || (viewMode === 'blocks' && detailLoading) ? (
                             <div className={styles.loading}>Loading programs...</div>
                         ) : viewMode === 'calendar' ? (
                             <ProgramCalendarView
@@ -810,9 +826,9 @@ function ProgramCalendarPage() {
                     onCreate={() => openCreateProgram()}
                     view={sidePaneView}
                     onViewChange={setSidePaneView}
-                    programMetrics={programMetrics}
+                    programMetrics={metricsQuery.data}
                     activeBlock={activeBlock}
-                    blockMetrics={blockMetrics}
+                    blockMetrics={activeBlockMetrics}
                     programGoalSeeds={hierarchyGoalSeeds}
                     onGoalClick={openGoalModal}
                     notesQuery={programNotesQuery}
