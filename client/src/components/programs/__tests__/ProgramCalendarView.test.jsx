@@ -69,11 +69,18 @@ vi.mock('@fullcalendar/react', async () => {
                 </div>
                 {props.events
                     .filter((event) => event.display !== 'background')
-                    .map((event) => (
-                        <ReactModule.Fragment key={event.id}>
+                    .map((event) => {
+                        const eventInfo = { event, el: null, view: {} };
+                        return (
+                        <div
+                            key={event.id}
+                            className="fc-event"
+                            onClick={(jsEvent) => props.eventClick?.({ ...eventInfo, jsEvent })}
+                        >
                             {props.eventContent?.({ event })}
-                        </ReactModule.Fragment>
-                    ))}
+                        </div>
+                        );
+                    })}
             </div>
         );
         }),
@@ -140,7 +147,7 @@ describe('ProgramCalendarView', () => {
     });
 
     it('renders configured SMART goal icons before calendar goal labels', () => {
-        renderCalendar({
+        const { props } = renderCalendar({
             calendarEvents: [{
                 id: 'goal-1',
                 title: 'SMART calendar goal',
@@ -168,6 +175,28 @@ describe('ProgramCalendarView', () => {
         expect(label.parentElement).toHaveStyle({ background: 'transparent' });
         expect(label.parentElement.style.color).toBe('');
         expect(icon.parentElement).not.toHaveAttribute('style');
+
+        fireEvent.click(label);
+        expect(props.onEventClick).toHaveBeenCalledTimes(1);
+        expect(props.onEventClick).toHaveBeenCalledWith(expect.objectContaining({
+            event: expect.objectContaining({ id: 'goal-1' }),
+        }));
+    });
+
+    it('opens goal deadlines directly from the keyboard without delegated duplicate activation', () => {
+        const { props } = renderCalendar({
+            calendarEvents: [{
+                id: 'goal-keyboard',
+                title: 'Keyboard goal',
+                extendedProps: { type: 'goal' },
+            }],
+        });
+
+        const goal = screen.getByRole('button', { name: 'Open goal: Keyboard goal' });
+        fireEvent.keyDown(goal, { key: 'Enter' });
+        fireEvent.keyDown(goal, { key: ' ' });
+
+        expect(props.onEventClick).toHaveBeenCalledTimes(2);
     });
 
     it('uses one mobile control row and drives calendar navigation through the API', () => {
@@ -226,7 +255,7 @@ describe('ProgramCalendarView', () => {
     });
 
     it('uses the program color when no block covers the calendar date', () => {
-        renderCalendar({
+        const { rerender, props } = renderCalendar({
             calendarEvents: [{
                 id: 'program-bg-1',
                 start: '2026-05-01',
@@ -236,6 +265,11 @@ describe('ProgramCalendarView', () => {
                 extendedProps: { type: 'program_background', sortOrder: -20 },
             }],
         });
+
+        expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-calendar-cell-color: #224466');
+        expect(screen.getByTestId('mock-day-cell')).toHaveAttribute('data-calendar-background', 'program');
+
+        rerender(<ProgramCalendarView {...props} selectedDate="2026-05-17" />);
 
         expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-calendar-cell-color: #224466');
         expect(screen.getByTestId('mock-day-cell')).toHaveAttribute('data-calendar-background', 'program');

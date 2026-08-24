@@ -95,7 +95,7 @@
     max-width: calc(100% - 33px);
 }
 
-.calendarContainer .calendarColorCell {
+.calendarContainer [data-calendar-background] {
     background: color-mix(
         in srgb,
         var(--program-calendar-cell-color) var(--program-calendar-color-weight),
@@ -247,6 +247,12 @@
 
 .eventPillGoal {
     color: var(--color-text-primary);
+}
+
+.eventPillGoal:focus-visible {
+    border-radius: 3px;
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 1px;
 }
 
 .blockCellLabel {
