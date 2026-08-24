@@ -353,6 +353,25 @@ class SessionAnalyticsService:
         window_days = self._normalize_window_days(days, self._active_goal_window_days_for_root(root))
         cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
 
+        recent_goals = self.db_session.query(Goal).options(
+            load_only(
+                Goal.id,
+                Goal.created_at,
+                Goal.completed_at,
+                Goal.paused,
+            ),
+            selectinload(Goal.pause_intervals),
+        ).filter(
+            Goal.root_id == root_id,
+            Goal.deleted_at.is_(None),
+            Goal.created_at >= cutoff,
+        ).all()
+        goal_ids = set()
+        for goal in recent_goals:
+            contribution_goal = resolve_contribution_goal(goal, goal.created_at)
+            if contribution_goal:
+                goal_ids.add(str(contribution_goal.id))
+
         recent_instance_rows = self.db_session.query(
                 ActivityInstance.activity_definition_id,
                 ActivityInstance.time_stop,
@@ -376,7 +395,6 @@ class SessionAnalyticsService:
         })
 
         effective_goals_by_activity = self._get_effective_activity_goals(root_id, recent_activity_ids)
-        goal_ids = set()
         for activity_definition_id, time_stop, updated_at, created_at in recent_instance_rows:
             if not activity_definition_id:
                 continue

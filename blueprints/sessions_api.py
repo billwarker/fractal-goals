@@ -217,7 +217,7 @@ def get_activity_instantiation_summary(current_user, root_id):
 @sessions_bp.route('/<root_id>/sessions/evidence-goals', methods=['GET'])
 @token_required
 def get_recent_evidence_goal_ids(current_user, root_id):
-    """Get goal ids with recent activity evidence."""
+    """Get goal ids with recent contribution evidence."""
     db_session = get_db_session()
     service = SessionService(db_session)
     try:

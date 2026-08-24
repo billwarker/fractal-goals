@@ -65,6 +65,7 @@ class TestSessionSummaryApi:
     ):
         root_id = sample_practice_session.root_id
         recent_stop = datetime.now(timezone.utc) - timedelta(days=1)
+        sample_goal_hierarchy['short_term'].created_at = recent_stop - timedelta(days=8)
 
         db_session.execute(
             activity_goal_associations.insert().values(
@@ -100,6 +101,7 @@ class TestSessionSummaryApi:
         root_id = sample_practice_session.root_id
         sample_goal_hierarchy['ultimate'].progress_settings = {'active_goal_window_days': 3}
         stop_time = datetime.now(timezone.utc) - timedelta(days=5)
+        sample_goal_hierarchy['short_term'].created_at = stop_time - timedelta(days=5)
 
         db_session.execute(
             activity_goal_associations.insert().values(
@@ -140,6 +142,77 @@ class TestSessionSummaryApi:
         payload = json.loads(response.data)
         assert payload['window_days'] == 90
 
+    def test_evidence_goals_counts_recent_goal_creation_without_activity(
+        self,
+        authed_client,
+        sample_goal_hierarchy,
+    ):
+        goal = sample_goal_hierarchy['short_term']
+        root_id = sample_goal_hierarchy['ultimate'].id
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions/evidence-goals?days=7'
+        )
+
+        assert response.status_code == 200
+        assert goal.id in response.get_json()['goal_ids']
+
+    def test_evidence_goals_excludes_goal_creation_outside_window(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+    ):
+        goal = sample_goal_hierarchy['short_term']
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal.created_at = datetime.now(timezone.utc) - timedelta(days=8)
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions/evidence-goals?days=7'
+        )
+
+        assert response.status_code == 200
+        assert goal.id not in response.get_json()['goal_ids']
+
+    def test_evidence_goals_excludes_recent_creation_for_paused_goal(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+    ):
+        goal = sample_goal_hierarchy['short_term']
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal.paused = True
+        goal.paused_at = datetime.now(timezone.utc)
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions/evidence-goals?days=7'
+        )
+
+        assert response.status_code == 200
+        assert goal.id not in response.get_json()['goal_ids']
+
+    def test_evidence_goals_keeps_recent_creation_for_completed_goal(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+    ):
+        goal = sample_goal_hierarchy['short_term']
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal.completed = True
+        goal.completed_at = datetime.now(timezone.utc)
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{root_id}/sessions/evidence-goals?days=7'
+        )
+
+        assert response.status_code == 200
+        assert goal.id in response.get_json()['goal_ids']
+
     def test_evidence_goals_counts_completed_activity_in_incomplete_session(
         self,
         authed_client,
@@ -151,6 +224,7 @@ class TestSessionSummaryApi:
     ):
         root_id = sample_practice_session.root_id
         recent_stop = datetime.now(timezone.utc) - timedelta(days=1)
+        sample_goal_hierarchy['short_term'].created_at = recent_stop - timedelta(days=8)
         db_session.execute(
             activity_goal_associations.insert().values(
                 activity_id=sample_activity_definition.id,
@@ -215,6 +289,7 @@ class TestSessionSummaryApi:
         """Activity performed AFTER a goal is completed no longer counts as evidence."""
         root_id = sample_practice_session.root_id
         recent_stop = datetime.now(timezone.utc) - timedelta(days=1)
+        sample_goal_hierarchy['short_term'].created_at = recent_stop - timedelta(days=8)
         sample_goal_hierarchy['short_term'].completed = True
         # Goal completed before the activity occurred -> activity must not re-activate it.
         sample_goal_hierarchy['short_term'].completed_at = recent_stop - timedelta(days=1)
@@ -245,6 +320,7 @@ class TestSessionSummaryApi:
         """Evidence from before completion still counts (natural fade) while in window."""
         root_id = sample_practice_session.root_id
         recent_stop = datetime.now(timezone.utc) - timedelta(days=2)
+        sample_goal_hierarchy['short_term'].created_at = recent_stop - timedelta(days=8)
         sample_goal_hierarchy['short_term'].completed = True
         # Goal completed after the activity occurred -> pre-completion evidence remains.
         sample_goal_hierarchy['short_term'].completed_at = recent_stop + timedelta(days=1)
