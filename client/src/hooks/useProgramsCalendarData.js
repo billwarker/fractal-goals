@@ -7,7 +7,13 @@ import { queryKeys } from './queryKeys';
 import { useFractalTree } from './useGoalQueries';
 import { fetchPrograms } from './useProgramQueries';
 
-export function useProgramsCalendarData(rootId, { getGoalColor, getGoalTextColor, timezone } = {}) {
+export function useProgramsCalendarData(rootId, {
+    getGoalColor,
+    getGoalTextColor,
+    getGoalSecondaryColor,
+    getGoalIcon,
+    timezone,
+} = {}) {
     const programsQuery = useQuery({
         queryKey: queryKeys.programs(rootId, timezone || 'UTC'),
         enabled: Boolean(rootId),
@@ -35,7 +41,8 @@ export function useProgramsCalendarData(rootId, { getGoalColor, getGoalTextColor
         getGoalColor || (() => '#3A86FF'),
         getGoalTextColor || (() => '#ffffff'),
         timezone,
-    ), [getGoalColor, getGoalTextColor, goals, sortedPrograms, timezone]);
+        { getGoalSecondaryColor, getGoalIcon },
+    ), [getGoalColor, getGoalIcon, getGoalSecondaryColor, getGoalTextColor, goals, sortedPrograms, timezone]);
 
     const blockLabels = useMemo(
         () => sortedPrograms.flatMap((program, programIndex) => buildProgramBlockLabels({

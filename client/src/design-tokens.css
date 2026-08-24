@@ -63,6 +63,7 @@
   --color-brand-accent-soft: color-mix(in srgb, var(--color-brand-accent) 14%, transparent);
   --color-brand-success-muted: color-mix(in srgb, var(--color-brand-success) 26%, transparent);
   --color-brand-danger-muted: color-mix(in srgb, var(--color-brand-danger) 26%, transparent);
+  --program-calendar-color-weight: 32%;
   --color-brand-warning-muted: color-mix(in srgb, var(--color-brand-warning) 26%, transparent);
   --color-brand-accent-muted: color-mix(in srgb, var(--color-brand-accent) 26%, transparent);
   --color-bg-selected: var(--color-brand-primary-soft);
@@ -253,6 +254,7 @@
   --color-checkbox-accent: #3bc57c;
 
   /* Light mode tints gradients toward the surface for calmer badges/buttons. */
+  --program-calendar-color-weight: 18%;
   --goal-gradient-primary-weight: 82%;
   --goal-gradient-secondary-weight: 58%;
   --goal-gradient-border-weight: 58%;

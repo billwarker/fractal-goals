@@ -2,25 +2,35 @@ import React from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import GoalIcon from '../atoms/GoalIcon';
 import styles from './ProgramCalendarView.module.css';
 
 function renderEventContent(eventInfo) {
-    const { type, blockColor, isCompleted } = eventInfo.event.extendedProps;
+    const { type, blockColor, isCompleted, goalIcon } = eventInfo.event.extendedProps;
 
     // Block backgrounds render through FullCalendar background styling.
     if (type === 'block_background') return null;
 
     const title = eventInfo.event.title;
 
-    // Goal events: use dynamic goal colors on the pill itself
+    // Goal events use their configured color without a filled banner.
     if (type === 'goal') {
-        const bg = eventInfo.event.backgroundColor;
-        const fg = eventInfo.event.textColor;
         return (
             <div
                 className={`${styles.eventPill} ${styles.eventPillGoal}`}
-                style={{ background: bg, color: fg }}
+                style={{ background: 'transparent' }}
             >
+                {goalIcon ? (
+                    <span className={styles.eventGoalIcon} aria-hidden="true">
+                        <GoalIcon
+                            shape={goalIcon.shape}
+                            color={goalIcon.color}
+                            secondaryColor={goalIcon.secondaryColor}
+                            isSmart={goalIcon.isSmart}
+                            size={13}
+                        />
+                    </span>
+                ) : null}
                 <span className={styles.eventPillText}>{title}</span>
             </div>
         );
@@ -138,9 +148,7 @@ function ProgramCalendarView({
         return labels;
     }, [blockLabels]);
 
-    const compactBackgroundRanges = React.useMemo(() => {
-        if (!compact) return [];
-
+    const backgroundRanges = React.useMemo(() => {
         return (calendarEvents || [])
             .filter((event) => event?.display === 'background')
             .map((event) => {
@@ -162,15 +170,15 @@ function ProgramCalendarView({
                 };
             })
             .filter(Boolean);
-    }, [calendarEvents, compact]);
+    }, [calendarEvents]);
 
-    const getCompactCellBackgrounds = React.useCallback((dateStr) => {
+    const getCellBackgrounds = React.useCallback((dateStr) => {
         const selectedRanges = {
             program: null,
             block: null,
         };
 
-        compactBackgroundRanges.forEach((range) => {
+        backgroundRanges.forEach((range) => {
             if (dateStr < range.start || dateStr >= range.end) return;
 
             const key = range.type === 'block_background' ? 'block' : 'program';
@@ -180,7 +188,7 @@ function ProgramCalendarView({
         });
 
         return selectedRanges;
-    }, [compactBackgroundRanges]);
+    }, [backgroundRanges]);
 
     const syncBlockLabelForCell = React.useCallback((dayEl) => {
         const dateStr = dayEl.getAttribute('data-date');
@@ -191,23 +199,20 @@ function ProgramCalendarView({
 
         if (!frame) return;
 
-        dayEl.classList.remove(styles.compactProgramCell, styles.compactBlockCell);
-        dayEl.style.removeProperty('--program-compact-program-bg');
-        dayEl.style.removeProperty('--program-compact-block-bg');
-        frame.querySelector(`.${styles.blockCellLabel}`)?.remove();
+        dayEl.classList.remove(styles.calendarColorCell);
+        dayEl.style.removeProperty('--program-calendar-cell-color');
+        dayEl.removeAttribute('data-calendar-background');
+        frame.querySelectorAll(`[data-program-block-label], .${styles.blockCellLabel}`)
+            .forEach((label) => label.remove());
         frame.removeAttribute('data-block-label');
         frame.style.removeProperty('--program-block-label-color');
 
-        if (compact) {
-            const cellBackgrounds = getCompactCellBackgrounds(dateStr);
-            if (cellBackgrounds.program) {
-                dayEl.classList.add(styles.compactProgramCell);
-                dayEl.style.setProperty('--program-compact-program-bg', cellBackgrounds.program.color);
-            }
-            if (cellBackgrounds.block) {
-                dayEl.classList.add(styles.compactBlockCell);
-                dayEl.style.setProperty('--program-compact-block-bg', cellBackgrounds.block.color);
-            }
+        const cellBackgrounds = getCellBackgrounds(dateStr);
+        const effectiveBackground = cellBackgrounds.block || cellBackgrounds.program;
+        if (effectiveBackground) {
+            dayEl.classList.add(styles.calendarColorCell);
+            dayEl.style.setProperty('--program-calendar-cell-color', effectiveBackground.color);
+            dayEl.setAttribute('data-calendar-background', cellBackgrounds.block ? 'block' : 'program');
         }
 
         if (blockLabel) {
@@ -217,6 +222,7 @@ function ProgramCalendarView({
             labelButton.textContent = blockLabel.title;
             labelButton.title = blockLabel.title;
             labelButton.setAttribute('aria-label', `Select ${blockLabel.title}`);
+            labelButton.setAttribute('data-program-block-label', 'true');
             labelButton.style.setProperty('--program-block-label-color', blockLabel.color);
             ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend'].forEach((eventName) => {
                 labelButton.addEventListener(eventName, (event) => {
@@ -236,14 +242,15 @@ function ProgramCalendarView({
             });
             frame.appendChild(labelButton);
         }
-    }, [blockLabelsByDate, compact, getCompactCellBackgrounds, onBlockLabelClick]);
+    }, [blockLabelsByDate, getCellBackgrounds, onBlockLabelClick]);
 
     const clearBlockLabelForCell = (dayEl) => {
         const frame = dayEl.querySelector('.fc-daygrid-day-frame');
-        dayEl.classList.remove(styles.compactProgramCell, styles.compactBlockCell);
-        dayEl.style.removeProperty('--program-compact-program-bg');
-        dayEl.style.removeProperty('--program-compact-block-bg');
-        frame?.querySelector(`.${styles.blockCellLabel}`)?.remove();
+        dayEl.classList.remove(styles.calendarColorCell);
+        dayEl.style.removeProperty('--program-calendar-cell-color');
+        dayEl.removeAttribute('data-calendar-background');
+        frame?.querySelectorAll(`[data-program-block-label], .${styles.blockCellLabel}`)
+            .forEach((label) => label.remove());
     };
 
     React.useEffect(() => {

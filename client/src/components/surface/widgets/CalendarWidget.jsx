@@ -22,7 +22,7 @@ export default function CalendarWidget({ sharedData }) {
         [sharedData?.goals],
     );
     const timezone = sharedData?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-    const { getGoalColor, getGoalTextColor } = useGoalLevels();
+    const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
 
     const calendarEvents = useMemo(() => buildProgramsCalendarEvents(
         programs,
@@ -30,7 +30,8 @@ export default function CalendarWidget({ sharedData }) {
         getGoalColor,
         getGoalTextColor,
         timezone,
-    ), [getGoalColor, getGoalTextColor, goals, programs, timezone]);
+        { getGoalSecondaryColor, getGoalIcon },
+    ), [getGoalColor, getGoalIcon, getGoalSecondaryColor, getGoalTextColor, goals, programs, timezone]);
 
     const blockLabels = useMemo(() => (
         programs.flatMap((program, programIndex) => buildProgramBlockLabels({

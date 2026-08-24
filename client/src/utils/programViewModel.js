@@ -6,6 +6,7 @@ import {
     getRecurringDatesWithinRange,
 } from './dateUtils';
 import { getGoalDeadline, isGoalAssociatedWithBlock } from './programGoalAssociations';
+import { buildGoalDeadlineCalendarEvent } from './programCalendarGoalEvents';
 import { buildProgramGoalScope } from './programGoalWindow';
 import { isBlockActive } from './programUtils.jsx';
 
@@ -300,6 +301,8 @@ export function buildProgramCalendarEvents({
     timezone,
     getGoalColor,
     getGoalTextColor,
+    getGoalSecondaryColor,
+    getGoalIcon,
     attachedGoalIds,
     includeProgramId = false,
     programIndex = 0,
@@ -544,74 +547,24 @@ export function buildProgramCalendarEvents({
 
     goalIds.forEach((goalId) => {
         const goal = goalById.get(goalId);
-        const deadline = goal ? getGoalDeadline(goal) : null;
-        if (!goal || !deadline) {
-            return;
-        }
-
-        const goalType = goal.attributes?.type || goal.type;
-        const completed = goal.completed || goal.attributes?.completed;
-        const completionDate = goal.completed_at || goal.attributes?.completed_at;
-        const color = getGoalColor(goalType);
-        events.push({
-            id: `${includeProgramId ? `program-goal-${program.id}` : 'goal'}-${goal.id}`,
-            title: goal.name,
-            start: !includeProgramId && completed && completionDate
-                ? getISOYMDInTimezone(completionDate, timezone)
-                : getDatePart(deadline),
-            allDay: true,
-            backgroundColor: color,
-            borderColor: color,
-            textColor: getGoalTextColor(goalType),
-            extendedProps: {
-                ...goal,
-                type: 'goal',
-                id: goal.id,
-                goalId: goal.id,
-                programId: program.id,
-                program,
-                sortOrder: 3,
-            },
-            classNames: completed ? ['completed-goal-event', 'clickable-goal-event'] : ['clickable-goal-event'],
+        const event = buildGoalDeadlineCalendarEvent({
+            goal,
+            timezone,
+            idPrefix: includeProgramId ? `program-goal-${program.id}` : 'goal',
+            useCompletionDate: !includeProgramId,
+            getGoalColor,
+            getGoalTextColor,
+            getGoalSecondaryColor,
+            getGoalIcon,
+            extendedProps: { programId: program.id, program },
         });
+        if (event) events.push(event);
     });
 
     return events;
 }
 
-function buildGoalDeadlineEvent(goal, getGoalColor, getGoalTextColor, timezone, idPrefix = 'calendar-goal') {
-    const deadline = getGoalDeadline(goal);
-    if (!goal || !deadline) {
-        return null;
-    }
-
-    const goalType = goal.attributes?.type || goal.type;
-    const completed = goal.completed || goal.attributes?.completed;
-    const completionDate = goal.completed_at || goal.attributes?.completed_at;
-    const color = getGoalColor(goalType);
-
-    return {
-        id: `${idPrefix}-${goal.id}`,
-        title: goal.name,
-        start: completed && completionDate
-            ? getISOYMDInTimezone(completionDate, timezone)
-            : getDatePart(deadline),
-        allDay: true,
-        backgroundColor: color,
-        borderColor: color,
-        textColor: getGoalTextColor(goalType),
-        extendedProps: {
-            ...goal,
-            type: 'goal',
-            id: goal.id,
-            goalId: goal.id,
-            sortOrder: 3,
-        },
-        classNames: completed ? ['completed-goal-event', 'clickable-goal-event'] : ['clickable-goal-event'],
-    };
-}
-
-export function buildProgramsCalendarEvents(programs = [], goals = [], getGoalColor, getGoalTextColor, timezone) {
+export function buildProgramsCalendarEvents(programs = [], goals = [], getGoalColor, getGoalTextColor, timezone, goalIconHelpers = {}) {
     const events = [];
     const goalEventIds = new Set();
 
@@ -646,6 +599,8 @@ export function buildProgramsCalendarEvents(programs = [], goals = [], getGoalCo
             timezone,
             getGoalColor,
             getGoalTextColor,
+            getGoalSecondaryColor: goalIconHelpers.getGoalSecondaryColor,
+            getGoalIcon: goalIconHelpers.getGoalIcon,
             includeProgramId: true,
             programIndex,
         });
@@ -666,7 +621,13 @@ export function buildProgramsCalendarEvents(programs = [], goals = [], getGoalCo
             return;
         }
 
-        const event = buildGoalDeadlineEvent(goal, getGoalColor, getGoalTextColor, timezone);
+        const event = buildGoalDeadlineCalendarEvent({
+            goal,
+            timezone,
+            getGoalColor,
+            getGoalTextColor,
+            ...goalIconHelpers,
+        });
         if (event) {
             events.push(event);
         }

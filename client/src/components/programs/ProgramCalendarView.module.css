@@ -49,7 +49,7 @@
     height: 100% !important;
 }
 
-.calendarContainerCompact :global(.fc-bg-event) {
+:global(.fc-bg-event) {
     display: none !important;
 }
 
@@ -95,17 +95,12 @@
     max-width: calc(100% - 33px);
 }
 
-.calendarContainerCompact .compactProgramCell {
-    background:
-        linear-gradient(color-mix(in srgb, var(--program-compact-program-bg) 30%, transparent), color-mix(in srgb, var(--program-compact-program-bg) 30%, transparent)),
-        var(--color-bg-card) !important;
-}
-
-.calendarContainerCompact .compactBlockCell {
-    background:
-        linear-gradient(color-mix(in srgb, var(--program-compact-block-bg) 30%, transparent), color-mix(in srgb, var(--program-compact-block-bg) 30%, transparent)),
-        linear-gradient(color-mix(in srgb, var(--program-compact-program-bg) 30%, transparent), color-mix(in srgb, var(--program-compact-program-bg) 30%, transparent)),
-        var(--color-bg-card) !important;
+.calendarContainer .calendarColorCell {
+    background: color-mix(
+        in srgb,
+        var(--program-calendar-cell-color) var(--program-calendar-color-weight),
+        var(--color-bg-card)
+    ) !important;
 }
 
 .headerActions {
@@ -237,6 +232,21 @@
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.3;
+}
+
+.eventGoalIcon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    margin-right: 4px;
+    background: transparent;
+}
+
+.eventPillGoal {
+    color: var(--color-text-primary);
 }
 
 .blockCellLabel {

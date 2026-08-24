@@ -14,6 +14,18 @@ const { mockCalendarApi } = vi.hoisted(() => ({
 
 vi.mock('@fullcalendar/daygrid', () => ({ default: {} }));
 vi.mock('@fullcalendar/interaction', () => ({ default: {} }));
+vi.mock('../../atoms/GoalIcon', () => ({
+    default: ({ shape, color, secondaryColor, isSmart, size }) => (
+        <svg
+            data-testid="calendar-goal-icon"
+            data-shape={shape}
+            data-color={color}
+            data-secondary-color={secondaryColor}
+            data-smart={String(isSmart)}
+            data-size={String(size)}
+        />
+    ),
+}));
 vi.mock('@fullcalendar/react', async () => {
     const ReactModule = await import('react');
 
@@ -51,8 +63,17 @@ vi.mock('@fullcalendar/react', async () => {
                     </button>
                 ) : null}
                 <div ref={dayRef} data-testid="mock-day-cell" className="fc-daygrid-day" data-date="2026-05-17">
-                    <div className="fc-daygrid-day-frame" />
+                    <div className="fc-daygrid-day-frame">
+                        <button type="button" data-program-block-label="true">Stale block label</button>
+                    </div>
                 </div>
+                {props.events
+                    .filter((event) => event.display !== 'background')
+                    .map((event) => (
+                        <ReactModule.Fragment key={event.id}>
+                            {props.eventContent?.({ event })}
+                        </ReactModule.Fragment>
+                    ))}
             </div>
         );
         }),
@@ -97,6 +118,8 @@ describe('ProgramCalendarView', () => {
         const { props } = renderCalendar();
 
         const label = await screen.findByRole('button', { name: 'Select Block 1' });
+        expect(screen.queryByRole('button', { name: 'Stale block label' })).not.toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: 'Select Block 1' })).toHaveLength(1);
         fireEvent.click(label);
 
         expect(props.onBlockLabelClick).toHaveBeenCalledWith(expect.objectContaining({
@@ -114,6 +137,37 @@ describe('ProgramCalendarView', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Today' }));
 
         expect(props.onTodayClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders configured SMART goal icons before calendar goal labels', () => {
+        renderCalendar({
+            calendarEvents: [{
+                id: 'goal-1',
+                title: 'SMART calendar goal',
+                backgroundColor: '#8b6fff',
+                textColor: '#ffffff',
+                extendedProps: {
+                    type: 'goal',
+                    goalIcon: {
+                        shape: 'triangle',
+                        color: '#8b6fff',
+                        secondaryColor: '#181329',
+                        isSmart: true,
+                    },
+                },
+            }],
+        });
+
+        const label = screen.getByText('SMART calendar goal');
+        const icon = screen.getByTestId('calendar-goal-icon');
+        expect(icon).toHaveAttribute('data-shape', 'triangle');
+        expect(icon).toHaveAttribute('data-color', '#8b6fff');
+        expect(icon).toHaveAttribute('data-secondary-color', '#181329');
+        expect(icon).toHaveAttribute('data-smart', 'true');
+        expect(icon.closest('[aria-hidden="true"]').nextElementSibling).toBe(label);
+        expect(label.parentElement).toHaveStyle({ background: 'transparent' });
+        expect(label.parentElement.style.color).toBe('');
+        expect(icon.parentElement).not.toHaveAttribute('style');
     });
 
     it('uses one mobile control row and drives calendar navigation through the API', () => {
@@ -167,7 +221,23 @@ describe('ProgramCalendarView', () => {
         expect(calendar).toHaveAttribute('data-expand-rows', 'true');
         expect(calendar).toHaveAttribute('data-day-max-events', '3');
         expect(calendar).toHaveAttribute('data-selectable', 'false');
-        expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-compact-program-bg: #224466');
-        expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-compact-block-bg: #89cff0');
+        expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-calendar-cell-color: #89cff0');
+        expect(screen.getByTestId('mock-day-cell')).toHaveAttribute('data-calendar-background', 'block');
+    });
+
+    it('uses the program color when no block covers the calendar date', () => {
+        renderCalendar({
+            calendarEvents: [{
+                id: 'program-bg-1',
+                start: '2026-05-01',
+                end: '2026-06-01',
+                backgroundColor: '#224466',
+                display: 'background',
+                extendedProps: { type: 'program_background', sortOrder: -20 },
+            }],
+        });
+
+        expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-calendar-cell-color: #224466');
+        expect(screen.getByTestId('mock-day-cell')).toHaveAttribute('data-calendar-background', 'program');
     });
 });

@@ -87,7 +87,7 @@ function ProgramCalendarPage() {
     const navigate = useNavigate();
     const isMobile = useIsMobile();
     const { setActiveRootId } = useGoals();
-    const { getGoalColor, getGoalTextColor } = useGoalLevels();
+    const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const { timezone } = useTimezone();
     const todayInTimezone = useMemo(
         () => getISOYMDInTimezone(new Date(), timezone || 'UTC'),
@@ -125,7 +125,7 @@ function ProgramCalendarPage() {
         blockLabels,
         loading,
         refetchPrograms,
-    } = useProgramsCalendarData(rootId, { getGoalColor, getGoalTextColor, timezone });
+    } = useProgramsCalendarData(rootId, { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon, timezone });
 
     const activeProgramId = useMemo(
         () => programs.find((program) => isProgramActive(program, todayInTimezone))?.id || null,
