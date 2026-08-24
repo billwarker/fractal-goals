@@ -36,4 +36,25 @@ describe('session creation footer actions', () => {
         expect(screen.getByText('Strength Day')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Create Session' })).toBeInTheDocument();
     });
+
+    it('shows the full program breadcrumb with the configured block color', () => {
+        render(<CreateSessionActions
+            selectedTemplate={{ id: 'template-1', name: 'Strength Day', template_data: { template_color: '#f97316' } }}
+            selectedProgramDay={{
+                program_name: 'Base',
+                program_color: '#22c55e',
+                block_name: 'Build',
+                block_color: '#d946ef',
+                day_name: 'Push',
+            }}
+            creating={false}
+            onCreateSession={vi.fn()}
+        />);
+        expect(screen.getByText('Strength Day')).toHaveStyle({ color: '#f97316' });
+        expect(screen.getByText('Build')).toHaveStyle({ color: '#d946ef' });
+        expect(screen.getByText('Base')).toHaveStyle({ color: '#22c55e' });
+        expect(screen.getByText('Push')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Create Session' })).toBeEnabled();
+        expect(screen.queryByText(/isn.t part of today.s program day/i)).not.toBeInTheDocument();
+    });
 });

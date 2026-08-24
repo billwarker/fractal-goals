@@ -98,4 +98,46 @@ describe('SessionGoalScopePanel', () => {
         expect(screen.queryByRole('heading', { name: 'Session Goals' })).not.toBeInTheDocument();
         expect(screen.getByTestId('goal-hierarchy-selector')).toBeInTheDocument();
     });
+
+    it('offers program scoping and clears selected goals outside it', () => {
+        const onProgramScopeChange = vi.fn();
+        const onClearOffScopeGoals = vi.fn();
+        render(<SessionGoalScopePanel
+            goals={[]}
+            manualGoalIds={['outside']}
+            automaticGoalIds={[]}
+            onChange={vi.fn()}
+            isLoading={false}
+            programScopeAvailable
+            programScopeEnabled
+            onProgramScopeChange={onProgramScopeChange}
+            programName="Strength"
+            programColor="#22c55e"
+            offScopeGoalCount={1}
+            onClearOffScopeGoals={onClearOffScopeGoals}
+        />);
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Only goals in Strength' }));
+        expect(screen.getByText('Strength')).toHaveStyle({ color: '#22c55e' });
+        expect(onProgramScopeChange).toHaveBeenCalledWith(false);
+        fireEvent.click(screen.getByRole('button', { name: 'Remove them' }));
+        expect(onClearOffScopeGoals).toHaveBeenCalledTimes(1);
+        expect(selectorProps).toHaveBeenLastCalledWith(expect.objectContaining({
+            emptyState: 'No goals in this program.',
+        }));
+    });
+
+    it('does not expose a program toggle for read-only quick sessions', () => {
+        render(<SessionGoalScopePanel
+            goals={[]}
+            manualGoalIds={[]}
+            automaticGoalIds={[]}
+            onChange={vi.fn()}
+            isLoading={false}
+            readOnly
+            programScopeAvailable
+            programScopeEnabled
+            programName="Strength"
+        />);
+        expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    });
 });

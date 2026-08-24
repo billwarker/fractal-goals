@@ -8,6 +8,7 @@ import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
+import ProgramName from './ProgramName';
 import { isQuickSession } from '../../utils/sessionRuntime';
 import { formatLastUsed, getAverageDurationStat, getTemplateSortTimestamp } from '../../utils/durationStats';
 import styles from './TemplatePicker.module.css';
@@ -15,6 +16,8 @@ import { fractalApi } from '../../utils/api';
 import { queryKeys } from '../../hooks/queryKeys';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
+import { partitionTemplatesByProgram } from '../../utils/createSessionProgramDay';
+import Badge from '../atoms/Badge';
 
 const STARTER_TEMPLATE = {
     name: 'Simple Empty Template',
@@ -52,7 +55,17 @@ function StarterTemplateEmptyState({ rootId, onSelectTemplate }) {
     );
 }
 
-function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate }) {
+function TemplatePicker({
+    templates,
+    selectedTemplate,
+    rootId,
+    onSelectTemplate,
+    programTemplateIds = new Set(),
+    requiredTemplateIds = new Set(),
+    completedTemplateIds = new Set(),
+    programName,
+    programColor,
+}) {
     const navigate = useNavigate();
     const [showArchived, setShowArchived] = useState(false);
     const orderedTemplates = [...templates].sort((a, b) => (
@@ -60,6 +73,8 @@ function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate 
     ));
     const activeTemplates = orderedTemplates.filter((template) => !template.is_archived || template.is_used_in_active_program);
     const archivedTemplates = orderedTemplates.filter((template) => template.is_archived && !template.is_used_in_active_program);
+    const { programTemplates, otherTemplates } = partitionTemplatesByProgram(activeTemplates, programTemplateIds);
+    const hasProgramGroup = programTemplates.length > 0;
 
     const renderTemplateCards = (items) => items.map((template) => {
         const isSelected = selectedTemplate?.id === template.id;
@@ -90,6 +105,12 @@ function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate 
                         <SessionTemplateTypePill entity={template} size="sm" />
                         {template.is_archived ? <span className={styles.statusPill}>Archived</span> : null}
                         {template.is_used_in_active_program ? <span className={styles.activeProgramPill}>Active Program</span> : null}
+                        {programTemplateIds.has(String(template.id)) ? (
+                            <Badge variant="info" size="sm">
+                                {requiredTemplateIds.has(String(template.id)) ? 'Required' : 'Optional'}
+                            </Badge>
+                        ) : null}
+                        {completedTemplateIds.has(String(template.id)) ? <Badge variant="success" size="sm">Done today</Badge> : null}
                     </div>
                 </div>
 
@@ -117,17 +138,23 @@ function TemplatePicker({ templates, selectedTemplate, rootId, onSelectTemplate 
                 <StarterTemplateEmptyState rootId={rootId} onSelectTemplate={onSelectTemplate} />
             ) : (
                 <div className={styles.templateSections}>
-                    {activeTemplates.length > 0 ? (
+                    {hasProgramGroup ? (
+                        <section className={styles.programSection}>
+                            <h3>Today in <ProgramName name={programName} color={programColor} /></h3>
+                            <div className={styles.grid}>{renderTemplateCards(programTemplates)}</div>
+                        </section>
+                    ) : null}
+                    {(hasProgramGroup ? otherTemplates : activeTemplates).length > 0 ? (
                         <div className={styles.grid}>
-                            {renderTemplateCards(activeTemplates)}
+                            {renderTemplateCards(hasProgramGroup ? otherTemplates : activeTemplates)}
                         </div>
-                    ) : (
+                    ) : !hasProgramGroup ? (
                         <EmptyState
                             description="No active templates available."
                             actionLabel="Manage Templates"
                             onAction={() => navigate(`/${rootId}/manage-session-templates`)}
                         />
-                    )}
+                    ) : null}
 
                     {archivedTemplates.length > 0 && (
                         <div className={styles.archivedSection}>

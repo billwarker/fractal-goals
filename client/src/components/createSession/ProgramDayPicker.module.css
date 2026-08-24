@@ -30,6 +30,10 @@
     font-size: 15px;
 }
 
+.blockName {
+    color: var(--color-brand-primary);
+}
+
 .programDaysList {
     display: flex;
     flex-direction: column;

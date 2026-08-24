@@ -31,5 +31,8 @@ export const fractalProgramsApi = {
         axios.post(`${API_BASE}/${rootId}/programs/${programId}/goal-deadlines`, data),
     deleteBlockDay: (rootId, programId, blockId, dayId) =>
         axios.delete(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}`),
-    getActiveProgramDays: (rootId) => axios.get(`${API_BASE}/${rootId}/programs/active-days`),
+    getActiveProgramDays: (rootId, date) => axios.get(
+        `${API_BASE}/${rootId}/programs/active-days`,
+        date ? { params: { date } } : undefined,
+    ),
 };

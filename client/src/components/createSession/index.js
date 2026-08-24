@@ -6,4 +6,6 @@ export { default as ProgramDayPicker } from './ProgramDayPicker';
 export { default as TemplatePicker } from './TemplatePicker';
 export { default as CreateSessionActions } from './CreateSessionActions';
 export { default as SessionGoalScopePanel } from './SessionGoalScopePanel';
+export { default as ProgramDayTodayBanner } from './ProgramDayTodayBanner';
+export { default as ProgramName } from './ProgramName';
 export { default as QuickSessionModal } from './QuickSessionModal';

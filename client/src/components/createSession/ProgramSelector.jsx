@@ -5,40 +5,42 @@ import Button from '../atoms/Button';
 import SelectableCard from '../common/SelectableCard';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
+import ProgramName from './ProgramName';
 import styles from './ProgramSelector.module.css';
 
 function ProgramSelector({
-    programsByName,
-    selectedProgram,
+    programsById,
+    selectedProgramId,
     onSelectProgram,
     hasTemplates,
     sessionSource,
     onSelectTemplateSource,
 }) {
-    const programNames = Object.keys(programsByName);
+    const programs = Object.values(programsById);
 
     return (
         <StepContainer>
             <StepHeader stepNumber={0} title="Choose a Program" />
 
             <div className={styles.list}>
-                {programNames.map((programName) => {
-                    const program = programsByName[programName];
-                    const isSelected = selectedProgram === programName;
+                {programs.map((program) => {
+                    const isSelected = selectedProgramId === String(program.program_id);
                     const dayCount = program.days.length;
 
                     return (
                         <SelectableCard
-                            key={programName}
+                            key={program.program_id}
                             isSelected={isSelected}
-                            onClick={() => onSelectProgram(programName)}
+                            onClick={() => onSelectProgram(String(program.program_id))}
                             className={styles.card}
                         >
                             <div>
                                 <div className={styles.icon}>
                                     <CalendarIcon size={24} />
                                 </div>
-                                <div className={styles.name}>{programName}</div>
+                                <div className={styles.name}>
+                                    <ProgramName name={program.program_name} color={program.program_color} />
+                                </div>
                                 <div className={styles.meta}>
                                     {dayCount} active day{dayCount !== 1 ? 's' : ''} available
                                 </div>

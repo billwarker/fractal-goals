@@ -4,6 +4,7 @@ import Button from '../atoms/Button';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
+import ProgramName from './ProgramName';
 import styles from './CreateSessionActions.module.css';
 
 function CreateSessionActions({
@@ -29,7 +30,6 @@ function CreateSessionActions({
                     compact={footerMode}
                 />
             ) : null}
-
             <Button
                 onClick={onCreateSession}
                 disabled={isDisabled}
@@ -52,7 +52,18 @@ function SessionSummary({ selectedTemplate, selectedProgramDay, compact = false 
                 <SessionTemplateNameBadge entity={selectedTemplate} size={compact ? 'sm' : 'md'} wrap />
                 {selectedProgramDay ? (
                     <span>
-                        {' '}from <strong className={styles.accentText}>{selectedProgramDay.program_name}</strong>
+                        {' '}from{' '}
+                        <strong><ProgramName
+                            name={selectedProgramDay.program_name}
+                            color={selectedProgramDay.program_color}
+                        /></strong>
+                        {selectedProgramDay.block_name ? (
+                            <> · <strong
+                                className={styles.blockName}
+                                style={{ color: selectedProgramDay.block_color || 'var(--color-brand-primary)' }}
+                            >{selectedProgramDay.block_name}</strong></>
+                        ) : null}
+                        {selectedProgramDay.day_name ? <> · <strong>{selectedProgramDay.day_name}</strong></> : null}
                     </span>
                 ) : null}
             </div>

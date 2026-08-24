@@ -3,6 +3,7 @@ import EmptyState from '../common/EmptyState';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
+import ProgramName from './ProgramName';
 import styles from './ProgramDayPicker.module.css';
 
 /**
@@ -28,6 +29,7 @@ function ProgramDayPicker({
                 groups[day.block_id] = {
                     block_id: day.block_id,
                     program_name: day.program_name,
+                    program_color: day.program_color,
                     block_name: day.block_name,
                     block_color: day.block_color,
                     days: []
@@ -58,7 +60,10 @@ function ProgramDayPicker({
             <StepHeader
                 stepNumber={1}
                 title={groupedDays.length === 1
-                    ? `Select a Program Day from ${groupedDays[0].block_name}`
+                    ? <>Select a Program Day from <span
+                        className={styles.blockName}
+                        style={{ color: groupedDays[0].block_color || 'var(--color-brand-primary)' }}
+                    >{groupedDays[0].block_name}</span></>
                     : "Select a Program Day from Your Program"
                 }
             />
@@ -95,7 +100,14 @@ function BlockGroup({
                     style={{ background: group.block_color || '#2196f3' }}
                 />
                 <div className={styles.blockTitle}>
-                    {group.program_name} - {group.block_name}
+                    <ProgramName name={group.program_name} color={group.program_color} />
+                    <span aria-hidden="true"> — </span>
+                    <span
+                        className={styles.blockName}
+                        style={{ color: group.block_color || 'var(--color-brand-primary)' }}
+                    >
+                        {group.block_name}
+                    </span>
                 </div>
             </div>
 
@@ -156,8 +168,8 @@ function ProgramDayRow({ programDay, isSelected, hasMultipleSessions, onClick, i
                 {!hasMultipleSessions && (
                     <div className={styles.templateNameBadge}>
                         <SessionTemplateNameBadge
+                            entity={programDay.sessions[0]}
                             name={programDay.sessions[0].template_name}
-                            color={programDay.sessions[0].template_color}
                             size="sm"
                         />
                     </div>
@@ -194,8 +206,8 @@ function SessionList({ sessions, selectedSession, onSelectSession }) {
                         >
                             <div>
                                 <SessionTemplateNameBadge
+                                    entity={session}
                                     name={session.template_name}
-                                    color={session.template_color}
                                     size="sm"
                                     className={styles.sessionRowTitle}
                                 />

@@ -16,43 +16,35 @@ function dedupeProgramDays(programDays) {
             return 0;
         })
         .filter((day) => {
-            const templateIds = (day.sessions || []).map((session) => session.template_id).sort().join(',');
-            const key = `${day.program_id}-${day.block_id}-${day.day_name}-${templateIds}`;
+            const key = day.day_id;
             if (seenKeys.has(key)) return false;
             seenKeys.add(key);
             return true;
         });
 }
 
-function groupProgramDaysByName(programDays) {
+function groupProgramDaysById(programDays) {
     return programDays.reduce((grouped, day) => {
-        const programName = day.program_name;
-        if (!grouped[programName]) {
-            grouped[programName] = {
+        const programId = String(day.program_id);
+        if (!grouped[programId]) {
+            grouped[programId] = {
                 program_id: day.program_id,
-                program_name: programName,
+                program_name: day.program_name,
+                program_color: day.program_color,
                 days: [],
             };
         }
-        grouped[programName].days.push(day);
+        grouped[programId].days.push(day);
         return grouped;
     }, {});
 }
 
-export function useCreateSessionPageData(rootId) {
+export function useCreateSessionPageData(rootId, todayISO) {
     const results = useQueries({
         queries: [
             {
                 queryKey: queryKeys.sessionTemplates(rootId),
                 queryFn: () => fetchSessionTemplates(rootId),
-                enabled: Boolean(rootId),
-            },
-            {
-                queryKey: queryKeys.goalsForSelection(rootId),
-                queryFn: async () => {
-                    const response = await fractalApi.getGoalsForSelection(rootId);
-                    return response.data || [];
-                },
                 enabled: Boolean(rootId),
             },
             {
@@ -64,9 +56,9 @@ export function useCreateSessionPageData(rootId) {
                 enabled: Boolean(rootId),
             },
             {
-                queryKey: queryKeys.activeProgramDays(rootId),
+                queryKey: queryKeys.activeProgramDays(rootId, todayISO),
                 queryFn: async () => {
-                    const response = await fractalApi.getActiveProgramDays(rootId);
+                    const response = await fractalApi.getActiveProgramDays(rootId, todayISO);
                     return response.data || [];
                 },
                 enabled: Boolean(rootId),
@@ -92,7 +84,6 @@ export function useCreateSessionPageData(rootId) {
 
     const [
         templatesQuery,
-        goalsQuery,
         goalTreeQuery,
         programDaysQuery,
         activitiesQuery,
@@ -109,17 +100,17 @@ export function useCreateSessionPageData(rootId) {
         [programDaysQuery.data]
     );
 
-    const programsByName = useMemo(
-        () => groupProgramDaysByName(programDays),
+    const programsById = useMemo(
+        () => groupProgramDaysById(programDays),
         [programDays]
     );
 
     return {
         templates: templatesQuery.data || [],
-        goals: goalsQuery.data || [],
+        goalTree: goalTreeQuery.data || null,
         allGoals,
         programDays,
-        programsByName,
+        programsById,
         activityDefinitions: activitiesQuery.data || [],
         activityGroups: activityGroupsQuery.data || [],
         loading: results.some((result) => result.isLoading),

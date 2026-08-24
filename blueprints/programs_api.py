@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from datetime import date
 import logging
 import models
 from sqlalchemy.exc import SQLAlchemyError
@@ -342,7 +343,19 @@ def get_active_program_days(current_user, root_id):
     """Get active program days if owned by user."""
     session = get_db_session()
     try:
-        days = ProgramService.get_active_program_days(session, root_id, current_user.id)
+        target_date = None
+        raw_date = request.args.get('date')
+        if raw_date:
+            try:
+                target_date = date.fromisoformat(raw_date)
+            except ValueError:
+                return jsonify({"error": "Invalid date. Use YYYY-MM-DD."}), 400
+        days = ProgramService.get_active_program_days(
+            session,
+            root_id,
+            current_user.id,
+            target_date=target_date,
+        )
         return jsonify(days or [])
     except ValueError as e:
         return jsonify({"error": str(e)}), 404

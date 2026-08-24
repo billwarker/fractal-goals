@@ -118,4 +118,20 @@ describe('DayViewModal', () => {
         expect(screen.getByText('Parent Goal')).toBeInTheDocument();
         expect(screen.queryByText('Child Goal')).not.toBeInTheDocument();
     });
+
+    it('offers the calendar-to-session action for an eligible day', () => {
+        const onStartSession = vi.fn();
+        const day = { id: 'day-1', name: 'Push', date: '2026-03-09', templates: [] };
+        const block = {
+            id: 'block-1', name: 'Base', start_date: '2026-03-01', end_date: '2026-03-12', days: [day],
+        };
+        render(<DayViewModal
+            {...baseProps}
+            program={{ ...baseProps.program, blocks: [block] }}
+            blocks={[block]}
+            onStartSession={onStartSession}
+        />);
+        fireEvent.click(screen.getByRole('button', { name: 'Start session' }));
+        expect(onStartSession).toHaveBeenCalledWith('day-1');
+    });
 });

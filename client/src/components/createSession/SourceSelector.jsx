@@ -4,17 +4,18 @@ import { CalendarIcon, ClipboardIcon } from '../atoms/AppIcons';
 import SelectableCard from '../common/SelectableCard';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
+import ProgramName from './ProgramName';
 import styles from './SourceSelector.module.css';
 
-function SourceSelector({ sessionSource, onSelectSource, programName }) {
+function SourceSelector({ sessionSource, onSelectSource, programName, programColor }) {
     return (
-        <StepContainer>
+        <StepContainer className={styles.container}>
             <StepHeader stepNumber={0} title="Choose Session Source" />
 
             <div className={styles.grid}>
                 <SourceCard
                     icon={<CalendarIcon size={24} />}
-                    title={programName ? `From ${programName}` : 'From Active Program'}
+                    title={programName ? <>From <ProgramName name={programName} color={programColor} /></> : 'From Active Program'}
                     description="Select a day from your current training program"
                     isSelected={sessionSource === 'program'}
                     onClick={() => onSelectSource('program')}
@@ -33,10 +34,12 @@ function SourceSelector({ sessionSource, onSelectSource, programName }) {
 
 function SourceCard({ icon, title, description, isSelected, onClick }) {
     return (
-        <SelectableCard isSelected={isSelected} onClick={onClick} centered className={styles.card}>
+        <SelectableCard isSelected={isSelected} onClick={onClick} className={styles.card}>
             <div className={styles.icon}>{icon}</div>
-            <div className={styles.title}>{title}</div>
-            <div className={styles.description}>{description}</div>
+            <div className={styles.copy}>
+                <div className={styles.title}>{title}</div>
+                <div className={styles.description}>{description}</div>
+            </div>
             {isSelected ? <div className={styles.selectedState}>✓ Selected</div> : null}
         </SelectableCard>
     );

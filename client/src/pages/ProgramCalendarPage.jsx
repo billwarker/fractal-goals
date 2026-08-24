@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useMemo, useReducer, useState } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import EmptyState from '../components/common/EmptyState';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
@@ -80,6 +80,7 @@ function ProgramCalendarPage() {
     const onboarding = useOptionalOnboarding();
     const { rootId, programId } = useParams();
     const location = useLocation();
+    const navigate = useNavigate();
     const isMobile = useIsMobile();
     const { setActiveRootId } = useGoals();
     const { getGoalColor, getGoalTextColor } = useGoalLevels();
@@ -1052,6 +1053,9 @@ function ProgramCalendarPage() {
                         onCreateDayForDate={handleCreateDayForDate}
                         onUnscheduleDay={handleUnscheduleDay}
                         sessions={sessions}
+                        onStartSession={selectedDate === todayInTimezone
+                            ? (dayId) => navigate(`/${rootId}/create-session?program_day_id=${encodeURIComponent(dayId)}`)
+                            : null}
                     />
                 </Suspense>
             )}

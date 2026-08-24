@@ -1,6 +1,6 @@
 import { logError } from '../utils/logger';
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from '../hooks/queryKeys';
@@ -15,6 +15,8 @@ import {
     CreateSessionActions,
     QuickSessionModal,
     SessionGoalScopePanel,
+    ProgramDayTodayBanner,
+    ProgramName,
 } from '../components/createSession';
 import LoadingState from '../components/common/LoadingState';
 import { QueuedQuickSessionProvider } from '../contexts/ActiveSessionContext';
@@ -24,6 +26,7 @@ import useIsMobile from '../hooks/useIsMobile';
 import { isQuickSession } from '../utils/sessionRuntime';
 import { buildTemplateSessionPayload } from '../utils/createSessionPayload';
 import { buildQueuedQuickSession, sanitizeMetrics, sanitizeSets } from '../utils/createSessionQuickDraft';
+import { programSessionToTemplate } from '../utils/createSessionProgramDay';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import Modal from '../components/atoms/Modal';
@@ -31,6 +34,9 @@ import ModalBody from '../components/atoms/ModalBody';
 import headerStyles from '../components/layout/PageHeader.module.css';
 import styles from './CreateSession.module.css';
 import '../App.css';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { getISOYMDInTimezone } from '../utils/dateUtils';
+import { useCreateSessionAutoSelection, useCreateSessionProgramContext } from '../hooks/useCreateSessionProgramContext';
 
 /**
  * Create Session Page
@@ -47,12 +53,18 @@ import '../App.css';
 function CreateSession() {
     const { rootId } = useParams();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const queryClient = useQueryClient();
     const { user } = useAuth();
     const isMobile = useIsMobile();
+    const { timezone } = useTimezone();
+    const todayISO = useMemo(
+        () => getISOYMDInTimezone(new Date(), timezone || 'UTC'),
+        [timezone],
+    );
     const { data: existingActiveSession, isFetched: activeSessionFetched } = useActiveSession(user?.id, rootId);
     // Selection state
-    const [selectedProgram, setSelectedProgram] = useState(null);
+    const [selectedProgramId, setSelectedProgramId] = useState(null);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     const [selectedProgramDay, setSelectedProgramDay] = useState(null);
     const [selectedProgramSession, setSelectedProgramSession] = useState(null);
@@ -67,12 +79,13 @@ function CreateSession() {
     const {
         templates,
         programDays,
-        programsByName,
+        programsById,
         activityDefinitions,
         activityGroups,
         allGoals,
+        goalTree,
         loading,
-    } = useCreateSessionPageData(rootId);
+    } = useCreateSessionPageData(rootId, todayISO);
 
     const selectedTemplateIsNormal = Boolean(selectedTemplate && !isQuickSession(selectedTemplate));
     const scopePreviewQuery = useQuery({
@@ -108,73 +121,57 @@ function CreateSession() {
         }
     }, [activeSessionFetched, existingActiveSession, navigate]);
 
-    const programNames = Object.keys(programsByName);
-    const defaultProgram = programNames.length === 1 ? programNames[0] : null;
+    const programIds = Object.keys(programsById);
+    const defaultProgramId = programIds.length === 1 ? programIds[0] : null;
     const defaultSessionSource = (() => {
-        if (programNames.length === 1 && templates.length === 0) {
+        if (programIds.length === 1 && templates.length === 0) {
             return 'program';
         }
-        if (programNames.length === 0 && templates.length > 0) {
+        if (programIds.length === 0 && templates.length > 0) {
             return 'template';
         }
         return null;
     })();
-    const effectiveSelectedProgram = selectedProgram ?? defaultProgram;
+    const effectiveSelectedProgramId = selectedProgramId ?? defaultProgramId;
     const effectiveSessionSource = sessionSource ?? defaultSessionSource;
+    const selectedProgram = effectiveSelectedProgramId ? programsById[effectiveSelectedProgramId] : null;
+
+    const resetSelectionState = ({ keepProgramDay = false, keepManualGoals = false } = {}) => {
+        if (!keepManualGoals) setManualGoalIds([]);
+        setQueuedQuickSession(null);
+        setQuickSessionModalOpen(false);
+        setSelectedTemplate(null);
+        setSelectedProgramSession(null);
+        if (!keepProgramDay) setSelectedProgramDay(null);
+    };
 
     // Handler functions
     const handleSelectProgramDay = (programDay) => {
-        setManualGoalIds([]);
-        setQueuedQuickSession(null);
-        setQuickSessionModalOpen(false);
+        resetSelectionState({ keepProgramDay: true });
         setSelectedProgramDay(programDay);
-        setSelectedProgramSession(null);
-        setSelectedTemplate(null);
 
         // Auto-select if single session
         if (programDay.sessions?.length === 1) {
             const session = programDay.sessions[0];
             setSelectedProgramSession(session);
-            setSelectedTemplate({
-                id: session.template_id,
-                name: session.template_name,
-                description: session.template_description,
-                template_data: session.template_data
-            });
+            setSelectedTemplate(programSessionToTemplate(session));
         }
     };
 
     const handleSelectProgramSession = (session) => {
-        setManualGoalIds([]);
-        setQueuedQuickSession(null);
-        setQuickSessionModalOpen(false);
+        resetSelectionState({ keepProgramDay: true });
         setSelectedProgramSession(session);
-        setSelectedTemplate({
-            id: session.template_id,
-            name: session.template_name,
-            description: session.template_description,
-            template_data: session.template_data
-        });
+        setSelectedTemplate(programSessionToTemplate(session));
     };
 
     const handleSelectSource = (source) => {
-        setManualGoalIds([]);
-        setQueuedQuickSession(null);
-        setQuickSessionModalOpen(false);
-        setSelectedTemplate(null);
-        setSelectedProgramDay(null);
-        setSelectedProgramSession(null);
+        resetSelectionState();
         setSessionSource(source);
     };
 
-    const handleSelectProgram = (programName) => {
-        setManualGoalIds([]);
-        setQueuedQuickSession(null);
-        setQuickSessionModalOpen(false);
-        setSelectedProgramDay(null);
-        setSelectedProgramSession(null);
-        setSelectedTemplate(null);
-        setSelectedProgram(programName);
+    const handleSelectProgram = (programId) => {
+        resetSelectionState();
+        setSelectedProgramId(String(programId));
         setSessionSource('program');
     };
 
@@ -314,10 +311,8 @@ function CreateSession() {
     };
 
     const handleSelectTemplate = (template) => {
-        setManualGoalIds([]);
+        resetSelectionState();
         setSelectedTemplate(template);
-        setSelectedProgramDay(null);
-        setSelectedProgramSession(null);
         if (isQuickSession(template)) {
             setQueuedQuickSession(buildQueuedQuickSession(template, activityDefinitions));
             setQuickSessionModalOpen(true);
@@ -326,6 +321,27 @@ function CreateSession() {
 
         setQueuedQuickSession(null);
         setQuickSessionModalOpen(false);
+    };
+
+    const quickTemplateSelected = Boolean(selectedTemplate && isQuickSession(selectedTemplate) && !selectedProgramDay);
+    const {
+        todayProgramView, primaryTodayProgramDay, programScopeAvailable,
+        programScopeEnabled, scopedGoals, offScopeManualGoalIds, setScopeEnabled,
+    } = useCreateSessionProgramContext({
+        rootId, userId: user?.id, programDays, selectedProgramDay,
+        goalTree, allGoals, manualGoalIds, quickTemplateSelected,
+    });
+    const { deepLinkNotice, setDeepLinkNotice } = useCreateSessionAutoSelection({
+        loading, programDays, searchParams, setSearchParams, sessionSource,
+        setSelectedProgramId, setSessionSource, setSelectedProgramDay,
+        setSelectedProgramSession, setSelectedTemplate,
+    });
+
+    const handleJumpToProgramDay = () => {
+        if (!primaryTodayProgramDay) return;
+        setSelectedProgramId(String(primaryTodayProgramDay.program_id));
+        setSessionSource('program');
+        handleSelectProgramDay(primaryTodayProgramDay);
     };
 
     const handleCloseQuickSessionModal = () => {
@@ -355,12 +371,11 @@ function CreateSession() {
     // Derived state for conditional rendering
     const hasProgramDays = programDays.length > 0;
     const hasTemplates = templates.length > 0;
-    const hasMultiplePrograms = programNames.length > 1;
-    const hasSingleProgram = programNames.length === 1;
+    const hasMultiplePrograms = programIds.length > 1;
+    const hasSingleProgram = programIds.length === 1;
     const showSourceChoice = hasSingleProgram && hasTemplates;
     const showProgramChoice = hasMultiplePrograms;
-    const currentProgramDays = effectiveSelectedProgram ? (programsByName[effectiveSelectedProgram]?.days || []) : [];
-    const quickTemplateSelected = Boolean(selectedTemplate && isQuickSession(selectedTemplate) && !selectedProgramDay);
+    const currentProgramDays = effectiveSelectedProgramId ? (programsById[effectiveSelectedProgramId]?.days || []) : [];
     const showCreationAction = !quickTemplateSelected;
     const renderCreationAction = (placement) => {
         const placementProps = placement === 'header'
@@ -380,7 +395,7 @@ function CreateSession() {
     };
     const sessionGoalScopePanel = (
         <SessionGoalScopePanel
-            goals={allGoals}
+            goals={scopedGoals}
             manualGoalIds={manualGoalIds}
             automaticGoalIds={scopePreviewQuery.data?.automatic_goal_ids || []}
             onChange={setManualGoalIds}
@@ -392,6 +407,15 @@ function CreateSession() {
             awaitingTemplate={!selectedTemplate}
             embedded={isMobile}
             hideHeading={isMobile}
+            programScopeAvailable={programScopeAvailable}
+            programScopeEnabled={programScopeEnabled}
+            onProgramScopeChange={setScopeEnabled}
+            programName={selectedProgramDay?.program_name}
+            programColor={selectedProgramDay?.program_color}
+            offScopeGoalCount={offScopeManualGoalIds.length}
+            onClearOffScopeGoals={() => setManualGoalIds((current) => (
+                current.filter((goalId) => !offScopeManualGoalIds.includes(goalId))
+            ))}
         />
     );
 
@@ -399,7 +423,17 @@ function CreateSession() {
         <div className={headerStyles.pageShell}>
             <PageHeader
                 title="Create Session"
-                subtitle="Select a template or program day to begin your session."
+                subtitle={selectedProgramDay
+                    ? <>Day {selectedProgramDay.day_number || selectedProgramDay.day_name} of{' '}
+                        <strong
+                            className={styles.selectedBlockName}
+                            style={{ color: selectedProgramDay.block_color || 'var(--color-brand-primary)' }}
+                        >{selectedProgramDay.block_name}</strong>
+                        {' '}· <ProgramName
+                            name={selectedProgramDay.program_name}
+                            color={selectedProgramDay.program_color}
+                        /></>
+                    : 'Select a template or program day to begin your session.'}
                 actions={isMobile ? (
                     <HeaderButton
                         variant="secondary"
@@ -408,7 +442,10 @@ function CreateSession() {
                         aria-controls="create-session-goals"
                         aria-label={`${mobileGoalsOpen ? 'Hide' : 'Show'} Session Goals`}
                     >
-                        Session Goals
+                        {programScopeEnabled ? <>Session Goals · <ProgramName
+                            name={selectedProgramDay?.program_name}
+                            color={selectedProgramDay?.program_color}
+                        /></> : 'Session Goals'}
                     </HeaderButton>
                 ) : showCreationAction ? (
                     <div className={styles.desktopHeaderAction}>
@@ -420,29 +457,50 @@ function CreateSession() {
 
             <div className={`${headerStyles.scrollContent} ${headerStyles.gridContent} ${styles.content}`}>
             <div className={styles.inner}>
-                {/* Step 0a: Choose Program (if multiple programs available) */}
-                {showProgramChoice && (
-                    <ProgramSelector
-                        programsByName={programsByName}
-                        selectedProgram={effectiveSelectedProgram}
-                        onSelectProgram={handleSelectProgram}
-                        hasTemplates={hasTemplates}
-                        sessionSource={effectiveSessionSource}
-                        onSelectTemplateSource={() => handleSelectSource('template')}
-                    />
-                )}
-
-                {/* Step 0b: Choose Session Source (if single program AND templates available) */}
-                {showSourceChoice && (
-                    <SourceSelector
-                        sessionSource={effectiveSessionSource}
-                        onSelectSource={handleSelectSource}
-                        programName={effectiveSelectedProgram}
-                    />
-                )}
-
+                {deepLinkNotice ? (
+                    <div className={styles.notice} role="status">
+                        <span>{deepLinkNotice}</span>
+                        <button type="button" onClick={() => setDeepLinkNotice(null)}>Dismiss</button>
+                    </div>
+                ) : null}
                 <div className={styles.sessionWorkspaceLayout}>
                     <div className={styles.requiredSessionFlow}>
+                        {todayProgramView.hasProgramDayToday && primaryTodayProgramDay ? (
+                            <ProgramDayTodayBanner
+                                programName={primaryTodayProgramDay.program_name}
+                                programColor={primaryTodayProgramDay.program_color}
+                                blockName={primaryTodayProgramDay.block_name}
+                                dayName={primaryTodayProgramDay.day_name}
+                                dayNumber={primaryTodayProgramDay.day_number}
+                                blockColor={primaryTodayProgramDay.block_color}
+                                completedCount={todayProgramView.completedCount}
+                                minTemplates={todayProgramView.minTemplates}
+                                totalRequired={todayProgramView.totalRequired}
+                                isDayComplete={todayProgramView.isDayComplete}
+                                onJumpToProgramDay={handleJumpToProgramDay}
+                            />
+                        ) : null}
+
+                        {showProgramChoice && (
+                            <ProgramSelector
+                                programsById={programsById}
+                                selectedProgramId={effectiveSelectedProgramId}
+                                onSelectProgram={handleSelectProgram}
+                                hasTemplates={hasTemplates}
+                                sessionSource={effectiveSessionSource}
+                                onSelectTemplateSource={() => handleSelectSource('template')}
+                            />
+                        )}
+
+                        {showSourceChoice && (
+                            <SourceSelector
+                                sessionSource={effectiveSessionSource}
+                                onSelectSource={handleSelectSource}
+                                programName={selectedProgram?.program_name}
+                                programColor={selectedProgram?.program_color}
+                            />
+                        )}
+
                         {/* Step 1: Select Program Day */}
                         {(effectiveSessionSource === 'program' || (hasProgramDays && !hasTemplates)) && (
                             <ProgramDayPicker
@@ -463,6 +521,11 @@ function CreateSession() {
                                 selectedTemplate={selectedTemplate}
                                 rootId={rootId}
                                 onSelectTemplate={handleSelectTemplate}
+                                programTemplateIds={todayProgramView.allTemplateIds}
+                                requiredTemplateIds={todayProgramView.requiredTemplateIds}
+                                completedTemplateIds={todayProgramView.completedTemplateIds}
+                                programName={primaryTodayProgramDay?.program_name}
+                                programColor={primaryTodayProgramDay?.program_color}
                             />
                         )}
 

@@ -78,6 +78,7 @@ const DayViewModal = ({
     onUnscheduleDay,
     blocks,
     sessions,
+    onStartSession,
 }) => {
     const { getGoalColor } = useGoalLevels();
     const { timezone } = useTimezone();
@@ -235,7 +236,6 @@ const DayViewModal = ({
             <ModalBody>
                 <div className={styles.contentArea}>
 
-                    {/* Program Days */}
                     {scheduledProgramDayData.length > 0 && (
                         <div className={styles.sectionContainer}>
                             {scheduledProgramDayData.map((day, idx) => {
@@ -289,17 +289,23 @@ const DayViewModal = ({
                                                     ) : `${completedTemplateCount}/${templates.length || 0} program sessions completed`}
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={() => onUnscheduleDay && onUnscheduleDay(day)}
-                                                className={styles.removeButton}
-                                                title={day.isRecurringTemplate ? 'Remove sessions from this date' : 'Unschedule Day'}
-                                                aria-label={day.isRecurringTemplate ? 'Remove sessions from this date' : 'Unschedule day'}
-                                            >
-                                                <CloseIcon size={14} />
-                                            </button>
+                                            <div className={styles.programDayActions}>
+                                                {onStartSession ? (
+                                                    <Button size="sm" variant="secondary" onClick={() => onStartSession(day.id)}>
+                                                        Start session
+                                                    </Button>
+                                                ) : null}
+                                                <button
+                                                    onClick={() => onUnscheduleDay && onUnscheduleDay(day)}
+                                                    className={styles.removeButton}
+                                                    title={day.isRecurringTemplate ? 'Remove sessions from this date' : 'Unschedule Day'}
+                                                    aria-label={day.isRecurringTemplate ? 'Remove sessions from this date' : 'Unschedule day'}
+                                                >
+                                                    <CloseIcon size={14} />
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        {/* Templates List */}
                                         {templates.length > 0 && (
                                             <div className={styles.templateList}>
                                                 {templates.map(t => {
@@ -320,7 +326,6 @@ const DayViewModal = ({
                                                                 {completedTSessions.length > 1 && <span className={styles.sessionCountBadge}>{completedTSessions.length}</span>}
                                                             </div>
 
-                                                            {/* Sessions under this template */}
                                                             {tSessions.length > 0 && (
                                                                 <div className={styles.templateSessions}>
                                                                     {tSessions.map(s => (
@@ -349,7 +354,6 @@ const DayViewModal = ({
                                             </div>
                                         )}
 
-                                        {/* Unlinked Sessions for this day */}
                                         {unlinkedDaySessions.length > 0 && (
                                             <div className={styles.unlinkedSessions}>
                                                 {unlinkedDaySessions.map(s => (
@@ -382,7 +386,6 @@ const DayViewModal = ({
                         </div>
                     )}
 
-                    {/* Scheduled Sessions Section */}
                     {looseScheduledSessions.length > 0 && (
                         <div className={styles.sectionContainer}>
                             <h3 className={styles.sectionTitle}>
@@ -422,7 +425,6 @@ const DayViewModal = ({
                         </div>
                     )}
 
-                    {/* Completed Sessions Section */}
                     {looseCompletedSessions.length > 0 && (
                         <div className={styles.sectionContainer}>
                             <h3 className={styles.sectionTitle}>
@@ -443,14 +445,12 @@ const DayViewModal = ({
                         </div>
                     )}
 
-                    {/* Goals Section */}
                     {(goalsDueOnDate.length > 0 || goalsCompletedOnDate.length > 0) && (
                         <div className={styles.sectionContainer}>
                             <h3 className={styles.sectionTitle}>
                                 Goals
                             </h3>
                             <div className={styles.listContainer}>
-                                {/* Completed Goals */}
                                 {goalsCompletedOnDate.map(goal => (
                                     <div key={`comp-${goal.id}`} className={styles.goalCardCompleted}>
                                         <div className={styles.goalCardFlex}>

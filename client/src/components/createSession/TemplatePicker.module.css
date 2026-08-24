@@ -48,6 +48,20 @@
     background: var(--color-bg-input);
 }
 
+.programSection {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.programSection h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 14px;
+}
+
 .activeProgramPill {
     border-color: color-mix(in srgb, var(--color-brand-success) 45%, var(--color-border));
     color: var(--color-brand-success);

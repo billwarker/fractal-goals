@@ -1,7 +1,8 @@
 import pytest
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from services.events import Events
+from models import Program, ProgramBlock, ProgramDay, ProgramDayTemplate, program_goals, program_block_goals
 
 @pytest.fixture
 def sample_program(authed_client, sample_ultimate_goal):
@@ -99,6 +100,74 @@ class TestProgramCRUD:
         assert isinstance(data, list)
         assert len(data) >= 1
         assert any(p['id'] == sample_program['id'] for p in data)
+
+    def test_active_days_honors_requested_date_and_preserves_program_contract(
+        self,
+        authed_client,
+        db_session,
+        sample_ultimate_goal,
+        sample_program,
+        sample_goal_hierarchy,
+        sample_session_template,
+    ):
+        target_date = date.today()
+        program = db_session.query(Program).filter_by(id=sample_program['id']).one()
+        program.color = '#22c55e'
+        program.start_date = datetime.combine(target_date, datetime.min.time())
+        program.end_date = datetime.combine(target_date, datetime.max.time())
+        block = db_session.query(ProgramBlock).filter_by(program_id=program.id).first()
+        block.start_date = target_date
+        block.end_date = target_date
+        day = ProgramDay(
+            block_id=block.id,
+            date=target_date,
+            day_number=4,
+            name='Today',
+            completion_min_templates=1,
+        )
+        db_session.add(day)
+        db_session.flush()
+        sample_session_template.template_data = json.dumps({'template_color': '#d946ef'})
+        db_session.add(ProgramDayTemplate(
+            program_day_id=day.id,
+            session_template_id=sample_session_template.id,
+            is_required=False,
+            order=3,
+        ))
+        db_session.execute(program_goals.insert().values(
+            program_id=program.id,
+            goal_id=sample_goal_hierarchy['mid_term'].id,
+        ))
+        db_session.execute(program_block_goals.insert().values(
+            program_block_id=block.id,
+            goal_id=sample_goal_hierarchy['short_term'].id,
+        ))
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{sample_ultimate_goal.id}/programs/active-days?date={target_date.isoformat()}'
+        )
+        assert response.status_code == 200
+        row = next(item for item in response.get_json() if item['day_id'] == day.id)
+        assert row['program_goal_ids'] == [sample_goal_hierarchy['mid_term'].id]
+        assert row['program_color'] == '#22c55e'
+        assert row['block_goal_ids'] == [sample_goal_hierarchy['short_term'].id]
+        assert row['completion_min_templates'] == 1
+        assert row['completed_session_count'] == 0
+        assert row['completed_template_ids'] == []
+        assert row['sessions'][0]['is_required'] is False
+        assert row['sessions'][0]['order'] == 3
+        assert row['sessions'][0]['template_color'] == '#d946ef'
+
+        other_date = target_date + timedelta(days=1)
+        assert authed_client.get(
+            f'/api/{sample_ultimate_goal.id}/programs/active-days?date={other_date.isoformat()}'
+        ).get_json() == []
+
+    def test_active_days_rejects_malformed_date(self, authed_client, sample_ultimate_goal):
+        response = authed_client.get(f'/api/{sample_ultimate_goal.id}/programs/active-days?date=tomorrow')
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Invalid date. Use YYYY-MM-DD.'
 
     def test_get_specific_program(self, authed_client, sample_ultimate_goal, sample_program):
         """Test retrieving a specific program."""

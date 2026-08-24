@@ -6,15 +6,15 @@ calls use cls.<method>(...) and resolve through the composed ProgramService clas
 
 import uuid
 import logging
-from datetime import datetime, date, timezone
+from datetime import datetime, date, time, timedelta, timezone
 from typing import List, Dict, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from services.serializers import format_utc
 from models import Program, ProgramBlock, ProgramDay, ProgramDayTemplate, Goal, Session, _safe_load_json
 from services import event_bus, Event, Events
 from services.owned_entity_queries import get_owned_program
-from services.serializers import serialize_program_day, serialize_goal
+from services.serializers import format_utc, serialize_program_day, serialize_goal
+from services.session_runtime import get_template_color
 from services.session_service import SessionService
 
 logger = logging.getLogger(__name__)
@@ -447,9 +447,18 @@ class _ProgramDaysMixin:
         return serialize_goal(goal, include_children=False)
 
     @classmethod
-    def get_active_program_days(cls, session, root_id: str, current_user_id: str | None = None) -> List[Dict]:
+    def get_active_program_days(
+        cls,
+        session,
+        root_id: str,
+        current_user_id: str | None = None,
+        *,
+        target_date: date | None = None,
+    ) -> List[Dict]:
         cls._require_root_access(session, root_id, current_user_id)
-        today = date.today()
+        today = target_date or date.today()
+        day_start = datetime.combine(today, time.min)
+        next_day_start = day_start + timedelta(days=1)
         
         from sqlalchemy.orm import selectinload
         active_programs = session.query(Program).options(
@@ -462,8 +471,8 @@ class _ProgramDaysMixin:
                 .selectinload(ProgramDayTemplate.template)
         ).filter(
             Program.root_id == root_id,
-            Program.start_date <= today,
-            Program.end_date >= today,
+            Program.start_date < next_day_start,
+            Program.end_date >= day_start,
         ).all()
         
         result = []
@@ -484,11 +493,13 @@ class _ProgramDaysMixin:
                                 }
                                 for index, template in enumerate(day.templates):
                                     template_rule = template_rules.get(template.id, {})
+                                    template_data = _safe_load_json(template.template_data, {})
                                     session_details.append({
                                         "template_id": template.id,
                                         "template_name": template.name,
                                         "template_description": template.description,
-                                        "template_data": _safe_load_json(template.template_data, {}),
+                                        "template_data": template_data,
+                                        "template_color": get_template_color(template_data),
                                         "is_archived": bool(getattr(template, "archived_at", None)),
                                         "archived_at": format_utc(getattr(template, "archived_at", None)),
                                         "is_used_in_active_program": True,
@@ -500,6 +511,7 @@ class _ProgramDaysMixin:
                                 result.append({
                                     "program_id": program.id,
                                     "program_name": program.name,
+                                    "program_color": program.color,
                                     "block_id": block.id,
                                     "block_name": block.name,
                                     "block_color": block.color,
@@ -512,6 +524,11 @@ class _ProgramDaysMixin:
                                     "is_completed": day.is_completed,
                                     "completion_min_templates": day.completion_min_templates,
                                     "sessions": session_details,
-                                    "completed_session_count": len([s for s in day.completed_sessions if not s.deleted_at])
+                                    "completed_session_count": len([s for s in day.completed_sessions if not s.deleted_at]),
+                                    "completed_template_ids": sorted({
+                                        s.template_id
+                                        for s in day.completed_sessions
+                                        if s.completed and not s.deleted_at and s.template_id
+                                    })
                                 })
         return result

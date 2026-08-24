@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import TemplatePicker from '../TemplatePicker';
 
-function renderPicker(templates) {
+function renderPicker(templates, props = {}) {
     return render(
         <MemoryRouter>
             <TemplatePicker
@@ -12,6 +12,7 @@ function renderPicker(templates) {
                 selectedTemplate={null}
                 rootId="root-1"
                 onSelectTemplate={vi.fn()}
+                {...props}
             />
         </MemoryRouter>
     );
@@ -71,5 +72,30 @@ describe('TemplatePicker', () => {
         const badge = screen.getByTitle(longName);
         expect(badge).toContainElement(screen.getByText(longName));
         expect(badge.className).toContain('wrap');
+    });
+
+    it('pins today’s program templates and labels their rules and completion', () => {
+        renderPicker([
+            { id: 'other', name: 'Other', updated_at: '2026-01-03', template_data: { sections: [] } },
+            { id: 'required', name: 'Program Required', updated_at: '2026-01-01', template_data: { sections: [] } },
+        ], {
+            programTemplateIds: new Set(['required']),
+            requiredTemplateIds: new Set(['required']),
+            completedTemplateIds: new Set(['required']),
+            programName: 'Strength',
+            programColor: '#22c55e',
+        });
+        expect(screen.getByRole('heading', { name: 'Today in Strength' })).toBeInTheDocument();
+        expect(screen.getByText('Strength')).toHaveStyle({ color: '#22c55e' });
+        expect(screen.getByText('Required')).toBeInTheDocument();
+        expect(screen.getByText('Done today')).toBeInTheDocument();
+        const names = screen.getAllByTitle(/Other|Program Required/).map((node) => node.title);
+        expect(names).toEqual(['Program Required', 'Other']);
+    });
+
+    it('keeps the standard layout when no program templates exist', () => {
+        renderPicker([{ id: 'normal', name: 'Normal', template_data: { sections: [] } }]);
+        expect(screen.queryByRole('heading', { name: /Today in/ })).not.toBeInTheDocument();
+        expect(screen.getByText('Normal')).toBeInTheDocument();
     });
 });

@@ -2,6 +2,8 @@ import React from 'react';
 
 import StepContainer from '../common/StepContainer';
 import GoalHierarchySelector from '../goals/GoalHierarchySelector';
+import Checkbox from '../atoms/Checkbox';
+import ProgramName from './ProgramName';
 import styles from './SessionGoalScopePanel.module.css';
 
 function SessionGoalScopePanel({
@@ -17,6 +19,13 @@ function SessionGoalScopePanel({
     awaitingTemplate = false,
     embedded = false,
     hideHeading = false,
+    programScopeAvailable = false,
+    programScopeEnabled = false,
+    onProgramScopeChange,
+    programName,
+    programColor,
+    offScopeGoalCount = 0,
+    onClearOffScopeGoals,
 }) {
     const statusLabel = readOnly ? 'Read only' : 'Optional';
     const description = readOnly
@@ -36,6 +45,28 @@ function SessionGoalScopePanel({
             <p className={`${styles.description} ${automaticGoalIds.length === 0 ? styles.descriptionStandalone : ''}`}>
                 {description}
             </p>
+            {programScopeAvailable && !readOnly ? (
+                <div className={styles.scopeRow}>
+                    <span
+                        className={styles.programSwatch}
+                        style={{ backgroundColor: programColor || 'var(--color-brand-primary)' }}
+                        aria-hidden="true"
+                    />
+                    <Checkbox
+                        checked={programScopeEnabled}
+                        onChange={(event) => onProgramScopeChange?.(event.target.checked)}
+                        label={<>Only goals in <ProgramName name={programName} color={programColor} /></>}
+                        title={`Only show goals in ${programName}, including their ancestors and descendants.`}
+                        containerStyle={{ margin: 0 }}
+                    />
+                </div>
+            ) : null}
+            {offScopeGoalCount > 0 ? (
+                <div className={styles.offScopeNotice} role="status">
+                    <span>{offScopeGoalCount} selected goal{offScopeGoalCount === 1 ? ' is' : 's are'} outside this program.</span>
+                    <button type="button" onClick={onClearOffScopeGoals}>Remove them</button>
+                </div>
+            ) : null}
             {automaticGoalIds.length > 0 && (
                 <p className={styles.provenanceLegend}>
                     <span aria-hidden="true">*</span>
@@ -65,6 +96,7 @@ function SessionGoalScopePanel({
                         initialHideCompletedGoals
                         lockHideCompletedGoals
                         showHideCompletedControl={false}
+                        emptyState={programScopeEnabled ? 'No goals in this program.' : 'No goals available.'}
                     />
                 </div>
             )}

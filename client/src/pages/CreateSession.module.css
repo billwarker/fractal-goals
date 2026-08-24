@@ -1,5 +1,5 @@
 .content {
-    padding: 32px 40px;
+    padding: 20px 40px 24px;
 }
 
 .inner {
@@ -9,6 +9,11 @@
 
 .createSessionHeader {
     align-items: center;
+}
+
+.selectedBlockName {
+    color: var(--color-brand-primary);
+    font-weight: 700;
 }
 
 .desktopHeaderAction {
@@ -55,9 +60,9 @@
 
 .sessionWorkspaceLayout {
     display: grid;
-    grid-template-columns: minmax(700px, 1.35fr) minmax(480px, 0.85fr);
+    grid-template-columns: minmax(0, 1.25fr) minmax(360px, 0.75fr);
     align-items: start;
-    gap: 24px;
+    gap: 16px;
 }
 
 .stickyActionFooter {
@@ -77,13 +82,11 @@
     margin-inline: auto;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1024px) {
     .sessionWorkspaceLayout {
         grid-template-columns: 1fr;
     }
-}
 
-@media (max-width: 1024px) {
     .content {
         padding: 20px 20px 28px 20px;
     }
@@ -107,4 +110,25 @@
         width: 100%;
         max-height: min(82dvh, calc(100dvh - var(--app-nav-height, 0px)));
     }
+}
+.notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-card);
+    font-size: 13px;
+}
+
+.notice button {
+    border: 0;
+    background: transparent;
+    color: var(--color-brand-primary);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
 }

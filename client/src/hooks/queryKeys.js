@@ -3,7 +3,9 @@ export const queryKeys = {
     circuits: (rootId, includeArchived = false) => ['circuits', rootId, { includeArchived }],
     circuit: (rootId, circuitId) => ['circuit', rootId, circuitId],
     sessionCircuitRuns: (rootId, sessionId) => ['circuit-runs', rootId, sessionId],
-    activeProgramDays: (rootId) => ['active-program-days', rootId],
+    activeProgramDays: (rootId, date) => date
+        ? ['active-program-days', rootId, date]
+        : ['active-program-days', rootId],
     analyticsSummary: (rootId, limit = 50) => ['analytics-summary', rootId, limit],
     analyticsSessions: (rootId, limit = 50) => ['analytics-sessions', rootId, limit],
     activityHistory: (rootId, activityDefinitionId, excludeSessionId = null, limit = 10) => [

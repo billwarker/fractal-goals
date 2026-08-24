@@ -20,8 +20,8 @@ from uuid import uuid4
 
 from models import (
     ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, Session, SessionTemplate,
-    SessionWorkInterval, Target,
-    activity_goal_associations, session_goals,
+    SessionWorkInterval, Target, Program, ProgramBlock, ProgramDay,
+    activity_goal_associations, session_goals, program_goals,
 )
 
 
@@ -66,6 +66,66 @@ class TestSessionListEndpoints:
         assert set(response.get_json()['automatic_goal_ids']) == {
             goal.id for goal in sample_goal_hierarchy.values()
         }
+        assert response.get_json()['program_scope_goal_ids'] == []
+
+    def test_program_goal_scope_preview_and_creation_record_off_program_goals(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        sample_session_template,
+    ):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        now = datetime.now(timezone.utc)
+        program = Program(
+            root_id=root_id,
+            name='Scoped program',
+            start_date=now,
+            end_date=now + timedelta(days=7),
+            weekly_schedule={},
+        )
+        db_session.add(program)
+        db_session.flush()
+        block = ProgramBlock(
+            program_id=program.id,
+            name='Block',
+            start_date=now.date(),
+            end_date=(now + timedelta(days=7)).date(),
+        )
+        db_session.add(block)
+        db_session.flush()
+        day = ProgramDay(block_id=block.id, date=now.date(), name='Today')
+        db_session.add(day)
+        db_session.flush()
+        in_program = sample_goal_hierarchy['mid_term'].id
+        off_program = sample_goal_hierarchy['short_term'].id
+        db_session.execute(program_goals.insert().values(program_id=program.id, goal_id=in_program))
+        db_session.commit()
+
+        preview = authed_client.post(
+            f'/api/{root_id}/sessions/goal-scope-preview',
+            json={'template_id': sample_session_template.id, 'program_day_id': day.id},
+        )
+        assert preview.status_code == 200
+        assert preview.get_json()['program_scope_goal_ids'] == [in_program]
+
+        created = authed_client.post(
+            f'/api/{root_id}/sessions',
+            json={
+                'name': 'Off-program intent',
+                'template_id': sample_session_template.id,
+                'goal_ids': [in_program, off_program],
+                'session_data': {
+                    'program_context': {
+                        'program_id': program.id,
+                        'day_id': day.id,
+                    },
+                },
+            },
+        )
+        assert created.status_code == 201
+        persisted = db_session.query(Session).filter_by(id=created.get_json()['id']).one()
+        assert persisted.attributes['program_context']['off_program_goal_ids'] == [off_program]
 
     def test_active_session_endpoint_returns_paused_session(
         self, authed_client, db_session, sample_ultimate_goal, test_user

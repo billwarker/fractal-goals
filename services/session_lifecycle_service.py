@@ -206,7 +206,7 @@ class SessionLifecycleService:
         if not template:
             return None, "Template not found in this fractal", 404
         if get_template_session_type(models._safe_load_json(template.template_data, {})) == SESSION_TYPE_QUICK:
-            return {"automatic_goal_ids": []}, None, 200
+            return {"automatic_goal_ids": [], "program_scope_goal_ids": []}, None, 200
 
         activity_ids, activity_error = self._template_activity_definition_ids(root_id, template)
         if activity_error:
@@ -222,7 +222,10 @@ class SessionLifecycleService:
             for goal in goals
             if not goal.deleted_at and (not program_goal_ids or goal.id in program_goal_ids)
         }
-        return {"automatic_goal_ids": sorted(automatic_goal_ids)}, None, 200
+        return {
+            "automatic_goal_ids": sorted(automatic_goal_ids),
+            "program_scope_goal_ids": sorted(program_goal_ids),
+        }, None, 200
 
     def _replace_manual_goal_scope(self, session, root_id, goal_ids):
         requested_ids = set(goal_ids or [])
@@ -633,6 +636,10 @@ class SessionLifecycleService:
         manual_ids.update(data.get('goal_ids', []) or [])
         if data.get('parent_id'):
             manual_ids.add(data.get('parent_id'))
+
+        if program_day_id and isinstance(session_data_dict.get('program_context'), dict):
+            session_data_dict['program_context']['off_program_goal_ids'] = sorted(manual_ids - program_goal_ids)
+            new_session.attributes = copy.deepcopy(session_data_dict)
 
         linked_goal_ids = set()
 
