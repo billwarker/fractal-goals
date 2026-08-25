@@ -10,7 +10,7 @@ from services.session_runtime import (
 )
 
 
-SECTION_STRUCTURE_KEYS = {'activities', 'exercises', 'activity_ids'}
+SECTION_STRUCTURE_KEYS = {'items', 'activities', 'exercises', 'activity_ids'}
 
 
 def extract_activity_definition_id(raw_item) -> str | None:
@@ -134,13 +134,15 @@ def _ordered_section_instances(runtime_data, active_instances):
         explicit_ids = section.get('activity_ids') if isinstance(section.get('activity_ids'), list) else []
         normalized_ids = [instance_id for instance_id in explicit_ids if instance_id in instance_map and instance_id not in used_ids]
 
-        raw_items = section.get('exercises') or section.get('activities') or []
+        raw_items = section.get('items') or section.get('exercises') or section.get('activities') or []
 
         if not normalized_ids:
             for item in raw_items:
                 if not isinstance(item, dict):
                     continue
-                instance_id = item.get('instance_id')
+                if item.get('type') == 'circuit':
+                    continue
+                instance_id = item.get('activity_instance_id') or item.get('instance_id')
                 if instance_id in instance_map and instance_id not in used_ids and instance_id not in normalized_ids:
                     normalized_ids.append(instance_id)
 
@@ -179,6 +181,108 @@ def _ordered_section_instances(runtime_data, active_instances):
     return ordered_sections
 
 
+def _project_session_sections(runtime_data, active_instances, circuit_runs, activity_item_builder):
+    """Project runtime IDs into reusable activity/circuit definition items.
+
+    Persisted ``items`` reference runtime instance/run IDs. Those IDs must never
+    cross a template or duplicate boundary, both of which accept definition IDs.
+    """
+    raw_sections = runtime_data.get('sections')
+    if not isinstance(raw_sections, list):
+        raw_sections = []
+
+    instance_by_id = {
+        instance.id: instance
+        for instance in active_instances
+        if getattr(instance, 'id', None)
+    }
+    run_by_id = {
+        run.id: run
+        for run in (circuit_runs or [])
+        if getattr(run, 'id', None)
+    }
+    circuit_instance_ids = set()
+    for run in (circuit_runs or []):
+        circuit_instance_ids.update(
+            slot.activity_instance_id
+            for slot in (getattr(run, 'slots', None) or [])
+            if slot.activity_instance_id
+        )
+        circuit_instance_ids.update(
+            member.activity_instance_id
+            for circuit_round in (getattr(run, 'rounds', None) or [])
+            for member in (getattr(circuit_round, 'members', None) or [])
+            if member.activity_instance_id
+        )
+    used_instance_ids = set()
+    used_run_ids = set()
+    sections = []
+
+    for raw_section in raw_sections:
+        if not isinstance(raw_section, dict):
+            continue
+        raw_items = raw_section.get('items')
+        if not isinstance(raw_items, list):
+            continue
+
+        section = _copy_section_metadata(raw_section)
+        items = []
+        for raw_item in raw_items:
+            if not isinstance(raw_item, dict):
+                continue
+            if raw_item.get('type') == 'circuit':
+                run = run_by_id.get(raw_item.get('circuit_run_id'))
+                if run and run.circuit_definition_id:
+                    items.append({
+                        'type': 'circuit',
+                        'circuit_definition_id': run.circuit_definition_id,
+                    })
+                    used_run_ids.add(run.id)
+                continue
+
+            instance_id = raw_item.get('activity_instance_id') or raw_item.get('instance_id')
+            instance = instance_by_id.get(instance_id)
+            if not instance or instance.id in circuit_instance_ids:
+                continue
+            items.append(activity_item_builder(instance))
+            used_instance_ids.add(instance.id)
+
+        section['items'] = items
+        sections.append(section)
+
+    if not sections:
+        for section, instances in _ordered_section_instances(
+            runtime_data,
+            [instance for instance in active_instances if instance.id not in circuit_instance_ids],
+        ):
+            payload = _copy_section_metadata(section)
+            payload['items'] = [activity_item_builder(instance) for instance in instances]
+            sections.append(payload)
+            used_instance_ids.update(instance.id for instance in instances)
+
+    remaining_items = [
+        activity_item_builder(instance)
+        for instance in active_instances
+        if instance.id not in used_instance_ids and instance.id not in circuit_instance_ids
+    ]
+    remaining_items.extend(
+        {
+            'type': 'circuit',
+            'circuit_definition_id': run.circuit_definition_id,
+        }
+        for run in (circuit_runs or [])
+        if run.id not in used_run_ids and run.circuit_definition_id
+    )
+    if remaining_items:
+        sections.append({
+            'name': 'Main',
+            'estimated_duration_minutes': runtime_data.get('total_duration_minutes'),
+            'items': remaining_items,
+        })
+
+    return sections
+
+
 def build_template_data_from_session(session):
     runtime_data = _session_runtime_data(session)
     template_runtime_data = _template_runtime_data(session)
@@ -195,7 +299,12 @@ def build_template_data_from_session(session):
         sections = []
         total_duration_minutes = 0
 
-        for section, instances in _ordered_section_instances(runtime_data, active_instances):
+        for section in _project_session_sections(
+            runtime_data,
+            active_instances,
+            getattr(session, 'circuit_runs', None) or [],
+            _build_template_activity_item,
+        ):
             normalized_duration = _normalize_duration(
                 section.get('duration_minutes', section.get('estimated_duration_minutes'))
             )
@@ -206,7 +315,7 @@ def build_template_data_from_session(session):
             section_payload.pop('estimated_duration_minutes', None)
             if normalized_duration is not None:
                 section_payload['duration_minutes'] = normalized_duration
-            section_payload['activities'] = [_build_template_activity_item(instance) for instance in instances]
+            section_payload['activities'] = copy.deepcopy(section.get('items') or [])
             sections.append(section_payload)
 
         payload = {
@@ -250,7 +359,12 @@ def build_duplicate_session_data(session):
     sections = []
     total_duration_minutes = 0
 
-    for section, instances in _ordered_section_instances(runtime_data, active_instances):
+    for section in _project_session_sections(
+        runtime_data,
+        active_instances,
+        getattr(session, 'circuit_runs', None) or [],
+        _build_duplicate_activity_item,
+    ):
         normalized_duration = _normalize_duration(
             section.get('estimated_duration_minutes', section.get('duration_minutes'))
         )
@@ -260,7 +374,7 @@ def build_duplicate_session_data(session):
         section_payload = _copy_section_metadata(section)
         if normalized_duration is not None:
             section_payload['estimated_duration_minutes'] = normalized_duration
-        section_payload['exercises'] = [_build_duplicate_activity_item(instance) for instance in instances]
+        section_payload['items'] = copy.deepcopy(section.get('items') or [])
         sections.append(section_payload)
 
     payload['sections'] = sections

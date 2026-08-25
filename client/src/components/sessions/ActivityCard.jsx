@@ -98,9 +98,9 @@ function ActivityProgressSummary({ sets, activityDefinition, progressComparison,
                 </div>
             )}
 
-            {/* Additive totals (non-multiplicative metrics) */}
+            {/* Additive totals */}
             {hasAdditive && trackedMetricDefs
-                .filter((md) => md.is_additive !== false && !md.is_multiplicative && autoAgg.additive_totals[md.id] != null)
+                .filter((md) => md.is_additive !== false && autoAgg.additive_totals[md.id] != null)
                 .map((md) => (
                     <div key={md.id} className={styles.progressSummaryRow}>
                         <span className={styles.progressSummaryLabel}>Total {md.name}:</span>

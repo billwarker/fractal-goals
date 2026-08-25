@@ -49,9 +49,9 @@ describe('progressAggregations', () => {
             },
         ];
         const metricDefs = filterTrackedMetricDefs([
-            { id: 'weight', is_multiplicative: true },
-            { id: 'reps', is_multiplicative: true },
-            { id: 'internal', is_multiplicative: true, track_progress: false },
+            { id: 'weight', is_multiplicative: true, is_additive: false },
+            { id: 'reps', is_multiplicative: true, is_additive: false },
+            { id: 'internal', is_multiplicative: true, is_additive: false, track_progress: false },
         ]);
 
         expect(computeAutoAggregations(sets, metricDefs)).toEqual({
@@ -70,6 +70,22 @@ describe('progressAggregations', () => {
         });
     });
 
+    it('also totals metrics independently marked as additive and multiplicative', () => {
+        const sets = [
+            { metrics: [{ metric_id: 'hold-time', value: 10 }] },
+            { metrics: [{ metric_id: 'hold-time', value: 10 }] },
+            { metrics: [{ metric_id: 'hold-time', value: 30 }] },
+        ];
+        const result = computeAutoAggregations(sets, [{
+            id: 'hold-time',
+            is_additive: true,
+            is_multiplicative: true,
+        }]);
+
+        expect(result.additive_totals).toEqual({ 'hold-time': 50 });
+        expect(result.total_yield).toBeNull();
+    });
+
     it('does not compute yield when any tracked metric is non-multiplicative', () => {
         const sets = [
             {
@@ -81,7 +97,7 @@ describe('progressAggregations', () => {
         ];
         const metricDefs = filterTrackedMetricDefs([
             { id: 'distance', is_multiplicative: false, is_additive: true },
-            { id: 'reps', is_multiplicative: true },
+            { id: 'reps', is_multiplicative: true, is_additive: false },
         ]);
 
         const result = computeAutoAggregations(sets, metricDefs);

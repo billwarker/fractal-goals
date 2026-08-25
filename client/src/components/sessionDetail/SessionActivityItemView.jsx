@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatForInput, localToISO, validateTimerRange } from '../../utils/dateUtils';
 import { formatAggValue } from '../../utils/progressAggregations';
-import { formatDuration } from '../../utils/sessionActivityMetrics';
+import { formatDuration, isMetricValueEmpty } from '../../utils/sessionActivityMetrics';
 import Button from '../atoms/Button';
 import ActivityCompletionButton from '../common/ActivityCompletionButton';
+import MetricCascadeButton from '../common/MetricCascadeButton';
 import { EditPencilIcon, PlayIcon } from '../atoms/AppIcons';
 import DropdownMenu, { DropdownMenuItem } from '../atoms/DropdownMenu';
 import Linkify from '../atoms/Linkify';
@@ -604,17 +605,16 @@ function SessionActivityItemView({
                                                     const buttons = [];
                                                     const checkAndAddButton = (m, splitId = null) => {
                                                         const val = getMetricValue(set.metrics, m.id, splitId);
-                                                        if (val && isNextSetEmpty(setIdx, m.id, splitId)) {
+                                                        if (!isMetricValueEmpty(val) && isNextSetEmpty(setIdx, m.id, splitId)) {
                                                             const key = splitId ? `${splitId}-${m.id}` : m.id;
                                                             buttons.push(
-                                                                <button
+                                                                <MetricCascadeButton
                                                                     key={key}
-                                                                    className={styles.cascadeButton}
+                                                                    value={val}
+                                                                    unit={m.unit}
+                                                                    destinationLabel="sets"
                                                                     onClick={() => handleCascade(m.id, val, splitId, setIdx)}
-                                                                    title={`Copy ${val} ${m.unit || ''} to subsequent empty sets`}
-                                                                >
-                                                                    Cascade {m.unit || 'Value'}
-                                                                </button>
+                                                                />
                                                             );
                                                         }
                                                     };

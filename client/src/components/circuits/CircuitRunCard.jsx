@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useCircuitRunActions } from '../../hooks/useCircuitQueries';
 import { EditPencilIcon } from '../atoms/AppIcons';
 import AddItemButton from '../atoms/AddItemButton';
@@ -18,20 +18,15 @@ import {
     CircuitMemberTagEditor,
     CircuitRoundTagControl,
     CircuitRunTagControl,
-    collectCircuitAvailableTags,
 } from './CircuitTagControls';
 import CircuitRunTimerControls from './CircuitRunTimerControls';
 import CircuitRunNotes from './CircuitRunNotes';
-import { getCircuitNotes, getCircuitNoteTarget } from './circuitNoteTarget';
+import { canCascadeCircuitMetric } from './circuitMetricCascade';
+import { handleCircuitSelectionKeyDown } from './circuitSelection';
+import useCircuitRunDerivedState from './useCircuitRunDerivedState';
 import styles from './CircuitRunCard.module.css';
 
 const INITIAL_VISIBLE_ROUNDS = 10;
-
-function handleSelectionKeyDown(event, select) {
-    if (event.currentTarget !== event.target || !['Enter', ' '].includes(event.key)) return;
-    event.preventDefault();
-    select(event);
-}
 
 export default function CircuitRunCard({
     rootId,
@@ -61,21 +56,14 @@ export default function CircuitRunCard({
     const [visibleRoundCount, setVisibleRoundCount] = useState(INITIAL_VISIBLE_ROUNDS);
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
     const optionsRef = useRef(null);
-    const slotById = useMemo(() => new Map((run.slots || []).map((slot) => [slot.id, slot])), [run.slots]);
-    const instanceById = useMemo(() => new Map((activityInstances || []).map((instance) => [instance.id, instance])), [activityInstances]);
-    const definitionById = useMemo(() => new Map((activityDefinitions || []).map((definition) => [definition.id, definition])), [activityDefinitions]);
-    const circuitAvailableTags = useMemo(
-        () => collectCircuitAvailableTags(activityDefinitions, run.slots),
-        [activityDefinitions, run.slots],
-    );
-    const noteTarget = useMemo(
-        () => getCircuitNoteTarget(run, selectedCircuitItem, sessionId),
-        [run, selectedCircuitItem, sessionId],
-    );
-    const circuitNotes = useMemo(
-        () => getCircuitNotes(run, allNotes),
-        [allNotes, run],
-    );
+    const derived = useCircuitRunDerivedState({
+        run,
+        activityInstances,
+        activityDefinitions,
+        selectedCircuitItem,
+        sessionId,
+        allNotes,
+    });
 
     useEffect(() => {
         if (!isOptionsOpen) return undefined;
@@ -154,7 +142,7 @@ export default function CircuitRunCard({
             data-session-circuit-card="true"
             isSelected={isRunSelected}
             onClick={selectRun}
-            onKeyDown={(event) => handleSelectionKeyDown(event, selectRun)}
+            onKeyDown={(event) => handleCircuitSelectionKeyDown(event, selectRun)}
             role="group"
             tabIndex={0}
             aria-label={`Activity circuit ${run.name}`}
@@ -245,7 +233,7 @@ export default function CircuitRunCard({
                                     <CircuitRunTagControl
                                         className={`${activityStyles.headerScopeControl} ${styles.runScopeControl}`}
                                         run={run}
-                                        availableTags={circuitAvailableTags}
+                                        availableTags={derived.circuitAvailableTags}
                                         disabled={disabled}
                                         editable={isRunSelected}
                                         onPerform={perform}
@@ -284,7 +272,7 @@ export default function CircuitRunCard({
                             className={styles.round}
                             isSelected={isRoundSelected}
                             onClick={(event) => selectRound(event, round.id)}
-                            onKeyDown={(event) => handleSelectionKeyDown(
+                            onKeyDown={(event) => handleCircuitSelectionKeyDown(
                                 event,
                                 (selectionEvent) => selectRound(selectionEvent, round.id),
                             )}
@@ -302,7 +290,7 @@ export default function CircuitRunCard({
                                 <div className={styles.roundActions}>
                                     <CircuitRoundTagControl
                                         round={round}
-                                        availableTags={circuitAvailableTags}
+                                        availableTags={derived.circuitAvailableTags}
                                         disabled={disabled}
                                         editable={isRoundSelected}
                                         onPerform={perform}
@@ -324,10 +312,10 @@ export default function CircuitRunCard({
                             </div>
                             <ol className={styles.members}>
                                 {(round.members || []).map((member) => {
-                                    const slot = slotById.get(member.circuit_run_slot_id);
+                                    const slot = derived.slotById.get(member.circuit_run_slot_id);
                                     const instanceId = member.activity_instance_id || slot?.activity_instance_id;
-                                    const instance = instanceById.get(instanceId);
-                                    const currentDefinition = definitionById.get(slot?.activity_definition_id);
+                                    const instance = derived.instanceById.get(instanceId);
+                                    const currentDefinition = derived.definitionById.get(slot?.activity_definition_id);
                                     const definition = Array.isArray(slot?.activity_schema?.metric_definitions)
                                         ? slot.activity_schema
                                         : currentDefinition;
@@ -356,7 +344,7 @@ export default function CircuitRunCard({
                                             className={styles.memberCard}
                                             isSelected={isMemberSelected}
                                             onClick={(event) => selectMember(event, member, instance, setIndex)}
-                                            onKeyDown={(event) => handleSelectionKeyDown(
+                                            onKeyDown={(event) => handleCircuitSelectionKeyDown(
                                                 event,
                                                 (selectionEvent) => selectMember(
                                                     selectionEvent,
@@ -401,6 +389,18 @@ export default function CircuitRunCard({
                                                         memberId: member.id,
                                                         value: nextMetrics,
                                                     })}
+                                                    canCascade={(metricId, splitId) => canCascadeCircuitMetric(
+                                                        rounds,
+                                                        round.round_number,
+                                                        member.circuit_run_slot_id,
+                                                        metricId,
+                                                        splitId,
+                                                    )}
+                                                    onCascade={(metricId, splitId) => perform({
+                                                        action: 'cascadeMemberMetric',
+                                                        memberId: member.id,
+                                                        value: { metricId, splitId },
+                                                    })}
                                                 />
                                             )}
                                             {activitySet && tagEditor ? (
@@ -424,8 +424,8 @@ export default function CircuitRunCard({
                         </AddItemButton>
                     )}
                     <CircuitRunNotes
-                        notes={circuitNotes}
-                        noteTarget={noteTarget}
+                        notes={derived.circuitNotes}
+                        noteTarget={derived.noteTarget}
                         onAddNote={onAddNote}
                         onUpdateNote={onUpdateNote}
                         onDeleteNote={onDeleteNote}

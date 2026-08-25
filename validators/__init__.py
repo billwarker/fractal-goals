@@ -150,6 +150,7 @@ from .templates import (
 from .circuits import (
     CircuitDefinitionCreateSchema,
     CircuitDefinitionUpdateSchema,
+    CircuitMemberMetricCascadeSchema,
     CircuitMemberMetricsUpdateSchema,
     CircuitRunCreateSchema,
     CircuitRunTimingUpdateSchema,
@@ -170,6 +171,7 @@ __all__ = [
     "ActivityTimerStartSchema",
     "CircuitDefinitionCreateSchema",
     "CircuitDefinitionUpdateSchema",
+    "CircuitMemberMetricCascadeSchema",
     "CircuitMemberMetricsUpdateSchema",
     "CircuitRunCreateSchema",
     "CircuitRunTimingUpdateSchema",

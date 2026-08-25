@@ -31,6 +31,7 @@ import {
     formatInlineProgressValue,
     getBestSetIndexes,
     buildEmptySet,
+    isMetricValueEmpty,
 } from '../../utils/sessionActivityMetrics';
 
 /**
@@ -603,7 +604,7 @@ function SessionActivityItem({
             const currentVal = metricIdx >= 0 ? set.metrics[metricIdx].value : '';
 
             // If empty (null, undefined, or empty string), update it
-            if (currentVal === '' || currentVal === null || currentVal === undefined) {
+            if (isMetricValueEmpty(currentVal)) {
                 if (metricIdx >= 0) {
                     set.metrics[metricIdx] = { ...set.metrics[metricIdx], value };
                 } else {
@@ -629,7 +630,7 @@ function SessionActivityItem({
         const nextSet = exercise.sets[currentIndex + 1];
         const val = getMetricValue(nextSet.metrics, metricId, splitId);
 
-        return val === '' || val === null || val === undefined;
+        return isMetricValueEmpty(val);
     };
 
     const commitSetMetricInput = (setIndex, metricDef, splitId = null, displayValue) => {

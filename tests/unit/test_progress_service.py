@@ -128,6 +128,52 @@ def _build_instance(db_session, *, root_id, session_id, activity_id, created_at,
 
 @pytest.mark.unit
 class TestProgressService:
+    def test_auto_totals_a_metric_marked_additive_and_multiplicative(self, db_session, sample_ultimate_goal):
+        fractal_metric = FractalMetricDefinition(
+            id=str(uuid4()),
+            root_id=sample_ultimate_goal.id,
+            name='Hold Time',
+            unit='Seconds',
+            is_additive=True,
+            is_multiplicative=True,
+        )
+        activity, metrics = _build_activity_with_metrics(
+            db_session,
+            sample_ultimate_goal.id,
+            metric_specs=[{
+                'name': 'Hold Time',
+                'unit': 'Seconds',
+                'is_multiplicative': True,
+                'fractal_metric': fractal_metric,
+            }],
+        )
+        session = _build_session(
+            db_session,
+            sample_ultimate_goal.id,
+            'Dual-mode Metric Session',
+            datetime(2026, 8, 25, tzinfo=timezone.utc),
+        )
+        instance = _build_instance(
+            db_session,
+            root_id=sample_ultimate_goal.id,
+            session_id=session.id,
+            activity_id=activity.id,
+            created_at=datetime(2026, 8, 25, 10, 0, tzinfo=timezone.utc),
+            values={},
+            data={
+                'sets': [
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 10}]},
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 10}]},
+                    {'metrics': [{'metric_id': metrics[0].id, 'value': 30}]},
+                ],
+            },
+        )
+
+        result = ProgressService(db_session)._compute_auto_aggregations(instance, metrics)
+
+        assert result['additive_totals'][metrics[0].id] == 50
+        assert result['total_yield'] is None
+
     def test_best_set_breaks_anchor_ties_with_secondary_metrics(self, db_session, sample_ultimate_goal):
         activity, metrics = _build_activity_with_metrics(
             db_session,

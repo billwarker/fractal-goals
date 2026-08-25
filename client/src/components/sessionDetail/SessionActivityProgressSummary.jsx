@@ -19,11 +19,16 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, disp
     const isExcluded = activeProgress?.included === false;
     const trackedMetricDefs = useMemo(() => filterTrackedMetricDefs(metricDefs), [metricDefs]);
     const autoAgg = useMemo(() => {
+        // The rendered sets are the current editing source of truth. Progress
+        // comparisons can lag one mutation behind because they are calculated
+        // by a separate query, so use their aggregation only when this view has
+        // no set data of its own (for example, a direct metric result).
+        if (sets?.length && trackedMetricDefs.length > 0) {
+            return computeAutoAggregations(sets, trackedMetricDefs);
+        }
         const fromRecord = activeProgress?.derived_summary?.auto_aggregations;
         if (fromRecord) return fromRecord;
-        if (!sets || sets.length === 0) return null;
-        if (trackedMetricDefs.length === 0) return null;
-        return computeAutoAggregations(sets, trackedMetricDefs);
+        return null;
     }, [activeProgress, sets, trackedMetricDefs]);
 
     if (!autoAgg && !isExcluded) return null;
@@ -43,6 +48,11 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, disp
     })();
 
     const isFirstInstance = activeProgress?.is_first_instance;
+    const additiveMetricDefs = hasAdditive
+        ? trackedMetricDefs.filter((md) => (
+            md.is_additive !== false && autoAgg.additive_totals[md.id] != null
+        ))
+        : [];
 
     const bestSetLabel = hasBestSet
         ? (hasYield && autoAgg.best_set_yield != null
@@ -56,36 +66,40 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, disp
 
     return (
         <div className={styles.progressSummary}>
-            {hasAdditive && trackedMetricDefs
-                .filter((md) => md.is_additive !== false && !md.is_multiplicative && autoAgg.additive_totals[md.id] != null)
-                .map((md) => (
-                    <div key={md.id} className={`${styles.progressSummaryRow} ${styles.progressSummaryTotal}`}>
+            {(additiveMetricDefs.length > 0 || hasYield || (hasBestSet && bestSetLabel)) && (
+                <div className={`${styles.progressSummaryRow} ${styles.progressSummaryTotal}`}>
+                    {additiveMetricDefs.map((md, index) => (
+                        <React.Fragment key={md.id}>
+                            {index > 0 && <span className={styles.progressSummaryDivider}>·</span>}
+                            <span className={styles.progressSummaryMetric}>
                         <span className={styles.progressSummaryLabel}>Total {md.name}:</span>
                         <span className={styles.progressSummaryValue}>
                             {formatAggValue(autoAgg.additive_totals[md.id])} {md.unit}
                         </span>
-                    </div>
-                ))
-            }
-
-            {/* Total yield + best set on one line */}
-            {(hasYield || hasBestSet) && (
-                <div className={`${styles.progressSummaryRow} ${styles.progressSummaryTotal}`}>
+                            </span>
+                        </React.Fragment>
+                    ))}
                     {hasYield && (
                         <>
-                            <span className={styles.progressSummaryLabel}>Total yield:</span>
-                            <span className={styles.progressSummaryValue}>
-                                {formatAggValue(autoAgg.total_yield)}
-                                {!isFirstInstance && prevYield != null && autoAgg.total_yield != null && (
-                                    <SummaryDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter styles={styles} displayMode={displayMode} />
-                                )}
+                            {additiveMetricDefs.length > 0 && <span className={styles.progressSummaryDivider}>·</span>}
+                            <span className={styles.progressSummaryMetric}>
+                                <span className={styles.progressSummaryLabel}>Total yield:</span>
+                                <span className={styles.progressSummaryValue}>
+                                    {formatAggValue(autoAgg.total_yield)}
+                                    {!isFirstInstance && prevYield != null && autoAgg.total_yield != null && (
+                                        <SummaryDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter styles={styles} displayMode={displayMode} />
+                                    )}
+                                </span>
                             </span>
                         </>
                     )}
                     {hasBestSet && bestSetLabel && (
-                        <span className={styles.progressSummaryBestSetInline}>
-                            · Best: Set {autoAgg.best_set_index + 1} {bestSetLabel}
-                        </span>
+                        <>
+                            {(additiveMetricDefs.length > 0 || hasYield) && <span className={styles.progressSummaryDivider}>·</span>}
+                            <span className={styles.progressSummaryBestSetInline}>
+                                Best: Set {autoAgg.best_set_index + 1} {bestSetLabel}
+                            </span>
+                        </>
                     )}
                 </div>
             )}

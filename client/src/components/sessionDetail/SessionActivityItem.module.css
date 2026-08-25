@@ -887,25 +887,6 @@
     margin-bottom: 10px;
 }
 
-.cascadeButton {
-    background: transparent;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    font-size: 10px;
-    padding: 2px 6px;
-    margin-left: 8px;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
-    white-space: nowrap;
-}
-
-.cascadeButton:hover {
-    background: var(--color-bg-input);
-    color: var(--color-brand-success);
-    border-color: var(--color-brand-success);
-}
-
 .cascadeButtonsContainer {
     display: flex;
     gap: 8px;
@@ -1116,15 +1097,6 @@
         width: 100%;
     }
 
-    .progressSummaryRow {
-        flex-wrap: wrap;
-        row-gap: 4px;
-    }
-
-    .progressSummaryBestSetInline {
-        flex-basis: 100%;
-        margin-left: 0;
-    }
 }
 
 @media (max-width: 768px) {
@@ -1154,6 +1126,20 @@
     gap: 8px;
     align-items: baseline;
     font-size: 12px;
+    min-width: 0;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.progressSummaryMetric {
+    display: inline-flex;
+    gap: 8px;
+    align-items: baseline;
+}
+
+.progressSummaryDivider {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
 }
 
 .progressSummaryLabel {
@@ -1175,7 +1161,7 @@
     font-size: 12px;
     font-weight: 400;
     font-style: italic;
-    margin-left: 8px;
+    flex-shrink: 0;
 }
 
 .durationCountdownAlert {

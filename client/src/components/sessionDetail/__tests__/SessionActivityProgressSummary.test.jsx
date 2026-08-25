@@ -39,3 +39,42 @@ it('retains the excluded indicator when no aggregation can be calculated', () =>
     expect(screen.getByText(excludedMessage)).toBeInTheDocument();
     expect(screen.queryByText('Total yield:')).not.toBeInTheDocument();
 });
+
+it('derives additive totals for a dual-mode metric from rendered sets when the stored summary is stale', () => {
+    render(
+        <SessionActivityProgressSummary
+            sets={[
+                { metrics: [{ metric_id: 'hold-time', value: '8.1' }] },
+                { metrics: [{ metric_id: 'hold-time', value: '8.9' }] },
+                { metrics: [{ metric_id: 'hold-time', value: '5' }] },
+            ]}
+            metricDefs={[
+                {
+                    id: 'hold-time',
+                    name: 'Hold Time',
+                    unit: 'Seconds',
+                    is_additive: true,
+                    is_multiplicative: true,
+                    is_best_set_metric: true,
+                },
+            ]}
+            activeProgress={{
+                derived_summary: {
+                    auto_aggregations: {
+                        additive_totals: {},
+                        best_set_index: 1,
+                        best_set_values: { 'hold-time': 8.9 },
+                    },
+                },
+            }}
+        />,
+    );
+
+    expect(screen.getByText('Total Hold Time:')).toBeInTheDocument();
+    expect(screen.getByText(/22 Seconds/)).toBeInTheDocument();
+    const bestSet = screen.getByText(/Best: Set 2 8.9 Seconds/);
+    expect(bestSet).toBeInTheDocument();
+    expect(bestSet.closest('[class*="progressSummaryRow"]')).toHaveTextContent(
+        'Total Hold Time:22 Seconds·Best: Set 2 8.9 Seconds',
+    );
+});

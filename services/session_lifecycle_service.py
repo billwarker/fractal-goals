@@ -316,7 +316,12 @@ class SessionLifecycleService:
             'session_data': build_duplicate_session_data(session),
         }
 
-        return self.create_session(root_id, current_user_id, duplicate_payload)
+        return self.create_session(
+            root_id,
+            current_user_id,
+            duplicate_payload,
+            allow_archived_definitions=True,
+        )
 
     def create_session(
         self,
@@ -326,6 +331,7 @@ class SessionLifecycleService:
         *,
         reserve_active_slot=True,
         initially_completed=False,
+        allow_archived_definitions=False,
     ) -> ServiceResult[JsonDict]:
         data = normalize_session_payload(data)
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
@@ -504,11 +510,13 @@ class SessionLifecycleService:
                 return None, "Quick sessions must include between 1 and 5 activities", 400
 
             unique_activity_def_ids = {activity_id for _, activity_id in normalized_quick_items}
-            activities = self.db_session.query(ActivityDefinition).filter(
+            activities_query = self.db_session.query(ActivityDefinition).filter(
                 ActivityDefinition.id.in_(unique_activity_def_ids),
                 ActivityDefinition.root_id == root_id,
-                ActivityDefinition.deleted_at == None
-            ).all()
+            )
+            if not (allow_archived_definitions or template):
+                activities_query = activities_query.filter(ActivityDefinition.deleted_at == None)
+            activities = activities_query.all()
             found_activity_ids = {a.id for a in activities}
             missing_activity_ids = unique_activity_def_ids - found_activity_ids
             if missing_activity_ids:
@@ -553,13 +561,15 @@ class SessionLifecycleService:
                     circuit_items = template_circuit_items
 
             if activity_def_ids:
-                activities = self.db_session.query(ActivityDefinition).options(
+                activities_query = self.db_session.query(ActivityDefinition).options(
                     joinedload(ActivityDefinition.associated_goals)
                 ).filter(
                     ActivityDefinition.id.in_(activity_def_ids),
                     ActivityDefinition.root_id == root_id,
-                    ActivityDefinition.deleted_at == None
-                ).all()
+                )
+                if not (allow_archived_definitions or template):
+                    activities_query = activities_query.filter(ActivityDefinition.deleted_at == None)
+                activities = activities_query.all()
                 found_activity_ids = {a.id for a in activities}
                 missing_activity_ids = activity_def_ids - found_activity_ids
                 if missing_activity_ids:
@@ -635,7 +645,7 @@ class SessionLifecycleService:
                         },
                         commit=False,
                         emit=False,
-                        allow_archived=bool(template),
+                        allow_archived=bool(template or allow_archived_definitions),
                     )
                     if circuit_error:
                         self.db_session.rollback()

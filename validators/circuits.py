@@ -67,6 +67,11 @@ class CircuitMemberMetricsUpdateSchema(BaseModel):
     metrics: List[CircuitMemberMetricSchema] = Field(default_factory=list, max_length=100)
 
 
+class CircuitMemberMetricCascadeSchema(BaseModel):
+    metric_id: str = Field(..., min_length=1)
+    split_id: Optional[str] = None
+
+
 class CircuitScopeTagMutationSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 

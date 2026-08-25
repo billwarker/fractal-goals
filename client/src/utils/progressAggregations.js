@@ -101,7 +101,7 @@ export function computeAutoAggregations(sets, metricDefs) {
 
     // --- Additive totals ---
     for (const md of metricDefs) {
-        if (md.is_multiplicative || md.is_additive === false) continue;
+        if (md.is_additive === false) continue;
         const values = [];
         for (const s of sets) {
             for (const m of (s.metrics || [])) {

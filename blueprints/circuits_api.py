@@ -10,6 +10,7 @@ from services.circuit_service import CircuitService
 from validators import (
     CircuitDefinitionCreateSchema,
     CircuitDefinitionUpdateSchema,
+    CircuitMemberMetricCascadeSchema,
     CircuitMemberMetricsUpdateSchema,
     CircuitRunCreateSchema,
     CircuitRunTimingUpdateSchema,
@@ -226,6 +227,25 @@ def update_circuit_member_metrics(current_user, root_id, run_id, member_id):
             data["metrics"],
         ),
         "Error updating circuit member metrics",
+    )
+
+
+@circuits_bp.route("/<root_id>/circuit-runs/<run_id>/members/<member_id>/metrics/cascade", methods=["POST"])
+@token_required
+def cascade_circuit_member_metric(current_user, root_id, run_id, member_id):
+    data, error = _validated(CircuitMemberMetricCascadeSchema)
+    if error:
+        return error
+    return _execute(
+        lambda service: service.cascade_member_metric(
+            root_id,
+            run_id,
+            member_id,
+            current_user.id,
+            data["metric_id"],
+            data.get("split_id"),
+        ),
+        "Error cascading circuit member metric",
     )
 
 

@@ -24,6 +24,10 @@ export const fractalCircuitsApi = {
         `${API_BASE}/${rootId}/circuit-runs/${runId}/members/${memberId}/metrics`,
         { metrics },
     ),
+    cascadeCircuitMemberMetric: (rootId, runId, memberId, metricId, splitId = null) => axios.post(
+        `${API_BASE}/${rootId}/circuit-runs/${runId}/members/${memberId}/metrics/cascade`,
+        { metric_id: metricId, ...(splitId ? { split_id: splitId } : {}) },
+    ),
     updateCircuitRunTag: (rootId, runId, data) => axios.patch(
         `${API_BASE}/${rootId}/circuit-runs/${runId}/tags`,
         data,

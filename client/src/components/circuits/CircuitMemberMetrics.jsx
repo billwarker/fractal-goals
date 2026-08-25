@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { resolveEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
-import { normalizeMetricValueForStorage } from '../../utils/sessionActivityMetrics';
+import { isMetricValueEmpty, normalizeMetricValueForStorage } from '../../utils/sessionActivityMetrics';
 import ProgressHint from '../common/ProgressHint';
+import MetricCascadeButton from '../common/MetricCascadeButton';
 import MetricValueEditor from '../sessionDetail/MetricValueEditor';
 import activityStyles from '../sessionDetail/SessionActivityItem.module.css';
 import styles from './CircuitRunCard.module.css';
@@ -14,7 +15,18 @@ const resolveMetricId = (metric) => metric?.metric_id || metric?.metric_definiti
 const resolveSplitId = (metric) => metric?.split_id || metric?.split_definition_id || null;
 const EMPTY_METRICS = [];
 
-export default function CircuitMemberMetrics({ memberId, rootId, definition, metrics = EMPTY_METRICS, disabled, saving, progress, onSave }) {
+export default function CircuitMemberMetrics({
+    memberId,
+    rootId,
+    definition,
+    metrics = EMPTY_METRICS,
+    disabled,
+    saving,
+    progress,
+    onSave,
+    canCascade,
+    onCascade,
+}) {
     const { progressSettings } = useRootProgressSettings(rootId);
     const [drafts, setDrafts] = useState({});
     const [localMetrics, setLocalMetrics] = useState(metrics);
@@ -85,6 +97,11 @@ export default function CircuitMemberMetrics({ memberId, rootId, definition, met
         const key = metricKey(metric.id, split?.id);
         const inputId = `circuit-metric-${memberId}-${key}`;
         const isSplitMetric = Boolean(split);
+        const currentValue = valueFor(metric.id, split?.id);
+        const showCascade = !disabled
+            && !saving
+            && !isMetricValueEmpty(currentValue)
+            && canCascade?.(metric.id, split?.id || null);
         return (
             <div key={key} className={activityStyles.metricInputContainer}>
                 <label
@@ -93,26 +110,36 @@ export default function CircuitMemberMetrics({ memberId, rootId, definition, met
                 >
                     {metric.name}
                 </label>
-                <MetricValueEditor
-                    metricDef={metric}
-                    value={valueFor(metric.id, split?.id)}
-                    isDraft={Object.prototype.hasOwnProperty.call(drafts, key)}
-                    inputClassName={`${activityStyles.metricInput} ${isSplitMetric ? activityStyles.metricInputSmall : activityStyles.metricInputLarge}`}
-                    metaClassName={isSplitMetric ? activityStyles.metricMeta : activityStyles.metricMetaLarge}
-                    unitClassName={isSplitMetric ? activityStyles.metricUnit : activityStyles.metricUnitLarge}
-                    progress={(
-                        <ProgressHint
-                            metricId={metric.id}
-                            setIndex={progress?.setIndex}
-                            progressComparison={progress?.comparison}
-                            displayMode={resolveEffectiveDeltaDisplayMode(definition, progressSettings)}
+                <div className={styles.memberMetricControl}>
+                    <MetricValueEditor
+                        metricDef={metric}
+                        value={currentValue}
+                        isDraft={Object.prototype.hasOwnProperty.call(drafts, key)}
+                        inputClassName={`${activityStyles.metricInput} ${isSplitMetric ? activityStyles.metricInputSmall : activityStyles.metricInputLarge}`}
+                        metaClassName={isSplitMetric ? activityStyles.metricMeta : activityStyles.metricMetaLarge}
+                        unitClassName={isSplitMetric ? activityStyles.metricUnit : activityStyles.metricUnitLarge}
+                        progress={(
+                            <ProgressHint
+                                metricId={metric.id}
+                                setIndex={progress?.setIndex}
+                                progressComparison={progress?.comparison}
+                                displayMode={resolveEffectiveDeltaDisplayMode(definition, progressSettings)}
+                            />
+                        )}
+                        disabled={disabled || saving}
+                        inputId={inputId}
+                        onDraftChange={(value) => setDrafts((previous) => ({ ...previous, [key]: value }))}
+                        onCommit={(value) => commit(metric, split?.id || null, value)}
+                    />
+                    {showCascade && (
+                        <MetricCascadeButton
+                            value={currentValue}
+                            unit={metric.unit}
+                            destinationLabel="rounds"
+                            onClick={() => onCascade(metric.id, split?.id || null)}
                         />
                     )}
-                    disabled={disabled || saving}
-                    inputId={inputId}
-                    onDraftChange={(value) => setDrafts((previous) => ({ ...previous, [key]: value }))}
-                    onCommit={(value) => commit(metric, split?.id || null, value)}
-                />
+                </div>
             </div>
         );
     };

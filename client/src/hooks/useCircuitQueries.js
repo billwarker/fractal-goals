@@ -48,6 +48,13 @@ export function useCircuitRunActions(rootId, sessionId) {
                 case 'addRound': return fractalApi.addCircuitRound(rootId, runId);
                 case 'removeRound': return fractalApi.deleteCircuitRound(rootId, runId, roundId);
                 case 'updateMemberMetrics': return fractalApi.updateCircuitMemberMetrics(rootId, runId, memberId, value);
+                case 'cascadeMemberMetric': return fractalApi.cascadeCircuitMemberMetric(
+                    rootId,
+                    runId,
+                    memberId,
+                    value.metricId,
+                    value.splitId,
+                );
                 case 'updateRunTag': return fractalApi.updateCircuitRunTag(rootId, runId, value);
                 case 'updateRoundTag': return fractalApi.updateCircuitRoundTag(rootId, runId, roundId, value);
                 case 'deleteRun': return fractalApi.deleteCircuitRun(rootId, runId);

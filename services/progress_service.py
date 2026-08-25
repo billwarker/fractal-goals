@@ -569,7 +569,7 @@ class ProgressService:
 
         # --- Additive totals ---
         for md in metric_defs:
-            if md.is_multiplicative or not self._resolve_is_additive(md):
+            if not self._resolve_is_additive(md):
                 continue
             if sets:
                 values = []

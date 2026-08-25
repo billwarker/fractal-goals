@@ -896,7 +896,13 @@ class TestSessionCRUDEndpoints:
         response = authed_client.get(f'/api/{root_id}/sessions/{session_id}')
         assert response.status_code == 404
 
-    def test_duplicate_session(self, authed_client, db_session, sample_practice_session, sample_activity_definition):
+    def test_duplicate_session_supports_archived_source_activity(
+        self,
+        authed_client,
+        db_session,
+        sample_practice_session,
+        sample_activity_definition,
+    ):
         root_id = sample_practice_session.root_id
         sample_practice_session.attributes = {
             'session_type': 'normal',
@@ -915,6 +921,7 @@ class TestSessionCRUDEndpoints:
             activity_definition_id=sample_activity_definition.id,
             root_id=root_id,
         ))
+        sample_activity_definition.deleted_at = datetime.now(timezone.utc)
         sample_practice_session.completed = True
         db_session.commit()
 
@@ -962,6 +969,48 @@ class TestSessionCRUDEndpoints:
         assert section['estimated_duration_minutes'] == 25
         assert len(section['activity_ids']) == 1
         assert section['activity_ids'][0] != 'source-instance-2'
+
+    def test_duplicate_session_normalizes_canonical_typed_activity_items(
+        self,
+        authed_client,
+        db_session,
+        sample_practice_session,
+        sample_activity_definition,
+    ):
+        root_id = sample_practice_session.root_id
+        source_instance_id = str(uuid4())
+        sample_practice_session.attributes = {
+            'session_data': {
+                'session_type': 'normal',
+                'sections': [{
+                    'name': 'Strength',
+                    'items': [{
+                        'type': 'activity',
+                        'activity_instance_id': source_instance_id,
+                    }],
+                }],
+            },
+        }
+        db_session.add(ActivityInstance(
+            id=source_instance_id,
+            session_id=sample_practice_session.id,
+            activity_definition_id=sample_activity_definition.id,
+            root_id=root_id,
+        ))
+        sample_practice_session.completed = True
+        db_session.commit()
+
+        response = authed_client.post(
+            f'/api/{root_id}/sessions/{sample_practice_session.id}/duplicate',
+            json={},
+        )
+
+        assert response.status_code == 201, response.get_json()
+        data = response.get_json()
+        section = data['attributes']['session_data']['sections'][0]
+        assert section['items'][0]['type'] == 'activity'
+        assert section['items'][0]['activity_instance_id'] != source_instance_id
+        assert data['activity_instances'][0]['activity_definition_id'] == sample_activity_definition.id
 
 
 @pytest.mark.integration

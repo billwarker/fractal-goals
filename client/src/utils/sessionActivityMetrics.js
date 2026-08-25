@@ -11,6 +11,10 @@ export function formatDuration(seconds) {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+export function isMetricValueEmpty(value) {
+    return value === '' || value === null || value === undefined;
+}
+
 export function parseMMSS(value) {
     const trimmed = value?.trim();
     if (!trimmed) return null;

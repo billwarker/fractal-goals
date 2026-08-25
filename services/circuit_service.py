@@ -514,6 +514,77 @@ class CircuitService:
         }, source="circuit_service.update_member_metrics", context={"db_session": self.db_session}))
         return serialize_circuit_run(self._run(root_id, run.id)), None, 200
 
+    @staticmethod
+    def _member_metric_values(member):
+        if member.activity_set_id and member.activity_set:
+            return member.activity_set.metric_values or []
+        if member.activity_instance:
+            return [
+                metric
+                for metric in (member.activity_instance.metric_values or [])
+                if metric.activity_set_id is None
+            ]
+        return []
+
+    def cascade_member_metric(self, root_id, run_id, member_id, user_id, metric_id, split_id=None):
+        """Fill one result into matching empty slots in subsequent rounds."""
+        run = self._authorized_run(root_id, run_id, user_id, for_update=True)
+        if isinstance(run, tuple):
+            return run
+        source_round, source_member = self._member_for_run(run, member_id)
+        if not source_member:
+            return None, "Circuit member not found", 404
+
+        source_metric = next((
+            metric
+            for metric in self._member_metric_values(source_member)
+            if metric.metric_definition_id == metric_id
+            and metric.split_definition_id == split_id
+        ), None)
+        if source_metric is None:
+            return None, "Enter a source metric value before cascading it", 400
+
+        changed_instance_ids = set()
+        for circuit_round in sorted(run.rounds or [], key=lambda row: row.round_number):
+            if circuit_round.round_number <= source_round.round_number:
+                continue
+            target = next((
+                member
+                for member in (circuit_round.members or [])
+                if member.circuit_run_slot_id == source_member.circuit_run_slot_id
+            ), None)
+            if target is None:
+                continue
+            already_present = any(
+                metric.metric_definition_id == metric_id
+                and metric.split_definition_id == split_id
+                for metric in self._member_metric_values(target)
+            )
+            if already_present:
+                continue
+            instance_id = target.activity_instance_id or target.run_slot.activity_instance_id
+            self.db_session.add(MetricValue(
+                activity_instance_id=instance_id,
+                activity_set_id=target.activity_set_id,
+                metric_definition_id=metric_id,
+                split_definition_id=split_id,
+                value=source_metric.value,
+            ))
+            changed_instance_ids.add(instance_id)
+
+        self.db_session.commit()
+        for instance_id in changed_instance_ids:
+            event_bus.emit(Event(Events.ACTIVITY_METRICS_UPDATED, {
+                "instance_id": instance_id,
+                "activity_definition_id": source_member.run_slot.activity_definition_id,
+                "activity_name": source_member.run_slot.activity_name,
+                "session_id": run.session_id,
+                "root_id": root_id,
+                "cascaded_from_member_id": source_member.id,
+                "updated_fields": ["metrics"],
+            }, source="circuit_service.cascade_member_metric", context={"db_session": self.db_session}))
+        return serialize_circuit_run(self._run(root_id, run.id)), None, 200
+
     def add_round(self, root_id, run_id, user_id):
         return self.round_operations.add(root_id, run_id, user_id)
 

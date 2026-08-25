@@ -1413,6 +1413,109 @@ def test_circuit_member_metrics_persist_to_each_round_result(
     assert cleared.get_json()["rounds"][0]["members"][0]["metrics"] == []
 
 
+def test_circuit_member_metric_cascade_fills_only_later_empty_rounds(
+    authed_client,
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+    sample_activity_definition,
+):
+    session = _session(db_session, sample_ultimate_goal, test_user)
+    non_set = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(
+        authed_client,
+        sample_ultimate_goal,
+        sample_activity_definition,
+        non_set,
+    )
+    run = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    ).get_json()
+    for _ in range(2):
+        run = authed_client.post(
+            f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/rounds",
+        ).get_json()
+
+    metric = sample_activity_definition.metric_definitions[0]
+    members = [circuit_round["members"][0] for circuit_round in run["rounds"]]
+    source = authed_client.patch(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/members/{members[0]['id']}/metrics",
+        json={"metrics": [{"metric_id": metric.id, "value": 135}]},
+    )
+    assert source.status_code == 200, source.get_json()
+    preserved = authed_client.patch(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/members/{members[2]['id']}/metrics",
+        json={"metrics": [{"metric_id": metric.id, "value": 155}]},
+    )
+    assert preserved.status_code == 200, preserved.get_json()
+
+    response = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/members/{members[0]['id']}/metrics/cascade",
+        json={"metric_id": metric.id},
+    )
+
+    assert response.status_code == 200, response.get_json()
+    cascaded = response.get_json()
+    values = [
+        next(value["value"] for value in circuit_round["members"][0]["metrics"] if value["metric_id"] == metric.id)
+        for circuit_round in cascaded["rounds"]
+    ]
+    assert values == [135, 135, 155]
+
+
+def test_duplicate_session_preserves_circuit_items_without_flattening_members(
+    authed_client,
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+    sample_activity_definition,
+):
+    session = _session(db_session, sample_ultimate_goal, test_user)
+    non_set = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(
+        authed_client,
+        sample_ultimate_goal,
+        sample_activity_definition,
+        non_set,
+    )
+    source_run = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    ).get_json()
+    template_response = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/create-template",
+        json={"name": "Circuit copy"},
+    )
+    assert template_response.status_code == 201, template_response.get_json()
+    assert template_response.get_json()["template_data"]["sections"][0]["activities"] == [{
+        "type": "circuit",
+        "circuit_definition_id": definition["id"],
+    }]
+    archived = authed_client.delete(
+        f"/api/{sample_ultimate_goal.id}/circuits/{definition['id']}",
+    )
+    assert archived.status_code == 200, archived.get_json()
+    session.completed = True
+    session.completed_at = datetime.now(timezone.utc)
+    db_session.commit()
+
+    response = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/duplicate",
+        json={},
+    )
+
+    assert response.status_code == 201, response.get_json()
+    duplicate = response.get_json()
+    section_items = duplicate["attributes"]["session_data"]["sections"][0]["items"]
+    assert len(section_items) == 1
+    assert section_items[0]["type"] == "circuit"
+    assert section_items[0]["circuit_run_id"] != source_run["id"]
+    duplicated_runs = db_session.query(CircuitRun).filter_by(session_id=duplicate["id"]).all()
+    assert len(duplicated_runs) == 1
+    assert duplicated_runs[0].circuit_definition_id == definition["id"]
+
+
 def test_completed_circuit_members_receive_dynamic_progress_comparisons(
     authed_client,
     db_session,
