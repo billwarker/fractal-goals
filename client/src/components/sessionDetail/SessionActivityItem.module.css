@@ -222,6 +222,7 @@
 }
 
 .actionStack {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -453,10 +454,91 @@
 }
 
 .timerConflict {
-    display: grid;
-    gap: 6px;
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 6px);
+    right: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: max-content;
+    max-width: min(440px, calc(100vw - 48px));
+    padding: 6px 8px;
+    border: 1px solid color-mix(in srgb, var(--color-brand-danger) 55%, var(--color-border));
+    border-radius: 4px;
+    background: var(--color-bg-card-alt);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
     color: var(--color-brand-danger);
     font-size: 12px;
+    line-height: 1.5;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 250ms ease, transform 250ms ease;
+}
+
+.timerConflictFading {
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
+.timerConflictMessage {
+    min-width: 0;
+}
+
+.timerConflictAction {
+    appearance: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.timerConflictAction:hover {
+    color: color-mix(in srgb, var(--color-brand-danger) 78%, white);
+}
+
+.timerConflictAction:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.timerConflictAction:focus-visible {
+    border-radius: 2px;
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+}
+
+.timerConflictDismiss {
+    appearance: none;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin: -2px -3px -2px 0;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+}
+
+.timerConflictDismiss:hover {
+    background: transparent;
+    color: var(--color-brand-danger);
+}
+
+.timerConflictDismiss:focus-visible {
+    background: transparent;
+    color: var(--color-brand-danger);
+    outline: none;
 }
 
 .timerModeHint {

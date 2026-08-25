@@ -106,6 +106,16 @@ def start_activity_timer(current_user, root_id, instance_id):
             return jsonify(payload), status
 
         response_data = dict(payload["serialized"])
+        if payload.get("completed_serialized"):
+            completed_data = dict(payload["completed_serialized"])
+            completed_instance_id = completed_data["id"]
+            completed_data["progress_comparison"] = (
+                get_live_progress(completed_instance_id)
+                or ProgressService(db_session).get_progress_for_instance(
+                    completed_instance_id
+                )
+            )
+            response_data["completed_activity"] = completed_data
         if payload.get("instance") and getattr(payload["instance"], "completed", False):
             response_data["progress_comparison"] = (
                 get_live_progress(instance_id)

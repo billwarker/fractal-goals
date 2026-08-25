@@ -513,10 +513,16 @@ class TestTimerDurationCalculation:
 class TestConcurrentTimers:
     """Test exclusive timer ownership within a session."""
     
-    def test_switches_between_timers_in_same_session(self, authed_client, sample_practice_session, sample_activity_definition):
+    def test_switches_between_timers_in_same_session(
+        self,
+        authed_client,
+        db_session,
+        sample_practice_session,
+        sample_activity_definition,
+    ):
         """Only one timer accrues work, with an explicit atomic switch."""
         root_id = sample_practice_session.root_id
-        
+
         # Create two instances
         instances = []
         for i in range(2):
@@ -547,15 +553,27 @@ class TestConcurrentTimers:
             json={'switch': True},
         )
         assert switched.status_code == 200
+        switched_data = switched.get_json()
+        assert switched_data['id'] == instances[1]
+        assert switched_data['time_stop'] is None
+        assert switched_data['completed'] is False
+        assert switched_data['completed_activity']['id'] == instances[0]
+        assert switched_data['completed_activity']['completed'] is True
+        assert switched_data['completed_activity']['time_stop'] is not None
+
+        db_session.expire_all()
+        open_intervals = db_session.query(SessionWorkInterval).filter(
+            SessionWorkInterval.session_id == sample_practice_session.id,
+            SessionWorkInterval.ended_at.is_(None),
+        ).all()
+        assert len(open_intervals) == 1
+        assert open_intervals[0].activity_instance_id == instances[1]
         
-        # Stop both timers
-        for instance_id in instances:
-            response = authed_client.post(
-                f'/api/{root_id}/activity-instances/{instance_id}/complete'
-            )
-            assert response.status_code == 200
-            data = json.loads(response.data)
-            assert data['duration_seconds'] is not None
+        response = authed_client.post(
+            f'/api/{root_id}/activity-instances/{instances[1]}/complete'
+        )
+        assert response.status_code == 200
+        assert response.get_json()['duration_seconds'] is not None
 
 
 @pytest.mark.integration

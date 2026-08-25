@@ -669,6 +669,97 @@ describe('useSessionDetailMutations', () => {
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessions('root-1') });
     });
 
+    it('lets the inline conflict action own expected active-timer feedback', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        const conflict = {
+            response: {
+                data: {
+                    code: 'active_work_exists',
+                    error: 'Another session item is already accruing work time',
+                },
+            },
+        };
+        startActivityTimer.mockRejectedValueOnce(conflict);
+
+        const { result } = renderHook(
+            () => useSessionDetailMutations(createBaseOptions(queryClient)),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await expect(result.current.updateTimer('inst-1', 'start')).rejects.toBe(conflict);
+        expect(notify.error).not.toHaveBeenCalled();
+    });
+
+    it('replaces both activities in cache after completing and switching timers', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        const activitiesKey = queryKeys.sessionActivities('root-1', 'session-1');
+        queryClient.setQueryData(activitiesKey, [
+            {
+                id: 'inst-active',
+                activity_definition_id: 'act-1',
+                time_start: '2026-03-12T14:55:00Z',
+                time_stop: null,
+                completed: false,
+            },
+            {
+                id: 'inst-1',
+                activity_definition_id: 'act-1',
+                time_start: null,
+                time_stop: null,
+                completed: false,
+            },
+        ]);
+        startActivityTimer.mockResolvedValueOnce({
+            data: {
+                id: 'inst-1',
+                activity_definition_id: 'act-1',
+                time_start: '2026-03-12T15:00:00Z',
+                time_stop: null,
+                completed: false,
+                completed_activity: {
+                    id: 'inst-active',
+                    activity_definition_id: 'act-1',
+                    time_start: '2026-03-12T14:55:00Z',
+                    time_stop: '2026-03-12T15:00:00Z',
+                    completed: true,
+                },
+            },
+        });
+
+        const { result } = renderHook(
+            () => useSessionDetailMutations(createBaseOptions(queryClient)),
+            { wrapper: createWrapper(queryClient) }
+        );
+
+        await act(async () => {
+            await result.current.updateTimer('inst-1', 'start', { switch: true });
+        });
+
+        expect(queryClient.getQueryData(activitiesKey)).toEqual([
+            expect.objectContaining({
+                id: 'inst-active',
+                time_stop: '2026-03-12T15:00:00Z',
+                completed: true,
+            }),
+            expect.objectContaining({
+                id: 'inst-1',
+                time_stop: null,
+                completed: false,
+            }),
+        ]);
+        expect(queryClient.getQueryData(activitiesKey)[1]).not.toHaveProperty('completed_activity');
+    });
+
     it('marks manual goal completion as completed in the active session and refreshes session lists', async () => {
         const queryClient = new QueryClient({
             defaultOptions: {

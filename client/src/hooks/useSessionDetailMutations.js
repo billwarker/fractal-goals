@@ -444,8 +444,13 @@ export function useSessionDetailMutations({
             }
 
             if (response?.data) {
+                const { completed_activity: completedActivity, ...updatedInstance } = response.data;
                 queryClient.setQueryData(sessionActivitiesKey, (previous = []) =>
-                    previous.map((entry) => entry.id === instanceId ? response.data : entry)
+                    previous.map((entry) => {
+                        if (entry.id === instanceId) return updatedInstance;
+                        if (completedActivity && entry.id === completedActivity.id) return completedActivity;
+                        return entry;
+                    })
                 );
                 queryClient.invalidateQueries({ queryKey: sessionKey });
                 queryClient.invalidateQueries({ queryKey: sessionGoalsViewKey });
@@ -454,6 +459,7 @@ export function useSessionDetailMutations({
                 invalidateFlowTreeActivityEvidence();
             }
         } catch (error) {
+            if (error.response?.data?.code === 'active_work_exists') throw error;
             logError('Timer action failed', error);
             notify.error(`Timer action failed: ${error.response?.data?.error || error.message}`);
             throw error;

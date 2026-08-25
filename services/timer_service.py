@@ -327,14 +327,23 @@ class TimerService:
                 return None, target_error, 400
             instance.target_duration_seconds = normalized_target
 
+        completed_activity = None
         if session_record and session_record.is_paused:
             instance.is_paused = True
             instance.last_paused_at = start_time
         else:
             instance.is_paused = False
             instance.last_paused_at = None
+            interval_service = WorkIntervalService(self.db_session)
+            if data.get('switch'):
+                open_interval = interval_service.get_open(instance.session_id)
+                if (
+                    open_interval
+                    and open_interval.activity_instance_id != instance.id
+                ):
+                    completed_activity = open_interval.activity_instance
             try:
-                WorkIntervalService(self.db_session).start(
+                interval_service.start(
                     root_id=root_id,
                     session_id=instance.session_id,
                     activity_instance_id=instance.id,
@@ -349,6 +358,11 @@ class TimerService:
                     "active_work": WorkIntervalService.describe(conflict.interval),
                 }, None, 409
 
+            if completed_activity:
+                completed_activity.completed = True
+                completed_activity.is_paused = False
+                completed_activity.last_paused_at = None
+
         if not instance.time_start:
             instance.time_start = start_time
         instance.time_stop = None
@@ -357,7 +371,37 @@ class TimerService:
         self.db_session.flush()
         activity_name = instance.definition.name if instance.definition else "Unknown"
         serialized = serialize_activity_instance(instance)
+        completed_serialized = (
+            serialize_activity_instance(completed_activity)
+            if completed_activity
+            else None
+        )
         self.db_session.commit()
+        if completed_activity:
+            self._recompute_stats_for_instance(completed_activity)
+            completed_name = (
+                completed_activity.definition.name
+                if completed_activity.definition
+                else "Unknown"
+            )
+            event_bus.emit(Event(
+                Events.ACTIVITY_INSTANCE_COMPLETED,
+                {
+                    **self._activity_event_payload(
+                        completed_activity,
+                        root_id,
+                        completed_name,
+                    ),
+                    'duration_seconds': completed_activity.duration_seconds,
+                    'completed_at': (
+                        completed_activity.time_stop.isoformat()
+                        if completed_activity.time_stop
+                        else None
+                    ),
+                },
+                source='timer_service.start_activity_timer.switch',
+                context={'db_session': self.db_session},
+            ))
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_UPDATED,
             self._activity_event_payload(
@@ -372,6 +416,7 @@ class TimerService:
         return {
             "instance": instance,
             "serialized": serialized,
+            "completed_serialized": completed_serialized,
             "activity_name": activity_name,
         }, None, 200
 
