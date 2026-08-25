@@ -13,9 +13,12 @@ from models import (
     ActivityDefinition,
     ActivityGroup,
     ActivityInstance,
+    AdminAuditEvent,
     AnalyticsDashboard,
     AppSetting,
     BetaSignupRequest,
+    CircuitDefinition,
+    CircuitSlot,
     EmailDeliveryEvent,
     Goal,
     GoalLevel,
@@ -68,6 +71,8 @@ def admin_user(db_session):
         username='adminuser',
         email='admin@example.com',
         role='admin',
+        terms_accepted_version='1.0',
+        privacy_accepted_version='1.0',
     )
     user.set_password('Password123')
     db_session.add(user)
@@ -163,6 +168,9 @@ def test_signup_requires_and_consumes_invite_key(client, admin_client):
             'email': 'invited@example.com',
             'password': 'Password123',
             'invite_key': invite_key,
+            'accepted_terms': True,
+            'terms_version': '1.0',
+            'privacy_version': '1.0',
         }),
         content_type='application/json',
     )
@@ -175,6 +183,9 @@ def test_signup_requires_and_consumes_invite_key(client, admin_client):
             'email': 'reuse@example.com',
             'password': 'Password123',
             'invite_key': invite_key,
+            'accepted_terms': True,
+            'terms_version': '1.0',
+            'privacy_version': '1.0',
         }),
         content_type='application/json',
     )
@@ -197,6 +208,9 @@ def test_manual_invite_key_is_bound_to_assigned_email(client, admin_client):
             'email': 'other@example.com',
             'password': 'Password123',
             'invite_key': invite_key,
+            'accepted_terms': True,
+            'terms_version': '1.0',
+            'privacy_version': '1.0',
         }),
         content_type='application/json',
     )
@@ -210,6 +224,9 @@ def test_manual_invite_key_is_bound_to_assigned_email(client, admin_client):
             'email': 'BOUND@example.com',
             'password': 'Password123',
             'invite_key': invite_key,
+            'accepted_terms': True,
+            'terms_version': '1.0',
+            'privacy_version': '1.0',
         }),
         content_type='application/json',
     )
@@ -283,6 +300,16 @@ def test_legacy_delete_route_soft_deletes_user(admin_client, db_session, test_us
 def test_admin_can_hard_delete_user_and_owned_roots(admin_client, db_session, test_user, sample_ultimate_goal):
     user_id = test_user.id
     root_id = sample_ultimate_goal.id
+    activity = ActivityDefinition(root_id=root_id, name='Circuit activity')
+    circuit = CircuitDefinition(root_id=root_id, name='Deletion circuit')
+    db_session.add_all([activity, circuit])
+    db_session.flush()
+    db_session.add(CircuitSlot(
+        circuit_definition_id=circuit.id,
+        activity_definition_id=activity.id,
+        sort_order=0,
+    ))
+    db_session.commit()
 
     response = admin_client.delete(f'/api/admin/users/{user_id}/hard-delete')
 
@@ -1444,7 +1471,7 @@ def test_non_admin_cannot_call_admin_user_actions(authed_client, test_user):
 
 
 @pytest.mark.integration
-def test_admin_read_only_and_read_write_fractal_access(client, admin_user, test_user, sample_ultimate_goal):
+def test_admin_read_only_and_read_write_fractal_access(client, db_session, admin_user, test_user, sample_ultimate_goal):
     headers = auth_headers_for(admin_user)
     root_id = sample_ultimate_goal.id
 
@@ -1469,6 +1496,16 @@ def test_admin_read_only_and_read_write_fractal_access(client, admin_user, test_
         content_type='application/json',
     )
     assert write_ok_response.status_code == 201
+
+    rows = db_session.query(AdminAuditEvent).filter_by(
+        actor_user_id=admin_user.id,
+        target_user_id=test_user.id,
+        action='support_access',
+    ).all()
+    assert [(row.event_metadata['method'], row.event_metadata['mode']) for row in rows] == [
+        ('GET', 'read_only'),
+        ('POST', 'read_write'),
+    ]
 
 
 @pytest.mark.integration
@@ -1651,6 +1688,9 @@ def test_beta_signup_invite_key_is_bound_to_signup_email(admin_client, client, d
             'email': 'someone-else@example.com',
             'password': 'Password123',
             'invite_key': invite_key,
+            'accepted_terms': True,
+            'terms_version': '1.0',
+            'privacy_version': '1.0',
         }),
         content_type='application/json',
     )
@@ -1664,6 +1704,9 @@ def test_beta_signup_invite_key_is_bound_to_signup_email(admin_client, client, d
             'email': target.email.upper(),
             'password': 'Password123',
             'invite_key': invite_key,
+            'accepted_terms': True,
+            'terms_version': '1.0',
+            'privacy_version': '1.0',
         }),
         content_type='application/json',
     )

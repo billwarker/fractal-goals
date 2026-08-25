@@ -34,7 +34,9 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
 
 def _admin_service_or_response(current_user, db_session):
-    service = AdminService(db_session)
+    # Actor is bound here so every audit row written during this request
+    # attributes the action to the authenticated admin.
+    service = AdminService(db_session, actor=current_user)
     error, status = service.require_admin(current_user)
     if error:
         return service, (jsonify({"error": error}), status)

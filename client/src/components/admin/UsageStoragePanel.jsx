@@ -127,7 +127,7 @@ function UsageStoragePanel({ storage, retention, exportState }) {
                     id="telemetry-retention-days"
                     type="number"
                     min="30"
-                    max="730"
+                    max="180"
                     value={retentionDays}
                     onChange={(event) => setRetentionDaysDraft(event.target.value)}
                 />

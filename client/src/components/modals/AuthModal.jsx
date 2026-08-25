@@ -37,6 +37,7 @@ function AuthModalInner({ onClose }) {
             if (!values.inviteKey) errors.inviteKey = "Required";
             if (!values.password) errors.password = "Required";
             else if (values.password.length < 8) errors.password = "Must be at least 8 characters";
+            if (!values.acceptedTerms) errors.acceptedTerms = "Required to create an account";
         }
         if (isLogin && !values.password) errors.password = "Required";
         return errors;
@@ -58,7 +59,8 @@ function AuthModalInner({ onClose }) {
         password: '',
         inviteKey: '',
         usernameOrEmail: '',
-        rememberMe: false
+        rememberMe: false,
+        acceptedTerms: false
     }, validate);
 
     useEffect(() => {
@@ -266,6 +268,42 @@ function AuthModalInner({ onClose }) {
                         </>
                     )}
 
+                    {!isLogin && (
+                        <div className={styles.consent}>
+                            <Checkbox
+                                name="acceptedTerms"
+                                checked={Boolean(values.acceptedTerms)}
+                                onChange={handleChange}
+                                onBlur={handleBlur}
+                                label={(
+                                    <span>
+                                        I am 16 or older and I agree to the{' '}
+                                        <a
+                                            href="/terms"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(event) => event.stopPropagation()}
+                                        >
+                                            Terms of Service
+                                        </a>
+                                        {' '}and{' '}
+                                        <a
+                                            href="/privacy"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(event) => event.stopPropagation()}
+                                        >
+                                            Privacy Policy
+                                        </a>.
+                                    </span>
+                                )}
+                            />
+                            {touched.acceptedTerms && errors.acceptedTerms && (
+                                <Text size="xs" color="danger">{errors.acceptedTerms}</Text>
+                            )}
+                        </div>
+                    )}
+
                     {generalError && (
                         <div className={styles.errorMessage}>
                             {generalError}
@@ -278,7 +316,7 @@ function AuthModalInner({ onClose }) {
                         <div className={styles.actions}>
                             <Button
                                 type="submit"
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || (!isLogin && !values.acceptedTerms)}
                                 fullWidth
                                 variant="primary"
                                 style={{ fontWeight: 'bold' }}

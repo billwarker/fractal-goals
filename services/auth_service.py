@@ -75,6 +75,12 @@ class AuthService:
         return current_user, None, 200
 
     def signup(self, data) -> ServiceResult[JsonDict]:
+        if (
+            data.get('terms_version') != config.TERMS_VERSION
+            or data.get('privacy_version') != config.PRIVACY_VERSION
+        ):
+            return None, "Legal documents have changed; reload and review the current versions", 409
+
         invite, invite_error, invite_status = AdminService(self.db_session).validate_invite_key(data.get('invite_key', ''))
         if invite_error:
             return None, invite_error, invite_status
@@ -94,6 +100,9 @@ class AuthService:
         if existing_user:
             return None, "Username or email already exists", 400
 
+        # One timestamp for both documents: they are accepted by a single
+        # checkbox, so recording them as simultaneous is what actually happened.
+        accepted_at = utc_now()
         new_user = User(
             username=data['username'],
             email=email,
@@ -101,6 +110,10 @@ class AuthService:
                 QuotaService(self.db_session).get_tier_storage_limit_bytes(DEFAULT_ACCOUNT_TIER)
                 or DEFAULT_STORAGE_LIMIT_BYTES
             ),
+            terms_accepted_version=config.TERMS_VERSION,
+            terms_accepted_at=accepted_at,
+            privacy_accepted_version=config.PRIVACY_VERSION,
+            privacy_accepted_at=accepted_at,
         )
         new_user.set_password(data['password'])
 
@@ -111,6 +124,25 @@ class AuthService:
         self.db_session.refresh(new_user)
         logger.info("Signed up user_id=%s", new_user.id)
         return serialize_user(new_user), None, 201
+
+    def accept_legal_documents(self, user_id: str, data) -> ServiceResult[JsonDict]:
+        if (
+            data.get('terms_version') != config.TERMS_VERSION
+            or data.get('privacy_version') != config.PRIVACY_VERSION
+        ):
+            return None, "Legal documents have changed; reload and review the current versions", 409
+
+        user = self.db_session.get(User, user_id)
+        if not user:
+            return None, "User not found", 404
+        accepted_at = utc_now()
+        user.terms_accepted_version = config.TERMS_VERSION
+        user.terms_accepted_at = accepted_at
+        user.privacy_accepted_version = config.PRIVACY_VERSION
+        user.privacy_accepted_at = accepted_at
+        self.db_session.commit()
+        self.db_session.refresh(user)
+        return serialize_user(user), None, 200
 
     def forgot_password(self, data) -> ServiceResult[JsonDict]:
         email = data["email"].lower()

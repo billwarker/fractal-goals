@@ -10,6 +10,13 @@ class User(Base):
     Represents a user in the system.
     """
     __tablename__ = 'users'
+    __table_args__ = (
+        sa.Index(
+            'ix_users_erasure_requested_at',
+            'erasure_requested_at',
+            postgresql_where=sa.text('erasure_requested_at IS NOT NULL'),
+        ),
+    )
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     username = Column(String(80), unique=True, nullable=False, index=True)
@@ -26,6 +33,20 @@ class User(Base):
     subscription_status = Column(String(32), default='none', nullable=False, server_default='none')
     paid_amount_cad_cents = Column(Integer, nullable=True)
     
+    # Legal acceptance. Stored as queryable columns rather than preferences
+    # JSON: this is consent evidence and must survive a preferences overwrite
+    # and be reportable when a user or regulator asks what was agreed to.
+    terms_accepted_version = Column(String(16), nullable=True)
+    terms_accepted_at = Column(DateTime, nullable=True)
+    privacy_accepted_version = Column(String(16), nullable=True)
+    privacy_accepted_at = Column(DateTime, nullable=True)
+
+    # Erasure request. Set when a user asks for deletion; a scheduled job
+    # performs the hard delete once the 30-day grace window elapses, so an
+    # accidental or malicious deletion can still be reversed. The sweep only
+    # scans pending requests, so the index is partial (see __table_args__).
+    erasure_requested_at = Column(DateTime, nullable=True)
+
     # Auth & Security Improvements
     last_login_at = Column(DateTime, nullable=True)
     failed_login_count = Column(Integer, default=0)
@@ -165,3 +186,35 @@ class EmailWebhookEvent(Base):
     event_type = Column(String(80), nullable=False, index=True)
     payload = Column(JSON_TYPE, nullable=True)
     created_at = Column(DateTime, default=utc_now)
+
+
+class AdminAuditEvent(Base):
+    """
+    Durable record of privileged administrative actions.
+
+    Application logs go to stdout and are neither queryable nor retained on our
+    own terms, so they cannot support the Privacy Policy's statement that access
+    to accounts is limited and logged. This table is that record.
+
+    Actor and target are SET NULL rather than CASCADE: deleting an account must
+    not erase the evidence that an administrator acted on it.
+    """
+    __tablename__ = 'admin_audit_events'
+    __table_args__ = (
+        # Reverse-chronological review, both globally and per target account.
+        sa.Index('ix_admin_audit_events_created_at_id', 'created_at', 'id'),
+        sa.Index('ix_admin_audit_events_target_created_at', 'target_user_id', 'created_at'),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    actor_user_id = Column(String, ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    action = Column(String(64), nullable=False, index=True)
+    target_user_id = Column(String, ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    # Denormalized so the trail stays meaningful after a hard delete removes
+    # the target row and the foreign key above goes NULL.
+    target_label = Column(String(255), nullable=True)
+    event_metadata = Column(JSON_TYPE, nullable=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+
+    actor = relationship("User", foreign_keys=[actor_user_id])
+    target = relationship("User", foreign_keys=[target_user_id])

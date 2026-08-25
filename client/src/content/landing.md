@@ -224,3 +224,10 @@ Beta access is invite-based while the product is being shaped. Drop your email a
 **Success Created Message:** You're on the list. We invite new testers in small batches as slots open, and we'll email you from fractalgoals.com when it's your turn.
 **Success Updated Message:** Thanks - we've updated your request. We'll email you from fractalgoals.com as new tester slots open.
 **Error Message:** Could not send the request. Please try again.
+
+## Footer
+
+**Note:** (c) Fractal Goals. Private beta.
+
+- [Privacy Policy](https://my.fractalgoals.com/privacy)
+- [Terms of Service](https://my.fractalgoals.com/terms)

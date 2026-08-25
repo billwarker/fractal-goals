@@ -1,3 +1,4 @@
+import datetime
 import uuid
 import logging
 
@@ -7,17 +8,32 @@ from sqlalchemy.orm.attributes import flag_modified
 
 import models
 from config import config
-from models import User
+from models import User, utc_now
 from models import ActivityDefinition, ActivityGroup, ActivityInstance, Goal, MetricDefinition, MetricValue, Program, ProgramBlock, ProgramDay, Session, SessionTemplate
 from services.account_flags import clear_force_password_change
 from services.email_service import EmailSendError, EmailService
-from services.email_templates import render_email_changed_email, render_password_changed_email
-from services.serializers import calculate_smart_status, serialize_user
+from services.email_templates import (
+    render_account_erasure_requested_email,
+    render_email_changed_email,
+    render_password_changed_email,
+)
+from services.serializers import calculate_smart_status, format_utc, serialize_user
 from services.template_service import STARTER_TEMPLATE_NAME
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, ServiceResult
 
 logger = logging.getLogger(__name__)
+
+
+class _SystemActor:
+    """
+    Stand-in actor for the unattended erasure sweep.
+
+    AdminService.hard_delete_user compares the actor id against the target to
+    stop an admin deleting themselves from the console. The sweep has no human
+    actor, so this sentinel simply never matches a real user id.
+    """
+    id = "system:erasure-sweep"
 
 ONBOARDING_PREFERENCE_KEY = "onboarding"
 ONBOARDING_ROOTS_PREFERENCE_KEY = "onboarding_by_root"
@@ -527,17 +543,131 @@ class UserService:
         return serialize_user(user), None, 200
 
     def delete_account(self, user_id: str, data) -> ServiceResult[JsonDict]:
+        """
+        Request erasure of the account and everything in it.
+
+        This schedules permanent deletion once ACCOUNT_ERASURE_GRACE_DAYS has
+        elapsed; the sweep in
+        ``execute_due_erasures`` performs the actual hard delete.
+
+        The grace window is deliberate. It is what the Privacy Policy promises,
+        and it means an accidental or coerced deletion can still be reversed
+        while the request is pending. The identity row is NOT anonymized here:
+        doing so would destroy the email needed to confirm or cancel the
+        request, and would leave the user's content orphaned rather than
+        deleted, which is the behaviour this replaces.
+        """
         user = self._get_user(user_id)
         if not user:
             return None, 'User not found', 404
         if not user.check_password(data['password']):
             return None, 'Invalid password', 401
 
-        user.username = f"deleted_{uuid.uuid4()}"
-        user.email = f"deleted_{uuid.uuid4()}@fractalgoals.com"
-        user.is_active = False
-        user.set_password(str(uuid.uuid4()))
+        if user.erasure_requested_at:
+            scheduled_for = self._erasure_due_at(user.erasure_requested_at)
+            return {
+                "message": "Account deletion is already scheduled",
+                "erasure_requested_at": format_utc(user.erasure_requested_at),
+                "scheduled_deletion_at": format_utc(scheduled_for),
+                "grace_days": config.ACCOUNT_ERASURE_GRACE_DAYS,
+            }, None, 200
 
+        requested_at = utc_now()
+        user.erasure_requested_at = requested_at
+        # The account stays active during the grace window. Deactivating here
+        # would lock the user out of the very endpoint that cancels the
+        # request (token_required rejects inactive users), turning a reversible
+        # 30-day window into an immediate, irreversible lockout.
         self.db_session.commit()
-        logger.info("Deleted account for user_id=%s", user.id)
-        return {"message": "Account deleted successfully"}, None, 200
+
+        # Reuses the shared best-effort notice helper: a failed confirmation
+        # email must not roll back a deletion the user already asked for.
+        due_at = self._erasure_due_at(requested_at)
+        self._send_security_notice(
+            to=user.email,
+            rendered=render_account_erasure_requested_email(
+                due_at.strftime("%d %B %Y"),
+                config.ACCOUNT_ERASURE_GRACE_DAYS,
+            ),
+            template_key="account_erasure_requested",
+            user_id=user.id,
+        )
+
+        logger.info(
+            "Erasure requested for user_id=%s, scheduled in %s days",
+            user.id,
+            config.ACCOUNT_ERASURE_GRACE_DAYS,
+        )
+        return {
+            "message": "Account deletion scheduled",
+            "erasure_requested_at": format_utc(requested_at),
+            "scheduled_deletion_at": format_utc(self._erasure_due_at(requested_at)),
+            "grace_days": config.ACCOUNT_ERASURE_GRACE_DAYS,
+        }, None, 200
+
+    def cancel_account_deletion(self, user_id: str) -> ServiceResult[JsonDict]:
+        """Reverse a pending erasure request during the grace window."""
+        user = self._get_user(user_id)
+        if not user:
+            return None, 'User not found', 404
+        if not user.erasure_requested_at:
+            return None, 'No pending deletion request', 400
+
+        user.erasure_requested_at = None
+        self.db_session.commit()
+        logger.info("Erasure cancelled for user_id=%s", user.id)
+        return {"message": "Account deletion cancelled"}, None, 200
+
+    @staticmethod
+    def _erasure_due_at(requested_at):
+        requested_at = UserService._as_aware_utc(requested_at)
+        return requested_at + datetime.timedelta(days=config.ACCOUNT_ERASURE_GRACE_DAYS)
+
+    @staticmethod
+    def _as_aware_utc(value):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=datetime.timezone.utc)
+        return value.astimezone(datetime.timezone.utc)
+
+    def execute_due_erasures(self, now=None) -> JsonDict:
+        """
+        Hard delete every account whose grace window has elapsed.
+
+        Reuses AdminService.hard_delete_user so there is exactly one deletion
+        cascade in the codebase rather than a second one that could drift.
+        Each account commits independently: one failure must not block the
+        rest of the sweep.
+        """
+        from services.admin_service import AdminService
+
+        now = self._as_aware_utc(now or utc_now())
+        cutoff = now - datetime.timedelta(days=config.ACCOUNT_ERASURE_GRACE_DAYS)
+
+        due_users = self.db_session.query(User).filter(
+            User.erasure_requested_at.isnot(None),
+            User.erasure_requested_at <= cutoff,
+        ).all()
+
+        deleted, failed = [], []
+        for user in due_users:
+            user_id = user.id
+            try:
+                # hard_delete_user refuses self-deletion, so pass a distinct
+                # sentinel actor rather than the user being erased.
+                _, error, _ = AdminService(self.db_session).hard_delete_user(
+                    user_id,
+                    _SystemActor(),
+                )
+                if error:
+                    failed.append({"user_id": user_id, "error": error})
+                else:
+                    deleted.append(user_id)
+            except Exception as exc:  # pragma: no cover - defensive
+                self.db_session.rollback()
+                logger.exception("Erasure failed for user_id=%s", user_id)
+                failed.append({"user_id": user_id, "error": str(exc)})
+
+        logger.info("Erasure sweep deleted=%s failed=%s", len(deleted), len(failed))
+        return {"deleted_count": len(deleted), "deleted_user_ids": deleted, "failed": failed}

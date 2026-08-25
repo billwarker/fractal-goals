@@ -16,6 +16,7 @@ import logging
 import sqlalchemy as sa
 from sqlalchemy import func
 
+from config import config
 from models import (
     EmailDeliveryEvent,
     EventLog,
@@ -41,7 +42,7 @@ MAX_WINDOW_DAYS = 365
 DEFAULT_WINDOW_DAYS = 30
 TOP_LIMIT = 20
 MIN_RETENTION_DAYS = 30
-MAX_RETENTION_DAYS = 730
+MAX_RETENTION_DAYS = config.PRODUCT_EVENT_RETENTION_DAYS
 
 # Domain activity surfaced as dedicated per-user columns; the full event-type
 # spectrum lives in events_breakdown.
@@ -145,7 +146,12 @@ class AdminUsageService:
     def _retention_settings(self):
         stored = get_app_setting(self.db_session, TELEMETRY_RETENTION_KEY, {}) or {}
         days = stored.get("product_events_days", DEFAULT_RETENTION_DAYS)
-        return {"product_events_days": int(days)}
+        return {
+            "product_events_days": max(
+                MIN_RETENTION_DAYS,
+                min(MAX_RETENTION_DAYS, int(days)),
+            )
+        }
 
     def _export_state(self):
         stored = get_app_setting(self.db_session, ANALYTICS_EXPORT_STATE_KEY, None)

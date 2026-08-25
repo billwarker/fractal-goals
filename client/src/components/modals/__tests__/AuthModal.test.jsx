@@ -76,6 +76,42 @@ describe('AuthModal', () => {
         expect(notify.success).toHaveBeenCalled();
     });
 
+    it('blocks signup until the consent checkbox is ticked', async () => {
+        window.history.pushState({}, '', '/?invite_key=fg_invite_abc123&email=invitee%40example.com');
+
+        render(<AuthModal isOpen={true} onClose={vi.fn()} />);
+
+        fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'newuser' } });
+        fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Password123' } });
+
+        // Consent is unticked: the control is disabled and submitting is a no-op.
+        const submit = screen.getByRole('button', { name: 'CREATE' });
+        expect(submit).toBeDisabled();
+        fireEvent.click(submit);
+        expect(signup).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('checkbox'));
+        expect(submit).toBeEnabled();
+        fireEvent.click(submit);
+
+        await waitFor(() => expect(signup).toHaveBeenCalledWith(
+            'newuser',
+            'invitee@example.com',
+            'Password123',
+            'fg_invite_abc123',
+        ));
+    });
+
+    it('states the age attestation and links both documents at signup', () => {
+        window.history.pushState({}, '', '/?invite_key=fg_invite_abc123');
+
+        render(<AuthModal isOpen={true} onClose={vi.fn()} />);
+
+        expect(screen.getByText(/I am 16 or older/i)).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute('href', '/terms');
+        expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy');
+    });
+
     it('prefills invite key and email from invite links', async () => {
         window.history.pushState({}, '', '/?invite_key=fg_invite_abc123&email=invitee%40example.com');
 

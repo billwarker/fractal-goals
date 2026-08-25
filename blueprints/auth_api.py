@@ -5,15 +5,19 @@ import secrets
 import hmac
 from validators import (
     validate_request, UserSignupSchema, UserLoginSchema, UserPreferencesUpdateSchema,
-    UserPasswordUpdateSchema, UserEmailUpdateSchema, UserDeleteSchema, UserUsernameUpdateSchema,
+    UserPasswordUpdateSchema, UserEmailUpdateSchema, UserDeleteSchema, UserExportSchema, UserUsernameUpdateSchema,
     PasswordForgotSchema, PasswordResetSchema,
+    LegalAcceptanceSchema,
     OnboardingStateUpdateSchema,
 )
 from services.account_flags import must_change_password
 from services.serializers import serialize_user
 from services.auth_service import AuthService
 from services.user_service import UserService
-from models import User, validate_root_goal
+from services.data_export_service import DataExportService
+from datetime import datetime, timezone
+
+from models import AdminAuditEvent, User, validate_root_goal
 from blueprints.api_utils import get_db_session, internal_error
 from extensions import limiter
 from config import config
@@ -29,6 +33,15 @@ FORCE_PASSWORD_CHANGE_EXEMPT_ENDPOINTS = frozenset({
     'auth.get_me',
     'auth.get_csrf_token',
     'auth.update_password',
+})
+
+LEGAL_ACCEPTANCE_EXEMPT_ENDPOINTS = frozenset({
+    'auth.get_me',
+    'auth.get_csrf_token',
+    'auth.update_password',
+    'auth.accept_legal_documents',
+    'auth.delete_account',
+    'auth.export_account_data',
 })
 
 
@@ -150,6 +163,17 @@ def token_required(f):
                     'error': 'Password change required',
                     'code': 'password_change_required',
                 }), 403
+            if (
+                request.endpoint not in LEGAL_ACCEPTANCE_EXEMPT_ENDPOINTS
+                and (
+                    current_user.terms_accepted_version != config.TERMS_VERSION
+                    or current_user.privacy_accepted_version != config.PRIVACY_VERSION
+                )
+            ):
+                return jsonify({
+                    'error': 'Legal acceptance required',
+                    'code': 'legal_acceptance_required',
+                }), 403
             root_id = kwargs.get('root_id')
             admin_user_id = request.args.get('admin_user_id')
             admin_mode = request.args.get('admin_mode')
@@ -170,13 +194,27 @@ def token_required(f):
                     root = validate_root_goal(db_session, root_id, owner_id=admin_user_id)
                     if not root:
                         return jsonify({'error': 'Fractal not found'}), 404
-                else:
-                    target_user = db_session.query(User).filter(
-                        User.id == admin_user_id,
-                        User.is_active.is_(True),
-                    ).first()
-                    if not target_user:
-                        return jsonify({'error': 'User not found'}), 404
+                target_user = db_session.query(User).filter(
+                    User.id == admin_user_id,
+                    User.is_active.is_(True),
+                ).first()
+                if not target_user:
+                    return jsonify({'error': 'User not found'}), 404
+                db_session.add(AdminAuditEvent(
+                    actor_user_id=current_user.id,
+                    action='support_access',
+                    target_user_id=target_user.id,
+                    target_label=f'user:{target_user.id}',
+                    event_metadata={
+                        'mode': admin_mode,
+                        'method': request.method,
+                        'path': request.path,
+                        'root_id': root_id,
+                    },
+                ))
+                # Support access fails closed if its audit record cannot be
+                # persisted. The protected route owns a separate unit of work.
+                db_session.commit()
                 g.admin_actor_user_id = current_user.id
                 g.admin_target_user_id = admin_user_id
                 g.admin_mode = admin_mode
@@ -186,6 +224,8 @@ def token_required(f):
         except SQLAlchemyError:
             logger.exception("Database error in token_required decorator")
             return jsonify({'error': 'Internal server error during authentication'}), 500
+        finally:
+            db_session.close()
             
     return decorated
 
@@ -304,6 +344,29 @@ def reset_password(validated_data):
 def get_me(current_user):
     """Get current user info."""
     return jsonify(serialize_user(current_user))
+
+
+@auth_bp.route('/legal/acceptance', methods=['POST'])
+@token_required
+@validate_request(LegalAcceptanceSchema)
+@limiter.limit("5 per minute")
+def accept_legal_documents(current_user, validated_data):
+    """Accept the currently published legal-document versions."""
+    db_session = get_db_session()
+    try:
+        payload, error, status = AuthService(db_session).accept_legal_documents(
+            current_user.id,
+            validated_data,
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error recording legal acceptance")
+        return internal_error(logger, "Error recording legal acceptance")
+    finally:
+        db_session.close()
 
 
 @auth_bp.route('/csrf', methods=['GET'])
@@ -474,6 +537,58 @@ def delete_account(current_user, validated_data):
         db_session.rollback()
         logger.exception("Error deleting account")
         return internal_error(logger, "Error deleting account")
+    finally:
+        db_session.close()
+
+@auth_bp.route('/account/deletion', methods=['DELETE'])
+@token_required
+@limiter.limit("3 per minute")
+def cancel_account_deletion(current_user):
+    """Cancel a pending erasure request during the grace window."""
+    db_session = get_db_session()
+    try:
+        service = UserService(db_session)
+        payload, error, status = service.cancel_account_deletion(current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error cancelling account deletion")
+        return internal_error(logger, "Error cancelling account deletion")
+    finally:
+        db_session.close()
+
+@auth_bp.route('/account/export', methods=['POST'])
+@token_required
+@validate_request(UserExportSchema)
+@limiter.limit("2 per hour")  # Exports are expensive; this is a rights request, not a feature
+def export_account_data(current_user, validated_data):
+    """
+    Export the account's core portable content as JSON.
+
+    POST rather than GET, and password-confirmed, because the response is a
+    sensitive copy of account content: it must never be triggerable by a link, an
+    embedded image, or a cached URL.
+    """
+    db_session = get_db_session()
+    try:
+        user = db_session.get(User, current_user.id)
+        if not user or not user.check_password(validated_data['password']):
+            return jsonify({"error": "Invalid password"}), 401
+
+        payload, error, status = DataExportService(db_session).build_export(current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+
+        response = jsonify(payload)
+        filename = f"fractal-goals-export-{datetime.now(timezone.utc).strftime('%Y%m%d')}.json"
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response, status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error exporting account data")
+        return internal_error(logger, "Error exporting account data")
     finally:
         db_session.close()
 

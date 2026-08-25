@@ -3,6 +3,7 @@ import uuid
 
 import pytest
 
+import services.analytics_export_service as analytics_export_module
 from models import EmailDeliveryEvent, EmailWebhookEvent, EventLog, Goal, ProductEvent, User
 from services.analytics_export_service import AnalyticsExportService
 from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, get_app_setting
@@ -131,6 +132,28 @@ def _seed_export_rows(db_session, *, now):
 
 @pytest.mark.unit
 class TestAnalyticsExportService:
+    def test_warehouse_prune_covers_legacy_unpartitioned_tables(self, db_session, monkeypatch):
+        class QueryClient:
+            project = 'project'
+
+            def __init__(self):
+                self.queries = []
+
+            def query(self, statement):
+                self.queries.append(statement)
+                return FakeLoadJob()
+
+        monkeypatch.setattr(analytics_export_module, 'bigquery', object())
+        client = QueryClient()
+        service = AnalyticsExportService(db_session, client, 'dataset')
+
+        service._prune_warehouse_table('event_logs', 'timestamp')
+
+        assert client.queries == [
+            'DELETE FROM `dataset.event_logs` '
+            'WHERE `timestamp` < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 730 DAY)'
+        ]
+
     def test_fresh_run_exports_all_tables_and_sets_watermarks(self, db_session):
         now = _dt(0)
         _seed_export_rows(db_session, now=now)
@@ -328,5 +351,6 @@ class TestAnalyticsExportService:
         event_load = next(load for load in bq.loads if load["table"] == "event_logs")
         webhook_load = next(load for load in bq.loads if load["table"] == "email_webhook_events")
         assert product_load["rows"][0]["properties_json"] == '{"source":"test"}'
-        assert event_load["rows"][0]["payload_json"] == '{"count":1}'
+        assert event_load["rows"][0]["description"] is None
+        assert event_load["rows"][0]["payload_json"] is None
         assert webhook_load["rows"][0]["payload_json"] == '{"delivered":true}'

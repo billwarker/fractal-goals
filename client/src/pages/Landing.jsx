@@ -942,6 +942,15 @@ function Landing() {
                         </form>
                     </div>
                 </div>
+
+                <footer className={styles.siteFooter}>
+                    <p className={styles.footerNote}>{landingContent.footer.note}</p>
+                    <nav className={styles.footerLinks} aria-label="Legal">
+                        {landingContent.footer.links.map((link) => (
+                            <a key={link.href} href={link.href}>{link.label}</a>
+                        ))}
+                    </nav>
+                </footer>
             </section>
         </main>
     );

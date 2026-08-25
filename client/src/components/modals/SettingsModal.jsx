@@ -35,7 +35,7 @@ const SettingsModalInner = ({ onClose }) => {
     const { preference, setPreference } = useTimezone();
 
     const [activeTab, setActiveTab] = useState('general');
-    const { logout, user } = useAuth();
+    const { user, setUser } = useAuth();
     const { activeRootId } = useGoals();
     const isMobile = useIsMobile();
     const onboarding = useOptionalOnboarding();
@@ -85,6 +85,8 @@ const SettingsModalInner = ({ onClose }) => {
     const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '' });
     const [emailData, setEmailData] = useState({ email: '', password: '' });
     const [deleteData, setDeleteData] = useState({ password: '', confirmation: '' });
+    const [exportPassword, setExportPassword] = useState('');
+    const [isExporting, setIsExporting] = useState(false);
 
     useEffect(() => {
         if (activeTab !== 'account') return;
@@ -180,19 +182,61 @@ const SettingsModalInner = ({ onClose }) => {
         }
     };
 
+    const handleExportData = async (e) => {
+        e.preventDefault();
+        setIsExporting(true);
+        try {
+            const res = await authApi.exportAccountData({ password: exportPassword });
+            // Turn the JSON response into a file download without a round trip.
+            const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `fractal-goals-export-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            setExportPassword('');
+            notify.success('Your data export has been downloaded.');
+        } catch (err) {
+            notify.error(`Failed to export data: ${formatError(err)}`);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const handleDeleteAccount = async (e) => {
         e.preventDefault();
         if (deleteData.confirmation !== 'DELETE') return;
 
-        if (window.confirm('Are you ABSOLUTELY sure? This action cannot be undone.')) {
+        const confirmed = window.confirm(
+            'Your account will remain accessible and be permanently deleted in 30 days.\n\n'
+            + 'You can cancel any time during those 30 days from Account Settings. '
+            + 'After that, deletion is irreversible.\n\n'
+            + 'Have you downloaded your data?'
+        );
+        if (confirmed) {
             try {
-                await authApi.deleteAccount(deleteData);
-                notify.success('Account deleted.');
-                logout();
-                onClose();
+                const res = await authApi.deleteAccount(deleteData);
+                notify.success(res?.data?.message || 'Account deletion scheduled.');
+                const currentUser = await authApi.getMe();
+                setUser(currentUser.data);
             } catch (err) {
                 notify.error(`Failed to delete account: ${formatError(err)}`);
             }
+        }
+    };
+
+    const handleCancelDeletion = async () => {
+        try {
+            await authApi.cancelAccountDeletion();
+            const currentUser = await authApi.getMe();
+            setUser(currentUser.data);
+            notify.success('Account deletion cancelled.');
+        } catch (err) {
+            notify.error(`Failed to cancel account deletion: ${formatError(err)}`);
         }
     };
 
@@ -228,8 +272,22 @@ const SettingsModalInner = ({ onClose }) => {
                         {/* Legal Footer in Sidebar */}
                         {!isMobile && (
                             <div className={styles.legalFooter}>
-                                <a href="/privacy" className={`${styles.legalLink} ${styles.legalLinkMargin}`}>Privacy Policy</a>
-                                <a href="/terms" className={styles.legalLink}>Terms of Service</a>
+                                <a
+                                    href="/privacy"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`${styles.legalLink} ${styles.legalLinkMargin}`}
+                                >
+                                    Privacy Policy
+                                </a>
+                                <a
+                                    href="/terms"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={styles.legalLink}
+                                >
+                                    Terms of Service
+                                </a>
                             </div>
                         )}
                     </div>
@@ -549,12 +607,46 @@ const SettingsModalInner = ({ onClose }) => {
                                     </form>
                                 </section>
 
+                                {/* Data export (GDPR/CPRA portability) */}
+                                <section>
+                                    <h3 className={styles.sectionTitle}>Your Data</h3>
+                                    <p className={styles.checkboxDescription}>
+                                        Download a portable copy of your core account content,
+                                        including goals, sessions, activities, programs, targets and notes.
+                                    </p>
+                                    <form onSubmit={handleExportData} className={styles.formContainer}>
+                                        <input
+                                            type="password"
+                                            placeholder="Current Password"
+                                            value={exportPassword}
+                                            onChange={e => setExportPassword(e.target.value)}
+                                            className={styles.textInput}
+                                            required
+                                        />
+                                        <button
+                                            type="submit"
+                                            className={styles.primaryButton}
+                                            disabled={isExporting || !exportPassword}
+                                        >
+                                            {isExporting ? 'Preparing download...' : 'Download my data'}
+                                        </button>
+                                    </form>
+                                </section>
+
                                 {/* Danger Zone */}
                                 <section className={styles.dangerZone}>
                                     <h3 className={styles.dangerTitle}>Danger Zone</h3>
                                     <p className={styles.dangerText}>
-                                        Deleting your account is permanent. All your data will be wiped.
+                                        Your account remains accessible during a 30-day grace period,
+                                        then your account and content are permanently deleted. You can
+                                        cancel here during the grace period. Download your data first.
                                     </p>
+                                    {user?.erasure_requested_at && (
+                                        <button type="button" className={styles.primaryButton} onClick={handleCancelDeletion}>
+                                            Cancel scheduled deletion
+                                        </button>
+                                    )}
+                                    {!user?.erasure_requested_at && (
                                     <form onSubmit={handleDeleteAccount} className={styles.formContainer}>
                                         <input
                                             type="password"
@@ -582,13 +674,28 @@ const SettingsModalInner = ({ onClose }) => {
                                             </button>
                                         </div>
                                     </form>
+                                    )}
                                 </section>
                             </div>
                         )}
                         {isMobile && (
                             <div className={styles.mobileLegalFooter}>
-                                <a href="/privacy" className={`${styles.legalLink} ${styles.legalLinkMargin}`}>Privacy Policy</a>
-                                <a href="/terms" className={styles.legalLink}>Terms of Service</a>
+                                <a
+                                    href="/privacy"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`${styles.legalLink} ${styles.legalLinkMargin}`}
+                                >
+                                    Privacy Policy
+                                </a>
+                                <a
+                                    href="/terms"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={styles.legalLink}
+                                >
+                                    Terms of Service
+                                </a>
                             </div>
                         )}
                     </div>

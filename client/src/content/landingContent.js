@@ -15,6 +15,13 @@ const fallbackContent = {
             { label: 'Open app', href: 'https://my.fractalgoals.com' },
         ],
     },
+    footer: {
+        note: '(c) Fractal Goals. Private beta.',
+        links: [
+            { label: 'Privacy Policy', href: 'https://my.fractalgoals.com/privacy' },
+            { label: 'Terms of Service', href: 'https://my.fractalgoals.com/terms' },
+        ],
+    },
     hero: {
         kicker: 'Composable goal tracking',
         navLabel: 'Top',
@@ -354,6 +361,15 @@ export function parseLandingContent(markdown) {
         ...content.header,
         ...headerMeta,
         nav: nav.length ? nav : content.header.nav,
+    };
+
+    const footerSection = getTopLevelSection(markdown, 'Footer');
+    const footerMeta = readMetadata(footerSection);
+    const footerLinks = readLinks(footerSection);
+    content.footer = {
+        ...content.footer,
+        ...footerMeta,
+        links: footerLinks.length ? footerLinks : content.footer.links,
     };
 
     const hero = readStandardSection(markdown, 'Hero', content.hero);

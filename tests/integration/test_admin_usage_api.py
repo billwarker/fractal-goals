@@ -27,6 +27,8 @@ def admin_user(db_session):
         username='usageadmin',
         email='usageadmin@example.com',
         role='admin',
+        terms_accepted_version='1.0',
+        privacy_accepted_version='1.0',
     )
     user.set_password('Password123')
     db_session.add(user)
@@ -301,7 +303,7 @@ class TestAdminUsageRetention:
             data=json.dumps({'product_events_days': 5000}),
             content_type='application/json',
         )
-        assert json.loads(high.data)['product_events_days'] == 730
+        assert json.loads(high.data)['product_events_days'] == 180
 
     def test_retention_requires_admin(self, authed_client):
         response = authed_client.patch(

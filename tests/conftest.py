@@ -203,7 +203,11 @@ def test_user(db_session):
     user = User(
         id=str(uuid.uuid4()),
         username="testuser",
-        email="test@example.com"
+        email="test@example.com",
+        terms_accepted_version="1.0",
+        terms_accepted_at=datetime.now(timezone.utc),
+        privacy_accepted_version="1.0",
+        privacy_accepted_at=datetime.now(timezone.utc),
     )
     user.set_password("Password123")
     db_session.add(user)

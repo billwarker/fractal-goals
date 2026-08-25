@@ -616,6 +616,50 @@
     padding-bottom: 28px;
 }
 
+/* The footer lives inside #beta rather than beside it: a sibling of the snap
+   sections would become a fifth horizontal snap target on desktop. */
+.siteFooter {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 24px;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border);
+}
+
+.footerNote {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.footerLinks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.footerLinks a {
+    color: var(--color-text-muted);
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.footerLinks a:hover {
+    color: var(--color-text-primary);
+    text-decoration: underline;
+}
+
+@media (max-width: 620px) {
+    .siteFooter {
+        justify-content: flex-start;
+        margin-top: 24px;
+    }
+}
+
 .betaAudience {
     min-width: 0;
 }

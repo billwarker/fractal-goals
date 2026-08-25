@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 from dataclasses import dataclass
 from typing import Callable
 
@@ -16,6 +17,8 @@ import sqlalchemy as sa
 
 from models import EmailDeliveryEvent, EmailWebhookEvent, EventLog, ProductEvent, User, format_utc, utc_now
 from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, get_app_setting, set_app_setting
+
+logger = logging.getLogger(__name__)
 
 try:  # pragma: no cover - exercised by the real export entrypoint.
     from google.cloud import bigquery
@@ -147,6 +150,12 @@ USERS_SCHEMA = (
 )
 
 
+# The Privacy Policy commits to deleting analytics records after 24 months.
+# Enforced as table-level expiration so the promise is kept by infrastructure
+# rather than by remembering to run something.
+ANALYTICS_RETENTION_DAYS = 730
+
+
 def _load_job_config(write_disposition, schema):
     if bigquery is None:
         return {"write_disposition": write_disposition, "schema": list(schema)}
@@ -181,8 +190,11 @@ def _serialize_event_log(row: EventLog) -> dict:
         "event_type": row.event_type,
         "entity_type": row.entity_type,
         "entity_id": row.entity_id,
-        "description": row.description,
-        "payload_json": _json_value(row.payload),
+        # Free-form descriptions and payloads can contain names, notes, and
+        # other user-authored content. Warehouse analytics only receives the
+        # structural event envelope; legacy columns remain null.
+        "description": None,
+        "payload_json": None,
         "source": row.source,
         "timestamp": _format_dt(row.timestamp),
     }
@@ -296,6 +308,7 @@ class AnalyticsExportService:
             for spec in INCREMENTAL_TABLES:
                 self._emit(f"Exporting incremental table {spec.table}")
                 run_counts[spec.table] = self._export_incremental_table(spec, state, cutoff)
+                self._prune_warehouse_table(spec.table, spec.cursor_column.key)
                 self._emit(f"Finished {spec.table}: rows={run_counts[spec.table]}")
 
             self._emit("Exporting users dimension")
@@ -399,7 +412,42 @@ class AnalyticsExportService:
             job_config=_load_job_config(write_disposition, schema),
         )
         job.result()
+        self._apply_retention(table)
         self._emit(f"BigQuery load complete table={table} rows={len(rows)}")
+
+    def _apply_retention(self, table):
+        """
+        Ensure the table drops partitions older than the published retention
+        window. Best effort: a retention update must not fail an export that
+        has already loaded, but it is logged so a silent gap is visible.
+        """
+        if bigquery is None:
+            return
+        try:
+            table_ref = _table_ref(self.dataset, table)
+            bq_table = self.bq_client.get_table(table_ref)
+            expiration_ms = ANALYTICS_RETENTION_DAYS * 24 * 60 * 60 * 1000
+            if bq_table.time_partitioning is not None:
+                if bq_table.time_partitioning.expiration_ms == expiration_ms:
+                    return
+                bq_table.time_partitioning.expiration_ms = expiration_ms
+                self.bq_client.update_table(bq_table, ["time_partitioning"])
+                self._emit(f"Applied {ANALYTICS_RETENTION_DAYS}d retention table={table}")
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Could not apply retention table=%s error=%s", table, exc)
+
+    def _prune_warehouse_table(self, table, timestamp_column):
+        """Delete expired rows even when a legacy table is not partitioned."""
+        if bigquery is None:
+            return
+        table_ref = _table_ref(self.dataset, table)
+        query = (
+            f"DELETE FROM `{table_ref}` "
+            f"WHERE `{timestamp_column}` < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), "
+            f"INTERVAL {ANALYTICS_RETENTION_DAYS} DAY)"
+        )
+        self.bq_client.query(query).result()
+        self._emit(f"Pruned expired warehouse rows table={table}")
 
     def _emit(self, message: str):
         if self.log:

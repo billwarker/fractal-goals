@@ -27,7 +27,21 @@ class UserSignupSchema(BaseModel):
     email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
     password: str = Field(..., min_length=8)
     invite_key: str = Field(..., min_length=8, max_length=128)
-    
+
+    # Consent evidence. The checkbox covers the 16+ age attestation as well as
+    # the two documents, so a missing or false value must fail the request
+    # rather than default to accepted.
+    accepted_terms: bool = Field(...)
+    terms_version: str = Field(..., min_length=1, max_length=16)
+    privacy_version: str = Field(..., min_length=1, max_length=16)
+
+    @field_validator('accepted_terms')
+    @classmethod
+    def require_acceptance(cls, v: bool) -> bool:
+        if v is not True:
+            raise ValueError('You must accept the Terms of Service and Privacy Policy')
+        return v
+
     @field_validator('username')
     @classmethod
     def sanitize_username(cls, v: str) -> str:
@@ -37,6 +51,22 @@ class UserSignupSchema(BaseModel):
     @classmethod
     def validate_password_strength(cls, v: str) -> str:
         return validate_strong_password(v)
+
+
+class LegalAcceptanceSchema(BaseModel):
+    """Acceptance of the currently published legal documents."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    accepted_terms: bool = Field(...)
+    terms_version: str = Field(..., min_length=1, max_length=16)
+    privacy_version: str = Field(..., min_length=1, max_length=16)
+
+    @field_validator('accepted_terms')
+    @classmethod
+    def require_acceptance(cls, value: bool) -> bool:
+        if value is not True:
+            raise ValueError('You must accept the Terms of Service and Privacy Policy')
+        return value
 
 
 class UserLoginSchema(BaseModel):
@@ -411,3 +441,10 @@ class UserDeleteSchema(BaseModel):
     
     password: str = Field(..., min_length=1)  # Require password to delete account
     confirmation: str = Field(..., pattern=r'^DELETE$')
+
+
+class UserExportSchema(BaseModel):
+    """Password confirmation for a sensitive account-data export."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    password: str = Field(..., min_length=1)

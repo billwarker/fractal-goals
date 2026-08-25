@@ -2,6 +2,7 @@ import copy
 from datetime import datetime, timezone, date
 
 from account_tiers import DEFAULT_ACCOUNT_TIER
+from config import config
 from models import _safe_load_json
 from .account_flags import must_change_password as _must_change_password
 from .goal_type_utils import get_canonical_goal_type
@@ -913,6 +914,8 @@ def serialize_program_day_session_light(session):
 
 def serialize_user(user):
     """Serialize a User object."""
+    terms_version = getattr(user, "terms_accepted_version", None)
+    privacy_version = getattr(user, "privacy_accepted_version", None)
     return {
         "id": user.id,
         "username": user.username,
@@ -927,6 +930,23 @@ def serialize_user(user):
         "paid_amount_cad_cents": getattr(user, "paid_amount_cad_cents", None),
         "storage_limit_bytes": getattr(user, "storage_limit_bytes", None),
         "last_login_at": format_utc(getattr(user, "last_login_at", None)),
+        # Shown in Settings -> Legal so a user can see exactly what they
+        # agreed to and when, and used to detect a pending re-acceptance.
+        "legal_acceptance": {
+            "terms": {
+                "version": getattr(user, "terms_accepted_version", None),
+                "accepted_at": format_utc(getattr(user, "terms_accepted_at", None)),
+            },
+            "privacy": {
+                "version": getattr(user, "privacy_accepted_version", None),
+                "accepted_at": format_utc(getattr(user, "privacy_accepted_at", None)),
+            },
+        },
+        "legal_acceptance_required": (
+            terms_version != config.TERMS_VERSION
+            or privacy_version != config.PRIVACY_VERSION
+        ),
+        "erasure_requested_at": format_utc(getattr(user, "erasure_requested_at", None)),
         "created_at": format_utc(user.created_at)
     }
 

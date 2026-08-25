@@ -108,6 +108,21 @@ class Config:
     PASSWORD_RESET_EMAIL_COOLDOWN_MINUTES = int(os.getenv('PASSWORD_RESET_EMAIL_COOLDOWN_MINUTES', '5'))
     BETA_INVITE_EMAIL_COOLDOWN_MINUTES = int(os.getenv('BETA_INVITE_EMAIL_COOLDOWN_MINUTES', '10'))
 
+    # Grace window between an erasure request and the irreversible hard delete.
+    # This is a published promise in the Privacy Policy and Terms; changing it
+    # requires updating both documents and notifying users.
+    ACCOUNT_ERASURE_GRACE_DAYS = int(os.getenv('ACCOUNT_ERASURE_GRACE_DAYS', '30'))
+
+    # Canonical legal-document versions. The API, not the browser, decides
+    # which versions are acceptable consent evidence.
+    TERMS_VERSION = '1.0'
+    PRIVACY_VERSION = '1.0'
+    PRODUCT_EVENT_RETENTION_DAYS = 180
+    PASSWORD_RESET_RECORD_RETENTION_DAYS = 30
+    EMAIL_EVENT_RETENTION_DAYS = 730
+    ADMIN_AUDIT_RETENTION_DAYS = 730
+    BETA_SIGNUP_CLOSED_RETENTION_DAYS = 365
+
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
     LOG_FILE = os.getenv('LOG_FILE', 'server.log')

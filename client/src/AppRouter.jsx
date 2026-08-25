@@ -32,8 +32,12 @@ const Logs = lazyWithRetry(() => import('./pages/Logs'), 'pages/Logs');
 const Notes = lazyWithRetry(() => import('./pages/Notes'), 'pages/Notes');
 const Admin = lazyWithRetry(() => import('./pages/Admin'), 'pages/Admin');
 const ResetPassword = lazyWithRetry(() => import('./pages/ResetPassword'), 'pages/ResetPassword');
+const Legal = lazyWithRetry(() => import('./pages/Legal'), 'pages/Legal');
+
+const LEGAL_PATHS = ['/privacy', '/terms'];
 const SettingsModal = lazyWithRetry(() => import('./components/modals/SettingsModal'), 'components/modals/SettingsModal');
 const ForcePasswordChangeModal = lazyWithRetry(() => import('./components/modals/ForcePasswordChangeModal'), 'components/modals/ForcePasswordChangeModal');
+const LegalAcceptanceModal = lazyWithRetry(() => import('./components/modals/LegalAcceptanceModal'), 'components/modals/LegalAcceptanceModal');
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 
 import { usePageTitle } from './hooks/usePageTitle';
@@ -413,6 +417,7 @@ function App() {
     const location = useLocation();
     const { user, isAuthenticated } = useAuth();
     const mustChangePassword = Boolean(isAuthenticated && user?.must_change_password);
+    const legalAcceptanceRequired = Boolean(isAuthenticated && user?.legal_acceptance_required);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const isMobile = useIsMobile();
     const [navHeight, setNavHeight] = useState(() => (location.pathname === '/' ? 0 : (isMobile ? 56 : 60)));
@@ -423,6 +428,9 @@ function App() {
         location.pathname === LANDING_PREVIEW_PATH && !isLandingPreviewPath(location.pathname)
     );
     const showLandingPage = isPublicLandingLocation(location.pathname);
+    // Legal documents render for signed-out visitors: the signup consent
+    // checkbox and the landing footer both link here before an account exists.
+    const showLegalPage = LEGAL_PATHS.includes(location.pathname);
     const showSelectionPage = location.pathname === '/' && !showLandingPage;
 
     // Determine page title based on path
@@ -431,6 +439,8 @@ function App() {
         if (pathname === '/') return 'Selection';
         if (pathname === '/admin') return 'Admin';
         if (pathname === '/reset-password') return 'Reset Password';
+        if (pathname === '/privacy') return 'Privacy Policy';
+        if (pathname === '/terms') return 'Terms of Service';
         if (pathname.includes('/goals')) return 'Goals';
         if (pathname.includes('/programs')) return 'Programs';
         if (pathname.includes('/sessions')) return 'Sessions';
@@ -525,7 +535,12 @@ function App() {
                         <ForcePasswordChangeModal />
                     </Suspense>
                 )}
-                {!showSelectionPage && !showLandingPage && !redirectDeprecatedLandingRoute && location.pathname !== '/admin' && location.pathname !== '/reset-password' && (
+                {!mustChangePassword && legalAcceptanceRequired && (
+                    <Suspense fallback={null}>
+                        <LegalAcceptanceModal />
+                    </Suspense>
+                )}
+                {!showSelectionPage && !showLandingPage && !showLegalPage && !redirectDeprecatedLandingRoute && location.pathname !== '/admin' && location.pathname !== '/reset-password' && (
                     <NavigationHeader
                         onOpenSettings={() => {
                             trackEvent('settings_opened');
@@ -545,6 +560,12 @@ function App() {
                         <Navigate to="/" replace />
                     ) : showLandingPage ? (
                         <Suspense fallback={<div className="loading-spinner">Loading...</div>}><Landing /></Suspense>
+                    ) : showLegalPage ? (
+                        <ComponentErrorBoundary>
+                            <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                <Legal />
+                            </Suspense>
+                        </ComponentErrorBoundary>
                     ) : showSelectionPage ? (
                         <Selection />
                     ) : location.pathname === '/admin' ? (

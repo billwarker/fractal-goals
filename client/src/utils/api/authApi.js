@@ -13,6 +13,7 @@ export const authApi = {
     ),
     getCsrf: () => axios.get(`${API_BASE}/auth/csrf`),
     getMe: () => axios.get(`${API_BASE}/auth/me`),
+    acceptLegalDocuments: (data) => axios.post(`${API_BASE}/auth/legal/acceptance`, data),
     getAccountUsage: (params = {}) => axios.get(`${API_BASE}/auth/account/usage`, { params }),
     updatePreferences: (data) => axios.patch(`${API_BASE}/auth/preferences`, data),
     getOnboarding: (rootId = null) => axios.get(`${API_BASE}/auth/onboarding`, {
@@ -23,4 +24,6 @@ export const authApi = {
     updateEmail: (data) => axios.put(`${API_BASE}/auth/account/email`, data),
     updateUsername: (data) => axios.put(`${API_BASE}/auth/account/username`, data),
     deleteAccount: (data) => axios.delete(`${API_BASE}/auth/account`, { data }),
+    cancelAccountDeletion: () => axios.delete(`${API_BASE}/auth/account/deletion`),
+    exportAccountData: (data) => axios.post(`${API_BASE}/auth/account/export`, data),
 };

@@ -11,6 +11,8 @@ def admin_user(db_session):
         username="logsadmin",
         email="logsadmin@example.com",
         role="admin",
+        terms_accepted_version="1.0",
+        privacy_accepted_version="1.0",
     )
     user.set_password("Password123")
     db_session.add(user)

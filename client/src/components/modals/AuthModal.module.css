@@ -121,3 +121,18 @@
     padding: 0 5px;
     font-weight: bold;
 }
+
+/* Signup consent row. The links sit inside the checkbox <label>, so they
+   stop propagation to avoid toggling consent when opening a document. */
+.consent {
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.consent a {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}

@@ -18,12 +18,15 @@ from account_tiers import (
 )
 from models import (
     ActivityDefinition,
+    AdminAuditEvent,
     ActivityDurationStats,
     ActivityGroup,
     ActivityInstance,
     AnalyticsDashboard,
     AppSetting,
     BetaSignupRequest,
+    CircuitDefinition,
+    CircuitRun,
     EmailDeliveryEvent,
     EventLog,
     FractalMetricDefinition,
@@ -71,6 +74,17 @@ from services.service_types import JsonDict, ServiceResult
 from config import config
 
 logger = logging.getLogger(__name__)
+
+
+def _jsonable(value):
+    """Coerce audit metadata into something the JSONB column accepts."""
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
 # Shared with auth/user services; re-exported here for existing imports.
 from services.account_flags import FORCE_PASSWORD_CHANGE_PREFERENCE
 
@@ -99,9 +113,37 @@ def as_aware_utc(value):
 
 
 class AdminService:
-    def __init__(self, db_session):
+    def __init__(self, db_session, actor: User | None = None):
         self.db_session = db_session
         self.quota_service = QuotaService(db_session)
+        # The admin performing the action, recorded on every audit row.
+        # Routes set this via `require_admin`, so callers that never
+        # authenticate an admin (the erasure sweep) simply leave it None.
+        self.actor = actor
+
+    def _audit(self, action: str, target: User | None = None, **metadata) -> None:
+        """
+        Record a privileged action.
+
+        Written in the caller's transaction so the trail commits with the change
+        it describes: an audit row without its action, or an action without its
+        audit row, would both be worse than useless.
+
+        Never raises. An audit failure must not roll back a completed
+        administrative action, but it is logged loudly because a silent gap in
+        the trail undermines what the Privacy Policy says about access.
+        """
+        try:
+            self.db_session.add(AdminAuditEvent(
+                actor_user_id=getattr(self.actor, "id", None),
+                action=action,
+                target_user_id=getattr(target, "id", None),
+                # Retain an opaque correlation key, not a deleted user's email.
+                target_label=(f"user:{target.id}" if target is not None else None),
+                event_metadata=metadata or None,
+            ))
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("Failed to record admin audit event action=%s", action)
 
     @staticmethod
     def is_admin(user: User) -> bool:
@@ -168,6 +210,8 @@ class AdminService:
             expires_at=expires_at,
         )
         self.db_session.add(invite)
+        self.db_session.flush()
+        self._audit("invite_created", invite_id=invite.id)
         self.db_session.commit()
         self.db_session.refresh(invite)
         payload = self.serialize_invite_key(invite)
@@ -185,6 +229,7 @@ class AdminService:
         if invite.used_at:
             return None, "Used invite keys cannot be revoked", 400
         invite.revoked_at = utc_now()
+        self._audit("invite_revoked", invite_id=invite.id)
         self.db_session.commit()
         return self.serialize_invite_key(invite), None, 200
 
@@ -209,19 +254,32 @@ class AdminService:
         )
         user.set_password(raw_password)
         self.db_session.add(user)
+        self.db_session.flush()
+        self._audit("user_created", target=user, role=user.role, membership_tier=user.membership_tier)
         self.db_session.commit()
         self.db_session.refresh(user)
         payload = self.serialize_admin_user(user)
         payload["temporary_password"] = raw_password
         return payload, None, 201
 
-    def update_user(self, user_id: str, data: JsonDict) -> ServiceResult[JsonDict]:
+    def update_user(
+        self,
+        user_id: str,
+        data: JsonDict,
+        audit_action: str | None = None,
+    ) -> ServiceResult[JsonDict]:
         user = self.db_session.get(User, user_id)
         if not user:
             return None, "User not found", 404
+        changes = {}
         for field in ("role", "is_active", "membership_tier", "quota_overrides", "storage_limit_bytes"):
             if field in data:
+                # Capture the prior value so the trail shows what changed,
+                # not merely that something did.
+                changes[field] = {"from": getattr(user, field, None), "to": data[field]}
                 setattr(user, field, data[field])
+        if audit_action:
+            self._audit(audit_action, target=user, changes=_jsonable(changes))
         self.db_session.commit()
         self.db_session.refresh(user)
         return self.serialize_admin_user(user), None, 200
@@ -229,10 +287,10 @@ class AdminService:
     def update_role(self, user_id: str, current_user: User, role: str) -> ServiceResult[JsonDict]:
         if user_id == current_user.id and role != "admin":
             return None, "Admins cannot remove their own admin role from the admin console", 400
-        return self.update_user(user_id, {"role": role})
+        return self.update_user(user_id, {"role": role}, audit_action="role_changed")
 
     def update_tier(self, user_id: str, membership_tier: str) -> ServiceResult[JsonDict]:
-        return self.update_user(user_id, {"membership_tier": membership_tier})
+        return self.update_user(user_id, {"membership_tier": membership_tier}, audit_action="tier_changed")
 
     def update_quota(self, user_id: str, data: JsonDict) -> ServiceResult[JsonDict]:
         updates = {}
@@ -240,7 +298,7 @@ class AdminService:
             updates["quota_overrides"] = data["quota_overrides"] or {}
         if "storage_limit_bytes" in data:
             updates["storage_limit_bytes"] = data["storage_limit_bytes"]
-        return self.update_user(user_id, updates)
+        return self.update_user(user_id, updates, audit_action="quota_changed")
 
     def get_tier_quota_settings(self) -> ServiceResult[JsonDict]:
         return {
@@ -297,6 +355,12 @@ class AdminService:
                 user.storage_limit_bytes = storage_limit_bytes
                 flag_modified(user, "quota_overrides")
 
+        self._audit(
+            "tier_defaults_changed",
+            tier=tier,
+            apply_existing_users=apply_existing_users,
+            affected_user_count=len(target_users),
+        )
         self.db_session.commit()
         return {
             "tier": tier,
@@ -308,7 +372,11 @@ class AdminService:
 
 
     def update_status(self, user_id: str, is_active: bool) -> ServiceResult[JsonDict]:
-        return self.update_user(user_id, {"is_active": is_active})
+        return self.update_user(
+            user_id,
+            {"is_active": is_active},
+            audit_action="account_reactivated" if is_active else "account_suspended",
+        )
 
     def unlock_user(self, user_id: str) -> ServiceResult[JsonDict]:
         user = self.db_session.get(User, user_id)
@@ -316,6 +384,7 @@ class AdminService:
             return None, "User not found", 404
         user.failed_login_count = 0
         user.locked_until = None
+        self._audit("login_lock_cleared", target=user)
         self.db_session.commit()
         self.db_session.refresh(user)
         return self.serialize_admin_user(user), None, 200
@@ -328,6 +397,7 @@ class AdminService:
         preferences[FORCE_PASSWORD_CHANGE_PREFERENCE] = bool(enabled)
         user.preferences = preferences
         flag_modified(user, "preferences")
+        self._audit("force_password_change_set", target=user, enabled=bool(enabled))
         self.db_session.commit()
         self.db_session.refresh(user)
         return self.serialize_admin_user(user), None, 200
@@ -344,6 +414,7 @@ class AdminService:
         preferences[FORCE_PASSWORD_CHANGE_PREFERENCE] = True
         user.preferences = preferences
         flag_modified(user, "preferences")
+        self._audit("temporary_password_generated", target=user)
         self.db_session.commit()
         self.db_session.refresh(user)
         payload = self.serialize_admin_user(user)
@@ -358,6 +429,7 @@ class AdminService:
         if not user:
             return None, "User not found", 404
 
+        self._audit("user_soft_deleted", target=user)
         user.username = f"deleted_{user.id}_{generate_secret('user')[:12]}"
         user.email = f"deleted_{user.id}@fractalgoals.com"
         user.is_active = False
@@ -386,9 +458,21 @@ class AdminService:
             ).all()
         ]
 
+        self._audit(
+            "user_hard_deleted",
+            target=user,
+            deleted_root_count=len(root_ids),
+        )
+
         if root_ids:
             self._hard_delete_roots(root_ids)
 
+        # Remove pre-account beta identity that otherwise survives the user
+        # row and disconnect invite records from the erased email address.
+        self.db_session.execute(delete(BetaSignupRequest).where(BetaSignupRequest.email == user.email))
+        self.db_session.query(SignupInviteKey).filter(
+            SignupInviteKey.assigned_email == user.email
+        ).update({"assigned_email": None}, synchronize_session=False)
         self.db_session.execute(delete(GoalLevel).where(GoalLevel.owner_id == user_id))
         self.db_session.delete(user)
         self.db_session.commit()
@@ -478,6 +562,10 @@ class AdminService:
         self._delete_for_roots(MetricDefinition, root_ids)
         self._delete_for_roots(SplitDefinition, root_ids)
         self._delete_for_roots(FractalMetricDefinition, root_ids)
+        # Circuit slots and run slots RESTRICT their referenced activity
+        # definitions, so remove both circuit aggregates before definitions.
+        self._delete_for_roots(CircuitRun, root_ids)
+        self._delete_for_roots(CircuitDefinition, root_ids)
         self._delete_for_roots(ActivityDefinition, root_ids)
         self._delete_for_roots(ActivityGroup, root_ids)
 
@@ -638,6 +726,13 @@ class AdminService:
         request.status = status
         if status == "invited" and request.invited_at is None:
             request.invited_at = utc_now()
+        if previous_status != status:
+            self._audit(
+                "beta_signup_status_changed",
+                beta_signup_id=request.id,
+                from_status=previous_status,
+                to_status=status,
+            )
         self.db_session.commit()
         self.db_session.refresh(request)
         if previous_status != status:
@@ -720,6 +815,7 @@ class AdminService:
         request.invited_at = request.invited_at or now
         request.invite_key_id = invite.id
         request.last_invite_email_sent_at = now
+        self._audit("beta_invite_sent", beta_signup_id=request.id, invite_id=invite.id)
         self.db_session.commit()
         self.db_session.refresh(request)
         log_ops_event(

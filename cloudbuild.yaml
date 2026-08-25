@@ -85,6 +85,26 @@ steps:
     ]
 
   # ==========================================
+  # 4c. Update Data Retention Job
+  # ==========================================
+  # Executes due account erasures and every live-database retention window
+  # published in the Privacy Policy. Provision the daily Scheduler trigger as
+  # described in docs/data-retention.md.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Update Data Retention Job'
+    entrypoint: gcloud
+    args: [
+      'run', 'jobs', 'deploy', 'data-retention',
+      '--image', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-backend:$BUILD_ID',
+      '--region', '$_REGION',
+      '--set-secrets', 'SUPABASE_DIRECT_DATABASE_URL=SUPABASE_DIRECT_DATABASE_URL:latest',
+      '--set-env-vars', 'FLASK_ENV=production',
+      '--command', 'python',
+      '--args', 'scripts/run_data_retention.py',
+      '--service-account', 'fractal-runtime@fractal-goals.iam.gserviceaccount.com'
+    ]
+
+  # ==========================================
   # 5. Deploy to Cloud Run (Backend)
   # ==========================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'

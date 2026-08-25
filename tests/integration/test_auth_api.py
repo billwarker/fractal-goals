@@ -18,7 +18,8 @@ import json
 from sqlalchemy import event
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
-from models import PasswordResetToken, Program, ProgramBlock, ProgramDay, utc_now
+from config import config
+from models import PasswordResetToken, Program, ProgramBlock, ProgramDay, User, utc_now
 from services.admin_service import hash_invite_key
 from services.email_service import EmailService, TEST_EMAIL_OUTBOX
 from services.quota_service import TIER_DEFAULT_LIMITS_SETTING_KEY
@@ -52,6 +53,9 @@ class TestSignupEndpoint:
             'email': 'newuser@example.com',
             'password': 'Securepassword123',
             'invite_key': invite_key,
+            'accepted_terms': True,
+            'terms_version': '1.0',
+            'privacy_version': '1.0',
         }
         response = client.post(
             '/api/auth/signup',
@@ -76,6 +80,9 @@ class TestSignupEndpoint:
             'email': 'different@example.com',
             'password': 'Securepassword123',
             'invite_key': invite_key,
+            'accepted_terms': True,
+            'terms_version': '1.0',
+            'privacy_version': '1.0',
         }
         response = client.post(
             '/api/auth/signup',
@@ -85,6 +92,22 @@ class TestSignupEndpoint:
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
+
+    def test_signup_rejects_stale_or_fabricated_legal_versions(self, client, db_session):
+        invite_key = create_invite_key(db_session, 'fg_invite_stale_legal')
+        response = client.post('/api/auth/signup', json={
+            'username': 'stalelegal',
+            'email': 'stalelegal@example.com',
+            'password': 'Securepassword123',
+            'invite_key': invite_key,
+            'accepted_terms': True,
+            'terms_version': 'banana',
+            'privacy_version': config.PRIVACY_VERSION,
+        })
+
+        assert response.status_code == 409
+        assert 'reload' in response.get_json()['error'].lower()
+        assert db_session.query(User).filter_by(email='stalelegal@example.com').first() is None
     
     def test_signup_duplicate_email(self, client, test_user, db_session):
         """Test signup with existing email fails."""
@@ -94,6 +117,9 @@ class TestSignupEndpoint:
             'email': 'test@example.com',  # Same as test_user
             'password': 'Securepassword123',
             'invite_key': invite_key,
+            'accepted_terms': True,
+            'terms_version': '1.0',
+            'privacy_version': '1.0',
         }
         response = client.post(
             '/api/auth/signup',
@@ -111,6 +137,9 @@ class TestSignupEndpoint:
             'email': 'not-an-email',
             'password': 'Securepassword123',
             'invite_key': 'fg_invite_invalid_email',
+            'accepted_terms': True,
+            'terms_version': '1.0',
+            'privacy_version': '1.0',
         }
         response = client.post(
             '/api/auth/signup',
@@ -127,6 +156,9 @@ class TestSignupEndpoint:
             'email': 'newuser@example.com',
             'password': 'short',  # Less than 8 characters
             'invite_key': 'fg_invite_short_password',
+            'accepted_terms': True,
+            'terms_version': '1.0',
+            'privacy_version': '1.0',
         }
         response = client.post(
             '/api/auth/signup',
@@ -922,11 +954,115 @@ class TestEmailChangeEndpoint:
 
 
 @pytest.mark.integration
+class TestLegalAcceptance:
+    def test_outdated_account_is_gated_until_current_documents_are_accepted(
+        self,
+        authed_client,
+        db_session,
+        test_user,
+    ):
+        test_user.terms_accepted_version = None
+        test_user.terms_accepted_at = None
+        db_session.commit()
+
+        me_response = authed_client.get('/api/auth/me')
+        assert me_response.status_code == 200
+        assert me_response.get_json()['legal_acceptance_required'] is True
+
+        gated_response = authed_client.get('/api/auth/account/usage')
+        assert gated_response.status_code == 403
+        assert gated_response.get_json()['code'] == 'legal_acceptance_required'
+
+        stale_response = authed_client.post('/api/auth/legal/acceptance', json={
+            'accepted_terms': True,
+            'terms_version': 'stale',
+            'privacy_version': config.PRIVACY_VERSION,
+        })
+        assert stale_response.status_code == 409
+
+        accepted_response = authed_client.post('/api/auth/legal/acceptance', json={
+            'accepted_terms': True,
+            'terms_version': config.TERMS_VERSION,
+            'privacy_version': config.PRIVACY_VERSION,
+        })
+        assert accepted_response.status_code == 200
+        assert accepted_response.get_json()['legal_acceptance_required'] is False
+
+        db_session.expire_all()
+        accepted_user = db_session.get(User, test_user.id)
+        assert accepted_user.terms_accepted_at is not None
+        assert accepted_user.privacy_accepted_at is not None
+
+
+@pytest.mark.integration
+class TestAccountDataExport:
+    """Self-service portability export promised by the Privacy Policy."""
+
+    def test_export_returns_account_and_content(self, authed_client, test_user):
+        response = authed_client.post(
+            '/api/auth/account/export',
+            data=json.dumps({'password': 'Password123'}),
+            content_type='application/json'
+        )
+        assert response.status_code == 200
+        body = response.get_json()
+
+        assert body['schema_version'] == 1
+        assert body['generated_at']
+        assert body['account']['email'] == test_user.email
+        assert isinstance(body['fractals'], list)
+        assert isinstance(body['product_events'], list)
+        # Served as a download rather than an inline document.
+        assert 'attachment' in response.headers.get('Content-Disposition', '')
+
+    def test_export_requires_the_account_password(self, authed_client):
+        response = authed_client.post(
+            '/api/auth/account/export',
+            data=json.dumps({'password': 'wrongpassword'}),
+            content_type='application/json'
+        )
+        assert response.status_code == 401
+
+    def test_export_is_scoped_to_the_caller(self, authed_client, db_session, test_user):
+        """Another account's fractals must never appear in this export."""
+        from models import Goal, User
+
+        other = User(username='otheruser', email='other@example.com')
+        other.set_password('Password123')
+        db_session.add(other)
+        db_session.flush()
+
+        other_root = Goal(
+            name='Other private goal',
+            owner_id=other.id,
+        )
+        db_session.add(other_root)
+        db_session.flush()
+        other_root.root_id = other_root.id
+        db_session.commit()
+
+        response = authed_client.post(
+            '/api/auth/account/export',
+            data=json.dumps({'password': 'Password123'}),
+            content_type='application/json'
+        )
+        assert response.status_code == 200
+        assert 'Other private goal' not in json.dumps(response.get_json())
+
+
+@pytest.mark.integration
 class TestAccountDeletionEndpoint:
     """Test account deletion endpoint."""
     
-    def test_delete_account_success(self, authed_client, db_session, test_user):
-        """Test successful account deletion (anonymization)."""
+    def test_delete_account_schedules_erasure(self, authed_client, db_session, test_user):
+        """
+        Deletion schedules a real erasure after the published grace window.
+
+        The account deliberately stays active and identifiable: the email is
+        what lets the user cancel, and deactivating would lock them out of the
+        cancellation endpoint itself. Anonymizing without deleting content is
+        the behaviour this replaced.
+        """
         payload = {
             'password': 'Password123',
             'confirmation': 'DELETE'
@@ -937,13 +1073,62 @@ class TestAccountDeletionEndpoint:
             content_type='application/json'
         )
         assert response.status_code == 200
-        
-        # Verify user is deactivated
+        body = response.get_json()
+        assert body['grace_days'] == 30
+        assert body['scheduled_deletion_at']
+
         from models import User
         db_session.expire_all()
         user = db_session.query(User).get(test_user.id)
-        assert user.is_active == False
-        assert 'deleted' in user.username
+        assert user.erasure_requested_at is not None
+        # Still active, so the user can reach the cancellation endpoint.
+        assert user.is_active is True
+        # Still identifiable, so the cancellation email can reach them.
+        assert user.username == 'testuser'
+
+    def test_erasure_sweep_respects_the_grace_window(self, authed_client, db_session, test_user):
+        """A pending request is only executed once the grace window elapses."""
+        import datetime
+        from models import User
+        from services.user_service import UserService
+
+        authed_client.delete(
+            '/api/auth/account',
+            data=json.dumps({'password': 'Password123', 'confirmation': 'DELETE'}),
+            content_type='application/json'
+        )
+        user_id = test_user.id
+
+        # Inside the window: nothing is deleted.
+        result = UserService(db_session).execute_due_erasures()
+        assert result['deleted_count'] == 0
+        assert db_session.query(User).get(user_id) is not None
+
+        # Past the window: the account is permanently gone.
+        later = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=31)
+        result = UserService(db_session).execute_due_erasures(now=later)
+        assert result['deleted_count'] == 1
+        db_session.expire_all()
+        assert db_session.query(User).get(user_id) is None
+
+    def test_cancel_account_deletion(self, authed_client, db_session, test_user):
+        """A user can reverse an erasure request during the grace window."""
+        from models import User
+
+        authed_client.delete(
+            '/api/auth/account',
+            data=json.dumps({'password': 'Password123', 'confirmation': 'DELETE'}),
+            content_type='application/json'
+        )
+
+        response = authed_client.delete('/api/auth/account/deletion')
+        assert response.status_code == 200
+
+        db_session.expire_all()
+        user = db_session.query(User).get(test_user.id)
+        assert user.erasure_requested_at is None
+        assert user.is_active is True
+
     
     def test_delete_account_wrong_password(self, authed_client):
         """Test account deletion with wrong password fails."""

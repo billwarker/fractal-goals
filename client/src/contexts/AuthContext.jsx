@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { PRIVACY_VERSION, TERMS_VERSION } from '../content/legal/legalVersions';
 import { authApi, clearAccessToken, setAccessToken } from '../utils/api';
 import notify from '../utils/notify';
 import { logError } from '../utils/logger';
@@ -132,7 +133,13 @@ export function AuthProvider({ children }) {
                 username,
                 email,
                 password,
-                invite_key: inviteKey
+                invite_key: inviteKey,
+                // Consent is recorded against the document versions actually
+                // shown at signup, read from the markdown rather than a
+                // constant, so a copy revision cannot record a stale version.
+                accepted_terms: true,
+                terms_version: TERMS_VERSION,
+                privacy_version: PRIVACY_VERSION,
             });
             return res.data;
         } catch (err) {
