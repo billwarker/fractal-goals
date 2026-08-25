@@ -633,16 +633,25 @@ const ActivityAssociator = ({
                         </div>
                         <div className={styles.metricItem}>
                             <span className={styles.metricNumber}>{counts.direct}</span>
-                            <span className={styles.metricLabel}>Directly Associated</span>
+                            <span className={styles.metricLabel}>
+                                <span className={styles.metricLabelFull}>Directly Associated</span>
+                                <span className={styles.metricLabelCompact} aria-hidden="true">Direct</span>
+                            </span>
                         </div>
                         <div className={styles.metricItem}>
                             <span className={styles.metricNumber}>{counts.inheritedFromChildren}</span>
-                            <span className={styles.metricLabel}>Inherited From Children</span>
+                            <span className={styles.metricLabel}>
+                                <span className={styles.metricLabelFull}>Inherited From Children</span>
+                                <span className={styles.metricLabelCompact} aria-hidden="true">Children</span>
+                            </span>
                         </div>
                         <div className={styles.metricItem}>
                             <span className={styles.metricNumber}>{counts.inheritedFromParent}</span>
                             <div className={styles.metricLabelRow}>
-                                <span className={styles.metricLabel}>Inherited From Parent</span>
+                                <span className={styles.metricLabel}>
+                                    <span className={styles.metricLabelFull}>Inherited From Parent</span>
+                                    <span className={styles.metricLabelCompact} aria-hidden="true">Parent</span>
+                                </span>
                                 {parentGoalId && (
                                     <label className={styles.inheritCheckbox}>
                                         <input

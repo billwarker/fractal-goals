@@ -160,6 +160,11 @@
     width: 100%;
 }
 
+.activitiesFooterPrimaryActions {
+    min-width: 0;
+    width: 100%;
+}
+
 .completionFooterButton {
     width: 100%;
     min-width: 0;
@@ -264,6 +269,10 @@
 
     .activitiesFooterSelectionActions {
         grid-template-columns: 1fr;
+    }
+
+    .activitiesFooterPrimaryActions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 

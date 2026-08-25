@@ -155,7 +155,7 @@ function GoalDetailModalFooter({
                     </button>
                 </div>
             ) : (
-                <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit}`}>
+                <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit} ${styles.activitiesFooterPrimaryActions}`}>
                     <button
                         type="button"
                         onClick={isTargetFlowActive ? handleCancelActivitiesFlow : activitiesAssociateAction}

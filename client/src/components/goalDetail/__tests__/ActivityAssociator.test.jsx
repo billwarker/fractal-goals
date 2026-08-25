@@ -161,6 +161,37 @@ describe('ActivityAssociator', () => {
         expect(screen.getByText('↓ inherited from parent')).toBeInTheDocument();
     });
 
+    it('provides concise mobile labels for every activity-count category', () => {
+        render(
+            <ActivityAssociatorHarness
+                initialActivities={[
+                    { id: 'direct', name: 'Direct', has_direct_association: true },
+                    {
+                        id: 'child',
+                        name: 'Child',
+                        has_direct_association: false,
+                        inherited_from_children: true,
+                    },
+                    {
+                        id: 'parent',
+                        name: 'Parent',
+                        has_direct_association: false,
+                        inherited_from_parent: true,
+                    },
+                ]}
+                parentGoalId="parent-goal-1"
+            />
+        );
+
+        expect(screen.getByText('Total')).toBeInTheDocument();
+        expect(screen.getByText('Directly Associated')).toBeInTheDocument();
+        expect(screen.getByText('Inherited From Children')).toBeInTheDocument();
+        expect(screen.getByText('Inherited From Parent')).toBeInTheDocument();
+        expect(screen.getByText('Direct', { selector: '[aria-hidden="true"]' })).toBeInTheDocument();
+        expect(screen.getByText('Children', { selector: '[aria-hidden="true"]' })).toBeInTheDocument();
+        expect(screen.getByText('Parent', { selector: '[aria-hidden="true"]' })).toBeInTheDocument();
+    });
+
     it('persists the inherit-from-parent flag for an existing goal', async () => {
         render(
             <ActivityAssociatorHarness

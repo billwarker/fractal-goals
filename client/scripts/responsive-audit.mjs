@@ -56,6 +56,21 @@ const checks = [
     ],
   },
   {
+    file: 'src/components/GoalDetailModal.module.css',
+    patterns: [
+      /@media\s*\(max-width:\s*560px\)[\s\S]*?\.activitiesFooterPrimaryActions\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+    ],
+  },
+  {
+    file: 'src/components/goalDetail/ActivityAssociator.module.css',
+    patterns: [
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.embeddedHeader \.metricsBreakdown\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap;[^}]*justify-content:\s*safe center;/,
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.embeddedHeader \.metricItem\s*\{[^}]*flex:\s*0 0 auto;[^}]*min-height:\s*20px;/,
+      /\.metricLabelCompact\s*\{[^}]*display:\s*none;/,
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.metricLabelCompact\s*\{[^}]*display:\s*inline;/,
+    ],
+  },
+  {
     file: 'src/pages/Sessions.module.css',
     patterns: [/\.pageContainer/, /\.rightPanel/, /@media\s*\(max-width:\s*768px\)/],
     forbiddenPatterns: [/@keyframes\s+(?:sheetSlideUp|backdropFadeIn)/],

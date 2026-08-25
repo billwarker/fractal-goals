@@ -260,6 +260,10 @@
     min-width: 0;
 }
 
+.metricLabelCompact {
+    display: none;
+}
+
 /* ============ GROUP CONTAINERS ============ */
 /* Shared style between associated and discovery views */
 .groupContainer {
@@ -892,12 +896,68 @@
     font-size: 12px;
 }
 
-@media (max-width: 480px) {
-    .activityGrid {
-        grid-template-columns: 1fr;
+@media (max-width: 768px) {
+    .embeddedHeader {
+        padding-right: 16px;
+        padding-left: 16px;
     }
 
-    .metricsBreakdown {
+    .embeddedHeader .metricsBreakdown {
+        display: flex;
+        flex-wrap: nowrap;
+        justify-content: center;
+        justify-content: safe center;
+        gap: 0;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .embeddedHeader .metricsBreakdown::-webkit-scrollbar {
+        display: none;
+    }
+
+    .embeddedHeader .metricItem {
+        flex: 0 0 auto;
+        min-height: 20px;
+        padding: 0 12px;
+        gap: 5px;
+        border-right-color: color-mix(in srgb, var(--color-border) 72%, transparent);
+    }
+
+    .embeddedHeader .metricItem:first-child {
+        padding-left: 0;
+    }
+
+    .embeddedHeader .metricItem:last-child {
+        padding-right: 0;
+    }
+
+    .embeddedHeader .metricNumber,
+    .embeddedHeader .metricLabel {
+        font-size: 11px;
+        line-height: 1;
+    }
+
+    .embeddedHeader .metricLabelRow {
+        gap: 5px;
+    }
+
+    .embeddedHeader .inheritCheckboxInput {
+        width: 14px;
+        height: 14px;
+    }
+
+    .metricLabelFull {
+        display: none;
+    }
+
+    .metricLabelCompact {
+        display: inline;
+    }
+}
+
+@media (max-width: 480px) {
+    .activityGrid {
         grid-template-columns: 1fr;
     }
 
