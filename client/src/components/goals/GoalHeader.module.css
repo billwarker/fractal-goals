@@ -151,3 +151,48 @@
     color: var(--color-text-secondary);
     font-weight: 500;
 }
+
+@media (max-width: 768px) {
+    .header {
+        top: -18px;
+        gap: 8px;
+        margin: -18px -16px 0;
+        padding: 16px 16px 10px;
+    }
+
+    .title {
+        font-size: 22px;
+        line-height: 1.12;
+    }
+
+    .metaPanel,
+    .metaRow {
+        gap: 0;
+    }
+
+    .metaRow {
+        flex-wrap: nowrap;
+        overflow: hidden;
+    }
+
+    .metadataRail {
+        flex-wrap: nowrap;
+        justify-content: center;
+        justify-content: safe center;
+        gap: 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        touch-action: pan-x pan-y;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .metadataRail::-webkit-scrollbar {
+        display: none;
+    }
+
+    .dateRow {
+        flex: 0 0 auto;
+    }
+}

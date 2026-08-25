@@ -861,10 +861,6 @@ describe('GoalDetailModal smoke coverage', () => {
             expect(screen.getByRole('button', { name: '+ Add Target' })).toBeInTheDocument();
         }, { timeout: 5000 });
 
-        expect(
-            screen.getByRole('button', { name: '+ Associate Activities' }).parentElement.className
-        ).toContain('activitiesFooterPrimaryActions');
-
         fireEvent.click(screen.getByRole('button', { name: '+ Associate Activities' }));
 
         await waitFor(() => {

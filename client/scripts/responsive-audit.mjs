@@ -62,6 +62,17 @@ const checks = [
     ],
   },
   {
+    file: 'src/components/goalDetail/GoalDetailModalFooter.jsx',
+    patterns: [/completionFooterSplit[^`]*activitiesFooterPrimaryActions/],
+  },
+  {
+    file: 'src/components/goals/GoalHeader.module.css',
+    patterns: [
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.header\s*\{[^}]*margin:\s*-18px -16px 0;[^}]*padding:\s*16px 16px 10px;/,
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.metadataRail\s*\{[^}]*flex-wrap:\s*nowrap;[^}]*justify-content:\s*safe center;[^}]*overflow-x:\s*auto;[^}]*overscroll-behavior-x:\s*contain;[^}]*touch-action:\s*pan-x pan-y;[^}]*-webkit-overflow-scrolling:\s*touch;/,
+    ],
+  },
+  {
     file: 'src/components/goalDetail/ActivityAssociator.module.css',
     patterns: [
       /@media\s*\(max-width:\s*768px\)[\s\S]*?\.embeddedHeader \.metricsBreakdown\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap;[^}]*justify-content:\s*safe center;/,

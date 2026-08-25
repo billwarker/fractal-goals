@@ -635,14 +635,14 @@ const ActivityAssociator = ({
                             <span className={styles.metricNumber}>{counts.direct}</span>
                             <span className={styles.metricLabel}>
                                 <span className={styles.metricLabelFull}>Directly Associated</span>
-                                <span className={styles.metricLabelCompact} aria-hidden="true">Direct</span>
+                                <span className={styles.metricLabelCompact}>Direct</span>
                             </span>
                         </div>
                         <div className={styles.metricItem}>
                             <span className={styles.metricNumber}>{counts.inheritedFromChildren}</span>
                             <span className={styles.metricLabel}>
                                 <span className={styles.metricLabelFull}>Inherited From Children</span>
-                                <span className={styles.metricLabelCompact} aria-hidden="true">Children</span>
+                                <span className={styles.metricLabelCompact}>Children</span>
                             </span>
                         </div>
                         <div className={styles.metricItem}>
@@ -650,7 +650,7 @@ const ActivityAssociator = ({
                             <div className={styles.metricLabelRow}>
                                 <span className={styles.metricLabel}>
                                     <span className={styles.metricLabelFull}>Inherited From Parent</span>
-                                    <span className={styles.metricLabelCompact} aria-hidden="true">Parent</span>
+                                    <span className={styles.metricLabelCompact}>Parent</span>
                                 </span>
                                 {parentGoalId && (
                                     <label className={styles.inheritCheckbox}>

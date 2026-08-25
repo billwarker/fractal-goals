@@ -31,6 +31,11 @@ function GoalHeader({
     const displayedDeadline = deadline || goal?.attributes?.deadline || goal?.deadline;
     const displayedCompletedAt = completedAt || goal?.attributes?.completed_at || goal?.completed_at;
     const ageLabel = getAgeLabel(createdAt);
+    const createdDateLabel = createdAt
+        ? formatDateInTimezone(createdAt, timezone, {
+            month: 'short', day: 'numeric', year: 'numeric', hour: undefined, minute: undefined,
+        })
+        : null;
     const completedDateLabel = displayedCompletedAt
         ? formatDateInTimezone(displayedCompletedAt, timezone, {
             month: 'short',
@@ -130,7 +135,7 @@ function GoalHeader({
             <div className={`${styles.metaPanel} ${isCompact ? styles.metaPanelCompact : ''}`}>
                 {/* Second Row: Badges, Status, and Dates */}
                 <div className={styles.metaRow}>
-                    <div className={styles.badgeRow}>
+                    <div className={`${styles.badgeRow} ${styles.metadataRail}`}>
                         {mode === 'create' && (
                             <span className={styles.createLabel}>
                                 + Create
@@ -148,11 +153,9 @@ function GoalHeader({
                             />
                         </span>
                         {mode !== 'create' && (
-                            <>
-                                <span className={styles.statusBadge}>
-                                    {statusConfig.label}
-                                </span>
-                            </>
+                            <span className={styles.statusBadge}>
+                                {statusConfig.label}
+                            </span>
                         )}
 
                         {mode === 'create' && parentGoal && (
@@ -166,17 +169,13 @@ function GoalHeader({
                                 {createdAt && (
                                     <div className={styles.dateItem}>
                                         <span className={styles.dateLabel}>Created</span>
-                                        <span className={styles.dateValue}>
-                                            {formatDateInTimezone(createdAt, timezone, { month: 'short', day: 'numeric', year: 'numeric', hour: undefined, minute: undefined })}
-                                        </span>
+                                        <span className={styles.dateValue}>{createdDateLabel}</span>
                                     </div>
                                 )}
                                 {terminalDateLabel && (
                                     <div className={styles.dateItem}>
                                         <span className={styles.dateLabel}>{terminalDateTitle}</span>
-                                        <span className={styles.dateValue}>
-                                            {terminalDateLabel}
-                                        </span>
+                                        <span className={styles.dateValue}>{terminalDateLabel}</span>
                                     </div>
                                 )}
                                 {ageLabel && (

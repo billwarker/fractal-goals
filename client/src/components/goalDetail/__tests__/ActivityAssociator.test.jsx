@@ -187,9 +187,9 @@ describe('ActivityAssociator', () => {
         expect(screen.getByText('Directly Associated')).toBeInTheDocument();
         expect(screen.getByText('Inherited From Children')).toBeInTheDocument();
         expect(screen.getByText('Inherited From Parent')).toBeInTheDocument();
-        expect(screen.getByText('Direct', { selector: '[aria-hidden="true"]' })).toBeInTheDocument();
-        expect(screen.getByText('Children', { selector: '[aria-hidden="true"]' })).toBeInTheDocument();
-        expect(screen.getByText('Parent', { selector: '[aria-hidden="true"]' })).toBeInTheDocument();
+        expect(screen.getByText('Direct', { selector: '[class*="metricLabelCompact"]' })).toBeInTheDocument();
+        expect(screen.getByText('Children', { selector: '[class*="metricLabelCompact"]' })).toBeInTheDocument();
+        expect(screen.getByText('Parent', { selector: '[class*="metricLabelCompact"]' })).toBeInTheDocument();
     });
 
     it('persists the inherit-from-parent flag for an existing goal', async () => {
