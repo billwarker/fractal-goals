@@ -854,14 +854,15 @@ class TestSessionCRUDEndpoints:
         assert 'session_start' in data
         assert 'session_end' in data
 
-    def test_completing_session_leaves_never_started_activity_instances_incomplete(
+    def test_completing_session_only_marks_started_activity_instances_complete(
         self, authed_client, db_session, sample_practice_session, sample_activity_definition
     ):
-        """Completing a session should not auto-complete instances that never started."""
+        """Session completion should preserve activity instances that never started."""
         root_id = sample_practice_session.root_id
         session_id = sample_practice_session.id
 
         # Create two incomplete activity instances in the session.
+        instance_ids = []
         for _ in range(2):
             response = authed_client.post(
                 f'/api/{root_id}/sessions/{session_id}/activities',
@@ -869,6 +870,12 @@ class TestSessionCRUDEndpoints:
                 content_type='application/json'
             )
             assert response.status_code == 201
+            instance_ids.append(response.get_json()['id'])
+
+        started_at = datetime.now(timezone.utc)
+        started_instance = db_session.get(ActivityInstance, instance_ids[0])
+        started_instance.time_start = started_at
+        db_session.commit()
 
         update_response = authed_client.put(
             f'/api/{root_id}/sessions/{session_id}',
@@ -882,7 +889,14 @@ class TestSessionCRUDEndpoints:
         activities = json.loads(activities_response.data)
 
         assert len(activities) >= 2
-        assert all(a['completed'] is False for a in activities)
+        by_id = {activity['id']: activity for activity in activities}
+        assert by_id[instance_ids[0]]['completed'] is True
+        assert by_id[instance_ids[0]]['time_stop'] is not None
+        assert by_id[instance_ids[0]]['duration_seconds'] >= 0
+        assert by_id[instance_ids[1]]['completed'] is False
+        assert by_id[instance_ids[1]]['time_start'] is None
+        assert by_id[instance_ids[1]]['time_stop'] is None
+        assert by_id[instance_ids[1]]['duration_seconds'] is None
     
     def test_delete_session(self, authed_client, sample_practice_session):
         """Test deleting a session."""

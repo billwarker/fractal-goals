@@ -455,6 +455,84 @@ def test_circuit_snapshot_occurrences_typed_order_and_archive(
     assert len(authed_client.get(f"/api/{sample_ultimate_goal.id}/circuits?include_archived=true").get_json()) == 1
 
 
+def test_session_completion_finalizes_active_and_preserves_planned_circuits(
+    authed_client,
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+    sample_activity_definition,
+):
+    session = _session(db_session, sample_ultimate_goal, test_user)
+    non_set = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(authed_client, sample_ultimate_goal, sample_activity_definition, non_set)
+    active_run = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    ).get_json()
+    planned_run = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    ).get_json()
+    started = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{active_run['id']}/start",
+    )
+    assert started.status_code == 200, started.get_json()
+
+    completion = authed_client.put(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}",
+        json={"completed": True},
+    )
+
+    assert completion.status_code == 200, completion.get_json()
+    assert completion.get_json()["completed"] is True
+    db_session.expire_all()
+    finalized_active = db_session.get(CircuitRun, active_run["id"])
+    finalized_planned = db_session.get(CircuitRun, planned_run["id"])
+    assert finalized_active.status == "completed"
+    assert finalized_active.time_start is not None
+    assert finalized_active.time_stop is not None
+    assert finalized_active.completed_at == finalized_active.time_stop
+    assert finalized_active.duration_seconds is not None
+    for circuit_round in finalized_active.rounds:
+        for member in circuit_round.members:
+            instance_id = member.activity_instance_id or member.run_slot.activity_instance_id
+            assert db_session.get(ActivityInstance, instance_id).completed is True
+            if member.activity_set_id:
+                assert db_session.get(ActivitySet, member.activity_set_id).status == "completed"
+
+    assert finalized_planned.status == "planned"
+    assert finalized_planned.time_start is None
+    assert finalized_planned.time_stop is None
+    assert finalized_planned.completed_at is None
+    assert finalized_planned.duration_seconds is None
+    for circuit_round in finalized_planned.rounds:
+        for member in circuit_round.members:
+            instance_id = member.activity_instance_id or member.run_slot.activity_instance_id
+            assert db_session.get(ActivityInstance, instance_id).completed is False
+            if member.activity_set_id:
+                assert db_session.get(ActivitySet, member.activity_set_id).status == "planned"
+
+    original_boundaries = {
+        run.id: (run.time_start, run.time_stop, run.completed_at, run.duration_seconds)
+        for run in (finalized_active, finalized_planned)
+    }
+    repeated = authed_client.put(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}",
+        json={"completed": True},
+    )
+    assert repeated.status_code == 200, repeated.get_json()
+    db_session.expire_all()
+    assert {
+        run_id: (
+            db_session.get(CircuitRun, run_id).time_start,
+            db_session.get(CircuitRun, run_id).time_stop,
+            db_session.get(CircuitRun, run_id).completed_at,
+            db_session.get(CircuitRun, run_id).duration_seconds,
+        )
+        for run_id in original_boundaries
+    } == original_boundaries
+
+
 def test_circuit_is_the_only_timer_and_children_remain_untimed(
     authed_client,
     db_session,
@@ -486,13 +564,6 @@ def test_circuit_is_the_only_timer_and_children_remain_untimed(
         for member in circuit_round["members"]
         if member["activity_instance_id"]
     }
-    blocked_session_completion = authed_client.put(
-        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}",
-        json={"completed": True},
-    )
-    assert blocked_session_completion.status_code == 409
-    assert "Complete each circuit" in blocked_session_completion.get_json()["error"]
-
     ordinary = ActivityInstance(
         root_id=sample_ultimate_goal.id,
         session_id=session.id,

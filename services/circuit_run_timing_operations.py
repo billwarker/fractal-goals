@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from sqlalchemy import or_
 
-from models import ActivityInstance, ActivitySet, CircuitRun, SessionWorkInterval
-from services.circuit_timing import finish_circuit_clock, parse_circuit_time
+from models import CircuitRun, SessionWorkInterval
+from services.circuit_completion import (
+    circuit_completion_event_data,
+    finalize_circuit_run,
+    set_circuit_results_completed,
+)
+from services.circuit_timing import parse_circuit_time
 from services.events import Event, Events, event_bus
 from services.serializers import serialize_circuit_run
 from services.work_interval_service import WorkIntervalService, utc_now_naive
@@ -53,24 +58,6 @@ class CircuitRunTimingOperations:
         if circuit_overlap:
             return None, "Circuit timing overlaps another circuit", 409
         return None
-
-    def _set_results_completed(self, run, completed):
-        for circuit_round in run.rounds:
-            for member in circuit_round.members:
-                instance_id = member.activity_instance_id or member.run_slot.activity_instance_id
-                instance = self.db_session.get(ActivityInstance, instance_id)
-                if instance:
-                    instance.completed = completed
-                    instance.time_start = None
-                    instance.time_stop = None
-                    instance.duration_seconds = None
-                    instance.is_paused = False
-                    instance.last_paused_at = None
-                    instance.total_paused_seconds = 0
-                if member.activity_set_id:
-                    activity_set = self.db_session.get(ActivitySet, member.activity_set_id)
-                    if activity_set:
-                        activity_set.status = "completed" if completed else "planned"
 
     def start(self, root_id, run_id, user_id):
         locked = self.owner._authorized_locked_run(root_id, run_id, user_id)
@@ -149,19 +136,19 @@ class CircuitRunTimingOperations:
             run.duration_seconds = None
             run.completed_at = None
             run.total_paused_seconds = 0
-            self._set_results_completed(run, False)
+            set_circuit_results_completed(self.db_session, run, False)
         elif time_stop:
             run.status = "completed"
             run.duration_seconds = max(
                 0, int((time_stop - time_start).total_seconds()) - (run.total_paused_seconds or 0)
             )
             run.completed_at = time_stop
-            self._set_results_completed(run, True)
+            set_circuit_results_completed(self.db_session, run, True)
         else:
             run.status = "active"
             run.duration_seconds = None
             run.completed_at = None
-            self._set_results_completed(run, False)
+            set_circuit_results_completed(self.db_session, run, False)
         self.db_session.commit()
         event_bus.emit(Event(Events.CIRCUIT_RUN_TIMING_UPDATED, {
             "circuit_run_id": run.id,
@@ -186,16 +173,11 @@ class CircuitRunTimingOperations:
         conflict = self._historical_conflict(run, run.time_start, now)
         if conflict:
             return conflict
-        finish_circuit_clock(run, now)
-        run.status = "completed"
-        run.completed_at = now
-        self._set_results_completed(run, True)
+        finalize_circuit_run(self.db_session, run, now)
         self.db_session.commit()
-        event_bus.emit(Event(Events.CIRCUIT_RUN_COMPLETED, {
-            "circuit_run_id": run.id,
-            "circuit_definition_id": run.circuit_definition_id,
-            "session_id": run.session_id,
-            "root_id": root_id,
-            "duration_seconds": run.duration_seconds,
-        }, source="circuit_service.complete_run"))
+        event_bus.emit(Event(
+            Events.CIRCUIT_RUN_COMPLETED,
+            circuit_completion_event_data(run, root_id),
+            source="circuit_service.complete_run",
+        ))
         return serialize_circuit_run(self.owner._run(root_id, run.id)), None, 200

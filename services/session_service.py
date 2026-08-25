@@ -401,15 +401,12 @@ class SessionService:
         session_id,
         current_user_id,
         data,
-        *,
-        complete_unstarted_instances=True,
     ) -> ServiceResult[JsonDict]:
         return self._session_lifecycle_service().update_session(
             root_id,
             session_id,
             current_user_id,
             data,
-            complete_unstarted_instances=complete_unstarted_instances,
         )
 
     def delete_session(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:

@@ -8,6 +8,7 @@ import { applyOptimisticQueryUpdate } from '../utils/optimisticQuery';
 import { fractalApi } from '../utils/api';
 import { invalidateOnboardingProgress, invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
 import { queryKeys } from './queryKeys';
+import { useSessionCompletion } from './useSessionCompletion';
 import {
     formatGoalTypeLabel,
     replaceGoalInList,
@@ -719,31 +720,14 @@ export function useSessionDetailMutations({
         sessionActivitiesKey,
     ]);
 
-    const handleToggleSessionComplete = useCallback(async () => {
-        if (!session) return;
-        const newCompleted = !session.attributes.completed;
-        const updatePayload = { completed: newCompleted };
-
-        try {
-            if (newCompleted) {
-                updatePayload.session_end = new Date().toISOString();
-                for (const instance of activityInstances) {
-                    if (instance.time_start && !instance.time_stop) {
-                        await handleUpdateTimer(instance.id, 'complete');
-                    }
-                }
-            }
-
-            await updateSession(updatePayload);
-            if (newCompleted) {
-                queryClient.invalidateQueries({ queryKey: queryKeys.sessionProgressSummary(sessionId) });
-            }
-            notify.success(newCompleted ? 'Session completed!' : 'Session marked as incomplete');
-        } catch (error) {
-            logError('Failed to toggle session completion', error);
-            notify.error(`Failed to update session completion: ${error?.response?.data?.error || error?.message || 'Unknown error'}`);
-        }
-    }, [activityInstances, handleUpdateTimer, queryClient, session, sessionId, updateSession]);
+    const handleToggleSessionComplete = useSessionCompletion({
+        queryClient,
+        rootId,
+        session,
+        sessionActivitiesKey,
+        sessionId,
+        updateSession,
+    });
 
     const createGoal = useCallback(async (goalData) => {
         try {

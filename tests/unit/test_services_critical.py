@@ -235,7 +235,7 @@ class TestProgramServiceGoalReplacement:
 
 @pytest.mark.unit
 class TestSessionServicePublicFlows:
-    def test_update_session_marks_session_and_instances_complete(
+    def test_update_session_marks_session_and_started_instances_complete(
         self,
         db_session,
         test_user,
@@ -247,6 +247,8 @@ class TestSessionServicePublicFlows:
         service = SessionService(db_session)
         emitted = []
         monkeypatch.setattr("services.session_lifecycle_service.event_bus.emit", lambda event: emitted.append(event.name))
+        sample_activity_instance.time_start = datetime.now(timezone.utc)
+        db_session.commit()
 
         payload, error, status = service.update_session(
             sample_ultimate_goal.id,

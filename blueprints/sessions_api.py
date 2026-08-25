@@ -347,7 +347,6 @@ def update_session(current_user, root_id, session_id, validated_data):
             session_id,
             current_user.id,
             validated_data,
-            complete_unstarted_instances=False,
         )
         if error:
             return jsonify(error if isinstance(error, dict) else {"error": error}), status

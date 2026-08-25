@@ -80,7 +80,7 @@ const checks = [
       /\.timerActionColumn\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(120px,\s*100%\),\s*1fr\)\);/s,
       /\.metricMeta,\s*\.metricMetaLarge\s*\{[^}]*grid-column:\s*1;[^}]*grid-row:\s*2;/s,
       /\.metricUnit,\s*\.metricUnitLarge\s*\{[^}]*white-space:\s*nowrap;/s,
-      /\.progressSummaryRow\s*\{[^}]*flex-wrap:\s*wrap;/s,
+      /\.progressSummaryRow\s*\{[^}]*overflow-x:\s*auto;[^}]*white-space:\s*nowrap;/s,
     ],
   },
   {

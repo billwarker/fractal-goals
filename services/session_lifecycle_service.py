@@ -21,6 +21,7 @@ from models import (
     validate_root_goal,
 )
 from services import Event, Events, event_bus
+from services.circuit_completion import circuit_completion_event_data, finalize_circuit_run
 from services.goal_type_utils import get_canonical_goal_type
 from services.payload_normalizers import normalize_session_payload
 from services.quota_service import QuotaService
@@ -870,7 +871,6 @@ class SessionLifecycleService:
             session_id,
             current_user_id,
             {'completed': True},
-            complete_unstarted_instances=False,
         )
         if complete_error:
             return None, complete_error, complete_status
@@ -883,10 +883,9 @@ class SessionLifecycleService:
         session_id,
         current_user_id,
         data,
-        *,
-        complete_unstarted_instances=True,
     ) -> ServiceResult[JsonDict]:
         data = normalize_session_payload(data, partial=True)
+        completed_circuit_runs = []
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
              return None, "Fractal not found or access denied", 404
@@ -908,16 +907,6 @@ class SessionLifecycleService:
             session.duration_minutes = data['duration_minutes']
 
         if 'completed' in data:
-            if data['completed']:
-                incomplete_circuit = self.db_session.query(CircuitRun.id).filter(
-                    CircuitRun.session_id == session.id,
-                    CircuitRun.status != 'completed',
-                ).first()
-                if incomplete_circuit:
-                    return None, (
-                        "Complete each circuit, explicitly preserving any unfinished work, "
-                        "before completing the session"
-                    ), 409
             if not data['completed'] and session.completed:
                 conflict = self._active_session_conflict(
                     root_id,
@@ -930,6 +919,14 @@ class SessionLifecycleService:
             if data['completed']:
                 completion_time = datetime.now(timezone.utc)
                 session.completed_at = completion_time
+                circuit_completion_time = completion_time.replace(tzinfo=None)
+                incomplete_circuits = self.db_session.query(CircuitRun).filter(
+                    CircuitRun.session_id == session.id,
+                    CircuitRun.status.in_(('active', 'paused')),
+                ).with_for_update().all()
+                for circuit_run in incomplete_circuits:
+                    if finalize_circuit_run(self.db_session, circuit_run, circuit_completion_time):
+                        completed_circuit_runs.append(circuit_run)
                 if is_quick_session(session):
                     if not session.session_start:
                         session.session_start = session.created_at or completion_time
@@ -967,11 +964,7 @@ class SessionLifecycleService:
                     if instance.completed:
                         continue
                     if not instance.time_start:
-                        if not complete_unstarted_instances:
-                            continue
-                        instance.time_start = completion_time
-                        instance.time_stop = completion_time
-                        instance.duration_seconds = 0
+                        continue
                     elif not instance.time_stop:
                         instance.time_stop = completion_time
 
@@ -1046,6 +1039,13 @@ class SessionLifecycleService:
 
         self.db_session.commit()
         self._recompute_and_attach_stats(session)
+
+        for circuit_run in completed_circuit_runs:
+            event_bus.emit(Event(
+                Events.CIRCUIT_RUN_COMPLETED,
+                circuit_completion_event_data(circuit_run, root_id),
+                source='session_service.update_session',
+            ))
 
         event_bus.emit(Event(
             Events.SESSION_UPDATED,
