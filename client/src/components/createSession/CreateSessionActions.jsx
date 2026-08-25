@@ -1,10 +1,10 @@
 import React from 'react';
 
 import Button from '../atoms/Button';
+import ProgramName from '../atoms/ProgramName';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
-import ProgramName from './ProgramName';
 import styles from './CreateSessionActions.module.css';
 
 function CreateSessionActions({

@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
+import ProgramName from '../atoms/ProgramName';
 import EmptyState from '../common/EmptyState';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
-import ProgramName from './ProgramName';
 import styles from './ProgramDayPicker.module.css';
 
 /**

@@ -1,7 +1,7 @@
 import React from 'react';
 
 import Button from '../atoms/Button';
-import ProgramName from './ProgramName';
+import ProgramName from '../atoms/ProgramName';
 import styles from './ProgramDayTodayBanner.module.css';
 
 function ProgramDayTodayBanner({

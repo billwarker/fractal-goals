@@ -1,10 +1,10 @@
 import React from 'react';
 
 import { CalendarIcon, ClipboardIcon } from '../atoms/AppIcons';
+import ProgramName from '../atoms/ProgramName';
 import SelectableCard from '../common/SelectableCard';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
-import ProgramName from './ProgramName';
 import styles from './SourceSelector.module.css';
 
 function SourceSelector({ sessionSource, onSelectSource, programName, programColor }) {

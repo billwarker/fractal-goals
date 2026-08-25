@@ -8,7 +8,7 @@ import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
-import ProgramName from './ProgramName';
+import ProgramName from '../atoms/ProgramName';
 import { isQuickSession } from '../../utils/sessionRuntime';
 import { formatLastUsed, getAverageDurationStat, getTemplateSortTimestamp } from '../../utils/durationStats';
 import styles from './TemplatePicker.module.css';

@@ -3,7 +3,7 @@ import React from 'react';
 import StepContainer from '../common/StepContainer';
 import GoalHierarchySelector from '../goals/GoalHierarchySelector';
 import Checkbox from '../atoms/Checkbox';
-import ProgramName from './ProgramName';
+import ProgramName from '../atoms/ProgramName';
 import styles from './SessionGoalScopePanel.module.css';
 
 function SessionGoalScopePanel({

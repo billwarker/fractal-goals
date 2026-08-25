@@ -14,12 +14,22 @@
 .heatmap span { min-height: 18px; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 3px; }
 .scheduled_met { background: #2f9e68; } .scheduled_missed { background: #d16969; background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgba(0,0,0,.18) 3px 5px); }
 .unscheduled_evidence { background: #4c83c3; } .rest { background: var(--color-bg-secondary); } .upcoming { background: transparent; border-style: dashed !important; }
-.legend { margin-top: 8px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 10px 0 0; padding: 0; list-style: none; }
+.legend li { display: inline-flex; align-items: center; gap: 6px; }
+.legendSwatch { width: 15px; height: 15px; flex: 0 0 auto; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 3px; }
 .notice { padding: 10px 12px; border-left: 3px solid var(--color-brand-primary); background: var(--color-bg-secondary); }
 .tableWrap { max-width: 100%; overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { padding: 8px; border-bottom: 1px solid var(--color-border); text-align: left; }
 th { color: var(--color-text-secondary); }
+.headingContent { display: inline-flex; align-items: center; gap: 5px; }
+.sortButton, .helpButton { border: 0; color: inherit; font: inherit; }
+.sortButton { display: inline-flex; align-items: center; gap: 5px; padding: 3px 2px; background: transparent; font-weight: 600; cursor: pointer; }
+.sortButton:hover { color: var(--color-text-primary); }
+.sortButton:focus-visible, .helpButton:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
+.sortIndicator { min-width: 1em; font-size: 9px; text-align: center; }
+.helpButton { display: inline-grid; width: 14px; height: 18px; place-items: center; padding: 0; background: transparent; color: var(--color-text-muted); font-family: Georgia, serif; font-size: 11px; font-weight: 600; line-height: 1; opacity: .72; cursor: help; }
+.helpButton:hover, .helpButton:focus-visible { color: var(--color-text-secondary); opacity: 1; }
 .goalCell { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .goalIcon { flex: 0 0 auto; }
 .state { padding: 40px 16px; text-align: center; color: var(--color-text-secondary); }

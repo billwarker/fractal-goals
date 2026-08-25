@@ -2,10 +2,10 @@ import React from 'react';
 
 import { CalendarIcon } from '../atoms/AppIcons';
 import Button from '../atoms/Button';
+import ProgramName from '../atoms/ProgramName';
 import SelectableCard from '../common/SelectableCard';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
-import ProgramName from './ProgramName';
 import styles from './ProgramSelector.module.css';
 
 function ProgramSelector({
