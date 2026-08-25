@@ -13,6 +13,8 @@ export default function SessionSectionActivitySelector({
     onSelectCircuit,
     onCreateActivityDefinition,
     onCopyActivityDefinition,
+    onCreateCircuitDefinition,
+    onCopyCircuitDefinition,
     initialBrowseGroupId,
 }) {
     const { scopedActivities, scopedCircuitDefinitions } = useScopedSessionActivityOptions(
@@ -30,6 +32,8 @@ export default function SessionSectionActivitySelector({
             onSelectCircuit={onSelectCircuit}
             onCreateActivityDefinition={onCreateActivityDefinition}
             onCopyActivityDefinition={onCopyActivityDefinition}
+            onCreateCircuitDefinition={onCreateCircuitDefinition}
+            onCopyCircuitDefinition={onCopyCircuitDefinition}
             allowCreate
             allowCopy
             showTypeToggle

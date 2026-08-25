@@ -98,6 +98,8 @@ export default function ActivitySelectorPanel({
     onSelectGroup,
     onCreateActivityDefinition,
     onCopyActivityDefinition,
+    onCreateCircuitDefinition,
+    onCopyCircuitDefinition,
     canCopyActivity,
     allowCreate = false,
     allowCopy = false,
@@ -119,6 +121,12 @@ export default function ActivitySelectorPanel({
         type: getCircuitTypeLabel(circuit),
     })), [circuits]);
     const visibleItems = selectingCircuits ? circuitOptions : activities;
+    const canCreateCurrentType = selectingCircuits
+        ? Boolean(onCreateCircuitDefinition)
+        : allowCreate;
+    const canCopyCurrentType = selectingCircuits
+        ? Boolean(onCopyCircuitDefinition)
+        : allowCopy;
     const scopedGoal = activityGoalScope?.goal || null;
     const itemLabelPlural = selectingCircuits ? 'activity circuits' : 'activities';
 
@@ -136,8 +144,17 @@ export default function ActivitySelectorPanel({
             selectionMode="single"
             allowActivitySelection
             allowGroupSelection={!selectingCircuits && allowGroupSelection}
-            allowCreateActivity={!selectingCircuits && allowCreate}
-            allowCopyActivity={!selectingCircuits && allowCopy}
+            allowCreateActivity={canCreateCurrentType}
+            allowCopyActivity={canCopyCurrentType}
+            createActionLabel={selectingCircuits
+                ? '+ Create New Activity Circuit'
+                : '+ Create New Activity Definition'}
+            copyActionLabel={selectingCircuits
+                ? '+ Copy Existing Activity Circuit'
+                : '+ Copy Existing Activity Definition'}
+            copyModeDescription={selectingCircuits
+                ? 'select an existing activity circuit to duplicate into a new one.'
+                : 'select an existing activity definition to duplicate into a new one.'}
             closeOnSelect={closeOnSelect}
             initialBrowseGroupId={selectingCircuits ? null : initialBrowseGroupId}
             groupSelectionLabel={groupSelectionLabel}
@@ -147,8 +164,8 @@ export default function ActivitySelectorPanel({
             flatActivityList={Boolean(scopedGoal)}
             onClose={onClose}
             onCancel={onClose}
-            onCreateActivity={onCreateActivityDefinition}
-            onCopyActivity={onCopyActivityDefinition}
+            onCreateActivity={selectingCircuits ? onCreateCircuitDefinition : onCreateActivityDefinition}
+            onCopyActivity={selectingCircuits ? onCopyCircuitDefinition : onCopyActivityDefinition}
             canCopyActivity={canCopyActivity}
             headerLeading={(showTypeToggle || scopedGoal) ? (
                 <div className={`${styles.pickerHeaderLeading} ${scopedGoal ? styles.pickerHeaderLeadingScoped : ''}`}>

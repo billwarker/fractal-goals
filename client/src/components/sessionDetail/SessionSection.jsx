@@ -8,12 +8,14 @@ import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } fro
 import useIsMobile from '../../hooks/useIsMobile';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import CircuitRunCard from '../circuits/CircuitRunCard';
-import CircuitBuilderModal from '../circuits/CircuitBuilderModal';
 import SessionAddActivityButton from './SessionAddActivityButton';
+import SessionCircuitDefinitionBuilderModal from './SessionCircuitDefinitionBuilderModal';
 import SessionSectionActivitySelector from './SessionSectionActivitySelector';
+import useSessionCircuitDefinitionBuilder from './useSessionCircuitDefinitionBuilder';
 import { useCircuitDefinitionMutations, useCircuits, useCreateCircuitRun } from '../../hooks/useCircuitQueries';
 
 import { prepareActivityDefinitionCopy } from '../../utils/activityBuilder';
+import { prepareCircuitDefinitionCopy } from '../../utils/circuitDefinition';
 import { getAverageDurationStat } from '../../utils/durationStats';
 import { calculateSectionDurationFromInstanceIds, formatClockDuration } from '../../utils/sessionTime';
 import { buildDefinitionMap, buildInstanceMap, buildPositionMap, buildSessionPositionMap } from '../../utils/sessionSection';
@@ -33,7 +35,6 @@ const SessionSection = ({
     activityGoalScope = null,
 }) => {
     const isMobile = useIsMobile();
-    // Context
     const {
         activityInstances,
         activities,
@@ -47,7 +48,10 @@ const SessionSection = ({
     } = useActiveSessionData();
     const { data: circuitDefinitions = [] } = useCircuits(rootId);
     const createCircuitRun = useCreateCircuitRun(rootId, sessionId);
-    const { updateMutation: updateCircuitDefinition } = useCircuitDefinitionMutations(rootId);
+    const {
+        createMutation: createCircuitDefinition,
+        updateMutation: updateCircuitDefinition,
+    } = useCircuitDefinitionMutations(rootId);
 
     const isCompleted = session?.completed || session?.attributes?.completed;
 
@@ -71,7 +75,6 @@ const SessionSection = ({
     const [isDragOver, setIsDragOver] = useState(false);
     const [circuitError, setCircuitError] = useState('');
     const [selectedCircuitItem, setSelectedCircuitItem] = useState(null);
-    const [editingCircuit, setEditingCircuit] = useState(null);
     const instanceById = useMemo(() => {
         return buildInstanceMap(activityInstances || []);
     }, [activityInstances]);
@@ -133,7 +136,6 @@ const SessionSection = ({
         return map;
     }, [allNotes]);
 
-    // Drag handlers for the section (drop target)
     const handleDragOver = (e) => {
         e.preventDefault();
         if (draggedItem && draggedItem.sourceSectionIndex !== sectionIndex) {
@@ -142,7 +144,6 @@ const SessionSection = ({
     };
 
     const handleDragLeave = (e) => {
-        // Only set to false if we're leaving the section entirely
         if (!e.currentTarget.contains(e.relatedTarget)) {
             setIsDragOver(false);
         }
@@ -153,7 +154,6 @@ const SessionSection = ({
         setIsDragOver(false);
 
         if (draggedItem && draggedItem.sourceSectionIndex !== sectionIndex) {
-            // Move activity from source section to this section
             moveActivity(
                 draggedItem.sourceSectionIndex,
                 sectionIndex,
@@ -177,6 +177,20 @@ const SessionSection = ({
         setShowActivitySelector(prev => ({ ...prev, [sectionIndex]: false }));
     };
 
+    const {
+        circuitBuilder,
+        openCircuitBuilder,
+        closeCircuitBuilder,
+        saveCircuitDefinition,
+    } = useSessionCircuitDefinitionBuilder({
+        sectionIndex,
+        closeSelector,
+        createCircuitDefinition,
+        updateCircuitDefinition,
+        createCircuitRun,
+        setCircuitError,
+    });
+
     const openActivityBuilder = (activityDefinition = null, options = {}) => {
         closeSelector();
         if (Object.keys(options).length > 0) {
@@ -186,9 +200,7 @@ const SessionSection = ({
         onOpenActivityBuilder(sectionIndex, activityDefinition);
     };
 
-    const handleCreateActivityDefinition = () => {
-        openActivityBuilder();
-    };
+    const handleCreateActivityDefinition = () => openActivityBuilder();
 
     const addCircuit = async (definitionId) => {
         setCircuitError('');
@@ -203,20 +215,6 @@ const SessionSection = ({
         }
     };
 
-    const updateCircuit = async (payload) => {
-        if (!editingCircuit) return;
-        setCircuitError('');
-        try {
-            await updateCircuitDefinition.mutateAsync({
-                circuitId: editingCircuit.id,
-                data: payload,
-            });
-            setEditingCircuit(null);
-        } catch (error) {
-            setCircuitError(error?.response?.data?.error || error.message || 'Unable to update circuit');
-        }
-    };
-
     const selectorContent = (
         <SessionSectionActivitySelector
             activities={activities}
@@ -228,6 +226,11 @@ const SessionSection = ({
             onSelectCircuit={(circuit) => addCircuit(circuit.id)}
             onCreateActivityDefinition={handleCreateActivityDefinition}
             onCopyActivityDefinition={(activity) => openActivityBuilder(prepareActivityDefinitionCopy(activity))}
+            onCreateCircuitDefinition={() => openCircuitBuilder('create')}
+            onCopyCircuitDefinition={(circuit) => openCircuitBuilder(
+                'copy',
+                prepareCircuitDefinitionCopy(circuit),
+            )}
             initialBrowseGroupId={section.default_activity_group_id || null}
         />
     );
@@ -301,7 +304,7 @@ const SessionSection = ({
                                 canMoveUp={itemIndex > 0}
                                 canMoveDown={itemIndex < orderedItems.length - 1}
                                 onEditDefinition={circuitDefinition
-                                    ? () => setEditingCircuit(circuitDefinition)
+                                    ? () => openCircuitBuilder('edit', circuitDefinition)
                                     : null}
                                 onDuplicate={isCompleted ? null : async () => {
                                     setCircuitError('');
@@ -395,16 +398,16 @@ const SessionSection = ({
                     </div>
                 )}
 
-                {/* Drop Zone Indicator */}
                 {isDragOver && draggedItem && (
                     <div className={styles.dropZoneIndicator}>
                         Drop "{draggedItem.activityName}" here
                     </div>
                 )}
 
-                {circuitError && <p className={styles.circuitError} role="alert">{circuitError}</p>}
+                {circuitError && !circuitBuilder && (
+                    <p className={styles.circuitError} role="alert">{circuitError}</p>
+                )}
 
-                {/* Unified activity and circuit control */}
                 {!isCompleted && (
                     isSelectorOpen ? (
                         isMobile ? (
@@ -428,17 +431,17 @@ const SessionSection = ({
                     )
                 )}
             </div>
-            {editingCircuit && (
-                <CircuitBuilderModal
-                    isOpen
-                    circuit={editingCircuit}
-                    activities={activities}
-                    activityGroups={activityGroups}
-                    onClose={() => setEditingCircuit(null)}
-                    onSave={updateCircuit}
-                    isSaving={updateCircuitDefinition.isPending}
-                />
-            )}
+            <SessionCircuitDefinitionBuilderModal
+                builder={circuitBuilder}
+                activities={activities}
+                activityGroups={activityGroups}
+                onClose={closeCircuitBuilder}
+                onSave={saveCircuitDefinition}
+                errorMessage={circuitError}
+                isSaving={circuitBuilder?.mode === 'edit'
+                    ? updateCircuitDefinition.isPending
+                    : createCircuitDefinition.isPending || createCircuitRun.isPending}
+            />
         </div>
     );
 };

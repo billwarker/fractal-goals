@@ -13,6 +13,7 @@ const {
     reorderActivity,
     setDraggedItem,
     createCircuitRun,
+    createCircuitDefinition,
     updateCircuitDefinition,
     circuitDefinitionsState,
     sessionUiState,
@@ -27,6 +28,7 @@ const {
     reorderActivity: vi.fn(),
     setDraggedItem: vi.fn(),
     createCircuitRun: vi.fn(),
+    createCircuitDefinition: vi.fn(),
     updateCircuitDefinition: vi.fn(),
     circuitDefinitionsState: { definitions: [] },
     sessionUiState: {
@@ -94,6 +96,7 @@ vi.mock('../../../hooks/useCircuitQueries', () => ({
     useCircuits: () => ({ data: circuitDefinitionsState.definitions, isLoading: false }),
     useCreateCircuitRun: () => ({ mutateAsync: createCircuitRun, isPending: false }),
     useCircuitDefinitionMutations: () => ({
+        createMutation: { mutateAsync: createCircuitDefinition, isPending: false },
         updateMutation: { mutateAsync: updateCircuitDefinition, isPending: false },
     }),
 }));
@@ -137,10 +140,11 @@ describe('SessionSection', () => {
         sessionDataState.groupedActivities = {
             'group-1': [sessionDataState.activities[0]],
         };
+        createCircuitDefinition.mockResolvedValue({ data: { id: 'created-circuit' } });
+        createCircuitRun.mockResolvedValue({});
     });
 
     it('offers circuits through Add Activity without a separate Add Circuit button', async () => {
-        createCircuitRun.mockResolvedValue({});
         circuitDefinitionsState.definitions = [{
             id: 'circuit-1',
             name: 'Technique Circuit',

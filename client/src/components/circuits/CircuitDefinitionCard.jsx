@@ -6,6 +6,7 @@ import CatalogueUsageMetadata from '../activities/CatalogueUsageMetadata';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 import { useCircuitDefinitionMutations } from '../../hooks/useCircuitQueries';
 import { logError } from '../../utils/logger';
+import { prepareCircuitDefinitionCopy } from '../../utils/circuitDefinition';
 import CircuitBuilderModal from './CircuitBuilderModal';
 import CircuitActivityCard from './CircuitActivityCard';
 import activityStyles from '../ActivityCard.module.css';
@@ -47,13 +48,7 @@ export default function CircuitDefinitionCard({ circuit, rootId, activities, act
         setIsDuplicating(false);
     };
 
-    const editableCircuit = isDuplicating ? {
-        ...circuit,
-        id: undefined,
-        name: `${circuit.name} (Copy)`,
-        version: undefined,
-        slots: (circuit.slots || []).map((slot) => ({ ...slot, id: undefined })),
-    } : circuit;
+    const editableCircuit = isDuplicating ? prepareCircuitDefinitionCopy(circuit) : circuit;
 
     const handleArchive = async () => {
         try {

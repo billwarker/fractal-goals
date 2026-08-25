@@ -30,6 +30,10 @@ function ActivityPicker({
     allowCreateActivity = false,
     allowCopyActivity = false,
     allowCreateGroup = false,
+    createActionLabel = '+ Create New Activity Definition',
+    copyActionLabel = '+ Copy Existing Activity Definition',
+    cancelCopyActionLabel = 'Cancel Copy Mode',
+    copyModeDescription = 'select an existing activity definition to duplicate into a new one.',
     closeOnSelect = false,
     showHeader = true,
     showFooter = true,
@@ -324,6 +328,7 @@ function ActivityPicker({
                         displayTitle={displayTitle}
                         subtitle={subtitle}
                         isCopyMode={isCopyMode}
+                        copyModeDescription={copyModeDescription}
                         showBackButton={Boolean(browseGroupId)}
                         onBack={handleBack}
                         showCloseButton={showCloseButton}
@@ -386,7 +391,7 @@ function ActivityPicker({
                         <div className={styles.primaryActions}>
                             {allowCreateActivity && (
                                 <button type="button" className={styles.secondaryAction} onClick={onCreateActivity}>
-                                    + Create New Activity Definition
+                                    {createActionLabel}
                                 </button>
                             )}
                             {allowCopyActivity && (
@@ -395,7 +400,7 @@ function ActivityPicker({
                                     className={`${styles.secondaryAction} ${isCopyMode ? styles.secondaryActionActive : ''}`}
                                     onClick={handleToggleCopyMode}
                                 >
-                                    {isCopyMode ? 'Cancel Copy Mode' : '+ Copy Existing Activity Definition'}
+                                    {isCopyMode ? cancelCopyActionLabel : copyActionLabel}
                                 </button>
                             )}
                             {allowCreateGroup && (

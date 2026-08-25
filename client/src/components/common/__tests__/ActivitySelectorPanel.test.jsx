@@ -78,6 +78,35 @@ describe('ActivitySelectorPanel', () => {
         expect(screen.getByText('Circuit • 1 activity')).toBeInTheDocument();
     });
 
+    it('uses circuit-specific create and copy actions when circuit callbacks are provided', () => {
+        const onCreateCircuitDefinition = vi.fn();
+        const onCopyCircuitDefinition = vi.fn();
+        render(
+            <ActivitySelectorPanel
+                activities={[]}
+                circuits={[{ id: 'circuit-1', name: 'Technique Circuit', slots: [] }]}
+                activityGroups={[]}
+                onClose={vi.fn()}
+                onSelectActivity={vi.fn()}
+                onSelectCircuit={vi.fn()}
+                onCreateCircuitDefinition={onCreateCircuitDefinition}
+                onCopyCircuitDefinition={onCopyCircuitDefinition}
+                showTypeToggle
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Activity Circuits' }));
+        fireEvent.click(screen.getByRole('button', { name: '+ Create New Activity Circuit' }));
+        expect(onCreateCircuitDefinition).toHaveBeenCalledOnce();
+
+        fireEvent.click(screen.getByRole('button', { name: '+ Copy Existing Activity Circuit' }));
+        expect(screen.getByText(
+            'Copy mode: select an existing activity circuit to duplicate into a new one.'
+        )).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Copy Technique Circuit' }));
+        expect(onCopyCircuitDefinition).toHaveBeenCalledWith(expect.objectContaining({ id: 'circuit-1' }));
+    });
+
     it('opens directly inside the requested activity group', () => {
         render(
             <ActivitySelectorPanel

@@ -5,6 +5,51 @@ import CircuitBuilderModal from '../CircuitBuilderModal';
 
 
 describe('CircuitBuilderModal', () => {
+    it('updates the create header from the live trimmed circuit name', () => {
+        render(
+            <CircuitBuilderModal
+                isOpen
+                onClose={vi.fn()}
+                onSave={vi.fn()}
+                activities={[]}
+                activityGroups={[]}
+            />,
+        );
+
+        expect(screen.getByRole('heading', { name: 'Create Circuit' })).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Name'), { target: { value: '  Strength Pairing  ' } });
+        expect(screen.getByRole('heading', { name: 'Create Circuit: Strength Pairing' })).toBeInTheDocument();
+    });
+
+    it('uses the live draft name with edit and copy action labels', () => {
+        const sharedProps = {
+            isOpen: true,
+            onClose: vi.fn(),
+            onSave: vi.fn(),
+            activities: [],
+            activityGroups: [],
+        };
+        const { unmount } = render(
+            <CircuitBuilderModal
+                {...sharedProps}
+                circuit={{ id: 'circuit-1', name: 'Original Circuit', slots: [] }}
+            />,
+        );
+        expect(screen.getByRole('heading', { name: 'Edit Circuit: Original Circuit' })).toBeInTheDocument();
+
+        unmount();
+        render(
+            <CircuitBuilderModal
+                {...sharedProps}
+                circuit={{ name: 'Original Circuit (Copy)', slots: [] }}
+                isCopy
+            />,
+        );
+        expect(screen.getByRole('heading', {
+            name: 'Create Circuit: Original Circuit (Copy)',
+        })).toBeInTheDocument();
+    });
+
     it('preserves duplicate slots and their explicit order', async () => {
         const onSave = vi.fn().mockResolvedValue(undefined);
         render(

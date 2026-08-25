@@ -10,6 +10,7 @@ export default function ActivityPickerHeader({
     displayTitle,
     subtitle,
     isCopyMode,
+    copyModeDescription = 'select an existing activity definition to duplicate into a new one.',
     showBackButton,
     onBack,
     showCloseButton,
@@ -25,7 +26,7 @@ export default function ActivityPickerHeader({
                         {subtitle && <div className={styles.subtitle}>{subtitle}</div>}
                         {isCopyMode && (
                             <div className={styles.subtitle}>
-                                Copy mode: select an existing activity definition to duplicate into a new one.
+                                Copy mode: {copyModeDescription}
                             </div>
                         )}
                     </div>
