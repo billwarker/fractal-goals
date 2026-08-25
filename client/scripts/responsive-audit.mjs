@@ -59,6 +59,7 @@ const checks = [
     file: 'src/components/GoalDetailModal.module.css',
     patterns: [
       /@media\s*\(max-width:\s*560px\)[\s\S]*?\.activitiesFooterPrimaryActions\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+      /@media\s*\(max-width:\s*560px\)[\s\S]*?\.activitiesFooterSelectionActions\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);[^}]*\}[\s\S]*?\.activitiesFooterSelectionActions \.activitiesFooterConfirmButton\s*\{[^}]*grid-column:\s*1 \/ -1;/,
     ],
   },
   {
