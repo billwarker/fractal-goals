@@ -55,6 +55,22 @@
     height: 18px;
 }
 
+/* Compact: sized to sit inside short (26px) control rows. */
+.compact {
+    width: 14px;
+    height: 14px;
+}
+
+.compact .mark {
+    width: 11px;
+    height: 11px;
+}
+
+.compact.inProgress .mark {
+    width: 9px;
+    height: 9px;
+}
+
 @keyframes inProgressSpin {
     to {
         transform: rotate(360deg);

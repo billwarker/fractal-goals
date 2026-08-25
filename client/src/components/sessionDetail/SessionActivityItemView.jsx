@@ -453,31 +453,18 @@ function SessionActivityItemView({
                                                 <PlayIcon size={13} />
                                                 <span>Start</span>
                                             </Button>
-                                            <Button
-                                                unstyled
+                                            <ActivityCompletionButton
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     onUpdate('timer_action', 'complete');
                                                 }}
-                                                className={styles.completeButton}
+                                                className={styles.timerCompletionButton}
+                                                size="sm"
                                                 title="Instant complete (0s duration)"
-                                            >
-                                                ✓ Complete
-                                            </Button>
+                                            />
                                         </>
-                                    ) : !exercise.time_stop ? (
+                                    ) : (!exercise.time_stop && !exercise.completed) ? (
                                         <>
-                                            <Button
-                                                unstyled
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onUpdate('timer_action', 'complete');
-                                                }}
-                                                className={styles.completeButton}
-                                                title="Complete activity"
-                                            >
-                                                ✓ Complete
-                                            </Button>
                                             <Button
                                                 unstyled
                                                 onClick={(e) => {
@@ -492,12 +479,18 @@ function SessionActivityItemView({
                                             >
                                                 ↺ Reset
                                             </Button>
+                                            <ActivityCompletionButton
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onUpdate('timer_action', 'complete');
+                                                }}
+                                                className={styles.timerCompletionButton}
+                                                size="sm"
+                                                title="Complete activity"
+                                            />
                                         </>
                                     ) : (
                                         <>
-                                            <div className={styles.completedBadge} title={`Completed at ${formatForInput(exercise.time_stop, timezone)}`}>
-                                                Completed
-                                            </div>
                                             <Button
                                                 unstyled
                                                 onClick={(e) => {
@@ -512,6 +505,15 @@ function SessionActivityItemView({
                                             >
                                                 ↺ Reset
                                             </Button>
+                                            <ActivityCompletionButton
+                                                completed
+                                                asStatus
+                                                className={styles.timerCompletionButton}
+                                                size="sm"
+                                                title={exercise.time_stop
+                                                    ? `Completed at ${formatForInput(exercise.time_stop, timezone)}`
+                                                    : 'Completed'}
+                                            />
                                         </>
                                     )}
                                 </SessionItemTimerActions>

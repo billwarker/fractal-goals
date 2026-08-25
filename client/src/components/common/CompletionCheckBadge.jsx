@@ -11,6 +11,8 @@ function CompletionCheckBadge({
     paused = false,
     label,
     className = '',
+    decorative = false,
+    compact = false,
 }) {
     let defaultLabel = 'Incomplete';
     if (paused) {
@@ -32,8 +34,9 @@ function CompletionCheckBadge({
 
     return (
         <span
-            className={`${styles.badge} ${statusClass} ${className}`.trim()}
-            aria-label={accessibleLabel}
+            className={`${styles.badge} ${statusClass} ${compact ? styles.compact : ''} ${className}`.trim()}
+            aria-hidden={decorative ? 'true' : undefined}
+            aria-label={decorative ? undefined : accessibleLabel}
         >
             {paused ? (
                 <CompletionPauseIcon className={styles.mark} />

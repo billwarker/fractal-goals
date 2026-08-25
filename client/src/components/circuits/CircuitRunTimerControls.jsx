@@ -5,6 +5,7 @@ import { formatForInput, validateTimerRange } from '../../utils/dateUtils';
 import { formatClockDuration } from '../../utils/sessionTime';
 import { PlayIcon } from '../atoms/AppIcons';
 import Button from '../atoms/Button';
+import CompletionButton from '../common/CompletionButton';
 import {
     SessionItemTimerActions,
     SessionItemTimerControls,
@@ -141,54 +142,10 @@ export default function CircuitRunTimerControls({
                         <PlayIcon size={13} /> <span>Start</span>
                     </Button>
                 )}
-                {run.status === 'active' && (
-                    <Button
-                        unstyled
-                        type="button"
-                        aria-label="Complete circuit"
-                        className={activityStyles.completeButton}
-                        onClick={(event) => invoke(event, 'completeRun')}
-                        disabled={actionsDisabled}
-                        title="Complete circuit"
-                    >
-                        ✓ Complete
-                    </Button>
-                )}
                 {run.status === 'paused' && (
                     <div className={activityStyles.completedBadge} title="Resume the session to continue this circuit">
                         Paused
                     </div>
-                )}
-                {run.status === 'completed' && (
-                    <div className={activityStyles.completedBadge} title={`Completed at ${localStopTime}`}>
-                        Completed
-                    </div>
-                )}
-                {run.status === 'planned' && (
-                    <Button
-                        unstyled
-                        type="button"
-                        aria-label="Complete circuit"
-                        className={activityStyles.completeButton}
-                        onClick={(event) => invoke(event, 'completeRun')}
-                        disabled={actionsDisabled}
-                        title="Instant complete (0s duration)"
-                    >
-                        ✓ Complete
-                    </Button>
-                )}
-                {run.status === 'paused' && (
-                    <Button
-                        unstyled
-                        type="button"
-                        aria-label="Complete circuit"
-                        className={activityStyles.completeButton}
-                        onClick={(event) => invoke(event, 'completeRun')}
-                        disabled={actionsDisabled}
-                        title="Complete circuit"
-                    >
-                        ✓ Complete
-                    </Button>
                 )}
                 {run.status !== 'planned' && (
                     <Button
@@ -201,6 +158,27 @@ export default function CircuitRunTimerControls({
                     >
                         ↺ Reset
                     </Button>
+                )}
+                {run.status === 'completed' ? (
+                    <CompletionButton
+                        completed
+                        asStatus
+                        entityName="Circuit"
+                        className={activityStyles.timerCompletionButton}
+                        size="sm"
+                        title={`Completed at ${localStopTime}`}
+                    />
+                ) : (
+                    <CompletionButton
+                        type="button"
+                        entityName="Circuit"
+                        aria-label="Complete circuit"
+                        className={activityStyles.timerCompletionButton}
+                        size="sm"
+                        onClick={(event) => invoke(event, 'completeRun')}
+                        disabled={actionsDisabled}
+                        title={run.status === 'planned' ? 'Instant complete (0s duration)' : 'Complete circuit'}
+                    />
                 )}
             </SessionItemTimerActions>
         </SessionItemTimerControls>

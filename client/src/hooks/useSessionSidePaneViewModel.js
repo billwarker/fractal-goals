@@ -42,7 +42,7 @@ export function useSessionSidePaneViewModel({
         onModeChange,
         details: {
             sessionId,
-            isCompleted: Boolean(session?.attributes?.completed),
+            isCompleted: Boolean(session?.completed ?? session?.attributes?.completed),
             onToggleComplete: toggleSessionComplete,
             onOptions,
             onNoteAdded,

@@ -1,0 +1,25 @@
+.control {
+    width: var(--completion-button-width, 190px);
+    max-width: 100%;
+}
+
+.completed {
+    background-color: transparent;
+    border-color: var(--color-brand-success);
+    color: var(--color-brand-success);
+}
+
+.completed:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--color-brand-success) 10%, transparent);
+    border-color: var(--color-brand-success-hover);
+    color: var(--color-brand-success-hover);
+}
+
+.status {
+    gap: 8px;
+    cursor: default;
+}
+
+.status:active {
+    transform: none;
+}

@@ -63,8 +63,7 @@ function SessionSidePane({
                                 <SessionCompletionButton
                                     onClick={details?.onToggleComplete}
                                     completed={details?.isCompleted}
-                                    title="Mark Session Complete"
-                                    className={!details?.isCompleted ? styles.completePendingButton : ''}
+                                    className={styles.sessionCompletionButton}
                                 />
                                 <Button
                                     onClick={details?.onOptions}

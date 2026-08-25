@@ -1181,8 +1181,71 @@ describe('SessionActivityItem quick mode', () => {
         expect(screen.queryByTitle('Start timer')).not.toBeInTheDocument();
         expect(screen.queryByTitle('Instant complete (0s duration)')).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: '×' })).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Mark Complete' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '✓ Complete' })).toBeInTheDocument();
         expect(screen.getByText('Mark this activity complete when finished.')).toBeInTheDocument();
+    });
+
+    it('keeps the completion button in the last timer action slot across timer states', () => {
+        const timerActionsFor = (exercise) => {
+            const { unmount } = renderWithProviders(
+                <SessionActivityItem
+                    exercise={exercise}
+                    isSelected
+                    activityDefinition={quickModeDefinition}
+                />,
+                {
+                    withTimezone: false,
+                    withAuth: false,
+                    withGoalLevels: false,
+                    withTheme: false,
+                }
+            );
+
+            const completion = screen.getByTitle(/complete/i);
+            const row = completion.parentElement;
+            const position = Array.from(row.children).indexOf(completion);
+            const result = { count: row.children.length, position };
+            unmount();
+            return result;
+        };
+
+        // Not started: [Start] [Complete]
+        const planned = timerActionsFor({ ...baseExercise, time_start: null, time_stop: null });
+        // Running: Start unmounts, Reset takes its slot -> [Reset] [Complete]
+        const running = timerActionsFor({
+            ...baseExercise,
+            time_start: '2026-08-25T14:24:23.000Z',
+            time_stop: null,
+        });
+
+        expect(planned.position).toBe(planned.count - 1);
+        expect(running.position).toBe(running.count - 1);
+        expect(running.position).toBe(planned.position);
+    });
+
+    it('shows a started instance as complete once the session cascade marks it completed', () => {
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    ...baseExercise,
+                    time_start: '2026-08-25T14:24:23.000Z',
+                    time_stop: null,
+                    completed: true,
+                }}
+                isSelected
+                activityDefinition={quickModeDefinition}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        // Completed instances expose a status, not an actionable Complete button.
+        expect(screen.getByRole('status', { name: /completed/i })).toBeInTheDocument();
+        expect(screen.queryByTitle('Complete activity')).not.toBeInTheDocument();
     });
 
     it('renders the same metric input surface in quick and regular modes', () => {

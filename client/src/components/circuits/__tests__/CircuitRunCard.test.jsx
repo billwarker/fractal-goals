@@ -15,6 +15,7 @@ vi.mock('../../../utils/api', () => ({
     },
 }));
 import CircuitRunCard from '../CircuitRunCard';
+import badgeStyles from '../../common/CompletionCheckBadge.module.css';
 function render(ui) {
     const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -199,7 +200,7 @@ describe('CircuitRunCard', () => {
         expect(startButton).toBeEnabled();
         expect(completeButton).toBeEnabled();
         expect(startButton.className).toMatch(/startButton/);
-        expect(completeButton.className).toMatch(/completeButton/);
+        expect(completeButton.className).toMatch(/timerCompletionButton/);
         expect(screen.getAllByRole('button', { name: /add .*tags/i })).toHaveLength(1);
     });
 
@@ -226,8 +227,12 @@ describe('CircuitRunCard', () => {
         expect(screen.queryByLabelText('Circuit duration')).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Start' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Complete circuit' })).not.toBeInTheDocument();
-        expect(screen.getByText('Completed')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /reset/i })).toBeEnabled();
+        const resetButton = screen.getByRole('button', { name: /reset/i });
+        const completedStatus = screen.getByText('Completed');
+        expect(completedStatus).toBeInTheDocument();
+        expect(completedStatus.querySelector(`.${badgeStyles.badge}.${badgeStyles.checked}`)).toBeInTheDocument();
+        expect(resetButton).toBeEnabled();
+        expect(resetButton.compareDocumentPosition(completedStatus) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it('keeps planned lifecycle controls visible but disabled for a completed session', () => {

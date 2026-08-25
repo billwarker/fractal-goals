@@ -262,6 +262,13 @@
     flex-wrap: wrap;
 }
 
+/* Every action occupies an identical fixed slot so the Complete button keeps
+   its position when a sibling (Start / Reset) mounts or unmounts. */
+.timerActionColumn > * {
+    flex: 0 0 96px;
+    min-width: 0;
+}
+
 .modeActionRow {
     display: flex;
     align-items: center;
@@ -615,20 +622,25 @@
     margin-top: 14px;
 }
 
-.completeButton {
-    background: var(--color-brand-success);
-    border: none;
-    border-radius: 4px;
-    color: white;
-    cursor: pointer;
-    font-size: 14px;
-    padding: 6px 10px;
-    display: flex;
-    align-items: center;
+/* Doubled class beats the equal-specificity size class from Button.module.css
+   regardless of stylesheet order. */
+.timerCompletionButton.timerCompletionButton {
+    --completion-button-width: 100%;
+
+    min-width: 0;
+    height: 26px;
+    /* Button's .sm raises min-height to 44px on coarse pointers; the desktop
+       timer row is fixed at 26px and the mobile block below restores tap size. */
+    min-height: 26px;
+    padding: 0 8px;
+    border-radius: 3px;
+    font-size: 11px;
     gap: 4px;
-    margin-top: 0;
-    justify-content: center;
-    width: auto;
+}
+
+/* Tighten the icon slot Button renders around the check badge. */
+.timerCompletionButton > span:first-child {
+    margin-right: 4px;
 }
 
 .completedBadge {
@@ -662,6 +674,18 @@
     margin-top: 0;
     justify-content: center;
     width: auto;
+}
+
+/* Timer action buttons share the duration field's 26px height so the
+   action row lines up with the meta fields beside it. */
+.startButton,
+.resetButton,
+.completedBadge {
+    width: 100%;
+    height: 26px;
+    padding: 0 8px;
+    border-radius: 3px;
+    font-size: 11px;
 }
 
 .deleteButton {
@@ -1041,14 +1065,23 @@
         min-width: 0;
     }
 
+    /* Mobile restores comfortable tap targets over the compact desktop row. */
     .startButton,
     .stopButton,
-    .completeButton,
+    .timerCompletionButton.timerCompletionButton,
     .completedBadge,
     .resetButton {
         margin-top: 0;
+        height: auto;
         min-height: 36px;
         width: 100%;
+        flex-basis: auto;
+        font-size: 13px;
+    }
+
+    /* The grid above owns sizing here; drop the fixed desktop slot. */
+    .timerActionColumn > * {
+        flex: initial;
     }
 
     /* Set row becomes: [#] [metrics]  then  [yield] on its own row below */
