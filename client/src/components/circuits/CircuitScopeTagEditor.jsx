@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
+import useAnchoredPortalPosition from '../../hooks/useAnchoredPortalPosition';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import Badge from '../atoms/Badge';
@@ -49,6 +51,15 @@ function CircuitScopeTagEditor({
     ));
     const tagOverflow = useTagCountOverflow(tags, editable);
 
+    useAnchoredPortalPosition({
+        open: editable && isOpen,
+        anchorRef: tagOverflow.triggerRef,
+        overlayRef: pickerRef,
+        margin: 16,
+        maxWidth: 260,
+        estimatedHeight: 320,
+    });
+
     useEffect(() => {
         if (!editable && isOpen) {
             setIsOpen(false);
@@ -66,7 +77,9 @@ function CircuitScopeTagEditor({
         if (!isOpen) return undefined;
         requestAnimationFrame(() => pickerRef.current?.querySelector('input, button')?.focus());
         const onPointerDown = (event) => {
-            if (!editorRef.current?.contains(event.target)) close({ restoreFocus: false });
+            if (!editorRef.current?.contains(event.target) && !pickerRef.current?.contains(event.target)) {
+                close({ restoreFocus: false });
+            }
         };
         const onKeyDown = (event) => {
             if (event.key === 'Escape') close();
@@ -166,7 +179,7 @@ function CircuitScopeTagEditor({
                 ))}
                 {triggerFirst ? null : addTagTrigger}
             </div>
-            {editable && isOpen && (
+            {editable && isOpen && createPortal(
                 <div
                     ref={pickerRef}
                     className={styles.picker}
@@ -240,7 +253,8 @@ function CircuitScopeTagEditor({
                             Create
                         </Button>
                     </div>
-                </div>
+                </div>,
+                document.body,
             )}
         </div>
     );

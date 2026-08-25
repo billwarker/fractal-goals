@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { useActivityTagMutations } from '../../hooks/useActivityProgressViews';
+import useAnchoredPortalPosition from '../../hooks/useAnchoredPortalPosition';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import Badge from '../atoms/Badge';
@@ -52,6 +54,15 @@ function ActivityTagEditor({
     const selectedTags = localTags.filter((tag) => selectedIds.includes(tag.id) && !inheritedIds.has(tag.id));
     const tagOverflow = useTagCountOverflow(selectedTags, editable);
 
+    useAnchoredPortalPosition({
+        open: editable && isPickerOpen,
+        anchorRef: tagOverflow.triggerRef,
+        overlayRef: pickerRef,
+        margin: 16,
+        maxWidth: 260,
+        estimatedHeight: 300,
+    });
+
     useEffect(() => {
         assignmentVersionRef.current = assignmentVersion;
     }, [assignmentKey, assignmentVersion]);
@@ -73,7 +84,9 @@ function ActivityTagEditor({
         if (!isPickerOpen) return undefined;
         requestAnimationFrame(() => (assignableTags.length > 5 ? searchRef.current : pickerRef.current?.querySelector('input, button'))?.focus());
         const closeOnOutsideClick = (event) => {
-            if (!editorRef.current?.contains(event.target)) closePicker({ restoreFocus: false });
+            if (!editorRef.current?.contains(event.target) && !pickerRef.current?.contains(event.target)) {
+                closePicker({ restoreFocus: false });
+            }
         };
         const closeOnEscape = (event) => {
             if (event.key === 'Escape') closePicker();
@@ -203,7 +216,7 @@ function ActivityTagEditor({
                 ))}
                 {triggerFirst ? null : addTagTrigger}
             </div>
-            {editable && isPickerOpen && (
+            {editable && isPickerOpen && createPortal(
                 <div ref={pickerRef} className={styles.picker} role="dialog" aria-modal="true" aria-label={setId ? 'Choose set tags' : 'Choose activity tags'}>
                     <div className={styles.pickerHeader}>
                         <span>Choose tags</span>
@@ -250,7 +263,8 @@ function ActivityTagEditor({
                         />
                         <Button size="sm" onClick={handleCreate} disabled={!name.trim() || isPending}>Create</Button>
                     </div>
-                </div>
+                </div>,
+                document.body,
             )}
         </div>
     );

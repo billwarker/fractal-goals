@@ -725,6 +725,7 @@ function ProgramCalendarPage() {
     const viewActions = displayProgram ? (
         <>
             <ViewToggleTabs
+                className={styles.mobileViewToggle}
                 items={PROGRAM_VIEW_ITEMS}
                 value={viewMode}
                 onChange={setViewMode}

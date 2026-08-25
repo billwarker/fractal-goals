@@ -18,7 +18,7 @@ describe('circuit scope tag controls', () => {
 
         const control = screen.getByRole('group', { name: 'Circuit tags' });
         fireEvent.click(within(control).getByRole('button', { name: 'Add circuit tags' }));
-        fireEvent.click(within(control).getByText('Competition'));
+        fireEvent.click(within(screen.getByRole('dialog', { name: 'Choose circuit tags' })).getByText('Competition'));
 
         await waitFor(() => expect(onPerform).toHaveBeenCalledWith({
             action: 'updateRunTag',
@@ -39,10 +39,10 @@ describe('circuit scope tag controls', () => {
 
         const control = screen.getByRole('group', { name: 'Round 1 tags' });
         fireEvent.click(within(control).getByRole('button', { name: 'Add round 1 tags' }));
-        fireEvent.change(within(control).getByRole('textbox', { name: 'New round 1 tags name' }), {
+        fireEvent.change(screen.getByRole('textbox', { name: 'New round 1 tags name' }), {
             target: { value: 'Sprint' },
         });
-        fireEvent.click(within(control).getByRole('button', { name: 'Create' }));
+        fireEvent.click(within(screen.getByRole('dialog', { name: 'Choose round 1 tags' })).getByRole('button', { name: 'Create' }));
 
         await waitFor(() => expect(onPerform).toHaveBeenCalledWith({
             action: 'updateRoundTag',
@@ -64,13 +64,13 @@ describe('circuit scope tag controls', () => {
 
         const control = screen.getByRole('group', { name: 'Circuit tags' });
         fireEvent.click(within(control).getByRole('button', { name: 'Add circuit tags' }));
-        fireEvent.change(within(control).getByRole('textbox', { name: 'New circuit tags name' }), {
+        fireEvent.change(screen.getByRole('textbox', { name: 'New circuit tags name' }), {
             target: { value: 'Competition' },
         });
-        fireEvent.change(within(control).getByLabelText('New circuit tags color'), {
+        fireEvent.change(screen.getByLabelText('New circuit tags color'), {
             target: { value: '#ff0000' },
         });
-        fireEvent.click(within(control).getByRole('button', { name: 'Create' }));
+        fireEvent.click(within(screen.getByRole('dialog', { name: 'Choose circuit tags' })).getByRole('button', { name: 'Create' }));
 
         await waitFor(() => expect(onPerform).toHaveBeenCalledWith({
             action: 'updateRunTag',

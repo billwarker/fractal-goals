@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 vi.mock('../../../hooks/useActivityProgressViews', () => ({
     useActivityTagMutations: () => ({
@@ -136,4 +136,30 @@ it('places a header trigger before its assigned tags', () => {
     const trigger = within(editor).getByRole('button', { name: 'Add tag' });
     const assignedTag = within(editor).getByText('Test').closest('label');
     expect(trigger.compareDocumentPosition(assignedTag) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it('portals and viewport-clamps the picker outside narrow session containers', () => {
+    render(
+        <div data-testid="narrow-session-card">
+            <ActivityTagEditor
+                rootId="root"
+                activityId="activity"
+                instanceId="instance"
+                availableTags={[]}
+            />
+        </div>,
+    );
+
+    vi.stubGlobal('innerWidth', 320);
+    vi.stubGlobal('innerHeight', 640);
+    const trigger = screen.getByRole('button', { name: 'Add tag' });
+    trigger.getBoundingClientRect = () => ({ left: -40, right: 12, top: 100, bottom: 130 });
+    fireEvent.click(trigger);
+
+    const picker = screen.getByRole('dialog', { name: 'Choose activity tags' });
+    expect(picker.parentElement).toBe(document.body);
+    expect(picker).toHaveStyle({ position: 'fixed' });
+    expect(picker.style.left).toBe('16px');
+    expect(picker.style.top).toBe('136px');
+    expect(picker.style.width).toBe('260px');
 });

@@ -156,9 +156,9 @@ describe('SessionActivityItem metric and timer editing', () => {
         expect(within(activityTags).queryByText('Available activity tag')).not.toBeInTheDocument();
 
         fireEvent.click(addActivityTag);
-        expect(within(activityTags).getByRole('dialog', { name: 'Choose activity tags' })).toBeInTheDocument();
-        expect(within(activityTags).getByText('Available activity tag')).toBeInTheDocument();
-        fireEvent.click(within(activityTags).getByRole('button', { name: 'Close tag picker' }));
+        expect(screen.getByRole('dialog', { name: 'Choose activity tags' })).toBeInTheDocument();
+        expect(screen.getByText('Available activity tag')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Close tag picker' }));
 
         const input = screen.getByDisplayValue('5');
         fireEvent.change(input, { target: { value: '123' } });
@@ -1429,8 +1429,8 @@ describe('SessionActivityItem quick mode', () => {
         expect(within(setTags).queryByText('Available set tag')).not.toBeInTheDocument();
         expect(within(screen.getByText('#2').parentElement).queryByRole('button', { name: 'Add tag' })).not.toBeInTheDocument();
         fireEvent.click(within(setTags).getByRole('button', { name: 'Add tag' }));
-        expect(within(setTags).getByText('Available set tag')).toBeInTheDocument();
-        expect(within(setTags).queryByText('Parent tag')).not.toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: 'Choose set tags' })).toHaveTextContent('Available set tag');
+        expect(screen.getByRole('dialog', { name: 'Choose set tags' })).not.toHaveTextContent('Parent tag');
     });
     it('uses the lower-is-better best-set anchor when placing max hints across set rows', () => {
         useProgressComparison.mockReturnValue({

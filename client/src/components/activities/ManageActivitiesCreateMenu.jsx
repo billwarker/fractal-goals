@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
+import useAnchoredPortalPosition from '../../hooks/useAnchoredPortalPosition';
 import DropdownMenu, { DropdownMenuItem } from '../atoms/DropdownMenu';
 import HeaderButton from '../layout/HeaderButton';
 import styles from './ManageActivitiesCreateMenu.module.css';
@@ -31,15 +33,31 @@ export default function ManageActivitiesCreateMenu({
 }) {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef(null);
+    const menuRef = useRef(null);
+
+    useAnchoredPortalPosition({
+        open: isOpen,
+        anchorRef: containerRef,
+        anchorSelector: 'button',
+        overlayRef: menuRef,
+    });
+
+    useEffect(() => {
+        if (isOpen) menuRef.current?.querySelector('[role="menuitem"]')?.focus();
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) return undefined;
 
         const closeOnOutsidePointer = (event) => {
-            if (!containerRef.current?.contains(event.target)) setIsOpen(false);
+            if (!containerRef.current?.contains(event.target) && !menuRef.current?.contains(event.target)) {
+                setIsOpen(false);
+            }
         };
         const closeOnEscape = (event) => {
-            if (event.key === 'Escape') setIsOpen(false);
+            if (event.key !== 'Escape') return;
+            setIsOpen(false);
+            containerRef.current?.querySelector('button')?.focus();
         };
 
         document.addEventListener('pointerdown', closeOnOutsidePointer);
@@ -61,12 +79,37 @@ export default function ManageActivitiesCreateMenu({
         handlers[key]?.();
     };
 
+    const toggleMenu = () => setIsOpen((open) => !open);
+
+    const menu = isOpen ? createPortal(
+        <DropdownMenu
+            ref={menuRef}
+            className={styles.menu}
+            align="left"
+            aria-label="Create"
+        >
+            {CREATE_OPTIONS.map((option) => (
+                <DropdownMenuItem
+                    key={option.key}
+                    aria-label={option.label}
+                    onClick={() => selectOption(option.key)}
+                >
+                    <span className={styles.optionCopy}>
+                        <strong>{option.label}</strong>
+                        <span>{option.description}</span>
+                    </span>
+                </DropdownMenuItem>
+            ))}
+        </DropdownMenu>,
+        document.body,
+    ) : null;
+
     return (
         <div className={styles.container} ref={containerRef}>
             <HeaderButton
                 variant="primary"
                 className={triggerClassName}
-                onClick={() => setIsOpen((open) => !open)}
+                onClick={toggleMenu}
                 aria-haspopup="menu"
                 aria-expanded={isOpen}
             >
@@ -74,22 +117,7 @@ export default function ManageActivitiesCreateMenu({
                 Create
                 <span className={styles.chevron} aria-hidden="true">▾</span>
             </HeaderButton>
-            {isOpen && (
-                <DropdownMenu className={styles.menu} aria-label="Create">
-                    {CREATE_OPTIONS.map((option) => (
-                        <DropdownMenuItem
-                            key={option.key}
-                            aria-label={option.label}
-                            onClick={() => selectOption(option.key)}
-                        >
-                            <span className={styles.optionCopy}>
-                                <strong>{option.label}</strong>
-                                <span>{option.description}</span>
-                            </span>
-                        </DropdownMenuItem>
-                    ))}
-                </DropdownMenu>
-            )}
+            {menu}
         </div>
     );
 }

@@ -16,6 +16,8 @@ describe('ManageActivitiesCreateMenu', () => {
 
         fireEvent.click(trigger);
         expect(trigger).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByRole('menu')).toHaveStyle({ position: 'fixed' });
+        expect(screen.getByRole('menu').parentElement).toBe(document.body);
         fireEvent.click(screen.getByRole('menuitem', { name: 'Activity' }));
         expect(handlers.onCreateActivity).toHaveBeenCalledOnce();
         expect(screen.queryByRole('menu')).not.toBeInTheDocument();
@@ -45,5 +47,29 @@ describe('ManageActivitiesCreateMenu', () => {
 
         expect(screen.queryByRole('menu')).not.toBeInTheDocument();
         expect(onCreateActivity).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: 'Create' })).toHaveFocus();
+    });
+
+    it('keeps the portalled menu interactive outside a clipped mobile header', () => {
+        const onCreateGroup = vi.fn();
+        render(
+            <div data-testid="clipped-mobile-header">
+                <ManageActivitiesCreateMenu
+                    onCreateActivity={vi.fn()}
+                    onCreateGroup={onCreateGroup}
+                    onCreateCircuit={vi.fn()}
+                />
+            </div>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+        const menu = screen.getByRole('menu', { name: 'Create' });
+        expect(menu.parentElement).toBe(document.body);
+
+        fireEvent.pointerDown(screen.getByRole('menuitem', { name: 'Activity Group' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Activity Group' }));
+
+        expect(onCreateGroup).toHaveBeenCalledOnce();
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     });
 });

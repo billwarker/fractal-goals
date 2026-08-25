@@ -2,17 +2,18 @@ import React from 'react';
 
 import styles from './DropdownMenu.module.css';
 
-function DropdownMenu({
+const DropdownMenu = React.forwardRef(function DropdownMenu({
     children,
     className = '',
     align = 'right',
     'aria-label': ariaLabel,
     ...props
-}) {
+}, ref) {
     const alignClass = align === 'left' ? styles.alignLeft : styles.alignRight;
 
     return (
         <div
+            ref={ref}
             className={`${styles.menu} ${alignClass} ${className}`.trim()}
             role="menu"
             aria-label={ariaLabel}
@@ -21,7 +22,7 @@ function DropdownMenu({
             {children}
         </div>
     );
-}
+});
 
 export function DropdownMenuItem({
     children,
