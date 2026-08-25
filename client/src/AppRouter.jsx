@@ -407,6 +407,8 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
     );
 };
 
+const appEnvironment = import.meta.env.VITE_ENV || 'development';
+
 function App() {
     const location = useLocation();
     const { user, isAuthenticated } = useAuth();
@@ -662,9 +664,11 @@ function App() {
 
                 {!showSelectionPage && !showLandingPage && isAuthenticated && <GettingStartedChecklist />}
 
-                <div className={`env-indicator ${import.meta.env.VITE_ENV || 'development'}`}>
-                    {import.meta.env.VITE_ENV || 'development'}
-                </div>
+                {appEnvironment !== 'production' && (
+                    <div className={`env-indicator ${appEnvironment}`}>
+                        {appEnvironment}
+                    </div>
+                )}
             </div>
         </HeaderProvider>
     );
