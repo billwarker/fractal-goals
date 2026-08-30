@@ -143,7 +143,7 @@ describe('CircuitRunCard selection and scale behavior', () => {
         expect(onDuplicate).toHaveBeenCalledOnce();
     });
 
-    it('allows the shared options menu to extend beyond the circuit card', () => {
+    it('portals the shared options menu beyond clipped session containers', () => {
         render(
             <CircuitRunCard
                 rootId="root"
@@ -158,9 +158,8 @@ describe('CircuitRunCard selection and scale behavior', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Conditioning options' }));
         const menu = screen.getByRole('menu', { name: 'Conditioning circuit options' });
-        const circuitCard = menu.closest('[data-session-circuit-card="true"]');
 
-        expect(circuitCard).toBeInTheDocument();
-        expect(getComputedStyle(circuitCard).overflow).not.toBe('hidden');
+        expect(menu.parentElement).toBe(document.body);
+        expect(menu).toHaveStyle({ position: 'fixed' });
     });
 });

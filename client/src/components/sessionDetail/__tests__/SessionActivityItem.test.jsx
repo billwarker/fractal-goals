@@ -331,6 +331,9 @@ describe('SessionActivityItem metric and timer editing', () => {
 
         expect(screen.getByText('#3')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Pull Up options' }));
+        const optionsMenu = screen.getByRole('menu', { name: 'Pull Up activity options' });
+        expect(optionsMenu.parentElement).toBe(document.body);
+        expect(optionsMenu).toHaveStyle({ position: 'fixed' });
         fireEvent.click(screen.getByRole('menuitem', { name: 'Duplicate instance' }));
         expect(onDuplicate).toHaveBeenCalledTimes(1);
 

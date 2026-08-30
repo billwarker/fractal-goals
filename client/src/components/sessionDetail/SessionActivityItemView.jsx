@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
+import useAnchoredMenuController from '../../hooks/useAnchoredMenuController';
 import { formatForInput, localToISO, validateTimerRange } from '../../utils/dateUtils';
 import { formatAggValue } from '../../utils/progressAggregations';
 import { formatDuration, isMetricValueEmpty } from '../../utils/sessionActivityMetrics';
@@ -105,29 +107,13 @@ function SessionActivityItemView({
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
     const [timerConflictExtras, setTimerConflictExtras] = useState(null);
     const [timeInputErrors, setTimeInputErrors] = useState({ start: '', stop: '' });
-    const optionsRef = useRef(null);
     const hasInstanceOptions = Boolean(onDuplicate || showCopyPreviousValuesOption || onClearValues || onDelete);
-
-    useEffect(() => {
-        if (!isOptionsOpen) return undefined;
-
-        const handlePointerDown = (event) => {
-            if (optionsRef.current?.contains(event.target)) return;
-            setIsOptionsOpen(false);
-        };
-        const handleKeyDown = (event) => {
-            if (event.key === 'Escape') {
-                setIsOptionsOpen(false);
-            }
-        };
-
-        document.addEventListener('pointerdown', handlePointerDown);
-        document.addEventListener('keydown', handleKeyDown);
-        return () => {
-            document.removeEventListener('pointerdown', handlePointerDown);
-            document.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [isOptionsOpen]);
+    const { anchorRef: optionsRef, menuRef: optionsMenuRef } = useAnchoredMenuController({
+        open: isOptionsOpen,
+        setOpen: setIsOptionsOpen,
+        maxWidth: 240,
+        estimatedHeight: 190,
+    });
 
     const handleOptionAction = (event, action) => {
         event.stopPropagation();
@@ -244,8 +230,9 @@ function SessionActivityItemView({
                                                     >
                                                         ···
                                                     </button>
-                                                    {isOptionsOpen && (
+                                                    {isOptionsOpen && createPortal(
                                                         <DropdownMenu
+                                                            ref={optionsMenuRef}
                                                             className={styles.instanceOptionsMenu}
                                                             aria-label={`${def.name} activity options`}
                                                         >
@@ -279,7 +266,8 @@ function SessionActivityItemView({
                                                                     Delete from session
                                                                 </DropdownMenuItem>
                                                             )}
-                                                        </DropdownMenu>
+                                                        </DropdownMenu>,
+                                                        document.body,
                                                     )}
                                                 </div>
                                             )}

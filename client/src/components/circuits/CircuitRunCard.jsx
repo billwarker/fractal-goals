@@ -1,5 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useCircuitRunActions } from '../../hooks/useCircuitQueries';
+import useAnchoredMenuController from '../../hooks/useAnchoredMenuController';
 import { EditPencilIcon } from '../atoms/AppIcons';
 import AddItemButton from '../atoms/AddItemButton';
 import DropdownMenu, { DropdownMenuItem } from '../atoms/DropdownMenu';
@@ -55,7 +57,6 @@ export default function CircuitRunCard({
     const [error, setError] = useState('');
     const [visibleRoundCount, setVisibleRoundCount] = useState(INITIAL_VISIBLE_ROUNDS);
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
-    const optionsRef = useRef(null);
     const derived = useCircuitRunDerivedState({
         run,
         activityInstances,
@@ -65,21 +66,12 @@ export default function CircuitRunCard({
         allNotes,
     });
 
-    useEffect(() => {
-        if (!isOptionsOpen) return undefined;
-        const closeOptions = (event) => {
-            if (!optionsRef.current?.contains(event.target)) setIsOptionsOpen(false);
-        };
-        const closeOptionsOnEscape = (event) => {
-            if (event.key === 'Escape') setIsOptionsOpen(false);
-        };
-        document.addEventListener('pointerdown', closeOptions);
-        document.addEventListener('keydown', closeOptionsOnEscape);
-        return () => {
-            document.removeEventListener('pointerdown', closeOptions);
-            document.removeEventListener('keydown', closeOptionsOnEscape);
-        };
-    }, [isOptionsOpen]);
+    const { anchorRef: optionsRef, menuRef: optionsMenuRef } = useAnchoredMenuController({
+        open: isOptionsOpen,
+        setOpen: setIsOptionsOpen,
+        maxWidth: 240,
+        estimatedHeight: 100,
+    });
 
     const perform = async (payload) => {
         setError('');
@@ -203,8 +195,9 @@ export default function CircuitRunCard({
                                             >
                                                 ···
                                             </IconButton>
-                                            {isOptionsOpen && (
+                                            {isOptionsOpen && createPortal(
                                                 <DropdownMenu
+                                                    ref={optionsMenuRef}
                                                     className={activityStyles.instanceOptionsMenu}
                                                     aria-label={`${run.name} circuit options`}
                                                 >
@@ -226,7 +219,8 @@ export default function CircuitRunCard({
                                                             Delete from session
                                                         </DropdownMenuItem>
                                                     )}
-                                                </DropdownMenu>
+                                                </DropdownMenu>,
+                                                document.body,
                                             )}
                                         </div>
                                     )}
