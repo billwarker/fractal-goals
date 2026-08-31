@@ -15,13 +15,9 @@ import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import TextArea from '../atoms/TextArea';
 import DeleteConfirmModal from './DeleteConfirmModal';
+import MetricInputSettingsFields, { defaultPrecisionForType } from './MetricInputSettingsFields';
 import styles from './ManageMetricsModal.module.css';
 
-const INPUT_TYPES = [
-    { value: 'number', label: 'Number (decimal)' },
-    { value: 'integer', label: 'Integer (whole)' },
-    { value: 'duration', label: 'Duration (MM:SS)' },
-];
 
 const EMPTY_FORM = {
     name: '',
@@ -29,6 +25,7 @@ const EMPTY_FORM = {
     is_multiplicative: true,
     is_additive: true,
     input_type: 'number',
+    precision: 2,
     default_value: '',
     higher_is_better: null,
     predefined_values: '',
@@ -148,6 +145,9 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
             is_multiplicative: metric.is_multiplicative ?? true,
             is_additive: metric.is_additive ?? true,
             input_type: metric.input_type || 'number',
+            precision: metric.input_type === 'integer'
+                ? 0
+                : (metric.precision ?? defaultPrecisionForType(metric.input_type)),
             default_value: metric.default_value != null ? String(metric.default_value) : '',
             higher_is_better: metric.higher_is_better ?? null,
             predefined_values: metric.predefined_values ? metric.predefined_values.join(', ') : '',
@@ -167,6 +167,9 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
             is_multiplicative: metric.is_multiplicative ?? true,
             is_additive: metric.is_additive ?? true,
             input_type: metric.input_type || 'number',
+            precision: metric.input_type === 'integer'
+                ? 0
+                : (metric.precision ?? defaultPrecisionForType(metric.input_type)),
             default_value: metric.default_value != null ? String(metric.default_value) : '',
             higher_is_better: metric.higher_is_better ?? null,
             predefined_values: metric.predefined_values ? metric.predefined_values.join(', ') : '',
@@ -186,6 +189,15 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
     const setField = (field, value) => {
         setValidationMessage('');
         setForm((prev) => ({ ...prev, [field]: value }));
+    };
+
+    const setInputType = (inputType) => {
+        setValidationMessage('');
+        setForm((prev) => ({
+            ...prev,
+            input_type: inputType,
+            precision: inputType === prev.input_type ? prev.precision : defaultPrecisionForType(inputType),
+        }));
     };
 
     const handleSubmit = async () => {
@@ -220,6 +232,7 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
             is_multiplicative: form.is_multiplicative,
             is_additive: form.is_additive,
             input_type: form.input_type,
+            precision: form.precision,
             default_value: defaultValue,
             higher_is_better: form.higher_is_better,
             predefined_values: predefined,
@@ -271,7 +284,6 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
             <Modal isOpen={isOpen} onClose={handleClose} title="Manage Metrics" size="xl">
                 <ModalBody noPadding>
                     <div className={styles.content}>
-                        {/* ── Left: scrollable list ── */}
                         <div className={styles.listSection}>
                             <div className={styles.listSectionInner}>
                                 <div className={styles.sectionHeading}>Metrics</div>
@@ -324,7 +336,6 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
                             </div>
                         </div>
 
-                        {/* ── Right: fixed form with sticky submit ── */}
                         <div className={styles.formSection}>
                             <div className={styles.formScrollable}>
                                 <div className={styles.sectionHeading}>
@@ -348,18 +359,11 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
                                     />
                                 </div>
 
-                                <div className={styles.fieldGroup}>
-                                    <label className={styles.fieldLabel}>Input type</label>
-                                    <select
-                                        className={styles.select}
-                                        value={form.input_type}
-                                        onChange={(e) => setField('input_type', e.target.value)}
-                                    >
-                                        {INPUT_TYPES.map((t) => (
-                                            <option key={t.value} value={t.value}>{t.label}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                                <MetricInputSettingsFields
+                                    form={form}
+                                    setField={setField}
+                                    setInputType={setInputType}
+                                />
 
                                 <div className={styles.toggleRow}>
                                     <label className={styles.toggleLabel}>
@@ -449,7 +453,6 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
                                 />
                             </div>
 
-                            {/* Sticky submit area — always visible */}
                             <div className={styles.formFooter}>
                                 {validationMessage && (
                                     <div className={styles.validationMessage} role="alert">

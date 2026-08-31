@@ -22,6 +22,7 @@ class FractalMetricCreateSchema(BaseModel):
     is_multiplicative: bool = True
     is_additive: bool = True
     input_type: str = 'number'
+    precision: int = Field(2, ge=0, le=6)
     default_value: Optional[float] = None
     higher_is_better: Optional[bool] = None
     predefined_values: Optional[List[float]] = None
@@ -73,6 +74,7 @@ class FractalMetricUpdateSchema(BaseModel):
     is_multiplicative: Optional[bool] = None
     is_additive: Optional[bool] = None
     input_type: Optional[str] = None
+    precision: Optional[int] = Field(None, ge=0, le=6)
     default_value: Optional[float] = None
     higher_is_better: Optional[bool] = None
     predefined_values: Optional[List[float]] = None
@@ -117,5 +119,4 @@ class FractalMetricUpdateSchema(BaseModel):
         if v is None:
             return v
         return sanitize_string(v)
-
 

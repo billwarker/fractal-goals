@@ -13,7 +13,7 @@ from .goal import (
 from .activity import (
     ActivityGroup, ActivityDefinition, MetricDefinition, FractalMetricDefinition,
     SplitDefinition, ActivityInstance, ActivitySet, MetricValue,
-    ActivityTag, ActivityProgressView, ActivityInstanceTag, ActivitySetTag,
+    ActivityTagDefinition, ActivityTag, ActivityProgressView, ActivityInstanceTag, ActivitySetTag,
 )
 from .circuit import (
     CircuitDefinition, CircuitSlot, CircuitRun, CircuitRunSlot,

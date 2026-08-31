@@ -36,16 +36,24 @@ export const fractalActivitiesApi = {
         axios.get(`${API_BASE}/${rootId}/activity-instances/${instanceId}/progress`),
     getActivityProgressHistory: (rootId, activityDefId, params = {}) =>
         axios.get(`${API_BASE}/${rootId}/activities/${activityDefId}/progress-history`, { params }),
-    getActivityTags: (rootId, activityId, params = {}) =>
-        axios.get(`${API_BASE}/${rootId}/activities/${activityId}/tags`, { params }),
-    createActivityTag: (rootId, activityId, data) =>
-        axios.post(`${API_BASE}/${rootId}/activities/${activityId}/tags`, data),
-    updateActivityTag: (rootId, activityId, tagId, data) =>
-        axios.put(`${API_BASE}/${rootId}/activities/${activityId}/tags/${tagId}`, data),
-    archiveActivityTag: (rootId, activityId, tagId) =>
-        axios.delete(`${API_BASE}/${rootId}/activities/${activityId}/tags/${tagId}`),
-    restoreActivityTag: (rootId, activityId, tagId) =>
-        axios.post(`${API_BASE}/${rootId}/activities/${activityId}/tags/${tagId}/restore`),
+    getActivityTagCatalog: (rootId, params = {}) =>
+        axios.get(`${API_BASE}/${rootId}/activity-tags`, { params }),
+    createActivityTagCatalogItem: (rootId, data) =>
+        axios.post(`${API_BASE}/${rootId}/activity-tags`, data),
+    updateActivityTagCatalogItem: (rootId, definitionId, data) =>
+        axios.put(`${API_BASE}/${rootId}/activity-tags/${definitionId}`, data),
+    archiveActivityTagCatalogItem: (rootId, definitionId, version) =>
+        axios.post(`${API_BASE}/${rootId}/activity-tags/${definitionId}/archive`, { version }),
+    restoreActivityTagCatalogItem: (rootId, definitionId, version) =>
+        axios.post(`${API_BASE}/${rootId}/activity-tags/${definitionId}/restore`, { version }),
+    getActivityTagImpact: (rootId, definitionId) =>
+        axios.get(`${API_BASE}/${rootId}/activity-tags/${definitionId}/impact`),
+    hardDeleteActivityTagCatalogItem: (rootId, definitionId, data) =>
+        axios.post(`${API_BASE}/${rootId}/activity-tags/${definitionId}/hard-delete`, data),
+    mergeActivityTagCatalogItems: (rootId, data) =>
+        axios.post(`${API_BASE}/${rootId}/activity-tags/merge`, data),
+    previewActivityTagCatalogMerge: (rootId, data) =>
+        axios.post(`${API_BASE}/${rootId}/activity-tags/merge-preview`, data),
     replaceActivityInstanceTags: (rootId, instanceId, tagIds, version = null) =>
         axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}/tags`, { tag_ids: tagIds, ...(version ? { version } : {}) }),
     replaceActivitySetTags: (rootId, setId, tagIds, version = null) =>

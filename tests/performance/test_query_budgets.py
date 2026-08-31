@@ -11,6 +11,8 @@ from models import (
     ActivityDefinition,
     ActivityGroup,
     ActivityInstance,
+    ActivityTag,
+    ActivityTagDefinition,
     AnalyticsDashboard,
     Goal,
     GoalLevel,
@@ -454,10 +456,11 @@ def test_tag_filtered_progress_timeline_query_budget(
     """Saved-view timelines keep a constant query budget as history grows."""
     root_id = sample_practice_session.root_id
     activity_id = sample_activity_definition.id
-    tag = authed_client.post(
-        f"/api/{root_id}/activities/{activity_id}/tags",
-        json={"name": "Competition"},
+    tag_definition = authed_client.post(
+        f"/api/{root_id}/activity-tags",
+        json={"name": "Competition", "scope": "selected", "activity_ids": [activity_id]},
     ).get_json()
+    tag = next(row for row in tag_definition["bindings"] if row["activity_definition_id"] == activity_id)
     authed_client.put(
         f"/api/{root_id}/activity-instances/{sample_activity_instance.id}/tags",
         json={"tag_ids": [tag["id"]]},
@@ -498,6 +501,39 @@ def test_tag_filtered_progress_timeline_query_budget(
     assert payload["total"] == 41
     assert len(payload["items"]) == 20
     assert query_counter["total"] <= 22
+
+
+@pytest.mark.integration
+def test_activity_tag_catalog_query_budget_is_constant(
+    authed_client,
+    db_session,
+    query_counter,
+    sample_ultimate_goal,
+    sample_activity_definition,
+):
+    definitions = []
+    for index in range(100):
+        definition = ActivityTagDefinition(
+            root_id=sample_ultimate_goal.id,
+            name=f"Catalog tag {index}",
+            sort_order=index,
+            scope="selected",
+        )
+        definition.bindings.append(ActivityTag(
+            root_id=sample_ultimate_goal.id,
+            activity_definition_id=sample_activity_definition.id,
+        ))
+        definitions.append(definition)
+    db_session.add_all(definitions)
+    db_session.commit()
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(
+        authed_client, f"/api/{sample_ultimate_goal.id}/activity-tags",
+    )
+    assert_response_budget(response, max_bytes=250_000, max_ms=750, elapsed_ms=elapsed_ms)
+    assert len(response.get_json()["tags"]) == 100
+    assert query_counter["total"] <= 12
 
 
 @pytest.mark.integration

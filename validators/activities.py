@@ -3,7 +3,7 @@
 Re-exported by the validators package __init__, so existing
 `from validators import <Schema>` imports keep working.
 """
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from .core import (
     MAX_NAME_LENGTH,
@@ -51,10 +51,6 @@ class ActivityTagCreateSchema(BaseModel):
         return value
 
 
-class ActivityTagUpdateSchema(ActivityTagCreateSchema):
-    name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
-
-
 class ActivityTagAssignmentSchema(BaseModel):
     model_config = ConfigDict(extra='forbid')
     tag_ids: List[str] = Field(default_factory=list, max_length=MAX_PROGRESS_TAG_IDS)
@@ -64,6 +60,79 @@ class ActivityTagAssignmentSchema(BaseModel):
     @classmethod
     def validate_tag_ids(cls, values: List[str]) -> List[str]:
         return _normalized_entity_ids(values)
+
+
+class ActivityTagCatalogCreateSchema(ActivityTagCreateSchema):
+    scope: Literal['selected', 'global'] = 'selected'
+    activity_ids: List[str] = Field(default_factory=list, max_length=500)
+
+    @field_validator('activity_ids')
+    @classmethod
+    def validate_activity_ids(cls, values: List[str]) -> List[str]:
+        return _normalized_entity_ids(values)
+
+
+class ActivityTagCatalogUpdateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
+
+    version: int = Field(..., ge=1)
+    name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
+    color: Optional[str] = Field(None, max_length=7)
+    scope: Optional[Literal['selected', 'global']] = None
+    activity_ids: Optional[List[str]] = Field(None, max_length=500)
+    sort_order: Optional[int] = Field(None, ge=0)
+
+    @field_validator('name')
+    @classmethod
+    def sanitize_name(cls, value: Optional[str]) -> Optional[str]:
+        return sanitize_string(value) if value is not None else None
+
+    @field_validator('color')
+    @classmethod
+    def validate_color(cls, value: Optional[str]) -> Optional[str]:
+        if value in (None, ''):
+            return None
+        if not HEX_COLOR_RE.match(value):
+            raise ValueError('color must be a valid #RRGGBB hex color')
+        return value
+
+    @field_validator('activity_ids')
+    @classmethod
+    def validate_activity_ids(cls, values: Optional[List[str]]) -> Optional[List[str]]:
+        return _normalized_entity_ids(values) if values is not None else None
+
+
+class ActivityTagVersionSchema(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    version: int = Field(..., ge=1)
+
+
+class ActivityTagHardDeleteSchema(ActivityTagVersionSchema):
+    confirmation_name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
+
+
+class ActivityTagMergeSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
+    target_id: str = Field(..., min_length=1, max_length=MAX_ENTITY_ID_LENGTH)
+    source_ids: List[str] = Field(..., min_length=1, max_length=100)
+    versions: Dict[str, int]
+    name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
+    color: Optional[str] = Field(None, max_length=7)
+    scope: Optional[Literal['selected', 'global']] = None
+
+    @field_validator('source_ids')
+    @classmethod
+    def validate_source_ids(cls, values: List[str]) -> List[str]:
+        return _normalized_entity_ids(values)
+
+    @field_validator('color')
+    @classmethod
+    def validate_color(cls, value: Optional[str]) -> Optional[str]:
+        if value in (None, ''):
+            return None
+        if not HEX_COLOR_RE.match(value):
+            raise ValueError('color must be a valid #RRGGBB hex color')
+        return value
 
 
 class ProgressViewConfigSchema(BaseModel):

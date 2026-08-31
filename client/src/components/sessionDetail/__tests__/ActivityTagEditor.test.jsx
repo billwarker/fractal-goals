@@ -2,8 +2,12 @@ import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 vi.mock('../../../hooks/useActivityProgressViews', () => ({
+    useActivityTagCatalog: () => ({ data: { tags: [], duplicate_groups: [] } }),
     useActivityTagMutations: () => ({
         createTag: vi.fn(),
+        updateCatalogTag: vi.fn(),
+        hardDeleteCatalogTag: vi.fn(),
+        archiveTag: vi.fn(),
         assignInstanceTags: vi.fn(),
         assignSetTags: vi.fn(),
         isPending: false,
@@ -161,5 +165,5 @@ it('portals and viewport-clamps the picker outside narrow session containers', (
     expect(picker).toHaveStyle({ position: 'fixed' });
     expect(picker.style.left).toBe('16px');
     expect(picker.style.top).toBe('136px');
-    expect(picker.style.width).toBe('260px');
+    expect(picker.style.width).toBe('288px');
 });

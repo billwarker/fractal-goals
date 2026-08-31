@@ -201,6 +201,10 @@
     margin-bottom: 12px;
 }
 
+.formRow > .fieldGroup {
+    margin-bottom: 0;
+}
+
 .fieldLabel {
     display: block;
     font-size: 13px;

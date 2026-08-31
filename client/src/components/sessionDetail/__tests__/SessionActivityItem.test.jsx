@@ -268,7 +268,7 @@ describe('SessionActivityItem metric and timer editing', () => {
             }
         );
 
-        const input = screen.getByDisplayValue('5');
+        const input = screen.getByDisplayValue('5.00');
         fireEvent.change(input, { target: { value: '5 / 0' } });
         fireEvent.blur(input);
 

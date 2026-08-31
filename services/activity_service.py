@@ -227,6 +227,10 @@ class ActivityService:
         )
         self.db_session.add(new_activity)
         self.db_session.flush() # Get ID
+
+        # Global catalog tags are options for every present and future activity.
+        from services.activity_tag_catalog_service import ActivityTagCatalogService
+        ActivityTagCatalogService(self.db_session).create_binding_for_activity(root_id, new_activity.id)
         
         # Create Metrics
         metrics_data = data.get('metrics', [])

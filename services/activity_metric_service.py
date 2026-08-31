@@ -51,6 +51,15 @@ class ActivityMetricService:
         return aggregation, None
 
     @staticmethod
+    def _resolve_precision(input_type, raw_value, fallback):
+        if input_type == 'integer':
+            return 0, None
+        precision = fallback if raw_value is None else raw_value
+        if isinstance(precision, bool) or not isinstance(precision, int) or not 0 <= precision <= 6:
+            return None, ("precision must be an integer between 0 and 6", 400)
+        return precision, None
+
+    @staticmethod
     def _numbers_equal(left, right):
         return abs(float(left) - float(right)) < 0.000001
 
@@ -162,6 +171,14 @@ class ActivityMetricService:
         input_type = data.get('input_type', 'number')
         if input_type not in ('number', 'integer', 'duration'):
             return None, "input_type must be 'number', 'integer', or 'duration'", 400
+        default_precision = 2 if input_type == 'number' else 0
+        precision, precision_error = self._resolve_precision(
+            input_type,
+            data.get('precision'),
+            default_precision,
+        )
+        if precision_error:
+            return None, *precision_error
 
         default_progress_aggregation, aggregation_error = self._validate_progress_aggregation(
             data.get('default_progress_aggregation'),
@@ -199,6 +216,7 @@ class ActivityMetricService:
             is_multiplicative=data.get('is_multiplicative', True),
             is_additive=data.get('is_additive', True),
             input_type=input_type,
+            precision=precision,
             default_value=data.get('default_value'),
             higher_is_better=data.get('higher_is_better'),
             predefined_values=data.get('predefined_values'),
@@ -259,6 +277,16 @@ class ActivityMetricService:
         next_input_type = data.get('input_type', metric.input_type)
         if next_input_type not in ('number', 'integer', 'duration'):
             return None, "input_type must be 'number', 'integer', or 'duration'", 400
+        fallback_precision = (
+            2 if next_input_type == 'number' else 0
+        ) if next_input_type != metric.input_type else metric.precision
+        next_precision, precision_error = self._resolve_precision(
+            next_input_type,
+            data.get('precision'),
+            fallback_precision,
+        )
+        if precision_error:
+            return None, *precision_error
 
         constraint_error = self._validate_metric_constraints(
             input_type=next_input_type,
@@ -289,6 +317,8 @@ class ActivityMetricService:
             metric.is_additive = data['is_additive']
         if 'input_type' in data:
             metric.input_type = next_input_type
+        if 'precision' in data or 'input_type' in data:
+            metric.precision = next_precision
         if 'default_progress_aggregation' in data:
             default_progress_aggregation, aggregation_error = self._validate_progress_aggregation(
                 data.get('default_progress_aggregation'),

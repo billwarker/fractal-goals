@@ -9,7 +9,7 @@ from models import (
     ActivityGroup,
     ActivityInstance,
     ActivitySet,
-    ActivityTag,
+    ActivityTag, ActivityTagDefinition,
     CircuitRun,
     MetricDefinition,
     MetricValue,
@@ -100,13 +100,23 @@ def test_circuit_and_round_tags_materialize_hierarchically_and_survive_new_round
     }
     assert set(competition_by_activity) == {sample_activity_definition.id, non_set.id}
     scoped_activity_tag = competition_by_activity[sample_activity_definition.id]
-    blocked_rename = authed_client.put(
-        f"/api/{sample_ultimate_goal.id}/activities/{sample_activity_definition.id}/tags/{scoped_activity_tag.id}",
-        json={"name": "Meet"},
+    renamed = authed_client.put(
+        f"/api/{sample_ultimate_goal.id}/activity-tags/{scoped_activity_tag.definition_id}",
+        json={"name": "Meet", "version": scoped_activity_tag.definition.version},
     )
-    assert blocked_rename.status_code == 409
-    blocked_archive = authed_client.delete(
-        f"/api/{sample_ultimate_goal.id}/activities/{sample_activity_definition.id}/tags/{scoped_activity_tag.id}",
+    assert renamed.status_code == 200
+    renamed_run = authed_client.get(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}"
+    ).get_json()
+    assert [tag["name"] for tag in renamed_run["tags"]] == ["Meet"]
+    restored_name = authed_client.put(
+        f"/api/{sample_ultimate_goal.id}/activity-tags/{scoped_activity_tag.definition_id}",
+        json={"name": "Competition", "version": renamed.get_json()["version"]},
+    )
+    assert restored_name.status_code == 200
+    blocked_archive = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/activity-tags/{scoped_activity_tag.definition_id}/archive",
+        json={"version": restored_name.get_json()["version"]},
     )
     assert blocked_archive.status_code == 409
     set_slot = next(slot for slot in run["slots"] if slot["has_sets"])
@@ -286,10 +296,10 @@ def test_inherited_run_scope_rejects_archived_tag_and_rolls_back_round(
 
     # Archive the setless activity's tag directly; the scope guard covers the
     # API path, so bypass it to simulate a tag archived before the scope existed.
-    archived_tag = db_session.query(ActivityTag).filter_by(
-        root_id=sample_ultimate_goal.id,
-        activity_definition_id=non_set.id,
-        name="Competition",
+    archived_tag = db_session.query(ActivityTag).join(ActivityTagDefinition).filter(
+        ActivityTag.root_id == sample_ultimate_goal.id,
+        ActivityTag.activity_definition_id == non_set.id,
+        ActivityTagDefinition.name == "Competition",
     ).one()
     archived_tag.deleted_at = datetime.now(timezone.utc)
     db_session.commit()
@@ -325,10 +335,16 @@ def test_circuit_scope_tags_validate_ownership_archives_and_round_membership(
         f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
         json={"circuit_definition_id": definition["id"], "section_index": 0},
     ).get_json()
+    archived_definition = ActivityTagDefinition(
+        root_id=sample_ultimate_goal.id,
+        name="Archived",
+        scope="selected",
+        deleted_at=datetime.now(timezone.utc),
+    )
     archived = ActivityTag(
         root_id=sample_ultimate_goal.id,
         activity_definition_id=sample_activity_definition.id,
-        name="Archived",
+        definition=archived_definition,
         deleted_at=datetime.now(timezone.utc),
     )
     db_session.add(archived)

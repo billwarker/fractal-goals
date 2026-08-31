@@ -141,6 +141,7 @@ def serialize_fractal_metric(metric):
         "is_multiplicative": metric.is_multiplicative,
         "is_additive": metric.is_additive,
         "input_type": metric.input_type,
+        "precision": metric.precision,
         "default_value": metric.default_value,
         "higher_is_better": metric.higher_is_better,
         "predefined_values": metric.predefined_values,
@@ -981,7 +982,7 @@ def serialize_activity_definition(activity):
         "tags": [
             serialize_activity_tag(tag)
             for tag in (getattr(activity, 'tags', None) or [])
-            if tag.deleted_at is None
+            if tag.deleted_at is None and not tag.catalog_archived
         ],
         "created_at": format_utc(activity.created_at),
         "metric_definitions": [serialize_metric_definition(m) for m in activity.metric_definitions if not m.deleted_at],
@@ -1010,6 +1011,7 @@ def serialize_metric_definition(metric):
         # Extra fields from fractal metric (None when not linked)
         "is_additive": fm.is_additive if fm else None,
         "input_type": fm.input_type if fm else "number",
+        "precision": fm.precision if fm else 2,
         "default_value": fm.default_value if fm else None,
         "higher_is_better": fm.higher_is_better if fm else None,
         "default_progress_aggregation": fm.default_progress_aggregation if fm else None,

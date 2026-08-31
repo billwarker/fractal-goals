@@ -1,12 +1,10 @@
 from flask import Blueprint, request, jsonify
 import logging
 from time import perf_counter
-import models
 from pydantic import ValidationError
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import SQLAlchemyError
 from models import (
-    get_session,
     ActivityDefinition,
     MetricDefinition,
 )
@@ -17,7 +15,9 @@ from validators import (
     ActivityGoalsSetSchema,
     GoalAssociationBatchSchema, GroupReorderSchema,
     FractalMetricCreateSchema, FractalMetricUpdateSchema,
-    ActivityTagCreateSchema, ActivityTagUpdateSchema, ActivityTagAssignmentSchema,
+    ActivityTagAssignmentSchema,
+    ActivityTagCatalogCreateSchema, ActivityTagCatalogUpdateSchema,
+    ActivityTagVersionSchema, ActivityTagHardDeleteSchema, ActivityTagMergeSchema,
     ActivityProgressViewCreateSchema, ActivityProgressViewUpdateSchema,
     ActivityProgressViewActivateSchema, ActivityProgressQuerySchema,
 )
@@ -35,6 +35,7 @@ from services.activity_service import (
 )
 from services.progress_service import ProgressService
 from services.activity_progress_view_service import ActivityProgressViewService
+from services.activity_tag_catalog_service import ActivityTagCatalogService
 from services.ops_log import log_ops_event
 
 logger = logging.getLogger(__name__)
@@ -112,64 +113,117 @@ def _service_response(payload, error, status):
 # ACTIVITY TAGS AND SAVED PROGRESS VIEWS
 # ============================================================================
 
-@activities_bp.route('/<root_id>/activities/<activity_id>/tags', methods=['GET'])
+@activities_bp.route('/<root_id>/activity-tags', methods=['GET'])
 @token_required
-def list_activity_tags(current_user, root_id, activity_id):
+def list_activity_tag_catalog(current_user, root_id):
     session = get_db_session()
     try:
         include_archived = request.args.get('include_archived', 'true').lower() != 'false'
-        return _service_response(*ActivityProgressViewService(session).list_tags(
-            root_id, activity_id, current_user.id, include_archived=include_archived
+        return _service_response(*ActivityTagCatalogService(session).list_catalog(
+            root_id, current_user.id, include_archived=include_archived,
         ))
     finally:
         session.close()
 
 
-@activities_bp.route('/<root_id>/activities/<activity_id>/tags', methods=['POST'])
+@activities_bp.route('/<root_id>/activity-tags', methods=['POST'])
 @token_required
-@validate_request(ActivityTagCreateSchema)
-def create_activity_tag(current_user, root_id, activity_id, validated_data):
+@validate_request(ActivityTagCatalogCreateSchema)
+def create_activity_tag_catalog_item(current_user, root_id, validated_data):
     session = get_db_session()
     try:
-        return _service_response(*ActivityProgressViewService(session).create_tag(
-            root_id, activity_id, current_user.id, validated_data
+        return _service_response(*ActivityTagCatalogService(session).create(
+            root_id, current_user.id, validated_data,
         ))
     finally:
         session.close()
 
 
-@activities_bp.route('/<root_id>/activities/<activity_id>/tags/<tag_id>', methods=['PUT'])
+@activities_bp.route('/<root_id>/activity-tags/<definition_id>', methods=['PUT'])
 @token_required
-@validate_request(ActivityTagUpdateSchema)
-def update_activity_tag(current_user, root_id, activity_id, tag_id, validated_data):
+@validate_request(ActivityTagCatalogUpdateSchema)
+def update_activity_tag_catalog_item(current_user, root_id, definition_id, validated_data):
     session = get_db_session()
     try:
-        return _service_response(*ActivityProgressViewService(session).update_tag(
-            root_id, activity_id, tag_id, current_user.id, validated_data
+        return _service_response(*ActivityTagCatalogService(session).update(
+            root_id, definition_id, current_user.id, validated_data,
         ))
     finally:
         session.close()
 
 
-@activities_bp.route('/<root_id>/activities/<activity_id>/tags/<tag_id>', methods=['DELETE'])
+@activities_bp.route('/<root_id>/activity-tags/<definition_id>/archive', methods=['POST'])
 @token_required
-def archive_activity_tag(current_user, root_id, activity_id, tag_id):
+@validate_request(ActivityTagVersionSchema)
+def archive_activity_tag_catalog_item(current_user, root_id, definition_id, validated_data):
     session = get_db_session()
     try:
-        return _service_response(*ActivityProgressViewService(session).archive_tag(
-            root_id, activity_id, tag_id, current_user.id
+        return _service_response(*ActivityTagCatalogService(session).archive(
+            root_id, definition_id, current_user.id, validated_data['version'],
         ))
     finally:
         session.close()
 
 
-@activities_bp.route('/<root_id>/activities/<activity_id>/tags/<tag_id>/restore', methods=['POST'])
+@activities_bp.route('/<root_id>/activity-tags/<definition_id>/restore', methods=['POST'])
 @token_required
-def restore_activity_tag(current_user, root_id, activity_id, tag_id):
+@validate_request(ActivityTagVersionSchema)
+def restore_activity_tag_catalog_item(current_user, root_id, definition_id, validated_data):
     session = get_db_session()
     try:
-        return _service_response(*ActivityProgressViewService(session).restore_tag(
-            root_id, activity_id, tag_id, current_user.id
+        return _service_response(*ActivityTagCatalogService(session).restore(
+            root_id, definition_id, current_user.id, validated_data['version'],
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activity-tags/<definition_id>/impact', methods=['GET'])
+@token_required
+def activity_tag_catalog_impact(current_user, root_id, definition_id):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityTagCatalogService(session).impact(
+            root_id, definition_id, current_user.id,
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activity-tags/<definition_id>/hard-delete', methods=['POST'])
+@token_required
+@validate_request(ActivityTagHardDeleteSchema)
+def hard_delete_activity_tag_catalog_item(current_user, root_id, definition_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityTagCatalogService(session).hard_delete(
+            root_id, definition_id, current_user.id, validated_data,
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activity-tags/merge', methods=['POST'])
+@token_required
+@validate_request(ActivityTagMergeSchema)
+def merge_activity_tag_catalog_items(current_user, root_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityTagCatalogService(session).merge(
+            root_id, current_user.id, validated_data,
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activity-tags/merge-preview', methods=['POST'])
+@token_required
+@validate_request(ActivityTagMergeSchema)
+def preview_activity_tag_catalog_merge(current_user, root_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityTagCatalogService(session).preview_merge(
+            root_id, current_user.id, validated_data,
         ))
     finally:
         session.close()
@@ -536,7 +590,7 @@ def get_activities(current_user, root_id):
     try:
         root = require_owned_root(session, root_id, current_user.id)
         if not root:
-             return jsonify({"error": "Fractal not found or access denied"}), 404
+            return jsonify({"error": "Fractal not found or access denied"}), 404
         
         activities_q = session.query(ActivityDefinition).options(
             selectinload(ActivityDefinition.metric_definitions).selectinload(MetricDefinition.fractal_metric),

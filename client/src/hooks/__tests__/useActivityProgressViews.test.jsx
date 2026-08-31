@@ -1,14 +1,16 @@
 import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import { useActivityTagMutations } from '../useActivityProgressViews';
+import { useActivityTagCatalogMutations, useActivityTagMutations } from '../useActivityProgressViews';
 import { queryKeys } from '../queryKeys';
 
 const replaceActivityInstanceTags = vi.fn();
+const mergeActivityTagCatalogItems = vi.fn();
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
         replaceActivityInstanceTags: (...args) => replaceActivityInstanceTags(...args),
+        mergeActivityTagCatalogItems: (...args) => mergeActivityTagCatalogItems(...args),
     },
 }));
 
@@ -48,11 +50,47 @@ describe('useActivityTagMutations', () => {
             queryKey: queryKeys.sessionActivitiesRoot('root-1'),
         });
         expect(invalidateSpy).toHaveBeenCalledWith({
-            queryKey: queryKeys.activityTags('root-1', 'activity-1'),
+            queryKey: queryKeys.activityTagCatalog('root-1'),
         });
         expect(invalidateSpy).toHaveBeenCalledWith({
             queryKey: queryKeys.activityProgressTimelineRoot('root-1', 'activity-1'),
             refetchType: 'all',
+        });
+    });
+});
+
+describe('useActivityTagCatalogMutations', () => {
+    it('removes merged sources from every catalog cache before refetching', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            },
+        });
+        const catalogKey = [...queryKeys.activityTagCatalog('root-1'), { includeArchived: true }];
+        queryClient.setQueryData(catalogKey, {
+            tags: [
+                { id: 'target', name: 'Rehab', normalized_name: 'rehab', archived: false },
+                { id: 'source', name: 'rehab', normalized_name: 'rehab', archived: false },
+            ],
+            duplicate_groups: [{ normalized_name: 'rehab', definition_ids: ['target', 'source'] }],
+        });
+        const merged = {
+            id: 'target', name: 'Rehab', normalized_name: 'rehab', archived: false, version: 2,
+        };
+        mergeActivityTagCatalogItems.mockResolvedValueOnce({ data: merged });
+        const { result } = renderHook(
+            () => useActivityTagCatalogMutations('root-1'),
+            { wrapper: createWrapper(queryClient) },
+        );
+
+        await act(() => result.current.mergeTags({
+            target_id: 'target', source_ids: ['source'], versions: { target: 1, source: 1 },
+        }));
+
+        expect(queryClient.getQueryData(catalogKey)).toEqual({
+            tags: [merged],
+            duplicate_groups: [],
         });
     });
 });

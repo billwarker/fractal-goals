@@ -239,6 +239,12 @@ class CircuitScopeTag(Base):
         nullable=True,
         index=True,
     )
+    activity_tag_definition_id = Column(
+        String,
+        ForeignKey("activity_tag_definitions.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     name = Column(String, nullable=False)
     color = Column(String(7), nullable=True)
     sort_order = Column(Integer, nullable=False, default=0, server_default="0")
@@ -254,6 +260,7 @@ class CircuitScopeTag(Base):
 
     run = relationship("CircuitRun", back_populates="scope_tags")
     round = relationship("CircuitRound", back_populates="scope_tags")
+    activity_tag_definition = relationship("ActivityTagDefinition")
 
     __table_args__ = (
         Index(

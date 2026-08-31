@@ -5,6 +5,18 @@ import pytest
 from models import ActivityDefinition, ActivitySet, MetricValue
 
 
+def _create_tag(client, root_id, activity_id, name, **extra):
+    response = client.post(
+        f'/api/{root_id}/activity-tags',
+        json={'name': name, 'scope': 'selected', 'activity_ids': [activity_id], **extra},
+    )
+    if response.status_code != 201:
+        return response, None
+    definition = response.get_json()
+    binding = next(row for row in definition['bindings'] if row['activity_definition_id'] == activity_id)
+    return response, binding
+
+
 @pytest.mark.integration
 def test_saved_progress_view_lifecycle_and_non_mutating_preview(
     authed_client,
@@ -14,17 +26,10 @@ def test_saved_progress_view_lifecycle_and_non_mutating_preview(
 ):
     root_id = sample_activity_definition.root_id
     activity_id = sample_activity_definition.id
-    tag_response = authed_client.post(
-        f'/api/{root_id}/activities/{activity_id}/tags',
-        json={'name': 'Competition', 'color': '#3366AA'},
-    )
+    tag_response, tag = _create_tag(authed_client, root_id, activity_id, 'Competition', color='#3366AA')
     assert tag_response.status_code == 201
-    tag = tag_response.get_json()
 
-    duplicate = authed_client.post(
-        f'/api/{root_id}/activities/{activity_id}/tags',
-        json={'name': 'competition'},
-    )
+    duplicate, _ = _create_tag(authed_client, root_id, activity_id, 'competition')
     assert duplicate.status_code == 409
 
     other_activity = ActivityDefinition(
@@ -36,10 +41,7 @@ def test_saved_progress_view_lifecycle_and_non_mutating_preview(
     )
     db_session.add(other_activity)
     db_session.commit()
-    other_tag = authed_client.post(
-        f'/api/{root_id}/activities/{other_activity.id}/tags',
-        json={'name': 'Other cohort'},
-    ).get_json()
+    _, other_tag = _create_tag(authed_client, root_id, other_activity.id, 'Other cohort')
     cross_activity_view = authed_client.post(
         f'/api/{root_id}/activities/{activity_id}/progress-views',
         json={'name': 'Invalid view', 'config': {'any_tag_ids': [other_tag['id']]}},
@@ -112,7 +114,9 @@ def test_saved_progress_view_lifecycle_and_non_mutating_preview(
     assert conflict.status_code == 409
     assert conflict.get_json()['details']['current']['name'] == 'Meet prep'
 
-    archived = authed_client.delete(f'/api/{root_id}/activities/{activity_id}/tags/{tag["id"]}')
+    archived = authed_client.post(
+        f'/api/{root_id}/activity-tags/{tag["definition_id"]}/archive', json={'version': tag['version']},
+    )
     assert archived.status_code == 200
     retained = authed_client.get(f'/api/{root_id}/activities/{activity_id}/progress-timeline')
     assert retained.get_json()['items'][0]['included'] is True
@@ -165,10 +169,7 @@ def test_set_tag_filter_uses_only_matching_sets_and_preserves_source_index(
     ])
     db_session.commit()
 
-    tag = authed_client.post(
-        f'/api/{root_id}/activities/{activity_id}/tags',
-        json={'name': 'Heavy'},
-    ).get_json()
+    _, tag = _create_tag(authed_client, root_id, activity_id, 'Heavy')
     assigned = authed_client.put(
         f'/api/{root_id}/activity-sets/{sets[1].id}/tags',
         json={'tag_ids': [tag['id']]},
@@ -198,12 +199,9 @@ def test_multiple_saved_views_config_round_trip_activation_and_assignment_versio
     activity_id = sample_activity_definition.id
     tags = []
     for name in ('Competition', 'Heavy'):
-        response = authed_client.post(
-            f'/api/{root_id}/activities/{activity_id}/tags',
-            json={'name': name},
-        )
+        response, binding = _create_tag(authed_client, root_id, activity_id, name)
         assert response.status_code == 201
-        tags.append(response.get_json())
+        tags.append(binding)
 
     assigned = authed_client.put(
         f'/api/{root_id}/activity-instances/{sample_activity_instance.id}/tags',
@@ -273,15 +271,15 @@ def test_multiple_saved_views_config_round_trip_activation_and_assignment_versio
     )
     assert overlap.status_code == 400
 
-    archived = authed_client.delete(f'/api/{root_id}/activities/{activity_id}/tags/{tags[0]["id"]}')
-    assert archived.status_code == 200
-    duplicate_archived_name = authed_client.post(
-        f'/api/{root_id}/activities/{activity_id}/tags',
-        json={'name': 'competition'},
+    archived = authed_client.post(
+        f'/api/{root_id}/activity-tags/{tags[0]["definition_id"]}/archive', json={'version': tags[0]['version']},
     )
+    assert archived.status_code == 200
+    duplicate_archived_name, _ = _create_tag(authed_client, root_id, activity_id, 'competition')
     assert duplicate_archived_name.status_code == 409
     restored = authed_client.post(
-        f'/api/{root_id}/activities/{activity_id}/tags/{tags[0]["id"]}/restore'
+        f'/api/{root_id}/activity-tags/{tags[0]["definition_id"]}/restore',
+        json={'version': archived.get_json()['version']},
     )
     assert restored.status_code == 200
     assert restored.get_json()['archived'] is False

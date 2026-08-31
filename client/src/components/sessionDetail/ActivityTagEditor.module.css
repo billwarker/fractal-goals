@@ -48,7 +48,7 @@
     content: attr(data-tag-label);
 }
 
-.tag {
+.choice {
     padding: 2px 7px;
     border: 1px solid var(--tag-color, var(--color-border));
     border-radius: 999px;
@@ -58,7 +58,7 @@
     cursor: pointer;
 }
 
-.tag input {
+.choice input {
     position: absolute;
     opacity: 0;
     pointer-events: none;
@@ -93,7 +93,7 @@
 .picker {
     position: fixed;
     z-index: var(--z-dropdown);
-    width: min(260px, calc(100vw - 32px));
+    width: min(380px, calc(100vw - 32px));
     padding: 8px;
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius-md);
@@ -146,6 +146,27 @@
     padding: 2px 0 8px;
 }
 
+.pickerGroup {
+    display: grid;
+    gap: 2px;
+}
+
+.pickerGroup + .pickerGroup {
+    margin-top: 7px;
+    padding-top: 7px;
+    border-top: 1px solid var(--color-border);
+}
+
+.pickerGroup h4 {
+    margin: 0;
+    padding: 0 7px 2px;
+    color: var(--color-text-muted);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
 .pickerSearch {
     width: 100%;
     min-height: 32px;
@@ -175,6 +196,48 @@
     color: var(--color-text-secondary);
     cursor: pointer;
     font-size: 12px;
+}
+
+.pickerOptionRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 4px;
+}
+
+.pickerOptionRow:hover,
+.pickerOptionRow:focus-within {
+    background: var(--color-bg-card-hover);
+}
+
+.pickerOptionRow .pickerOption {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.optionActions {
+    display: flex;
+    gap: 4px;
+    padding-right: 5px;
+    opacity: 0;
+}
+
+.pickerOptionRow:hover .optionActions,
+.pickerOptionRow:focus-within .optionActions {
+    opacity: 1;
+}
+
+.optionActions button {
+    padding: 2px;
+    border: 0;
+    background: transparent;
+    color: var(--color-brand-primary);
+    cursor: pointer;
+    font-size: 10px;
+}
+
+.optionActions button:last-child {
+    color: var(--color-brand-danger);
 }
 
 .pickerOption:hover,
@@ -236,7 +299,52 @@
     cursor: pointer;
 }
 
-.tag:focus-within {
+.createScope {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 2px 1px;
+    color: var(--color-text-muted);
+    font-size: 11px;
+}
+
+.inlineManager {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px;
+    gap: 7px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    font-size: 11px;
+}
+
+.inlineManager strong,
+.inlineManager span,
+.inlineManager div {
+    grid-column: 1 / -1;
+}
+
+.inlineManager input {
+    min-width: 0;
+    min-height: 32px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    padding: 5px 7px;
+}
+
+.inlineManager input[type='color'] {
+    padding: 2px;
+}
+
+.inlineManager div {
+    display: flex;
+    gap: 6px;
+}
+
+.choice:focus-within {
     outline: 2px solid var(--color-focus-ring, var(--color-brand-primary));
     outline-offset: 1px;
 }

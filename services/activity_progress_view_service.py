@@ -8,6 +8,7 @@ from models import (
     ActivityProgressView,
     ActivitySet,
     ActivityTag,
+    ActivityTagDefinition,
     CircuitRound,
     CircuitRoundMember,
     CircuitRun,
@@ -20,6 +21,7 @@ from services.owned_entity_queries import get_owned_activity_definition, get_own
 from services.quota_service import QuotaService
 from services.events import Event, Events, event_bus
 from services.ops_log import log_ops_event
+from services.activity_tag_catalog_service import ActivityTagCatalogService
 
 
 EMPTY_PROGRESS_VIEW_CONFIG = {
@@ -40,17 +42,7 @@ def normalize_progress_view_config(raw_config) -> dict:
 
 
 def serialize_activity_tag(tag: ActivityTag) -> dict:
-    return {
-        "id": tag.id,
-        "root_id": tag.root_id,
-        "activity_definition_id": tag.activity_definition_id,
-        "name": tag.name,
-        "color": tag.color,
-        "sort_order": tag.sort_order,
-        "archived": tag.deleted_at is not None,
-        "created_at": tag.created_at.isoformat() if tag.created_at else None,
-        "updated_at": tag.updated_at.isoformat() if tag.updated_at else None,
-    }
+    return ActivityTagCatalogService.serialize_binding(tag)
 
 
 def serialize_progress_view(view: ActivityProgressView) -> dict:
@@ -96,15 +88,6 @@ class ActivityProgressViewService:
         new_size = quota.payload_size(*new_values)
         return quota.check_storage_available(user_id, max(0, new_size - old_size))
 
-    def _circuit_scope_uses_tag(self, tag):
-        return self.db.query(CircuitScopeTag.id).join(
-            CircuitRunSlot,
-            CircuitRunSlot.circuit_run_id == CircuitScopeTag.circuit_run_id,
-        ).filter(
-            CircuitRunSlot.activity_definition_id == tag.activity_definition_id,
-            func.lower(CircuitScopeTag.name) == tag.name.lower(),
-        ).first() is not None
-
     def _validate_config_tags(self, activity, config, *, include_archived=True):
         normalized = normalize_progress_view_config(config)
         tag_ids = {
@@ -120,160 +103,26 @@ class ActivityProgressViewService:
             ActivityTag.activity_definition_id == activity.id,
         )
         if not include_archived:
-            query = query.filter(ActivityTag.deleted_at.is_(None))
+            query = query.join(ActivityTagDefinition).filter(
+                ActivityTag.deleted_at.is_(None),
+                ActivityTagDefinition.deleted_at.is_(None),
+            )
         found = {row[0] for row in query.all()}
         if found != tag_ids:
             return None, "Progress view contains tags that do not belong to this activity"
         return normalized, None
-
-    def list_tags(self, root_id, activity_id, user_id, *, include_archived=True):
-        activity = self._activity(root_id, activity_id, user_id)
-        if not activity:
-            return None, "Activity not found", 404
-        query = self.db.query(ActivityTag).filter(
-            ActivityTag.activity_definition_id == activity.id,
-            ActivityTag.root_id == root_id,
-        )
-        if not include_archived:
-            query = query.filter(ActivityTag.deleted_at.is_(None))
-        rows = query.order_by(ActivityTag.deleted_at.asc(), ActivityTag.sort_order, ActivityTag.name).all()
-        return [serialize_activity_tag(row) for row in rows], None, 200
-
-    def create_tag(self, root_id, activity_id, user_id, data):
-        activity = self._activity(root_id, activity_id, user_id)
-        if not activity:
-            return None, "Activity not found", 404
-        _, error, status = self._storage_check(user_id, data.get("name"), data.get("color"))
-        if error:
-            return None, error, status
-        name = data["name"].strip()
-        existing = self.db.query(ActivityTag).filter(
-            ActivityTag.activity_definition_id == activity.id,
-            func.lower(ActivityTag.name) == name.lower(),
-        ).first()
-        if existing:
-            suffix = "; restore the archived tag instead" if existing.deleted_at is not None else ""
-            return None, f"A tag with this name already exists for this activity{suffix}", 409
-        sort_order = data.get("sort_order")
-        if sort_order is None:
-            maximum = self.db.query(func.max(ActivityTag.sort_order)).filter(
-                ActivityTag.activity_definition_id == activity.id,
-                ActivityTag.deleted_at.is_(None),
-            ).scalar()
-            sort_order = (maximum if maximum is not None else -1) + 1
-        tag = ActivityTag(
-            root_id=root_id,
-            activity_definition_id=activity.id,
-            name=name,
-            color=data.get("color"),
-            sort_order=sort_order,
-        )
-        self.db.add(tag)
-        try:
-            self.db.commit()
-        except IntegrityError:
-            self.db.rollback()
-            return None, "A tag with this name already exists for this activity", 409
-        self._emit(Events.ACTIVITY_TAG_CREATED, root_id=root_id, activity_id=activity.id, activity_tag_id=tag.id, name=tag.name)
-        return serialize_activity_tag(tag), None, 201
-
-    def update_tag(self, root_id, activity_id, tag_id, user_id, data):
-        activity = self._activity(root_id, activity_id, user_id)
-        if not activity:
-            return None, "Activity not found", 404
-        tag = self.db.query(ActivityTag).filter(
-            ActivityTag.id == tag_id,
-            ActivityTag.activity_definition_id == activity.id,
-            ActivityTag.deleted_at.is_(None),
-        ).first()
-        if not tag:
-            return None, "Tag not found", 404
-        next_name = data.get("name") if data.get("name") is not None else tag.name
-        next_color = data.get("color") if "color" in data else tag.color
-        _, quota_error, quota_status = self._storage_delta_check(
-            user_id, (tag.name, tag.color), (next_name, next_color),
-        )
-        if quota_error:
-            return None, quota_error, quota_status
-        if "name" in data and data["name"] is not None:
-            name = data["name"].strip()
-            if name != tag.name and self._circuit_scope_uses_tag(tag):
-                return None, "Tags used by a circuit or round scope cannot be renamed", 409
-            conflict = self.db.query(ActivityTag.id).filter(
-                ActivityTag.activity_definition_id == activity.id,
-                ActivityTag.id != tag.id,
-                func.lower(ActivityTag.name) == name.lower(),
-            ).first()
-            if conflict:
-                return None, "A tag with this name already exists for this activity", 409
-            tag.name = name
-        for field in ("color", "sort_order"):
-            if field in data:
-                setattr(tag, field, data[field])
-        try:
-            self.db.commit()
-        except IntegrityError:
-            self.db.rollback()
-            return None, "A tag with this name already exists for this activity", 409
-        self._emit(Events.ACTIVITY_TAG_UPDATED, root_id=root_id, activity_id=activity.id, activity_tag_id=tag.id, name=tag.name)
-        return serialize_activity_tag(tag), None, 200
-
-    def archive_tag(self, root_id, activity_id, tag_id, user_id):
-        activity = self._activity(root_id, activity_id, user_id)
-        if not activity:
-            return None, "Activity not found", 404
-        tag = self.db.query(ActivityTag).filter(
-            ActivityTag.id == tag_id,
-            ActivityTag.activity_definition_id == activity.id,
-            ActivityTag.deleted_at.is_(None),
-        ).first()
-        if not tag:
-            return None, "Tag not found", 404
-        if self._circuit_scope_uses_tag(tag):
-            return None, "Tags used by a circuit or round scope cannot be archived", 409
-        tag.deleted_at = utc_now()
-        self.db.commit()
-        self._emit(Events.ACTIVITY_TAG_ARCHIVED, root_id=root_id, activity_id=activity.id, activity_tag_id=tag.id, name=tag.name)
-        return {"message": "Tag archived", "id": tag.id}, None, 200
-
-    def restore_tag(self, root_id, activity_id, tag_id, user_id):
-        activity = self._activity(root_id, activity_id, user_id)
-        if not activity:
-            return None, "Activity not found", 404
-        tag = self.db.query(ActivityTag).filter(
-            ActivityTag.id == tag_id,
-            ActivityTag.activity_definition_id == activity.id,
-            ActivityTag.deleted_at.is_not(None),
-        ).first()
-        if not tag:
-            return None, "Archived tag not found", 404
-        conflict = self.db.query(ActivityTag.id).filter(
-            ActivityTag.activity_definition_id == activity.id,
-            ActivityTag.id != tag.id,
-            func.lower(ActivityTag.name) == tag.name.lower(),
-            ActivityTag.deleted_at.is_(None),
-        ).first()
-        if conflict:
-            return None, "An active tag with this name already exists", 409
-        _, quota_error, quota_status = self._storage_check(user_id, tag.name, tag.color)
-        if quota_error:
-            return None, quota_error, quota_status
-        tag.deleted_at = None
-        tag.updated_at = utc_now()
-        self.db.commit()
-        self._emit(Events.ACTIVITY_TAG_RESTORED, root_id=root_id, activity_id=activity.id, activity_tag_id=tag.id, name=tag.name)
-        return serialize_activity_tag(tag), None, 200
 
     def _assignable_tags(self, activity, tag_ids, *, retained_archived_ids=()):
         normalized = list(dict.fromkeys(tag_ids or []))
         if not normalized:
             return [], None
         retained = set(retained_archived_ids)
-        tags = self.db.query(ActivityTag).filter(
+        tags = self.db.query(ActivityTag).join(ActivityTagDefinition).filter(
             ActivityTag.id.in_(normalized),
             ActivityTag.root_id == activity.root_id,
             ActivityTag.activity_definition_id == activity.id,
-            (ActivityTag.deleted_at.is_(None)) | (ActivityTag.id.in_(retained)),
+            ((ActivityTag.deleted_at.is_(None)) & (ActivityTagDefinition.deleted_at.is_(None)))
+            | (ActivityTag.id.in_(retained)),
         ).all()
         if {tag.id for tag in tags} != set(normalized):
             return None, "One or more tags are unavailable for this activity"
@@ -319,9 +168,9 @@ class ActivityProgressViewService:
             return set()
         return {
             tag_id
-            for (tag_id,) in self.db.query(ActivityTag.id).filter(
+            for (tag_id,) in self.db.query(ActivityTag.id).join(ActivityTagDefinition).filter(
                 ActivityTag.activity_definition_id == activity_definition_id,
-                func.lower(ActivityTag.name).in_(normalized_names),
+                func.lower(ActivityTagDefinition.name).in_(normalized_names),
             ).all()
         }
 
@@ -366,7 +215,7 @@ class ActivityProgressViewService:
         tags, error = self._assignable_tags(
             instance.definition,
             tag_ids,
-            retained_archived_ids={tag.id for tag in instance.tags if tag.deleted_at is not None},
+            retained_archived_ids={tag.id for tag in instance.tags if tag.deleted_at is not None or tag.catalog_archived},
         )
         if error:
             return None, error, 400
@@ -417,7 +266,7 @@ class ActivityProgressViewService:
         tags, error = self._assignable_tags(
             activity_set.activity_instance.definition,
             tag_ids,
-            retained_archived_ids={tag.id for tag in activity_set.tags if tag.deleted_at is not None},
+            retained_archived_ids={tag.id for tag in activity_set.tags if tag.deleted_at is not None or tag.catalog_archived},
         )
         if error:
             return None, error, 400

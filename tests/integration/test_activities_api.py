@@ -212,6 +212,51 @@ class TestActivityGroups:
 class TestFractalMetricEndpoints:
     """Test fractal metric configuration validation."""
 
+    def test_metric_precision_defaults_and_updates_by_input_type(self, authed_client, sample_ultimate_goal):
+        root_id = sample_ultimate_goal.id
+        decimal = authed_client.post(
+            f'/api/{root_id}/fractal-metrics',
+            json={'name': 'Load', 'unit': 'kg', 'input_type': 'number'},
+        )
+        assert decimal.status_code == 201
+        assert decimal.get_json()['precision'] == 2
+
+        created = authed_client.post(
+            f'/api/{root_id}/fractal-metrics',
+            json={'name': 'Pace', 'unit': 'seconds', 'input_type': 'duration'},
+        )
+
+        assert created.status_code == 201
+        metric = created.get_json()
+        assert metric['precision'] == 0
+
+        updated = authed_client.put(
+            f"/api/{root_id}/fractal-metrics/{metric['id']}",
+            json={'input_type': 'duration', 'precision': 3},
+        )
+        assert updated.status_code == 200
+        assert updated.get_json()['precision'] == 3
+
+        integer = authed_client.put(
+            f"/api/{root_id}/fractal-metrics/{metric['id']}",
+            json={'input_type': 'integer', 'precision': 4},
+        )
+        assert integer.status_code == 200
+        assert integer.get_json()['precision'] == 0
+
+    def test_metric_precision_rejects_values_outside_supported_range(
+        self,
+        authed_client,
+        sample_ultimate_goal,
+    ):
+        response = authed_client.post(
+            f'/api/{sample_ultimate_goal.id}/fractal-metrics',
+            json={'name': 'Too precise', 'unit': 'score', 'precision': 7},
+        )
+
+        assert response.status_code == 400
+        assert response.get_json()['error'] == 'Validation failed'
+
     def test_create_metric_rejects_conflicting_constraints(self, authed_client, sample_ultimate_goal):
         root_id = sample_ultimate_goal.id
 

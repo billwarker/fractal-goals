@@ -1346,9 +1346,15 @@ class ProgressService:
             payload["included"] = comparison is not None and comparison.get("included", True)
             items.append(payload)
 
-        tags = self.db.query(ActivityTag).filter(
+        from models import ActivityTagDefinition
+        tags = self.db.query(ActivityTag).join(ActivityTagDefinition).filter(
             ActivityTag.activity_definition_id == activity.id,
-        ).order_by(ActivityTag.deleted_at.asc(), ActivityTag.sort_order, ActivityTag.name).all()
+        ).order_by(
+            ActivityTagDefinition.deleted_at.asc(),
+            ActivityTag.deleted_at.asc(),
+            ActivityTagDefinition.sort_order,
+            ActivityTagDefinition.name,
+        ).all()
         views = self.db.query(ActivityProgressView).filter(
             ActivityProgressView.activity_definition_id == activity.id,
             ActivityProgressView.deleted_at.is_(None),

@@ -15,6 +15,7 @@ class FractalMetricDefinition(Base):
     is_multiplicative = Column(Boolean, default=True, nullable=False, server_default=sa.text('true'))
     is_additive = Column(Boolean, default=True, nullable=False, server_default=sa.text('true'))
     input_type = Column(String, default='number', nullable=False, server_default='number')  # 'number' | 'integer' | 'duration'
+    precision = Column(Integer, default=2, nullable=False, server_default='2')
     default_value = Column(Float, nullable=True)
     higher_is_better = Column(Boolean, nullable=True)
     predefined_values = Column(JSON_TYPE, nullable=True)
@@ -27,6 +28,10 @@ class FractalMetricDefinition(Base):
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        sa.CheckConstraint('precision >= 0 AND precision <= 6', name='ck_fractal_metric_precision'),
+    )
 
 class ActivityGroup(Base):
     __tablename__ = 'activity_groups'
@@ -150,7 +155,56 @@ class SplitDefinition(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
 
+class ActivityTagDefinition(Base):
+    """Fractal-owned canonical identity for one logical activity tag."""
+
+    __tablename__ = 'activity_tag_definitions'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    color = Column(String(7), nullable=True)
+    scope = Column(String(16), nullable=False, default='selected', server_default='selected')
+    sort_order = Column(Integer, nullable=False, default=0, server_default='0')
+    version = Column(Integer, nullable=False, default=1, server_default='1')
+    created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
+    deleted_at = Column(DateTime, nullable=True)
+
+    bindings = relationship(
+        "ActivityTag",
+        back_populates="definition",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        sa.Index(
+            'uq_activity_tag_definitions_global_name',
+            'root_id',
+            sa.text("regexp_replace(lower(btrim(name)), '\\s+', ' ', 'g')"),
+            unique=True,
+            postgresql_where=sa.text("deleted_at IS NULL AND scope = 'global'"),
+        ),
+        sa.Index(
+            'ix_activity_tag_definitions_root_active_order',
+            'root_id',
+            'sort_order',
+            'name',
+            postgresql_where=sa.text('deleted_at IS NULL'),
+        ),
+        sa.CheckConstraint("scope IN ('selected', 'global')", name='ck_activity_tag_definitions_scope'),
+        sa.CheckConstraint('sort_order >= 0', name='ck_activity_tag_definitions_sort_order_nonnegative'),
+        sa.CheckConstraint('version > 0', name='ck_activity_tag_definitions_version_positive'),
+        sa.CheckConstraint(
+            "color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$'",
+            name='ck_activity_tag_definitions_color',
+        ),
+    )
+
+
 class ActivityTag(Base):
+    """Per-activity binding used by historical and live tag assignments."""
+
     __tablename__ = 'activity_tags'
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -161,33 +215,46 @@ class ActivityTag(Base):
         nullable=False,
         index=True,
     )
-    name = Column(String, nullable=False)
-    color = Column(String(7), nullable=True)
-    sort_order = Column(Integer, nullable=False, default=0, server_default='0')
+    definition_id = Column(
+        String,
+        ForeignKey('activity_tag_definitions.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
     created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
     deleted_at = Column(DateTime, nullable=True)
 
     activity_definition = relationship("ActivityDefinition", back_populates="tags")
+    definition = relationship("ActivityTagDefinition", back_populates="bindings", lazy="joined")
+
+    @property
+    def name(self):
+        return self.definition.name
+
+    @property
+    def color(self):
+        return self.definition.color
+
+    @property
+    def sort_order(self):
+        return self.definition.sort_order
+
+    @property
+    def catalog_archived(self):
+        return self.definition.deleted_at is not None
 
     __table_args__ = (
-        sa.Index(
-            'uq_activity_tags_active_name',
+        sa.UniqueConstraint(
             'activity_definition_id',
-            sa.func.lower(name),
-            unique=True,
-            postgresql_where=sa.text('deleted_at IS NULL'),
+            'definition_id',
+            name='uq_activity_tags_activity_definition',
         ),
         sa.Index(
-            'ix_activity_tags_activity_order_active',
+            'ix_activity_tags_activity_active',
             'activity_definition_id',
-            'sort_order',
-            'name',
+            'definition_id',
             postgresql_where=sa.text('deleted_at IS NULL'),
-        ),
-        sa.CheckConstraint(
-            "color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$'",
-            name='ck_activity_tags_color',
         ),
     )
 
@@ -307,7 +374,6 @@ class ActivityInstance(Base):
         "ActivityTag",
         secondary="activity_instance_tags",
         lazy="selectin",
-        order_by="ActivityTag.sort_order, ActivityTag.name",
     )
     completed = Column(Boolean, default=False)
     notes = Column(String, nullable=True)
@@ -374,7 +440,6 @@ class ActivitySet(Base):
         "ActivityTag",
         secondary="activity_set_tags",
         lazy="selectin",
-        order_by="ActivityTag.sort_order, ActivityTag.name",
     )
 
     __table_args__ = (

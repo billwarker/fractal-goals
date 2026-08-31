@@ -36,30 +36,45 @@ export function formatMetricNumber(value) {
     return numericValue.toFixed(1).replace(/\.0$/, '');
 }
 
-export function formatDurationMetricValue(value) {
+export function getMetricPrecision(metricDef) {
+    if (metricDef?.input_type === 'integer') return 0;
+    const defaultPrecision = metricDef?.input_type === 'duration' ? 0 : 2;
+    const precision = Number(metricDef?.precision ?? defaultPrecision);
+    return Number.isInteger(precision) ? Math.min(6, Math.max(0, precision)) : defaultPrecision;
+}
+
+function roundMetricValue(value, precision) {
+    const factor = 10 ** precision;
+    return Math.round((Number(value) + Number.EPSILON) * factor) / factor;
+}
+
+export function formatDurationMetricValue(value, precision = 0) {
     if (value == null || value === '') return '';
     const rawValue = String(value);
     if (rawValue.includes(':')) return rawValue;
     const numericValue = Number(rawValue);
     if (Number.isNaN(numericValue)) return rawValue;
-    const totalSeconds = Math.max(0, Math.round(numericValue));
+    const totalSeconds = Math.max(0, roundMetricValue(numericValue, precision));
     const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    const secs = roundMetricValue(totalSeconds - (mins * 60), precision);
+    const formattedSeconds = precision > 0
+        ? secs.toFixed(precision).padStart(precision + 3, '0')
+        : String(secs).padStart(2, '0');
+    return `${String(mins).padStart(2, '0')}:${formattedSeconds}`;
 }
 
-export function parseDurationMetricInput(value) {
+export function parseDurationMetricInput(value, precision = 0) {
     const trimmed = String(value ?? '').trim();
     if (!trimmed) return '';
     if (/^\d+(\.\d+)?$/.test(trimmed)) {
-        return Math.max(0, Math.round(Number(trimmed)));
+        return Math.max(0, roundMetricValue(Number(trimmed), precision));
     }
-    const match = trimmed.match(/^(\d+):(\d{1,2})$/);
+    const match = trimmed.match(/^(\d+):(\d{1,2}(?:\.\d+)?)$/);
     if (!match) return null;
     const mins = Number(match[1]);
     const secs = Number(match[2]);
-    if (!Number.isInteger(mins) || !Number.isInteger(secs) || secs > 59) return null;
-    return (mins * 60) + secs;
+    if (!Number.isInteger(mins) || !Number.isFinite(secs) || secs >= 60) return null;
+    return roundMetricValue((mins * 60) + secs, precision);
 }
 
 export function clampMetricValue(metricDef, value) {
@@ -183,8 +198,9 @@ export function normalizeMetricValueForStorage(metricDef, value) {
     if (!trimmed) return '';
 
     let normalized;
+    const precision = getMetricPrecision(metricDef);
     if (metricDef?.input_type === 'duration') {
-        normalized = parseDurationMetricInput(trimmed);
+        normalized = parseDurationMetricInput(trimmed, precision);
         if (normalized == null) return trimmed;
     } else {
         const isDecimalLiteral = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(trimmed);
@@ -203,7 +219,7 @@ export function normalizeMetricValueForStorage(metricDef, value) {
     }
 
     const clamped = clampMetricValue(metricDef, normalized);
-    return String(clamped);
+    return String(roundMetricValue(clamped, precision));
 }
 
 export function getMetricDefaultStorageValue(metricDef) {
@@ -214,14 +230,20 @@ export function getMetricDefaultStorageValue(metricDef) {
 export function formatMetricValueForInput(metricDef, value) {
     if (value == null || value === '') return '';
     if (metricDef?.input_type === 'duration') {
-        return formatDurationMetricValue(value);
+        return formatDurationMetricValue(value, getMetricPrecision(metricDef));
+    }
+    if (metricDef?.input_type === 'number' && Number.isFinite(Number(value))) {
+        return Number(value).toFixed(getMetricPrecision(metricDef));
     }
     return String(value);
 }
 
 export function formatAllowedMetricValueLabel(metricDef, value) {
     if (metricDef?.input_type === 'duration') {
-        return formatDurationMetricValue(value);
+        return formatDurationMetricValue(value, getMetricPrecision(metricDef));
+    }
+    if (metricDef?.input_type === 'number' && Number.isFinite(Number(value))) {
+        return Number(value).toFixed(getMetricPrecision(metricDef));
     }
     return String(value);
 }
@@ -242,17 +264,18 @@ export function formatAllowedMetricValues(metricDef) {
 
 export function getMetricInputProps(metricDef) {
     if (metricDef?.input_type === 'duration') {
+        const precision = getMetricPrecision(metricDef);
         return {
             type: 'text',
-            inputMode: 'numeric',
-            placeholder: 'MM:SS',
+            inputMode: precision > 0 ? 'decimal' : 'numeric',
+            placeholder: precision > 0 ? `MM:SS.${'0'.repeat(precision)}` : 'MM:SS',
         };
     }
 
     return {
         type: 'text',
         inputMode: metricDef?.input_type === 'integer' ? 'numeric' : 'decimal',
-        step: metricDef?.input_type === 'integer' ? 1 : 'any',
+        step: metricDef?.input_type === 'integer' ? 1 : 10 ** -getMetricPrecision(metricDef),
         min: metricDef?.min_value ?? undefined,
         max: metricDef?.max_value ?? undefined,
     };

@@ -530,6 +530,7 @@ class LandingPublishService:
             "name": fm.name if fm else metric.name,
             "unit": fm.unit if fm else metric.unit,
             "input_type": fm.input_type if fm else "number",
+            "precision": fm.precision if fm else 2,
             "track_progress": metric.track_progress,
         }
 

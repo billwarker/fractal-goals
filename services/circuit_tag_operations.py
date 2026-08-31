@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
-from models import ActivityInstance, ActivitySet, ActivityTag, CircuitScopeTag
+from models import ActivityInstance, ActivitySet, ActivityTag, ActivityTagDefinition, CircuitScopeTag
 from services.events import Event, Events, event_bus
 from services.quota_service import QuotaService
 from services.serializers import serialize_circuit_run
@@ -18,7 +18,7 @@ class CircuitTagOperations:
 
     @staticmethod
     def _normalized_name(name):
-        return name.lower()
+        return " ".join((name or "").strip().split()).casefold()
 
     @staticmethod
     def _scope_payload(scope):
@@ -94,12 +94,16 @@ class CircuitTagOperations:
             for target, definition_id in raw_targets
         ]
 
-    def _tags_by_definition(self, root_id, definition_ids, normalized_name):
-        rows = self.db.query(ActivityTag).filter(
+    def _tags_by_definition(self, root_id, definition_ids, normalized_name=None, catalog_definition_id=None):
+        query = self.db.query(ActivityTag).join(ActivityTagDefinition).filter(
             ActivityTag.root_id == root_id,
             ActivityTag.activity_definition_id.in_(definition_ids),
-            func.lower(ActivityTag.name) == normalized_name,
-        ).all()
+        )
+        if catalog_definition_id:
+            query = query.filter(ActivityTag.definition_id == catalog_definition_id)
+        else:
+            query = query.filter(func.lower(ActivityTagDefinition.name) == normalized_name)
+        rows = query.all()
         return {row.activity_definition_id: row for row in rows}
 
     def _ensure_activity_tags(
@@ -115,9 +119,37 @@ class CircuitTagOperations:
         definition_ids = sorted({definition_id for _, definition_id in targets})
         normalized_name = self._normalized_name(name)
         by_definition = self._tags_by_definition(root_id, definition_ids, normalized_name)
-        archived = [tag for tag in by_definition.values() if tag.deleted_at is not None]
+        archived = [
+            tag for tag in by_definition.values()
+            if tag.deleted_at is not None or tag.definition.deleted_at is not None
+        ]
         if archived:
             return None, [], "An archived tag with this name must be restored before it can be assigned", 409
+
+        catalog_definitions = {tag.definition for tag in by_definition.values()}
+        if catalog_definitions:
+            canonical = sorted(
+                catalog_definitions,
+                key=lambda item: (-sum(tag.definition_id == item.id for tag in by_definition.values()), item.id),
+            )[0]
+            for tag in by_definition.values():
+                tag.definition = canonical
+            for candidate in catalog_definitions - {canonical}:
+                if not candidate.bindings:
+                    self.db.delete(candidate)
+        else:
+            maximum = self.db.query(func.max(ActivityTagDefinition.sort_order)).filter(
+                ActivityTagDefinition.root_id == root_id,
+                ActivityTagDefinition.deleted_at.is_(None),
+            ).scalar()
+            canonical = ActivityTagDefinition(
+                root_id=root_id,
+                name=name,
+                color=color,
+                scope="selected",
+                sort_order=(maximum if maximum is not None else -1) + 1,
+            )
+            self.db.add(canonical)
 
         missing = [definition_id for definition_id in definition_ids if definition_id not in by_definition]
         quota = QuotaService(self.db)
@@ -128,20 +160,12 @@ class CircuitTagOperations:
         if error:
             return None, [], error, status
         if missing:
-            maximums = dict(
-                self.db.query(ActivityTag.activity_definition_id, func.max(ActivityTag.sort_order))
-                .filter(ActivityTag.activity_definition_id.in_(missing), ActivityTag.deleted_at.is_(None))
-                .group_by(ActivityTag.activity_definition_id)
-                .all()
-            )
             created = []
             for definition_id in missing:
                 tag = ActivityTag(
                     root_id=root_id,
                     activity_definition_id=definition_id,
-                    name=name,
-                    color=color,
-                    sort_order=(maximums.get(definition_id) if maximums.get(definition_id) is not None else -1) + 1,
+                    definition=canonical,
                 )
                 self.db.add(tag)
                 by_definition[definition_id] = tag
@@ -251,7 +275,7 @@ class CircuitTagOperations:
             if not circuit_round:
                 return None, "Circuit round not found", 404
 
-        name = data["name"].strip()
+        name = " ".join(data["name"].strip().split())
         normalized_name = self._normalized_name(name)
         scope = next((
             row for row in run.scope_tags
@@ -286,6 +310,7 @@ class CircuitTagOperations:
                 name=name,
                 color=data.get("color"),
                 sort_order=sort_order,
+                activity_tag_definition_id=next(iter(by_definition.values())).definition_id,
                 preserved_target_keys=[
                     self._target_key(target)
                     for target, definition_id in targets
@@ -310,7 +335,7 @@ class CircuitTagOperations:
             by_definition = self._tags_by_definition(
                 root_id,
                 {definition_id for _, definition_id in targets},
-                normalized_name,
+                catalog_definition_id=scope.activity_tag_definition_id,
             )
             protected = self._protected_targets(run, scope, normalized_name)
             changed = self._remove(targets, by_definition, protected)
@@ -343,9 +368,9 @@ class CircuitTagOperations:
             by_definition = self._tags_by_definition(
                 run.root_id,
                 definition_ids,
-                self._normalized_name(scope.name),
+                catalog_definition_id=scope.activity_tag_definition_id,
             )
-            if any(tag.deleted_at is not None for tag in by_definition.values()):
+            if any(tag.deleted_at is not None or tag.definition.deleted_at is not None for tag in by_definition.values()):
                 return (
                     None,
                     "An archived tag with this name must be restored before it can be assigned",

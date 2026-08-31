@@ -20,6 +20,7 @@ from models import (
     ActivityInstance,
     ActivityProgressView,
     ActivityTag,
+    ActivityTagDefinition,
     CircuitDefinition,
     CircuitSlot,
     AnalyticsDashboard,
@@ -317,8 +318,8 @@ class QuotaService:
                 ActivityDefinition.root_id.in_(roots), ActivityDefinition.deleted_at.is_(None),
             ),
             table_total(
-                text_bytes(ActivityTag.name, ActivityTag.color),
-                ActivityTag.root_id.in_(roots), ActivityTag.deleted_at.is_(None),
+                text_bytes(ActivityTagDefinition.name, ActivityTagDefinition.color),
+                ActivityTagDefinition.root_id.in_(roots), ActivityTagDefinition.deleted_at.is_(None),
             ),
             table_total(
                 text_bytes(ActivityProgressView.name) + json_bytes(ActivityProgressView.config),

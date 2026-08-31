@@ -81,6 +81,7 @@ describe('ManageMetricsModal', () => {
             }));
         });
         expect(mockNotifySuccess).toHaveBeenCalledWith('"Range" created');
+        expect(mockCreateMetric).toHaveBeenCalledWith(expect.objectContaining({ precision: 2 }));
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 
@@ -107,5 +108,28 @@ describe('ManageMetricsModal', () => {
         });
         expect(mockNotifySuccess).toHaveBeenCalledWith('"Form Quality" updated');
         expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('places precision beside input type and allows duration precision changes', async () => {
+        render(<ManageMetricsModal isOpen={true} onClose={vi.fn()} rootId="root-1" />);
+
+        expect(screen.getByLabelText('Precision')).toHaveValue('2');
+        fireEvent.change(screen.getByLabelText('Input type'), { target: { value: 'duration' } });
+        fireEvent.change(screen.getByLabelText('Precision'), { target: { value: '3' } });
+        fireEvent.change(screen.getByLabelText('Name *'), { target: { value: 'Hold time' } });
+        fireEvent.change(screen.getByLabelText('Unit *'), { target: { value: 'seconds' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Create Metric' }));
+
+        await waitFor(() => expect(mockCreateMetric).toHaveBeenCalledWith(expect.objectContaining({
+            input_type: 'duration',
+            precision: 3,
+        })));
+    });
+
+    it('locks integer precision to zero', () => {
+        render(<ManageMetricsModal isOpen={true} onClose={vi.fn()} rootId="root-1" />);
+        fireEvent.change(screen.getByLabelText('Input type'), { target: { value: 'integer' } });
+        expect(screen.getByLabelText('Precision')).toHaveValue('0');
+        expect(screen.getByLabelText('Precision')).toBeDisabled();
     });
 });
