@@ -1,3 +1,4 @@
+import { useCallback, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { fractalApi } from '../utils/api';
@@ -35,6 +36,19 @@ export function useCircuitDefinitionMutations(rootId) {
 
 export function useCircuitRunActions(rootId, sessionId) {
     const queryClient = useQueryClient();
+    const memberMetricQueueRef = useRef(Promise.resolve());
+    const saveMemberMetrics = useCallback(({ runId, memberId, metrics }) => {
+        const request = memberMetricQueueRef.current
+            .catch(() => undefined)
+            .then(async () => {
+                const response = await fractalApi.updateCircuitMemberMetrics(rootId, runId, memberId, metrics);
+                updateCircuitRunCache(queryClient, rootId, sessionId, 'updateMemberMetrics', response);
+                void refreshCircuitSessionConsumers(queryClient, rootId, sessionId, 'updateMemberMetrics');
+                return response;
+            });
+        memberMetricQueueRef.current = request;
+        return request;
+    }, [queryClient, rootId, sessionId]);
     const mutation = useMutation({
         mutationFn: async ({ action, runId, roundId, memberId, value }) => {
             switch (action) {
@@ -66,7 +80,7 @@ export function useCircuitRunActions(rootId, sessionId) {
             await refreshCircuitSessionConsumers(queryClient, rootId, sessionId, variables.action);
         },
     });
-    return mutation;
+    return { ...mutation, saveMemberMetrics };
 }
 
 

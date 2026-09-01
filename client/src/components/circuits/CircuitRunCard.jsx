@@ -378,11 +378,17 @@ export default function CircuitRunCard({
                                                     disabled={disabled}
                                                     saving={action.isPending}
                                                     progress={{ comparison: instance?.progress_comparison, setIndex }}
-                                                    onSave={(nextMetrics) => perform({
-                                                        action: 'updateMemberMetrics',
-                                                        memberId: member.id,
-                                                        value: nextMetrics,
-                                                    })}
+                                                    onSave={(nextMetrics) => action.saveMemberMetrics
+                                                        ? action.saveMemberMetrics({
+                                                            runId: run.id,
+                                                            memberId: member.id,
+                                                            metrics: nextMetrics,
+                                                        })
+                                                        : perform({
+                                                            action: 'updateMemberMetrics',
+                                                            memberId: member.id,
+                                                            value: nextMetrics,
+                                                        })}
                                                     canCascade={(metricId, splitId) => canCascadeCircuitMetric(
                                                         rounds,
                                                         round.round_number,

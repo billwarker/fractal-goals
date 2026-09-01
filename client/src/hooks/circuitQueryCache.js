@@ -32,7 +32,6 @@ const SUMMARY_ACTIONS = new Set([
 
 export function refreshCircuitSessionConsumers(queryClient, rootId, sessionId, action) {
     const invalidations = [
-        queryClient.invalidateQueries({ queryKey: queryKeys.sessionCircuitRuns(rootId, sessionId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.session(rootId, sessionId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivities(rootId, sessionId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionProgressSummary(sessionId) }),
@@ -44,6 +43,11 @@ export function refreshCircuitSessionConsumers(queryClient, rootId, sessionId, a
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsFlowtreeMetricsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
     ];
+    if (action !== 'updateMemberMetrics') {
+        invalidations.push(
+            queryClient.invalidateQueries({ queryKey: queryKeys.sessionCircuitRuns(rootId, sessionId) }),
+        );
+    }
     if (SUMMARY_ACTIONS.has(action)) {
         invalidations.push(
             queryClient.invalidateQueries({ queryKey: ['circuits', rootId] }),

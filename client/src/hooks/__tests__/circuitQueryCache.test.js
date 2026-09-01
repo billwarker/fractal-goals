@@ -44,4 +44,17 @@ describe('circuitQueryCache', () => {
         expect(client.getQueryState(circuitKey)?.isInvalidated).toBe(true);
         expect(client.getQueryState(sessionsKey)?.isInvalidated).toBe(true);
     });
+
+    it('keeps an authoritative member-metric run response fresh while refreshing dependents', async () => {
+        const client = new QueryClient();
+        const runKey = queryKeys.sessionCircuitRuns('root', 'session');
+        const activitiesKey = queryKeys.sessionActivities('root', 'session');
+        client.setQueryData(runKey, [{ id: 'run-1' }]);
+        client.setQueryData(activitiesKey, [{ id: 'instance-1' }]);
+
+        await refreshCircuitSessionConsumers(client, 'root', 'session', 'updateMemberMetrics');
+
+        expect(client.getQueryState(runKey)?.isInvalidated).toBe(false);
+        expect(client.getQueryState(activitiesKey)?.isInvalidated).toBe(true);
+    });
 });

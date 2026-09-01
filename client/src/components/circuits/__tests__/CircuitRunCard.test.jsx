@@ -2,10 +2,11 @@ import React from 'react';
 import { fireEvent, render as testingLibraryRender, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 const mutateAsync = vi.fn();
+const saveMemberMetrics = vi.fn();
 const replaceActivityInstanceTags = vi.fn();
 const replaceActivitySetTags = vi.fn();
 vi.mock('../../../hooks/useCircuitQueries', () => ({
-    useCircuitRunActions: () => ({ mutateAsync, isPending: false }),
+    useCircuitRunActions: () => ({ mutateAsync, saveMemberMetrics, isPending: false }),
 }));
 vi.mock('../../../hooks/useRootProgressSettings', () => ({ useRootProgressSettings: () => ({ progressSettings: { delta_display_mode: 'percent' } }) }));
 vi.mock('../../../utils/api', () => ({
@@ -63,6 +64,7 @@ const definitions = [{
 describe('CircuitRunCard', () => {
     beforeEach(() => {
         mutateAsync.mockReset();
+        saveMemberMetrics.mockReset().mockResolvedValue({ data: run });
         replaceActivityInstanceTags.mockReset().mockResolvedValue({ data: { tags: [], version: 3 } });
         replaceActivitySetTags.mockReset().mockResolvedValue({ data: { tags: [], version: 5 } });
     });
@@ -541,11 +543,12 @@ describe('CircuitRunCard', () => {
         fireEvent.change(screen.getByLabelText('Weight'), { target: { value: '135' } });
         fireEvent.blur(screen.getByLabelText('Weight'));
         expect(within(screen.getByLabelText('Press metrics')).queryByText(/^#/)).not.toBeInTheDocument();
-        await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
-            action: 'updateMemberMetrics',
+        await waitFor(() => expect(saveMemberMetrics).toHaveBeenCalledWith({
+            runId: 'run-1',
             memberId: 'member-a',
-            value: [{ metric_id: 'metric-weight', value: 135 }],
-        })));
+            metrics: [{ metric_id: 'metric-weight', value: 135 }],
+        }));
+        expect(mutateAsync).not.toHaveBeenCalled();
     });
 
 });

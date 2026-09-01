@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 
 import {
     formatAllowedMetricValueLabel,
@@ -25,12 +25,16 @@ export default function MetricValueEditor({
 }) {
     const allowedValues = useMemo(() => getAllowedMetricValues(metricDef), [metricDef]);
     const formattedValue = isDraft ? String(value ?? '') : formatMetricValueForInput(metricDef, value);
-    const [draftValue, setDraftValue] = useState(formattedValue);
-    const [isEditing, setIsEditing] = useState(false);
-    const displayValue = isEditing ? draftValue : formattedValue;
+    const inputRef = useRef(null);
     const selectedAllowedValue = allowedValues.length > 0
         ? normalizeMetricValueForStorage(metricDef, value)
         : null;
+
+    useEffect(() => {
+        const input = inputRef.current;
+        if (!input || document.activeElement === input || input.value === formattedValue) return;
+        input.value = formattedValue;
+    }, [formattedValue]);
 
     return (
         <>
@@ -57,23 +61,23 @@ export default function MetricValueEditor({
                 ) : (
                     <input
                         {...getMetricInputProps(metricDef)}
+                        ref={inputRef}
                         id={inputId}
                         className={inputClassName}
-                        value={displayValue}
+                        defaultValue={formattedValue}
                         disabled={disabled}
-                        onFocus={() => {
-                            setDraftValue(formattedValue);
-                            setIsEditing(true);
-                        }}
                         onChange={(event) => {
                             const nextValue = event.target.value;
-                            setIsEditing(true);
-                            setDraftValue(nextValue);
                             onDraftChange(nextValue);
                         }}
                         onBlur={(event) => {
                             const didCommit = onCommit(event.target.value);
-                            if (didCommit !== false) setIsEditing(false);
+                            if (didCommit !== false) {
+                                const normalizedValue = normalizeMetricValueForStorage(metricDef, event.target.value);
+                                if (normalizedValue != null) {
+                                    event.currentTarget.value = formatMetricValueForInput(metricDef, normalizedValue);
+                                }
+                            }
                         }}
                         onKeyDown={(event) => {
                             if (event.key === 'Enter') event.currentTarget.blur();

@@ -28,7 +28,7 @@ export default function CircuitMemberMetrics({
     onCascade,
 }) {
     const { progressSettings } = useRootProgressSettings(rootId);
-    const [drafts, setDrafts] = useState({});
+    const draftsRef = useRef({});
     const [localMetrics, setLocalMetrics] = useState(metrics);
     const localMetricsRef = useRef(metrics);
     const [error, setError] = useState('');
@@ -49,19 +49,19 @@ export default function CircuitMemberMetrics({
 
     const valueFor = (metricId, splitId = null) => {
         const key = metricKey(metricId, splitId);
-        if (Object.prototype.hasOwnProperty.call(drafts, key)) return drafts[key];
+        if (Object.prototype.hasOwnProperty.call(draftsRef.current, key)) return draftsRef.current[key];
         return localMetrics.find((metric) => (
             resolveMetricId(metric) === metricId
             && (splitId ? resolveSplitId(metric) === splitId : !resolveSplitId(metric))
         ))?.value ?? '';
     };
 
-    const commit = async (metric, splitId, rawValue) => {
+    const commit = (metric, splitId, rawValue) => {
         const key = metricKey(metric.id, splitId);
         const normalized = normalizeMetricValueForStorage(metric, rawValue);
         if (normalized == null || (normalized !== '' && !Number.isFinite(Number(normalized)))) {
             setError(`Enter a valid value for ${metric.name}.`);
-            return;
+            return false;
         }
         setError('');
         const retained = localMetricsRef.current.filter((entry) => !(
@@ -78,19 +78,19 @@ export default function CircuitMemberMetrics({
         ];
         localMetricsRef.current = nextMetrics;
         setLocalMetrics(nextMetrics);
-        try {
-            const saved = await onSave(nextMetrics);
-            if (saved === false) throw new Error('Unable to save metrics.');
-            setDrafts((previous) => {
-                const next = { ...previous };
-                delete next[key];
-                return next;
-            });
-        } catch (requestError) {
-            localMetricsRef.current = metrics;
-            setLocalMetrics(metrics);
-            setError(requestError?.response?.data?.error || requestError.message || 'Unable to save metrics.');
-        }
+        const save = async () => {
+            try {
+                const saved = await onSave(nextMetrics);
+                if (saved === false) throw new Error('Unable to save metrics.');
+                delete draftsRef.current[key];
+            } catch (requestError) {
+                localMetricsRef.current = metrics;
+                setLocalMetrics(metrics);
+                setError(requestError?.response?.data?.error || requestError.message || 'Unable to save metrics.');
+            }
+        };
+        void save();
+        return true;
     };
 
     const renderMetric = (metric, split = null) => {
@@ -114,7 +114,7 @@ export default function CircuitMemberMetrics({
                     <MetricValueEditor
                         metricDef={metric}
                         value={currentValue}
-                        isDraft={Object.prototype.hasOwnProperty.call(drafts, key)}
+                        isDraft={Object.prototype.hasOwnProperty.call(draftsRef.current, key)}
                         inputClassName={`${activityStyles.metricInput} ${isSplitMetric ? activityStyles.metricInputSmall : activityStyles.metricInputLarge}`}
                         metaClassName={isSplitMetric ? activityStyles.metricMeta : activityStyles.metricMetaLarge}
                         unitClassName={isSplitMetric ? activityStyles.metricUnit : activityStyles.metricUnitLarge}
@@ -128,7 +128,9 @@ export default function CircuitMemberMetrics({
                         )}
                         disabled={disabled || saving}
                         inputId={inputId}
-                        onDraftChange={(value) => setDrafts((previous) => ({ ...previous, [key]: value }))}
+                        onDraftChange={(value) => {
+                            draftsRef.current[key] = value;
+                        }}
                         onCommit={(value) => commit(metric, split?.id || null, value)}
                     />
                     {showCascade && (
