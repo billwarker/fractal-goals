@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+import { getISOYMDInTimezone } from '../../utils/dateUtils';
 import CreateSession from '../CreateSession';
 
 const completeQuickSession = vi.fn();
@@ -214,6 +215,10 @@ describe('CreateSession quick-session flow', () => {
     });
 
     it('keeps active program identity and goal scoping when no day is scheduled today', async () => {
+        const todayISO = getISOYMDInTimezone(
+            new Date(),
+            Intl.DateTimeFormat().resolvedOptions().timeZone,
+        );
         previewSessionGoalScope.mockResolvedValueOnce({
             data: { automatic_goal_ids: ['child', 'other'] },
         });
@@ -224,12 +229,12 @@ describe('CreateSession quick-session flow', () => {
                 id: 'program-1',
                 name: 'Q4 2026',
                 color: '#ef4444',
-                start_date: '2026-08-01',
-                end_date: '2026-08-31',
+                start_date: todayISO,
+                end_date: todayISO,
                 goal_ids: ['child'],
                 blocks: [{
                     id: 'block-1', name: 'Month 1', color: '#d946ef',
-                    start_date: '2026-08-01', end_date: '2026-08-31',
+                    start_date: todayISO, end_date: todayISO,
                 }],
             },
             goalTree: { id: 'root', children: [{ id: 'child', children: [] }, { id: 'other', children: [] }] },

@@ -635,14 +635,16 @@ function SessionActivityItem({
 
     const commitSetMetricInput = (setIndex, metricDef, splitId = null, displayValue) => {
         const normalizedValue = normalizeMetricValueForStorage(metricDef, displayValue);
-        if (normalizedValue == null) return;
+        if (normalizedValue == null) return false;
         commitSetMetricChange(setIndex, metricDef.id, splitId, normalizedValue);
+        return true;
     };
 
     const commitSingleMetricInput = (metricDef, splitId = null, displayValue) => {
         const normalizedValue = normalizeMetricValueForStorage(metricDef, displayValue);
-        if (normalizedValue == null) return;
+        if (normalizedValue == null) return false;
         commitSingleMetricChange(metricDef.id, splitId, normalizedValue);
+        return true;
     };
 
     const renderMetricEditor = ({

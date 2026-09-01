@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 
 import {
     formatAllowedMetricValueLabel,
@@ -23,9 +23,14 @@ export default function MetricValueEditor({
     disabled = false,
     inputId,
 }) {
-    const allowedValues = getAllowedMetricValues(metricDef);
-    const displayValue = isDraft ? String(value ?? '') : formatMetricValueForInput(metricDef, value);
-    const selectedAllowedValue = normalizeMetricValueForStorage(metricDef, value);
+    const allowedValues = useMemo(() => getAllowedMetricValues(metricDef), [metricDef]);
+    const formattedValue = isDraft ? String(value ?? '') : formatMetricValueForInput(metricDef, value);
+    const [draftValue, setDraftValue] = useState(formattedValue);
+    const [isEditing, setIsEditing] = useState(false);
+    const displayValue = isEditing ? draftValue : formattedValue;
+    const selectedAllowedValue = allowedValues.length > 0
+        ? normalizeMetricValueForStorage(metricDef, value)
+        : null;
 
     return (
         <>
@@ -56,8 +61,20 @@ export default function MetricValueEditor({
                         className={inputClassName}
                         value={displayValue}
                         disabled={disabled}
-                        onChange={(event) => onDraftChange(event.target.value)}
-                        onBlur={(event) => onCommit(event.target.value)}
+                        onFocus={() => {
+                            setDraftValue(formattedValue);
+                            setIsEditing(true);
+                        }}
+                        onChange={(event) => {
+                            const nextValue = event.target.value;
+                            setIsEditing(true);
+                            setDraftValue(nextValue);
+                            onDraftChange(nextValue);
+                        }}
+                        onBlur={(event) => {
+                            const didCommit = onCommit(event.target.value);
+                            if (didCommit !== false) setIsEditing(false);
+                        }}
                         onKeyDown={(event) => {
                             if (event.key === 'Enter') event.currentTarget.blur();
                         }}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 function resolveMetricId(metric) {
     return metric?.metric_id || metric?.metric_definition_id || null;
@@ -73,8 +73,11 @@ function applySingleSetDraft(baseSets, { setIndex, metricId, splitId = null, val
 }
 
 export default function useMetricDrafts({ exercise, updateExercise }) {
-    const [setMetricDrafts, setSetMetricDrafts] = useState({});
-    const [singleMetricDrafts, setSingleMetricDrafts] = useState({});
+    // Draft text is rendered locally by MetricValueEditor. Keeping this registry
+    // in refs preserves drafts for cascade/add/remove operations without making
+    // the entire activity card rerender for every keystroke.
+    const setMetricDraftsRef = useRef({});
+    const singleMetricDraftsRef = useRef({});
     const latestSetsRef = useRef(exercise.sets || []);
 
     useEffect(() => {
@@ -98,46 +101,46 @@ export default function useMetricDrafts({ exercise, updateExercise }) {
 
     const getSetMetricDisplayValue = useCallback((setIndex, metricsList, metricId, splitId = null) => {
         const key = setMetricDraftKey(setIndex, metricId, splitId);
-        if (Object.prototype.hasOwnProperty.call(setMetricDrafts, key)) {
-            return setMetricDrafts[key];
+        if (Object.prototype.hasOwnProperty.call(setMetricDraftsRef.current, key)) {
+            return setMetricDraftsRef.current[key];
         }
         return getMetricValue(metricsList, metricId, splitId);
-    }, [getMetricValue, setMetricDraftKey, setMetricDrafts]);
+    }, [getMetricValue, setMetricDraftKey]);
 
     const getSingleMetricDisplayValue = useCallback((metricsList, metricId, splitId = null) => {
         const key = singleMetricDraftKey(metricId, splitId);
-        if (Object.prototype.hasOwnProperty.call(singleMetricDrafts, key)) {
-            return singleMetricDrafts[key];
+        if (Object.prototype.hasOwnProperty.call(singleMetricDraftsRef.current, key)) {
+            return singleMetricDraftsRef.current[key];
         }
         return getMetricValue(metricsList, metricId, splitId);
-    }, [getMetricValue, singleMetricDraftKey, singleMetricDrafts]);
+    }, [getMetricValue, singleMetricDraftKey]);
 
     const hasSetMetricDraft = useCallback((setIndex, metricId, splitId = null) => {
         const key = setMetricDraftKey(setIndex, metricId, splitId);
-        return Object.prototype.hasOwnProperty.call(setMetricDrafts, key);
-    }, [setMetricDraftKey, setMetricDrafts]);
+        return Object.prototype.hasOwnProperty.call(setMetricDraftsRef.current, key);
+    }, [setMetricDraftKey]);
 
     const hasSingleMetricDraft = useCallback((metricId, splitId = null) => {
         const key = singleMetricDraftKey(metricId, splitId);
-        return Object.prototype.hasOwnProperty.call(singleMetricDrafts, key);
-    }, [singleMetricDraftKey, singleMetricDrafts]);
+        return Object.prototype.hasOwnProperty.call(singleMetricDraftsRef.current, key);
+    }, [singleMetricDraftKey]);
 
     const handleSetMetricDraftChange = useCallback((setIndex, metricId, value, splitId = null) => {
         const key = setMetricDraftKey(setIndex, metricId, splitId);
-        setSetMetricDrafts((prev) => ({ ...prev, [key]: value }));
+        setMetricDraftsRef.current[key] = value;
     }, [setMetricDraftKey]);
 
     const handleSingleMetricDraftChange = useCallback((metricId, value, splitId = null) => {
         const key = singleMetricDraftKey(metricId, splitId);
-        setSingleMetricDrafts((prev) => ({ ...prev, [key]: value }));
+        singleMetricDraftsRef.current[key] = value;
     }, [singleMetricDraftKey]);
 
     const commitSetMetricChange = useCallback((setIndex, metricId, splitId = null, overrideValue = undefined) => {
         const key = setMetricDraftKey(setIndex, metricId, splitId);
-        const hasDraft = Object.prototype.hasOwnProperty.call(setMetricDrafts, key);
+        const hasDraft = Object.prototype.hasOwnProperty.call(setMetricDraftsRef.current, key);
         if (!hasDraft && overrideValue === undefined) return;
 
-        const nextValue = overrideValue === undefined ? setMetricDrafts[key] : overrideValue;
+        const nextValue = overrideValue === undefined ? setMetricDraftsRef.current[key] : overrideValue;
         const nextSets = applySingleSetDraft(latestSetsRef.current, {
             setIndex,
             metricId,
@@ -145,20 +148,16 @@ export default function useMetricDrafts({ exercise, updateExercise }) {
             value: nextValue,
         });
         latestSetsRef.current = nextSets;
+        delete setMetricDraftsRef.current[key];
         updateExercise('sets', nextSets);
-        setSetMetricDrafts((prev) => {
-            const next = { ...prev };
-            delete next[key];
-            return next;
-        });
-    }, [setMetricDraftKey, setMetricDrafts, updateExercise]);
+    }, [setMetricDraftKey, updateExercise]);
 
     const commitSingleMetricChange = useCallback((metricId, splitId = null, overrideValue = undefined) => {
         const key = singleMetricDraftKey(metricId, splitId);
-        const hasDraft = Object.prototype.hasOwnProperty.call(singleMetricDrafts, key);
+        const hasDraft = Object.prototype.hasOwnProperty.call(singleMetricDraftsRef.current, key);
         if (!hasDraft && overrideValue === undefined) return;
 
-        const value = overrideValue === undefined ? singleMetricDrafts[key] : overrideValue;
+        const value = overrideValue === undefined ? singleMetricDraftsRef.current[key] : overrideValue;
         const currentMetrics = [...(exercise.metrics || [])];
         const metricIndex = currentMetrics.findIndex((metric) => (
             resolveMetricId(metric) === metricId
@@ -173,20 +172,16 @@ export default function useMetricDrafts({ exercise, updateExercise }) {
             currentMetrics.push(nextMetric);
         }
 
+        delete singleMetricDraftsRef.current[key];
         updateExercise('metrics', currentMetrics);
-        setSingleMetricDrafts((prev) => {
-            const next = { ...prev };
-            delete next[key];
-            return next;
-        });
-    }, [exercise.metrics, singleMetricDraftKey, singleMetricDrafts, updateExercise]);
+    }, [exercise.metrics, singleMetricDraftKey, updateExercise]);
 
     const applyAllSetDrafts = useCallback((baseSets) => (
-        applyDraftsToSets(baseSets, setMetricDrafts)
-    ), [setMetricDrafts]);
+        applyDraftsToSets(baseSets, setMetricDraftsRef.current)
+    ), []);
 
     const clearSetDrafts = useCallback(() => {
-        setSetMetricDrafts({});
+        setMetricDraftsRef.current = {};
     }, []);
 
     return {
