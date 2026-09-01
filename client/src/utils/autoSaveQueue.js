@@ -19,33 +19,57 @@ export function createAutoSaveQueue({ save, serialize = defaultSerialize, onErro
         if (inFlight) return;
 
         inFlight = true;
-        try {
-            while (pending !== null) {
-                const next = pending;
-                pending = null;
-                const serialized = serialize(next);
+        while (pending !== null) {
+            const batch = pending;
+            pending = null;
+            const serialized = serialize(batch.value);
 
-                if (!serialized || serialized === lastSavedSerialized) continue;
-
-                await save(next);
-                lastSavedSerialized = serialized;
+            if (!serialized || serialized === lastSavedSerialized) {
+                batch.resolve(undefined);
+                continue;
             }
-        } catch (error) {
-            if (typeof onError === 'function') onError(error);
-        } finally {
-            inFlight = false;
+
+            try {
+                const result = await save(batch.value);
+                lastSavedSerialized = serialized;
+                batch.resolve(result);
+            } catch (error) {
+                if (typeof onError === 'function') onError(error);
+                batch.resolve({ error });
+            }
         }
+        inFlight = false;
     };
 
     return {
         enqueue(value) {
-            pending = value;
-            return flush();
+            const serialized = serialize(value);
+            if (!pending && !inFlight && serialized && serialized === lastSavedSerialized) {
+                return Promise.resolve(undefined);
+            }
+
+            const completion = new Promise((resolve) => {
+                if (pending) {
+                    const previousResolve = pending.resolve;
+                    pending = {
+                        value,
+                        resolve: (result) => {
+                            previousResolve(result);
+                            resolve(result);
+                        },
+                    };
+                    return;
+                }
+                pending = { value, resolve };
+            });
+            void flush();
+            return completion;
         },
         seed(value) {
             lastSavedSerialized = serialize(value);
         },
         reset() {
+            pending?.resolve(undefined);
             pending = null;
             inFlight = false;
             lastSavedSerialized = '';

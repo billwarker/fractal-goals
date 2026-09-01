@@ -50,7 +50,7 @@ export default function useRelativeTimeAdjustment({ timezone, validate, onApply 
             }
             setApplyingTarget(target);
             const saved = await onApply(target, isoValue);
-            if (saved?.error) throw new Error(saved.error);
+            if (saved?.error) throw saved.error;
             if (saved === false) throw new Error('Unable to save time adjustment');
             setActiveTarget(null);
             setDrafts((current) => ({ ...current, [target]: '' }));
@@ -58,7 +58,10 @@ export default function useRelativeTimeAdjustment({ timezone, validate, onApply 
         } catch (error) {
             setErrors((current) => ({
                 ...current,
-                [target]: error?.response?.data?.error || error?.message || 'Use +10M, -2H, or +30S',
+                [target]: error?.response?.data?.error
+                    || error?.message
+                    || (typeof error === 'string' ? error : '')
+                    || 'Use +10M, -2H, or +30S',
             }));
         } finally {
             setApplyingTarget(null);

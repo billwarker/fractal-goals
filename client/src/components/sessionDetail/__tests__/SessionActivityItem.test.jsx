@@ -698,6 +698,62 @@ describe('SessionActivityItem metric and timer editing', () => {
         expect(screen.getByText('Use YYYY-MM-DD HH:MM:SS')).toBeInTheDocument();
     });
 
+    it('keeps a valid timer draft visible and shows the server error when persistence fails', async () => {
+        const saveError = new Error('conflicting historical interval');
+        saveError.response = { data: { error: 'Timer overlaps another work interval' } };
+        updateInstance.mockResolvedValueOnce({ error: saveError });
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-failed-time',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: '2026-01-01T00:00:00.000Z',
+                    time_stop: '2026-01-01T02:00:00.000Z',
+                    duration_seconds: 7200,
+                }}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false,
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            },
+        );
+
+        const [startInput] = screen.getAllByPlaceholderText('YYYY-MM-DD HH:MM:SS');
+        fireEvent.change(startInput, { target: { value: '2026-01-01 01:00:00' } });
+        fireEvent.blur(startInput);
+
+        await waitFor(() => {
+            expect(screen.getByText('Timer overlaps another work interval')).toBeInTheDocument();
+        });
+        expect(startInput).toHaveValue('2026-01-01 01:00:00');
+    });
+
     it('applies a relative adjustment to the start time from the header control', async () => {
         renderWithProviders(
             <SessionActivityItem

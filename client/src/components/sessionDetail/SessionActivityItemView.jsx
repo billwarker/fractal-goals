@@ -134,28 +134,50 @@ function SessionActivityItemView({
         }
     };
 
-    const handleCommitTimeInput = (event, target, field, setDraft) => {
+    const handleCommitTimeInput = async (event, target, field, setDraft) => {
         if (event.target.value) {
+            let isoValue;
             try {
-                const isoValue = localToISO(event.target.value, timezone);
-                const rangeError = getTimerRangeError(target, isoValue);
-                if (rangeError) {
-                    setTimeInputErrors((current) => ({ ...current, [target]: rangeError }));
-                    return;
-                }
-                onUpdate(field, isoValue);
-                setDraft(null);
-                setTimeInputErrors((current) => ({ ...current, [target]: '' }));
+                isoValue = localToISO(event.target.value, timezone);
             } catch {
                 setTimeInputErrors((current) => ({
                     ...current,
                     [target]: 'Use YYYY-MM-DD HH:MM:SS',
                 }));
+                return;
+            }
+
+            const rangeError = getTimerRangeError(target, isoValue);
+            if (rangeError) {
+                setTimeInputErrors((current) => ({ ...current, [target]: rangeError }));
+                return;
+            }
+
+            try {
+                const saved = await onUpdate(field, isoValue);
+                if (saved?.error) throw saved.error;
+                setDraft(null);
+                setTimeInputErrors((current) => ({ ...current, [target]: '' }));
+            } catch (error) {
+                setTimeInputErrors((current) => ({
+                    ...current,
+                    [target]: error?.response?.data?.error
+                        || error?.message
+                        || 'Use YYYY-MM-DD HH:MM:SS',
+                }));
             }
         } else {
-            onUpdate(field, null);
-            setDraft(null);
-            setTimeInputErrors((current) => ({ ...current, [target]: '' }));
+            try {
+                const saved = await onUpdate(field, null);
+                if (saved?.error) throw saved.error;
+                setDraft(null);
+                setTimeInputErrors((current) => ({ ...current, [target]: '' }));
+            } catch (error) {
+                setTimeInputErrors((current) => ({
+                    ...current,
+                    [target]: error?.response?.data?.error || error?.message || 'Unable to save time',
+                }));
+            }
         }
     };
 
@@ -352,7 +374,7 @@ function SessionActivityItemView({
                                                 setStartTimeDraft(e.target.value);
                                                 setTimeInputErrors((current) => ({ ...current, start: '' }));
                                             }}
-                                            onBlur={(e) => handleCommitTimeInput(e, 'start', 'time_start', setStartTimeDraft)}
+                                            onBlur={(e) => { void handleCommitTimeInput(e, 'start', 'time_start', setStartTimeDraft); }}
                                             className={`${styles.timerInput} ${timeInputErrors.start ? styles.timerInputError : ''}`}
                                         />
                                         {timeInputErrors.start && (
@@ -377,7 +399,7 @@ function SessionActivityItemView({
                                                 setStopTimeDraft(e.target.value);
                                                 setTimeInputErrors((current) => ({ ...current, stop: '' }));
                                             }}
-                                            onBlur={(e) => handleCommitTimeInput(e, 'stop', 'time_stop', setStopTimeDraft)}
+                                            onBlur={(e) => { void handleCommitTimeInput(e, 'stop', 'time_stop', setStopTimeDraft); }}
                                             disabled={!exercise.time_start}
                                             className={`${styles.timerInput} ${!exercise.time_start ? styles.timerInputDisabled : ''} ${timeInputErrors.stop ? styles.timerInputError : ''}`}
                                         />
