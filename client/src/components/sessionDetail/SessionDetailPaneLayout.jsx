@@ -23,6 +23,7 @@ function SessionDetailPaneLayout({
             {isMobile && isMobilePaneOpen && (
                 <ModalBackdrop
                     className={`${styles.mobilePaneOverlay} mobile-sheet-backdrop-enter`}
+                    constrainToVisualViewport={false}
                     onClose={onCloseMobilePane}
                     role="presentation"
                 >

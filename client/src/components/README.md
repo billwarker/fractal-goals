@@ -13,6 +13,8 @@ Use these shared primitives before adding local UI controls:
 - `atoms/SmartBadge.jsx` - the SMART-letters pill; `SMARTIndicator.jsx` wraps it with per-goal criterion status.
 - `atoms/Input.jsx`, `atoms/Select.jsx`, `atoms/TextArea.jsx`, `atoms/Checkbox.jsx`, `atoms/Radio.jsx` - form controls.
 - `atoms/Tooltip.jsx` - hover/focus help for compact icon controls.
+- `atoms/Modal.jsx` - canonical titled dialogs with focus trapping, focus restoration, a persistent header/close control, and a scrolling body.
+- `atoms/ModalBackdrop.jsx` - shared backdrop dismissal and visual-viewport positioning for canonical modals, specialized dialogs, and full-viewport sheets. Visual-viewport tracking is on by default; use `constrainToVisualViewport={false}` only for sheets whose geometry intentionally reserves app-owned navigation or footer space.
 - `atoms/Spinner.jsx` - the only spinner animation primitive.
 - `common/LoadingState.jsx` - page, panel, and list loading states; composes `Spinner`.
 - `common/EmptyState.jsx` - empty list, no data, and no result states.

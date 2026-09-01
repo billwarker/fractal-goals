@@ -515,7 +515,7 @@ function Analytics() {
 
             {activeMode === 'dashboard' && isFiltersPaneOpen && isMobile && (
                 <ModalBackdrop
-                    className={styles.sheetBackdrop}
+                    className={styles.sheetBackdrop} constrainToVisualViewport={false}
                     onClose={() => setIsFiltersPaneOpen(false)}
                     aria-hidden="true"
                 />

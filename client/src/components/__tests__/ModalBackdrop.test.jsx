@@ -55,4 +55,18 @@ describe('ModalBackdrop', () => {
 
         expect(onClose).not.toHaveBeenCalled();
     });
+
+    it('allows reserved-layout sheets to opt out of visual viewport positioning', () => {
+        render(
+            <ModalBackdrop
+                className="reserved-sheet"
+                constrainToVisualViewport={false}
+                data-testid="reserved-backdrop"
+                onClose={() => {}}
+            />
+        );
+
+        expect(screen.getByTestId('reserved-backdrop').className).toBe('reserved-sheet');
+        expect(screen.getByTestId('reserved-backdrop').style.getPropertyValue('--modal-viewport-height')).toBe('');
+    });
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import Modal from '../atoms/Modal';
 
@@ -119,5 +119,54 @@ describe('Modal', () => {
         expect(screen.getByRole('dialog')).toHaveStyle({
             zIndex: 'calc(var(--z-modal-top) + 1)',
         });
+    });
+
+    it('tracks the visual viewport so mobile browser chrome cannot hide the dialog', () => {
+        const originalVisualViewport = Object.getOwnPropertyDescriptor(window, 'visualViewport');
+        const listeners = new Map();
+        const visualViewport = {
+            height: 640,
+            width: 360,
+            offsetTop: 12,
+            offsetLeft: 4,
+            addEventListener: vi.fn((event, listener) => listeners.set(event, listener)),
+            removeEventListener: vi.fn((event) => listeners.delete(event)),
+        };
+
+        Object.defineProperty(window, 'visualViewport', {
+            configurable: true,
+            value: visualViewport,
+        });
+
+        try {
+            const { unmount } = render(
+                <Modal isOpen onClose={() => {}} title="Viewport-aware modal">
+                    Content
+                </Modal>
+            );
+            const dialog = screen.getByRole('dialog');
+
+            expect(dialog.style.getPropertyValue('--modal-viewport-height')).toBe('640px');
+            expect(dialog.style.getPropertyValue('--modal-viewport-width')).toBe('360px');
+            expect(dialog.style.getPropertyValue('--modal-viewport-top')).toBe('12px');
+            expect(dialog.style.getPropertyValue('--modal-viewport-left')).toBe('4px');
+
+            visualViewport.height = 420;
+            visualViewport.offsetTop = 36;
+            act(() => listeners.get('resize')());
+
+            expect(dialog.style.getPropertyValue('--modal-viewport-height')).toBe('420px');
+            expect(dialog.style.getPropertyValue('--modal-viewport-top')).toBe('36px');
+
+            unmount();
+            expect(visualViewport.removeEventListener).toHaveBeenCalledWith('resize', expect.any(Function));
+            expect(visualViewport.removeEventListener).toHaveBeenCalledWith('scroll', expect.any(Function));
+        } finally {
+            if (originalVisualViewport) {
+                Object.defineProperty(window, 'visualViewport', originalVisualViewport);
+            } else {
+                delete window.visualViewport;
+            }
+        }
     });
 });

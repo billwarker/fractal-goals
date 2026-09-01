@@ -56,6 +56,45 @@ const checks = [
     ],
   },
   {
+    file: 'src/components/atoms/Modal.module.css',
+    patterns: [
+      /--modal-available-height:\s*calc\(/,
+      /padding:\s*var\(--modal-edge-top\) var\(--modal-edge-right\) var\(--modal-edge-bottom\) var\(--modal-edge-left\);/,
+      /\.content\s*\{[^}]*max-height:\s*min\(90vh,\s*var\(--modal-available-height\)\);[^}]*min-height:\s*0;/s,
+      /\.header\s*\{[^}]*flex:\s*0 0 auto;/s,
+      /\.body\s*\{[^}]*min-height:\s*0;[^}]*overflow-y:\s*auto;[^}]*overscroll-behavior-y:\s*contain;/s,
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.container\s*\{[^}]*width:\s*100%;[^}]*max-height:\s*var\(--modal-available-height\);/,
+    ],
+    forbiddenPatterns: [
+      /max-height:\s*calc\(100vh - 16px\)/,
+    ],
+  },
+  {
+    file: 'src/components/atoms/ModalBackdrop.module.css',
+    patterns: [
+      /\.visualViewport\s*\{[^}]*top:\s*var\(--modal-viewport-top,\s*0px\);[^}]*left:\s*var\(--modal-viewport-left,\s*0px\);/s,
+      /width:\s*var\(--modal-viewport-width,\s*100vw\);/,
+      /height:\s*var\(--modal-viewport-height,\s*var\(--app-viewport-height,\s*100dvh\)\);/,
+      /overscroll-behavior:\s*contain;/,
+    ],
+  },
+  {
+    file: 'src/components/atoms/ModalBackdrop.jsx',
+    patterns: [
+      /constrainToVisualViewport = true/,
+      /window\.visualViewport/,
+      /visualViewport\?\.addEventListener\('resize', syncVisualViewport\)/,
+      /visualViewport\?\.addEventListener\('scroll', syncVisualViewport\)/,
+    ],
+  },
+  {
+    file: 'src/components/sessionDetail/SessionOptionsModal.module.css',
+    patterns: [
+      /@media\s*\(max-width:\s*640px\)[\s\S]*?\.content\s*\{[^}]*gap:\s*var\(--spacing-sm\);/,
+      /\.optionHeader > :global\(button\)\s*\{[^}]*width:\s*100%;/s,
+    ],
+  },
+  {
     file: 'src/components/GoalDetailModal.module.css',
     patterns: [
       /@media\s*\(max-width:\s*560px\)[\s\S]*?\.activitiesFooterPrimaryActions\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,

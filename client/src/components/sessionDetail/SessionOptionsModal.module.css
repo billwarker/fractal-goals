@@ -55,11 +55,29 @@
 }
 
 @media (max-width: 640px) {
+    .content {
+        gap: var(--spacing-sm);
+    }
+
+    .optionCard {
+        gap: var(--spacing-sm);
+        padding: var(--spacing-md);
+    }
+
     .optionHeader {
         flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+
+    .optionHeader > :global(button) {
+        width: 100%;
     }
 
     .inlineActions {
         flex-direction: column-reverse;
+    }
+
+    .inlineActions > :global(button) {
+        width: 100%;
     }
 }
