@@ -546,28 +546,49 @@ class TimerService:
         }.intersection(data):
             return None, "Circuit child completion and timing are owned by its circuit run", 409
 
+        was_live = bool(
+            instance.time_start
+            and instance.time_stop is None
+            and not instance.completed
+        )
+
+        updated_time_start = instance.time_start
+        updated_time_stop = instance.time_stop
         if 'time_start' in data:
             try:
-                instance.time_start = _parse_iso_datetime(data['time_start'])
+                updated_time_start = _parse_iso_datetime(data['time_start'])
             except ValueError:
                 return None, f"Invalid datetime format: {data['time_start']}", 400
 
         if 'time_stop' in data:
             try:
-                instance.time_stop = _parse_iso_datetime(data['time_stop'])
+                updated_time_stop = _parse_iso_datetime(data['time_stop'])
             except ValueError:
                 return None, f"Invalid datetime format: {data['time_stop']}", 400
 
         if 'time_start' in data or 'time_stop' in data:
             try:
-                if instance.time_start is None and instance.time_stop is None:
+                is_live_start_adjustment = (
+                    was_live
+                    and 'time_start' in data
+                    and 'time_stop' not in data
+                    and updated_time_start is not None
+                )
+                if is_live_start_adjustment:
+                    WorkIntervalService(self.db_session).adjust_live_start(
+                        instance,
+                        started_at=updated_time_start,
+                    )
+                elif updated_time_start is None and updated_time_stop is None:
                     WorkIntervalService(self.db_session).replace_ordinary_intervals(instance, [])
-                elif instance.time_start is None or instance.time_stop is None:
+                elif updated_time_start is None or updated_time_stop is None:
                     return None, "Historical timing edits require both time_start and time_stop", 400
                 else:
+                    instance.time_start = updated_time_start
+                    instance.time_stop = updated_time_stop
                     WorkIntervalService(self.db_session).replace_ordinary_intervals(
                         instance,
-                        [(instance.time_start, instance.time_stop)],
+                        [(updated_time_start, updated_time_stop)],
                     )
             except ValueError as error:
                 self.db_session.rollback()
@@ -592,12 +613,6 @@ class TimerService:
             except ActivitySetValidationError as error:
                 self.db_session.rollback()
                 return None, str(error), 400
-
-        if instance.time_start and instance.time_stop:
-            duration = (instance.time_stop - instance.time_start).total_seconds()
-            instance.duration_seconds = int(duration)
-        elif not instance.time_start or not instance.time_stop:
-            instance.duration_seconds = None
 
         self.db_session.flush()
         activity_name = instance.definition.name if instance.definition else "Unknown"

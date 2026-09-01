@@ -16,7 +16,7 @@ from uuid import uuid4
 
 from sqlalchemy.exc import IntegrityError
 
-from models import Goal, Session, SessionTemplate, SessionWorkInterval
+from models import ActivityInstance, Goal, Session, SessionTemplate, SessionWorkInterval
 
 
 @pytest.mark.integration
@@ -366,6 +366,128 @@ class TestManualTimeEntry:
         )
         assert response.status_code == 400
         assert 'both time_start and time_stop' in response.get_json()['error']
+
+    def test_update_start_time_while_activity_is_live(
+        self,
+        authed_client,
+        db_session,
+        sample_activity_instance,
+    ):
+        session = db_session.get(Session, sample_activity_instance.session_id)
+        root_id = session.root_id
+        instance_id = sample_activity_instance.id
+        assert authed_client.post(
+            f'/api/{root_id}/activity-instances/{instance_id}/start'
+        ).status_code == 200
+
+        interval = db_session.query(SessionWorkInterval).filter_by(
+            activity_instance_id=instance_id,
+            ended_at=None,
+        ).one()
+        adjusted_start = (interval.started_at - timedelta(minutes=3)).replace(microsecond=0)
+
+        response = authed_client.put(
+            f'/api/{root_id}/activity-instances/{instance_id}',
+            json={'time_start': adjusted_start.isoformat()},
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert datetime.fromisoformat(payload['time_start'].replace('Z', '+00:00')).replace(
+            tzinfo=None
+        ) == adjusted_start
+        assert payload['time_stop'] is None
+        db_session.refresh(interval)
+        assert interval.started_at == adjusted_start
+        assert interval.ended_at is None
+
+    def test_update_start_time_while_activity_is_paused(
+        self,
+        authed_client,
+        db_session,
+        sample_activity_instance,
+    ):
+        session = db_session.get(Session, sample_activity_instance.session_id)
+        root_id = session.root_id
+        instance_id = sample_activity_instance.id
+        assert authed_client.post(
+            f'/api/{root_id}/activity-instances/{instance_id}/start'
+        ).status_code == 200
+        assert authed_client.post(
+            f'/api/{root_id}/timers/session/{session.id}/pause'
+        ).status_code == 200
+
+        interval = db_session.query(SessionWorkInterval).filter_by(
+            activity_instance_id=instance_id,
+        ).one()
+        adjusted_start = (interval.started_at - timedelta(minutes=3)).replace(microsecond=0)
+
+        response = authed_client.put(
+            f'/api/{root_id}/activity-instances/{instance_id}',
+            json={'time_start': adjusted_start.isoformat()},
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert datetime.fromisoformat(payload['time_start'].replace('Z', '+00:00')).replace(
+            tzinfo=None
+        ) == adjusted_start
+        assert payload['time_stop'] is None
+        assert payload['is_paused'] is True
+        assert payload['duration_seconds'] >= 180
+        db_session.refresh(interval)
+        assert interval.started_at == adjusted_start
+        assert interval.duration_seconds >= 180
+
+    def test_live_start_adjustment_rejects_another_items_interval(
+        self,
+        authed_client,
+        db_session,
+        sample_activity_instance,
+        sample_activity_definition,
+    ):
+        session = db_session.get(Session, sample_activity_instance.session_id)
+        root_id = session.root_id
+        instance_id = sample_activity_instance.id
+        assert authed_client.post(
+            f'/api/{root_id}/activity-instances/{instance_id}/start'
+        ).status_code == 200
+
+        live_interval = db_session.query(SessionWorkInterval).filter_by(
+            activity_instance_id=instance_id,
+        ).one()
+        original_start = live_interval.started_at
+        other_instance_id = str(uuid4())
+        db_session.add(ActivityInstance(
+            id=other_instance_id,
+            root_id=root_id,
+            session_id=session.id,
+            activity_definition_id=sample_activity_definition.id,
+        ))
+        db_session.add(SessionWorkInterval(
+            root_id=root_id,
+            session_id=session.id,
+            activity_instance_id=other_instance_id,
+            started_at=original_start - timedelta(minutes=5),
+            ended_at=original_start - timedelta(minutes=2),
+            duration_seconds=180,
+        ))
+        db_session.commit()
+
+        response = authed_client.put(
+            f'/api/{root_id}/activity-instances/{instance_id}',
+            json={'time_start': (original_start - timedelta(minutes=3)).isoformat()},
+        )
+
+        assert response.status_code == 409
+        assert 'overlaps another session item' in response.get_json()['error']
+        db_session.expire_all()
+        persisted_interval = db_session.query(SessionWorkInterval).filter_by(
+            activity_instance_id=instance_id,
+        ).one()
+        persisted_instance = db_session.get(ActivityInstance, instance_id)
+        assert persisted_interval.started_at == original_start
+        assert persisted_instance.time_start == original_start
 
     def test_update_only_stop_time(self, authed_client, db_session, sample_activity_instance):
         """Test updating only the stop time."""

@@ -100,6 +100,55 @@ class WorkIntervalService:
         self._lock_session(session_id)
         return self.close(self.get_open(session_id), ended_at=ended_at)
 
+    def adjust_live_start(self, instance, *, started_at):
+        """Move the first accrual boundary for a logically live activity."""
+        if not started_at:
+            raise ValueError("A live activity requires a start time")
+
+        self._lock_session(instance.session_id)
+        intervals = self.db_session.query(SessionWorkInterval).filter(
+            SessionWorkInterval.activity_instance_id == instance.id,
+        ).order_by(
+            SessionWorkInterval.started_at,
+            SessionWorkInterval.id,
+        ).with_for_update().all()
+
+        # Preserve support for legacy live rows created before the interval ledger.
+        if not intervals:
+            instance.time_start = started_at
+            return
+
+        first = intervals[0]
+        boundary_end = first.ended_at or utc_now_naive()
+        if started_at > boundary_end:
+            raise ValueError("Live activity start cannot follow its current accrual boundary")
+
+        overlap = self.db_session.query(SessionWorkInterval.id).filter(
+            SessionWorkInterval.session_id == instance.session_id,
+            SessionWorkInterval.activity_instance_id != instance.id,
+            SessionWorkInterval.started_at < boundary_end,
+            or_(
+                SessionWorkInterval.ended_at.is_(None),
+                SessionWorkInterval.ended_at > started_at,
+            ),
+        ).first()
+        if overlap:
+            raise ValueError("Adjusted live start overlaps another session item")
+
+        first.started_at = started_at
+        if first.ended_at is not None:
+            first.duration_seconds = max(0, int((first.ended_at - started_at).total_seconds()))
+
+        instance.time_start = started_at
+        closed_durations = [
+            interval.duration_seconds
+            for interval in intervals
+            if interval.ended_at is not None
+        ]
+        if closed_durations:
+            instance.duration_seconds = sum(duration or 0 for duration in closed_durations)
+        self.db_session.flush()
+
     def recompute_subjects(self, interval):
         instance_total = self.db_session.query(
             func.coalesce(func.sum(SessionWorkInterval.duration_seconds), 0)
