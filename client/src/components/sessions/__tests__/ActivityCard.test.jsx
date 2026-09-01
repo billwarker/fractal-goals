@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import ActivityCard from '../ActivityCard';
 
 describe('ActivityCard', () => {
@@ -139,6 +139,51 @@ describe('ActivityCard', () => {
         expect(screen.getAllByText(/135 lbs/).length).toBeGreaterThan(0);
         expect(screen.getByText('Reps:')).toBeInTheDocument();
         expect(screen.getAllByText(/5/).length).toBeGreaterThan(0);
+    });
+
+    it('renders yield, best set, and additive totals in one wrapping summary rail', () => {
+        render(
+            <ActivityCard
+                activity={{
+                    type: 'activity',
+                    name: 'Parallel Bar Dips',
+                    completed: true,
+                    sets: [{
+                        metrics: [
+                            { metric_id: 'weight', value: 1 },
+                            { metric_id: 'reps', value: 10 },
+                        ],
+                    }],
+                    metrics: [],
+                    progress_comparison: {
+                        derived_summary: {
+                            auto_aggregations: {
+                                additive_totals: { reps: 10 },
+                                total_yield: 10,
+                                best_set_index: 0,
+                                best_set_yield: 10,
+                                best_set_values: { weight: 1, reps: 10 },
+                                yield_per_set: [{ set_index: 0, yield: 10 }],
+                            },
+                        },
+                    },
+                }}
+                activityDefinition={{
+                    metric_definitions: [
+                        { id: 'weight', name: 'Weight', unit: 'lbs', is_multiplicative: true, is_additive: false },
+                        { id: 'reps', name: 'Reps', unit: 'Count', is_multiplicative: true, is_additive: true },
+                    ],
+                    split_definitions: [],
+                }}
+            />
+        );
+
+        const summary = screen.getByLabelText('Activity summary metrics');
+        expect(within(summary).getByText('Yield:')).toBeInTheDocument();
+        expect(within(summary).getByText('Best S1:')).toBeInTheDocument();
+        expect(within(summary).getByText('Total Reps:')).toBeInTheDocument();
+        expect(summary.children).toHaveLength(3);
+        expect(screen.getByText('Yield:').compareDocumentPosition(screen.getByText('Total Reps:')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it('uses an activity-level delta display override over the root mode', () => {

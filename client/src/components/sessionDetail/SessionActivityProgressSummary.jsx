@@ -2,7 +2,7 @@
  * Progress summary + delta presentational components for session activity items.
  * Extracted from SessionActivityItem.jsx (audit P1-5) — no behavior change.
  */
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 
 import {
     canComputeYield,
@@ -10,6 +10,7 @@ import {
     filterTrackedMetricDefs,
     formatAggValue,
 } from '../../utils/progressAggregations';
+import ActivitySummaryRail from '../common/ActivitySummaryRail';
 import styles from './SessionActivityItem.module.css';
 
 /**
@@ -64,45 +65,37 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, disp
         )
         : null;
 
+    const summaryMetrics = additiveMetricDefs.map((md) => ({
+        key: `total-${md.id}`,
+        label: `Total ${md.name}:`,
+        value: `${formatAggValue(autoAgg.additive_totals[md.id])} ${md.unit}`,
+    }));
+    if (hasYield) {
+        summaryMetrics.push({
+            key: 'yield',
+            label: 'Total yield:',
+            value: (
+                <>
+                    {formatAggValue(autoAgg.total_yield)}
+                    {!isFirstInstance && prevYield != null && autoAgg.total_yield != null && (
+                        <SummaryDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter styles={styles} displayMode={displayMode} />
+                    )}
+                </>
+            ),
+        });
+    }
+    if (hasBestSet && bestSetLabel) {
+        summaryMetrics.push({
+            key: 'best-set',
+            label: 'Best:',
+            value: `Set ${autoAgg.best_set_index + 1} ${bestSetLabel}`,
+            muted: true,
+        });
+    }
+
     return (
         <div className={styles.progressSummary}>
-            {(additiveMetricDefs.length > 0 || hasYield || (hasBestSet && bestSetLabel)) && (
-                <div className={`${styles.progressSummaryRow} ${styles.progressSummaryTotal}`}>
-                    {additiveMetricDefs.map((md, index) => (
-                        <React.Fragment key={md.id}>
-                            {index > 0 && <span className={styles.progressSummaryDivider}>·</span>}
-                            <span className={styles.progressSummaryMetric}>
-                        <span className={styles.progressSummaryLabel}>Total {md.name}:</span>
-                        <span className={styles.progressSummaryValue}>
-                            {formatAggValue(autoAgg.additive_totals[md.id])} {md.unit}
-                        </span>
-                            </span>
-                        </React.Fragment>
-                    ))}
-                    {hasYield && (
-                        <>
-                            {additiveMetricDefs.length > 0 && <span className={styles.progressSummaryDivider}>·</span>}
-                            <span className={styles.progressSummaryMetric}>
-                                <span className={styles.progressSummaryLabel}>Total yield:</span>
-                                <span className={styles.progressSummaryValue}>
-                                    {formatAggValue(autoAgg.total_yield)}
-                                    {!isFirstInstance && prevYield != null && autoAgg.total_yield != null && (
-                                        <SummaryDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter styles={styles} displayMode={displayMode} />
-                                    )}
-                                </span>
-                            </span>
-                        </>
-                    )}
-                    {hasBestSet && bestSetLabel && (
-                        <>
-                            {(additiveMetricDefs.length > 0 || hasYield) && <span className={styles.progressSummaryDivider}>·</span>}
-                            <span className={styles.progressSummaryBestSetInline}>
-                                Best: Set {autoAgg.best_set_index + 1} {bestSetLabel}
-                            </span>
-                        </>
-                    )}
-                </div>
-            )}
+            <ActivitySummaryRail metrics={summaryMetrics} />
             {isExcluded && (
                 <div className={styles.progressExcluded}>
                     Excluded from the active progress view. Metrics remain available as raw session data.

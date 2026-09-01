@@ -1233,52 +1233,7 @@
     display: flex;
     flex-direction: column;
     gap: 3px;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px dashed var(--color-border);
-}
-
-.progressSummaryRow {
-    display: flex;
-    gap: 8px;
-    align-items: baseline;
-    font-size: 12px;
     min-width: 0;
-    overflow-x: auto;
-    white-space: nowrap;
-}
-
-.progressSummaryMetric {
-    display: inline-flex;
-    gap: 8px;
-    align-items: baseline;
-}
-
-.progressSummaryDivider {
-    color: var(--color-text-muted);
-    flex-shrink: 0;
-}
-
-.progressSummaryLabel {
-    color: var(--color-text-muted);
-    flex-shrink: 0;
-}
-
-.progressSummaryValue {
-    font-weight: 600;
-    color: var(--color-text-secondary);
-}
-
-.progressSummaryTotal .progressSummaryValue {
-    color: var(--color-text-primary);
-}
-
-.progressSummaryBestSetInline {
-    color: var(--color-text-muted);
-    font-size: 12px;
-    font-weight: 400;
-    font-style: italic;
-    flex-shrink: 0;
 }
 
 .durationCountdownAlert {

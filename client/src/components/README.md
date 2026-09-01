@@ -18,6 +18,7 @@ Use these shared primitives before adding local UI controls:
 - `atoms/Spinner.jsx` - the only spinner animation primitive.
 - `common/LoadingState.jsx` - page, panel, and list loading states; composes `Spinner`.
 - `common/EmptyState.jsx` - empty list, no data, and no result states.
+- `common/ActivitySummaryRail.jsx` - wrapping horizontal label/value summaries for derived activity-instance metrics across Sessions and Session Detail.
 - `common/SectionHeader.jsx`, `common/SidePaneHeader.jsx` - title/action rows.
 - `common/MetaField.jsx` - label/value metadata rows.
 - `common/ViewToggleTabs.jsx` - segmented view and mode switching.

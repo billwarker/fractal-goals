@@ -72,9 +72,8 @@ it('derives additive totals for a dual-mode metric from rendered sets when the s
 
     expect(screen.getByText('Total Hold Time:')).toBeInTheDocument();
     expect(screen.getByText(/22 Seconds/)).toBeInTheDocument();
-    const bestSet = screen.getByText(/Best: Set 2 8.9 Seconds/);
-    expect(bestSet).toBeInTheDocument();
-    expect(bestSet.closest('[class*="progressSummaryRow"]')).toHaveTextContent(
-        'Total Hold Time:22 Seconds·Best: Set 2 8.9 Seconds',
-    );
+    const summary = screen.getByLabelText('Activity summary metrics');
+    expect(within(summary).getByText('Best:')).toBeInTheDocument();
+    expect(within(summary).getByText('Set 2 8.9 Seconds')).toBeInTheDocument();
+    expect(summary).toHaveTextContent('Total Hold Time:22 SecondsBest:Set 2 8.9 Seconds');
 });

@@ -20,6 +20,7 @@ import {
 } from '../../utils/progressAggregations';
 import styles from './ActivityCard.module.css';
 import ActivityTagBadges from '../common/ActivityTagBadges';
+import ActivitySummaryRail from '../common/ActivitySummaryRail';
 import ProgressHint from '../common/ProgressHint';
 
 /**
@@ -76,50 +77,39 @@ function ActivityProgressSummary({ sets, activityDefinition, progressComparison,
         )
         : null;
 
-    return (
-        <div className={styles.progressSummary}>
-            {/* Total yield + best set on one line */}
-            {hasYield && (
-                <div className={styles.progressSummaryRow}>
-                    <span className={styles.progressSummaryLabel}>Yield:</span>
-                    <span className={styles.progressSummaryValue}>
-                        {formatAggValue(autoAgg.total_yield)}
-                        {prevYield != null && autoAgg.total_yield != null && (
-                            <TotalDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter displayMode={displayMode} />
-                        )}
-                    </span>
-                    {hasBestSet && bestSetLabel && (
-                        <>
-                            <span className={styles.progressSummaryDivider}>·</span>
-                            <span className={styles.progressSummaryLabel}>Best S{autoAgg.best_set_index + 1}:</span>
-                            <span className={styles.progressSummaryValue}>{bestSetLabel}</span>
-                        </>
+    const summaryMetrics = [];
+    if (hasYield) {
+        summaryMetrics.push({
+            key: 'yield',
+            label: 'Yield:',
+            value: (
+                <>
+                    {formatAggValue(autoAgg.total_yield)}
+                    {prevYield != null && autoAgg.total_yield != null && (
+                        <TotalDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter displayMode={displayMode} />
                     )}
-                </div>
-            )}
+                </>
+            ),
+        });
+    }
+    if (hasBestSet && bestSetLabel) {
+        summaryMetrics.push({
+            key: 'best-set',
+            label: `Best S${autoAgg.best_set_index + 1}:`,
+            value: bestSetLabel,
+        });
+    }
+    if (hasAdditive) {
+        trackedMetricDefs
+            .filter((md) => md.is_additive !== false && autoAgg.additive_totals[md.id] != null)
+            .forEach((md) => summaryMetrics.push({
+                key: `total-${md.id}`,
+                label: `Total ${md.name}:`,
+                value: `${formatAggValue(autoAgg.additive_totals[md.id])} ${md.unit}`,
+            }));
+    }
 
-            {/* Additive totals */}
-            {hasAdditive && trackedMetricDefs
-                .filter((md) => md.is_additive !== false && autoAgg.additive_totals[md.id] != null)
-                .map((md) => (
-                    <div key={md.id} className={styles.progressSummaryRow}>
-                        <span className={styles.progressSummaryLabel}>Total {md.name}:</span>
-                        <span className={styles.progressSummaryValue}>
-                            {formatAggValue(autoAgg.additive_totals[md.id])} {md.unit}
-                        </span>
-                    </div>
-                ))
-            }
-
-            {/* Best set only (no yield) */}
-            {!hasYield && hasBestSet && bestSetLabel && (
-                <div className={styles.progressSummaryRow}>
-                    <span className={styles.progressSummaryLabel}>Best S{autoAgg.best_set_index + 1}:</span>
-                    <span className={styles.progressSummaryValue}>{bestSetLabel}</span>
-                </div>
-            )}
-        </div>
-    );
+    return <ActivitySummaryRail metrics={summaryMetrics} compact />;
 }
 
 function TotalDelta({ current, previous, higherIsBetter = true, displayMode = 'percent' }) {

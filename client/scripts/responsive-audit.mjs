@@ -95,6 +95,18 @@ const checks = [
     ],
   },
   {
+    file: 'src/components/common/ActivitySummaryRail.module.css',
+    patterns: [
+      /\.rail\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap;[^}]*align-items:\s*baseline;/s,
+      /\.metric\s*\{[^}]*display:\s*inline-flex;[^}]*max-width:\s*100%;[^}]*white-space:\s*nowrap;/s,
+      /\.metric \+ \.metric::before\s*\{[^}]*content:\s*'·';/s,
+    ],
+    forbiddenPatterns: [
+      /overflow-x:\s*auto/,
+      /flex-direction:\s*column/,
+    ],
+  },
+  {
     file: 'src/components/GoalDetailModal.module.css',
     patterns: [
       /@media\s*\(max-width:\s*560px\)[\s\S]*?\.activitiesFooterPrimaryActions\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
@@ -146,7 +158,10 @@ const checks = [
       /\.timerActionColumn\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(120px,\s*100%\),\s*1fr\)\);/s,
       /\.metricMeta,\s*\.metricMetaLarge\s*\{[^}]*grid-column:\s*1;[^}]*grid-row:\s*2;/s,
       /\.metricUnit,\s*\.metricUnitLarge\s*\{[^}]*white-space:\s*nowrap;/s,
-      /\.progressSummaryRow\s*\{[^}]*overflow-x:\s*auto;[^}]*white-space:\s*nowrap;/s,
+    ],
+    forbiddenPatterns: [
+      /\.progressSummaryRow/,
+      /\.progressSummary\s*\{[^}]*overflow-x:\s*auto;/s,
     ],
   },
   {
