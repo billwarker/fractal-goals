@@ -32,8 +32,12 @@ function formatTimelineTitle(item) {
             return `Completed activity: ${activityName || 'Activity'}`;
         case 'activity.associated':
             return `Associated activity: ${activityName || 'Activity'}`;
+        case 'activity.disassociated':
+            return `Disassociated activity: ${activityName || 'Activity'}`;
         case 'activity_group.associated':
             return `Associated activity group: ${payload.activity_group_name || 'Activity group'}`;
+        case 'activity_group.disassociated':
+            return `Disassociated activity group: ${payload.activity_group_name || 'Activity group'}`;
         case 'target.created':
             return `Created target: ${targetName || 'Target'}`;
         case 'target.achieved':
@@ -84,7 +88,9 @@ function formatEventLabel(item) {
     switch (item.event_type) {
         case 'activity.completed': return 'Completed activity';
         case 'activity.associated': return 'Activity association';
+        case 'activity.disassociated': return 'Activity disassociation';
         case 'activity_group.associated': return 'Activity group association';
+        case 'activity_group.disassociated': return 'Activity group disassociation';
         case 'target.created': return 'Target created';
         case 'target.achieved': return 'Target achieved';
         case 'goal.created': return 'Goal created';

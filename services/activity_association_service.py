@@ -8,7 +8,10 @@ from models import (
     goal_activity_group_associations,
     validate_root_goal,
 )
-from services.association_reconciliation import reconcile_association_rows
+from services.association_reconciliation import (
+    append_goal_association_event,
+    reconcile_association_rows,
+)
 from services.events import Event, Events, event_bus
 from services.effective_goal_activities import resolve_effective_activity_entries
 from services.goal_loading import load_fractal_goals_for_serialization
@@ -42,7 +45,7 @@ class ActivityAssociationService:
                 goal_id for goal_id in goal_ids if goal_id in valid_goal_id_set
             ]
 
-        reconcile_association_rows(
+        delta = reconcile_association_rows(
             self.db_session,
             activity_goal_associations,
             activity_goal_associations.c.activity_id,
@@ -50,6 +53,23 @@ class ActivityAssociationService:
             activity_goal_associations.c.goal_id,
             valid_goal_ids,
         )
+        activity = self.db_session.query(ActivityDefinition).filter_by(id=activity_id).first()
+        if activity:
+            for action, changed_goal_ids in (
+                ("associated", delta.added_ids),
+                ("disassociated", delta.removed_ids),
+            ):
+                for changed_goal_id in changed_goal_ids:
+                    append_goal_association_event(
+                        self.db_session,
+                        root_id=root_id,
+                        goal_id=changed_goal_id,
+                        association_kind="activity",
+                        association_id=activity_id,
+                        association_name=activity.name,
+                        action=action,
+                        occurred_at=delta.occurred_at,
+                    )
         return valid_goal_ids
 
     def set_activity_goals(self, root_id, activity_id, current_user_id, goal_ids) -> ServiceResult[ActivityDefinition]:
@@ -92,6 +112,16 @@ class ActivityAssociationService:
         )
         if result.rowcount == 0:
             return None, "Association not found", 404
+
+        append_goal_association_event(
+            self.db_session,
+            root_id=root_id,
+            goal_id=goal_id,
+            association_kind="activity",
+            association_id=activity_id,
+            association_name=activity.name,
+            action="disassociated",
+        )
 
         self.db_session.commit()
 
@@ -137,7 +167,7 @@ class ActivityAssociationService:
         valid_activity_ids = {row[0] for row in valid_activities}
         valid_group_ids = {row[0] for row in valid_groups}
 
-        reconcile_association_rows(
+        activity_delta = reconcile_association_rows(
             self.db_session,
             activity_goal_associations,
             activity_goal_associations.c.goal_id,
@@ -145,7 +175,7 @@ class ActivityAssociationService:
             activity_goal_associations.c.activity_id,
             valid_activity_ids,
         )
-        reconcile_association_rows(
+        group_delta = reconcile_association_rows(
             self.db_session,
             goal_activity_group_associations,
             goal_activity_group_associations.c.goal_id,
@@ -153,6 +183,38 @@ class ActivityAssociationService:
             goal_activity_group_associations.c.activity_group_id,
             valid_group_ids,
         )
+
+        changed_activity_ids = activity_delta.added_ids | activity_delta.removed_ids
+        activities_by_id = dict(
+            self.db_session.query(ActivityDefinition.id, ActivityDefinition.name).filter(
+                ActivityDefinition.id.in_(changed_activity_ids)
+            ).all()
+        ) if changed_activity_ids else {}
+        changed_group_ids = group_delta.added_ids | group_delta.removed_ids
+        groups_by_id = dict(
+            self.db_session.query(ActivityGroup.id, ActivityGroup.name).filter(
+                ActivityGroup.id.in_(changed_group_ids)
+            ).all()
+        ) if changed_group_ids else {}
+        for kind, delta, names in (
+            ("activity", activity_delta, activities_by_id),
+            ("activity_group", group_delta, groups_by_id),
+        ):
+            for action, changed_ids in (
+                ("associated", delta.added_ids),
+                ("disassociated", delta.removed_ids),
+            ):
+                for association_id in changed_ids:
+                    append_goal_association_event(
+                        self.db_session,
+                        root_id=root_id,
+                        goal_id=goal_id,
+                        association_kind=kind,
+                        association_id=association_id,
+                        association_name=names.get(association_id, "Unknown"),
+                        action=action,
+                        occurred_at=delta.occurred_at,
+                    )
 
         self.db_session.commit()
         return {
@@ -231,6 +293,15 @@ class ActivityAssociationService:
                 activity_group_id=group_id,
             )
         )
+        append_goal_association_event(
+            self.db_session,
+            root_id=root_id,
+            goal_id=goal_id,
+            association_kind="activity_group",
+            association_id=group_id,
+            association_name=group.name,
+            action="associated",
+        )
         self.db_session.commit()
         return {"message": "Group linked successfully"}, None, 201
 
@@ -247,6 +318,17 @@ class ActivityAssociationService:
         )
         if result.rowcount == 0:
             return None, "Link not found", 404
+
+        group = self.db_session.query(ActivityGroup).filter_by(id=group_id).first()
+        append_goal_association_event(
+            self.db_session,
+            root_id=root_id,
+            goal_id=goal_id,
+            association_kind="activity_group",
+            association_id=group_id,
+            association_name=group.name if group else "Unknown",
+            action="disassociated",
+        )
 
         self.db_session.commit()
         return {"message": "Group unlinked successfully"}, None, 200

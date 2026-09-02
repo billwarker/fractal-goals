@@ -64,7 +64,7 @@ The intended backend flow is:
 Important backend design choices:
 
 - Services are the canonical boundary for validation, ownership checks, and transaction behavior.
-- Goal/activity and goal/activity-group replacement writes reconcile membership instead of deleting and recreating unchanged junction rows. This keeps association `created_at` values stable for Timeline history; the goal editor also skips the batch request when its direct activity and group ID sets are unchanged, while real association mutations invalidate root-scoped Timeline queries immediately.
+- Goal/activity and goal/activity-group replacement writes reconcile membership instead of deleting and recreating unchanged junction rows. Exact add/remove deltas append transaction-bound, name-snapshotted `EventLog` records, and Goal Timeline reads those immutable events rather than treating current junction rows as historical evidence; revision `d4e6f8a1b3c5` backfills active legacy associations and adds the root/goal/time history index. The goal editor skips the batch request when its direct activity and group ID sets are unchanged, while real association mutations invalidate root-scoped Timeline queries immediately.
 - Fractal roots self-scope with `root_id == id`; creation establishes that invariant after UUID generation, migration `7f8a9b0c1d2e` repairs older roots missing the linkage, and subtree deletion defensively includes its validated starting goal so a successful response always persists in subsequent lists.
 - Payload normalization is centralized.
 - Serialization is separated from business logic.

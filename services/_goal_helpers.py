@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from models import ActivityInstance, ActivityDefinition, ActivityGroup, Goal, GoalLevel, MetricDefinition, Note, Session, SessionTemplate, SplitDefinition, Target, activity_goal_associations, get_goal_by_id, validate_root_goal
 from services.goal_type_utils import get_canonical_goal_type
 from services.goal_loading import load_fractal_goals_for_serialization
+from services.association_reconciliation import append_goal_association_event
 from validators import parse_date_string
 
 from services._goal_service_common import authorize_goal_access, logger
@@ -54,6 +55,18 @@ class _GoalHelpersMixin:
                 goal_id=goal_id,
             )
         )
+        goal = get_goal_by_id(self.db_session, goal_id, load_associations=False)
+        activity = self.db_session.query(ActivityDefinition).filter_by(id=activity_id).first()
+        if goal and activity:
+            append_goal_association_event(
+                self.db_session,
+                root_id=goal.root_id or goal.id,
+                goal_id=goal_id,
+                association_kind="activity",
+                association_id=activity_id,
+                association_name=activity.name,
+                action="associated",
+            )
 
     def _get_authorized_goal(
         self,

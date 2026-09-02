@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import selectinload
 
 from models import Goal, activity_goal_associations, goal_activity_group_associations, get_goal_by_id, validate_root_goal
+from services.association_reconciliation import append_goal_association_event
 from services.goal_type_utils import get_canonical_goal_type
 from services.events import event_bus, Event, Events
 from services.goal_domain_rules import goal_allows_manual_completion, goal_requires_smart_validation
@@ -175,6 +176,15 @@ class _GoalLifecycleMixin:
                     goal_id=new_goal.id,
                 )
             )
+            append_goal_association_event(
+                self.db_session,
+                root_id=root_id,
+                goal_id=new_goal.id,
+                association_kind="activity",
+                association_id=activity.id,
+                association_name=activity.name,
+                action="associated",
+            )
 
         # Copy activity group associations
         for group in (source.associated_activity_groups or []):
@@ -183,6 +193,15 @@ class _GoalLifecycleMixin:
                     goal_id=new_goal.id,
                     activity_group_id=group.id,
                 )
+            )
+            append_goal_association_event(
+                self.db_session,
+                root_id=root_id,
+                goal_id=new_goal.id,
+                association_kind="activity_group",
+                association_id=group.id,
+                association_name=group.name,
+                action="associated",
             )
 
         self.db_session.commit()

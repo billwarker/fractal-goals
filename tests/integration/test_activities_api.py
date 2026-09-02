@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from models import (
     ActivityGroup,
+    EventLog,
     MetricDefinition,
     SplitDefinition,
     activity_goal_associations,
@@ -969,6 +970,11 @@ class TestActivityGoalAssociations:
             json=payload,
         )
         assert response.status_code == 200
+        history_count_before = db_session.query(EventLog).filter(
+            EventLog.root_id == root_id,
+            EventLog.source == 'association_reconciliation',
+            EventLog.payload['goal_id'].astext == goal_id,
+        ).count()
 
         historical_timestamp = datetime(2025, 1, 2, 3, 4, 5)
         db_session.execute(
@@ -990,6 +996,11 @@ class TestActivityGoalAssociations:
             json=payload,
         )
         assert response.status_code == 200
+        history_count_after = db_session.query(EventLog).filter(
+            EventLog.root_id == root_id,
+            EventLog.source == 'association_reconciliation',
+            EventLog.payload['goal_id'].astext == goal_id,
+        ).count()
 
         activity_created_at = db_session.execute(
             select(activity_goal_associations.c.created_at).where(
@@ -1005,6 +1016,7 @@ class TestActivityGoalAssociations:
         ).scalar_one()
         assert activity_created_at == historical_timestamp
         assert group_created_at == historical_timestamp
+        assert history_count_after == history_count_before
 
     def test_set_goal_associations_batch_rejects_non_array_ids(
         self,

@@ -5,6 +5,7 @@ from models import (
     ActivityDefinition,
     ActivityGroup,
     ActivityInstance,
+    EventLog,
     Goal,
     GoalLevel,
     GoalPauseInterval,
@@ -323,57 +324,42 @@ class GoalTimelineService:
                 )
 
         if 'activity' in requested_types:
-            activity_ids = {row.activity_id for row in direct_activity_rows}
-            activities_by_id = {}
-            if activity_ids:
-                activities = self.db_session.query(ActivityDefinition).options(
-                    selectinload(ActivityDefinition.metric_definitions).selectinload(MetricDefinition.fractal_metric),
-                    selectinload(ActivityDefinition.split_definitions),
-                ).filter(
-                    ActivityDefinition.id.in_(activity_ids),
-                    ActivityDefinition.root_id == root_id,
-                    ActivityDefinition.deleted_at.is_(None),
-                ).all()
-                activities_by_id = {activity.id: activity for activity in activities}
-            for activity_id, source_goal_id, associated_at in direct_activity_rows:
-                source_goal = goals_by_id.get(source_goal_id) or parent_goal
-                activity = activities_by_id.get(activity_id)
-                if not source_goal or not activity:
-                    continue
-                append_entry(
-                    f"activity_associated:{source_goal_id}:{activity_id}",
+            association_events = self.db_session.query(EventLog).filter(
+                EventLog.root_id == root_id,
+                EventLog.event_type.in_({
                     'activity.associated',
-                    associated_at,
-                    f"Associated activity: {activity.name}",
+                    'activity.disassociated',
+                    'activity_group.associated',
+                    'activity_group.disassociated',
+                }),
+                EventLog.payload['goal_id'].astext.in_(effective_goal_ids),
+            ).order_by(
+                EventLog.timestamp.desc(),
+                EventLog.id.desc(),
+            ).limit(limit).all()
+            for association_event in association_events:
+                event_payload = association_event.payload or {}
+                source_goal_id = event_payload.get('goal_id')
+                source_goal = goals_by_id.get(source_goal_id) or parent_goal
+                if not source_goal:
+                    continue
+                is_group = association_event.event_type.startswith('activity_group.')
+                is_associated = association_event.event_type.endswith('.associated')
+                name_key = 'activity_group_name' if is_group else 'activity_name'
+                association_name = event_payload.get(name_key) or 'Unknown'
+                action_label = 'Associated' if is_associated else 'Disassociated'
+                entity_label = 'activity group' if is_group else 'activity'
+                append_entry(
+                    f"association_event:{association_event.id}",
+                    association_event.event_type,
+                    association_event.timestamp,
+                    f"{action_label} {entity_label}: {association_name}",
                     category='activity',
-                    entity_id=activity.id,
-                    entity_type='activity_definition',
+                    entity_id=association_event.entity_id,
+                    entity_type=association_event.entity_type,
                     source_goal=source_goal,
-                    payload={'activity_definition_id': activity.id, 'activity_name': activity.name},
+                    payload=event_payload,
                 )
-            if group_ids:
-                groups = self.db_session.query(ActivityGroup).filter(
-                    ActivityGroup.id.in_(group_ids),
-                    ActivityGroup.root_id == root_id,
-                    ActivityGroup.deleted_at.is_(None),
-                ).all()
-                groups_by_id = {group.id: group for group in groups}
-                for group_id, source_goal_id, associated_at in group_rows:
-                    source_goal = goals_by_id.get(source_goal_id) or parent_goal
-                    group = groups_by_id.get(group_id)
-                    if not source_goal or not group:
-                        continue
-                    append_entry(
-                        f"activity_group_associated:{source_goal_id}:{group_id}",
-                        'activity_group.associated',
-                        associated_at,
-                        f"Associated activity group: {group.name}",
-                        category='activity',
-                        entity_id=group.id,
-                        entity_type='activity_group',
-                        source_goal=source_goal,
-                        payload={'activity_group_id': group.id, 'activity_group_name': group.name},
-                    )
 
         if 'target' in requested_types:
             targets = self.db_session.query(Target).options(

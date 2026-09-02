@@ -115,6 +115,17 @@ describe('GoalTimelineView', () => {
                 },
             },
             {
+                id: 'activity-disassociated',
+                type: 'activity',
+                event_type: 'activity.disassociated',
+                timestamp: '2026-05-13T11:37:00.000Z',
+                title: 'Disassociated activity: Archived Practice',
+                relationship: 'self',
+                payload: {
+                    activity_name: 'Archived Practice',
+                },
+            },
+            {
                 id: 'goal-created',
                 type: 'goal_lifecycle',
                 event_type: 'goal.created',
@@ -290,6 +301,7 @@ describe('GoalTimelineView', () => {
 
         expect(screen.getByText('Completed activity: Freestanding HSPU Eccentrics')).toBeInTheDocument();
         expect(screen.getByText('Associated activity: Handstand Practice')).toBeInTheDocument();
+        expect(screen.getByText('Disassociated activity: Archived Practice')).toBeInTheDocument();
         expect(screen.getByText('Created Short Term goal:')).toBeInTheDocument();
         expect(screen.getAllByText('HSPU Single with Good Form').length).toBeGreaterThanOrEqual(3);
         expect(screen.getByText('Completed Immediate goal:')).toBeInTheDocument();
@@ -300,8 +312,8 @@ describe('GoalTimelineView', () => {
         expect(screen.getByText('Created target: First clean rep')).toBeInTheDocument();
         expect(screen.getByText('Achieved target: First clean rep')).toBeInTheDocument();
 
-        expect(screen.getAllByText('May 13, 2026')).toHaveLength(9);
-        expect(screen.getAllByText('11:37 AM')).toHaveLength(9);
+        expect(screen.getAllByText('May 13, 2026')).toHaveLength(10);
+        expect(screen.getAllByText('11:37 AM')).toHaveLength(10);
         expect(screen.getAllByText('via child goal: HSPU Single with Good Form')).toHaveLength(3);
         expect(screen.queryByText('via child goal')).not.toBeInTheDocument();
         expect(screen.queryByText('Child contribution')).not.toBeInTheDocument();

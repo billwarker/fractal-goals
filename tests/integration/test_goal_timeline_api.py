@@ -22,12 +22,14 @@ class TestGoalTimelineApi:
         parent_goal = sample_goal_hierarchy['mid_term']
         child_goal = sample_goal_hierarchy['short_term']
 
-        db_session.execute(
-            activity_goal_associations.insert().values(
-                activity_id=sample_activity_definition.id,
-                goal_id=child_goal.id,
-            )
+        association_response = authed_client.put(
+            f'/api/{root_id}/goals/{child_goal.id}/associations/batch',
+            json={
+                'activity_ids': [sample_activity_definition.id],
+                'group_ids': [],
+            },
         )
+        assert association_response.status_code == 200
         session = Session(
             owner_id=sample_goal_hierarchy['ultimate'].owner_id,
             id=str(uuid.uuid4()),
@@ -94,6 +96,43 @@ class TestGoalTimelineApi:
             for metric in activity_entry['payload']['activity_definition']['metric_definitions']
         )
         assert activity_entry['payload']['sets'][0]['metrics'][0]['metric_id'] == sample_activity_definition.metric_definitions[0].id
+
+    def test_timeline_keeps_immutable_disassociation_history(
+        self,
+        authed_client,
+        sample_goal_hierarchy,
+        sample_activity_definition,
+    ):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal_id = sample_goal_hierarchy['short_term'].id
+        endpoint = f'/api/{root_id}/goals/{goal_id}/associations/batch'
+
+        associated = authed_client.put(endpoint, json={
+            'activity_ids': [sample_activity_definition.id],
+            'group_ids': [],
+        })
+        disassociated = authed_client.put(endpoint, json={
+            'activity_ids': [],
+            'group_ids': [],
+        })
+        assert associated.status_code == 200
+        assert disassociated.status_code == 200
+
+        response = authed_client.get(
+            f'/api/{root_id}/goals/{goal_id}/timeline?types=activity&include_children=false'
+        )
+        assert response.status_code == 200
+        association_events = [
+            entry for entry in response.get_json()['entries']
+            if entry['entity_id'] == sample_activity_definition.id
+        ]
+        assert [entry['event_type'] for entry in association_events] == [
+            'activity.disassociated',
+            'activity.associated',
+        ]
+        assert {
+            entry['payload']['activity_name'] for entry in association_events
+        } == {sample_activity_definition.name}
 
     def test_timeline_includes_parent_inherited_activity_when_enabled(self, authed_client, db_session, sample_goal_hierarchy, sample_activity_definition):
         root_id = sample_goal_hierarchy['ultimate'].id
