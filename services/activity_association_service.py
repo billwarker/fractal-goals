@@ -8,6 +8,7 @@ from models import (
     goal_activity_group_associations,
     validate_root_goal,
 )
+from services.association_reconciliation import reconcile_association_rows
 from services.events import Event, Events, event_bus
 from services.effective_goal_activities import resolve_effective_activity_entries
 from services.goal_loading import load_fractal_goals_for_serialization
@@ -29,28 +30,26 @@ class ActivityAssociationService:
         goal_ids = normalize_id_list(goal_ids)
         valid_goal_ids = []
         if goal_ids:
-            valid_goal_ids = [
+            valid_goal_id_set = {
                 goal_id
                 for (goal_id,) in self.db_session.query(Goal.id).filter(
                     Goal.id.in_(goal_ids),
                     Goal.root_id == root_id,
                     Goal.deleted_at.is_(None),
                 ).all()
+            }
+            valid_goal_ids = [
+                goal_id for goal_id in goal_ids if goal_id in valid_goal_id_set
             ]
 
-        self.db_session.execute(
-            activity_goal_associations.delete().where(
-                activity_goal_associations.c.activity_id == activity_id
-            )
+        reconcile_association_rows(
+            self.db_session,
+            activity_goal_associations,
+            activity_goal_associations.c.activity_id,
+            activity_id,
+            activity_goal_associations.c.goal_id,
+            valid_goal_ids,
         )
-        if valid_goal_ids:
-            self.db_session.execute(
-                activity_goal_associations.insert(),
-                [
-                    {"activity_id": activity_id, "goal_id": goal_id}
-                    for goal_id in valid_goal_ids
-                ],
-            )
         return valid_goal_ids
 
     def set_activity_goals(self, root_id, activity_id, current_user_id, goal_ids) -> ServiceResult[ActivityDefinition]:
@@ -108,6 +107,8 @@ class ActivityAssociationService:
     def set_goal_associations_batch(
         self, root_id, goal_id, current_user_id, activity_ids, group_ids
     ) -> ServiceResult[JsonDict]:
+        if not isinstance(activity_ids, list) or not isinstance(group_ids, list):
+            return None, "activity_ids and group_ids must be lists", 400
         activity_ids = normalize_id_list(activity_ids)
         group_ids = normalize_id_list(group_ids)
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -123,9 +124,6 @@ class ActivityAssociationService:
         if not goal:
             return None, "Goal not found", 404
 
-        if not isinstance(activity_ids, list) or not isinstance(group_ids, list):
-            return None, "activity_ids and group_ids must be lists", 400
-
         valid_activities = self.db_session.query(ActivityDefinition.id).filter(
             ActivityDefinition.root_id == root_id,
             ActivityDefinition.id.in_(activity_ids),
@@ -139,28 +137,27 @@ class ActivityAssociationService:
         valid_activity_ids = {row[0] for row in valid_activities}
         valid_group_ids = {row[0] for row in valid_groups}
 
-        self.db_session.execute(
-            activity_goal_associations.delete().where(activity_goal_associations.c.goal_id == goal_id)
+        reconcile_association_rows(
+            self.db_session,
+            activity_goal_associations,
+            activity_goal_associations.c.goal_id,
+            goal_id,
+            activity_goal_associations.c.activity_id,
+            valid_activity_ids,
         )
-        if valid_activity_ids:
-            self.db_session.execute(
-                activity_goal_associations.insert(),
-                [{"goal_id": goal_id, "activity_id": activity_id} for activity_id in valid_activity_ids],
-            )
-
-        self.db_session.execute(
-            goal_activity_group_associations.delete().where(goal_activity_group_associations.c.goal_id == goal_id)
+        reconcile_association_rows(
+            self.db_session,
+            goal_activity_group_associations,
+            goal_activity_group_associations.c.goal_id,
+            goal_id,
+            goal_activity_group_associations.c.activity_group_id,
+            valid_group_ids,
         )
-        if valid_group_ids:
-            self.db_session.execute(
-                goal_activity_group_associations.insert(),
-                [{"goal_id": goal_id, "activity_group_id": group_id} for group_id in valid_group_ids],
-            )
 
         self.db_session.commit()
         return {
-            "activity_ids": list(valid_activity_ids),
-            "group_ids": list(valid_group_ids),
+            "activity_ids": sorted(valid_activity_ids),
+            "group_ids": sorted(valid_group_ids),
         }, None, 200
 
     def get_goal_activities(

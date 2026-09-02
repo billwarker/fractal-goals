@@ -10,6 +10,7 @@ from models import (
     validate_root_goal,
     utc_now,
 )
+from services.association_reconciliation import reconcile_association_rows
 from services.events import Event, Events, event_bus
 from services.payload_normalizers import normalize_activity_payload, normalize_id_list
 from services.service_types import JsonDict, ServiceResult
@@ -94,28 +95,26 @@ class ActivityGroupService:
         goal_ids = normalize_id_list(goal_ids)
         valid_goal_ids = []
         if goal_ids:
-            valid_goal_ids = [
+            valid_goal_id_set = {
                 goal_id
                 for (goal_id,) in self.db_session.query(Goal.id).filter(
                     Goal.id.in_(goal_ids),
                     Goal.root_id == root_id,
                     Goal.deleted_at.is_(None),
                 ).all()
+            }
+            valid_goal_ids = [
+                goal_id for goal_id in goal_ids if goal_id in valid_goal_id_set
             ]
 
-        self.db_session.execute(
-            goal_activity_group_associations.delete().where(
-                goal_activity_group_associations.c.activity_group_id == group_id
-            )
+        reconcile_association_rows(
+            self.db_session,
+            goal_activity_group_associations,
+            goal_activity_group_associations.c.activity_group_id,
+            group_id,
+            goal_activity_group_associations.c.goal_id,
+            valid_goal_ids,
         )
-        if valid_goal_ids:
-            self.db_session.execute(
-                goal_activity_group_associations.insert(),
-                [
-                    {"activity_group_id": group_id, "goal_id": goal_id}
-                    for goal_id in valid_goal_ids
-                ],
-            )
         return valid_goal_ids
 
     def _get_active_group(self, root_id, group_id) -> ActivityGroup | None:

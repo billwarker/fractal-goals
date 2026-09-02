@@ -35,7 +35,7 @@ describe('useGoalAssociationMutations', () => {
         vi.clearAllMocks();
     });
 
-    it('persists goal associations and invalidates shared queries', async () => {
+    it('persists changed goal associations and invalidates shared queries', async () => {
         const queryClient = new QueryClient({
             defaultOptions: {
                 queries: { retry: false },
@@ -58,14 +58,51 @@ describe('useGoalAssociationMutations', () => {
         });
 
         await act(async () => {
-            await result.current.persistAssociations();
+            await result.current.persistAssociations(
+                [
+                    { id: 'activity-1', name: 'A' },
+                    { id: 'activity-2', name: 'B' },
+                ],
+                [{ id: 'group-1', name: 'G' }],
+            );
         });
 
         expect(setGoalAssociationsBatch).toHaveBeenCalledWith('root-1', 'goal-1', {
-            activity_ids: ['activity-1'],
+            activity_ids: ['activity-1', 'activity-2'],
             group_ids: ['group-1'],
         });
         expect(invalidateGoalAssociationQueries).toHaveBeenCalledWith(queryClient, 'root-1', 'goal-1');
+    });
+
+    it('skips persistence when goal associations are unchanged', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            }
+        });
+
+        const { result } = renderHook(() => useGoalAssociationMutations({
+            rootId: 'root-1',
+            goalId: 'goal-1',
+            mode: 'edit',
+            isOpen: true,
+            activityGroupsRaw: [],
+            fetchedActivities: [{ id: 'activity-1', name: 'A' }],
+            fetchedGroups: [{ id: 'group-1', name: 'G' }],
+        }), { wrapper: createWrapper(queryClient) });
+
+        await waitFor(() => {
+            expect(result.current.associatedActivities).toHaveLength(1);
+            expect(result.current.associatedActivityGroups).toHaveLength(1);
+        });
+
+        await act(async () => {
+            await result.current.persistAssociations();
+        });
+
+        expect(setGoalAssociationsBatch).not.toHaveBeenCalled();
+        expect(invalidateGoalAssociationQueries).not.toHaveBeenCalled();
     });
 
     it('buffers inline-created activities in create mode without persisting immediately', async () => {
@@ -222,12 +259,47 @@ describe('useGoalAssociationMutations', () => {
         });
 
         await act(async () => {
-            await result.current.persistAssociations();
+            await result.current.persistAssociations([
+                ...result.current.associatedActivities,
+                { id: 'activity-new', name: 'New Direct Activity', has_direct_association: true },
+            ]);
         });
 
         expect(setGoalAssociationsBatch).toHaveBeenCalledWith('root-1', 'goal-1', {
-            activity_ids: ['activity-direct', 'activity-hybrid'],
+            activity_ids: ['activity-direct', 'activity-hybrid', 'activity-new'],
             group_ids: [],
         });
+    });
+
+    it('treats unchanged inherited activities as a no-op', async () => {
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: { retry: false },
+                mutations: { retry: false },
+            }
+        });
+
+        const { result } = renderHook(() => useGoalAssociationMutations({
+            rootId: 'root-1',
+            goalId: 'goal-1',
+            mode: 'edit',
+            isOpen: true,
+            activityGroupsRaw: [],
+            fetchedActivities: [
+                { id: 'activity-direct', has_direct_association: true },
+                { id: 'activity-inherited', has_direct_association: false, inherited_from_children: true },
+            ],
+            fetchedGroups: [],
+        }), { wrapper: createWrapper(queryClient) });
+
+        await waitFor(() => {
+            expect(result.current.associatedActivities).toHaveLength(2);
+        });
+
+        await act(async () => {
+            await result.current.persistAssociations();
+        });
+
+        expect(setGoalAssociationsBatch).not.toHaveBeenCalled();
     });
 });

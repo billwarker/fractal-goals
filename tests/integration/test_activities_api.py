@@ -1,7 +1,17 @@
-import pytest
+from datetime import datetime
 import json
 import uuid
-from models import ActivityGroup, MetricDefinition, Goal, SplitDefinition
+
+import pytest
+from sqlalchemy import select
+
+from models import (
+    ActivityGroup,
+    MetricDefinition,
+    SplitDefinition,
+    activity_goal_associations,
+    goal_activity_group_associations,
+)
 
 
 @pytest.mark.integration
@@ -172,8 +182,14 @@ class TestActivityGroups:
         data = response.get_json()
         assert set(data['associated_goal_ids']) == set(goal_ids)
 
-    def test_set_activity_group_goals_replaces_associations(self, authed_client, sample_goal_hierarchy, sample_activity_group):
-        """Setting group-goal associations should replace the previous set."""
+    def test_set_activity_group_goals_replaces_associations_without_rewriting_retained_history(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        sample_activity_group,
+    ):
+        """Setting group-goal associations removes stale rows and retains existing history."""
         root_id = sample_goal_hierarchy['ultimate'].id
         group_id = sample_activity_group.id
         first_goal_id = sample_goal_hierarchy['ultimate'].id
@@ -186,12 +202,28 @@ class TestActivityGroups:
         assert first_response.status_code == 200
         assert set(first_response.get_json()['associated_goal_ids']) == {first_goal_id, second_goal_id}
 
+        historical_timestamp = datetime(2025, 1, 2, 3, 4, 5)
+        db_session.execute(
+            goal_activity_group_associations.update().where(
+                goal_activity_group_associations.c.activity_group_id == group_id,
+                goal_activity_group_associations.c.goal_id == second_goal_id,
+            ).values(created_at=historical_timestamp)
+        )
+        db_session.commit()
+
         replace_response = authed_client.post(
             f'/api/{root_id}/activity-groups/{group_id}/goals',
             json={'goal_ids': [second_goal_id]}
         )
         assert replace_response.status_code == 200
         assert set(replace_response.get_json()['associated_goal_ids']) == {second_goal_id}
+        retained_created_at = db_session.execute(
+            select(goal_activity_group_associations.c.created_at).where(
+                goal_activity_group_associations.c.activity_group_id == group_id,
+                goal_activity_group_associations.c.goal_id == second_goal_id,
+            )
+        ).scalar_one()
+        assert retained_created_at == historical_timestamp
 
     def test_set_activity_group_goals_rejects_non_array_goal_ids(
         self,
@@ -807,6 +839,55 @@ class TestActivityGoalAssociations:
         associated_goal_ids = {goal['id'] for goal in data['associated_goals']}
         assert associated_goal_ids == set(goal_ids)
 
+    def test_set_activity_goals_preserves_unchanged_association_timestamps(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        sample_activity_definition,
+    ):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        activity_id = sample_activity_definition.id
+        removed_goal_id = sample_goal_hierarchy['ultimate'].id
+        retained_goal_id = sample_goal_hierarchy['short_term'].id
+        goal_ids = [removed_goal_id, retained_goal_id]
+
+        response = authed_client.post(
+            f'/api/{root_id}/activities/{activity_id}/goals',
+            json={'goal_ids': goal_ids},
+        )
+        assert response.status_code == 200
+
+        historical_timestamp = datetime(2025, 1, 2, 3, 4, 5)
+        db_session.execute(
+            activity_goal_associations.update().where(
+                activity_goal_associations.c.activity_id == activity_id,
+                activity_goal_associations.c.goal_id == retained_goal_id,
+            ).values(created_at=historical_timestamp)
+        )
+        db_session.commit()
+
+        response = authed_client.post(
+            f'/api/{root_id}/activities/{activity_id}/goals',
+            json={'goal_ids': [retained_goal_id]},
+        )
+        assert response.status_code == 200
+
+        created_at = db_session.execute(
+            select(activity_goal_associations.c.created_at).where(
+                activity_goal_associations.c.activity_id == activity_id,
+                activity_goal_associations.c.goal_id == retained_goal_id,
+            )
+        ).scalar_one()
+        assert created_at == historical_timestamp
+        removed_rows = db_session.execute(
+            select(activity_goal_associations.c.goal_id).where(
+                activity_goal_associations.c.activity_id == activity_id,
+                activity_goal_associations.c.goal_id == removed_goal_id,
+            )
+        ).all()
+        assert removed_rows == []
+
     def test_set_activity_goals_rejects_non_array_goal_ids(
         self,
         authed_client,
@@ -867,6 +948,63 @@ class TestActivityGoalAssociations:
         groups_response = authed_client.get(f'/api/{root_id}/goals/{goal_id}/activity-groups')
         group_ids = {group['id'] for group in groups_response.get_json()}
         assert group_ids == {sample_activity_group.id}
+
+    def test_set_goal_associations_batch_preserves_unchanged_association_timestamps(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        sample_activity_definition,
+        sample_activity_group,
+    ):
+        root_id = sample_goal_hierarchy['ultimate'].id
+        goal_id = sample_goal_hierarchy['short_term'].id
+        payload = {
+            'activity_ids': [sample_activity_definition.id],
+            'group_ids': [sample_activity_group.id],
+        }
+
+        response = authed_client.put(
+            f'/api/{root_id}/goals/{goal_id}/associations/batch',
+            json=payload,
+        )
+        assert response.status_code == 200
+
+        historical_timestamp = datetime(2025, 1, 2, 3, 4, 5)
+        db_session.execute(
+            activity_goal_associations.update().where(
+                activity_goal_associations.c.goal_id == goal_id,
+                activity_goal_associations.c.activity_id == sample_activity_definition.id,
+            ).values(created_at=historical_timestamp)
+        )
+        db_session.execute(
+            goal_activity_group_associations.update().where(
+                goal_activity_group_associations.c.goal_id == goal_id,
+                goal_activity_group_associations.c.activity_group_id == sample_activity_group.id,
+            ).values(created_at=historical_timestamp)
+        )
+        db_session.commit()
+
+        response = authed_client.put(
+            f'/api/{root_id}/goals/{goal_id}/associations/batch',
+            json=payload,
+        )
+        assert response.status_code == 200
+
+        activity_created_at = db_session.execute(
+            select(activity_goal_associations.c.created_at).where(
+                activity_goal_associations.c.goal_id == goal_id,
+                activity_goal_associations.c.activity_id == sample_activity_definition.id,
+            )
+        ).scalar_one()
+        group_created_at = db_session.execute(
+            select(goal_activity_group_associations.c.created_at).where(
+                goal_activity_group_associations.c.goal_id == goal_id,
+                goal_activity_group_associations.c.activity_group_id == sample_activity_group.id,
+            )
+        ).scalar_one()
+        assert activity_created_at == historical_timestamp
+        assert group_created_at == historical_timestamp
 
     def test_set_goal_associations_batch_rejects_non_array_ids(
         self,

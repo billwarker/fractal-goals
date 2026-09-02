@@ -20,6 +20,12 @@ function arePrimitiveArraysEqual(left = [], right = []) {
     return left.every((value, index) => value === right[index]);
 }
 
+function haveSameIds(left = [], right = []) {
+    if (left.length !== right.length) return false;
+    const rightIds = new Set(right.map(String));
+    return left.every((value) => rightIds.has(String(value)));
+}
+
 function areShallowObjectsEqual(left, right) {
     if (left === right) return true;
     if (!left || !right) return false;
@@ -126,7 +132,9 @@ export function useGoalAssociationMutations({
         // Edit mode intentionally mirrors fetched associations into local editable state when the backing goal changes.
         setAssociatedActivities(normalizedFetchedActivities);
         setAssociatedActivityGroups(normalizedFetchedGroups);
-        initialActivitiesRef.current = normalizedFetchedActivities.map((activity) => activity.id);
+        initialActivitiesRef.current = normalizedFetchedActivities
+            .filter(isDirectActivityAssociation)
+            .map((activity) => activity.id);
         initialGroupsRef.current = normalizedFetchedGroups.map((group) => group.id);
     }, [normalizedFetchedActivities, normalizedFetchedGroups, mode, goalId]);
 
@@ -152,6 +160,14 @@ export function useGoalAssociationMutations({
                 .filter(isDirectActivityAssociation)
                 .map((activity) => activity.id);
             const groupIds = nextGroups.map((group) => group.id);
+
+            const associationsUnchanged = mode !== 'create'
+                && !overrideGoalId
+                && haveSameIds(activityIds, initialActivitiesRef.current)
+                && haveSameIds(groupIds, initialGroupsRef.current);
+            if (associationsUnchanged) {
+                return true;
+            }
 
             await fractalApi.setGoalAssociationsBatch(rootId, targetGoalId, {
                 activity_ids: activityIds,
