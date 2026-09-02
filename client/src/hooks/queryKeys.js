@@ -46,6 +46,7 @@ export const queryKeys = {
         limit,
     ],
     goalTimelineRoot: (rootId, goalId) => ['goalTimeline', rootId, goalId],
+    goalTimelinesRoot: (rootId) => ['goalTimeline', rootId],
     goalAnalytics: (rootId) => ['goal-analytics', rootId],
     targetAnalytics: (rootId, targetId, since = 'creation') => ['targetAnalytics', rootId, targetId, since],
     targetAnalyticsRoot: (rootId, targetId) => ['targetAnalytics', rootId, targetId],

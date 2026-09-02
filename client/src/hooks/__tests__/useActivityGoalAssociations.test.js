@@ -18,6 +18,9 @@ describe('invalidateActivityGoalAssociationQueries', () => {
             queryKey: queryKeys.onboardingRoot(),
             predicate: expect.any(Function),
         }));
+        expect(invalidateQueries).toHaveBeenCalledWith({
+            queryKey: queryKeys.goalTimelinesRoot('root-1'),
+        });
     });
 
     it('does not invalidate anything without a query client or root', async () => {
