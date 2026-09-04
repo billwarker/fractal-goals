@@ -305,21 +305,6 @@
     max-width: 100%;
 }
 
-.templateDoneMark {
-    justify-self: center;
-    color: var(--color-brand-success);
-    width: 12px;
-    height: 12px;
-    display: block;
-}
-
-.templateCount {
-    flex: 0 0 auto;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--color-text-muted);
-}
-
 .templateMeta {
     align-items: center;
     display: flex;
@@ -334,10 +319,6 @@
     font-size: 9px;
     font-weight: 700;
     text-transform: uppercase;
-}
-
-.templateItemDone {
-    opacity: 1;
 }
 
 .templateItemPending {

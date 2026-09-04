@@ -3,9 +3,16 @@ export const queryKeys = {
     circuits: (rootId, includeArchived = false) => ['circuits', rootId, { includeArchived }],
     circuit: (rootId, circuitId) => ['circuit', rootId, circuitId],
     sessionCircuitRuns: (rootId, sessionId) => ['circuit-runs', rootId, sessionId],
-    activeProgramDays: (rootId, date) => date
-        ? ['active-program-days', rootId, date]
-        : ['active-program-days', rootId],
+    programDayOptions: (rootId, date = null, timezone = null) => [
+        'program-day-options', rootId, ...(date ? [{ date, timezone }] : []),
+    ],
+    programDayReadModelRoot: (rootId, programId = null) => programId
+        ? ['program-day-read-model', rootId, programId]
+        : ['program-day-read-model', rootId],
+    programDayReadModel: (rootId, programId, timezone, rangeStart, rangeEnd, detailDate = null) => [
+        'program-day-read-model', rootId, programId,
+        { timezone, rangeStart, rangeEnd, detailDate },
+    ],
     analyticsSummary: (rootId, limit = 50) => ['analytics-summary', rootId, limit],
     analyticsSessions: (rootId, limit = 50) => ['analytics-sessions', rootId, limit],
     activityHistory: (rootId, activityDefinitionId, excludeSessionId = null, limit = 10) => [
@@ -79,9 +86,6 @@ export const queryKeys = {
     programMetricsRoot: (rootId) => ['program-metrics', rootId],
     programMetrics: (rootId, programId, timezone, rangeStart = null, rangeEnd = null) => [
         'program-metrics', rootId, programId, { timezone, rangeStart, rangeEnd },
-    ],
-    programMetricsComparison: (rootId, anchorProgramId, timezone, limit = 5) => [
-        'program-metrics', rootId, 'comparison', { anchorProgramId, timezone, limit },
     ],
     session: (rootId, sessionId) => ['session', rootId, sessionId],
     sessionRoot: (rootId) => ['session', rootId],

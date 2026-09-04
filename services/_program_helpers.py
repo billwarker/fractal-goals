@@ -148,17 +148,8 @@ class _ProgramHelpersMixin:
 
     @classmethod
     def _program_day_scheduled_on(cls, day: ProgramDay, block: ProgramBlock, target_date: date) -> bool:
-        if day.date:
-            return day.date == target_date
-
-        if not block.start_date or not block.end_date:
-            return False
-
-        if target_date < block.start_date or target_date > block.end_date:
-            return False
-
-        day_names = day.day_of_week if isinstance(day.day_of_week, list) else ([day.day_of_week] if day.day_of_week else [])
-        return bool(day_names and target_date.strftime('%A') in day_names)
+        from services.program_day_occurrences import program_day_scheduled_on
+        return program_day_scheduled_on(day, block, target_date)
 
     @classmethod
     def _normalize_template_configs(cls, data: Dict[str, Any]) -> List[Dict[str, Any]]:

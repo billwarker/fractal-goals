@@ -183,13 +183,18 @@ const checks = [
       /\.container\s*\{[^}]*background:\s*transparent;/s,
       /\.workspace\s*\{[^}]*background:\s*transparent;/s,
       /\.calendarPanel\s*\{[^}]*background:\s*transparent;/s,
-      /@media\s*\(max-width:\s*768px\)\s*\{[^}]*\.mobileSidePaneBackdrop\s*\{[^}]*position:\s*fixed;[^}]*z-index:\s*calc\(var\(--z-sheet\) \+ 1\);/s,
-      /\.mobileSidePaneSheet\s*\{[^}]*height:\s*min\(82dvh, 760px\);[^}]*padding-bottom:\s*env\(safe-area-inset-bottom, 0px\);/s,
-      /\.sidePaneViewToggle :global\(button\[role="tab"\]\)\s*\{[^}]*min-height:\s*44px;/s,
       /@media\s*\(max-width:\s*980px\)/,
     ],
     forbiddenPatterns: [
       /linear-gradient\(var\(--color-grid\)/,
+    ],
+  },
+  {
+    file: 'src/components/programs/ProgramSidePane.module.css',
+    patterns: [
+      /@media\s*\(max-width:\s*768px\)\s*\{[^}]*\.mobileSidePaneBackdrop\s*\{[^}]*position:\s*fixed;[^}]*z-index:\s*calc\(var\(--z-sheet\) \+ 1\);/s,
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.mobileSidePaneSheet\s*\{[^}]*height:\s*min\(82dvh, 760px\);[^}]*padding-bottom:\s*env\(safe-area-inset-bottom, 0px\);/s,
+      /\.sidePaneViewToggle :global\(button\[role="tab"\]\)\s*\{[^}]*min-height:\s*44px;/s,
     ],
   },
   {

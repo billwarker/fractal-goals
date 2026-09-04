@@ -135,6 +135,7 @@ jobs:
       - name: Lint Syntax
         run: |
           python -m compileall blueprints services models
+          python scripts/check_backend_maintainability.py
 
       - name: Run Unit Tests
         run: |
@@ -282,7 +283,8 @@ jobs:
 
       - name: Run Coverage Suite
         run: |
-          python -m pytest tests/unit tests/integration tests/performance --cov=. --cov-report=xml --cov-report=html --cov-report=term-missing -o addopts="--verbose --strict-markers"
+          python scripts/check_backend_coverage_gate.py
+          python -m pytest tests/unit tests/integration tests/performance --cov-report=xml --cov-report=html --cov-report=term-missing
 
       - name: Upload Coverage Artifacts
         uses: actions/upload-artifact@v4

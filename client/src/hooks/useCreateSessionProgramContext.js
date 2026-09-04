@@ -70,7 +70,7 @@ export function useCreateSessionProgramContext({
 export function useCreateSessionAutoSelection({
     loading, programDays, searchParams, setSearchParams, sessionSource,
     setSelectedProgramId, setSessionSource, setSelectedProgramDay,
-    setSelectedProgramSession, setSelectedTemplate,
+    setSelectedProgramSession, setSelectedTemplate, todayISO,
 }) {
     const [deepLinkNotice, setDeepLinkNotice] = useState(null);
     const hasAutoSelectedRef = useRef(false);
@@ -79,8 +79,15 @@ export function useCreateSessionAutoSelection({
     useEffect(() => {
         if (loading || hasAutoSelectedRef.current) return;
         const deepLinkedDayId = searchParams.get('program_day_id');
+        const deepLinkedProgramId = searchParams.get('program_id');
+        const deepLinkedTemplateId = searchParams.get('template_id');
+        const deepLinkedDate = searchParams.get('date');
         const matchedDay = deepLinkedDayId
-            ? programDays.find((day) => String(day.day_id) === deepLinkedDayId)
+            ? programDays.find((day) => (
+                String(day.day_id) === deepLinkedDayId
+                && (!deepLinkedProgramId || String(day.program_id) === deepLinkedProgramId)
+                && (!deepLinkedDate || deepLinkedDate === todayISO)
+            ))
             : null;
         const onlyDay = programDays.length === 1 ? programDays[0] : null;
         const requiredSessions = (onlyDay?.sessions || []).filter((session) => session.is_required !== false);
@@ -89,12 +96,18 @@ export function useCreateSessionAutoSelection({
 
         hasAutoSelectedRef.current = true;
         if (deepLinkedDayId) {
-            if (!matchedDay) setDeepLinkNotice('That program day isn’t scheduled for today.');
-            setSearchParams({}, { replace: true });
+            if (!matchedDay) {
+                setDeepLinkNotice('That program day isn’t scheduled for today.');
+            }
+            const remaining = new URLSearchParams(searchParams);
+            ['program_id', 'program_day_id', 'date', 'template_id'].forEach((key) => remaining.delete(key));
+            setSearchParams(remaining, { replace: true });
         }
         if (!autoDay) return;
         const autoSession = deepLinkedDayId
-            ? (autoDay.sessions?.length === 1 ? autoDay.sessions[0] : null)
+            ? (deepLinkedTemplateId
+                ? autoDay.sessions?.find((session) => String(session.template_id) === deepLinkedTemplateId)
+                : (autoDay.sessions?.length === 1 ? autoDay.sessions[0] : null))
             : requiredSessions[0];
         setSelectedProgramId(String(autoDay.program_id));
         setSessionSource('program');
@@ -107,6 +120,7 @@ export function useCreateSessionAutoSelection({
         loading, programDays, searchParams, sessionSource, setSearchParams,
         setSelectedProgramDay, setSelectedProgramId, setSelectedProgramSession,
         setSelectedTemplate, setSessionSource,
+        todayISO,
     ]);
     /* eslint-enable react-hooks/set-state-in-effect */
 

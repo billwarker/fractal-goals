@@ -975,7 +975,9 @@ class TestGlobalGoalEndpointProtection:
         other_user = User(
             id=str(uuid.uuid4()),
             username="otheruser",
-            email="other@example.com"
+            email="other@example.com",
+            terms_accepted_version=config.TERMS_VERSION,
+            privacy_accepted_version=config.PRIVACY_VERSION,
         )
         other_user.set_password("Password123")
         db_session.add(other_user)

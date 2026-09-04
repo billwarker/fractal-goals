@@ -51,6 +51,7 @@ export function useSessionDetailMutations({
             queryKeys.sessionsEvidenceGoalsRoot(rootId),
             queryKeys.sessionsFlowtreeMetricsRoot(rootId),
             queryKeys.programMetricsRoot(rootId),
+            queryKeys.programDayReadModelRoot(rootId),
         ]);
     }, [queryClient, rootId]);
 

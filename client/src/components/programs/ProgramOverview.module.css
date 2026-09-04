@@ -1,0 +1,39 @@
+.overview { display: grid; align-content: start; gap: 20px; padding: 18px 16px 28px; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); background: var(--color-border); }
+.stats > div { min-width: 0; padding: 12px; background: color-mix(in srgb, var(--color-bg-card) 92%, var(--color-bg-sidebar)); }
+.stats dt { color: var(--color-text-muted); font-size: 10px; font-weight: 700; letter-spacing: .035em; line-height: 1.25; text-transform: uppercase; }
+.stats dd { margin: 5px 0 0; color: var(--color-text-primary); font-size: 18px; font-weight: 800; line-height: 1.2; }
+.section { min-width: 0; display: grid; gap: 10px; }
+.sectionHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 2px; }
+.sectionHeading h2 { margin: 0; color: var(--color-text-primary); font-size: 14px; line-height: 1.3; }
+.sectionHeading > span { color: var(--color-text-muted); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.goalList, .blockList { display: grid; gap: 1px; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); background: var(--color-border); list-style: none; }
+.goalRow, .blockRow { min-width: 0; background: color-mix(in srgb, var(--color-bg-card) 92%, var(--color-bg-sidebar)); }
+.goalRow { display: grid; gap: 8px; padding: 10px 12px; }
+.goalIdentity { min-width: 0; display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.goalIdentity > span { overflow: hidden; color: var(--color-text-secondary); font-size: 12px; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.goalIdentity strong { color: var(--color-text-primary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.effortTrack { height: 3px; margin-left: 24px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--color-border) 70%, transparent); }
+.effortTrack span { display: block; height: 100%; min-width: 0; border-radius: inherit; background: var(--color-brand-primary); }
+.blockRow { display: grid; gap: 10px; padding: 11px 12px 12px; }
+.blockName { min-width: 0; display: flex; align-items: center; gap: 8px; color: var(--color-text-primary); font-size: 13px; font-weight: 700; }
+.blockName > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.blockMarker { width: 3px; height: 15px; flex: 0 0 auto; border-radius: 999px; background: var(--color-brand-primary); }
+.blockMetrics { display: grid; grid-template-columns: 1.35fr 1fr 1fr; gap: 8px; margin: 0 0 0 11px; }
+.blockMetrics div { min-width: 0; }
+.blockMetrics dt { color: var(--color-text-muted); font-size: 9px; font-weight: 700; letter-spacing: .025em; line-height: 1.2; text-transform: uppercase; }
+.blockMetrics dd { margin: 4px 0 0; color: var(--color-text-secondary); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.programDays { display: grid; gap: 6px; margin-left: 11px; padding-top: 9px; border-top: 1px solid color-mix(in srgb, var(--color-border) 62%, transparent); }
+.programDaysHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; color: var(--color-text-muted); font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.programDays ul { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.programDays li { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 10px; color: var(--color-text-secondary); font-size: 11px; }
+.programDays li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.programDays li strong { color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+.empty, .state { color: var(--color-text-muted); font-size: 12px; line-height: 1.5; }
+.empty { margin: 0; padding: 14px 12px; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); text-align: center; }
+.state { padding: 32px 20px; text-align: center; }
+
+@media (max-width: 360px) {
+    .overview { padding-inline: 12px; }
+    .blockMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

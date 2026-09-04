@@ -120,7 +120,7 @@ describe('ProgramBlockView', () => {
         expect(screen.getByText('Optional')).toBeInTheDocument();
     });
 
-    it('counts completed program day occurrences instead of raw completed sessions in the day card summary', () => {
+    it('does not publish a competing client-derived program-day completion summary', () => {
         renderWithProviders(
             <ProgramBlockView
                 blocks={[
@@ -168,7 +168,7 @@ describe('ProgramBlockView', () => {
             }
         );
 
-        expect(screen.getByLabelText('2 completed program days')).toBeInTheDocument();
+        expect(screen.queryByLabelText('2 completed program days')).not.toBeInTheDocument();
         expect(screen.queryByLabelText('6 completed program days')).not.toBeInTheDocument();
     });
 });

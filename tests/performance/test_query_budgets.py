@@ -250,6 +250,8 @@ def landing_publish_budget_dataset(db_session):
         username="landingadmin",
         email="landingadmin@example.com",
         role="admin",
+        terms_accepted_version=config.TERMS_VERSION,
+        privacy_accepted_version=config.PRIVACY_VERSION,
     )
     admin.set_password("Password123")
     db_session.add(admin)
@@ -975,6 +977,8 @@ def test_large_account_admin_users_budget(client, db_session, test_user, query_c
         username="largeadmin",
         email="largeadmin@example.com",
         role="admin",
+        terms_accepted_version=config.TERMS_VERSION,
+        privacy_accepted_version=config.PRIVACY_VERSION,
     )
     admin.set_password("Password123")
     db_session.add(admin)

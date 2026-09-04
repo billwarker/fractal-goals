@@ -41,7 +41,7 @@ describe('buildOnboardingSteps', () => {
                     program_created: true,
                     program_block_created: true,
                     program_day_completed: false,
-                    calendar_day_modal_opened: true,
+                    program_calendar_day_reviewed: true,
                 },
             },
         }, 'root-1').find((candidate) => candidate.id === 'schedule_program');
@@ -50,8 +50,8 @@ describe('buildOnboardingSteps', () => {
             { id: 'program_created', title: 'Create a Program', done: true },
             { id: 'program_block_created', title: 'Define Program Blocks', done: true },
             { id: 'program_day_completed', title: 'Create Program Days', done: false },
-            { id: 'calendar_day_modal_opened', title: 'Review the Calendar', done: true },
+            { id: 'program_calendar_day_reviewed', title: 'Review the Calendar', done: true },
         ]);
-        expect(step.substeps[3].description).toContain('Click twice on a calendar day');
+        expect(step.substeps[3].description).toContain('Click a calendar day once');
     });
 });

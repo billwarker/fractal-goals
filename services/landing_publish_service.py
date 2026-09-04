@@ -354,6 +354,11 @@ class LandingPublishService:
         try:
             programs = ProgramService.get_programs(self.db_session, root.id, owner_id)
         except Exception:
+            logger.warning(
+                "Landing options could not load programs for root_id=%s",
+                root.id,
+                exc_info=True,
+            )
             programs = []
 
         analytics_views = self.db_session.query(AnalyticsDashboard).filter(
@@ -884,6 +889,11 @@ class LandingPublishService:
         try:
             programs = ProgramService.get_programs(self.db_session, root.id, owner_id)
         except Exception:
+            logger.warning(
+                "Landing snapshot could not load programs for root_id=%s",
+                root.id,
+                exc_info=True,
+            )
             programs = []
 
         return {

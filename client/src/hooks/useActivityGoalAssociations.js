@@ -69,6 +69,7 @@ export function invalidateActivityGoalAssociationQueries(queryClient, {
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsEvidenceGoalsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsFlowtreeMetricsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId) }),
         // Activity-centric association flows (including session detail) bypass the
         // goal-detail batch helper but change Achievable and "Associate it to a goal".
         invalidateOnboardingProgress(queryClient, queryKeys),

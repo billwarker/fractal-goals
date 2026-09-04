@@ -86,7 +86,7 @@ function CreateSession() {
         allGoals,
         goalTree,
         loading,
-    } = useCreateSessionPageData(rootId, todayISO);
+    } = useCreateSessionPageData(rootId, todayISO, timezone || 'UTC');
 
     const selectedTemplateIsNormal = Boolean(selectedTemplate && !isQuickSession(selectedTemplate));
 
@@ -212,6 +212,8 @@ function CreateSession() {
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsHeatmap(rootId), refetchType: 'inactive' });
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId), refetchType: 'inactive' });
         queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.programDayOptions(rootId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.activeSessionRoot() });
         // Advances the onboarding "Create your first session" step.
         invalidateOnboardingProgress(queryClient, queryKeys);
@@ -343,6 +345,7 @@ function CreateSession() {
         loading, programDays, searchParams, setSearchParams, sessionSource,
         setSelectedProgramId, setSessionSource, setSelectedProgramDay,
         setSelectedProgramSession, setSelectedTemplate,
+        todayISO,
     });
     const visibleGoalIds = useMemo(
         () => new Set(scopedGoals.map((goal) => String(goal.id ?? goal.attributes?.id))),

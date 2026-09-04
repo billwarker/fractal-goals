@@ -1,5 +1,4 @@
 import React from 'react';
-import CheckIcon from '../atoms/CheckIcon';
 import EditIcon from '../atoms/EditIcon';
 import LinkIcon from '../atoms/LinkIcon';
 import PlusIcon from '../atoms/PlusIcon';
@@ -14,25 +13,17 @@ import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 import EmptyState from '../common/EmptyState';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 
-import { useTimezone } from '../../contexts/TimezoneContext';
 import {
     formatLiteralDate,
-    getDatePart,
     getDaysRemaining,
     getDurationDaysInclusive,
-    getISOYMDInTimezone,
     getWeekdayName,
 } from '../../utils/dateUtils';
-import {
-    getProgramDayScheduledDates,
-    getScheduledProgramDayCompletion,
-} from '../../utils/programViewModel';
 import { ProgramCheckIcon } from './ProgramSvgIcons';
 
 function ProgramBlockView({
     blocks, // sortedBlocks
     blockGoalsByBlockId,
-    sessions,
     onEditDay,
     onAttachGoal,
     onEditBlock,
@@ -42,7 +33,6 @@ function ProgramBlockView({
     onAddBlock,
 }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
-    const { timezone } = useTimezone();
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [blockToDelete, setBlockToDelete] = useState(null);
 
@@ -88,9 +78,6 @@ function ProgramBlockView({
                 const blockColor = block.color || '#3A86FF';
                 const headerBg = `color-mix(in srgb, ${blockColor} 8%, var(--color-bg-card))`;
                 const associatedGoals = blockGoalsByBlockId?.get(block.id) || [];
-                const blockStartDate = getDatePart(block.start_date);
-                const blockEndDate = getDatePart(block.end_date);
-
                 return (
                     <Card
                         key={block.id}
@@ -235,59 +222,24 @@ function ProgramBlockView({
                                                             return null;
                                                         })()}
                                                     </div>
-                                                    {(() => {
-                                                        const completedProgramDayCount = getProgramDayScheduledDates(day, block).filter((date) => (
-                                                            getScheduledProgramDayCompletion({
-                                                                date,
-                                                                dayId: day.id,
-                                                                day,
-                                                                templates: day.templates || [],
-                                                            }, sessions, timezone).isCompleted
-                                                        )).length;
-
-                                                        if (completedProgramDayCount > 0) {
-                                                            return (
-                                                                <div
-                                                                    className={styles.sessionCount}
-                                                                    aria-label={`${completedProgramDayCount} completed program days`}
-                                                                    title={`${completedProgramDayCount} completed program days`}
-                                                                >
-                                                                    <span>{completedProgramDayCount}</span>
-                                                                    <ProgramCheckIcon size={13} />
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    })()}
                                                 </div>
 
                                                 <div className={styles.templatesList}>
                                                     {(() => {
-                                                        const daySessions = sessions.filter(s => {
-                                                            if (s.program_day_id !== day.id || !s.completed) return false;
-                                                            const sessionDate = getISOYMDInTimezone(s.session_start || s.created_at, timezone);
-                                                            return sessionDate >= blockStartDate && sessionDate <= blockEndDate;
-                                                        });
-
                                                         if (day.templates?.length > 0) {
                                                             return day.templates.map(template => {
-                                                                const tSessions = daySessions.filter(s => s.template_id === template.id);
-                                                                const sCount = tSessions.length;
-                                                                const isDone = sCount > 0;
                                                                 const isRequired = template.is_required !== false;
 
                                                                 return (
                                                                     <div
                                                                         key={template.id}
-                                                                        className={`${styles.templateItem} ${isDone ? styles.templateItemDone : styles.templateItemPending} ${!isRequired ? styles.templateItemOptional : ''}`}
+                                                                        className={`${styles.templateItem} ${styles.templateItemPending} ${!isRequired ? styles.templateItemOptional : ''}`}
                                                                     >
                                                                         <div className={styles.templateBadgeWrap}>
-                                                                            {isDone && <CheckIcon className={styles.templateDoneMark} size={12} />}
                                                                             <SessionTemplateNameBadge entity={template} size="sm" wrap className={styles.templateBadge} />
                                                                         </div>
                                                                         <span className={styles.templateMeta}>
                                                                             {!isRequired ? <span className={styles.optionalMark}>Optional</span> : null}
-                                                                            {sCount > 1 && <span className={styles.templateCount}>×{sCount}</span>}
                                                                         </span>
                                                                     </div>
                                                                 );

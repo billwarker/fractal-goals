@@ -38,7 +38,7 @@ export const ONBOARDING_SUBSTEPS = {
         tracked('program_created', 'Create a Program', "Give your program a name, choose which goals you're planning to achieve, and give it start/end dates"),
         tracked('program_block_created', 'Define Program Blocks', 'Split your program into smaller block periods, where you can target specific goals or have a phased approach'),
         tracked('program_day_completed', 'Create Program Days', 'Within a block, you can define program days, with specific session templates or conditions for a successful day'),
-        tracked('calendar_day_modal_opened', 'Review the Calendar', 'Click twice on a calendar day to open the Calendar Day modal: from here you can schedule specific program days or goal deadlines.'),
+        tracked('program_calendar_day_reviewed', 'Review the Calendar', 'Click a calendar day once to review its schedule, completion requirements, sessions, and actions in the sidepane.'),
     ],
 };
 

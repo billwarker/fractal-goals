@@ -481,6 +481,28 @@ def test_check_program_day_completion(db_session, sample_program, sample_session
     assert day.is_completed is True
 
 
+def test_check_program_day_completion_logs_malformed_legacy_context(caplog):
+    completed_session = Session(id="session-malformed", attributes="{not-json")
+
+    class Query:
+        def filter_by(self, **_kwargs):
+            return self
+
+        def first(self):
+            return completed_session
+
+    class FakeSession:
+        def query(self, _model):
+            return Query()
+
+    with caplog.at_level("WARNING", logger="services._program_completion"):
+        assert ProgramService.check_program_day_completion(
+            FakeSession(), completed_session.id
+        ) is False
+
+    assert "Ignoring malformed program context for session session-malformed" in caplog.text
+
+
 def test_check_program_day_completion_allows_optional_template_missing(db_session, sample_program, sample_session_template, sample_goal_hierarchy):
     root_id = sample_goal_hierarchy['ultimate'].id
     optional_template = SessionTemplate(

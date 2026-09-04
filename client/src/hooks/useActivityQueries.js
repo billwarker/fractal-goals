@@ -44,6 +44,7 @@ export function useCreateActivity(rootId) {
         onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId) });
             await invalidateOnboardingProgress(queryClient, queryKeys);
         }
     });
@@ -56,6 +57,7 @@ export function useDeleteActivity(rootId) {
         onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId) });
             await invalidateOnboardingProgress(queryClient, queryKeys);
         }
     });

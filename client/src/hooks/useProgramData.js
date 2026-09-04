@@ -75,7 +75,8 @@ export function useProgramData(rootId, programId, timezone = null) {
         await invalidateQueryList([
             queryKeys.program(rootId, programId),
             queryKeys.programs(rootId),
-            queryKeys.activeProgramDays(rootId),
+            queryKeys.programDayOptions(rootId),
+            queryKeys.programDayReadModelRoot(rootId, programId),
             queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, programId, rootId]);
@@ -95,7 +96,8 @@ export function useProgramData(rootId, programId, timezone = null) {
             queryKeys.programs(rootId),
             queryKeys.sessions(rootId),
             queryKeys.sessionsAll(rootId),
-            queryKeys.activeProgramDays(rootId),
+            queryKeys.programDayOptions(rootId),
+            queryKeys.programDayReadModelRoot(rootId, programId),
             queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, programId, rootId]);
@@ -109,7 +111,8 @@ export function useProgramData(rootId, programId, timezone = null) {
             queryKeys.activityGroups(rootId),
             queryKeys.sessions(rootId),
             queryKeys.sessionsAll(rootId),
-            queryKeys.activeProgramDays(rootId),
+            queryKeys.programDayOptions(rootId),
+            queryKeys.programDayReadModelRoot(rootId, programId),
             queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, rootId, programId]);

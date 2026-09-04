@@ -25,6 +25,7 @@ from blueprints.auth_api import token_required
 from blueprints.api_utils import get_db_session, internal_error, parse_optional_pagination, etag_json_response
 from services import event_bus, Event, Events
 from services.program_metrics_service import ProgramMetricsService
+from services.program_day_read_model_service import ProgramDayReadModelService
 from services.session_filters import resolve_timezone
 
 logger = logging.getLogger(__name__)
@@ -122,6 +123,38 @@ def get_program_metrics(current_user, root_id, program_id):
         session.rollback()
         logger.exception("Error calculating program metrics")
         return internal_error(logger, "Program metrics request failed")
+    finally:
+        session.close()
+
+
+@programs_bp.route('/<root_id>/programs/<program_id>/day-read-model', methods=['GET'])
+@token_required
+def get_program_day_read_model(current_user, root_id, program_id):
+    session = get_db_session()
+    try:
+        if request.args.get('date'):
+            return jsonify({"error": "Use range_start and range_end."}), 400
+        timezone_name = request.args.get('timezone')
+        if not timezone_name:
+            return jsonify({"error": "Timezone is required."}), 400
+        payload, error, status = ProgramDayReadModelService(session).get(
+            root_id,
+            program_id,
+            current_user.id,
+            range_start=request.args.get('range_start'),
+            range_end=request.args.get('range_end'),
+            timezone_name=timezone_name,
+            detail_date=request.args.get('detail_date'),
+            session_limit=request.args.get('session_limit', 50),
+            session_cursor=request.args.get('session_cursor'),
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return etag_json_response(payload)
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Error building program day read model")
+        return internal_error(logger, "Program day read model request failed")
     finally:
         session.close()
 
@@ -415,10 +448,11 @@ def unschedule_block_day_occurrence(current_user, root_id, program_id, block_id,
     finally:
         session.close()
 
+@programs_bp.route('/<root_id>/programs/day-options', methods=['GET'])
 @programs_bp.route('/<root_id>/programs/active-days', methods=['GET'])
 @token_required
 def get_active_program_days(current_user, root_id):
-    """Get active program days if owned by user."""
+    """Get date-specific program session options; active-days remains a compatibility alias."""
     session = get_db_session()
     try:
         target_date = None

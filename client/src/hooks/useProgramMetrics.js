@@ -4,6 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 
+const PROGRAM_METRICS_CALCULATION_VERSION = 3;
+
 const millisecondsUntilNextLocalMidnight = () => {
     const now = new Date();
     const next = new Date(now);
@@ -26,6 +28,9 @@ export function useProgramMetrics(rootId, programId, timezone, range = {}) {
                 timezone: timezone || 'UTC',
                 ...(rangeStart && rangeEnd ? { range_start: rangeStart, range_end: rangeEnd } : {}),
             });
+            if (response.data?.calculation_version !== PROGRAM_METRICS_CALCULATION_VERSION) {
+                throw new Error('Unsupported program metrics version. Refresh and try again.');
+            }
             return response.data;
         },
         enabled: Boolean(rootId && programId),
@@ -41,20 +46,4 @@ export function useProgramMetrics(rootId, programId, timezone, range = {}) {
     }, [programId, queryClient, rootId, timezone]);
 
     return query;
-}
-
-export function useProgramMetricsComparison(rootId, anchorProgramId, timezone, enabled = false) {
-    return useQuery({
-        queryKey: queryKeys.programMetricsComparison(rootId, anchorProgramId, timezone || 'UTC', 5),
-        queryFn: async () => {
-            const response = await fractalApi.getProgramMetricsComparison(rootId, {
-                anchor_program_id: anchorProgramId,
-                timezone: timezone || 'UTC',
-                limit: 5,
-            });
-            return response.data;
-        },
-        enabled: Boolean(enabled && rootId && anchorProgramId),
-        staleTime: 5 * 60 * 1000,
-    });
 }

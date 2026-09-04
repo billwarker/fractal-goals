@@ -42,6 +42,31 @@ describe('createSessionProgramDay', () => {
         });
     });
 
+    it('treats overlapping occurrence minimums as one per-day threshold', () => {
+        const view = buildTodayProgramDayView([
+            {
+                sessions: [
+                    { template_id: 'a', is_required: false },
+                    { template_id: 'b', is_required: false },
+                ],
+                completed_template_ids: ['a'],
+                completion_min_templates: 2,
+            },
+            {
+                sessions: [
+                    { template_id: 'b', is_required: false },
+                    { template_id: 'c', is_required: false },
+                ],
+                completed_template_ids: ['b'],
+                completion_min_templates: 2,
+            },
+        ]);
+
+        expect(view.minTemplates).toBe(2);
+        expect([...view.completedTemplateIds]).toEqual(['a', 'b']);
+        expect(view.isDayComplete).toBe(true);
+    });
+
     it('partitions templates without changing recency order', () => {
         const templates = [
             { id: 'other', updated_at: '2026-01-02' },

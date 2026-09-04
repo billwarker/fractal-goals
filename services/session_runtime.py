@@ -22,6 +22,7 @@ def get_template_session_type(template_data):
 
 
 def get_template_color(template_data):
+    template_data = models._safe_load_json(template_data, {})
     if not isinstance(template_data, dict):
         return None
     color = template_data.get('template_color')

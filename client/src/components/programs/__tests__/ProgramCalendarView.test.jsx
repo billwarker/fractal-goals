@@ -55,6 +55,7 @@ vi.mock('@fullcalendar/react', async () => {
                 data-expand-rows={String(Boolean(props.expandRows))}
                 data-day-max-events={String(props.dayMaxEvents)}
                 data-selectable={String(Boolean(props.selectable))}
+                data-select-min-distance={String(props.selectMinDistance)}
                 data-header-left={props.headerToolbar.left}
             >
                 {props.headerToolbar.left.includes('contextualToday') ? (
@@ -138,12 +139,41 @@ describe('ProgramCalendarView', () => {
         }));
     });
 
+    it('reconciles repeated calendar cell mounts without duplicate labels or handlers', async () => {
+        const firstHandler = vi.fn();
+        const secondHandler = vi.fn();
+        const { props, rerender } = renderCalendar({ onBlockLabelClick: firstHandler });
+
+        for (let index = 0; index < 5; index += 1) {
+            rerender(
+                <ProgramCalendarView
+                    {...props}
+                    selectedDate={index % 2 ? '2026-05-17' : undefined}
+                    onBlockLabelClick={secondHandler}
+                />,
+            );
+        }
+
+        expect(await screen.findAllByRole('button', { name: 'Select Block 1' })).toHaveLength(1);
+        fireEvent.click(screen.getByRole('button', { name: 'Select Block 1' }));
+        expect(firstHandler).not.toHaveBeenCalled();
+        expect(secondHandler).toHaveBeenCalledTimes(1);
+    });
+
     it('keeps the Today button wired to context reset', () => {
         const { props } = renderCalendar();
 
         fireEvent.click(screen.getByRole('button', { name: 'Today' }));
 
         expect(props.onTodayClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks the entire calendar as a multi-day selection surface while the mode is active', () => {
+        const { container } = renderCalendar({ blockCreationMode: true });
+
+        expect(container.querySelector('[data-selection-mode="multiple"]')).toBeInTheDocument();
+        expect(screen.getByTestId('mock-calendar')).toHaveAttribute('data-selectable', 'true');
+        expect(screen.getByTestId('mock-calendar')).toHaveAttribute('data-select-min-distance', '5');
     });
 
     it('renders configured SMART goal icons before calendar goal labels', () => {
@@ -250,6 +280,7 @@ describe('ProgramCalendarView', () => {
         expect(calendar).toHaveAttribute('data-expand-rows', 'true');
         expect(calendar).toHaveAttribute('data-day-max-events', '3');
         expect(calendar).toHaveAttribute('data-selectable', 'false');
+        expect(calendar).toHaveAttribute('data-select-min-distance', '5');
         expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-calendar-cell-color: #89cff0');
         expect(screen.getByTestId('mock-day-cell')).toHaveAttribute('data-calendar-background', 'block');
     });
@@ -273,5 +304,78 @@ describe('ProgramCalendarView', () => {
 
         expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-calendar-cell-color: #224466');
         expect(screen.getByTestId('mock-day-cell')).toHaveAttribute('data-calendar-background', 'program');
+    });
+
+    it('shows an inline completion mark on program-day ribbons and clears stale state', () => {
+        const { rerender, props } = renderCalendar({
+            calendarEvents: [
+                {
+                    id: 'pday-program-1-2026-05-17-practice',
+                    title: 'Daily practice',
+                    start: '2026-05-17',
+                    extendedProps: {
+                        type: 'program_day',
+                        programId: 'program-1',
+                        blockColor: '#663333',
+                        isCompleted: true,
+                    },
+                },
+                {
+                    id: 'pday-program-1-2026-05-17-review',
+                    title: 'Daily review',
+                    start: '2026-05-17',
+                    extendedProps: {
+                        type: 'program_day',
+                        programId: 'program-1',
+                        blockColor: '#663333',
+                        isCompleted: false,
+                    },
+                },
+                {
+                    id: 'pday-program-1-2026-05-18-future',
+                    title: 'Future practice',
+                    start: '2026-05-18',
+                    extendedProps: {
+                        type: 'program_day',
+                        programId: 'program-1',
+                        blockColor: '#663333',
+                        isCompleted: false,
+                    },
+                },
+            ],
+            dayStates: [
+                {
+                    date: '2026-05-17',
+                    state: 'scheduled_partial',
+                    closed: true,
+                    chain_role: 'none',
+                    breaks_chain: true,
+                },
+                {
+                    date: '2026-05-18',
+                    state: 'scheduled_pending',
+                    closed: false,
+                    chain_role: 'none',
+                    breaks_chain: false,
+                },
+            ],
+            selectedProgramName: 'Strong Finish',
+            selectedProgramId: 'program-1',
+        });
+
+        const cell = screen.getByTestId('mock-day-cell');
+        expect(cell).toHaveAttribute('data-day-state', 'scheduled_partial');
+        expect(screen.getByRole('img', { name: 'Daily practice: requirements met' })).toHaveTextContent('✓');
+        expect(screen.getByRole('img', { name: 'Daily review: missed' })).toHaveTextContent('✗');
+        expect(screen.queryByRole('img', { name: /Future practice/ })).not.toBeInTheDocument();
+        expect(screen.getByText('Daily practice').parentElement).toHaveStyle({
+            '--program-day-pill-bg': 'color-mix(in srgb, #663333 13%, var(--color-bg-card))',
+        });
+
+        rerender(<ProgramCalendarView {...props} dayStates={[]} />);
+
+        expect(cell).not.toHaveAttribute('data-day-state');
+        expect(screen.getByRole('img', { name: 'Daily practice: requirements met' })).toBeInTheDocument();
+        expect(screen.queryByRole('img', { name: 'Daily review: missed' })).not.toBeInTheDocument();
     });
 });

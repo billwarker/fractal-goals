@@ -223,6 +223,7 @@ run_verify() {
     print_message "$GREEN" "Running cheap repo verification..."
     ensure_frontend_tools
     bash -n "$ROOT_DIR/run-tests.sh"
+    "$VENV_PYTHON" "$ROOT_DIR/scripts/check_backend_maintainability.py"
     frontend_vitest --reporter=dot
     frontend_npm_script check:responsive
 }
@@ -380,7 +381,8 @@ run_with_coverage() {
     print_message "$GREEN" "Running tests with coverage..."
     ensure_backend_tools
     check_backend_db
-    backend_pytest --cov=. --cov-report=html --cov-report=term-missing
+    "$VENV_PYTHON" "$ROOT_DIR/scripts/check_backend_coverage_gate.py"
+    backend_pytest --cov-report=html --cov-report=term-missing
     print_message "$GREEN" "Coverage report generated in htmlcov/index.html"
 }
 

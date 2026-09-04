@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from models import ActivityInstance, Program, ProgramBlock, ProgramDay, Session, activity_goal_associations
+from models import ActivityInstance, Program, ProgramBlock, ProgramDay, ProgramDayTemplate, Session, activity_goal_associations
 from models.program import program_goals
 from services.program_metrics_service import ProgramMetricsService
 from services.program_scope import resolve_program_scope, resolve_program_scopes
@@ -82,7 +82,7 @@ def test_metrics_future_dates_are_upcoming_and_rates_are_nullable(
     assert (error, status) == (None, 200)
     assert payload["program"]["status"] == "upcoming"
     assert payload["window"]["observed_days"] == 0
-    assert {day["state"] for day in payload["days"]} == {"upcoming"}
+    assert {day["state"] for day in payload["days"]} == {"upcoming", "scheduled_pending"}
     assert payload["adherence"]["rate"] is None
     assert payload["alignment"]["duration_seconds"]["rate"] is None
     assert payload["semantics"]["data_layer"] == "analytics_engine"
@@ -138,7 +138,8 @@ def test_metrics_counts_completed_instances_in_unfinished_sessions_and_splits_ef
     )
     db_session.add(block)
     db_session.flush()
-    db_session.add(ProgramDay(block_id=block.id, name="Today", date=now.date()))
+    day = ProgramDay(block_id=block.id, name="Today", date=now.date())
+    db_session.add(day)
     db_session.execute(program_goals.insert().values(
         program_id=program.id, goal_id=sample_goal_hierarchy["mid_term"].id,
     ))
@@ -171,10 +172,18 @@ def test_metrics_counts_completed_instances_in_unfinished_sessions_and_splits_ef
     )
 
     assert (error, status) == (None, 200)
-    assert payload["adherence"]["met_days"] == 1
+    assert payload["adherence"]["met_days"] == 0
+    assert next(day for day in payload["days"] if day["date"] == now.date().isoformat())["state"] == "scheduled_pending"
     assert payload["alignment"]["instances"] == {"aligned": 1, "total": 1, "rate": 1.0}
     assert payload["execution"]["linked_sessions"] == 0
     assert payload["blocks"][0]["aligned_instances"] == 0
+    assert payload["blocks"][0]["program_days"] == [{
+        "program_day_id": day.id,
+        "name": "Today",
+        "day_number": None,
+        "scheduled_occurrences": 1,
+        "completed_occurrences": 0,
+    }]
     shares = {row["goal_id"]: row["effort_share"] for row in payload["goal_coverage"]}
     assert shares[sample_goal_hierarchy["mid_term"].id] == 0.5
     assert shares[sample_goal_hierarchy["short_term"].id] == 0.5
@@ -184,3 +193,94 @@ def test_metrics_counts_completed_instances_in_unfinished_sessions_and_splits_ef
     assert mid_term_coverage["level_name"] == mid_term_coverage["level"]
     assert mid_term_coverage["type"] == "MidTermGoal"
     assert isinstance(mid_term_coverage["is_smart"], bool)
+
+
+def test_comparison_uses_exact_occurrence_completion_not_aligned_goal_evidence(
+    db_session, sample_goal_hierarchy, sample_activity_definition, sample_session_template, test_user
+):
+    root = sample_goal_hierarchy["ultimate"]
+    today = datetime.now(timezone.utc).date()
+    scheduled_date = today - timedelta(days=1)
+    program = Program(
+        root_id=root.id,
+        name="Ended program",
+        start_date=datetime.combine(scheduled_date, datetime.min.time()),
+        end_date=datetime.combine(scheduled_date, datetime.max.time()),
+        weekly_schedule={},
+    )
+    db_session.add(program)
+    db_session.flush()
+    block = ProgramBlock(
+        program_id=program.id, name="Only block",
+        start_date=scheduled_date, end_date=scheduled_date,
+    )
+    db_session.add(block)
+    db_session.flush()
+    day = ProgramDay(block_id=block.id, name="Only day", date=scheduled_date)
+    db_session.add(day)
+    db_session.flush()
+    db_session.add(ProgramDayTemplate(
+        program_day_id=day.id,
+        session_template_id=sample_session_template.id,
+        is_required=True,
+        order=0,
+    ))
+    db_session.execute(program_goals.insert().values(
+        program_id=program.id, goal_id=sample_goal_hierarchy["mid_term"].id,
+    ))
+    db_session.execute(activity_goal_associations.insert().values(
+        activity_id=sample_activity_definition.id,
+        goal_id=sample_goal_hierarchy["mid_term"].id,
+    ))
+    evidence_session = Session(
+        owner_id=test_user.id, root_id=root.id, name="Aligned but unlinked",
+        completed=True,
+        total_duration_seconds=300,
+        session_start=datetime.combine(scheduled_date, datetime.min.time(), tzinfo=timezone.utc),
+    )
+    db_session.add(evidence_session)
+    db_session.flush()
+    db_session.add(ActivityInstance(
+        session_id=evidence_session.id, root_id=root.id,
+        activity_definition_id=sample_activity_definition.id,
+        completed=True, duration_seconds=300,
+        time_stop=datetime.combine(scheduled_date, datetime.min.time(), tzinfo=timezone.utc),
+    ))
+    db_session.commit()
+
+    payload, error, status = ProgramMetricsService(db_session).get_program_comparison(
+        root.id, test_user.id, anchor_program_id=program.id,
+        timezone_name="UTC", as_of=today,
+    )
+
+    assert (error, status) == (None, 200)
+    assert payload["programs"][0]["scheduled_days_observed"] == 1
+    assert payload["programs"][0]["met_days"] == 0
+    assert payload["programs"][0]["alignment_rate"] == 1.0
+
+    db_session.add(Session(
+        owner_id=test_user.id, root_id=root.id, name="Exact execution",
+        program_id=program.id, program_block_id=block.id, program_day_id=day.id,
+        template_id=sample_session_template.id, completed=True,
+        session_start=datetime.combine(scheduled_date, datetime.min.time(), tzinfo=timezone.utc),
+    ))
+    db_session.commit()
+
+    metrics, error, status = ProgramMetricsService(db_session).get_program_metrics(
+        root.id, program.id, test_user.id, timezone_name="UTC", as_of=today,
+    )
+    assert (error, status) == (None, 200)
+    assert metrics["blocks"][0]["program_days"] == [{
+        "program_day_id": day.id,
+        "name": "Only day",
+        "day_number": None,
+        "scheduled_occurrences": 1,
+        "completed_occurrences": 1,
+    }]
+
+    completed, error, status = ProgramMetricsService(db_session).get_program_comparison(
+        root.id, test_user.id, anchor_program_id=program.id,
+        timezone_name="UTC", as_of=today,
+    )
+    assert (error, status) == (None, 200)
+    assert completed["programs"][0]["met_days"] == 1

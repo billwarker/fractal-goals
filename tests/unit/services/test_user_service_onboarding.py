@@ -12,6 +12,17 @@ def test_normalize_onboarding_state_migrates_supporting_goal_achievement():
     ]
 
 
+def test_normalize_onboarding_state_migrates_calendar_modal_achievement():
+    state = UserService._normalize_onboarding_state({
+        'completed_substeps': {'schedule_program': ['calendar_day_modal_opened']},
+    })
+
+    assert state['completed_substeps']['schedule_program'] == [
+        'calendar_day_modal_opened',
+        'program_calendar_day_reviewed',
+    ]
+
+
 def test_merge_persisted_onboarding_achievements_is_monotonic():
     state = UserService._normalize_onboarding_state({
         'status': 'active',

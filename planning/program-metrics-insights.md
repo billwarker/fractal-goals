@@ -1,5 +1,7 @@
 # Program Metrics & Insights
 
+> UI status (2026-09-04): the standalone Insights workspace described in this historical plan has been retired. Its useful program-native summary now lives in the persistent Details sidepane, and multi-day calendar selection scopes that overview directly. The backend metrics and comparison contracts remain available; the obsolete Insights component, header tab, client comparison query, heatmap-only status icon, and associated styles/tests were removed.
+
 ## Context
 
 Programs currently model structure (programs → blocks → days → templates → goals) but say almost nothing about **execution**. The entire metrics surface today is eight lines of plain text in `ProgramSidebar.jsx:44-71` — Days Remaining, Program Days completed/scheduled, Duration, Goals met/total — computed client-side by `buildProgramMetrics` (`client/src/utils/programViewModel.js:687-723`) from the fat `getProgram` payload. There is no program metrics endpoint, no program visualization in the analytics registry, and no measure of whether the user is actually *doing* the program.
@@ -306,11 +308,11 @@ Both range parameters must be supplied together. Reject reversed ranges and rang
 
   "semantics": { "attribution": "current_state", "effort_allocation": "equal_split",
                  "execution_linkage": "explicit" },
-  "calculation_version": 1
+  "calculation_version": 3
 }
 ```
 
-`calculation_version` mirrors `SessionTemplateStats.calculation_version` so a formula change can invalidate a future cache.
+`calculation_version` is the Programs metrics contract version so a formula change can invalidate a future cache. Version 3 consumes the canonical occurrence evaluator's stable chain roles, active-break facts, and per-calendar-day minimum-template semantics.
 
 ### Metric semantics (precise)
 

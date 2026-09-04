@@ -1,0 +1,14 @@
+.mark {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    font-family: system-ui, sans-serif;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.sm { width: 16px; height: 16px; font-size: 15px; }
+.md { width: 21px; height: 21px; font-size: 20px; }
+.complete { color: var(--color-brand-success); }
+.incomplete { color: var(--color-brand-danger); }

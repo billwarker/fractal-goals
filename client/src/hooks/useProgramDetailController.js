@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
-import { subtractDaysToDateString } from '../utils/dateUtils';
 
-export function useProgramDetailController({ goals = [], onDayViewOpen }) {
+export function useProgramDetailController({ goals = [] }) {
     const [showEditBuilder, setShowEditBuilder] = useState(false);
     const [viewMode, setViewMode] = useState('calendar');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -17,11 +16,6 @@ export function useProgramDetailController({ goals = [], onDayViewOpen }) {
     const [attachBlockId, setAttachBlockId] = useState(null);
 
     const [blockCreationMode, setBlockCreationMode] = useState(false);
-
-    const [showDayViewModal, setShowDayViewModal] = useState(false);
-    const [selectedDate, setSelectedDate] = useState(null);
-    const [unscheduleConfirmOpen, setUnscheduleConfirmOpen] = useState(false);
-    const [itemToUnschedule, setItemToUnschedule] = useState(null);
 
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [selectedGoal, setSelectedGoal] = useState(null);
@@ -40,42 +34,6 @@ export function useProgramDetailController({ goals = [], onDayViewOpen }) {
         setModalMode('view');
         setSelectedParent(null);
     }, []);
-
-    const handleDateSelect = useCallback((selectInfo) => {
-        selectInfo.view.calendar.unselect();
-
-        if (blockCreationMode) {
-            setBlockModalData({
-                name: '',
-                startDate: selectInfo.startStr,
-                endDate: subtractDaysToDateString(selectInfo.endStr, 1),
-                color: '#3A86FF',
-            });
-            setShowBlockModal(true);
-            return;
-        }
-
-        setSelectedDate(selectInfo.startStr);
-        setShowDayViewModal(true);
-        onDayViewOpen?.();
-    }, [blockCreationMode, onDayViewOpen]);
-
-    const handleDateClick = useCallback((clickInfo) => {
-        if (blockCreationMode) {
-            setBlockModalData({
-                name: '',
-                startDate: clickInfo.dateStr,
-                endDate: clickInfo.dateStr,
-                color: '#3A86FF',
-            });
-            setShowBlockModal(true);
-            return;
-        }
-
-        setSelectedDate(clickInfo.dateStr);
-        setShowDayViewModal(true);
-        onDayViewOpen?.();
-    }, [blockCreationMode, onDayViewOpen]);
 
     const handleAddBlockClick = useCallback((initialBlockData = null) => {
         setBlockModalData({
@@ -123,8 +81,6 @@ export function useProgramDetailController({ goals = [], onDayViewOpen }) {
             day_of_week: [],
             templates: [],
         });
-        setShowDayViewModal(false);
-        setSelectedDate(null);
         setShowDayModal(true);
     }, []);
 
@@ -157,30 +113,6 @@ export function useProgramDetailController({ goals = [], onDayViewOpen }) {
         setShowAttachModal(false);
     }, []);
 
-    const closeDayViewModal = useCallback(() => {
-        setShowDayViewModal(false);
-        setSelectedDate(null);
-    }, []);
-
-    const handleScheduleDaySuccess = useCallback(() => {
-        setShowDayViewModal(false);
-        setSelectedDate(null);
-    }, []);
-
-    const handleUnscheduleDay = useCallback((item) => {
-        setItemToUnschedule(item);
-        setUnscheduleConfirmOpen(true);
-    }, []);
-
-    const closeUnscheduleConfirm = useCallback(() => {
-        setUnscheduleConfirmOpen(false);
-        setItemToUnschedule(null);
-    }, []);
-
-    const handleUnscheduleSuccess = useCallback(() => {
-        setUnscheduleConfirmOpen(false);
-        setItemToUnschedule(null);
-    }, []);
 
     const handleEventClick = useCallback((info) => {
         if (info.event.extendedProps.type !== 'goal') {
@@ -216,18 +148,12 @@ export function useProgramDetailController({ goals = [], onDayViewOpen }) {
         attachBlockId,
         blockCreationMode,
         setBlockCreationMode,
-        showDayViewModal,
-        selectedDate,
-        unscheduleConfirmOpen,
-        itemToUnschedule,
         showGoalModal,
         selectedGoal,
         modalMode,
         selectedParent,
         openGoalModal,
         closeGoalModal,
-        handleDateSelect,
-        handleDateClick,
         handleAddBlockClick,
         handleEditBlockClick,
         closeBlockModal,
@@ -240,11 +166,6 @@ export function useProgramDetailController({ goals = [], onDayViewOpen }) {
         handleAttachGoalClick,
         closeAttachModal,
         handleAttachGoalSaveSuccess,
-        closeDayViewModal,
-        handleScheduleDaySuccess,
-        handleUnscheduleDay,
-        closeUnscheduleConfirm,
-        handleUnscheduleSuccess,
         handleEventClick,
         handleAddChildGoal,
     };

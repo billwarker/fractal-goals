@@ -62,6 +62,7 @@ export function useTargetMutations(rootId, goalId) {
             queryClient.invalidateQueries({ queryKey: queryKeys.goalTimelineRoot(rootId, goalId) }),
             queryClient.invalidateQueries({ queryKey: queryKeys.goalActivityInstancesRoot(rootId, goalId) }),
             queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId) }),
             targetId
                 ? queryClient.invalidateQueries({ queryKey: queryKeys.targetAnalyticsRoot(rootId, targetId) })
                 : Promise.resolve(),

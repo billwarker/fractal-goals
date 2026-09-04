@@ -6,8 +6,8 @@ export const fractalProgramsApi = {
     getProgramMetrics: (rootId, programId, params = {}) => axios.get(
         `${API_BASE}/${rootId}/programs/${programId}/metrics`, { params },
     ),
-    getProgramMetricsComparison: (rootId, params = {}) => axios.get(
-        `${API_BASE}/${rootId}/programs/metrics/comparison`, { params },
+    getProgramDayReadModel: (rootId, programId, params) => axios.get(
+        `${API_BASE}/${rootId}/programs/${programId}/day-read-model`, { params },
     ),
     createProgram: (rootId, data) => axios.post(`${API_BASE}/${rootId}/programs`, data),
     updateProgram: (rootId, programId, data) => axios.put(`${API_BASE}/${rootId}/programs/${programId}`, data),
@@ -37,8 +37,8 @@ export const fractalProgramsApi = {
         axios.post(`${API_BASE}/${rootId}/programs/${programId}/goal-deadlines`, data),
     deleteBlockDay: (rootId, programId, blockId, dayId) =>
         axios.delete(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}`),
-    getActiveProgramDays: (rootId, date) => axios.get(
-        `${API_BASE}/${rootId}/programs/active-days`,
-        date ? { params: { date } } : undefined,
+    getProgramDayOptions: (rootId, date, timezone) => axios.get(
+        `${API_BASE}/${rootId}/programs/day-options`,
+        { params: { date, timezone } },
     ),
 };

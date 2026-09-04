@@ -266,10 +266,14 @@ describe('CreateSession quick-session flow', () => {
         })));
     });
 
-    it('honors a program-day deep link and clears the query parameter', async () => {
+    it('honors an exact program-day/template/date deep link and preserves unrelated query state', async () => {
+        const today = getISOYMDInTimezone(new Date(), 'UTC');
         const day = {
             day_id: 'day-linked', day_name: 'Linked Day', program_id: 'program-1', program_name: 'Strength',
-            sessions: [{ template_id: 'normal-1', template_name: 'Linked Session', template_data: { sections: [] } }],
+            sessions: [
+                { template_id: 'normal-1', template_name: 'Linked Session', template_data: { sections: [] } },
+                { template_id: 'normal-2', template_name: 'Exact Session', template_data: { sections: [] } },
+            ],
         };
         mockPageData.value = {
             ...mockPageData.value,
@@ -277,9 +281,9 @@ describe('CreateSession quick-session flow', () => {
             programDays: [day],
             programsById: { 'program-1': { program_id: 'program-1', program_name: 'Strength', days: [day] } },
         };
-        renderPage('/root-1/session/create?program_day_id=day-linked');
-        await waitFor(() => expect(screen.getByText(/Program picker: Linked Day \/ Linked Session/)).toBeInTheDocument());
-        expect(screen.getByTestId('location-search')).toHaveTextContent('');
+        renderPage(`/root-1/session/create?program_id=program-1&program_day_id=day-linked&date=${today}&template_id=normal-2&return_to=calendar`);
+        await waitFor(() => expect(screen.getByText(/Program picker: Linked Day \/ Exact Session/)).toBeInTheDocument());
+        expect(screen.getByTestId('location-search')).toHaveTextContent('?return_to=calendar');
     });
 
     it('shows a safe notice for an unavailable deep-linked day', async () => {

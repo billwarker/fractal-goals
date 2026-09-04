@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useMemo, useReducer, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 
 import EmptyState from '../components/common/EmptyState';
 import ViewToggleTabs from '../components/common/ViewToggleTabs';
@@ -7,9 +7,7 @@ import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import ProgramBlockView from '../components/programs/ProgramBlockView';
 import ProgramCalendarView from '../components/programs/ProgramCalendarView';
-import ProgramInsights from '../components/programs/ProgramInsights';
 import ResponsiveProgramSidePane from '../components/programs/ResponsiveProgramSidePane';
-import ConfirmationModal from '../components/ConfirmationModal';
 import Modal from '../components/atoms/Modal';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
@@ -22,15 +20,16 @@ import { useProgramDetailController } from '../hooks/useProgramDetailController'
 import { useProgramDetailMutations } from '../hooks/useProgramDetailMutations';
 import { useProgramDetailViewModel } from '../hooks/useProgramDetailViewModel';
 import { useProgramGoalSets } from '../hooks/useProgramGoalSets';
-import { useProgramMetrics, useProgramMetricsComparison } from '../hooks/useProgramMetrics';
-import { useNotesPageQuery } from '../hooks/useNotesPageQuery';
+import { useProgramMetrics } from '../hooks/useProgramMetrics';
+import { useProgramCalendarSelection } from '../hooks/useProgramCalendarSelection';
+import { useProgramDayDetail, useProgramDayRange } from '../hooks/useProgramDayReadModel';
 import { useProgramsCalendarData } from '../hooks/useProgramsCalendarData';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { formatLiteralDate, getISOYMDInTimezone, subtractDaysToDateString } from '../utils/dateUtils';
 import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
-import { createProgramCalendarContext, programCalendarContextReducer } from '../utils/programCalendarContext';
+import { createProgramCalendarContext, getProgramOverviewMetricsRange, programCalendarContextReducer } from '../utils/programCalendarContext';
 import { getProgramColor } from '../utils/programViewModel';
 import { getProgramStatus, isProgramActive } from '../utils/programGoalWindow';
 import styles from './ProgramCalendarPage.module.css';
@@ -38,16 +37,11 @@ import styles from './ProgramCalendarPage.module.css';
 const ProgramBlockModal = lazyWithRetry(() => import('../components/modals/ProgramBlockModal'), 'components/modals/ProgramBlockModal');
 const ProgramDayModal = lazyWithRetry(() => import('../components/modals/ProgramDayModal'), 'components/modals/ProgramDayModal');
 const AttachGoalModal = lazyWithRetry(() => import('../components/modals/AttachGoalModal'), 'components/modals/AttachGoalModal');
-const DayViewModal = lazyWithRetry(() => import('../components/modals/DayViewModal'), 'components/modals/DayViewModal');
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
-const PROGRAM_VIEW_ITEMS = ['calendar', 'blocks', 'insights'].map((value) => ({ value, label: `${value[0].toUpperCase()}${value.slice(1)}` }));
+const PROGRAM_VIEW_ITEMS = ['calendar', 'blocks'].map((value) => ({ value, label: `${value[0].toUpperCase()}${value.slice(1)}` }));
 function getDatePart(dateValue) {
     if (!dateValue) return null;
     return String(dateValue).split('T')[0];
-}
-
-function dateRangesOverlap(startA, endA, startB, endB) {
-    return Boolean(startA && endA && startB && endB && startA <= endB && endA >= startB);
 }
 
 function getStatusBadgeClass(status) {
@@ -84,7 +78,6 @@ function ProgramCalendarPage() {
     const onboarding = useOptionalOnboarding();
     const { rootId, programId } = useParams();
     const location = useLocation();
-    const navigate = useNavigate();
     const isMobile = useIsMobile();
     const { setActiveRootId } = useGoals();
     const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
@@ -99,14 +92,14 @@ function ProgramCalendarPage() {
         createProgramCalendarContext,
     );
     const {
+        scope: calendarScope,
         contextProgramId,
         contextDate,
         selectedRange: selectedCalendarRange,
         pendingBlockSelection,
     } = calendarContext;
+    const [visibleCalendarRange, setVisibleCalendarRange] = useState(null);
     const [viewMode, setViewMode] = useState(programId ? 'blocks' : 'calendar');
-    const [metricsRange, setMetricsRange] = useState(null);
-    const [comparisonEnabled, setComparisonEnabled] = useState(false);
     const [isSidePaneVisible, setIsSidePaneVisible] = useState(() => {
         return !getIsMobileViewport();
     });
@@ -151,20 +144,20 @@ function ProgramCalendarPage() {
     } = useProgramData(rootId, selectedProgramId, timezone || 'UTC');
 
     const displayProgram = detailedProgram || selectedProgram;
-    const metricsQuery = useProgramMetrics(rootId, displayProgram?.id, timezone, metricsRange);
-    const comparisonQuery = useProgramMetricsComparison(
+    const overviewMetricsRange = getProgramOverviewMetricsRange(calendarContext);
+    const overviewMetricsQuery = useProgramMetrics(
+        rootId, displayProgram?.id, timezone, overviewMetricsRange,
+    );
+    const dayRangeQuery = useProgramDayRange(
+        rootId, displayProgram?.id, timezone, visibleCalendarRange,
+    );
+    const dayDetailQuery = useProgramDayDetail(
         rootId,
         displayProgram?.id,
         timezone,
-        comparisonEnabled && metricsQuery.data?.program?.status === 'ended',
+        calendarScope === 'day' ? contextDate : null,
     );
     const displayGoals = detailGoals?.length ? detailGoals : goals;
-    const programNoteFilters = useMemo(() => ({
-        context_types: ['program'],
-        context_id: displayProgram?.id || '__no-program__',
-    }), [displayProgram?.id]);
-    const programNotesQuery = useNotesPageQuery(rootId, programNoteFilters);
-    const programNotes = programNotesQuery.notes;
 
     const {
         attachedGoalIds,
@@ -184,10 +177,6 @@ function ProgramCalendarPage() {
         dayModalInitialData,
         showAttachModal,
         attachBlockId,
-        showDayViewModal,
-        selectedDate,
-        unscheduleConfirmOpen,
-        itemToUnschedule,
         showGoalModal,
         selectedGoal,
         modalMode,
@@ -196,8 +185,6 @@ function ProgramCalendarPage() {
         setBlockCreationMode,
         openGoalModal,
         closeGoalModal,
-        handleDateSelect,
-        handleDateClick: handleProgramDateClick,
         handleAddBlockClick,
         handleEditBlockClick,
         closeBlockModal,
@@ -210,13 +197,25 @@ function ProgramCalendarPage() {
         handleAttachGoalClick,
         closeAttachModal,
         handleAttachGoalSaveSuccess,
-        closeDayViewModal,
-        handleScheduleDaySuccess,
-        handleUnscheduleDay,
-        closeUnscheduleConfirm,
-        handleUnscheduleSuccess,
         handleAddChildGoal,
-    } = useProgramDetailController({ goals: displayGoals, onDayViewOpen: () => onboarding?.enabled && !onboarding.state?.visited?.includes('calendar_day_modal') && onboarding.markVisited('calendar_day_modal') });
+    } = useProgramDetailController({ goals: displayGoals });
+    const {
+        updateRangeContext: updateCalendarRangeContext,
+        extendMultiDaySelection,
+        selectCalendarRange: handleDateSelectForContext,
+        resetToToday: resetCalendarContextToToday,
+        selectBlockRange: handleBlockLabelClick,
+        setMultiDayMode: setBlockCreationModeForCalendar,
+    } = useProgramCalendarSelection({
+        calendarContext,
+        dispatchCalendarContext,
+        displayProgram,
+        programs,
+        today: todayInTimezone,
+        blockCreationMode,
+        setBlockCreationMode,
+        setIsSidePaneVisible,
+    });
 
     /* eslint-disable react-hooks/set-state-in-effect -- Responsive navigation collapses the desktop side pane on mobile. */
     useEffect(() => {
@@ -227,7 +226,6 @@ function ProgramCalendarPage() {
 
     const {
         sortedBlocks,
-        activeBlock,
         attachBlock,
         blockGoalsByBlockId,
     } = useProgramDetailViewModel({
@@ -242,20 +240,14 @@ function ProgramCalendarPage() {
         attachedGoalIds,
         hierarchyGoalSeeds,
     });
-    const activeBlockMetrics = metricsQuery.data?.blocks?.find(
-        (block) => block.block_id === activeBlock?.id,
-    ) || null;
-
     const {
         saveBlock,
         deleteBlock,
         saveDay,
         copyDay,
         deleteDay,
-        unscheduleDay,
         scheduleDay,
         saveAttachedGoal,
-        saveDayGoal,
         updateGoal,
         toggleGoalCompletion,
         deleteGoal,
@@ -265,18 +257,13 @@ function ProgramCalendarPage() {
         program: displayProgram,
         refreshData,
         refreshers,
-        timezone,
         sessions,
         selectedBlockId,
         dayModalInitialData,
         attachBlockId,
-        selectedDate,
-        itemToUnschedule,
         onBlockSaved: handleProgramBlockSaveSuccess,
         onDaySaved: handleDaySaveSuccess,
         onAttachGoalSaved: handleAttachGoalSaveSuccess,
-        onScheduleDaySaved: handleScheduleDaySuccess,
-        onUnscheduleFinished: handleUnscheduleSuccess,
         onGoalEditorClosed: closeGoalModal,
     });
 
@@ -352,12 +339,12 @@ function ProgramCalendarPage() {
                         {getStatusLabel(displayProgramStatus)}
                     </span>
                 ) : null}
-                {activeBlockMetrics ? (
+                {contextBlock ? (
                     <span
                         className={styles.blockBadge}
-                        style={{ borderColor: activeBlockMetrics.color, color: activeBlockMetrics.color, background: `color-mix(in srgb, ${activeBlockMetrics.color} 14%, transparent)` }}
+                        style={{ borderColor: contextBlockColor, color: contextBlockColor, background: `color-mix(in srgb, ${contextBlockColor} 14%, transparent)` }}
                     >
-                        {activeBlockMetrics.name}
+                        {contextBlock.name}
                     </span>
                 ) : null}
                 {selectedRangeText ? <span>Selected {selectedRangeText}</span> : null}
@@ -397,65 +384,31 @@ function ProgramCalendarPage() {
         setBuilderState({ open: false, mode: 'create', startDate: '', duplicateSource: null });
     };
 
-    const updateCalendarRangeContext = ({ startDate, endDate = startDate, program = null }) => {
-        const programId = program?.id || null;
-        const isRangeSelection = startDate !== endDate;
-        const canAddBlockFromSelection = Boolean(
-            isRangeSelection
-            && program
-            && getProgramStatus(program, todayInTimezone) !== 'completed'
-            && isProgramActive(program, startDate)
-            && isProgramActive(program, endDate)
-            && !(program.blocks || []).some((block) =>
-                dateRangesOverlap(startDate, endDate, getDatePart(block.start_date), getDatePart(block.end_date))
-            )
-        );
-
-        if (isRangeSelection) {
-            dispatchCalendarContext({
-                type: 'focus_range',
-                startDate,
-                endDate,
-                programId,
-                pendingBlockSelection: canAddBlockFromSelection ? { startDate, endDate } : null,
-            });
-        } else {
-            dispatchCalendarContext({
-                type: 'focus_day',
-                date: startDate,
-                programId,
-            });
-        }
-        closeDayViewModal();
-    };
-
     const handleDateClick = (info) => {
         const clickedDate = info.dateStr;
-        const program = programs.find((candidate) => isProgramActive(candidate, clickedDate));
-        const clickedProgramId = program?.id || null;
-        const currentProgramId = selectedProgramId || null;
+        const program = displayProgram && isProgramActive(displayProgram, clickedDate) ? displayProgram : null;
 
         if (blockCreationMode) {
-            updateCalendarRangeContext({ startDate: clickedDate, program });
+            extendMultiDaySelection(clickedDate);
             return;
         }
 
-        if (clickedProgramId !== currentProgramId || clickedDate !== contextDate || selectedCalendarRange) {
-            updateCalendarRangeContext({ startDate: clickedDate, program });
-            return;
-        }
-
-        dispatchCalendarContext({
-            type: 'focus_day',
-            date: clickedDate,
-            programId: clickedProgramId,
-        });
+        updateCalendarRangeContext({ startDate: clickedDate, program });
         setViewMode('calendar');
-        handleProgramDateClick(info);
+        setIsSidePaneVisible(true);
+        if (onboarding?.enabled && !onboarding.state?.visited?.includes('program_calendar_day_reviewed')) {
+            onboarding.markVisited('program_calendar_day_reviewed');
+        }
     };
 
     const handleEventClick = (info) => {
         const eventType = info.event.extendedProps?.type;
+
+        if (blockCreationMode && eventType !== 'block_background' && eventType !== 'program_background') {
+            const clickedDate = info.event.startStr ? getDatePart(info.event.startStr) : contextDate;
+            extendMultiDaySelection(clickedDate);
+            return;
+        }
 
         if (eventType === 'block_background' || eventType === 'program_background') {
             return;
@@ -476,56 +429,25 @@ function ProgramCalendarPage() {
         }
 
         const clickedDate = info.event.startStr ? getDatePart(info.event.startStr) : contextDate;
-        const isSameContext = programId === selectedProgramId;
-
-        if (!isSameContext) {
-            updateCalendarRangeContext({
-                startDate: clickedDate,
-                program: programs.find((candidate) => candidate.id === programId) || null,
-            });
-            return;
-        }
-
-        if (clickedDate !== contextDate || selectedCalendarRange) {
-            updateCalendarRangeContext({
-                startDate: clickedDate,
-                program: programs.find((candidate) => candidate.id === programId) || null,
-            });
-            return;
-        }
-
-        setViewMode('calendar');
-        handleProgramDateClick({ dateStr: clickedDate });
-    };
-
-    const handleDateSelectForContext = (info) => {
-        const clickedDate = info.startStr;
-        const selectionEndDate = subtractDaysToDateString(info.endStr, 1);
-        const program = programs.find((candidate) => isProgramActive(candidate, clickedDate));
-
-        if (blockCreationMode) {
-            info.view.calendar.unselect();
-            updateCalendarRangeContext({ startDate: clickedDate, endDate: selectionEndDate, program });
-            return;
-        }
-
-        handleDateSelect(info);
-    };
-
-    const handleCalendarGoalDeadline = async (goalId, deadline) => {
-        await updateGoal(goalId, { deadline });
-        notify.success('Deadline updated');
-    };
-
-    const resetCalendarContextToToday = () => {
-        const program = programs.find((candidate) => isProgramActive(candidate, todayInTimezone));
-        dispatchCalendarContext({
-            type: 'reset_today',
-            date: todayInTimezone,
-            programId: program?.id || null,
+        updateCalendarRangeContext({
+            startDate: clickedDate,
+            program: programs.find((candidate) => candidate.id === programId) || null,
         });
-        setBlockCreationMode(false);
-        closeDayViewModal();
+        setViewMode('calendar');
+        setIsSidePaneVisible(true);
+    };
+
+    const moveScopedDay = (offset) => {
+        const nextDate = shiftDatePart(contextDate, offset);
+        if (!nextDate || !displayProgram || !isProgramActive(displayProgram, nextDate)) return;
+        dispatchCalendarContext({ type: 'focus_day', date: nextDate, programId: displayProgram.id });
+    };
+
+    const handleCalendarDatesSet = (info) => {
+        setVisibleCalendarRange({
+            start: getDatePart(info.startStr),
+            end: subtractDaysToDateString(info.endStr, 1),
+        });
     };
 
     const handleCalendarBackgroundClick = (event) => {
@@ -540,25 +462,9 @@ function ProgramCalendarPage() {
         resetCalendarContextToToday();
     };
 
-    const handleBlockLabelClick = ({ startDate, endDate, programId: blockProgramId }) => {
-        const program = programs.find((candidate) => candidate.id === blockProgramId)
-            || (displayProgram?.id === blockProgramId ? displayProgram : null);
-
-        updateCalendarRangeContext({
-            startDate,
-            endDate,
-            program,
-        });
-    };
-
     const handleAddSelectedBlock = () => {
         if (!pendingBlockSelection) return;
         handleAddBlockClick(pendingBlockSelection);
-    };
-
-    const setBlockCreationModeForCalendar = (nextValue) => {
-        setBlockCreationMode(nextValue);
-        dispatchCalendarContext({ type: 'clear_pending_block_selection' });
     };
 
     function handleProgramBlockSaveSuccess() {
@@ -690,22 +596,12 @@ function ProgramCalendarPage() {
         });
     };
 
-    const handleCreateProgramNote = async (content) => {
-        if (!displayProgram) return;
-        await programNotesQuery.createNote({
-            content,
-            context_type: 'program',
-            context_id: displayProgram.id,
-        });
-    };
-
     const handleSelectProgramOption = (program) => {
         dispatchCalendarContext({
-            type: 'focus_day',
+            type: 'focus_program',
             date: getDatePart(program.start_date) || contextDate,
             programId: program.id,
         });
-        closeDayViewModal();
         setIsProgramOptionsOpen(false);
         setProgramOptionsView('actions');
     };
@@ -761,17 +657,7 @@ function ProgramCalendarPage() {
                     />
 
                     <div className={`${styles.calendarPanel} ${viewMode === 'blocks' ? styles.blocksModePanel : ''}`}>
-                        {viewMode === 'insights' ? (
-                            <ProgramInsights
-                                metrics={metricsQuery.data}
-                                loading={metricsQuery.isLoading}
-                                error={metricsQuery.error}
-                                onRangeChange={setMetricsRange}
-                                comparison={comparisonQuery.data}
-                                comparisonLoading={comparisonQuery.isLoading}
-                                onLoadComparison={() => setComparisonEnabled(true)}
-                            />
-                        ) : loading || (viewMode === 'blocks' && detailLoading) ? (
+                        {loading || (viewMode === 'blocks' && detailLoading) ? (
                             <div className={styles.loading}>Loading programs...</div>
                         ) : viewMode === 'calendar' ? (
                             <ProgramCalendarView
@@ -788,18 +674,21 @@ function ProgramCalendarPage() {
                                 onDateSelect={handleDateSelectForContext}
                                 initialDate={contextDate}
                                 isMobile={isMobile}
-                                selectedDate={selectedCalendarRange ? null : contextDate}
+                                selectedDate={calendarScope === 'day' ? contextDate : null}
                                 selectedRange={selectedCalendarRange}
                                 onCalendarBackgroundClick={handleCalendarBackgroundClick}
                                 onTodayClick={resetCalendarContextToToday}
                                 onBlockLabelClick={handleBlockLabelClick}
+                                onDatesSet={handleCalendarDatesSet}
+                                dayStates={dayRangeQuery.data?.days || []}
+                                selectedProgramName={displayProgram?.name || ''}
+                                selectedProgramId={displayProgram?.id || null}
                             />
                         ) : displayProgram ? (
                             <div className={styles.blocksPanel}>
                                 <ProgramBlockView
                                     blocks={sortedBlocks}
                                     blockGoalsByBlockId={blockGoalsByBlockId}
-                                    sessions={sessions}
                                     onEditDay={handleEditDay}
                                     onAttachGoal={handleAttachGoalClick}
                                     onEditBlock={handleEditBlockClick}
@@ -827,14 +716,33 @@ function ProgramCalendarPage() {
                     onCreate={() => openCreateProgram()}
                     view={sidePaneView}
                     onViewChange={setSidePaneView}
-                    programMetrics={metricsQuery.data}
-                    activeBlock={activeBlock}
-                    blockMetrics={activeBlockMetrics}
+                    programMetrics={overviewMetricsQuery.data}
+                    programMetricsLoading={overviewMetricsQuery.isLoading}
+                    programMetricsError={overviewMetricsQuery.error}
                     programGoalSeeds={hierarchyGoalSeeds}
                     onGoalClick={openGoalModal}
-                    notesQuery={programNotesQuery}
-                    notes={programNotes}
-                    onCreateNote={handleCreateProgramNote}
+                    rootId={rootId}
+                    scope={calendarScope}
+                    contextDate={contextDate}
+                    selectedRange={selectedCalendarRange}
+                    dayDetailQuery={dayDetailQuery}
+                    onProgramScope={() => dispatchCalendarContext({
+                        type: 'focus_program', programId: displayProgram?.id, date: contextDate,
+                    })}
+                    onPreviousDay={() => moveScopedDay(-1)}
+                    onNextDay={() => moveScopedDay(1)}
+                    today={todayInTimezone}
+                    blocks={sortedBlocks}
+                    onScheduleDay={scheduleDay}
+                    onCreateDay={handleCreateDayForDate}
+                    getGoalIcon={getGoalIcon}
+                    getGoalColor={getGoalColor}
+                    getGoalSecondaryColor={getGoalSecondaryColor}
+                    availablePrograms={programs.filter((candidate) => isProgramActive(candidate, contextDate))}
+                    onSelectProgramForDate={(candidate) => dispatchCalendarContext({
+                        type: 'focus_day', date: contextDate, programId: candidate.id,
+                    })}
+                    timezone={timezone || 'UTC'}
                 />
             </div>
 
@@ -1055,41 +963,6 @@ function ProgramCalendarPage() {
                     />
                 </Suspense>
             )}
-            {showDayViewModal && (
-                <Suspense fallback={null}>
-                    <DayViewModal
-                        isOpen={showDayViewModal}
-                        onClose={closeDayViewModal}
-                        date={selectedDate}
-                        program={displayProgram}
-                        goals={displayGoals}
-                        onSetGoalDeadline={handleCalendarGoalDeadline}
-                        onAttachGoalToDay={saveDayGoal}
-                        blocks={sortedBlocks}
-                        onScheduleDay={scheduleDay}
-                        onCreateDayForDate={handleCreateDayForDate}
-                        onUnscheduleDay={handleUnscheduleDay}
-                        sessions={sessions}
-                        onStartSession={selectedDate === todayInTimezone
-                            ? (dayId) => navigate(`/${rootId}/create-session?program_day_id=${encodeURIComponent(dayId)}`)
-                            : null}
-                    />
-                </Suspense>
-            )}
-
-            <ConfirmationModal
-                isOpen={unscheduleConfirmOpen}
-                onClose={closeUnscheduleConfirm}
-                onConfirm={unscheduleDay}
-                title="Unschedule Day"
-                message={
-                    itemToUnschedule?.isRecurringTemplate
-                        ? `Remove scheduled sessions for "${itemToUnschedule?.name || 'this day'}" on ${selectedDate || 'this date'}?`
-                        : `Are you sure you want to unschedule ${itemToUnschedule?.name || 'this day'}?`
-                }
-                confirmText="Unschedule"
-            />
-
             <Suspense fallback={null}>
                 {showGoalModal && displayProgram && (
                     <GoalDetailModal

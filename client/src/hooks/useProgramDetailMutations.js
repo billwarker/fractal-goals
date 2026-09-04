@@ -16,18 +16,14 @@ export function useProgramDetailMutations({
     program,
     refreshData,
     refreshers,
-    timezone,
     selectedBlockId,
     dayModalInitialData,
     attachBlockId,
-    selectedDate,
-    itemToUnschedule,
     onProgramSaved,
     onBlockSaved,
     onDaySaved,
     onAttachGoalSaved,
     onScheduleDaySaved,
-    onUnscheduleFinished,
     onGoalEditorClosed,
 }) {
     const resolvedRefreshers = useMemo(() => (
@@ -108,42 +104,6 @@ export function useProgramDetailMutations({
         }
     }, [actions, selectedBlockId, onDaySaved]);
 
-    const unscheduleDay = useCallback(async () => {
-        if (!itemToUnschedule) {
-            return;
-        }
-
-        try {
-            const isRecurringTemplateUnschedule =
-                itemToUnschedule.type === 'program_day' &&
-                itemToUnschedule.isRecurringTemplate &&
-                Boolean(selectedDate);
-
-            if (isRecurringTemplateUnschedule) {
-                await actions.unscheduleRecurringDay({
-                    blockId: itemToUnschedule.blockId,
-                    dayId: itemToUnschedule.id,
-                    date: selectedDate,
-                    timezone,
-                });
-            } else {
-                await actions.unscheduleDay(itemToUnschedule);
-            }
-            notify.success('Day unscheduled');
-        } catch (error) {
-            logError('Failed to unschedule day:', error);
-            notify.error(`Failed to unschedule day: ${formatError(error)}`);
-        } finally {
-            onUnscheduleFinished?.();
-        }
-    }, [
-        actions,
-        itemToUnschedule,
-        onUnscheduleFinished,
-        selectedDate,
-        timezone,
-    ]);
-
     const scheduleDay = useCallback(async (blockId, date, templateDay) => {
         try {
             await actions.scheduleDay(blockId, date, templateDay);
@@ -165,27 +125,6 @@ export function useProgramDetailMutations({
             notify.error(`Failed to attach goal: ${formatError(error)}`);
         }
     }, [actions, attachBlockId, onAttachGoalSaved]);
-
-    const saveDayGoal = useCallback(async ({ block_id, day_id, goal_id, deadline }) => {
-        try {
-            await actions.setProgramGoalDeadline({ goal_id, deadline });
-            await actions.attachGoalToDay(block_id, day_id, { goal_id });
-            notify.success('Goal attached to day');
-        } catch (error) {
-            logError('Failed to attach goal to day:', error);
-            notify.error(`Failed to attach goal to day: ${formatError(error)}`);
-        }
-    }, [actions]);
-
-    const setGoalDeadline = useCallback(async (goalId, deadline) => {
-        try {
-            await actions.setProgramGoalDeadline({ goal_id: goalId, deadline });
-            notify.success('Deadline updated');
-        } catch (error) {
-            logError('Failed to set goal deadline:', error);
-            notify.error(`Failed to set goal deadline: ${formatError(error)}`);
-        }
-    }, [actions]);
 
     const updateGoal = useCallback(async (goalId, payload) => {
         try {
@@ -249,11 +188,8 @@ export function useProgramDetailMutations({
         saveDay,
         copyDay,
         deleteDay,
-        unscheduleDay,
         scheduleDay,
         saveAttachedGoal,
-        saveDayGoal,
-        setGoalDeadline,
         updateGoal,
         toggleGoalCompletion,
         deleteGoal,

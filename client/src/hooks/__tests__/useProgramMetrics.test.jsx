@@ -17,7 +17,7 @@ const wrapperFor = (client) => function Wrapper({ children }) {
 describe('useProgramMetrics', () => {
     it('keys every result by root, program, timezone, and range', async () => {
         const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-        getProgramMetrics.mockResolvedValue({ data: { calculation_version: 1 } });
+        getProgramMetrics.mockResolvedValue({ data: { calculation_version: 3 } });
         const range = { start: '2025-01-01', end: '2025-12-31' };
         const { result } = renderHook(
             () => useProgramMetrics('root-1', 'program-1', 'America/Toronto', range),
@@ -32,7 +32,19 @@ describe('useProgramMetrics', () => {
         });
         expect(client.getQueryData(queryKeys.programMetrics(
             'root-1', 'program-1', 'America/Toronto', range.start, range.end,
-        ))).toEqual({ calculation_version: 1 });
+        ))).toEqual({ calculation_version: 3 });
+    });
+
+    it('rejects an incompatible metrics calculation version', async () => {
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        getProgramMetrics.mockResolvedValueOnce({ data: { calculation_version: 2 } });
+        const { result } = renderHook(
+            () => useProgramMetrics('root-1', 'program-1', 'UTC'),
+            { wrapper: wrapperFor(client) },
+        );
+
+        await waitFor(() => expect(result.current.isError).toBe(true));
+        expect(result.current.error.message).toMatch(/unsupported program metrics version/i);
     });
 
     it('schedules invalidation for the caller’s next local midnight', () => {

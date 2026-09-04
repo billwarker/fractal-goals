@@ -1,0 +1,96 @@
+.sidePane { width: 410px; height: 100%; min-width: 0; flex-shrink: 0; position: sticky; top: 0; z-index: 25; border-left: 1px solid var(--color-border); background: var(--color-bg-sidebar); display: flex; flex-direction: column; overflow: hidden; }
+.mobileSidePaneBackdrop, .mobileSidePaneSheet { display: none; }
+.programHeader, .scopedHeader { padding: 14px 16px; }
+.scopedHeader { align-items: stretch; }
+.scopeNav { min-width: 0; display: grid; gap: 10px; }
+.programCrumb { width: fit-content; max-width: 100%; display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: var(--color-text-secondary); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.programCrumb span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.programCrumb:hover { color: var(--color-brand-primary); }
+.programCrumb:focus-visible, .dayNavButton:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
+.dayNavButton { width: 32px; height: 32px; padding: 0; border: 1px solid var(--color-border); border-radius: var(--border-radius-sm); background: var(--color-bg-input); color: var(--color-text-primary); font-size: 18px; line-height: 1; cursor: pointer; }
+.dayNavButton:hover { border-color: var(--color-border-hover); background: var(--color-bg-card-hover); }
+.rangeSummary { min-width: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.rangeNavLabel { color: var(--color-text-muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.rangeNavDate { display: block; min-width: 0; color: var(--color-text-primary); font-size: 13px; font-weight: 700; line-height: 1.2; white-space: nowrap; }
+.collapseButton { min-height: 32px; padding-inline: 10px; }
+.dayReviewHeader { display: grid; gap: 16px; padding: 14px 16px 16px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-sidebar); }
+.dayReviewTopline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dayReviewHeading { display: grid; grid-template-columns: 32px minmax(0, 1fr) 32px; align-items: center; gap: 10px; }
+.dayReviewTitle { min-width: 0; min-height: 32px; display: flex; align-items: center; justify-content: center; text-align: center; }
+.dayReviewTitle h2 { margin: 0; color: var(--color-text-primary); font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
+.embeddedSidebar { width: 100%; height: 100%; border-right: none; background: var(--color-bg-sidebar); }
+.detailsPane, .goalsPane { min-height: 0; flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 0 16px; }
+.detailsPane { padding: 0; }
+.goalsPane { padding-bottom: 16px; }
+.sidePaneSectionGroup { padding: 14px 0 4px; border-bottom: 1px solid var(--color-border); }
+.sidePaneSectionGroup:last-child { border-bottom: none; }
+.sidePaneSectionGroupCollapsed { padding-bottom: 14px; }
+.sidePaneSectionTitleRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.sidePaneSectionTitle { color: var(--color-text-muted); font-size: 11px; font-weight: 700; letter-spacing: .08em; line-height: 1.2; text-transform: uppercase; }
+.sidePaneSectionToggle { color: var(--color-text-muted); }
+.sidePaneSectionToggle:hover { color: var(--color-text-primary); }
+.sidePaneSectionContent { padding: 8px 0 12px; }
+.goalsSidePaneSection { min-height: 0; display: flex; flex-direction: column; }
+.goalsSidePaneSection { border-bottom: none; }
+.goalsSidePaneSection:not(.sidePaneSectionGroupCollapsed) { flex: 1; padding-bottom: 0; }
+.goalsSectionContent { min-height: 0; flex: 1; display: flex; flex-direction: column; padding-bottom: 0; }
+.emptySidePane { min-height: 260px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+.emptySidePaneCard { width: min(100%, 260px); display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 22px 18px; border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent); border-radius: 6px; background: color-mix(in srgb, var(--color-bg-input) 72%, transparent); text-align: center; }
+.emptySidePaneCard p { margin: 0; color: var(--color-text-secondary); font-size: 14px; line-height: 1.45; }
+.emptySidePaneButton { min-height: 38px; padding: 0 18px; border: 1px solid var(--color-border); border-radius: var(--border-radius-sm); background: var(--color-bg-input); color: var(--color-text-primary); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease; }
+.emptySidePaneButton:hover { border-color: var(--color-border-hover); background: var(--color-bg-card-hover); transform: translateY(-1px); }
+
+.scopedContent { display: grid; align-content: start; gap: 16px; padding: 18px 16px 28px; overflow: auto; scrollbar-gutter: stable; }
+.state { padding: 32px 20px; color: var(--color-text-secondary); font-size: 13px; line-height: 1.5; }
+.state button { margin-left: 6px; border: 0; background: transparent; color: var(--color-brand-primary); font: inherit; font-weight: 700; cursor: pointer; }
+.cardHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.card h3, .cardHeading h3, .cardHeading small, .note, .explainer { margin: 0; }
+.card { display: grid; gap: 14px; padding: 16px; border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent); border-radius: var(--border-radius-md); background: color-mix(in srgb, var(--color-bg-card) 92%, var(--color-bg-sidebar)); box-shadow: 0 1px 0 color-mix(in srgb, white 3%, transparent); }
+.cardHeading { align-items: flex-start; }
+.cardTitle { min-width: 0; display: grid; gap: 3px; }
+.programDayTitleLine { min-width: 0; display: flex; align-items: center; gap: 8px; }
+.cardTitle h3 { overflow-wrap: anywhere; color: var(--color-text-primary); font-size: 17px; line-height: 1.25; }
+.cardHeading small { color: var(--color-text-muted); font-size: 11px; font-weight: 700; letter-spacing: .03em; }
+.explainer, .note { color: var(--color-text-secondary); font-size: 12px; line-height: 1.55; }
+.startList, .sessionList { display: grid; gap: 8px; }
+.startList { width: fit-content; max-width: 100%; justify-items: start; }
+.startAction { display: grid; width: fit-content; max-width: 100%; grid-template-columns: 52px minmax(0, auto); align-items: center; gap: 8px; border-radius: 4px; color: var(--color-text-secondary); text-decoration: none; }
+.startVerb { min-width: 0; font-size: 11px; font-weight: 700; text-align: right; }
+.startAction > span:last-child { justify-self: start; }
+.startAction:hover { filter: brightness(1.12); }
+.startAction:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
+.sessionCard { display: grid; gap: 7px; padding: 10px 0; border-top: 1px solid color-mix(in srgb, var(--color-border) 62%, transparent); }
+.sessionRow { display: grid; gap: 8px; color: var(--color-text-primary); text-decoration: none; font-size: 13px; font-weight: 600; }
+.sessionIdentity { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sessionIdentity > :first-child { min-width: 0; }
+.sessionTemplateStatus { min-width: 0; display: inline-flex; align-items: center; gap: 8px; }
+.sessionDuration { flex: 0 0 auto; color: var(--color-text-muted); font-size: 11px; font-weight: 700; }
+.sessionMetadata { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--color-text-muted); font-size: 11px; font-weight: 500; }
+.sessionMetadata time { margin-left: 3px; color: var(--color-text-secondary); font-weight: 700; }
+.sessionRow:hover { color: var(--color-brand-primary); }
+.primaryAction { min-height: 40px; padding: 0 14px; border: 1px solid var(--color-brand-primary); border-radius: var(--border-radius-sm); background: var(--color-brand-primary); color: white; font-weight: 700; cursor: pointer; }
+.primaryAction:hover { filter: brightness(1.08); }
+.primaryAction:disabled { cursor: wait; opacity: .65; }
+.actionList { display: grid; gap: 8px; }
+.actionList button { min-height: 36px; padding: 7px 11px; border: 1px solid var(--color-border); border-radius: var(--border-radius-sm); background: var(--color-bg-input); color: var(--color-text-primary); cursor: pointer; text-align: left; transition: background .16s ease, border-color .16s ease, color .16s ease; }
+.actionList button:hover { border-color: var(--color-border-hover); background: var(--color-bg-card-hover); }
+.goalList { display: grid; gap: 4px; }
+.goalList button { display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 5px 6px; border: 0; border-radius: var(--border-radius-sm); background: transparent; color: var(--color-text-primary); cursor: pointer; text-align: left; }
+.goalList button:hover { background: var(--color-bg-card-hover); }
+
+@media (max-width: 980px) {
+    .sidePane { width: 100%; height: auto; position: static; max-height: none; border-left: none; border-bottom: 1px solid var(--color-border); }
+}
+@media (min-width: 769px) and (max-width: 980px) { .sidePane { order: -1; } }
+@media (max-width: 768px) {
+    .mobileSidePaneBackdrop { position: fixed; inset: 0; z-index: calc(var(--z-sheet) + 1); display: grid; align-items: end; background: rgba(7, 12, 18, .58); overscroll-behavior: contain; touch-action: none; }
+    .mobileSidePaneSheet { z-index: calc(var(--z-sheet) + 2); display: flex; width: 100%; height: min(82dvh, 760px); max-height: calc(var(--app-viewport-height, 100vh) - var(--app-nav-height, 0px)); min-height: 0; padding-bottom: env(safe-area-inset-bottom, 0px); border: 1px solid var(--color-border); border-bottom: none; border-radius: var(--sheet-radius) var(--sheet-radius) 0 0; background: var(--color-bg-sidebar); box-shadow: var(--shadow-lg); box-sizing: border-box; overflow: hidden; touch-action: auto; }
+    .mobileSidePaneSheet .sidePane { flex: 1; width: 100%; height: 100%; min-height: 0; border: none; overflow: hidden; }
+    .sidePaneViewToggle :global(button[role="tab"]) { min-height: 44px; }
+    .programHeader, .scopedHeader { padding: 18px 16px 14px; }
+    .dayReviewHeader { padding: 18px 16px 16px; }
+    .dayNavButton { width: 44px; height: 44px; }
+    .dayReviewHeading { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+    .collapseButton { min-height: 44px; }
+    .scopedContent { padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)); }
+}

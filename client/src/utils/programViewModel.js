@@ -82,11 +82,11 @@ const DAY_NAME_TO_INDEX = {
 };
 
 function getProgramDayTemplateKey(template) {
-    return template?.id || template?.name || null;
+    return template?.id || null;
 }
 
 function getSessionTemplateKey(session) {
-    return session?.template_id || session?.name || null;
+    return session?.template_id || null;
 }
 
 function getProgramDayWeekdayIndexes(day) {
@@ -325,12 +325,13 @@ export function buildProgramCalendarEvents({
             return;
         }
         if (!dateGroups[dateStr]) {
-            dateGroups[dateStr] = { groupsByName: {}, unlinkedSessions: [] };
+            dateGroups[dateStr] = { groupsByDay: {}, unlinkedSessions: [] };
         }
 
         const name = day.name || 'Program Day';
-        if (!dateGroups[dateStr].groupsByName[name]) {
-            dateGroups[dateStr].groupsByName[name] = {
+        const dayKey = day.id || `name:${name}`;
+        if (!dateGroups[dateStr].groupsByDay[dayKey]) {
+            dateGroups[dateStr].groupsByDay[dayKey] = {
                 name,
                 pDay: day,
                 blockColor: block.color || programColor,
@@ -339,7 +340,7 @@ export function buildProgramCalendarEvents({
             };
         }
 
-        const group = dateGroups[dateStr].groupsByName[name];
+        const group = dateGroups[dateStr].groupsByDay[dayKey];
         (day.templates || []).forEach((template) => {
             if (!group.templatesByName[template.name]) {
                 group.templatesByName[template.name] = { templates: [], sessions: [] };
@@ -392,7 +393,7 @@ export function buildProgramCalendarEvents({
             return;
         }
         if (!dateGroups[dateStr]) {
-            dateGroups[dateStr] = { groupsByName: {}, unlinkedSessions: [] };
+            dateGroups[dateStr] = { groupsByDay: {}, unlinkedSessions: [] };
         }
 
         const programDayId = getSessionProgramDayId(session);
@@ -400,7 +401,8 @@ export function buildProgramCalendarEvents({
 
         if (programDay) {
             const name = programDay.name || 'Program Day';
-            if (!dateGroups[dateStr].groupsByName[name]) {
+            const dayKey = programDay.id || `name:${name}`;
+            if (!dateGroups[dateStr].groupsByDay[dayKey]) {
                 const owningBlock = blocks.find((block) =>
                     (block.days || []).some((day) => day.id === programDayId)
                 );
@@ -408,7 +410,7 @@ export function buildProgramCalendarEvents({
                     ? dateStr >= getDatePart(owningBlock.start_date) && dateStr <= getDatePart(owningBlock.end_date)
                     : false;
 
-                dateGroups[dateStr].groupsByName[name] = {
+                dateGroups[dateStr].groupsByDay[dayKey] = {
                     name,
                     pDay: programDay,
                     blockColor: sessionInBlockRange ? programDay.blockColor : null,
@@ -416,19 +418,19 @@ export function buildProgramCalendarEvents({
                     templatesByName: {},
                 };
                 (programDay.templates || []).forEach((template) => {
-                    if (!dateGroups[dateStr].groupsByName[name].templatesByName[template.name]) {
-                        dateGroups[dateStr].groupsByName[name].templatesByName[template.name] = { templates: [], sessions: [] };
+                    if (!dateGroups[dateStr].groupsByDay[dayKey].templatesByName[template.name]) {
+                        dateGroups[dateStr].groupsByDay[dayKey].templatesByName[template.name] = { templates: [], sessions: [] };
                     }
-                    dateGroups[dateStr].groupsByName[name].templatesByName[template.name].templates.push(template);
+                    dateGroups[dateStr].groupsByDay[dayKey].templatesByName[template.name].templates.push(template);
                 });
             }
 
-            dateGroups[dateStr].groupsByName[name].sessions.push(session);
+            dateGroups[dateStr].groupsByDay[dayKey].sessions.push(session);
             return;
         }
 
         let claimed = false;
-        for (const group of Object.values(dateGroups[dateStr].groupsByName)) {
+        for (const group of Object.values(dateGroups[dateStr].groupsByDay)) {
             if (group.templatesByName[session.name]) {
                 group.sessions.push(session);
                 claimed = true;
@@ -442,7 +444,7 @@ export function buildProgramCalendarEvents({
     });
 
     Object.entries(dateGroups).forEach(([dateStr, data]) => {
-        Object.values(data.groupsByName).forEach((group) => {
+        Object.values(data.groupsByDay).forEach((group) => {
             group.sessions.forEach((session) => {
                 const templateGroup = group.templatesByName[session.name];
                 if (templateGroup) {
@@ -460,13 +462,13 @@ export function buildProgramCalendarEvents({
             });
 
             const templatePairs = Object.values(group.templatesByName);
-            const isProgramDayCompleted = getScheduledProgramDayCompletion({
-                date: dateStr,
-                dayId: group.pDay?.id,
-                day: group.pDay,
-                templates: group.pDay?.templates || [],
-            }, group.sessions, timezone).isCompleted;
-
+            const isProgramDayCompleted = group.pDay
+                ? getScheduledProgramDayCompletion({
+                    dayId: group.pDay.id,
+                    date: dateStr,
+                    day: group.pDay,
+                }, sessions, timezone).isCompleted
+                : false;
             events.push({
                 id: `pday-${includeProgramId ? `${program.id}-` : ''}${dateStr}-${group.pDay?.id || group.name}`,
                 title: group.name,

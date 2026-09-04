@@ -80,7 +80,7 @@ def _safe_load_json(data, default=None):
     if isinstance(data, (dict, list)): return data
     try:
         return json.loads(data)
-    except:
+    except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
         return default
 
 # Singleton engine for connection pooling

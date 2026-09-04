@@ -4,13 +4,15 @@
 
 **Target:** S+ production quality.
 
+**Implementation status (2026-09-04):** Complete after dedicated visual-quality passes. Canonical occurrence and chain metrics, the range/detail read model, exact Create Session deep links, explicit program/day/range scope, conventional top-right dates, uncluttered goal deadlines, concise session-only day review, responsive sidepane hierarchy, cursor pagination, onboarding compatibility, query-budget coverage, CSS migration, and dead modal/model removal are implemented. Program-day cards and calendar ribbons use the same simple inline checkmark/x completion treatment, with accessible state labels preserved throughout. The day heading consolidates scope, date, collapse, and adjacent-day navigation without duplicating status or a redundant review eyebrow; equal navigation columns place the localized date at the true horizontal and vertical midpoint between the arrows. Multi-day selection scopes the canonical program overview metrics directly, supports both click-drag and anchored successive clicks, opens the pane, and labels the selected timeframe in its fixed header. The former competing range pane and standalone Insights workspace have been removed. Session rows resolve current or snapshotted template metadata, render the Sessions-page completion check beside the correctly colored template badge, include timezone-local start/end metadata, and show the block label in its own color. Day review is intentionally read-focused: definition editing, occurrence removal, and day-goal attachment live outside this surface. The visual chain is intentionally deferred because the compact connector treatment did not communicate clearly. The only compatibility surface is the documented `/active-days` alias through Release N+1; supported client code now uses `/day-options`.
+
 This plan is implementation-ready only when the data contract, completion semantics, migration compatibility, performance budgets, accessibility behavior, and verification gates below are treated as acceptance criteria rather than optional polish.
 
-The work is intentionally split into a canonical backend domain layer, a lightweight range projection, and an on-demand day-detail projection. Calendar, sidepane, Insights, and Create Session may render different projections, but they must not implement competing scheduling or completion rules.
+The work is intentionally split into a canonical backend domain layer, a lightweight range projection, and an on-demand day-detail projection. Calendar, sidepane, and Create Session may render different projections, but they must not implement competing scheduling or completion rules.
 
 ---
 
-## Current-state audit
+## Pre-implementation audit (historical baseline)
 
 ### Product surfaces
 
@@ -91,11 +93,11 @@ Extract a pure, tested occurrence evaluator shared by the day read-model and `Pr
 - whether the date is scheduled;
 - aligned activity evidence for unscheduled dates.
 
-For a scheduled occurrence, only completed, non-deleted sessions linked to that `program_day_id`, local date, and template contribute to completion. Required templates and `completion_min_templates` use the same rules as `evaluate_program_day_completion`.
+For a scheduled occurrence, only completed, non-deleted sessions linked to that `program_day_id`, local date, and template contribute evidence. Calendar completion is evaluated per local date: overlapping definitions contribute one deduplicated template pool, required template IDs are unioned, and the strongest configured `completion_min_templates` threshold applies once.
 
 One session may satisfy a template once; duplicate sessions are visible as extras but do not inflate the number of completed templates. Template names are never identifiers.
 
-When multiple program-day occurrences land on the same local date, evaluate each occurrence independently. The aggregate date is met only when **every** scheduled occurrence is met. Requirement counts are summed by `(program_day_id, template_id)`, so the same template scheduled by two occurrences represents two requirements rather than collapsing into one. The aggregate date is partial when at least one occurrence has a completed scheduled template but one or more occurrences remain unmet.
+When multiple program-day occurrences land on the same local date, retain each occurrence for attribution and launch actions but evaluate the date once. Template IDs are deduplicated across definitions, required IDs are unioned, and thresholds are not added. The aggregate date is partial when at least one scheduled template is complete but the shared daily rule remains unmet.
 
 ### 3. Day states
 
@@ -122,14 +124,17 @@ The backend returns facts rather than asking clients to infer them:
   "closed": false,
   "counts_as_success": false,
   "breaks_chain": false,
+  "broke_active_chain": false,
   "completed_template_count": 2,
   "required_template_count": 3,
-  "completion_min_templates": 3,
   "requirements_met": false
 }
 ```
 
-### 4. Chain semantics and rendering
+Minimum-template rules remain on each occurrence's `requirements` object. They are
+not summed into a synthetic day threshold when multiple occurrences share a date.
+
+### 4. Chain semantics and presentation
 
 The scheduled chain is calculated on the server from ordered canonical day facts:
 
@@ -141,17 +146,17 @@ The scheduled chain is calculated on the server from ordered canonical day facts
 - Longest streak uses the same rule.
 - A chain break is a transition from a non-zero run to a closed scheduled failure.
 
-Each returned day includes `chain_role: start | member | end | bridge | none`, `run_length_at_date`, and `breaks_chain`. A rest/evidence day between successful scheduled dates renders a thin neutral bridge. Week boundaries cap one row segment and resume at the next row edge with continuation styling. Upcoming cells never receive a chain segment.
+Each returned day includes `chain_role: start | member | end | single | bridge | none`, `run_length_at_date`, `breaks_chain`, and `broke_active_chain`. The final field is true only for the first closed failure that ends a live run, so every summary uses one chain-break definition. These facts support metrics and a future chain treatment, but the calendar intentionally renders no connector line for now. The previous short green segments were visually ambiguous and competed with event content.
 
-Chain calculation must include the minimum scheduled history before and after the requested display range needed to classify its boundary cells and compute the full current run. Return `continues_before_range` and `continues_after_range`; do not reset a streak merely because the calendar navigated to a new month. For programs longer than the 366-day response limit, fetch compact predecessor/successor facts rather than returning an oversized response.
+Chain calculation includes up to 366 prior days plus one following day, bounding query and evaluator work independently of program age. Return `continues_before_range`, `continues_after_range`, `context_start`, and `context_truncated_before`; the last field explicitly identifies the rare case where a run may predate the bounded context instead of silently claiming whole-program precision.
 
-This contract removes the contradiction between “rest does not break a streak” and “the ribbon spans consecutive met cells.”
+This contract keeps streak metrics correct independently of whether the calendar renders a chain visualization.
 
 ### 5. Metrics semantics
 
 `ProgramMetricsService.days[]`, adherence, template completion, block metrics, current streak, and longest streak must consume the canonical occurrence evaluator. Aligned activity evidence remains the source for alignment and `unscheduled_evidence`, but it cannot independently make a scheduled day met.
 
-Increment `CALCULATION_VERSION` because adherence semantics change. Update Insights legends and tests for all seven states. Existing persisted program/block completion flags remain write-side compatibility data only and are not read as analytics truth.
+Increment `CALCULATION_VERSION` because adherence semantics change. Update calendar and accessible-state tests for all seven states. Existing persisted program/block completion flags remain write-side compatibility data only and are not read as analytics truth.
 
 ---
 
@@ -197,14 +202,14 @@ Rules:
 - Return 404 for an inaccessible program without revealing cross-tenant existence.
 - Clamp neither bound silently. Dates outside the program remain present as neutral days only when needed by the visible calendar grid; no occurrence is fabricated.
 - Results are ordered by date, block order, program-day order, template order, and effective session timestamp with stable ID tie-breakers.
-- Return `schema_version: 1` from the first release of this endpoint and contract-test it.
+- Return and contract-test `schema_version: 2`; version 2 adds bounded-chain context metadata and canonical active-break facts.
 - Day-detail session pagination is ordered by effective timestamp then session ID. Requirements and aggregate counts always cover the complete date, not merely the returned page.
 
 Summary response shape:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "program_id": "...",
   "timezone": "America/Toronto",
   "range": { "start": "2026-08-30", "end": "2026-10-10" },
@@ -212,7 +217,9 @@ Summary response shape:
     "current_streak": 3,
     "longest_streak": 8,
     "continues_before_range": false,
-    "continues_after_range": false
+    "continues_after_range": false,
+    "context_start": "2025-08-31",
+    "context_truncated_before": true
   },
   "range_summary": {
     "scheduled_dates": 12,
@@ -237,6 +244,7 @@ Summary response shape:
       "closed": false,
       "counts_as_success": false,
       "breaks_chain": false,
+      "broke_active_chain": false,
       "chain_role": "none",
       "run_length_at_date": 0,
       "duration_seconds": 1800,
@@ -244,7 +252,6 @@ Summary response shape:
       "occurrence_count": 1,
       "completed_template_count": 2,
       "required_template_count": 3,
-      "completion_min_templates": 3,
       "requirements_met": false,
       "block_ids": ["..."]
     }
@@ -287,12 +294,13 @@ When `detail_date` is present, add `detail`:
           "id": "...",
           "name": "...",
           "template_id": "...",
+          "template": { "id": "...", "name": "...", "color": "..." },
           "session_start": "...Z",
+          "session_end": "...Z",
           "completed_at": "...Z",
           "total_duration_seconds": 1800,
           "completed": true,
-          "is_paused": false,
-          "activity_summaries": []
+          "is_paused": false
         }
       ]
     }
@@ -308,7 +316,7 @@ When `detail_date` is present, add `detail`:
 
 `range_summary.template_completion` contains compact `{template_id, name, color, scheduled_occurrences, completed_occurrences}` rows. `range_summary.goals_touched_ids` is a distinct-ID aggregate from evidence inside the requested range. This supports range scope without embedding every occurrence or guessing from current program scope.
 
-`activity_summaries` contains raw lightweight activity-instance summary data sufficient for the existing client formatter to produce `ActivitySummaryRail` entries. Return at most five activity summaries per returned session, include `has_more_activity_summaries`, and link to Session Detail for the complete record. Do not return full session-detail payloads or trigger one request per session. Linked and other session rows share the day-detail pagination budget.
+Program-day review intentionally stops at session granularity. Session rows contain identity, timing, duration, and execution state, then link to Session Detail for activities and other execution detail. The day read model does not load or serialize activity summaries; this keeps the sidepane scannable and removes activity eager-loading from the endpoint. Linked and other session rows share the day-detail pagination budget.
 
 `other_sessions` means non-deleted sessions on that local date not linked to the selected program. It is loaded tenant-safely and labeled as other work, not credited toward scheduled completion. `goals_touched_ids` is derived from actual session/activity evidence in the detailed date projection, not from whole-program goal coverage.
 
@@ -384,7 +392,7 @@ Create:
 
 Range queries include FullCalendar's leading/trailing week padding. Normalize visible range boundaries before key construction so rerenders do not create duplicate cache entries.
 
-`programDayState.js` may index and decorate server facts for rendering, but it must not recalculate completion or chain semantics. Its responsibilities are limited to stable lookup, glyph/label mapping, and CSS-safe chain attributes.
+`programDayState.js` may index and decorate server facts for rendering, but it must not recalculate completion or chain semantics. Its responsibilities are limited to stable lookup and accessible state labels; visual completion marks remain in the shared component.
 
 Rewrite `useProgramDayViewModel` to consume canonical detail. Delete fuzzy name matching and any client reimplementation of requirement satisfaction. Goal-tree selectors may remain client-derived when they concern available actions rather than historical truth.
 
@@ -448,16 +456,15 @@ Add `queryKeys.programDayReadModelRoot(rootId, programId?)` for prefix invalidat
 
 ### Visual rules
 
-- `scheduled_met`: success glyph.
-- `scheduled_partial`: distinct progress glyph/treatment, not a failure cross.
-- `scheduled_missed`: failure glyph.
-- `scheduled_pending`: open/pending glyph.
-- `unscheduled_evidence`: neutral positive-evidence glyph.
-- `rest`: quiet rest marker.
-- `upcoming`: quiet future marker.
-- Ribbon and glyph layer over program/block tint without replacing it.
+- `scheduled_met`: a green inline checkmark at the end of the program-day ribbon.
+- Closed, incomplete occurrences use an inline x at the end of the program-day ribbon. Today and future scheduled occurrences remain neutral because they have not been missed.
+- `unscheduled_evidence`, `rest`, and `upcoming`: available through the scoped day review and visually hidden calendar state text.
+- Program-day cards use the same temporal inline treatment as calendar ribbons: check when met, x only when closed and unmet, and no mark while pending.
 - Use semantic design tokens and preserve sufficient contrast in light/dark themes, forced-colors mode, and selected/today states.
-- Status cannot rely on color alone.
+- Calendar state never relies on color alone; every closed program-day ribbon includes a labeled completion mark.
+- Calendar date numbers use FullCalendar's conventional top-right position. Block-start labels occupy the remaining header width at left and truncate before the date zone.
+- Dates without a matching program-day ribbon add only a screen-reader label. They do not add a visible fallback marker that can collide with goal deadlines or FullCalendar overflow controls.
+- Chain roles remain in the read model for metrics and future design work, but no chain line is rendered in this version.
 
 The selected program's name and state are included in each decorated cell's accessible label. Purely decorative pseudo-elements are hidden from assistive technology.
 
@@ -467,13 +474,13 @@ The selected program's name and state are included in each decorated cell's acce
 
 ### Structure
 
-`ProgramSidePane` becomes a scope router while retaining `ProgramSidePaneSection` and program Details/Goals sub-tabs.
+`ProgramSidePane` is the scope router while retaining `ProgramSidePaneSection` and program Details/Goals sub-tabs. Program and multi-day range scopes share the canonical `ProgramOverview`; range selection changes the metrics query window instead of mounting a competing summary.
 
 Add:
 
 - `ProgramScopeBreadcrumb`
 - `ProgramDayPane`
-- `ProgramRangePane`
+- `ProgramOverview`
 - `ProgramDayActionsMenu`
 - `ProgramChainSummary`
 
@@ -486,21 +493,30 @@ Move sidepane-only CSS out of `ProgramCalendarPage.module.css` into `ProgramSide
 - Auto-open a collapsed pane after an intentional day/range selection. On mobile, open the existing focus-trapped bottom sheet and restore focus to the triggering calendar cell when dismissed.
 - Escape closes menus/dialogs before the mobile pane itself.
 - Collapse state is stored per scope and reset only when the selected program changes.
+- Day scope has one fixed heading section containing the program-return breadcrumb, collapse action, and a full localized date centered horizontally and vertically between equal-width previous/next control columns. It does not add a redundant “Day review” eyebrow. Status remains with the reviewed program-day card instead of being duplicated in navigation. Native unstyled buttons and wrapping ISO-date fragments are not acceptable.
+
+### Visual hierarchy
+
+- The pane owns a single scroll region below its fixed header and maintains stable scrollbar space.
+- Day/range identity, state, occurrence cards, requirements, sessions, goals, and actions each have a distinct typographic and surface hierarchy using semantic design tokens.
+- Occurrence cards use consistent padding, border radius, dividers, and action treatments; controls have visible hover, focus, disabled, and loading states.
+- At desktop width the pane is 410px, with the calendar grid consuming the remaining flexible width. At tablet/mobile widths it retains the existing full-width, focus-trapped sheet behavior.
+- IDs from API projections are normalized before client set membership checks, avoiding silent goal omissions when serializers differ between numeric and string identifiers.
 
 ### Day content
 
-- Requirement explainer uses server counts: e.g. “2 of 3 required templates completed; 3 needed to meet this day.”
-- Templates use `SessionTemplateNameBadge` and canonical status facts.
+- The daily requirement explainer uses deduplicated server counts once above the occurrence cards; occurrence cards only describe their own template evidence.
+- Incomplete occurrences do not render a second template-status inventory. Today shows a compact left-aligned two-column action grid: a fixed verb column (`Start` or `Continue`) and an app-standard small, correctly colored template badge column. This keeps verbs aligned across different template-name lengths while keeping the badge identity separate; the combined accessible name is `Start <template>` or `Continue <template>`. Closed and future occurrences expose no misleading launch action.
 - Goals use configured `GoalIcon` styling.
-- Session rows link to Session Detail and show start time and duration.
-- `ActivitySummaryRail` is rendered only from returned bounded activity summary data.
+- Once occurrence requirements are met, only completed session rows are shown. They link to Session Detail and show the shared template-name badge, Sessions-page completion check, duration, and explicitly labeled timezone-local start and end times (falling back to completion time when legacy data has no `session_end`). The requirement template row is omitted so completed work is not represented twice.
+- Session rows remain compact session-level links; activity summaries belong exclusively to Session Detail and are neither requested nor rendered here.
 - Other work is clearly separated and never presented as scheduled completion.
 - Schedule note edits make recurrence-wide scope explicit.
-- Write actions remain behind an accessible menu and preserve existing confirmation/validation behavior.
+- Day review does not expose definition editing, occurrence removal, or goal attachment. Those are program-authoring operations and belong in the Blocks workspace rather than the review pane; empty-day scheduling remains available as the intentional planning action.
 
 ### Quick start
 
-For today, a per-template quick-start link uses:
+For today, each outstanding template has a single quick-start link using:
 
 ```text
 /<root_id>/create-session?program_id=...&program_day_id=...&date=YYYY-MM-DD&template_id=...
@@ -606,12 +622,12 @@ Required retirement records before merge:
 - All seven states, including today pending and today partial versus closed partial.
 - Required, optional, and `completion_min_templates` combinations.
 - Multiple sessions for one template count once; extras remain visible.
-- Multiple occurrences on one date are independently evaluated and the aggregate date is met only when all are met.
+- Multiple occurrences on one date retain independent attribution while sharing one deduplicated daily completion rule.
 - Same-name templates never cross-match.
 - Recurring `program_day_id` occurrences bucket by local date.
 - DST spring/fall boundaries and at least two IANA timezones.
 - Rest/evidence bridges, pending dates, week boundaries, current streak, longest streak, and chain-break counts.
-- Range-boundary continuation preserves a run across adjacent month requests and programs longer than 366 days.
+- Range-boundary continuation preserves runs within the bounded prior context; older programs report `context_truncated_before` explicitly.
 - Scheduled aligned evidence without required-template completion is not met.
 - Unscheduled aligned evidence remains `unscheduled_evidence`.
 - Deleted sessions/templates and archived templates follow documented rules.
@@ -633,7 +649,7 @@ Required retirement records before merge:
 - Day summary-first loading, detail retry, empty states, and retained calendar interaction on error.
 - Stable day-detail pagination, Load More behavior, and complete requirement counts on every page.
 - Breadcrumb, prev/next, menu, dialog, Escape, focus restoration, and mobile focus trap.
-- Day pane requirement copy, template statuses, bounded activity rail, other work, goal icons, and definition-note warning.
+- Day pane requirement copy, template statuses, concise session links, other work, goal icons, definition-note warning, and absence of activity-detail rendering.
 - Range aggregates and unavailable/loading goals-touched behavior.
 - Exact Create Session query parsing and validation for `program_id`, `program_day_id`, `date`, and `template_id`.
 - Mutation and midnight invalidation of both metrics and read-model queries.
@@ -657,18 +673,18 @@ Run broader backend/client suites if shared serializers, session lifecycle inval
 
 1. Verify a program containing met, partial, missed, pending, evidence, rest, and upcoming dates.
 2. Confirm a scheduled date with unrelated aligned evidence stays partial/missed rather than met.
-3. Confirm rest/evidence days bridge the visual chain without increasing its numeric length.
+3. Confirm rest/evidence days preserve the numeric chain without adding ambiguous connector fragments to the calendar.
 4. Verify the chain across a week boundary and after local midnight.
-5. Switch between overlapping programs and confirm the glyph/ribbon always names and reflects only the selected program.
+5. Switch between overlapping programs and confirm the completion mark/ribbon always names and reflects only the selected program.
 6. Click a day once and verify the pane opens immediately, loads detail non-blockingly, and retains calendar visibility.
 7. Navigate prev/next and breadcrumbs; verify scope and focus behavior.
-8. Open linked Session Detail and verify bounded activity summaries agree with it.
+8. Open a linked Session Detail and verify activity information is available there but absent from the day-review pane and payload.
 9. Confirm other work is separated and never satisfies scheduled requirements.
 10. Edit a schedule note and confirm every recurrence displays the updated definition note.
-11. Exercise schedule, unschedule, attach-goal, and deadline actions including disabled past-date rules and confirmations.
+11. Exercise empty-day scheduling and verify review cards do not expose definition, unschedule, or goal-attachment mutations.
 12. Drag a range and click a block label; verify aggregates and Add Block eligibility.
 13. Start today's exact template through the deep link. Confirm future dates do not claim to start a session.
-14. Complete a session and verify calendar, pane, and Insights converge after invalidation.
+14. Complete a session and verify calendar and the scoped overview pane converge after invalidation.
 15. Verify mobile bottom-sheet focus trapping/restoration, keyboard-only use, screen-reader labels, forced colors, light/dark themes, and reduced motion.
 16. Confirm old onboarding achievements remain complete and a new user completes the step by opening day scope once.
 
@@ -679,7 +695,7 @@ Run broader backend/client suites if shared serializers, session lifecycle inval
 The work is S+ only when:
 
 - one canonical backend evaluator owns occurrence completion and chain semantics;
-- Calendar, sidepane, and Insights parity is asserted by automated tests;
+- Calendar and scoped-sidepane parity is asserted by automated tests;
 - partial and today-pending behavior is correct and timezone-safe;
 - overlapping programs never produce ambiguous cell status;
 - summary and detail projections meet fixed query and payload budgets;

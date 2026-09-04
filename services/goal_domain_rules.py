@@ -5,17 +5,11 @@ def get_goal_level_name(goal) -> str | None:
     level = getattr(goal, "level", None)
     if level and getattr(level, "name", None):
         return level.name
-    try:
-        return get_canonical_goal_level_name(goal)
-    except Exception:
-        return None
+    return get_canonical_goal_level_name(goal)
 
 
 def is_goal_type(goal, canonical_type: str) -> bool:
-    try:
-        return get_canonical_goal_type(goal) == canonical_type
-    except Exception:
-        return False
+    return get_canonical_goal_type(goal) == canonical_type
 
 
 def _normalized_goal_level_name(goal) -> str:

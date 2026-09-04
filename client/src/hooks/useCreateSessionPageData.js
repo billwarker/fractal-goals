@@ -41,7 +41,7 @@ function groupProgramDaysById(programDays) {
     }, {});
 }
 
-export function useCreateSessionPageData(rootId, todayISO) {
+export function useCreateSessionPageData(rootId, todayISO, timezone) {
     const results = useQueries({
         queries: [
             {
@@ -58,12 +58,12 @@ export function useCreateSessionPageData(rootId, todayISO) {
                 enabled: Boolean(rootId),
             },
             {
-                queryKey: queryKeys.activeProgramDays(rootId, todayISO),
+                queryKey: queryKeys.programDayOptions(rootId, todayISO, timezone),
                 queryFn: async () => {
-                    const response = await fractalApi.getActiveProgramDays(rootId, todayISO);
+                    const response = await fractalApi.getProgramDayOptions(rootId, todayISO, timezone);
                     return response.data || [];
                 },
-                enabled: Boolean(rootId),
+                enabled: Boolean(rootId && todayISO && timezone),
             },
             {
                 queryKey: queryKeys.programs(rootId),

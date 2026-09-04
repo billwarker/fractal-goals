@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, date, time, timedelta, timezone
 from typing import List, Dict, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from sqlalchemy import func
 
 from models import Program, ProgramBlock, ProgramDay, ProgramDayTemplate, Goal, Session, _safe_load_json
 from services import event_bus, Event, Events
@@ -17,6 +18,7 @@ from services.serializers import format_utc, serialize_program_day, serialize_go
 from services.session_runtime import get_template_color
 from services.session_service import SessionService
 from services.program_scope import resolve_program_scopes
+from services.program_day_occurrences import bucket_sessions, evaluate_occurrence
 
 logger = logging.getLogger(__name__)
 
@@ -458,16 +460,16 @@ class _ProgramDaysMixin:
         timezone_name: str | None = None,
     ) -> List[Dict]:
         cls._require_root_access(session, root_id, current_user_id)
+        try:
+            zone = ZoneInfo(timezone_name or "UTC")
+        except ZoneInfoNotFoundError:
+            raise ValueError("Invalid timezone")
         if target_date:
             today = target_date
         else:
-            try:
-                zone = ZoneInfo(timezone_name or "UTC")
-            except ZoneInfoNotFoundError:
-                raise ValueError("Invalid timezone")
             today = datetime.now(zone).date()
-        day_start = datetime.combine(today, time.min)
-        next_day_start = day_start + timedelta(days=1)
+        day_start = datetime.combine(today, time.min, tzinfo=zone).astimezone(timezone.utc)
+        next_day_start = datetime.combine(today + timedelta(days=1), time.min, tzinfo=zone).astimezone(timezone.utc)
         
         from sqlalchemy.orm import selectinload
         active_programs = session.query(Program).options(
@@ -486,6 +488,16 @@ class _ProgramDaysMixin:
         
         result = []
         scopes = resolve_program_scopes(session, root_id, [program.id for program in active_programs])
+        effective = func.coalesce(Session.session_start, Session.completed_at, Session.created_at)
+        execution_sessions = session.query(Session).filter(
+            Session.root_id == root_id,
+            Session.owner_id == current_user_id,
+            Session.program_id.in_([program.id for program in active_programs]),
+            Session.deleted_at.is_(None),
+            effective >= day_start,
+            effective < next_day_start,
+        ).all() if active_programs else []
+        sessions_by_occurrence = bucket_sessions(execution_sessions, zone)
         
         for program in active_programs:
             program_scope = scopes.get(program.id)
@@ -519,6 +531,9 @@ class _ProgramDaysMixin:
                                         "order": template_rule.get("order", index),
                                     })
                                 
+                                evaluation = evaluate_occurrence(
+                                    day, sessions_by_occurrence[(day.id, today)]
+                                )
                                 result.append({
                                     "program_id": program.id,
                                     "program_name": program.name,
@@ -534,14 +549,13 @@ class _ProgramDaysMixin:
                                     "day_name": day.name,
                                     "day_number": day.day_number,
                                     "day_date": format_utc(day.date),
-                                    "is_completed": day.is_completed,
+                                    "is_completed": evaluation["requirements_met"],
                                     "completion_min_templates": day.completion_min_templates,
                                     "sessions": session_details,
-                                    "completed_session_count": len([s for s in day.completed_sessions if not s.deleted_at]),
-                                    "completed_template_ids": sorted({
-                                        s.template_id
-                                        for s in day.completed_sessions
-                                        if s.completed and not s.deleted_at and s.template_id
-                                    })
+                                    "completed_session_count": len([
+                                        item for item in sessions_by_occurrence[(day.id, today)]
+                                        if item.completed
+                                    ]),
+                                    "completed_template_ids": evaluation["completed_template_ids"],
                                 })
         return result

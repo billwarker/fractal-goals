@@ -37,7 +37,7 @@ export function buildTodayProgramDayView(programDays = []) {
         });
         (day.completed_template_ids || []).forEach((id) => completedTemplateIds.add(String(id)));
         completedCount += Number(day.completed_session_count || 0);
-        minTemplates += Number(day.completion_min_templates || 0);
+        minTemplates = Math.max(minTemplates, Number(day.completion_min_templates || 0));
     });
 
     const totalRequired = requiredTemplateIds.size;

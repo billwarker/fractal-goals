@@ -1,8 +1,10 @@
 import pytest
 import json
 from datetime import date, datetime, timedelta
+from sqlalchemy import event
 from services.events import Events
 from models import Program, ProgramBlock, ProgramDay, ProgramDayTemplate, program_goals, program_block_goals
+from services.program_day_read_model_service import ProgramDayReadModelService
 
 @pytest.fixture
 def sample_program(authed_client, sample_ultimate_goal):
@@ -145,7 +147,8 @@ class TestProgramCRUD:
         db_session.commit()
 
         response = authed_client.get(
-            f'/api/{sample_ultimate_goal.id}/programs/active-days?date={target_date.isoformat()}'
+            f'/api/{sample_ultimate_goal.id}/programs/day-options'
+            f'?date={target_date.isoformat()}&timezone=UTC'
         )
         assert response.status_code == 200
         row = next(item for item in response.get_json() if item['day_id'] == day.id)
@@ -166,6 +169,11 @@ class TestProgramCRUD:
         assert row['sessions'][0]['is_required'] is False
         assert row['sessions'][0]['order'] == 3
         assert row['sessions'][0]['template_color'] == '#d946ef'
+        compatibility_response = authed_client.get(
+            f'/api/{sample_ultimate_goal.id}/programs/active-days'
+            f'?date={target_date.isoformat()}&timezone=UTC'
+        )
+        assert compatibility_response.get_json() == response.get_json()
 
         other_date = target_date + timedelta(days=1)
         assert authed_client.get(
@@ -176,6 +184,75 @@ class TestProgramCRUD:
         response = authed_client.get(f'/api/{sample_ultimate_goal.id}/programs/active-days?date=tomorrow')
         assert response.status_code == 400
         assert response.get_json()['error'] == 'Invalid date. Use YYYY-MM-DD.'
+
+    def test_program_day_read_model_returns_canonical_summary_and_detail(
+        self, authed_client, db_session, sample_ultimate_goal, sample_program, sample_session_template
+    ):
+        target_date = date.today()
+        program = db_session.query(Program).filter_by(id=sample_program['id']).one()
+        program.start_date = datetime.combine(target_date, datetime.min.time())
+        program.end_date = datetime.combine(target_date, datetime.max.time())
+        block = db_session.query(ProgramBlock).filter_by(program_id=program.id).first()
+        block.start_date = target_date
+        block.end_date = target_date
+        day = ProgramDay(block_id=block.id, date=target_date, name='Canonical day')
+        db_session.add(day)
+        db_session.flush()
+        db_session.add(ProgramDayTemplate(
+            program_day_id=day.id,
+            session_template_id=sample_session_template.id,
+            is_required=True,
+            order=0,
+        ))
+        db_session.commit()
+
+        response = authed_client.get(
+            f'/api/{sample_ultimate_goal.id}/programs/{program.id}/day-read-model'
+            f'?range_start={target_date.isoformat()}&range_end={target_date.isoformat()}'
+            f'&detail_date={target_date.isoformat()}&timezone=UTC'
+        )
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['schema_version'] == 2
+        assert payload['chain']['context_start'] == target_date.isoformat()
+        assert payload['chain']['context_truncated_before'] is False
+        assert payload['days'][0]['state'] == 'scheduled_pending'
+        assert payload['days'][0]['broke_active_chain'] is False
+        assert payload['days'][0]['required_template_count'] == 1
+        assert payload['days'][0]['completion_min_templates'] is None
+        assert payload['detail']['requirements'] == {
+            'required_template_ids': [sample_session_template.id],
+            'completed_template_ids': [],
+            'scheduled_template_ids': [sample_session_template.id],
+            'scheduled_template_count': 1,
+            'required_template_count': 1,
+            'completion_min_templates': None,
+            'requirements_met': False,
+        }
+        assert payload['detail']['occurrences'][0]['program_day_id'] == day.id
+        assert payload['detail']['occurrences'][0]['templates'][0]['status'] == 'pending'
+        metrics = authed_client.get(
+            f'/api/{sample_ultimate_goal.id}/programs/{program.id}/metrics'
+            f'?range_start={target_date.isoformat()}&range_end={target_date.isoformat()}&timezone=UTC'
+        ).get_json()
+        assert metrics['days'][0]['state'] == payload['days'][0]['state']
+        assert metrics['days'][0]['required_template_count'] == payload['days'][0]['required_template_count']
+
+    def test_program_day_read_model_validates_contract(
+        self, authed_client, sample_ultimate_goal, sample_program
+    ):
+        base = f'/api/{sample_ultimate_goal.id}/programs/{sample_program["id"]}/day-read-model'
+        assert authed_client.get(f'{base}?range_start=2026-01-01&range_end=2026-01-01').status_code == 400
+        assert authed_client.get(
+            f'{base}?range_start=2026-01-02&range_end=2026-01-01&timezone=UTC'
+        ).status_code == 400
+        assert authed_client.get(
+            f'{base}?range_start=2026-01-01&range_end=2026-01-01&timezone=Not/AZone'
+        ).status_code == 400
+        assert authed_client.get(
+            f'{base}?range_start=2026-01-01&range_end=2026-01-01'
+            f'&detail_date=2026-01-01&timezone=UTC&session_cursor=invalid'
+        ).status_code == 400
 
     def test_get_specific_program(self, authed_client, sample_ultimate_goal, sample_program):
         """Test retrieving a specific program."""
@@ -199,7 +276,7 @@ class TestProgramCRUD:
         assert response.status_code == 200
         assert response.headers.get('ETag')
         payload = response.get_json()
-        assert payload['calculation_version'] == 1
+        assert payload['calculation_version'] == 3
         assert payload['window']['timezone'] == 'UTC'
         assert payload['semantics'] == {
             'attribution': 'current_state',
@@ -267,6 +344,34 @@ class TestProgramCRUD:
         )
 
         assert response.status_code == 400
+
+    def test_program_day_read_model_has_bounded_query_plan(
+        self, db_session, test_user, sample_ultimate_goal, sample_program
+    ):
+        target = date.today()
+        statements = []
+        engine = db_session.get_bind()
+
+        def capture_statement(_conn, _cursor, statement, _params, _context, _many):
+            statements.append(statement)
+
+        event.listen(engine, "before_cursor_execute", capture_statement)
+        try:
+            payload, error, status = ProgramDayReadModelService(db_session).get(
+                sample_ultimate_goal.id,
+                sample_program['id'],
+                test_user.id,
+                range_start=target.isoformat(),
+                range_end=target.isoformat(),
+                detail_date=target.isoformat(),
+                timezone_name="UTC",
+            )
+        finally:
+            event.remove(engine, "before_cursor_execute", capture_statement)
+
+        assert (error, status) == (None, 200)
+        assert payload["schema_version"] == 2
+        assert len(statements) <= 40
 
     def test_delete_program(self, authed_client, sample_ultimate_goal, sample_program):
         """Test deleting a program."""

@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 import ModalBackdrop from '../atoms/ModalBackdrop';
-import styles from '../../pages/ProgramCalendarPage.module.css';
+import styles from './ProgramSidePane.module.css';
 
 const FOCUSABLE_SELECTOR = [
     'button:not([disabled])',

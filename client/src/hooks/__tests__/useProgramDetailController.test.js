@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { useProgramDetailController } from '../useProgramDetailController';
 
@@ -10,25 +10,17 @@ describe('useProgramDetailController', () => {
         expect(result.current.isSidebarOpen).toBe(false);
     });
 
-    it('opens block creation modal from calendar selection and resets state after save success', () => {
-        const unselect = vi.fn();
+    it('opens block creation modal with an explicit selected range and resets state after save success', () => {
         const { result } = renderHook(() => useProgramDetailController({ goals: [] }));
 
         act(() => {
             result.current.setBlockCreationMode(true);
         });
 
-        act(() => {
-            result.current.handleDateSelect({
-                startStr: '2026-03-10',
-                endStr: '2026-03-13',
-                view: {
-                    calendar: { unselect },
-                },
-            });
-        });
+        act(() => result.current.handleAddBlockClick({
+            startDate: '2026-03-10', endDate: '2026-03-12',
+        }));
 
-        expect(unselect).toHaveBeenCalled();
         expect(result.current.showBlockModal).toBe(true);
         expect(result.current.blockModalData).toMatchObject({
             startDate: '2026-03-10',
@@ -83,22 +75,13 @@ describe('useProgramDetailController', () => {
         expect(result.current.modalMode).toBe('view');
     });
 
-    it('opens a dated program day draft from the calendar day modal flow', () => {
+    it('opens a dated program day definition draft', () => {
         const { result } = renderHook(() => useProgramDetailController({ goals: [] }));
-
-        act(() => {
-            result.current.handleDateClick({ dateStr: '2026-03-09' });
-        });
-
-        expect(result.current.showDayViewModal).toBe(true);
-        expect(result.current.selectedDate).toBe('2026-03-09');
 
         act(() => {
             result.current.handleCreateDayForDate('block-1', '2026-03-09');
         });
 
-        expect(result.current.showDayViewModal).toBe(false);
-        expect(result.current.selectedDate).toBe(null);
         expect(result.current.showDayModal).toBe(true);
         expect(result.current.selectedBlockId).toBe('block-1');
         expect(result.current.dayModalInitialData).toMatchObject({

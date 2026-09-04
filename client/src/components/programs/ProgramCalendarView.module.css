@@ -74,6 +74,21 @@
     font-size: 11px !important;
 }
 
+.calendarContainer :global(.fc-daygrid-day-top) {
+    position: relative;
+    z-index: 5;
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    padding-right: 0;
+}
+
+.calendarContainer :global(.fc-daygrid-day-number) {
+    position: relative;
+    z-index: 5;
+    min-width: 24px;
+    text-align: right;
+}
+
 .calendarContainerCompact :global(.fc-daygrid-day-events) {
     margin: 0 2px !important;
 }
@@ -88,19 +103,24 @@
     font-size: 10px;
 }
 
-.calendarContainerCompact .blockCellLabel {
-    top: 5px;
-    left: 5px;
-    right: 28px;
-    max-width: calc(100% - 33px);
-}
-
 .calendarContainer [data-calendar-background] {
     background: color-mix(
         in srgb,
         var(--program-calendar-cell-color) var(--program-calendar-color-weight),
         var(--color-bg-card)
     ) !important;
+}
+
+.dayStatusAssistive {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 .headerActions {
@@ -188,6 +208,13 @@
     font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
+}
+
+/* FullCalendar rejects date selection when a drag originates on any interactive
+   child. In multi-day mode, make every visible layer defer to the day frame. */
+.calendarContainerSelecting :global(.fc-daygrid-day-frame) > * {
+    pointer-events: none !important;
+    user-select: none;
 }
 
 /* ─── Custom Event Pills ─────────────────────────────────────────────────── */
@@ -280,6 +307,13 @@
     transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
 
+.calendarContainerCompact .blockCellLabel {
+    top: 5px;
+    left: 5px;
+    right: 30px;
+    max-width: calc(100% - 35px);
+}
+
 .blockCellLabel:hover,
 .blockCellLabel:focus-visible {
     color: color-mix(in srgb, var(--program-block-label-color) 82%, white);
@@ -289,8 +323,28 @@
 }
 
 .eventPillProgramDay {
-    /* background set inline via JS */
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 24px;
+    padding-right: 3px;
+    overflow: visible;
+    background: var(--program-day-pill-bg);
     color: var(--color-text-primary);
+}
+
+.eventPillProgramDay .eventPillText {
+    position: relative;
+    z-index: 2;
+    min-width: 0;
+    flex: 1 1 auto;
+    padding-right: 3px;
+    background: var(--program-day-pill-bg);
+}
+
+.calendarContainerCompact .eventPillProgramDay {
+    min-height: 20px;
 }
 
 /* Template pending */

@@ -653,7 +653,7 @@ class TestPreferencesEndpoint:
             'program_created': True,
             'program_block_created': True,
             'program_day_completed': True,
-            'calendar_day_modal_opened': False,
+            'program_calendar_day_reviewed': False,
         }
 
     def test_onboarding_history_checks_return_scalars_instead_of_hydrating_payloads(

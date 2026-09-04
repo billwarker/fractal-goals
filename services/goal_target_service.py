@@ -58,7 +58,7 @@ def _parse_target_int(value):
         return None
     try:
         return int(value)
-    except Exception:
+    except (TypeError, ValueError, OverflowError):
         return None
 
 

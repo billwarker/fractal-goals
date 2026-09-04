@@ -79,7 +79,7 @@ describe('useProgramData', () => {
         expect(result.current.sessions).toEqual([{ id: 'session-1', name: 'Session 1' }]);
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.program('root-1', 'program-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.programs('root-1') });
-        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.activeProgramDays('root-1') });
+        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.programDayOptions('root-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessionsAll('root-1') });
     });
 });

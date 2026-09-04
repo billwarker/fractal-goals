@@ -20,12 +20,8 @@ const {
             saveDay: vi.fn(),
             copyDay: vi.fn(),
             deleteDay: vi.fn(),
-            unscheduleRecurringDay: vi.fn(),
-            unscheduleDay: vi.fn(),
             scheduleDay: vi.fn(),
             attachGoal: vi.fn(),
-            attachGoalToDay: vi.fn(),
-            setProgramGoalDeadline: vi.fn(),
         },
         updateGoal: vi.fn(),
         toggleGoalCompletion: vi.fn(),
@@ -70,7 +66,6 @@ describe('useProgramDetailMutations', () => {
         onDaySaved: vi.fn(),
         onAttachGoalSaved: vi.fn(),
         onScheduleDaySaved: vi.fn(),
-        onUnscheduleFinished: vi.fn(),
         onGoalEditorClosed: vi.fn(),
     };
 
@@ -91,12 +86,9 @@ describe('useProgramDetailMutations', () => {
             program: { id: 'program-1', blocks: [], goal_ids: [] },
             refreshData,
             refreshers,
-            timezone: 'UTC',
             selectedBlockId: 'block-1',
             dayModalInitialData: { id: 'day-1' },
             attachBlockId: 'block-2',
-            selectedDate: '2026-03-10',
-            itemToUnschedule: null,
             ...callbacks,
             ...overrides,
         }));
@@ -131,32 +123,6 @@ describe('useProgramDetailMutations', () => {
         expect(notify.success).not.toHaveBeenCalled();
     });
 
-    it('delegates recurring unschedule to the program service path and always clears the confirmation state', async () => {
-        const { result } = renderMutations({
-            itemToUnschedule: {
-                id: 'day-template',
-                blockId: 'block-9',
-                type: 'program_day',
-                isRecurringTemplate: true,
-                name: 'Template Day',
-            },
-        });
-
-        await act(async () => {
-            await result.current.unscheduleDay();
-        });
-
-        expect(mockActions.unscheduleRecurringDay).toHaveBeenCalledWith({
-            blockId: 'block-9',
-            dayId: 'day-template',
-            date: '2026-03-10',
-            timezone: 'UTC',
-        });
-        expect(mockActions.unscheduleDay).not.toHaveBeenCalled();
-        expect(callbacks.onUnscheduleFinished).toHaveBeenCalledTimes(1);
-        expect(notify.success).toHaveBeenCalledWith('Day unscheduled');
-    });
-
     it('deletes a goal after confirmation, then refreshes and closes the goal editor', async () => {
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
 
@@ -175,54 +141,4 @@ describe('useProgramDetailMutations', () => {
         confirmSpy.mockRestore();
     });
 
-    it('formats structured deadline update errors into a readable toast message', async () => {
-        const deadlineError = {
-            response: {
-                data: {
-                    error: {
-                        error: 'Child deadline cannot be later than parent deadline',
-                        parent_deadline: '2026-03-13',
-                    },
-                },
-            },
-        };
-        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-        mockActions.setProgramGoalDeadline.mockRejectedValueOnce(deadlineError);
-
-        try {
-            const { result } = renderMutations();
-
-            await act(async () => {
-                await result.current.setGoalDeadline('goal-1', '2026-03-16');
-            });
-
-            expect(notify.error).toHaveBeenCalledWith(
-                'Failed to set goal deadline: Child deadline cannot be later than parent deadline (parent deadline: 2026-03-13)'
-            );
-            expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to set goal deadline:', deadlineError);
-        } finally {
-            consoleErrorSpy.mockRestore();
-        }
-    });
-
-    it('sets a deadline before attaching a goal to a specific program day', async () => {
-        const { result } = renderMutations();
-
-        await act(async () => {
-            await result.current.saveDayGoal({
-                block_id: 'block-1',
-                day_id: 'day-1',
-                goal_id: 'goal-1',
-                deadline: '2026-03-10',
-            });
-        });
-
-        expect(mockActions.setProgramGoalDeadline).toHaveBeenCalledWith({
-            goal_id: 'goal-1',
-            deadline: '2026-03-10',
-        });
-        expect(mockActions.attachGoalToDay).toHaveBeenCalledWith('block-1', 'day-1', { goal_id: 'goal-1' });
-        expect(notify.success).toHaveBeenCalledWith('Goal attached to day');
-    });
 });

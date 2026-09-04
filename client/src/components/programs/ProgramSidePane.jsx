@@ -1,13 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 
+import Button from '../atoms/Button';
 import SidePaneHeader from '../common/SidePaneHeader';
 import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
-import SidePaneNotePanel from '../common/SidePaneNotePanel';
 import ViewToggleTabs from '../common/ViewToggleTabs';
 import DisclosureButton from '../atoms/DisclosureButton';
-import { buildProgramSidePaneData } from '../../utils/programViewModel';
+import { formatLiteralDate } from '../../utils/dateUtils';
+import { formatProgramCalendarRange } from '../../utils/programCalendarContext';
 import ProgramSidebar from './ProgramSidebar';
-import styles from '../../pages/ProgramCalendarPage.module.css';
+import ProgramDayPane from './ProgramDayPane';
+import ProgramOverview from './ProgramOverview';
+import styles from './ProgramSidePane.module.css';
 
 function ProgramSidePaneSection({
     title,
@@ -47,23 +50,31 @@ export default function ProgramSidePane({
     view,
     onViewChange,
     programMetrics,
-    activeBlock,
-    blockMetrics,
     programGoalSeeds,
     onGoalClick,
-    notesQuery,
-    notes,
-    onCreateNote,
+    programMetricsLoading = false,
+    programMetricsError = null,
+    rootId,
+    scope = 'program',
+    contextDate,
+    selectedRange,
+    dayDetailQuery,
+    onProgramScope,
+    onPreviousDay,
+    onNextDay,
+    today,
+    blocks,
+    onScheduleDay,
+    onCreateDay,
+    getGoalIcon,
+    getGoalColor,
+    getGoalSecondaryColor,
+    availablePrograms = [],
+    onSelectProgramForDate,
+    timezone = 'UTC',
 }) {
-    const fallbackSidePaneData = useMemo(() => buildProgramSidePaneData({
-        program,
-        goals,
-    }), [goals, program]);
-    const getGoalDetails = (goalId) => goals.find((goal) => goal.id === goalId) || null;
+    const getGoalDetails = (goalId) => goals.find((goal) => String(goal.id) === String(goalId)) || null;
     const [collapsedSections, setCollapsedSections] = useState({
-        details: false,
-        metrics: false,
-        notes: false,
         goals: false,
     });
     const toggleSection = (key) => {
@@ -72,23 +83,30 @@ export default function ProgramSidePane({
             [key]: !current[key],
         }));
     };
-    const sidePaneData = {
-        programMetrics: programMetrics || fallbackSidePaneData.programMetrics,
-        activeBlock: activeBlock || fallbackSidePaneData.activeBlock,
-        blockMetrics: blockMetrics || fallbackSidePaneData.blockMetrics,
-        programGoalSeeds: programGoalSeeds || fallbackSidePaneData.programGoalSeeds,
-    };
-
     return (
         <aside className={styles.sidePane} aria-label="Program side pane">
-            <SidePaneHeader
-                actions={(
-                    <SidePaneHeaderButton onClick={onCollapse}>
-                        Collapse
-                    </SidePaneHeaderButton>
-                )}
+            {scope === 'day' ? (
+                <header className={styles.dayReviewHeader}>
+                    <div className={styles.dayReviewTopline}>
+                        <Button unstyled className={styles.programCrumb} onClick={onProgramScope}>
+                            <span aria-hidden="true">‹</span>
+                            <span>{program?.name || 'Program'}</span>
+                        </Button>
+                        <SidePaneHeaderButton className={styles.collapseButton} onClick={onCollapse}>Collapse</SidePaneHeaderButton>
+                    </div>
+                    <div className={styles.dayReviewHeading}>
+                        <Button unstyled className={styles.dayNavButton} onClick={onPreviousDay} aria-label="Previous day">‹</Button>
+                        <div className={styles.dayReviewTitle}>
+                            <h2>{formatLiteralDate(contextDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h2>
+                        </div>
+                        <Button unstyled className={styles.dayNavButton} onClick={onNextDay} aria-label="Next day">›</Button>
+                    </div>
+                </header>
+            ) : <SidePaneHeader
+                className={scope === 'program' ? styles.programHeader : styles.scopedHeader}
+                actions={<SidePaneHeaderButton className={styles.collapseButton} onClick={onCollapse}>Collapse</SidePaneHeaderButton>}
             >
-                <ViewToggleTabs
+                {scope === 'program' ? <ViewToggleTabs
                     className={styles.sidePaneViewToggle}
                     items={[
                         { value: 'details', label: 'Details' },
@@ -100,71 +118,52 @@ export default function ProgramSidePane({
                     style={{
                         '--view-toggle-panel-bg': 'var(--color-bg-sidebar)',
                     }}
+                /> : (
+                    <nav className={styles.scopeNav} aria-label="Program scope">
+                        <Button unstyled className={styles.programCrumb} onClick={onProgramScope}>
+                            <span aria-hidden="true">‹</span>
+                            <span>{program?.name || 'Program'}</span>
+                        </Button>
+                        <span className={styles.rangeSummary}>
+                            <span className={styles.rangeNavLabel}>Selected timeframe</span>
+                            <span className={styles.rangeNavDate}>
+                                {formatProgramCalendarRange(selectedRange?.startDate, selectedRange?.endDate)}
+                            </span>
+                        </span>
+                    </nav>
+                )}
+            </SidePaneHeader>}
+
+            {program && scope === 'day' ? (
+                <ProgramDayPane
+                    rootId={rootId}
+                    date={contextDate}
+                    today={today}
+                    query={dayDetailQuery}
+                    program={program}
+                    blocks={blocks}
+                    onScheduleDay={onScheduleDay}
+                    onCreateDay={onCreateDay}
+                    goals={goals}
+                    onGoalClick={onGoalClick}
+                    getGoalIcon={getGoalIcon}
+                    getGoalColor={getGoalColor}
+                    getGoalSecondaryColor={getGoalSecondaryColor}
+                    timezone={timezone}
                 />
-            </SidePaneHeader>
+            ) : null}
 
-            {program && view === 'details' ? (
+            {program && (scope === 'range' || (scope === 'program' && view === 'details')) ? (
                 <div className={styles.detailsPane}>
-                    <ProgramSidePaneSection
-                        title="Details"
-                        collapsed={collapsedSections.details}
-                        onToggle={() => toggleSection('details')}
-                    >
-                        {program.description ? (
-                            <p className={styles.sectionDescription}>{program.description}</p>
-                        ) : (
-                            <p className={styles.emptySectionText}>No details yet.</p>
-                        )}
-                    </ProgramSidePaneSection>
-
-                    <ProgramSidePaneSection
-                        title="Metrics"
-                        collapsed={collapsedSections.metrics}
-                        onToggle={() => toggleSection('metrics')}
-                        contentClassName={styles.metricsSectionContent}
-                    >
-                        <ProgramSidebar
-                            program={program}
-                            programMetrics={sidePaneData.programMetrics}
-                            activeBlock={sidePaneData.activeBlock}
-                            blockMetrics={sidePaneData.blockMetrics}
-                            programGoalSeeds={sidePaneData.programGoalSeeds}
-                            onGoalClick={onGoalClick || (() => {})}
-                            getGoalDetails={getGoalDetails}
-                            compact
-                            hideGoals
-                            flushMetricsPadding
-                            className={styles.embeddedSidebarMetrics}
-                        />
-                    </ProgramSidePaneSection>
-
-                    <ProgramSidePaneSection
-                        title={notes.length > 0 ? `Program Notes (${notes.length})` : 'Program Notes'}
-                        collapsed={collapsedSections.notes}
-                        onToggle={() => toggleSection('notes')}
-                        className={styles.notesSidePaneSection}
-                        contentClassName={styles.notesSectionContent}
-                    >
-                        <SidePaneNotePanel
-                            notes={notes}
-                            isLoading={notesQuery.isLoading}
-                            error={notesQuery.error}
-                            onSubmit={onCreateNote}
-                            onEdit={notesQuery.updateNote}
-                            onDelete={notesQuery.deleteNote}
-                            onPin={notesQuery.pinNote}
-                            onUnpin={notesQuery.unpinNote}
-                            hasMore={notesQuery.hasMore}
-                            onLoadMore={notesQuery.loadNextPage}
-                            placeholder="Add a program note..."
-                            label="Program Notes"
-                            hideHeader
-                        />
-                    </ProgramSidePaneSection>
+                    <ProgramOverview
+                        metrics={programMetrics || null}
+                        loading={programMetricsLoading}
+                        error={programMetricsError}
+                    />
                 </div>
             ) : null}
 
-            {program && view === 'goals' ? (
+            {program && scope === 'program' && view === 'goals' ? (
                 <div className={styles.goalsPane}>
                     <ProgramSidePaneSection
                         title="Program Goals"
@@ -175,10 +174,7 @@ export default function ProgramSidePane({
                     >
                         <ProgramSidebar
                             program={program}
-                            programMetrics={sidePaneData.programMetrics}
-                            activeBlock={sidePaneData.activeBlock}
-                            blockMetrics={sidePaneData.blockMetrics}
-                            programGoalSeeds={sidePaneData.programGoalSeeds}
+                            programGoalSeeds={programGoalSeeds || []}
                             onGoalClick={onGoalClick || (() => {})}
                             getGoalDetails={getGoalDetails}
                             compact
@@ -193,8 +189,18 @@ export default function ProgramSidePane({
             {!program ? (
                 <div className={styles.emptySidePane}>
                     <div className={styles.emptySidePaneCard}>
-                        <p>No program is scheduled for this day.</p>
-                        <button className={styles.emptySidePaneButton} onClick={onCreate}>New Program</button>
+                        <p>{availablePrograms.length ? 'Choose a program for this day.' : 'No program is scheduled for this day.'}</p>
+                        {availablePrograms.map((candidate) => (
+                            <Button
+                                unstyled
+                                key={candidate.id}
+                                className={styles.emptySidePaneButton}
+                                onClick={() => onSelectProgramForDate?.(candidate)}
+                            >
+                                View {candidate.name}
+                            </Button>
+                        ))}
+                        <Button unstyled className={styles.emptySidePaneButton} onClick={onCreate}>New Program</Button>
                     </div>
                 </div>
             ) : null}

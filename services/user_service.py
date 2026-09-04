@@ -76,7 +76,7 @@ ONBOARDING_SUBSTEP_DEFAULTS = {
         'program_created': False,
         'program_block_created': False,
         'program_day_completed': False,
-        'calendar_day_modal_opened': False,
+        'program_calendar_day_reviewed': False,
     },
 }
 
@@ -263,7 +263,9 @@ class UserService:
                 'program_created': has_program,
                 'program_block_created': has_program_block,
                 'program_day_completed': has_completed_program_day,
-                'calendar_day_modal_opened': 'calendar_day_modal' in visited,
+                'program_calendar_day_reviewed': bool(
+                    {'calendar_day_modal', 'program_calendar_day_reviewed'} & visited
+                ),
             },
         }
 
@@ -294,6 +296,10 @@ class UserService:
         if 'supporting_goal' in completed_substeps.get('break_it_down', []):
             completed_substeps = {**completed_substeps, 'break_it_down': [
                 *completed_substeps['break_it_down'], 'child_goal_created',
+            ]}
+        if 'calendar_day_modal_opened' in completed_substeps.get('schedule_program', []):
+            completed_substeps = {**completed_substeps, 'schedule_program': [
+                *completed_substeps['schedule_program'], 'program_calendar_day_reviewed',
             ]}
         return {
             "version": ONBOARDING_VERSION,

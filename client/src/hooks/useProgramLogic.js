@@ -130,38 +130,9 @@ export function useProgramLogic(rootId, program, refreshers) {
         await invalidateScheduling();
     }, [invalidateProgram, invalidateScheduling, rootId, programId]);
 
-    const unscheduleRecurringDay = useCallback(async ({ blockId, dayId, date, timezone }) => {
-        await fractalApi.unscheduleBlockDayOccurrence(rootId, programId, blockId, dayId, {
-            date,
-            timezone,
-        });
-        await invalidateScheduling();
-    }, [invalidateScheduling, programId, rootId]);
-
-    const unscheduleDay = useCallback(async (item) => {
-        if (item.type === 'session') {
-            await fractalApi.deleteSession(rootId, item.id);
-        } else {
-            // Legacy Program Day (Instance)
-            if (!item.blockId) throw new Error("Cannot delete day without blockId");
-            await fractalApi.deleteBlockDay(rootId, programId, item.blockId, item.id);
-        }
-        await invalidateScheduling();
-    }, [invalidateScheduling, rootId, programId]);
-
     // --- Goals ---
     const attachGoal = useCallback(async (blockId, { goal_id, deadline }) => {
         await fractalApi.attachGoalToBlock(rootId, programId, blockId, { goal_id, deadline });
-        await invalidateProgramGoals();
-    }, [invalidateProgramGoals, rootId, programId]);
-
-    const attachGoalToDay = useCallback(async (blockId, dayId, { goal_id }) => {
-        await fractalApi.attachGoalToDay(rootId, programId, blockId, dayId, { goal_id });
-        await invalidateProgramGoals();
-    }, [invalidateProgramGoals, rootId, programId]);
-
-    const setProgramGoalDeadline = useCallback(async ({ goal_id, deadline }) => {
-        await fractalApi.setProgramGoalDeadline(rootId, programId, { goal_id, deadline });
         await invalidateProgramGoals();
     }, [invalidateProgramGoals, rootId, programId]);
 
@@ -173,10 +144,6 @@ export function useProgramLogic(rootId, program, refreshers) {
         copyDay,
         deleteDay,
         scheduleDay,
-        unscheduleRecurringDay,
-        unscheduleDay,
         attachGoal,
-        attachGoalToDay,
-        setProgramGoalDeadline,
     };
 }

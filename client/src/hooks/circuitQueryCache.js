@@ -42,6 +42,7 @@ export function refreshCircuitSessionConsumers(queryClient, rootId, sessionId, a
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsEvidenceGoalsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsFlowtreeMetricsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId) }),
     ];
     if (action !== 'updateMemberMetrics') {
         invalidations.push(
