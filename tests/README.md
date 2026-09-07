@@ -35,6 +35,40 @@ pip install -r requirements-test.txt
 ./run-tests.sh db-down       # Stop the container when you're done
 ```
 
+### Full-suite performance and isolation
+
+`./run-tests.sh backend`, `frontend`, `all`, and `coverage` retain the full test
+inventory for their respective suites. Backend database setup creates the schema
+once per pytest session, then deletes rows from all ORM tables in dependency order
+and resets serial/identity sequences before
+each app-backed test. Tests can still commit, roll back, and use separate connections;
+the concurrency suite continues to exercise real PostgreSQL locks. The actual
+`models.base` scoped session is removed between tests and the shared engine is
+disposed at session end.
+
+Deletion is batched in one transaction: unlike truncation, it avoids replacing
+table/index storage on disk for every test. Setup takes an explicit lock timeout
+so a leaked connection causes a visible failure instead of hanging indefinitely.
+
+Use a dedicated database whose name contains `test`, with `ENV=testing`. Do not run
+two backend pytest processes against the same database: either process can reset
+the other's data. Parallel backend execution requires separate databases per worker.
+
+Frontend tests use four threads with per-file isolation. To compare worker settings
+without skipping tests, run `npm run test:run -- --pool=forks` or
+`npm run test:run -- --maxWorkers=8` from `client/`. Compare the final test/file counts
+as well as elapsed time. More workers can increase memory pressure or slow a busy
+machine; the default remains bounded. The wall timeout still terminates real hangs.
+
+For backend timing detail without changing test selection or coverage, run
+`PYTEST_ADDOPTS="--durations=20" ./run-tests.sh coverage`.
+Successful tests capture logs rather than streaming every domain event; failure
+reports retain captured logs. Use `PYTEST_ADDOPTS="-o log_cli=true"` when live logs
+are useful for debugging.
+
+Measured audit results and remaining production gaps are recorded in
+[`planning/production-quality-audit-2026-09-07.md`](../planning/production-quality-audit-2026-09-07.md).
+
 ---
 
 ## Test Structure

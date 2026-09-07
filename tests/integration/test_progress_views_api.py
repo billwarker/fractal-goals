@@ -151,7 +151,10 @@ def test_set_tag_filter_uses_only_matching_sets_and_preserves_source_index(
 ):
     root_id = sample_activity_definition.root_id
     activity_id = sample_activity_definition.id
-    metric = sample_activity_definition.metric_definitions[0]
+    metric = next(
+        metric for metric in sample_activity_definition.metric_definitions
+        if metric.is_best_set_metric
+    )
     sets = [
         ActivitySet(id=str(uuid4()), activity_instance_id=sample_activity_instance.id, sort_order=index, status='completed')
         for index in range(2)

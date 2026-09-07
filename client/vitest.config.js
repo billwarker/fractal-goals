@@ -8,11 +8,10 @@ export default defineConfig({
         globals: true,
         setupFiles: './src/test/setup.js',
         include: ['src/**/*.{test,spec}.{js,jsx}'],
-        pool: 'forks',
-        // Was fully serial (maxWorkers: 1) to fight test hangs; re-parallelized
-        // 2026-07-13 after repeated green full-suite runs. If hangs or
-        // order-dependent flakes reappear, bisect the offending test before
-        // reaching for maxWorkers: 1 again.
+        // Threads reduce worker startup/transform overhead while keeping each
+        // file isolated. Keep the worker count bounded for local and CI memory.
+        pool: 'threads',
+        isolate: true,
         maxWorkers: 4,
         testTimeout: 10000,
         hookTimeout: 10000,

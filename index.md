@@ -156,7 +156,12 @@ Backend CI separately gates migration health, unit, integration, performance, an
 coverage. `pytest.ini` owns the services/blueprints coverage scope and ratcheted threshold;
 `scripts/check_backend_coverage_gate.py` prevents CI from stripping it through `addopts`.
 `scripts/check_backend_maintainability.py` caps oversized backend modules and exception debt.
-Frontend CI gates tests, lint, production build, responsive checks, and maintainability budgets.
+Frontend CI gates tests, production build, responsive source checks, and maintainability
+budgets. Lint is currently local-only; the production audit below tracks this CI gap.
+
+Backend tests build the schema once per pytest session and clear ORM rows in dependency
+order between tests, preserving real commit and independent-connection semantics. Frontend tests use
+four isolated Vitest threads. See `tests/README.md` for full-suite execution details.
 
 Standing review rules—including boundary-case tests, broad-exception criteria, large-file
 ownership seams, commit hygiene, and high-churn manual QA—live in
@@ -164,6 +169,8 @@ ownership seams, commit hygiene, and high-churn manual QA—live in
 
 The current backlog assessment and item-level evidence live in
 [Backlog Quality Audit — September 2026](planning/backlog-quality-audit-2026-09.md).
+The broader production assessment, release-gate gaps, and test-speed evidence are in
+[Production Quality Audit — September 7, 2026](planning/production-quality-audit-2026-09-07.md).
 
 ## Practical invariants
 

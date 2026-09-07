@@ -1610,7 +1610,10 @@ def test_completed_circuit_members_receive_dynamic_progress_comparisons(
     sample_ultimate_goal,
     sample_activity_definition,
 ):
-    metric = sample_activity_definition.metric_definitions[0]
+    metric = next(
+        metric for metric in sample_activity_definition.metric_definitions
+        if metric.is_best_set_metric
+    )
     previous_session = _session(db_session, sample_ultimate_goal, test_user)
     previous_session.name = "Previous circuit baseline"
     previous_session.session_start = datetime.now(timezone.utc) - timedelta(days=1)

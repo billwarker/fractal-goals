@@ -10,7 +10,6 @@ This file contains:
 import os
 import sys
 import pytest
-import tempfile
 from sqlalchemy import event, text
 from datetime import datetime, timedelta, timezone
 import uuid
@@ -30,7 +29,7 @@ from models import (
     Base, Goal, PracticeSession,
     ActivityGroup, ActivityDefinition, MetricDefinition, SplitDefinition,
     ActivityInstance, MetricValue, SessionTemplate,
-    get_engine, init_db, get_session
+    init_db, get_session
 )
 
 # Import blueprints
@@ -55,8 +54,32 @@ from blueprints.circuits_api import circuits_bp
 from services.completion_handlers import clear_achievement_context, clear_live_progress
 
 
+@pytest.fixture(scope='session')
+def test_database_engine():
+    """Build the schema once; individual tests still use real transactions."""
+    from config import config
+    from sqlalchemy import create_engine
+    from sqlalchemy.engine import make_url
+
+    database_url = config.get_database_url()
+    database_name = make_url(database_url).database or ''
+    if config.ENV != 'testing' or 'test' not in database_name.lower():
+        pytest.fail('Refusing to reset a database without a test database name in ENV=testing')
+
+    engine = create_engine(database_url, echo=False)
+    try:
+        with engine.begin() as connection:
+            connection.execute(text('DROP TABLE IF EXISTS visualization_annotations CASCADE'))
+            connection.execute(text('DROP TABLE IF EXISTS activity_instance_modes CASCADE'))
+        Base.metadata.drop_all(engine)
+        init_db(engine)
+        yield engine
+    finally:
+        engine.dispose()
+
+
 @pytest.fixture(scope='function')
-def app():
+def app(test_database_engine, test_database_reset_sql, monkeypatch):
     """Create and configure a test Flask application instance."""
     
     # Create Flask app for testing
@@ -119,42 +142,39 @@ def app():
         clear_achievement_context()
         clear_live_progress()
     
-    # Ensure usage of test database
-    if not config.DATABASE_URL or 'test' not in config.DATABASE_URL:
-         pytest.fail(f"CRITICAL: Running tests against non-test database: {config.DATABASE_URL}! Check .env.testing (ENV={config.ENV})")
+    # Reset rows in one transaction without replacing table/index storage on
+    # disk. Keep real commits and independent connections for lock tests.
+    import models.base as model_base
 
-    # Patch get_engine to use test database (although config should already point to it)
-    original_get_engine = models.get_engine
-    test_db_uri = config.get_database_url()
-    
-    # Create engine
-    from sqlalchemy import create_engine
-    engine = create_engine(test_db_uri, echo=False)
-    
-    def mock_get_engine(db_path_arg=None):
-        return engine
-    
-    models.get_engine = mock_get_engine
-    
-    with engine.begin() as connection:
-        connection.execute(text('DROP TABLE IF EXISTS visualization_annotations CASCADE'))
-        connection.execute(text('DROP TABLE IF EXISTS activity_instance_modes CASCADE'))
+    model_base.remove_session()
+    monkeypatch.setattr(model_base, '_session_factory', None)
+    monkeypatch.setattr(model_base, 'get_engine', lambda db_url=None: test_database_engine)
+    monkeypatch.setattr(models, 'get_engine', lambda db_url=None: test_database_engine)
+    with test_database_engine.begin() as connection:
+        connection.execute(text("SET LOCAL lock_timeout = '5s'"))
+        connection.exec_driver_sql(test_database_reset_sql)
 
-    # Reset Database
-    # Drop all tables and recreate them to ensure a clean state
-    Base.metadata.drop_all(engine)
-    init_db(engine)
-    
-    yield test_app
-    
-    # Cleanup
-    # Optional: drop tables after test
-    # Base.metadata.drop_all(engine)
-    
-    # Restore original get_engine
-    models.get_engine = original_get_engine
-    models.engine = None # Reset cached engine in models if any
-    models._session_factory = None # Reset the scoped session factory between tests!
+    try:
+        yield test_app
+    finally:
+        model_base.remove_session()
+
+
+@pytest.fixture(scope='session')
+def test_database_reset_sql(test_database_engine):
+    """Delete children first; reset any serial/identity sequences as well."""
+    from sqlalchemy import inspect
+
+    preparer = test_database_engine.dialect.identifier_preparer
+    statements = [
+        f'DELETE FROM {preparer.format_table(table)}'
+        for table in reversed(Base.metadata.sorted_tables)
+    ]
+    statements.extend(
+        f'ALTER SEQUENCE {preparer.quote(name)} RESTART'
+        for name in inspect(test_database_engine).get_sequence_names()
+    )
+    return '; '.join(statements)
 
 
 @pytest.fixture(scope='function')
