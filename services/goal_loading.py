@@ -1,5 +1,5 @@
 from sqlalchemy import or_
-from sqlalchemy.orm import selectinload, with_loader_criteria
+from sqlalchemy.orm import joinedload, selectinload, with_loader_criteria
 from sqlalchemy.orm.attributes import set_committed_value
 
 from models import ActivityGroup, Goal, Target
@@ -9,8 +9,8 @@ def goal_serializer_load_options(*, include_group_activities=False):
     """Eager-load relationships touched by serialize_goal and goal timeline views."""
     options = [
         with_loader_criteria(Goal, Goal.deleted_at.is_(None), include_aliases=True),
-        selectinload(Goal.level),
-        selectinload(Goal.targets_rel).selectinload(Target.metric_conditions),
+        joinedload(Goal.level),
+        selectinload(Goal.targets_rel).joinedload(Target.metric_conditions),
         selectinload(Goal.associated_activities),
         selectinload(Goal.associated_activity_groups),
         selectinload(Goal.pause_intervals),

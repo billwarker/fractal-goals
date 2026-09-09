@@ -20,6 +20,7 @@ class WorkIntervalConflict(Exception):
 class WorkIntervalService:
     def __init__(self, db_session):
         self.db_session = db_session
+        self._session_locks = {}
 
     def get_open(self, session_id):
         return self.db_session.query(SessionWorkInterval).filter(
@@ -27,8 +28,17 @@ class WorkIntervalService:
             SessionWorkInterval.ended_at.is_(None),
         ).first()
 
-    def _lock_session(self, session_id):
-        return self.db_session.query(Session).filter(Session.id == session_id).with_for_update().first()
+    def lock_session(self, session_id):
+        """Reuse this service's row lock only within the same transaction/savepoint."""
+        transaction = self.db_session.get_nested_transaction() or self.db_session.get_transaction()
+        cached = self._session_locks.get(session_id)
+        if transaction is not None and cached and cached[0] is transaction:
+            return cached[1]
+        session = self.db_session.query(Session).filter(Session.id == session_id).with_for_update().first()
+        transaction = self.db_session.get_nested_transaction() or self.db_session.get_transaction()
+        if session is not None:
+            self._session_locks[session_id] = (transaction, session)
+        return session
 
     @staticmethod
     def describe(interval):
@@ -54,7 +64,7 @@ class WorkIntervalService:
         started_at=None,
         switch=False,
     ):
-        if not self._lock_session(session_id):
+        if not self.lock_session(session_id):
             raise ValueError("Session not found")
         open_interval = self.get_open(session_id)
         same_subject = open_interval and (
@@ -97,7 +107,7 @@ class WorkIntervalService:
         return interval
 
     def close_open(self, session_id, *, ended_at=None):
-        self._lock_session(session_id)
+        self.lock_session(session_id)
         return self.close(self.get_open(session_id), ended_at=ended_at)
 
     def adjust_live_start(self, instance, *, started_at):
@@ -105,7 +115,7 @@ class WorkIntervalService:
         if not started_at:
             raise ValueError("A live activity requires a start time")
 
-        self._lock_session(instance.session_id)
+        self.lock_session(instance.session_id)
         intervals = self.db_session.query(SessionWorkInterval).filter(
             SessionWorkInterval.activity_instance_id == instance.id,
         ).order_by(

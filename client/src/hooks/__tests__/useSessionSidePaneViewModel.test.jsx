@@ -106,4 +106,15 @@ describe('useSessionSidePaneViewModel', () => {
             ],
         });
     });
+    it.each([false, true])('tracks completion transitions from %s with stable inputs', (initial) => {
+        const data = useActiveSessionData();
+        const props = { mode: 'details' };
+        useActiveSessionData.mockReturnValue({ ...data, session: { completed: initial } });
+        const { result, rerender } = renderHook(() => useSessionSidePaneViewModel(props));
+        expect(result.current.details.isCompleted).toBe(initial);
+        useActiveSessionData.mockReturnValue({ ...data, session: { completed: !initial } });
+        rerender();
+        expect(result.current.details.isCompleted).toBe(!initial);
+    });
+
 });

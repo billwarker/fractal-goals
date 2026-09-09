@@ -15,7 +15,8 @@
     "test": "vitest",
     "test:run": "node scripts/run-vitest-with-timeout.mjs",
     "test:related": "node scripts/run-vitest-with-timeout.mjs --related",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "node scripts/run-vitest-with-timeout.mjs --coverage",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@fullcalendar/daygrid": "^6.1.20",
@@ -42,6 +43,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.63.0",
     "@resvg/resvg-js": "^2.6.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

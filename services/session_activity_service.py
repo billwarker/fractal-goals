@@ -6,18 +6,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.orm.attributes import flag_modified
 
 import models
-from models import (
-    ActivityDefinition,
-    ActivityInstance,
-    ActivitySet,
-    Goal,
-    MetricDefinition,
-    MetricValue,
-    Session,
-    SessionWorkInterval,
-    session_goals,
-    validate_root_goal,
-)
+from models import ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricDefinition, MetricValue, SessionWorkInterval, session_goals, validate_root_goal
 from services import Event, Events, event_bus
 from services.goal_type_utils import get_canonical_goal_type
 from services.owned_entity_queries import (
@@ -250,6 +239,7 @@ class SessionActivityService:
             session_id=session_id,
             activity_definition_id=activity_definition_id,
             root_id=root_id,
+            metric_values=[], sets=[], tags=[],
         )
         instance.definition = activity_def
         self.db_session.add(instance)
@@ -306,13 +296,15 @@ class SessionActivityService:
                 self.db_session.execute(session_goals.insert(), insert_values)
 
         serialized = serialize_activity_instance(instance)
-        self.db_session.commit()
         activity_name = activity_def.name if activity_def else 'Unknown'
+        created_instance_id = instance.id
+        created_definition_id = instance.activity_definition_id
+        self.db_session.commit()
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_CREATED,
             {
-                'instance_id': instance.id,
-                'activity_definition_id': instance.activity_definition_id,
+                'instance_id': created_instance_id,
+                'activity_definition_id': created_definition_id,
                 'activity_name': activity_name,
                 'session_id': session_id,
                 'root_id': root_id,

@@ -97,7 +97,7 @@ if config.ENV == 'production':
     csp = {
         'default-src': "'self'",
         'script-src': ["'self'"],  # No unsafe-inline or unsafe-eval in production
-        'style-src': ["'self'", "'unsafe-inline'"],  # Inline styles still needed for React
+        'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],  # Inline styles still needed for React
         'img-src': ["'self'", 'data:', 'https:'],
         'connect-src': unique_sources([
             "'self'",
@@ -105,7 +105,7 @@ if config.ENV == 'production':
             'https://*.sentry.io',
             *config.CSP_CONNECT_SRC,
         ]),
-        'font-src': ["'self'", 'https://fonts.gstatic.com'],
+        'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
         'frame-ancestors': "'none'",
         'base-uri': "'self'",
         'form-action': "'self'"
@@ -115,9 +115,10 @@ else:
     csp = {
         'default-src': "'self'",
         'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],  # Needed for Vite/React Dev
-        'style-src': ["'self'", "'unsafe-inline'"],
+        'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         'img-src': ["'self'", 'data:', 'https:'],
-        'connect-src': ["'self'", 'http://localhost:5173', 'ws://localhost:5173']  # Allow Vite HMR
+        'connect-src': ["'self'", 'http://localhost:5173', 'ws://localhost:5173'],  # Allow Vite HMR
+        'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
     }
 
 Talisman(
@@ -195,6 +196,10 @@ app.register_blueprint(feature_flags_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(public_bp)
+# Static assets and SPA route shells do not consume API rate-limit capacity.
+# Keeping them exempt prevents a chunked page reload from exhausting the
+# client IP's budget before its authenticated API requests can run.
+limiter.exempt(pages_bp)
 app.register_blueprint(pages_bp)
 app.register_blueprint(health_bp)
 app.register_blueprint(telemetry_bp)

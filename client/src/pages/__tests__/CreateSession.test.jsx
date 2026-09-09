@@ -106,6 +106,7 @@ function LocationProbe() {
 describe('CreateSession quick-session flow', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        window.localStorage.clear();
         mockIsMobile.value = false;
         goalScopeProps.mockClear();
         mockPageData.value = {

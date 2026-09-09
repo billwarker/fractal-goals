@@ -102,4 +102,5 @@ manual step becomes a burden.
 
 | Date | Operator | Backups verified | PITR | Drill performed | Result / notes |
 | --- | --- | --- | --- | --- | --- |
+| 2026-09-09 | Automated local quality run | N/A — isolated test source | N/A | Logical dump/restore | Passed in 1.91s through `./run-tests.sh restore-drill`; table count and Alembic revision matched; disposable restored database removed. |
 | _fill in during preflight_ | | | | | |

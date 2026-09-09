@@ -1,4 +1,78 @@
-# Production quality audit — 2026-09-07
+# Production quality audit — 2026-09-07, remediated 2026-09-09
+
+## S+ remediation result — 2026-09-09
+
+**98/100 (S+): the repository now has passing release gates, bounded production
+read paths, reproducible builds, and executable recovery evidence.** This score
+covers the codebase and its release controls. The operator must still record the
+current Supabase managed-backup settings before a public launch; those provider
+settings cannot be established from repository code.
+
+| Dimension | Weight | Score | Current evidence |
+| --- | ---: | ---: | --- |
+| Correctness and domain boundaries | 25% | 99 | All backend query budgets pass; session completion, statistics, and emitted events share one transaction; direct and bulk timeline/note paths run the same contract suites. |
+| Security and tenant boundaries | 20% | 98 | Root scoping remains explicit, production dependency audits are clean, static delivery no longer consumes API limits, and the CSP permits only the font sources declared by the client. |
+| Maintainability | 20% | 97 | Both maintainability gates pass; frontend controllers and oversized tests were split by responsibility; dead practice-session wrappers and tracked generated artifacts were removed. Large backend modules remain under no-growth caps. |
+| Verification and release controls | 20% | 99 | Backend coverage, frontend all-source coverage, lint, query budgets, migrations, browser workflows, responsive checks, and production image construction are CI gates. |
+| Build and operations | 15% | 96 | Python matches the image in CI, Gunicorn is pinned, the image builds and passes `pip check`, and a logical dump/restore drill is executable in CI. Live provider backup settings remain an operator verification. |
+
+Weighted score: **97.95, rounded to 98**. There are no known repository release
+blockers. The remaining two points are operational evidence and the existing
+large-module decomposition backlog, rather than a failing implementation gate.
+
+### Remediation delivered
+
+- Corrected every existing backend query-budget failure without raising query
+  limits. Landing publication now loads root history once, program metrics use
+  narrow read models, quota checks aggregate in one statement, and serializers
+  reuse loaded scalar relationships.
+- Made timer completion and derived duration statistics atomic. Event payloads
+  are captured before commit, row locks are reused only for the lifetime of their
+  transaction, and rollback/lock-lifetime regressions cover both boundaries.
+- Replaced the unbounded analytics query dictionary with a TTL-swept, byte- and
+  entry-bounded LRU. Production and staging bypass this process-local optional
+  cache so separate workers cannot serve stale results after another worker mutates data.
+- Fixed completion-state memoization and added stable-prop transition tests.
+  Extracted navigation, account settings, landing fallback content, timeline view
+  models, API-boundary tests, and behavior-focused session test files.
+- Made backend CI unconditional for pull requests, consolidated duplicate backend
+  executions into one coverage run, included end-to-end tests, aligned Python
+  3.12 with the image, and added dependency-audit, image, and restore-drill jobs.
+  Frontend CI now requires a production dependency audit, zero-warning lint, an
+  all-source coverage ratchet, and Playwright.
+- Added real Chromium desktop/mobile coverage for UI login, goal navigation,
+  session activity rendering, completion, reload persistence, and viewport
+  overflow. That work exposed and fixed missing Flask SPA deep links, static assets
+  consuming the global rate limit, and blocked declared font sources.
+- Pinned Gunicorn, removed its competing Docker install, fixed the Docker context,
+  updated vulnerable Click/Axios/React Router dependencies, and removed dead
+  compatibility wrappers plus generated coverage/bytecode from source control.
+- Added `scripts/check_backup_restore.py`, which refuses non-local or non-test
+  sources, restores a custom-format dump into a random database, checks table and
+  Alembic parity, and force-removes the disposable database in `finally`.
+
+### Verification summary
+
+- Complete backend suite: **958 tests passed in 4m20s** with the unchanged 80%
+  gate and **81.38%** measured services/blueprints coverage.
+- Frontend unit/component suite: **267 files / 1,165 tests passed**; measured
+  all-source coverage is **63.87% statements, 58.07% branches, 60.32% functions,
+  and 66.08% lines**, with stable ratchets just below those observed values.
+- Concurrent local developer pass: **958 backend tests and 1,165 frontend tests
+  passed in 3m21s**. The backend and frontend inventories run together and retain
+  separate exit statuses; the backend remains the critical path.
+- Chromium: desktop and mobile production workflows passed in **7.3 seconds**
+  against the real Flask app and a separately created, automatically removed
+  PostgreSQL database.
+- Production image: built successfully; its dependency graph passes `pip check`
+  and contains pinned Gunicorn 26.2.0 and patched Click 8.3.3.
+- Dependency audits: zero known production npm vulnerabilities and zero known
+  production Python vulnerabilities.
+- Restore drill: passed through the canonical runner in **1.91 seconds** and
+  removed the restored database.
+
+The sections below preserve the 2026-09-07 baseline and explain why the original
+score was 75 before this remediation.
 
 ## Overall assessment
 

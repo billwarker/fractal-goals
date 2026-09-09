@@ -7,6 +7,21 @@ from services.events import Events
 from models import Note, Program, SessionTemplate, activity_goal_associations
 
 
+@pytest.fixture(params=['direct', 'bulk'], autouse=True)
+def goal_note_read_mode(request, monkeypatch):
+    if request.param == 'direct':
+        return
+    from services.note_service import NoteService
+    from services.goal_note_read_model import load_root_goal_notes
+    original = NoteService.get_goal_notes
+
+    def bulk(self, root_id, goal_id, current_user_id, **kwargs):
+        kwargs['preloaded_notes'] = load_root_goal_notes(self.db_session, root_id)
+        return original(self, root_id, goal_id, current_user_id, **kwargs)
+
+    monkeypatch.setattr(NoteService, 'get_goal_notes', bulk)
+
+
 @pytest.mark.integration
 class TestNotesApiNanoValidation:
     def test_create_note_rejects_removed_nano_goal_id_field(self, authed_client, sample_goal_hierarchy):

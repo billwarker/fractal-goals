@@ -1,16 +1,9 @@
 import logging
 
 from sqlalchemy import func, inspect
-from sqlalchemy.orm import selectinload, with_loader_criteria
-from models import (
-    ActivityDefinition, ActivityInstance, ActivitySet,
-    CircuitRun, CircuitRound, CircuitRoundMember,
-    Goal, Target,
-    MetricValue, ProgramBlock, ProgramDay, Session,
-    validate_root_goal
-)
+from sqlalchemy.orm import joinedload, selectinload, with_loader_criteria
+from models import ActivityDefinition, ActivityInstance, ActivitySet, CircuitRun, CircuitRound, Goal, Target, MetricValue, ProgramBlock, ProgramDay, Session, validate_root_goal
 import models
-from services.owned_entity_queries import get_owned_session
 from services.effective_goal_activities import resolve_effective_goals_by_activity
 from services.goal_loading import load_fractal_goals_for_serialization
 from services.service_types import JsonDict, ServiceResult
@@ -28,8 +21,9 @@ from services.program_scope import resolve_program_scope
 logger = logging.getLogger(__name__)
 
 class SessionService:
-    def __init__(self, db_session):
+    def __init__(self, db_session, *, preloaded_goals_by_id=None):
         self.db_session = db_session
+        self._preloaded_goals_by_id = preloaded_goals_by_id
         self._session_goals_has_source = None
         self._session_filters = SessionFilterService(
             db_session,
@@ -40,6 +34,7 @@ class SessionService:
     def _analytics_service(self) -> SessionAnalyticsService:
         return SessionAnalyticsService(
             self.db_session,
+            preloaded_goals_by_id=self._preloaded_goals_by_id,
             session_filters=self._session_filters,
             effective_activity_goals_resolver=self._get_effective_activity_goals,
         )
@@ -78,20 +73,21 @@ class SessionService:
     @staticmethod
     def _session_read_options():
         return (
-            selectinload(Session.goals).selectinload(Goal.level),
-            selectinload(Session.goals).selectinload(Goal.targets_rel).selectinload(Target.metric_conditions),
-            selectinload(Session.template),
+            selectinload(Session.goals).joinedload(Goal.level),
+            selectinload(Session.goals).selectinload(Goal.targets_rel).joinedload(Target.metric_conditions),
+            joinedload(Session.template),
             selectinload(Session.notes_list),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.definition),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.split),
+            selectinload(Session.activity_instances).joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
+            selectinload(Session.activity_instances).joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.metric_definitions),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).joinedload(MetricValue.split),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).joinedload(MetricValue.definition),
+            selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).joinedload(MetricValue.split),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.tags),
             selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.tags),
             selectinload(Session.circuit_runs).selectinload(CircuitRun.slots),
             selectinload(Session.circuit_runs).selectinload(CircuitRun.rounds).selectinload(CircuitRound.members),
-            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program),
+            joinedload(Session.program_day).joinedload(ProgramDay.block).joinedload(ProgramBlock.program),
             with_loader_criteria(ActivityInstance, ActivityInstance.deleted_at == None, include_aliases=True),
         )
 
@@ -99,11 +95,13 @@ class SessionService:
         """Resolve canonical effective goals for each activity definition."""
         if not activity_def_ids:
             return {}
-        goals_by_id = load_fractal_goals_for_serialization(
-            self.db_session,
-            root_id,
-            include_group_activities=True,
-        )
+        goals_by_id = self._preloaded_goals_by_id
+        if goals_by_id is None:
+            goals_by_id = load_fractal_goals_for_serialization(
+                self.db_session, root_id, include_group_activities=True,
+            )
+        else:
+            goals_by_id = {key: goal for key, goal in goals_by_id.items() if goal.root_id == root_id}
         return resolve_effective_goals_by_activity(goals_by_id, activity_def_ids)
 
     def _attach_dynamic_progress(self, sessions):
@@ -114,7 +112,7 @@ class SessionService:
             for instance in (session.activity_instances or [])
             if instance.deleted_at is None
         ]
-        comparisons = progress.compute_comparisons_for_instances(instances)
+        comparisons = progress.compute_comparisons_for_instances(instances, preloaded=True)
         for instance in instances:
             instance._dynamic_progress = comparisons.get(instance.id)
 
@@ -339,11 +337,10 @@ class SessionService:
         ]
         if missing_activity_ids:
             session._activity_duration_stats.update(
-                stats_service.recompute_activity_stats(root_id, missing_activity_ids)
+                stats_service.activity_duration_stats(root_id, missing_activity_ids)
             )
-            self.db_session.commit()
-
-        return serialize_session(session), None, 200
+        payload = serialize_session(session)
+        return payload, None, 200
 
     def get_session_activities(self, root_id, session_id, current_user_id) -> ServiceResult[list[JsonDict]]:
         return self._session_activity_service().get_session_activities(root_id, session_id, current_user_id)

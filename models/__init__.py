@@ -33,9 +33,3 @@ from .product_event import ProductEvent
 
 # Legacy ALIASES for backward compatibility (Optional)
 PracticeSession = Session
-def get_practice_session_by_id(db_session, session_id):
-    return get_session_by_id(db_session, session_id)
-def get_all_practice_sessions(db_session):
-    return get_all_sessions(db_session)
-def delete_practice_session(db_session, session_id):
-    return delete_session(db_session, session_id)

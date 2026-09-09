@@ -17,10 +17,24 @@ const args = isRelatedRun
     ? ['vitest', 'related', '--run', '--pool=threads', '--maxWorkers=2', ...cliArgs.slice(1)]
     : ['vitest', 'run', ...cliArgs];
 
+const childEnv = { ...process.env };
+const disableNativeWebStorage = '--no-experimental-webstorage';
+if (
+    process.allowedNodeEnvironmentFlags.has(disableNativeWebStorage)
+    && !childEnv.NODE_OPTIONS?.includes('webstorage')
+) {
+    // jsdom owns Web Storage in tests; Node 25's experimental global conflicts
+    // with it and emits one missing-persistence-file warning per worker.
+    childEnv.NODE_OPTIONS = [childEnv.NODE_OPTIONS, disableNativeWebStorage]
+        .filter(Boolean)
+        .join(' ');
+}
+
 const child = spawn('npx', args, {
     stdio: 'inherit',
     detached: process.platform !== 'win32',
     shell: process.platform === 'win32',
+    env: childEnv,
 });
 
 let finished = false;

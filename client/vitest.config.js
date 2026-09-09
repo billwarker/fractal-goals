@@ -17,7 +17,10 @@ export default defineConfig({
         hookTimeout: 10000,
         teardownTimeout: 5000,
         coverage: {
-            reporter: ['text', 'html'],
+            reporter: ['text', 'html', 'json-summary'],
+            include: ['src/**/*.{js,jsx}'],
+            // Ratchet the measured all-source baseline; raise these as coverage grows.
+            thresholds: { statements: 63.5, branches: 57.8, functions: 60, lines: 65.8 },
             exclude: ['node_modules/', 'src/test/']
         }
     }

@@ -100,10 +100,6 @@ class ProgressService:
         except (TypeError, ValueError):
             return None
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
     def _active_instances_query(self):
         return (
             self.db.query(ActivityInstance)
@@ -218,7 +214,7 @@ class ProgressService:
         """Return progress_settings dict for the root goal, or {} if not set."""
         if root_id in self._root_settings_cache:
             return self._root_settings_cache[root_id]
-        root = self.db.query(Goal).filter_by(id=root_id).first()
+        root = self.db.get(Goal, root_id)
         if root and root.progress_settings and isinstance(root.progress_settings, dict):
             settings = root.progress_settings
         else:
@@ -1088,12 +1084,15 @@ class ProgressService:
         )
         return self._build_activity_comparison_map(activity_def, config, view_id, instances)
 
-    def compute_comparisons_for_instances(self, instances) -> dict:
+    def compute_comparisons_for_instances(self, instances, *, preloaded=False) -> dict:
         """Batch active-view comparisons for session and analytics read models."""
         target_ids = [instance.id for instance in instances if instance and instance.deleted_at is None]
         if not target_ids:
             return {}
-        targets = self._active_instances_query().filter(ActivityInstance.id.in_(target_ids)).all()
+        targets = [
+            instance for instance in instances
+            if instance.deleted_at is None and instance.session and instance.session.deleted_at is None
+        ] if preloaded else self._active_instances_query().filter(ActivityInstance.id.in_(target_ids)).all()
         if not targets:
             return {}
         activities = {instance.definition.id: instance.definition for instance in targets if instance.definition}

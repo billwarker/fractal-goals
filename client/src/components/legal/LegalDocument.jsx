@@ -1,8 +1,8 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import styles from './LegalDocument.module.css';
 import { formatEffectiveDate } from '../../content/legal/legalContent';
+import styles from './LegalDocument.module.css';
 
 const SAFE_PROTOCOLS = ['http:', 'https:', 'mailto:', 'tel:'];
 
@@ -41,7 +41,8 @@ const legalMarkdownComponents = {
     },
     // Wide tables (subprocessors, retention) scroll within their own bounds
     // instead of forcing the surrounding surface to scroll horizontally.
-    table({ node, children, ...props }) {
+    table({ children, ...props }) {
+        delete props.node;
         return (
             <div className={styles.tableScroll}>
                 <table {...props}>{children}</table>

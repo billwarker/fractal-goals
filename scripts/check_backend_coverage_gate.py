@@ -39,7 +39,7 @@ def verify(root: Path) -> None:
     )
     if "-o addopts" in command:
         raise SystemExit("Coverage CI must not override pytest.ini addopts")
-    for test_scope in ("tests/unit", "tests/integration", "tests/performance"):
+    for test_scope in ("tests/unit", "tests/integration", "tests/performance", "tests/e2e"):
         if test_scope not in command:
             raise SystemExit(f"Coverage CI is missing {test_scope}")
 

@@ -15,6 +15,25 @@ from models import (
 )
 
 
+@pytest.fixture(params=['direct', 'bulk'], autouse=True)
+def timeline_read_mode(request, monkeypatch):
+    """Run the full timeline contract against individual and bulk root reads."""
+    if request.param == 'direct':
+        return
+    from services.goal_timeline_service import GoalTimelineService
+    from services.goal_history_read_model import GoalHistoryReadModel
+    from services.goal_loading import load_fractal_goals_for_serialization
+    original = GoalTimelineService.get_goal_timeline
+
+    def bulk(self, root_id, goal_id, current_user_id, **kwargs):
+        goals = load_fractal_goals_for_serialization(self.db_session, root_id)
+        kwargs['history'] = GoalHistoryReadModel(self.db_session, root_id).preload(set(goals), goals_by_id=goals)
+        kwargs['preloaded_goals_by_id'] = goals
+        return original(self, root_id, goal_id, current_user_id, **kwargs)
+
+    monkeypatch.setattr(GoalTimelineService, 'get_goal_timeline', bulk)
+
+
 @pytest.mark.integration
 class TestGoalTimelineApi:
     def test_timeline_includes_child_activity_completion_and_target(self, authed_client, db_session, sample_goal_hierarchy, sample_activity_definition):

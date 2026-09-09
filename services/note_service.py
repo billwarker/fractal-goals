@@ -1,3 +1,4 @@
+from services.goal_note_read_model import filter_goal_notes, goal_note_load_options
 from datetime import datetime, timezone
 import logging
 import uuid
@@ -5,27 +6,13 @@ import uuid
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import selectinload
 
-from models import (
-    ActivityDefinition,
-    ActivityInstance,
-    CircuitRound,
-    CircuitRun,
-    Goal,
-    Note,
-    Program,
-    Session,
-    activity_goal_associations,
-    goal_activity_group_associations,
-    session_goals,
-    validate_root_goal,
-)
+from models import ActivityDefinition, ActivityInstance, CircuitRound, CircuitRun, Goal, Note, Program, Session, activity_goal_associations, goal_activity_group_associations, validate_root_goal
 from services.events import Event, Events, event_bus
-from services.goal_service import GoalService, sync_goal_targets
 from services.owned_entity_queries import get_owned_activity_instance, get_owned_session
 from services.payload_normalizers import normalize_note_payload
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
-from services.serializers import derive_note_type, serialize_goal, serialize_note_display
+from services.serializers import derive_note_type, serialize_note_display
 from services.session_runtime import is_quick_session
 from services.view_serializers import (
     serialize_activity_history_entry,
@@ -84,9 +71,7 @@ class NoteService:
             Note.session_id == session_id,
             Note.deleted_at.is_(None),
         ).options(
-            selectinload(Note.session).selectinload(Session.template),
-            selectinload(Note.goal),
-            selectinload(Note.activity_definition),
+            *goal_note_load_options(),
         ).order_by(
             Note.pinned_at.desc().nullslast(),
             Note.created_at.desc(),
@@ -103,9 +88,7 @@ class NoteService:
             Note.activity_instance_id == instance_id,
             Note.deleted_at.is_(None),
         ).options(
-            selectinload(Note.session).selectinload(Session.template),
-            selectinload(Note.goal),
-            selectinload(Note.activity_definition),
+            *goal_note_load_options(),
         ).order_by(
             Note.pinned_at.desc().nullslast(),
             Note.created_at.desc(),
@@ -150,9 +133,7 @@ class NoteService:
             Note.context_type == 'session',
             Note.deleted_at.is_(None),
         ).options(
-            selectinload(Note.session).selectinload(Session.template),
-            selectinload(Note.goal),
-            selectinload(Note.activity_definition),
+            *goal_note_load_options(),
         ).order_by(Note.created_at.desc()).all()
 
         results = []
@@ -175,9 +156,7 @@ class NoteService:
             Note.activity_definition_id == activity_id,
             Note.deleted_at.is_(None),
         ).options(
-            selectinload(Note.session).selectinload(Session.template),
-            selectinload(Note.goal),
-            selectinload(Note.activity_definition),
+            *goal_note_load_options(),
         )
 
         if exclude_session_id:
@@ -224,9 +203,7 @@ class NoteService:
                 Note.activity_instance_id.in_(instance_ids),
                 Note.deleted_at.is_(None),
             ).options(
-                selectinload(Note.session).selectinload(Session.template),
-                selectinload(Note.goal),
-                selectinload(Note.activity_definition),
+                *goal_note_load_options(),
             ).order_by(
                 Note.pinned_at.desc().nullslast(),
                 Note.created_at.desc(),
@@ -375,6 +352,7 @@ class NoteService:
         validated_root=None,
         preloaded_goal=None,
         preloaded_activity_definition_ids=None,
+        preloaded_notes=None,
     ) -> ServiceResult[JsonList]:
         if validated_root is not None and (
             validated_root.id != root_id or validated_root.owner_id != current_user_id
@@ -433,18 +411,23 @@ class NoteService:
                 ))
             note_scope_conditions.append(or_(*activity_note_conditions))
 
-        notes = self.db_session.query(Note).filter(
-            Note.root_id == root_id,
-            or_(*note_scope_conditions),
-            Note.deleted_at.is_(None),
-        ).options(
-            selectinload(Note.session).selectinload(Session.template),
-            selectinload(Note.goal),
-            selectinload(Note.activity_definition),
-        ).order_by(
-            Note.pinned_at.desc().nullslast(),
-            Note.created_at.desc(),
-        ).all()
+        if preloaded_notes is not None:
+            notes = filter_goal_notes(
+                preloaded_notes, root_id, goal_ids,
+                activity_definition_ids if include_activity_instance_notes else [],
+                include_goal_notes, include_activity_instance_notes,
+            )
+        else:
+            notes = self.db_session.query(Note).filter(
+                Note.root_id == root_id,
+                or_(*note_scope_conditions),
+                Note.deleted_at.is_(None),
+            ).options(
+                *goal_note_load_options(),
+            ).order_by(
+                Note.pinned_at.desc().nullslast(),
+                Note.created_at.desc(),
+            ).all()
         return [serialize_note_display(note) for note in notes], None, 200
 
     def _collect_goal_activity_definition_ids(self, root_id, goal_ids):
@@ -508,9 +491,7 @@ class NoteService:
             Note.root_id == root_id,
             Note.deleted_at.is_(None),
         ).options(
-            selectinload(Note.session).selectinload(Session.template),
-            selectinload(Note.goal),
-            selectinload(Note.activity_definition),
+            *goal_note_load_options(),
         )
 
         note_types = filters.get('note_types') or []

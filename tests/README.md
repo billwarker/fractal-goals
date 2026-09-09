@@ -23,8 +23,11 @@ pip install -r requirements-test.txt
 ```bash
 ./run-tests.sh unit          # Unit tests only
 ./run-tests.sh integration   # Integration tests only
+./run-tests.sh e2e           # Backend workflow tests
+./run-tests.sh browser       # Real app in desktop and mobile Chromium
 ./run-tests.sh verify        # Cheap local verification path
 ./run-tests.sh coverage      # With coverage report
+./run-tests.sh restore-drill # Local pg_dump/restore verification
 ```
 
 ### Local Postgres Bootstrap
@@ -38,7 +41,9 @@ pip install -r requirements-test.txt
 ### Full-suite performance and isolation
 
 `./run-tests.sh backend`, `frontend`, `all`, and `coverage` retain the full test
-inventory for their respective suites. Backend database setup creates the schema
+inventory for their respective suites. `all` starts the backend and frontend suites
+concurrently and reports both exit statuses, reducing wall time without changing test
+selection. Backend database setup creates the schema
 once per pytest session, then deletes rows from all ORM tables in dependency order
 and resets serial/identity sequences before
 each app-backed test. Tests can still commit, roll back, and use separate connections;
@@ -54,7 +59,8 @@ Use a dedicated database whose name contains `test`, with `ENV=testing`. Do not 
 two backend pytest processes against the same database: either process can reset
 the other's data. Parallel backend execution requires separate databases per worker.
 
-Frontend tests use four threads with per-file isolation. To compare worker settings
+Frontend tests use four threads with per-file isolation. The timeout runner terminates
+real hangs and preserves Vitest's normal result reporting. To compare worker settings
 without skipping tests, run `npm run test:run -- --pool=forks` or
 `npm run test:run -- --maxWorkers=8` from `client/`. Compare the final test/file counts
 as well as elapsed time. More workers can increase memory pressure or slow a busy
@@ -77,18 +83,14 @@ Measured audit results and remaining production gaps are recorded in
 tests/
 ├── __init__.py
 ├── conftest.py              # Shared fixtures and configuration
-├── unit/                    # Unit tests (60% of tests)
-│   ├── test_models.py       # Database model tests
-│   ├── test_goal_hierarchy.py
-│   └── test_utils.py
-├── integration/             # Integration tests (30% of tests)
-│   ├── test_goals_api.py    # Goals API endpoint tests
-│   ├── test_sessions_api.py # Sessions API endpoint tests
-│   ├── test_activities_api.py
-│   ├── test_timers_api.py   # Timer functionality tests
-│   └── test_templates_api.py
-└── e2e/                     # End-to-end tests (10% of tests)
-    └── test_workflows.py    # Complete user workflows
+├── unit/                    # Models, services, handlers, and delivery boundaries
+├── integration/             # API, persistence, and read-model parity tests
+├── performance/             # Query-count budgets and regression limits
+└── e2e/                     # Authenticated backend workflow tests
+
+client/
+├── src/**/__tests__/        # Vitest component, hook, and utility tests
+└── e2e/                     # Playwright tests against the real Flask/Vite build
 ```
 
 ---
@@ -116,13 +118,14 @@ Tests for API endpoints and database interactions:
 **Run:** `./run-tests.sh integration`
 
 ### End-to-End Tests
-Complete user workflow tests (to be implemented):
-- Goal creation workflow
-- Session logging workflow
-- Timer usage workflow
-- Template management workflow
+Complete user workflow tests:
+- Inline activity creation with builder and goal associations
+- Countdown-target start and completion persistence
+- Root and activity delta-display setting round trips
+- Browser login, goal/session navigation, completion persistence, and responsive behavior
 
-**Run:** `./run-tests.sh e2e`
+**Run:** `./run-tests.sh e2e` for backend workflows or
+`./run-tests.sh browser` for the built application.
 
 ---
 
@@ -291,33 +294,13 @@ git commit --no-verify
 
 ## Continuous Integration
 
-### GitHub Actions (To Be Configured)
-
-Create `.github/workflows/test.yml`:
-
-```yaml
-name: Test Suite
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install -r requirements-test.txt
-      - name: Run tests
-        run: pytest --cov=. --cov-report=xml
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-```
+GitHub Actions runs on every pull request and pushes to `main`. Backend CI checks
+migration reversibility, the production dependency graph, maintainability, the full
+unit/integration/performance/e2e inventory in one coverage pass, a logical backup/restore
+drill, and the production container. Frontend CI checks its production dependency graph,
+lint, coverage, responsive and maintainability budgets, the production build, and
+Playwright on desktop and mobile. Consolidating backend tests into one coverage
+execution avoids running the same inventory twice.
 
 ---
 
@@ -417,10 +400,10 @@ pip install -r requirements-test.txt
 ```
 
 ### Database Errors
-Tests use temporary in-memory databases. If you see database errors:
-- Check that `conftest.py` is creating the test database correctly
-- Verify all models are imported in `conftest.py`
-- Check for missing migrations
+Tests use a dedicated local PostgreSQL database. If you see database errors:
+- Run `./run-tests.sh db-up` and then `./run-tests.sh doctor`
+- Confirm `.env.testing` points to a database whose name contains `test`
+- Do not run parallel backend processes against the same test database
 
 ### Import Errors
 ```bash
@@ -468,6 +451,8 @@ The report shows:
 
 ---
 
-**Last Updated:** 2026-01-01  
-**Status:** Initial Implementation  
-**Coverage:** TBD (run tests to generate)
+**Last Updated:** 2026-09-09
+
+**Status:** Production release gates active
+
+**Coverage:** Backend 81%+; frontend global ratchets enforced in Vitest

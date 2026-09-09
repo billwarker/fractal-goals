@@ -55,7 +55,7 @@ charset-normalizer==3.4.4
 # -----------------------------------------------------------------------------
 # Core Utilities (Flask dependencies, pinned for stability)
 # -----------------------------------------------------------------------------
-click==8.3.1
+click==8.3.3
 itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.3
@@ -67,3 +67,6 @@ blinker==1.9.0
 google-cloud-storage==2.14.0
 google-cloud-bigquery==3.27.0
 sentry-sdk[flask]==1.45.1
+
+# Production WSGI server (also installed in CI)
+gunicorn==26.2.0

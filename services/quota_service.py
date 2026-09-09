@@ -14,29 +14,7 @@ from account_tiers import (
     TIER_PAID,
 )
 import models
-from models import (
-    ActivityDefinition,
-    ActivityGroup,
-    ActivityInstance,
-    ActivityProgressView,
-    ActivityTag,
-    ActivityTagDefinition,
-    CircuitDefinition,
-    CircuitSlot,
-    AnalyticsDashboard,
-    AppSetting,
-    FractalMetricDefinition,
-    Goal,
-    MetricDefinition,
-    Note,
-    Program,
-    ProgramBlock,
-    ProgramDay,
-    Session,
-    SessionTemplate,
-    Target,
-    User,
-)
+from models import ActivityDefinition, ActivityGroup, ActivityInstance, ActivityProgressView, ActivityTagDefinition, CircuitDefinition, CircuitSlot, AnalyticsDashboard, AppSetting, FractalMetricDefinition, Goal, MetricDefinition, Note, Program, ProgramBlock, ProgramDay, Session, SessionTemplate, Target, User
 from services.ops_log import log_ops_event
 from services.service_types import JsonDict, ServiceResult
 
@@ -384,7 +362,7 @@ class QuotaService:
         total = self.db_session.execute(select(sum(totals, literal(0)))).scalar_one()
         return int(total or 0)
 
-    def get_usage(self, user_id: str, root_ids: Optional[Sequence[str]] = None) -> JsonDict:
+    def get_usage(self, user_id: str, root_ids: Optional[Sequence[str]] = None, *, resources=None) -> JsonDict:
         scoped_root_ids = list(dict.fromkeys(root_ids or []))
         if scoped_root_ids:
             roots = select(Goal.id).where(
@@ -406,7 +384,7 @@ class QuotaService:
             goal_filter = Goal.owner_id == user_id
 
         def scalar_count(query):
-            return int(query.scalar() or 0)
+            return query.scalar_subquery()
 
         metrics_count = scalar_count(
             self.db_session.query(func.count(FractalMetricDefinition.id)).filter(
@@ -421,7 +399,7 @@ class QuotaService:
             )
         )
 
-        return {
+        counts = {
             "fractals": scalar_count(
                 self.db_session.query(func.count(Goal.id)).filter(
                     Goal.id.in_(scoped_root_ids) if scoped_root_ids else Goal.owner_id == user_id,
@@ -479,6 +457,11 @@ class QuotaService:
                 )
             ),
         }
+        selected = list(resources) if resources is not None else list(counts)
+        if not selected:
+            return {}
+        row = self.db_session.execute(select(*(counts[name].label(name) for name in selected))).one()
+        return {name: int(value or 0) for name, value in zip(selected, row)}
 
     def validate_root_ids(self, user_id: str, root_ids: Sequence[str]) -> ServiceResult[list[str]]:
         normalized_root_ids = [root_id for root_id in dict.fromkeys(root_ids) if root_id]
@@ -583,7 +566,7 @@ class QuotaService:
         if resource not in limits:
             return None, f"Unknown quota resource: {resource}", 500
 
-        usage = self.get_usage(user_id)
+        usage = self.get_usage(user_id, resources=(resource,))
         current = int(usage.get(resource, 0))
         limit = int(limits[resource])
         if current + increment <= limit:

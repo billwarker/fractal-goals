@@ -1,3 +1,5 @@
+from services.goal_note_read_model import load_root_goal_notes
+from services.landing_history_projection import compact_landing_timeline_entry
 """Landing-example settings, snapshot building, and publish pipeline.
 
 Extracted from AdminService so the ~1k-line landing read-model builder lives
@@ -45,6 +47,7 @@ from models import (
 from services.activity_association_service import ActivityAssociationService
 from services.goal_loading import load_fractal_goals_for_serialization
 from services.goal_target_service import GoalTargetService
+from services.goal_history_read_model import GoalHistoryReadModel
 from services.goal_timeline_service import GoalTimelineService
 from services.goal_type_utils import get_canonical_goal_type
 from services.note_service import NoteService
@@ -479,7 +482,7 @@ class LandingPublishService:
         }
 
     def _build_landing_target_analytics(
-        self, root: Goal, serialized_tree: JsonDict, goals_by_id: dict[str, Goal]
+        self, root: Goal, serialized_tree: JsonDict, goals_by_id: dict[str, Goal], history=None
     ) -> dict[str, JsonDict]:
         """Publish bounded target analytics for the read-only public demo."""
         targets = []
@@ -518,6 +521,7 @@ class LandingPublishService:
                 since="all",
                 validated_root=root,
                 preloaded_goals_by_id=goals_by_id,
+                history=history,
             )
             if error or not payload:
                 continue
@@ -560,86 +564,6 @@ class LandingPublishService:
                 if not metric.deleted_at
             ],
         }
-
-    @staticmethod
-    def _compact_landing_timeline_payload(payload):
-        if not isinstance(payload, dict):
-            return payload
-
-        allowed_keys = {
-            "id",
-            "name",
-            "content",
-            "notes",
-            "created_at",
-            "completed",
-            "completed_at",
-            "goal_id",
-            "goal_name",
-            "type",
-            "level",
-            "level_id",
-            "level_name",
-            "is_smart",
-            "activity_definition_id",
-            "activity_id",
-            "activity_name",
-            "definition_name",
-            "activity_group_id",
-            "activity_group_name",
-            "session_id",
-            "session_name",
-            "session_date",
-            "duration_seconds",
-            "metric_values",
-            "metrics",
-            "progress_comparison",
-            "target_value",
-            "value",
-            "operator",
-            "unit",
-            "time_scope",
-            "start_date",
-            "end_date",
-            "completed_session_id",
-            "completed_instance_id",
-        }
-        compacted = {
-            key: value
-            for key, value in payload.items()
-            if key in allowed_keys and value is not None
-        }
-        if isinstance(compacted.get("notes"), str):
-            compacted["notes"] = compacted["notes"][:1000]
-        return compacted
-
-    @classmethod
-    def _compact_landing_timeline_entry(cls, entry: JsonDict) -> JsonDict:
-        if not isinstance(entry, dict):
-            return entry
-
-        compacted = {
-            key: entry.get(key)
-            for key in (
-                "id",
-                "type",
-                "category",
-                "event_type",
-                "entity_type",
-                "entity_id",
-                "relationship",
-                "source_goal_id",
-                "source_goal_name",
-                "title",
-                "subtitle",
-                "timestamp",
-            )
-            if entry.get(key) is not None
-        }
-        payload = cls._compact_landing_timeline_payload(entry.get("payload"))
-        if payload:
-            compacted["payload"] = payload
-        return compacted
 
     def _serialize_public_goal_tree(
         self,
@@ -760,16 +684,18 @@ class LandingPublishService:
         root: Goal,
         goals_by_id: dict[str, Goal],
         effective_levels_by_name: dict[str, GoalLevel],
+        history=None,
     ) -> None:
         """Embed bounded per-goal timeline + notes into the serialized snapshot tree.
 
-        Publishing is a rare manual admin action and example fractals are small, so
-        per-goal service calls are acceptable. This keeps the public read model
+        Root history is loaded once and projected through the canonical services. This keeps the public read model
         self-contained: the landing modal renders Timeline / Notes tabs entirely
         from this cache, with no authenticated API calls.
         """
+        history = history or GoalHistoryReadModel(self.db_session, root.id).preload(set(goals_by_id), goals_by_id=goals_by_id)
         timeline_service = GoalTimelineService(self.db_session)
         note_service = NoteService(self.db_session)
+        root_notes = load_root_goal_notes(self.db_session, root.id)
         activity_association_service = ActivityAssociationService(self.db_session)
         owner_id = root.owner_id
 
@@ -817,10 +743,11 @@ class LandingPublishService:
                     validated_root=root,
                     preloaded_goals_by_id=goals_by_id,
                     preloaded_levels_by_name=effective_levels_by_name,
+                    history=history,
                 )
                 attributes["timeline_events"] = (
                     [
-                        self._compact_landing_timeline_entry(entry)
+                        compact_landing_timeline_entry(entry)
                         for entry in timeline_result.get("entries", [])
                     ] if timeline_result and not timeline_error else []
                 )
@@ -844,6 +771,7 @@ class LandingPublishService:
                     validated_root=root,
                     preloaded_goal=goal,
                     preloaded_activity_definition_ids=list(direct_activity_ids),
+                    preloaded_notes=root_notes,
                 )
                 notes = notes_result if notes_result and not notes_error else []
                 attributes["notes"] = notes[:LANDING_EXAMPLE_NOTES_LIMIT]
@@ -867,13 +795,13 @@ class LandingPublishService:
             stack.extend(node.get("children") or [])
         return ids
 
-    def _build_landing_flowtree_data(self, root: Goal, serialized_root: JsonDict) -> dict:
+    def _build_landing_flowtree_data(self, root: Goal, serialized_root: JsonDict, goals_by_id=None) -> dict:
         """Compute the root-scoped flowtree data the authenticated goals page fetches
         (recent-evidence goal ids, a whole-fractal metrics summary, and programs), so
         the landing view-options widget acts on real data without any public API.
         """
         owner_id = root.owner_id
-        session_service = SessionService(self.db_session)
+        session_service = SessionService(self.db_session, preloaded_goals_by_id=goals_by_id)
 
         evidence_result, evidence_error, _ = session_service.get_recent_evidence_goal_ids(root.id, owner_id)
         evidence_goal_ids = (
@@ -1341,11 +1269,12 @@ class LandingPublishService:
             if not root:
                 return None, "Landing example root not found", 404
             effective_levels_by_name = self._load_effective_landing_levels(root.owner_id, root.id)
+            history = GoalHistoryReadModel(self.db_session, root.id).preload(set(goals_by_id), goals_by_id=goals_by_id)
             serialized_tree = self._serialize_public_goal_tree(root, effective_levels_by_name)
             self._enrich_landing_tree_with_history(
-                serialized_tree, root, goals_by_id, effective_levels_by_name,
+                serialized_tree, root, goals_by_id, effective_levels_by_name, history,
             )
-            flowtree_data = self._build_landing_flowtree_data(root, serialized_tree)
+            flowtree_data = self._build_landing_flowtree_data(root, serialized_tree, goals_by_id)
             resolved_showcase, warnings = self._resolve_landing_showcase(root, item.get("showcase"))
             showcase_warnings.extend(f"{item['label']}: {warning}" for warning in warnings)
             resolved_content, content_warnings = self._resolve_landing_goal_content(
@@ -1356,7 +1285,7 @@ class LandingPublishService:
             item["landing_content"] = resolved_content
             showcase_data = self._build_landing_showcase_data(root, resolved_showcase)
             target_analytics = self._build_landing_target_analytics(
-                root, serialized_tree, goals_by_id,
+                root, serialized_tree, goals_by_id, history,
             )
             published_examples.append({
                 "root_id": root.id,

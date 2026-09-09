@@ -1,22 +1,6 @@
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from services.goal_history_read_model import GoalHistoryReadModel
 
-from models import (
-    ActivityDefinition,
-    ActivityGroup,
-    ActivityInstance,
-    EventLog,
-    Goal,
-    GoalLevel,
-    GoalPauseInterval,
-    MetricDefinition,
-    MetricValue,
-    Target,
-    Session,
-    activity_goal_associations,
-    goal_activity_group_associations,
-    validate_root_goal,
-)
+from models import Goal, GoalLevel, validate_root_goal
 from services.goal_loading import load_fractal_goals_for_serialization
 from services.goal_type_utils import get_canonical_goal_type
 from services.serializers import (
@@ -100,6 +84,7 @@ class GoalTimelineService:
         validated_root=None,
         preloaded_goals_by_id=None,
         preloaded_levels_by_name=None,
+        history=None,
     ) -> ServiceResult[JsonDict]:
         if validated_root is not None and (
             validated_root.id != root_id or validated_root.owner_id != current_user_id
@@ -110,6 +95,9 @@ class GoalTimelineService:
             if error:
                 return None, *error
 
+        history = history or GoalHistoryReadModel(self.db_session, root_id)
+        if history.root_id != root_id:
+            return None, "History scope does not match fractal", 400
         goals_by_id = preloaded_goals_by_id
         if goals_by_id is None:
             goals_by_id = load_fractal_goals_for_serialization(self.db_session, root_id)
@@ -226,42 +214,17 @@ class GoalTimelineService:
                 effective_goal_ids.add(parent_goal.id)
 
         activity_contexts = {}
-        direct_activity_rows = self.db_session.execute(
-            select(
-                activity_goal_associations.c.activity_id,
-                activity_goal_associations.c.goal_id,
-                activity_goal_associations.c.created_at,
-            ).where(
-                activity_goal_associations.c.goal_id.in_(effective_goal_ids),
-                activity_goal_associations.c.deleted_at.is_(None),
-            )
-        ).all()
+        direct_activity_rows = history.direct_activities(effective_goal_ids)
         for activity_id, source_goal_id, associated_at in direct_activity_rows:
             source_goal = goals_by_id.get(source_goal_id) or parent_goal
             if source_goal:
                 activity_contexts.setdefault(activity_id, []).append((source_goal, associated_at))
 
-        group_rows = self.db_session.execute(
-            select(
-                goal_activity_group_associations.c.activity_group_id,
-                goal_activity_group_associations.c.goal_id,
-                goal_activity_group_associations.c.created_at,
-            ).where(
-                goal_activity_group_associations.c.goal_id.in_(effective_goal_ids),
-                goal_activity_group_associations.c.deleted_at.is_(None),
-            )
-        ).all()
+        group_rows = history.group_associations(effective_goal_ids)
         group_ids = {row.activity_group_id for row in group_rows}
         activities_by_group = {}
         if group_ids:
-            group_activities = self.db_session.query(ActivityDefinition).options(
-                selectinload(ActivityDefinition.metric_definitions).selectinload(MetricDefinition.fractal_metric),
-                selectinload(ActivityDefinition.split_definitions),
-            ).filter(
-                ActivityDefinition.root_id == root_id,
-                ActivityDefinition.group_id.in_(group_ids),
-                ActivityDefinition.deleted_at.is_(None),
-            ).all()
+            group_activities = history.group_activities(group_ids)
             for activity in group_activities:
                 activities_by_group.setdefault(activity.group_id, []).append(activity)
         for group_id, source_goal_id, associated_at in group_rows:
@@ -272,19 +235,7 @@ class GoalTimelineService:
                 activity_contexts.setdefault(activity.id, []).append((source_goal, associated_at))
 
         if 'activity' in requested_types and activity_contexts:
-            instances = self.db_session.query(ActivityInstance).options(
-                selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
-                selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.metric_definitions).selectinload(MetricDefinition.fractal_metric),
-                selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.split_definitions),
-                selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
-                selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
-                selectinload(ActivityInstance.session).selectinload(Session.template),
-            ).filter(
-                ActivityInstance.root_id == root_id,
-                ActivityInstance.activity_definition_id.in_(list(activity_contexts.keys())),
-                ActivityInstance.completed.is_(True),
-                ActivityInstance.deleted_at.is_(None),
-            ).all()
+            instances = history.instances(list(activity_contexts.keys()))
             for instance in instances:
                 source_goal = next(
                     (
@@ -324,19 +275,7 @@ class GoalTimelineService:
                 )
 
         if 'activity' in requested_types:
-            association_events = self.db_session.query(EventLog).filter(
-                EventLog.root_id == root_id,
-                EventLog.event_type.in_({
-                    'activity.associated',
-                    'activity.disassociated',
-                    'activity_group.associated',
-                    'activity_group.disassociated',
-                }),
-                EventLog.payload['goal_id'].astext.in_(effective_goal_ids),
-            ).order_by(
-                EventLog.timestamp.desc(),
-                EventLog.id.desc(),
-            ).limit(limit).all()
+            association_events = history.association_events(effective_goal_ids, limit)
             for association_event in association_events:
                 event_payload = association_event.payload or {}
                 source_goal_id = event_payload.get('goal_id')
@@ -362,14 +301,7 @@ class GoalTimelineService:
                 )
 
         if 'target' in requested_types:
-            targets = self.db_session.query(Target).options(
-                selectinload(Target.completed_session),
-                selectinload(Target.metric_conditions),
-            ).filter(
-                Target.root_id == root_id,
-                Target.goal_id.in_(timeline_goal_ids),
-                Target.deleted_at.is_(None),
-            ).all()
+            targets = history.targets(timeline_goal_ids)
             for target in targets:
                 source_goal = goals_by_id.get(target.goal_id, goal)
                 append_entry(
@@ -450,9 +382,7 @@ class GoalTimelineService:
 
             pause_goal_ids = {item.id for item in lifecycle_goals}
             if pause_goal_ids:
-                pause_intervals = self.db_session.query(GoalPauseInterval).filter(
-                    GoalPauseInterval.goal_id.in_(pause_goal_ids),
-                ).all()
+                pause_intervals = history.pause_intervals(pause_goal_ids)
                 for interval in pause_intervals:
                     source_goal = goals_by_id.get(interval.goal_id)
                     if not source_goal:

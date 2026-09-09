@@ -5,8 +5,9 @@ from datetime import date, datetime, time, timedelta, timezone
 import logging
 import time as time_module
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 
-from models import ActivityInstance, Program, Session, Target, validate_root_goal
+from models import ActivityInstance, Program, ProgramBlock, ProgramDay, ProgramDayTemplate, Session, Target, validate_root_goal
 from services.analytics_engine import build_scoped_dataset_query, get_analytics_dataset
 from services.effective_goal_activities import resolve_effective_goals_by_activity
 from services.goal_contribution import resolve_contribution_goal
@@ -14,7 +15,6 @@ from services.goal_loading import load_fractal_goals_for_serialization
 from services.goal_type_utils import get_canonical_goal_type
 from services.program_scope import resolve_program_scope, resolve_program_scopes
 from services.program_day_occurrences import build_day_facts, summarize_chain_facts
-from services.programs import ProgramService
 from services.serializers import calculate_smart_status
 from services.session_filters import resolve_timezone, session_duration_seconds_from_row
 from services.session_runtime import get_template_color
@@ -59,6 +59,14 @@ class ProgramMetricsService:
     def __init__(self, db_session):
         self.db_session = db_session
 
+    @staticmethod
+    def _read_options():
+        days = joinedload(Program.blocks).joinedload(ProgramBlock.days)
+        return (
+            days.selectinload(ProgramDay.template_links).joinedload(ProgramDayTemplate.template),
+            days.selectinload(ProgramDay.templates),
+        )
+
     def load_aligned_evidence(self, root_id, current_user_id, start, end, zone, scope_ids):
         """Return governed evidence resolved to a program scope for a local-date window."""
         if end < start:
@@ -95,7 +103,7 @@ class ProgramMetricsService:
         local_today = as_of or datetime.now(zone).date()
 
         program = self.db_session.query(Program).options(
-            *ProgramService._program_serializer_load_options()
+            *self._read_options()
         ).filter(Program.id == program_id, Program.root_id == root_id).first()
         if not program:
             return None, "Program not found", 404
@@ -104,13 +112,13 @@ class ProgramMetricsService:
         if error:
             return None, error, 400
 
-        scope = resolve_program_scope(self.db_session, root_id, program.id)
-        goals_by_id = load_fractal_goals_for_serialization(
-            self.db_session, root_id, include_group_activities=True
-        )
+        scope = resolve_program_scope(self.db_session, root_id, program.id, programs=[program])
         evidence_rows = self._load_evidence(
             root_id, current_user_id, window, zone
         )
+        goals_by_id = load_fractal_goals_for_serialization(
+            self.db_session, root_id, include_group_activities=True
+        ) if scope.goal_ids or evidence_rows else {}
         activity_ids = {row.activity_definition_id for row in evidence_rows if row.activity_definition_id}
         effective_goals = resolve_effective_goals_by_activity(goals_by_id, activity_ids)
         evidence = self._resolve_evidence(evidence_rows, effective_goals, goals_by_id, scope.goal_ids, zone)
@@ -190,15 +198,17 @@ class ProgramMetricsService:
             "observation_end": max(item["observation_end"] for item in windows.values()),
         }
         evidence_rows = self._load_evidence(root_id, current_user_id, overall_window, zone)
+        scopes = resolve_program_scopes(
+            self.db_session, root_id, [item.id for item in programs], programs=programs,
+        )
         goals_by_id = load_fractal_goals_for_serialization(
             self.db_session, root_id, include_group_activities=True
-        )
+        ) if evidence_rows or any(scope.goal_ids for scope in scopes.values()) else {}
         activity_ids = {row.activity_definition_id for row in evidence_rows if row.activity_definition_id}
         effective_goals = resolve_effective_goals_by_activity(goals_by_id, activity_ids)
-        scopes = resolve_program_scopes(self.db_session, root_id, [item.id for item in programs])
         ordered_ids = [item.id for item in programs]
         loaded_programs = self.db_session.query(Program).options(
-            *ProgramService._program_serializer_load_options()
+            *self._read_options()
         ).filter(Program.id.in_(ordered_ids)).all()
         programs_by_id = {item.id: item for item in loaded_programs}
         programs = [programs_by_id[item_id] for item_id in ordered_ids]

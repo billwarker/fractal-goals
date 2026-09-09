@@ -12,7 +12,6 @@ These handlers subscribe to the event bus and react to completion-related events
 import logging
 import threading
 from datetime import datetime, timezone
-import json
 
 from services.events import event_bus, Event, Events
 from services.progress_service import ProgressService
@@ -531,7 +530,7 @@ def handle_activity_instance_updated(event: Event):
     root_id = event.data.get('root_id')
     updated_fields = event.data.get('updated_fields', [])
     
-    if not instance_id:
+    if not instance_id or 'completed' not in updated_fields:
         return
         
     db_session, owns_session = _resolve_db_session(event)
@@ -541,10 +540,6 @@ def handle_activity_instance_updated(event: Event):
         if not instance:
             return
             
-        # Only lifecycle transitions should drive persistence changes here.
-        if 'completed' not in updated_fields:
-            return
-
         # If instance was explicitly marked incomplete, revert its achievements.
         if not instance.completed:
             _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events)

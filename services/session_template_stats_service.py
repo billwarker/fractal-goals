@@ -365,7 +365,10 @@ class SessionTemplateStatsService:
 
         durations_by_activity = defaultdict(list)
         last_observed = {}
-        for instance in query.all():
+        for instance in query.with_entities(
+            ActivityInstance.activity_definition_id, ActivityInstance.duration_seconds,
+            ActivityInstance.time_stop, ActivityInstance.updated_at, ActivityInstance.created_at,
+        ).all():
             seconds = _duration_from_instance(instance)
             if seconds is None:
                 continue

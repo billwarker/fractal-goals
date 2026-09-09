@@ -26,8 +26,9 @@ def _as_utc_datetime(value: datetime | None) -> datetime | None:
 
 
 class SessionAnalyticsService:
-    def __init__(self, db_session, *, session_filters, effective_activity_goals_resolver):
+    def __init__(self, db_session, *, session_filters, effective_activity_goals_resolver, preloaded_goals_by_id=None):
         self.db_session = db_session
+        self._preloaded_goals_by_id = preloaded_goals_by_id
         self._session_filters = session_filters
         self._get_effective_activity_goals = effective_activity_goals_resolver
 
@@ -52,6 +53,7 @@ class SessionAnalyticsService:
     def _session_activity_read_options():
         return (
             joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
+            joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.metric_definitions),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
             joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split),
             selectinload(ActivityInstance.tags),
@@ -152,7 +154,7 @@ class SessionAnalyticsService:
 
             persisted_session_ids = set()
             progress = ProgressService(self.db_session)
-            comparisons = progress.compute_comparisons_for_instances(activity_instances)
+            comparisons = progress.compute_comparisons_for_instances(activity_instances, preloaded=True)
             for instance in activity_instances:
                 if not instance.activity_definition_id:
                     continue
@@ -421,15 +423,20 @@ class SessionAnalyticsService:
             return self._empty_flowtree_session_metrics(window_days), None, 200
 
         target_goal_ids = {str(goal_id) for goal_id in visible_goal_ids}
-        goals_by_id = {
-            goal.id: goal
-            for goal in self.db_session.query(Goal).options(
-                selectinload(Goal.pause_intervals),
-            ).filter(
-                Goal.root_id == root_id,
-                Goal.deleted_at == None,
-            ).all()
-        }
+        goals_by_id = self._preloaded_goals_by_id
+        if goals_by_id is not None:
+            goals_by_id = {key: goal for key, goal in goals_by_id.items() if goal.root_id == root_id and goal.deleted_at is None}
+        else:
+            goals_by_id = {
+                goal.id: goal
+                for goal in self.db_session.query(Goal).options(
+                    selectinload(Goal.pause_intervals),
+                ).filter(
+                    Goal.root_id == root_id,
+                    Goal.deleted_at == None,
+                ).all()
+            }
+
 
         activity_ids = [
             activity_id

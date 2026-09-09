@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">10% </span>
+                <span class="strong">90% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/10</span>
+                <span class='fraction'>9/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/8</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">66.66% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/3</span>
+                <span class='fraction'>2/3</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">10% </span>
+                <span class="strong">90% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/10</span>
+                <span class='fraction'>9/10</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -116,7 +116,8 @@
 <a name='L51'></a><a href='#L51'>51</a>
 <a name='L52'></a><a href='#L52'>52</a>
 <a name='L53'></a><a href='#L53'>53</a>
-<a name='L54'></a><a href='#L54'>54</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -129,22 +130,22 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -162,7 +163,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -182,28 +184,29 @@
  * @param {Object} props.style - Optional inline styles
  * @param {string} props.linkStyle - Optional inline styles for the link
  */
-const Linkify = <span class="fstat-no" title="function not covered" >({</span> children, className, style, linkColor }) =&gt; {
-<span class="cstat-no" title="statement not covered" >    if (!children || typeof children !== 'string') {</span>
-<span class="cstat-no" title="statement not covered" >        return &lt;span className={className} style={style}&gt;{children}&lt;/span&gt;;</span>
+const Linkify = ({ children, className, style, linkColor, linkClassName }) =&gt; {
+    if (!children || typeof children !== 'string') {
+        return &lt;span className={className} style={style}&gt;{children}&lt;/span&gt;;
     }
 &nbsp;
     // Regex to detect URLs (simple version)
     // Matches http:// or https:// followed by non-whitespace characters
-    const urlRegex = <span class="cstat-no" title="statement not covered" >/(https?:\/\/[^\s]+)/g;</span>
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
 &nbsp;
-    const parts = <span class="cstat-no" title="statement not covered" >children.split(urlRegex);</span>
+    const parts = children.split(urlRegex);
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    return (</span>
+    return (
         &lt;span className={className} style={style}&gt;
-            {parts.map(<span class="fstat-no" title="function not covered" >(p</span>art, index) =&gt; {
-<span class="cstat-no" title="statement not covered" >                if (part.match(urlRegex)) {</span>
-<span class="cstat-no" title="statement not covered" >                    return (</span>
+            {parts.map((part, index) =&gt; {
+                if (part.match(urlRegex)) {
+                    return (
                         &lt;a
                             key={index}
                             href={part}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={<span class="fstat-no" title="function not covered" >(e</span>) =&gt; <span class="cstat-no" title="statement not covered" >e.stopPropagation()} // Prevent triggering parent click handlers (e.g., cards)</span>
+                            className={linkClassName}
                             style={{
                                 color: linkColor || 'var(--color-brand-primary)',
                                 textDecoration: 'underline',
@@ -215,7 +218,7 @@ const Linkify = <span class="fstat-no" title="function not covered" >({</span> c
                         &lt;/a&gt;
                     );
                 }
-<span class="cstat-no" title="statement not covered" >                return part;</span>
+                return part;
             })}
         &lt;/span&gt;
     );
@@ -229,7 +232,7 @@ export default Linkify;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-02-26T13:29:48.579Z
+                at 2026-09-09T18:52:49.652Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

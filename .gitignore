@@ -76,3 +76,6 @@ client/lint-errors.txt
 # Temporary Files
 *.tmp
 .cache/
+
+client/playwright-report/
+client/test-results/

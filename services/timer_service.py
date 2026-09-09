@@ -1,22 +1,9 @@
 from datetime import datetime, timezone
 import uuid
 
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy import or_
 
-from models import (
-    ActivityDefinition,
-    ActivityInstance,
-    ActivitySet,
-    CircuitRun,
-    CircuitRunSlot,
-    CircuitRound,
-    CircuitRoundMember,
-    MetricValue,
-    ProgramBlock,
-    ProgramDay,
-    Session,
-    validate_root_goal,
-)
+from models import ActivityInstance, CircuitRun, CircuitRunSlot, CircuitRoundMember, Session, validate_root_goal
 from services.owned_entity_queries import (
     get_owned_activity_definition,
     get_owned_activity_instance,
@@ -25,12 +12,14 @@ from services.owned_entity_queries import (
 
 from services.events import Event, Events, event_bus
 from services.quota_service import QuotaService
+from services.progress_service import ProgressService
 from services.activity_set_service import ActivitySetValidationError, replace_activity_sets
 from services.work_interval_service import WorkIntervalConflict, WorkIntervalService
 from services.session_runtime import is_quick_session
 from services.session_template_stats_service import SessionTemplateStatsService
 from services.serializers import serialize_activity_instance, serialize_session
 from services.service_types import JsonDict, ServiceResult
+from services.timer_loading import activity_instance_query_options, session_query_options
 
 
 def _utc_now_naive() -> datetime:
@@ -61,50 +50,23 @@ class TimerService:
         if not instance or not instance.session_id:
             return
         SessionTemplateStatsService(self.db_session).recompute_for_session(instance.session_id)
-        self.db_session.commit()
-
-    @staticmethod
-    def _activity_instance_query_options():
-        return (
-            joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
-            joinedload(ActivityInstance.metric_values).joinedload(MetricValue.definition),
-            joinedload(ActivityInstance.metric_values).joinedload(MetricValue.split),
-            selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.definition),
-            selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.split),
-        )
-
-    @staticmethod
-    def _session_query_options():
-        return (
-            selectinload(Session.goals),
-            selectinload(Session.template),
-            selectinload(Session.notes_list),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.definition).selectinload(ActivityDefinition.group),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.definition),
-            selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values).selectinload(MetricValue.split),
-            selectinload(Session.circuit_runs).selectinload(CircuitRun.slots),
-            selectinload(Session.circuit_runs).selectinload(CircuitRun.rounds).selectinload(CircuitRound.members),
-            selectinload(Session.program_day).selectinload(ProgramDay.block).selectinload(ProgramBlock.program),
-        )
 
     def _get_root(self, root_id, current_user_id):
         return validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
 
     def _is_circuit_child(self, instance_id):
-        return bool(
+        return self.db_session.query(or_(
             self.db_session.query(CircuitRunSlot.id).filter(
                 CircuitRunSlot.activity_instance_id == instance_id,
-            ).first()
-            or self.db_session.query(CircuitRoundMember.id).filter(
+            ).exists(),
+            self.db_session.query(CircuitRoundMember.id).filter(
                 CircuitRoundMember.activity_instance_id == instance_id,
-            ).first()
-        )
+            ).exists(),
+        )).scalar()
 
     def _load_session_for_response(self, root_id, session_id):
         return self.db_session.query(Session).options(
-            *self._session_query_options()
+            *session_query_options()
         ).filter(
             Session.id == session_id,
             Session.root_id == root_id,
@@ -186,7 +148,7 @@ class TimerService:
             self.db_session,
             root_id,
             instance_id,
-            query_options=self._activity_instance_query_options(),
+            query_options=activity_instance_query_options(),
         )
         if existing:
             return {
@@ -249,7 +211,7 @@ class TimerService:
             return [], None, 200
 
         query = self.db_session.query(ActivityInstance).options(
-            *self._activity_instance_query_options(),
+            *activity_instance_query_options(),
         ).filter(
             ActivityInstance.session_id.in_(session_ids),
             ActivityInstance.deleted_at.is_(None),
@@ -268,7 +230,7 @@ class TimerService:
             self.db_session,
             root_id,
             instance_id,
-            query_options=self._activity_instance_query_options(),
+            query_options=activity_instance_query_options(),
         )
 
         if not instance:
@@ -310,9 +272,8 @@ class TimerService:
                 return None, "Circuit child timing is owned by its circuit run", 409
 
         start_time = _utc_now_naive()
-        self.db_session.query(Session).filter(
-            Session.id == instance.session_id,
-        ).with_for_update().first()
+        interval_service = WorkIntervalService(self.db_session)
+        interval_service.lock_session(instance.session_id)
         running_circuit = self.db_session.query(CircuitRun.id).filter(
             CircuitRun.session_id == instance.session_id,
             CircuitRun.status.in_(("active", "paused")),
@@ -325,7 +286,6 @@ class TimerService:
             normalized_target, target_error = self._normalize_target_duration(target_duration)
             if target_error:
                 return None, target_error, 400
-            instance.target_duration_seconds = normalized_target
 
         completed_activity = None
         if session_record and session_record.is_paused:
@@ -334,7 +294,6 @@ class TimerService:
         else:
             instance.is_paused = False
             instance.last_paused_at = None
-            interval_service = WorkIntervalService(self.db_session)
             if data.get('switch'):
                 open_interval = interval_service.get_open(instance.session_id)
                 if (
@@ -363,6 +322,8 @@ class TimerService:
                 completed_activity.is_paused = False
                 completed_activity.last_paused_at = None
 
+        if target_duration is not None:
+            instance.target_duration_seconds = normalized_target
         if not instance.time_start:
             instance.time_start = start_time
         instance.time_stop = None
@@ -376,7 +337,10 @@ class TimerService:
             if completed_activity
             else None
         )
-        self.db_session.commit()
+        updated_payload = self._activity_event_payload(
+            instance, root_id, activity_name, updated_fields=['time_start'],
+        )
+        pending_events = []
         if completed_activity:
             self._recompute_stats_for_instance(completed_activity)
             completed_name = (
@@ -384,7 +348,7 @@ class TimerService:
                 if completed_activity.definition
                 else "Unknown"
             )
-            event_bus.emit(Event(
+            pending_events.append(Event(
                 Events.ACTIVITY_INSTANCE_COMPLETED,
                 {
                     **self._activity_event_payload(
@@ -402,14 +366,12 @@ class TimerService:
                 source='timer_service.start_activity_timer.switch',
                 context={'db_session': self.db_session},
             ))
+        self.db_session.commit()
+        for event in pending_events:
+            event_bus.emit(event)
         event_bus.emit(Event(
             Events.ACTIVITY_INSTANCE_UPDATED,
-            self._activity_event_payload(
-                instance,
-                root_id,
-                activity_name,
-                updated_fields=['time_start'],
-            ),
+            updated_payload,
             source='timer_service.start_activity_timer',
             context={'db_session': self.db_session},
         ))
@@ -436,7 +398,7 @@ class TimerService:
             self.db_session,
             root_id,
             instance_id,
-            query_options=self._activity_instance_query_options(),
+            query_options=activity_instance_query_options(),
         )
         if not instance:
             return None, "Activity instance not found.", 404
@@ -471,8 +433,11 @@ class TimerService:
                 instance.duration_seconds = max(0, int(duration) - (instance.total_paused_seconds or 0))
             instance.completed = True
 
-        self.db_session.commit()
+        self.db_session.flush()
         self._recompute_stats_for_instance(instance)
+        comparison = ProgressService(self.db_session).compute_comparisons_for_instances([instance], preloaded=True).get(instance.id)
+        serialized = serialize_activity_instance(instance)
+        completed_at = instance.time_stop.isoformat() if instance.time_stop else None
         activity_name = instance.definition.name if instance.definition else "Unknown"
         completion_event = Event(
             Events.ACTIVITY_INSTANCE_COMPLETED,
@@ -488,15 +453,17 @@ class TimerService:
             source='timer_service.complete_activity_instance',
             context={} if async_completion else {'db_session': self.db_session},
         )
+        self.db_session.commit()
         if async_completion:
             event_bus.emit_async(completion_event)
         else:
             event_bus.emit(completion_event)
         return {
             "instance": instance,
-            "serialized": serialize_activity_instance(instance),
+            "serialized": serialized,
             "activity_name": activity_name,
-            "completed_at": instance.time_stop.isoformat() if instance.time_stop else None,
+            "completed_at": completed_at,
+            "progress_comparison": comparison,
         }, None, 200
 
     def update_activity_instance(self, root_id, instance_id, current_user_id, data) -> ServiceResult[JsonDict]:
@@ -508,7 +475,7 @@ class TimerService:
             self.db_session,
             root_id,
             instance_id,
-            query_options=self._activity_instance_query_options(),
+            query_options=activity_instance_query_options(),
         )
 
         if not instance:
@@ -617,12 +584,12 @@ class TimerService:
         self.db_session.flush()
         activity_name = instance.definition.name if instance.definition else "Unknown"
         serialized = serialize_activity_instance(instance)
-        self.db_session.commit()
+        pending_events = []
         updated_fields = list(data.keys())
         non_metric_fields = [field for field in updated_fields if field != 'sets']
         if 'sets' in data:
             for activity_set in updated_sets:
-                event_bus.emit(Event(
+                pending_events.append(Event(
                     Events.ACTIVITY_SET_UPDATED,
                     {
                         'activity_set_id': activity_set.id,
@@ -632,7 +599,7 @@ class TimerService:
                     },
                     source='timer_service.update_activity_instance',
                 ))
-            event_bus.emit(Event(
+            pending_events.append(Event(
                 Events.ACTIVITY_METRICS_UPDATED,
                 self._activity_event_payload(
                     instance,
@@ -644,7 +611,7 @@ class TimerService:
                 context={'db_session': self.db_session},
             ))
         if non_metric_fields:
-            event_bus.emit(Event(
+            pending_events.append(Event(
                 Events.ACTIVITY_INSTANCE_UPDATED,
                 self._activity_event_payload(
                     instance,
@@ -655,6 +622,9 @@ class TimerService:
                 source='timer_service.update_activity_instance',
                 context={'db_session': self.db_session},
             ))
+        self.db_session.commit()
+        for event in pending_events:
+            event_bus.emit(event)
         return {
             "instance": instance,
             "serialized": serialized,

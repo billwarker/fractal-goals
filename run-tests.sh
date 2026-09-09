@@ -39,6 +39,8 @@ usage() {
     echo "  unit          Run only unit tests"
     echo "  integration   Run only integration tests"
     echo "  e2e           Run only end-to-end tests"
+    echo "  browser       Build and run browser tests on desktop and mobile"
+    echo "  restore-drill Exercise a local logical backup and restore"
     echo "  smoke         Run quick smoke tests"
     echo "  critical      Run critical functionality tests"
     echo "  coverage      Run tests with detailed coverage report"
@@ -203,8 +205,6 @@ run_dependency_audit() {
     ensure_backend_tools
     "$VENV_PYTHON" -m pip_audit \
         -r "$ROOT_DIR/requirements.txt" \
-        --no-deps \
-        --disable-pip \
         --cache-dir "${PIP_AUDIT_CACHE_DIR:-${TMPDIR:-/tmp}/fractal-goals-pip-audit-cache}" \
         --progress-spinner off
     (cd "$CLIENT_DIR" && "$NPM_BIN" audit --omit=dev)
@@ -319,9 +319,23 @@ run_fix() {
 
 # Run all tests
 run_all_tests() {
-    print_message "$GREEN" "Running all tests..."
-    run_backend_tests
-    run_frontend_tests
+    print_message "$GREEN" "Running backend and frontend tests concurrently..."
+
+    local backend_status=0
+    local frontend_status=0
+
+    run_backend_tests &
+    local backend_pid=$!
+    run_frontend_tests &
+    local frontend_pid=$!
+
+    wait "$backend_pid" || backend_status=$?
+    wait "$frontend_pid" || frontend_status=$?
+
+    if [ "$backend_status" -ne 0 ] || [ "$frontend_status" -ne 0 ]; then
+        print_message "$RED" "Backend status: $backend_status; frontend status: $frontend_status"
+        return 1
+    fi
 }
 
 # Run unit tests
@@ -350,6 +364,22 @@ run_e2e_tests() {
         check_backend_db
         backend_pytest_no_cov tests/e2e/ -m e2e
     fi
+}
+
+run_browser_tests() {
+    print_message "$GREEN" "Building and running browser tests..."
+    ensure_backend_tools
+    ensure_frontend_tools
+    check_backend_db
+    frontend_npm_script build
+    frontend_npm_script test:browser
+}
+
+run_restore_drill() {
+    print_message "$GREEN" "Running local backup and restore drill..."
+    ensure_backend_tools
+    check_backend_db
+    "$VENV_PYTHON" "$ROOT_DIR/scripts/check_backup_restore.py"
 }
 
 # Run smoke tests
@@ -447,6 +477,12 @@ main() {
             ;;
         e2e)
             run_e2e_tests
+            ;;
+        browser)
+            run_browser_tests
+            ;;
+        restore-drill)
+            run_restore_drill
             ;;
         smoke)
             run_smoke_tests

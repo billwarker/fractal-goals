@@ -378,7 +378,7 @@ class GoalTargetService:
         }
 
     def _collect_goal_activity_instances(
-        self, root_id, goal, goals_by_id, activity_id, effective_start=None, effective_end=None
+        self, root_id, goal, goals_by_id, activity_id, effective_start=None, effective_end=None, history=None
     ) -> list[JsonDict]:
         """Serialized completed instances of `activity_id` contributing to `goal`'s
         subtree (respecting the evidence rule), optionally bounded by a date window.
@@ -393,7 +393,10 @@ class GoalTargetService:
             if parent_goal:
                 effective_goal_ids.add(parent_goal.id)
 
-        associated_goal_ids = self._activity_associated_goal_ids(root_id, activity_id, effective_goal_ids)
+        associated_goal_ids = (
+            history.associated_goal_ids(activity_id, effective_goal_ids)
+            if history is not None else self._activity_associated_goal_ids(root_id, activity_id, effective_goal_ids)
+        )
         if not associated_goal_ids:
             return []
 
@@ -417,12 +420,12 @@ class GoalTargetService:
         if effective_end:
             query = query.filter(occurred_at_expr <= effective_end)
 
-        instances = query.all()
+        instances = history.instances({activity_id}) if history is not None else query.all()
 
         serialized_instances = []
         for instance in instances:
             occurred_at = self._as_utc(instance.time_stop or instance.time_start or instance.created_at)
-            if not occurred_at:
+            if not occurred_at or (effective_start and occurred_at < effective_start) or (effective_end and occurred_at > effective_end):
                 continue
             contributes = any(
                 resolve_contribution_goal(goals_by_id.get(gid), occurred_at) is not None
@@ -466,7 +469,7 @@ class GoalTargetService:
 
     def get_target_analytics(
         self, root_id, target_id, current_user_id, *, since='creation',
-        validated_root=None, preloaded_goals_by_id=None,
+        validated_root=None, preloaded_goals_by_id=None, history=None,
     ) -> ServiceResult[JsonDict]:
         """Assemble a self-contained analytics read model for a single target.
 
@@ -488,13 +491,18 @@ class GoalTargetService:
             if error:
                 return None, *error
 
-        target = self.db_session.query(Target).options(
-            selectinload(Target.metric_conditions).selectinload(TargetMetricCondition.metric),
-        ).filter(
-            Target.id == target_id,
-            Target.root_id == root_id,
-            Target.deleted_at.is_(None),
-        ).first()
+        if history is not None:
+            if history.root_id != root_id:
+                return None, "History scope does not match fractal", 400
+            target = next((row for row in history.targets(set(preloaded_goals_by_id or {})) if row.id == target_id), None)
+        else:
+            target = self.db_session.query(Target).options(
+                selectinload(Target.metric_conditions).selectinload(TargetMetricCondition.metric),
+            ).filter(
+                Target.id == target_id,
+                Target.root_id == root_id,
+                Target.deleted_at.is_(None),
+            ).first()
         if not target:
             return None, "Target not found", 404
 
@@ -510,12 +518,12 @@ class GoalTargetService:
         effective_start = None if since == 'all' else self._as_utc(target.start_date or target.created_at)
         effective_end = self._as_utc(target.end_date)
 
-        activity_def = self._load_activity_definition(root_id, target.activity_id)
+        activity_def = history.activity_definition(target.activity_id) if history is not None else self._load_activity_definition(root_id, target.activity_id)
 
         activity_definition_payload = self._serialize_activity_definition_payload(activity_def)
 
         serialized_instances = self._collect_goal_activity_instances(
-            root_id, goal, goals_by_id, target.activity_id, effective_start, effective_end
+            root_id, goal, goals_by_id, target.activity_id, effective_start, effective_end, history
         )
 
         summary = self._build_target_summary(target, serialized_instances, activity_def)

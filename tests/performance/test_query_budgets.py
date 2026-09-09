@@ -28,26 +28,33 @@ from models import (
 )
 
 
-def assert_response_budget(response, *, max_bytes: int, max_ms: float, elapsed_ms: float):
+def assert_response_budget(
+    response, *, max_bytes: int, max_ms: float, elapsed_ms: float
+):
     assert response.status_code == 200
     assert len(response.data) <= max_bytes
     assert elapsed_ms <= max_ms
 
 
-def assert_mutation_budget(response, *, status_code: int, max_bytes: int, max_ms: float, elapsed_ms: float):
+def assert_mutation_budget(
+    response, *, status_code: int, max_bytes: int, max_ms: float, elapsed_ms: float
+):
     assert response.status_code == status_code
     assert len(response.data) <= max_bytes
     assert elapsed_ms <= max_ms
 
 
-def timed_get(client, url):
+def timed_get(client, url, *, query_counter):
+    # Evaluate fixture-derived URL/payload arguments before measuring request SQL.
+    query_counter["total"] = 0
     started_at = time.perf_counter()
     response = client.get(url)
     elapsed_ms = (time.perf_counter() - started_at) * 1000
     return response, elapsed_ms
 
 
-def timed_request(client, method, url, **kwargs):
+def timed_request(client, method, url, *, query_counter, **kwargs):
+    query_counter["total"] = 0
     started_at = time.perf_counter()
     response = getattr(client, method)(url, **kwargs)
     elapsed_ms = (time.perf_counter() - started_at) * 1000
@@ -97,13 +104,15 @@ def sample_program_tree(db_session, sample_ultimate_goal, sample_session_templat
 @pytest.fixture
 def large_account_dataset(db_session, test_user):
     levels = []
-    for rank, name in enumerate([
-        "Ultimate Goal",
-        "Long Term Goal",
-        "Mid Term Goal",
-        "Short Term Goal",
-        "Immediate Goal",
-    ]):
+    for rank, name in enumerate(
+        [
+            "Ultimate Goal",
+            "Long Term Goal",
+            "Mid Term Goal",
+            "Short Term Goal",
+            "Immediate Goal",
+        ]
+    ):
         level = GoalLevel(
             id=str(uuid.uuid4()),
             name=name,
@@ -183,15 +192,21 @@ def large_account_dataset(db_session, test_user):
             session_end=datetime.now(timezone.utc) - timedelta(days=index, hours=-1),
             total_duration_seconds=1800 + index,
             completed=index != 0,
-            completed_at=datetime.now(timezone.utc) - timedelta(days=index) if index != 0 else None,
+            completed_at=(
+                datetime.now(timezone.utc) - timedelta(days=index)
+                if index != 0
+                else None
+            ),
             created_at=datetime.now(timezone.utc) - timedelta(days=index),
-            attributes=json.dumps({
-                "session_data": {
-                    "sections": [
-                        {"name": "Main", "activity_ids": []},
-                    ],
-                },
-            }),
+            attributes=json.dumps(
+                {
+                    "session_data": {
+                        "sections": [
+                            {"name": "Main", "activity_ids": []},
+                        ],
+                    },
+                }
+            ),
         )
         db_session.add(session)
         sessions.append(session)
@@ -222,25 +237,31 @@ def large_account_dataset(db_session, test_user):
         notes.append(note)
 
     for index in range(5):
-        db_session.add(AnalyticsDashboard(
-            id=str(uuid.uuid4()),
-            root_id=root.id,
-            user_id=test_user.id,
-            name=f"Large Dashboard {index}",
-            layout={"windows": [], "version": 1},
-            created_at=datetime.now(timezone.utc),
-        ))
+        db_session.add(
+            AnalyticsDashboard(
+                id=str(uuid.uuid4()),
+                root_id=root.id,
+                user_id=test_user.id,
+                name=f"Large Dashboard {index}",
+                layout={"windows": [], "version": 1},
+                created_at=datetime.now(timezone.utc),
+            )
+        )
 
     db_session.commit()
     return {"root": root, "goals": goals, "sessions": sessions, "notes": notes}
 
 
 def auth_headers_for(user):
-    token = jwt.encode({
-        'user_id': user.id,
-        'exp': datetime.now(timezone.utc) + timedelta(hours=24),
-    }, config.JWT_SECRET_KEY, algorithm="HS256")
-    return {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+    token = jwt.encode(
+        {
+            "user_id": user.id,
+            "exp": datetime.now(timezone.utc) + timedelta(hours=24),
+        },
+        config.JWT_SECRET_KEY,
+        algorithm="HS256",
+    )
+    return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
 
 @pytest.fixture
@@ -306,7 +327,9 @@ def landing_publish_budget_dataset(db_session):
         total_duration_seconds=1800,
         completed=True,
         completed_at=datetime.now(timezone.utc) - timedelta(days=1),
-        attributes=json.dumps({"session_data": {"sections": [{"name": "Main", "activity_ids": []}]}}),
+        attributes=json.dumps(
+            {"session_data": {"sections": [{"name": "Main", "activity_ids": []}]}}
+        ),
     )
     db_session.add(session)
     db_session.flush()
@@ -323,11 +346,13 @@ def landing_publish_budget_dataset(db_session):
     )
     db_session.add(instance)
     db_session.flush()
-    session.attributes = json.dumps({
-        "session_data": {
-            "sections": [{"name": "Main", "activity_ids": [instance.id]}],
-        },
-    })
+    session.attributes = json.dumps(
+        {
+            "session_data": {
+                "sections": [{"name": "Main", "activity_ids": [instance.id]}],
+            },
+        }
+    )
 
     for index in range(16):
         child = Goal(
@@ -343,36 +368,61 @@ def landing_publish_budget_dataset(db_session):
         )
         db_session.add(child)
         db_session.flush()
-        db_session.execute(activity_goal_associations.insert().values(activity_id=activity.id, goal_id=child.id))
-        db_session.add(Target(
-            id=str(uuid.uuid4()),
-            goal_id=child.id,
-            root_id=root.id,
-            name=f"Landing Target {index}",
-        ))
-        db_session.add(Note(
-            id=str(uuid.uuid4()),
-            root_id=root.id,
-            context_type="goal",
-            context_id=child.id,
-            goal_id=child.id,
-            content=f"Budget note {index}",
-        ))
+        db_session.execute(
+            activity_goal_associations.insert().values(
+                activity_id=activity.id, goal_id=child.id
+            )
+        )
+        db_session.add(
+            Target(
+                id=str(uuid.uuid4()),
+                goal_id=child.id,
+                root_id=root.id,
+                name=f"Landing Target {index}",
+            )
+        )
+        db_session.add(
+            Note(
+                id=str(uuid.uuid4()),
+                root_id=root.id,
+                context_type="goal",
+                context_id=child.id,
+                goal_id=child.id,
+                content=f"Budget note {index}",
+            )
+        )
 
-    db_session.add(SessionTemplate(
-        id=str(uuid.uuid4()),
-        root_id=root.id,
-        name="Landing Budget Template",
-        template_data={"sections": [{"name": "Main", "activities": [{"activity_id": activity.id, "name": activity.name}]}]},
-    ))
-    db_session.add(AnalyticsDashboard(
-        id=str(uuid.uuid4()),
-        root_id=root.id,
-        user_id=admin.id,
-        name="Landing Budget View",
-        kind="view",
-        layout={"version": 3, "layout": {"type": "grid", "panels": []}, "window_states": {}},
-    ))
+    db_session.add(
+        SessionTemplate(
+            id=str(uuid.uuid4()),
+            root_id=root.id,
+            name="Landing Budget Template",
+            template_data={
+                "sections": [
+                    {
+                        "name": "Main",
+                        "activities": [
+                            {"activity_id": activity.id, "name": activity.name}
+                        ],
+                    }
+                ]
+            },
+        )
+    )
+    db_session.add(
+        AnalyticsDashboard(
+            id=str(uuid.uuid4()),
+            root_id=root.id,
+            user_id=admin.id,
+            name="Landing Budget View",
+            kind="view",
+            layout={
+                "version": 3,
+                "layout": {"type": "grid", "panels": []},
+                "window_states": {},
+            },
+        )
+    )
 
     second_root = Goal(
         id=str(uuid.uuid4()),
@@ -407,31 +457,39 @@ def landing_publish_budget_dataset(db_session):
         )
         db_session.add(child)
         db_session.flush()
-        db_session.execute(activity_goal_associations.insert().values(
-            activity_id=second_activity.id,
-            goal_id=child.id,
-        ))
-        db_session.add(Target(
-            id=str(uuid.uuid4()),
-            goal_id=child.id,
-            root_id=second_root.id,
-            name=f"Second Landing Target {index}",
-            activity_id=second_activity.id,
-        ))
-        db_session.add(Note(
-            id=str(uuid.uuid4()),
-            root_id=second_root.id,
-            context_type="goal",
-            context_id=child.id,
-            goal_id=child.id,
-            content=f"Second budget note {index}",
-        ))
+        db_session.execute(
+            activity_goal_associations.insert().values(
+                activity_id=second_activity.id,
+                goal_id=child.id,
+            )
+        )
+        db_session.add(
+            Target(
+                id=str(uuid.uuid4()),
+                goal_id=child.id,
+                root_id=second_root.id,
+                name=f"Second Landing Target {index}",
+                activity_id=second_activity.id,
+            )
+        )
+        db_session.add(
+            Note(
+                id=str(uuid.uuid4()),
+                root_id=second_root.id,
+                context_type="goal",
+                context_id=child.id,
+                goal_id=child.id,
+                content=f"Second budget note {index}",
+            )
+        )
     db_session.commit()
     return {"admin": admin, "root": root, "second_root": second_root}
 
 
 @pytest.mark.integration
-def test_get_session_activities_query_budget(authed_client, query_counter, sample_practice_session, sample_activity_instance):
+def test_get_session_activities_query_budget(
+    authed_client, query_counter, sample_practice_session, sample_activity_instance
+):
     """
     Guard against accidental N+1 regressions in session activities endpoint.
     Budget is intentionally loose to avoid flakes while still catching blowups.
@@ -440,9 +498,15 @@ def test_get_session_activities_query_budget(authed_client, query_counter, sampl
     session_id = sample_practice_session.id
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/sessions/{session_id}/activities")
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{root_id}/sessions/{session_id}/activities",
+        query_counter=query_counter,
+    )
 
-    assert_response_budget(response, max_bytes=80_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=80_000, max_ms=500, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 15
 
 
@@ -460,9 +524,17 @@ def test_tag_filtered_progress_timeline_query_budget(
     activity_id = sample_activity_definition.id
     tag_definition = authed_client.post(
         f"/api/{root_id}/activity-tags",
-        json={"name": "Competition", "scope": "selected", "activity_ids": [activity_id]},
+        json={
+            "name": "Competition",
+            "scope": "selected",
+            "activity_ids": [activity_id],
+        },
     ).get_json()
-    tag = next(row for row in tag_definition["bindings"] if row["activity_definition_id"] == activity_id)
+    tag = next(
+        row
+        for row in tag_definition["bindings"]
+        if row["activity_definition_id"] == activity_id
+    )
     authed_client.put(
         f"/api/{root_id}/activity-instances/{sample_activity_instance.id}/tags",
         json={"tag_ids": [tag["id"]]},
@@ -483,22 +555,27 @@ def test_tag_filtered_progress_timeline_query_budget(
         )
         db_session.add(session)
         db_session.flush()
-        db_session.add(ActivityInstance(
-            id=str(uuid.uuid4()),
-            session_id=session.id,
-            activity_definition_id=activity_id,
-            root_id=root_id,
-            completed=True,
-        ))
+        db_session.add(
+            ActivityInstance(
+                id=str(uuid.uuid4()),
+                session_id=session.id,
+                activity_definition_id=activity_id,
+                root_id=root_id,
+                completed=True,
+            )
+        )
     db_session.commit()
 
     query_counter["total"] = 0
     response, elapsed_ms = timed_get(
         authed_client,
         f"/api/{root_id}/activities/{activity_id}/progress-timeline?limit=20&offset=0",
+        query_counter=query_counter,
     )
 
-    assert_response_budget(response, max_bytes=180_000, max_ms=900, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=180_000, max_ms=900, elapsed_ms=elapsed_ms
+    )
     payload = response.get_json()
     assert payload["total"] == 41
     assert len(payload["items"]) == 20
@@ -521,25 +598,33 @@ def test_activity_tag_catalog_query_budget_is_constant(
             sort_order=index,
             scope="selected",
         )
-        definition.bindings.append(ActivityTag(
-            root_id=sample_ultimate_goal.id,
-            activity_definition_id=sample_activity_definition.id,
-        ))
+        definition.bindings.append(
+            ActivityTag(
+                root_id=sample_ultimate_goal.id,
+                activity_definition_id=sample_activity_definition.id,
+            )
+        )
         definitions.append(definition)
     db_session.add_all(definitions)
     db_session.commit()
 
     query_counter["total"] = 0
     response, elapsed_ms = timed_get(
-        authed_client, f"/api/{sample_ultimate_goal.id}/activity-tags",
+        authed_client,
+        f"/api/{sample_ultimate_goal.id}/activity-tags",
+        query_counter=query_counter,
     )
-    assert_response_budget(response, max_bytes=250_000, max_ms=750, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=250_000, max_ms=750, elapsed_ms=elapsed_ms
+    )
     assert len(response.get_json()["tags"]) == 100
     assert query_counter["total"] <= 12
 
 
 @pytest.mark.integration
-def test_publish_landing_examples_query_budget(client, query_counter, landing_publish_budget_dataset):
+def test_publish_landing_examples_query_budget(
+    client, query_counter, landing_publish_budget_dataset
+):
     """Landing snapshot publish should batch goal tree enrichment instead of querying per goal."""
     admin = landing_publish_budget_dataset["admin"]
     root = landing_publish_budget_dataset["root"]
@@ -549,21 +634,28 @@ def test_publish_landing_examples_query_budget(client, query_counter, landing_pu
         client,
         "post",
         "/api/admin/landing-examples/publish",
-        data=json.dumps({
-            "examples": [{
-                "root_id": root.id,
-                "label": "Budget fixture",
-                "sort_order": 0,
-            }],
-        }),
+        data=json.dumps(
+            {
+                "examples": [
+                    {
+                        "root_id": root.id,
+                        "label": "Budget fixture",
+                        "sort_order": 0,
+                    }
+                ],
+            }
+        ),
         headers=auth_headers_for(admin),
         content_type="application/json",
+        query_counter=query_counter,
     )
 
     # Reusing the validated/preloaded goal graph across enrichment phases keeps
     # this production-shaped 17-goal snapshot below one second locally while
     # retaining CI headroom and a strict regression ceiling.
-    assert_response_budget(response, max_bytes=140_000, max_ms=1_800, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=140_000, max_ms=1_800, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 65
 
 
@@ -584,17 +676,22 @@ def test_publish_multiple_landing_examples_total_payload_budget(
         client,
         "post",
         "/api/admin/landing-examples/publish",
-        data=json.dumps({
-            "examples": [
-                {"root_id": root.id, "label": root.name, "sort_order": index}
-                for index, root in enumerate(roots)
-            ],
-        }),
+        data=json.dumps(
+            {
+                "examples": [
+                    {"root_id": root.id, "label": root.name, "sort_order": index}
+                    for index, root in enumerate(roots)
+                ],
+            }
+        ),
         headers=auth_headers_for(admin),
         content_type="application/json",
+        query_counter=query_counter,
     )
 
-    assert_response_budget(response, max_bytes=160_000, max_ms=3_000, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=160_000, max_ms=3_000, elapsed_ms=elapsed_ms
+    )
     payload = response.get_json()
     assert payload["published_example_count"] == 2
     assert payload["snapshot_bytes"] <= 400_000
@@ -617,10 +714,16 @@ def test_add_session_activity_mutation_query_budget(
         authed_client,
         "post",
         f"/api/{root_id}/sessions/{session_id}/activities",
-        json={"activity_definition_id": sample_activity_definition.id, "section_index": 0},
+        json={
+            "activity_definition_id": sample_activity_definition.id,
+            "section_index": 0,
+        },
+        query_counter=query_counter,
     )
 
-    assert_mutation_budget(response, status_code=201, max_bytes=40_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert_mutation_budget(
+        response, status_code=201, max_bytes=40_000, max_ms=500, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 16
 
 
@@ -639,9 +742,12 @@ def test_remove_session_activity_mutation_query_budget(
         authed_client,
         "delete",
         f"/api/{root_id}/sessions/{session_id}/activities/{sample_activity_instance.id}",
+        query_counter=query_counter,
     )
 
-    assert_mutation_budget(response, status_code=200, max_bytes=20_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert_mutation_budget(
+        response, status_code=200, max_bytes=20_000, max_ms=500, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 14
 
 
@@ -660,9 +766,12 @@ def test_start_activity_timer_mutation_query_budget(
         "post",
         f"/api/{root_id}/activity-instances/{sample_activity_instance.id}/start",
         json={"target_duration_seconds": 90},
+        query_counter=query_counter,
     )
 
-    assert_mutation_budget(response, status_code=200, max_bytes=40_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert_mutation_budget(
+        response, status_code=200, max_bytes=40_000, max_ms=500, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 12
 
 
@@ -675,7 +784,9 @@ def test_reset_activity_timer_mutation_query_budget(
     sample_activity_instance,
 ):
     root_id = sample_practice_session.root_id
-    sample_activity_instance.time_start = datetime.now(timezone.utc) - timedelta(minutes=5)
+    sample_activity_instance.time_start = datetime.now(timezone.utc) - timedelta(
+        minutes=5
+    )
     sample_activity_instance.time_stop = datetime.now(timezone.utc)
     sample_activity_instance.duration_seconds = 300
     sample_activity_instance.completed = True
@@ -694,9 +805,12 @@ def test_reset_activity_timer_mutation_query_budget(
             "target_duration_seconds": None,
             "completed": False,
         },
+        query_counter=query_counter,
     )
 
-    assert_mutation_budget(response, status_code=200, max_bytes=40_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert_mutation_budget(
+        response, status_code=200, max_bytes=40_000, max_ms=500, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 14
 
 
@@ -709,7 +823,9 @@ def test_complete_activity_timer_mutation_query_budget(
     sample_activity_instance,
 ):
     root_id = sample_practice_session.root_id
-    sample_activity_instance.time_start = datetime.now(timezone.utc) - timedelta(minutes=5)
+    sample_activity_instance.time_start = datetime.now(timezone.utc) - timedelta(
+        minutes=5
+    )
     db_session.commit()
 
     query_counter["total"] = 0
@@ -717,69 +833,106 @@ def test_complete_activity_timer_mutation_query_budget(
         authed_client,
         "post",
         f"/api/{root_id}/activity-instances/{sample_activity_instance.id}/complete",
+        query_counter=query_counter,
     )
 
-    assert_mutation_budget(response, status_code=200, max_bytes=60_000, max_ms=800, elapsed_ms=elapsed_ms)
+    assert_mutation_budget(
+        response, status_code=200, max_bytes=60_000, max_ms=800, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 24
 
 
 @pytest.mark.integration
-def test_get_session_details_query_budget(authed_client, query_counter, sample_practice_session, sample_activity_instance):
+def test_get_session_details_query_budget(
+    authed_client, query_counter, sample_practice_session, sample_activity_instance
+):
     """Session detail should stay within a bounded eager-loading query budget."""
     root_id = sample_practice_session.root_id
     session_id = sample_practice_session.id
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/sessions/{session_id}")
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{root_id}/sessions/{session_id}",
+        query_counter=query_counter,
+    )
 
-    assert_response_budget(response, max_bytes=160_000, max_ms=700, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=160_000, max_ms=700, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 20
 
 
 @pytest.mark.integration
-def test_get_goal_tree_query_budget(authed_client, query_counter, sample_goal_hierarchy):
+def test_get_goal_tree_query_budget(
+    authed_client, query_counter, sample_goal_hierarchy
+):
     """Goal tree fetches should remain bounded as hierarchy depth grows."""
     root_id = sample_goal_hierarchy["ultimate"].id
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/goals")
+    response, elapsed_ms = timed_get(
+        authed_client, f"/api/{root_id}/goals", query_counter=query_counter
+    )
 
-    assert_response_budget(response, max_bytes=180_000, max_ms=700, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=180_000, max_ms=700, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 24
 
 
 @pytest.mark.integration
-def test_get_root_goal_header_query_budget(authed_client, query_counter, sample_goal_hierarchy):
+def test_get_root_goal_header_query_budget(
+    authed_client, query_counter, sample_goal_hierarchy
+):
     """Header root-goal lookup should not serialize the whole tree."""
     root_id = sample_goal_hierarchy["ultimate"].id
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/goals/{root_id}?include_children=false")
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{root_id}/goals/{root_id}?include_children=false",
+        query_counter=query_counter,
+    )
 
-    assert_response_budget(response, max_bytes=30_000, max_ms=400, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=30_000, max_ms=400, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 10
 
 
 @pytest.mark.integration
-def test_get_activities_query_budget(authed_client, query_counter, sample_activity_definition):
+def test_get_activities_query_budget(
+    authed_client, query_counter, sample_activity_definition
+):
     """Activity definition serialization should batch metrics, splits, and goal associations."""
     root_id = sample_activity_definition.root_id
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/activities")
+    response, elapsed_ms = timed_get(
+        authed_client, f"/api/{root_id}/activities", query_counter=query_counter
+    )
 
-    assert_response_budget(response, max_bytes=120_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=120_000, max_ms=500, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 8
 
 
 @pytest.mark.integration
-def test_get_activity_groups_query_budget(authed_client, query_counter, sample_activity_group):
+def test_get_activity_groups_query_budget(
+    authed_client, query_counter, sample_activity_group
+):
     root_id = sample_activity_group.root_id
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/activity-groups")
+    response, elapsed_ms = timed_get(
+        authed_client, f"/api/{root_id}/activity-groups", query_counter=query_counter
+    )
 
-    assert_response_budget(response, max_bytes=80_000, max_ms=400, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=80_000, max_ms=400, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 6
 
 
@@ -788,21 +941,30 @@ def test_get_programs_query_budget(authed_client, query_counter, sample_program_
     root_id = sample_program_tree.root_id
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/programs")
+    response, elapsed_ms = timed_get(
+        authed_client, f"/api/{root_id}/programs", query_counter=query_counter
+    )
 
-    assert_response_budget(response, max_bytes=200_000, max_ms=700, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=200_000, max_ms=700, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 22
 
 
 @pytest.mark.integration
-def test_get_program_metrics_query_and_response_budget(authed_client, query_counter, sample_program_tree):
+def test_get_program_metrics_query_and_response_budget(
+    authed_client, query_counter, sample_program_tree
+):
     query_counter["total"] = 0
     response, elapsed_ms = timed_get(
         authed_client,
         f"/api/{sample_program_tree.root_id}/programs/{sample_program_tree.id}/metrics?timezone=UTC",
+        query_counter=query_counter,
     )
 
-    assert_response_budget(response, max_bytes=1_048_576, max_ms=750, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=1_048_576, max_ms=750, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 8
 
 
@@ -814,13 +976,15 @@ def test_get_program_metrics_comparison_query_budget(
     sample_program_tree.start_date = now - timedelta(days=30)
     sample_program_tree.end_date = now - timedelta(days=20)
     for index in range(4):
-        db_session.add(Program(
-            root_id=sample_program_tree.root_id,
-            name=f"Ended program {index}",
-            start_date=now - timedelta(days=100 + index * 20),
-            end_date=now - timedelta(days=90 + index * 20),
-            weekly_schedule=[],
-        ))
+        db_session.add(
+            Program(
+                root_id=sample_program_tree.root_id,
+                name=f"Ended program {index}",
+                start_date=now - timedelta(days=100 + index * 20),
+                end_date=now - timedelta(days=90 + index * 20),
+                weekly_schedule=[],
+            )
+        )
     db_session.commit()
 
     query_counter["total"] = 0
@@ -828,9 +992,12 @@ def test_get_program_metrics_comparison_query_budget(
         authed_client,
         f"/api/{sample_program_tree.root_id}/programs/metrics/comparison"
         f"?timezone=UTC&anchor_program_id={sample_program_tree.id}&limit=5",
+        query_counter=query_counter,
     )
 
-    assert_response_budget(response, max_bytes=1_048_576, max_ms=1_500, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=1_048_576, max_ms=1_500, elapsed_ms=elapsed_ms
+    )
     assert response.get_json()["programs"][0]["program_id"] == sample_program_tree.id
     assert query_counter["total"] <= 10
 
@@ -838,9 +1005,13 @@ def test_get_program_metrics_comparison_query_budget(
 @pytest.mark.integration
 def test_get_fractals_query_budget(authed_client, query_counter, sample_goal_hierarchy):
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, "/api/fractals")
+    response, elapsed_ms = timed_get(
+        authed_client, "/api/fractals", query_counter=query_counter
+    )
 
-    assert_response_budget(response, max_bytes=80_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=80_000, max_ms=500, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 12
 
 
@@ -856,9 +1027,15 @@ def test_get_session_goals_view_query_budget(
     session_id = sample_practice_session.id
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/fractal/{root_id}/sessions/{session_id}/goals-view")
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/fractal/{root_id}/sessions/{session_id}/goals-view",
+        query_counter=query_counter,
+    )
 
-    assert_response_budget(response, max_bytes=220_000, max_ms=900, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=220_000, max_ms=900, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 36
 
 
@@ -883,9 +1060,15 @@ def test_get_session_detail_goal_activities_query_budget(
     db_session.commit()
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/goals/{parent_goal.id}/activities")
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{root_id}/goals/{parent_goal.id}/activities",
+        query_counter=query_counter,
+    )
 
-    assert_response_budget(response, max_bytes=80_000, max_ms=500, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=80_000, max_ms=500, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 16
 
 
@@ -914,9 +1097,12 @@ def test_get_goal_timeline_query_budget(
     response, elapsed_ms = timed_get(
         authed_client,
         f"/api/{root_id}/goals/{parent_goal.id}/timeline?types=activity,target,child_goal",
+        query_counter=query_counter,
     )
 
-    assert_response_budget(response, max_bytes=160_000, max_ms=800, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=160_000, max_ms=800, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 28
 
 
@@ -931,47 +1117,77 @@ def test_get_session_analytics_summary_query_budget(
     root_id = sample_practice_session.root_id
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/sessions/analytics-summary?limit=50")
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{root_id}/sessions/analytics-summary?limit=50",
+        query_counter=query_counter,
+    )
 
-    assert_response_budget(response, max_bytes=200_000, max_ms=700, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=200_000, max_ms=700, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 12
 
 
 @pytest.mark.integration
-def test_large_account_goal_tree_budget(authed_client, query_counter, large_account_dataset):
+def test_large_account_goal_tree_budget(
+    authed_client, query_counter, large_account_dataset
+):
     root_id = large_account_dataset["root"].id
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/goals")
+    response, elapsed_ms = timed_get(
+        authed_client, f"/api/{root_id}/goals", query_counter=query_counter
+    )
 
-    assert_response_budget(response, max_bytes=650_000, max_ms=1_200, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=650_000, max_ms=1_200, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 32
 
 
 @pytest.mark.integration
-def test_large_account_sessions_search_budget(authed_client, query_counter, large_account_dataset):
+def test_large_account_sessions_search_budget(
+    authed_client, query_counter, large_account_dataset
+):
     root_id = large_account_dataset["root"].id
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/sessions?limit=50&sort_by=session_start&sort_order=desc")
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{root_id}/sessions?limit=50&sort_by=session_start&sort_order=desc",
+        query_counter=query_counter,
+    )
 
-    assert_response_budget(response, max_bytes=500_000, max_ms=1_000, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=500_000, max_ms=1_000, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 18
 
 
 @pytest.mark.integration
-def test_large_account_notes_page_budget(authed_client, query_counter, large_account_dataset):
+def test_large_account_notes_page_budget(
+    authed_client, query_counter, large_account_dataset
+):
     root_id = large_account_dataset["root"].id
 
     query_counter["total"] = 0
-    response, elapsed_ms = timed_get(authed_client, f"/api/{root_id}/notes?page=0&page_size=50")
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{root_id}/notes?page=0&page_size=50",
+        query_counter=query_counter,
+    )
 
-    assert_response_budget(response, max_bytes=350_000, max_ms=1_000, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=350_000, max_ms=1_000, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 20
 
 
 @pytest.mark.integration
-def test_large_account_admin_users_budget(client, db_session, test_user, query_counter, large_account_dataset):
+def test_large_account_admin_users_budget(
+    client, db_session, test_user, query_counter, large_account_dataset
+):
     admin = User(
         id=str(uuid.uuid4()),
         username="largeadmin",
@@ -986,8 +1202,10 @@ def test_large_account_admin_users_budget(client, db_session, test_user, query_c
 
     query_counter["total"] = 0
     started_at = time.perf_counter()
-    response = client.get('/api/admin/users?limit=50', headers=auth_headers_for(admin))
+    response = client.get("/api/admin/users?limit=50", headers=auth_headers_for(admin))
     elapsed_ms = (time.perf_counter() - started_at) * 1000
 
-    assert_response_budget(response, max_bytes=250_000, max_ms=1_200, elapsed_ms=elapsed_ms)
+    assert_response_budget(
+        response, max_bytes=250_000, max_ms=1_200, elapsed_ms=elapsed_ms
+    )
     assert query_counter["total"] <= 45

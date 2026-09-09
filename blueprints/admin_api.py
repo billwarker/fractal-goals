@@ -425,10 +425,6 @@ def publish_landing_examples(current_user, validated_data):
         if response:
             return response
         landing_service = LandingPublishService(db_session)
-        if "examples" in validated_data:
-            _, error, status = landing_service.update_landing_example_settings(validated_data)
-            if error:
-                return jsonify({"error": error}), status
         payload, error, status = landing_service.publish_landing_examples(
             examples_override=validated_data.get("examples")
         )

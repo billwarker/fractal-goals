@@ -116,7 +116,7 @@ def start_activity_timer(current_user, root_id, instance_id):
                 )
             )
             response_data["completed_activity"] = completed_data
-        if payload.get("instance") and getattr(payload["instance"], "completed", False):
+        if response_data.get("completed", False):
             response_data["progress_comparison"] = (
                 get_live_progress(instance_id)
                 or ProgressService(db_session).get_progress_for_instance(instance_id)
@@ -163,7 +163,7 @@ def complete_activity_instance(current_user, root_id, instance_id):
             result['achieved_targets'] = achievements.get('achieved_targets', [])
             result['completed_goals'] = achievements.get('completed_goals', [])
 
-        result['progress_comparison'] = ProgressService(db_session).get_progress_for_instance(instance_id)
+        result['progress_comparison'] = payload['progress_comparison']
         
         return jsonify(result), status
 
@@ -193,7 +193,7 @@ def update_activity_instance(current_user, root_id, instance_id, validated_data)
             return jsonify({"error": error}), status
 
         response_data = dict(payload["serialized"])
-        if payload.get("instance") and getattr(payload["instance"], "completed", False):
+        if response_data.get("completed", False):
             response_data["progress_comparison"] = (
                 get_live_progress(instance_id)
                 or ProgressService(db_session).get_progress_for_instance(instance_id)

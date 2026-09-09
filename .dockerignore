@@ -30,3 +30,16 @@ client/
 docs/
 docker/
 tests/
+
+# Local environments, agent state, and generated artifacts never enter images.
+fractal-goals-venv/
+.venv/
+.agents/
+.codex/
+htmlcov/
+planning/
+backups/
+*.dump
+*.sql
+logs/
+supabase/

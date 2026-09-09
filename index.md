@@ -76,6 +76,11 @@ calculated from canonical result data; obsolete snapshot progress is not a compe
 Primary code: `services/session_*`, `services/activity_*`, `services/progress_service.py`,
 `services/timer_service.py`, `blueprints/sessions_api.py`, and the matching client hooks/views.
 
+Timer mutations persist the timer state and derived duration statistics in one
+transaction, then emit immutable event payloads after commit. `services/timer_loading.py`
+owns their response loading contract. Work-interval row locks may be reused only
+inside the same SQLAlchemy transaction or savepoint.
+
 ### Programs
 
 Programs contain dated blocks and reusable or dated program-day definitions. Program scope is
@@ -107,6 +112,11 @@ separate from dashboard layout; registered visualizations provide explicit query
 
 Primary code: `services/note_service.py`, `services/analytics_*`, `blueprints/notes_api.py`,
 `blueprints/analytics_api.py`, and `client/src/components/analytics/`.
+
+`services/goal_history_read_model.py` and `services/goal_note_read_model.py` are
+request-scoped bulk loaders. Landing publication reuses them while projecting each
+goal through the canonical timeline and note services. Analytics query caching is
+bounded in development/testing and bypassed in production-like multi-worker runtimes.
 
 ### Interaction contracts
 
@@ -147,21 +157,29 @@ Use `./run-tests.sh` as the canonical entry point:
 
 - `./run-tests.sh backend` / `frontend` / `all`
 - `./run-tests.sh coverage`
+- `./run-tests.sh browser` / `restore-drill`
 - `./run-tests.sh lint`
 - `./run-tests.sh maintain`
 - `./run-tests.sh audit`
 - `./run-tests.sh file <path>`
 
-Backend CI separately gates migration health, unit, integration, performance, and full-suite
-coverage. `pytest.ini` owns the services/blueprints coverage scope and ratcheted threshold;
+Backend CI gates migration health, one complete unit/integration/performance/e2e
+coverage run, a production dependency audit, a logical backup/restore drill, and the
+production container. Consolidating the test layers avoids executing the same backend
+tests again only to collect coverage.
+`pytest.ini` owns the services/blueprints coverage scope and ratcheted threshold;
 `scripts/check_backend_coverage_gate.py` prevents CI from stripping it through `addopts`.
 `scripts/check_backend_maintainability.py` caps oversized backend modules and exception debt.
-Frontend CI gates tests, production build, responsive source checks, and maintainability
-budgets. Lint is currently local-only; the production audit below tracks this CI gap.
+Frontend CI gates its production dependency audit, zero-warning lint, all-source
+coverage, production build, responsive source checks, maintainability budgets, and
+desktop/mobile Chromium workflows against the real Flask app and a disposable
+PostgreSQL database.
 
 Backend tests build the schema once per pytest session and clear ORM rows in dependency
 order between tests, preserving real commit and independent-connection semantics. Frontend tests use
-four isolated Vitest threads. See `tests/README.md` for full-suite execution details.
+four isolated Vitest threads. The `all` command runs the complete backend and frontend
+suites concurrently and reports each result, reducing wall time without removing tests.
+See `tests/README.md` for full-suite execution details.
 
 Standing review rules—including boundary-case tests, broad-exception criteria, large-file
 ownership seams, commit hygiene, and high-churn manual QA—live in

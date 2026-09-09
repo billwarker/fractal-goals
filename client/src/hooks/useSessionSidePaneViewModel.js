@@ -30,6 +30,7 @@ export function useSessionSidePaneViewModel({
         activities: activityDefinitions,
     } = useActiveSessionData();
     const { toggleSessionComplete } = useActiveSessionActions();
+    const isCompleted = Boolean(session?.completed ?? session?.attributes?.completed);
 
     const sessionActivityDefs = useMemo(() => {
         if (!activityInstances || !activityDefinitions) return [];
@@ -42,7 +43,7 @@ export function useSessionSidePaneViewModel({
         onModeChange,
         details: {
             sessionId,
-            isCompleted: Boolean(session?.completed ?? session?.attributes?.completed),
+            isCompleted,
             onToggleComplete: toggleSessionComplete,
             onOptions,
             onNoteAdded,
@@ -86,7 +87,7 @@ export function useSessionSidePaneViewModel({
         rootId,
         readOnly,
         selectedActivity,
-        session?.attributes?.completed,
+        isCompleted,
         sessionActivityDefs,
         sessionId,
         targetModal,

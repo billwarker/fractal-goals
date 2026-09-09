@@ -400,7 +400,7 @@ class TestCompletionHandlerPublicFlow:
         fake_db = _fake_db_session(instance)
         reverted = []
 
-        monkeypatch.setattr(completion_handlers, "_get_db_session", lambda: fake_db)
+        monkeypatch.setattr(completion_handlers, "_get_db_session", lambda: pytest.fail("Non-lifecycle updates must not open a database session"))
         monkeypatch.setattr(
             completion_handlers,
             "_revert_achievements_for_instance",
@@ -416,7 +416,7 @@ class TestCompletionHandlerPublicFlow:
 
         assert reverted == []
         assert fake_db.committed is False
-        assert fake_db.closed is True
+        assert fake_db.closed is False
 
     def test_handle_activity_instance_updated_evaluates_when_completed_field_toggled(self, monkeypatch):
         instance = SimpleNamespace(completed=True)

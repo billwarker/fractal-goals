@@ -77,6 +77,7 @@ def selection_page():
 
 
 # Fractal-scoped routes
+@pages_bp.route('/<root_id>/goals')
 @pages_bp.route('/<root_id>/fractal-goals')
 def fractal_goals_page(root_id):
     """Goals View - Flow Tree View in ReactJS."""
@@ -131,3 +132,20 @@ def serve_assets(path):
 def serve_vite_svg():
     """Serve the vite.svg icon."""
     return send_from_directory(CLIENT_BUILD_DIR, 'vite.svg')
+
+
+@pages_bp.route('/admin')
+@pages_bp.route('/reset-password')
+@pages_bp.route('/terms')
+@pages_bp.route('/privacy')
+@pages_bp.route('/<root_id>/analytics')
+@pages_bp.route('/<root_id>/notes')
+@pages_bp.route('/<root_id>/logs')
+@pages_bp.route('/<root_id>/create-session')
+@pages_bp.route('/<root_id>/manage-session-templates')
+@pages_bp.route('/<root_id>/manage-activities')
+@pages_bp.route('/<root_id>/programs/<program_id>')
+@pages_bp.route('/<root_id>/programs/<program_id>/blocks')
+def client_route(**_route_parameters):
+    """Serve the built SPA at canonical deep links, including browser reloads."""
+    return render_react_app()
