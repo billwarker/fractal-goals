@@ -21,6 +21,7 @@ from uuid import uuid4
 from models import (
     ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, Session, SessionTemplate,
     SessionWorkInterval, Target, Program, ProgramBlock, ProgramDay,
+    CircuitDefinition, CircuitSlot, CircuitRun,
     activity_goal_associations, session_goals, program_goals,
 )
 
@@ -812,6 +813,79 @@ class TestSessionCRUDEndpoints:
         sections = detail['attributes']['session_data']['sections']
         assert len(sections[0]['activity_ids']) == 1
         assert sections[0]['activity_ids'][0] == 'test-instance-1'
+
+    def test_create_session_from_circuit_template_deduplicates_activity_goals(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        sample_activity_definition,
+    ):
+        """Circuit construction and initial session scope must not insert the same goal twice."""
+        root_id = sample_goal_hierarchy['ultimate'].id
+        associated_goal = sample_goal_hierarchy['short_term']
+        circuit = CircuitDefinition(
+            id=str(uuid4()),
+            root_id=root_id,
+            name='Goal-backed circuit',
+            slots=[CircuitSlot(
+                id=str(uuid4()),
+                activity_definition_id=sample_activity_definition.id,
+                sort_order=0,
+            )],
+        )
+        template_sections = [{
+            'name': 'Main',
+            'items': [
+                {'type': 'circuit', 'circuit_definition_id': circuit.id},
+                {
+                    'type': 'activity',
+                    'activity_definition_id': sample_activity_definition.id,
+                    'name': sample_activity_definition.name,
+                },
+            ],
+        }]
+        template = SessionTemplate(
+            id=str(uuid4()),
+            root_id=root_id,
+            name='Circuit template',
+            template_data=json.dumps({
+                'session_type': 'normal',
+                'sections': template_sections,
+            }),
+        )
+        db_session.add_all([circuit, template])
+        db_session.execute(activity_goal_associations.insert().values(
+            activity_id=sample_activity_definition.id,
+            goal_id=associated_goal.id,
+        ))
+        db_session.commit()
+
+        response = authed_client.post(
+            f'/api/{root_id}/sessions',
+            json={
+                'name': template.name,
+                'template_id': template.id,
+                'session_start': datetime.now(timezone.utc).isoformat(),
+                'session_data': {
+                    'template_id': template.id,
+                    'session_type': 'normal',
+                    'sections': template_sections,
+                },
+            },
+        )
+
+        assert response.status_code == 201, response.get_json()
+        created = response.get_json()
+        goal_rows = db_session.execute(
+            session_goals.select().where(session_goals.c.session_id == created['id'])
+        ).mappings().all()
+        assert len(goal_rows) == len({row['goal_id'] for row in goal_rows})
+        assert associated_goal.id in {row['goal_id'] for row in goal_rows}
+        assert all(row['association_source'] == 'activity' for row in goal_rows)
+        assert db_session.query(CircuitRun).filter_by(session_id=created['id']).count() == 1
+        section_items = created['attributes']['session_data']['sections'][0]['items']
+        assert [item['type'] for item in section_items] == ['circuit', 'activity']
 
     def test_update_session(self, authed_client, sample_practice_session):
         """Test updating a session."""

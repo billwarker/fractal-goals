@@ -636,9 +636,7 @@ class SessionLifecycleService:
                 circuit_service = CircuitService(self.db_session)
                 for section_index, item_index, circuit_definition_id in circuit_items:
                     created_run, circuit_error, circuit_status = circuit_service.create_run(
-                        root_id,
-                        new_session.id,
-                        current_user_id,
+                        root_id, new_session.id, current_user_id,
                         {
                             'circuit_definition_id': circuit_definition_id,
                             'section_index': section_index,
@@ -647,6 +645,7 @@ class SessionLifecycleService:
                         commit=False,
                         emit=False,
                         allow_archived=bool(template or allow_archived_definitions),
+                        attach_goals=False,
                     )
                     if circuit_error:
                         self.db_session.rollback()

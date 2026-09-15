@@ -146,6 +146,7 @@ def token_required(f):
             return jsonify({'error': 'CSRF token missing or invalid'}), 403
 
         db_session = get_db_session()
+        authentication_complete = False
         try:
             service = AuthService(db_session)
             current_user, error, status = service.get_current_user_for_token(token)
@@ -220,8 +221,11 @@ def token_required(f):
                 g.admin_mode = admin_mode
                 current_user.id = admin_user_id
             g.current_user = current_user
+            authentication_complete = True
             return f(current_user, *args, **kwargs)
         except SQLAlchemyError:
+            if authentication_complete:
+                raise
             logger.exception("Database error in token_required decorator")
             return jsonify({'error': 'Internal server error during authentication'}), 500
         finally:

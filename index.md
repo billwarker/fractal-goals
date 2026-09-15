@@ -72,6 +72,8 @@ Primary code: `services/goal_service.py` and `_goal_*` modules, `services/goal_t
 Sessions are the execution container. Activity definitions and instances, metrics, sets,
 circuits, work intervals, templates, and tags remain relationally linked. Dynamic progress is
 calculated from canonical result data; obsolete snapshot progress is not a competing source.
+Template session creation assembles activity-derived goal scope once after all standalone and
+circuit activities are instantiated; circuits added later attach their member goals directly.
 
 Primary code: `services/session_*`, `services/activity_*`, `services/progress_service.py`,
 `services/timer_service.py`, `blueprints/sessions_api.py`, and the matching client hooks/views.

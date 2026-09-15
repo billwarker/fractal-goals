@@ -270,6 +270,7 @@ class CircuitService:
         commit=True,
         emit=True,
         allow_archived=False,
+        attach_goals=True,
     ):
         if not self._owned_root(root_id, user_id):
             return None, "Fractal not found or access denied", 404
@@ -349,7 +350,8 @@ class CircuitService:
             self.db_session.add(run_slot)
         self.db_session.flush()
         self._create_round_occurrences(run, 1)
-        self._attach_member_goals(session, definition, root_id)
+        if attach_goals:
+            self._attach_member_goals(session, definition, root_id)
         structure_error = append_circuit_run_item(
             session,
             run.id,

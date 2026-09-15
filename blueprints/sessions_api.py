@@ -282,7 +282,7 @@ def create_fractal_session(current_user, root_id, validated_data):
                 'code': 'active_session_exists',
                 'active_session': active_session,
             }), 409
-        raise
+        return internal_error(logger, "Integrity error creating session")
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error creating session")
