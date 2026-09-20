@@ -13,6 +13,7 @@ from validators import (
     ProgramDayCopySchema,
     ProgramDayScheduleSchema,
     ProgramDayOccurrenceUnscheduleSchema,
+    ProgramDayStatusesUpdateSchema,
     ProgramGoalDeadlineSchema,
     ProgramBlockSchema,
     ProgramBlockUpdateSchema,
@@ -109,6 +110,7 @@ def get_program_metrics(current_user, root_id, program_id):
             timezone_name=request.args.get('timezone'),
             range_start=request.args.get('range_start'),
             range_end=request.args.get('range_end'),
+            dates=request.args.get('dates'),
         )
         if error:
             return jsonify({"error": error}), status
@@ -155,6 +157,27 @@ def get_program_day_read_model(current_user, root_id, program_id):
         session.rollback()
         logger.exception("Error building program day read model")
         return internal_error(logger, "Program day read model request failed")
+    finally:
+        session.close()
+
+
+@programs_bp.route('/<root_id>/programs/<program_id>/day-statuses', methods=['PATCH'])
+@token_required
+@validate_request(ProgramDayStatusesUpdateSchema)
+def update_program_day_statuses(current_user, root_id, program_id, validated_data):
+    """Atomically set or clear occurrence-level manual day statuses."""
+    session = get_db_session()
+    try:
+        result = ProgramService.set_program_day_statuses(
+            session, root_id, program_id, validated_data, current_user.id
+        )
+        return jsonify(result)
+    except ProgramServiceValidationError as exc:
+        session.rollback()
+        return _program_service_error_response(exc)
+    except ValueError as exc:
+        session.rollback()
+        return jsonify({"error": str(exc)}), 400
     finally:
         session.close()
 

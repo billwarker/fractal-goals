@@ -42,11 +42,27 @@ export function buildTodayProgramDayView(programDays = []) {
 
     const totalRequired = requiredTemplateIds.size;
     const effectiveMinimum = minTemplates || totalRequired;
-    const requiredComplete = [...requiredTemplateIds].every((id) => completedTemplateIds.has(id));
-    const isDayComplete = days.length > 0 && (
-        days.every((day) => Boolean(day.is_completed))
-        || (requiredComplete && completedTemplateIds.size >= effectiveMinimum)
-    );
+    const daysByProgram = new Map();
+    days.forEach((day) => {
+        const key = String(day.program_id || 'unspecified-program');
+        daysByProgram.set(key, [...(daysByProgram.get(key) || []), day]);
+    });
+    const programStates = [...daysByProgram.values()].map((programDaysForDate) => {
+        const manualStatus = programDaysForDate[0].manual_status;
+        if (manualStatus === 'complete' || manualStatus === 'rest') return manualStatus;
+        const rules = programDaysForDate.flatMap((day) => getProgramDayTemplateRules({
+            templates: (day.sessions || []).map((session) => ({ ...session, id: session.template_id })),
+        }));
+        const requiredIds = new Set(rules.filter((rule) => rule.isRequired).map((rule) => String(rule.templateKey)));
+        const completedIds = new Set(programDaysForDate.flatMap((day) => day.completed_template_ids || []).map(String));
+        const minimum = Math.max(...programDaysForDate.map((day) => Number(day.completion_min_templates || 0)));
+        const requiredComplete = [...requiredIds].every((id) => completedIds.has(id));
+        const evidenceComplete = rules.length > 0 && requiredComplete
+            && (minimum ? completedIds.size >= minimum : requiredIds.size > 0 || completedIds.size > 0);
+        return evidenceComplete ? 'complete' : 'pending';
+    });
+    const isDayComplete = programStates.length > 0 && programStates.every((state) => state === 'complete');
+    const isDayRest = programStates.length > 0 && programStates.every((state) => state === 'rest');
 
     return {
         hasProgramDayToday: days.length > 0,
@@ -58,6 +74,7 @@ export function buildTodayProgramDayView(programDays = []) {
         completedCount,
         minTemplates: effectiveMinimum,
         isDayComplete,
+        isDayRest,
     };
 }
 

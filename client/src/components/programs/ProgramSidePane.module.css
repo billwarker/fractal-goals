@@ -46,7 +46,7 @@
 .cardHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .card h3, .cardHeading h3, .cardHeading small, .note, .explainer { margin: 0; }
 .card { display: grid; gap: 14px; padding: 16px; border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent); border-radius: var(--border-radius-md); background: color-mix(in srgb, var(--color-bg-card) 92%, var(--color-bg-sidebar)); box-shadow: 0 1px 0 color-mix(in srgb, white 3%, transparent); }
-.cardHeading { align-items: flex-start; }
+.cardHeading { position: relative; align-items: flex-start; }
 .cardTitle { min-width: 0; display: grid; gap: 3px; }
 .programDayTitleLine { min-width: 0; display: flex; align-items: center; gap: 8px; }
 .cardTitle h3 { overflow-wrap: anywhere; color: var(--color-text-primary); font-size: 17px; line-height: 1.25; }
@@ -74,6 +74,21 @@
 .actionList { display: grid; gap: 8px; }
 .actionList button { min-height: 36px; padding: 7px 11px; border: 1px solid var(--color-border); border-radius: var(--border-radius-sm); background: var(--color-bg-input); color: var(--color-text-primary); cursor: pointer; text-align: left; transition: background .16s ease, border-color .16s ease, color .16s ease; }
 .actionList button:hover { border-color: var(--color-border-hover); background: var(--color-bg-card-hover); }
+.dayStatusMenuRoot { flex: 0 0 auto; }
+.dayStatusTrigger { display: grid; width: 24px; height: 24px; padding: 0; place-items: center; border: 0; border-radius: 4px; background: transparent; cursor: pointer; }
+.dayStatusTrigger:hover { background: color-mix(in srgb, var(--color-brand-primary) 10%, transparent); }
+.dayStatusTrigger:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 1px; }
+.dayStatusIcon { display: inline-flex; width: 21px; height: 21px; align-items: center; justify-content: center; font: 600 20px/1 system-ui, sans-serif; }
+.dayStatusTriggercomplete .dayStatusIcon { color: var(--color-brand-success); }
+.dayStatusTriggermissed .dayStatusIcon { color: var(--color-brand-danger); }
+.dayStatusCircle { width: 17px; height: 17px; border: 2px solid #69a9ff; border-radius: 50%; }
+.dayStatusDropdown { position: fixed; z-index: 10000; display: grid; box-sizing: border-box; width: min(300px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); gap: 8px; padding: 12px; overflow: auto; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); background: var(--color-bg-card); box-shadow: var(--shadow-lg); color: var(--color-text-primary); font-size: 12px; }
+.dayStatusDropdown > strong { font-size: 13px; }
+.dayStatusDropdown > span, .dayStatusDropdown p { margin: 0; color: var(--color-text-secondary); line-height: 1.4; }
+.dayStatusDropdown button { min-height: 40px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: var(--border-radius-sm); background: var(--color-bg-input); color: var(--color-text-primary); cursor: pointer; font: inherit; font-weight: 600; text-align: left; }
+.dayStatusDropdown button:hover:not(:disabled) { border-color: var(--color-border-hover); background: var(--color-bg-card-hover); }
+.dayStatusDropdown button:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
+.dayStatusDropdown button:disabled { cursor: not-allowed; opacity: .5; }
 .goalList { display: grid; gap: 4px; }
 .goalList button { display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 5px 6px; border: 0; border-radius: var(--border-radius-sm); background: transparent; color: var(--color-text-primary); cursor: pointer; text-align: left; }
 .goalList button:hover { background: var(--color-bg-card-hover); }
@@ -93,4 +108,6 @@
     .dayReviewHeading { grid-template-columns: 44px minmax(0, 1fr) 44px; }
     .collapseButton { min-height: 44px; }
     .scopedContent { padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)); }
+    .dayStatusTrigger { width: 44px; height: 44px; }
+    .dayStatusDropdown button { min-height: 44px; }
 }

@@ -34,7 +34,6 @@ class _ProgramHelpersMixin:
             template_goal_load.selectinload(Goal.associated_activities),
             template_goal_load.selectinload(Goal.associated_activity_groups),
             day_load.selectinload(ProgramDay.completed_sessions),
-            day_load.selectinload(ProgramDay.day_sessions),
         ]
 
     @classmethod

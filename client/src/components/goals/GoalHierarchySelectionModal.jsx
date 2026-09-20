@@ -23,6 +23,10 @@ function GoalHierarchySelectionModal({
     onConfirm,
     lockedGoalIds = [],
     lockedGoalLabel,
+    initialHideCompletedGoals = false,
+    scopeGoalIds = [],
+    scopeLabel = '',
+    initialScopeEnabled = false,
 }) {
     const [draftGoalIds, setDraftGoalIds] = useState(selectedGoalIds);
     const [isConfirming, setIsConfirming] = useState(false);
@@ -69,6 +73,10 @@ function GoalHierarchySelectionModal({
                     showAncestorControls={showAncestorControls}
                     lockedGoalIds={lockedGoalIds}
                     lockedGoalLabel={lockedGoalLabel}
+                    initialHideCompletedGoals={initialHideCompletedGoals}
+                    scopeGoalIds={scopeGoalIds}
+                    scopeLabel={scopeLabel}
+                    initialScopeEnabled={initialScopeEnabled}
                 />
                 {confirmError && <div role="alert" className={styles.error}>{confirmError}</div>}
             </ModalBody>

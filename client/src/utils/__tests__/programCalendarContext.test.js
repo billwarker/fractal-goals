@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     createProgramCalendarContext,
     formatProgramCalendarRange,
+    formatProgramCalendarSelection,
     getNextMultiDayRange,
     getProgramOverviewMetricsRange,
     programCalendarContextReducer,
@@ -13,6 +14,14 @@ describe('programCalendarContext', () => {
         expect(formatProgramCalendarRange('2026-09-02', '2026-09-08')).toBe('Sep 2 – Sep 8, 2026');
         expect(formatProgramCalendarRange('2026-12-31', '2027-01-02')).toBe('Dec 31, 2026 – Jan 2, 2027');
         expect(formatProgramCalendarRange('2026-09-02', '2026-09-02')).toBe('Sep 2, 2026');
+    });
+
+    it('labels scattered selections by count rather than a misleading bounding range', () => {
+        expect(formatProgramCalendarSelection([])).toBeNull();
+        expect(formatProgramCalendarSelection(['2026-09-03'])).toBe('Sep 3, 2026');
+        expect(formatProgramCalendarSelection(['2026-09-04', '2026-09-03'])).toBe('Sep 3 – Sep 4, 2026');
+        expect(formatProgramCalendarSelection(['2026-09-09', '2026-09-03', '2026-09-04', '2026-09-03']))
+            .toBe('3 selected days');
     });
 
     it('starts on today without forcing a program context', () => {

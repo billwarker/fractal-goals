@@ -506,6 +506,7 @@ function CreateSession() {
                                 minTemplates={todayProgramView.minTemplates}
                                 totalRequired={todayProgramView.totalRequired}
                                 isDayComplete={todayProgramView.isDayComplete}
+                                isDayRest={todayProgramView.isDayRest}
                                 onJumpToProgramDay={handleJumpToProgramDay}
                             />
                         ) : null}

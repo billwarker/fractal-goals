@@ -29,4 +29,11 @@ describe('ProgramDayTodayBanner', () => {
         expect(screen.getByText('Today’s program day is complete')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Start this day' })).not.toBeInTheDocument();
     });
+
+    it('shows a manual rest day without prompting a session', () => {
+        render(<ProgramDayTodayBanner isDayRest completedCount={1} minTemplates={2} />);
+        expect(screen.getByText('Today is a program rest day')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Start this day' })).not.toBeInTheDocument();
+        expect(screen.queryByText('1 / 2 complete')).not.toBeInTheDocument();
+    });
 });

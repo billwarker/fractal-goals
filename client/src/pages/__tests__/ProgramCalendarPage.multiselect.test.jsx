@@ -1,8 +1,12 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import ProgramCalendarPage from '../ProgramCalendarPage';
+
+const { mutateStatuses } = vi.hoisted(() => ({
+    mutateStatuses: vi.fn().mockResolvedValue({}),
+}));
 
 const program = {
     id: 'program-1',
@@ -95,7 +99,11 @@ vi.mock('../../hooks/useProgramMetrics', () => ({
 }));
 vi.mock('../../hooks/useProgramDayReadModel', () => ({
     useProgramDayDetail: () => ({ data: null }),
-    useProgramDayRange: () => ({ data: { days: [] } }),
+    useProgramDayRange: () => ({ data: { days: [
+        { date: '2026-09-02', scheduled: true },
+        { date: '2026-09-08', scheduled: true },
+    ] } }),
+    useUpdateProgramDayStatuses: () => ({ mutateAsync: mutateStatuses, isPending: false }),
 }));
 
 vi.mock('../../components/layout/PageHeader', () => ({
@@ -114,10 +122,13 @@ vi.mock('../../components/programs/ProgramCalendarView', () => ({
         onDateClick,
         onDateSelect,
         onEventClick,
+        onCalendarBackgroundClick,
         selectedRange,
+        selectionModeButtonRef,
+        statusActions,
     }) => (
         <div>
-            <button type="button" onClick={() => setBlockCreationMode(!blockCreationMode)}>Toggle multi-select</button>
+            <button type="button" ref={selectionModeButtonRef} onClick={() => setBlockCreationMode(!blockCreationMode)}>Toggle multi-select</button>
             <button
                 type="button"
                 onClick={() => {
@@ -155,19 +166,27 @@ vi.mock('../../components/programs/ProgramCalendarView', () => ({
             <output data-testid="calendar-range">
                 {selectedRange ? `${selectedRange.startDate}/${selectedRange.endDate}` : 'none'}
             </output>
+            <button type="button" onClick={() => onDateClick({ dateStr: '2026-09-02' })}>Toggle status day</button>
+            <button type="button" onClick={() => onDateClick({ dateStr: '2026-09-08' })}>Toggle September 8 status day</button>
+            <button type="button" onClick={() => onCalendarBackgroundClick({ target: { closest: () => null } })}>
+                Calendar drag background click
+            </button>
+            {statusActions}
         </div>
     ),
 }));
 vi.mock('../../components/programs/ResponsiveProgramSidePane', () => ({
-    default: ({ scope, selectedRange, programMetrics }) => (
+    default: ({ scope, selectedRange, selectionLabel, programMetrics }) => (
         <aside>
             <output data-testid="pane-scope">{scope}</output>
+            <output data-testid="pane-selection-label">{selectionLabel || 'none'}</output>
             <output data-testid="pane-range">
                 {selectedRange ? `${selectedRange.startDate}/${selectedRange.endDate}` : 'none'}
             </output>
             <output data-testid="metrics-range">
                 {programMetrics?.requestedRange
-                    ? `${programMetrics.requestedRange.start}/${programMetrics.requestedRange.end}`
+                    ? (programMetrics.requestedRange.dates?.join(',')
+                        || `${programMetrics.requestedRange.start}/${programMetrics.requestedRange.end}`)
                     : 'whole-program'}
             </output>
         </aside>
@@ -188,13 +207,19 @@ describe('ProgramCalendarPage multi-day selection', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Select September 2' }));
 
         expect(screen.getByTestId('pane-scope')).toHaveTextContent('range');
-        expect(screen.getByTestId('calendar-range')).toHaveTextContent('2026-09-02/2026-09-02');
+        expect(screen.getByTestId('calendar-range')).toHaveTextContent('none');
 
         fireEvent.click(screen.getByRole('button', { name: 'Select scheduled event on September 8' }));
 
-        expect(screen.getByTestId('calendar-range')).toHaveTextContent('2026-09-02/2026-09-08');
+        expect(screen.getByTestId('calendar-range')).toHaveTextContent('none');
         expect(screen.getByTestId('pane-range')).toHaveTextContent('2026-09-02/2026-09-08');
-        expect(screen.getByTestId('metrics-range')).toHaveTextContent('2026-09-02/2026-09-08');
+        expect(screen.getByTestId('metrics-range')).toHaveTextContent('2026-09-02,2026-09-08');
+        expect(screen.getByTestId('pane-selection-label')).toHaveTextContent('2 selected days');
+        expect(screen.getAllByText('2 selected days').length).toBeGreaterThan(1);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Toggle September 8 status day' }));
+        expect(screen.getByTestId('metrics-range')).toHaveTextContent('2026-09-02');
+        expect(screen.getByTestId('pane-selection-label')).toHaveTextContent('Sep 2, 2026');
     });
 
     it('scopes the pane and metrics to a September 1–3 drag selection', () => {
@@ -210,8 +235,88 @@ describe('ProgramCalendarPage multi-day selection', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Drag September 1 through 3' }));
 
         expect(screen.getByTestId('pane-scope')).toHaveTextContent('range');
-        expect(screen.getByTestId('calendar-range')).toHaveTextContent('2026-09-01/2026-09-03');
+        expect(screen.getByTestId('calendar-range')).toHaveTextContent('none');
         expect(screen.getByTestId('pane-range')).toHaveTextContent('2026-09-01/2026-09-03');
-        expect(screen.getByTestId('metrics-range')).toHaveTextContent('2026-09-01/2026-09-03');
+        expect(screen.getByTestId('metrics-range')).toHaveTextContent('2026-09-02');
+        expect(screen.getByText('1 selected')).toBeInTheDocument();
+    });
+
+    it('bulk marks arbitrary scheduled dates complete through one mutation', async () => {
+        render(
+            <MemoryRouter initialEntries={['/root-1/programs']}>
+                <Routes>
+                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Toggle multi-select' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Toggle status day' }));
+        expect(screen.getByText('1 selected')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Complete' }));
+
+        await waitFor(() => expect(mutateStatuses).toHaveBeenCalledWith({
+            dates: ['2026-09-02'],
+            status: 'complete',
+            timezone: 'UTC',
+            acknowledge_completed_evidence: false,
+        }));
+    });
+
+    it('bulk marks noncontiguous days as rest from the same multi-day mode', async () => {
+        render(
+            <MemoryRouter initialEntries={['/root-1/programs']}>
+                <Routes>
+                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Toggle multi-select' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Toggle status day' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Toggle September 8 status day' }));
+        expect(screen.getByText('2 selected')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Rest' }));
+
+        await waitFor(() => expect(mutateStatuses).toHaveBeenCalledWith({
+            dates: ['2026-09-02', '2026-09-08'],
+            status: 'rest',
+            timezone: 'UTC',
+            acknowledge_completed_evidence: false,
+        }));
+    });
+
+    it('restores focus to the selection toggle after Escape', () => {
+        render(
+            <MemoryRouter initialEntries={['/root-1/programs']}>
+                <Routes>
+                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Toggle multi-select' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Toggle status day' }));
+        fireEvent.keyDown(window, { key: 'Escape' });
+
+        expect(screen.queryByText('1 selected')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Toggle multi-select' })).toHaveFocus();
+    });
+
+    it('keeps multi-day selection active after the background click emitted by a drag', () => {
+        render(
+            <MemoryRouter initialEntries={['/root-1/programs']}>
+                <Routes>
+                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Toggle multi-select' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Toggle status day' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Calendar drag background click' }));
+
+        expect(screen.getByText('1 selected')).toBeInTheDocument();
+        expect(screen.getByTestId('metrics-range')).toHaveTextContent('2026-09-02');
     });
 });

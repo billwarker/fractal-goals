@@ -36,10 +36,13 @@ def main():
             ActivityInstance,
             Goal,
             GoalLevel,
+            Program,
+            ProgramBlock,
+            ProgramDay,
             Session,
             User,
         )
-        from datetime import datetime, timezone
+        from datetime import datetime, timedelta, timezone
 
         engine = models.get_engine()
         if engine.url.database != name:
@@ -77,6 +80,36 @@ def main():
                     )
                 )
                 db.flush()
+                today = now.date()
+                db.add(
+                    Program(
+                        id=f"browser-program-{suffix}",
+                        root_id=root_id,
+                        name=f"Daily Practice {suffix}",
+                        start_date=datetime.combine(today - timedelta(days=1), datetime.min.time()),
+                        end_date=datetime.combine(today + timedelta(days=7), datetime.max.time()),
+                        weekly_schedule={},
+                    )
+                )
+                db.add(
+                    ProgramBlock(
+                        id=f"browser-block-{suffix}",
+                        program_id=f"browser-program-{suffix}",
+                        name="Month 1",
+                        start_date=today - timedelta(days=1),
+                        end_date=today + timedelta(days=7),
+                    )
+                )
+                db.flush()
+                for offset in (0, 1, 3):
+                    db.add(
+                        ProgramDay(
+                            id=f"browser-day-{suffix}-{offset}",
+                            block_id=f"browser-block-{suffix}",
+                            name="Daily Practice",
+                            date=today + timedelta(days=offset),
+                        )
+                    )
                 db.add(
                     Session(
                         id=f"browser-session-{suffix}",

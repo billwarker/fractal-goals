@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 import ProgramDayPane from '../ProgramDayPane';
@@ -51,6 +51,97 @@ function renderPane(overrides = {}) {
 }
 
 describe('ProgramDayPane', () => {
+    it('opens a blue status dropdown beside the name and offers all manual actions', async () => {
+        const onSetDayStatus = vi.fn().mockResolvedValue(false);
+        renderPane({
+            query: { data: { detail: {
+                ...detail,
+                scheduled: true,
+                status_source: 'manual',
+                manual_status: 'rest',
+            } } },
+            onSetDayStatus,
+        });
+
+        const dayCard = screen.getByRole('heading', { name: 'Strength day' }).closest('section');
+        const trigger = within(dayCard).getByRole('button', { name: /Change status for Strength day/ });
+        expect(trigger.parentElement.className).toContain('dayStatusMenuRoot');
+        expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        fireEvent.click(trigger);
+        expect(trigger).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByText('Manual rest')).toBeInTheDocument();
+        expect(screen.getAllByRole('group', { name: 'Day status options' })).toHaveLength(1);
+        fireEvent.click(screen.getByRole('button', { name: 'Mark complete' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Mark rest' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Use automatic status' }));
+        await waitFor(() => expect(onSetDayStatus.mock.calls.map(([status]) => status)).toEqual(['complete', 'rest', 'automatic']));
+    });
+
+    it('renders one date-level status control when definitions overlap', () => {
+        renderPane({
+            query: { data: { detail: {
+                ...detail,
+                scheduled: true,
+                occurrences: [detail.occurrences[0], {
+                    ...detail.occurrences[0],
+                    occurrence_key: 'day-2:2026-09-02',
+                    name: 'Second definition',
+                }],
+            } } },
+        });
+
+        expect(screen.getAllByRole('button', { name: /Change status for/ })).toHaveLength(1);
+        fireEvent.click(screen.getByRole('button', { name: /Change status for Strength day/ }));
+        expect(screen.getByText('This status applies to every scheduled definition on this date.')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Second definition' }).closest('section')).not.toHaveTextContent('Day status');
+    });
+
+    it('closes the dropdown on Escape and returns focus to its blue-circle trigger', async () => {
+        const onSetDayStatus = vi.fn().mockResolvedValue(true);
+        renderPane({
+            query: { data: { detail: { ...detail, scheduled: true } } },
+            onSetDayStatus,
+        });
+        const trigger = screen.getByRole('button', { name: /Change status for Strength day/ });
+        fireEvent.click(trigger);
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        expect(trigger).toHaveFocus();
+
+        fireEvent.click(trigger);
+        fireEvent.click(screen.getByRole('button', { name: 'Mark rest' }));
+        await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
+        expect(onSetDayStatus).toHaveBeenCalledWith('rest');
+        expect(trigger).toHaveFocus();
+    });
+
+    it('keeps future completion unavailable inside the day card', () => {
+        renderPane({
+            date: '2026-09-03',
+            query: { data: { detail: { ...detail, scheduled: true } } },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: /Change status for Strength day/ }));
+        expect(screen.getByRole('button', { name: 'Mark complete' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Mark rest' })).toBeEnabled();
+    });
+
+    it('does not label a manually rested day as missed when its templates are incomplete', () => {
+        renderPane({
+            today: '2026-09-03',
+            query: { data: { detail: {
+                ...detail,
+                scheduled: true,
+                status_source: 'manual',
+                manual_status: 'rest',
+            } } },
+        });
+
+        expect(screen.getByRole('button', { name: /Manual rest/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Manual rest/ })).not.toHaveTextContent('✗');
+        expect(screen.queryByRole('img', { name: 'Strength day: missed' })).not.toBeInTheDocument();
+    });
+
     it('renders a single exact start action for an incomplete current-day occurrence', () => {
         const props = renderPane();
 
@@ -93,6 +184,8 @@ describe('ProgramDayPane', () => {
         };
         const completedDetail = {
             ...detail,
+            scheduled: true,
+            state: 'scheduled_met',
             occurrences: [{
                 ...detail.occurrences[0],
                 requirements: {
@@ -106,7 +199,8 @@ describe('ProgramDayPane', () => {
         };
         renderPane({ query: { data: { detail: completedDetail } } });
 
-        expect(screen.getByRole('img', { name: 'Strength day: requirements met' })).toHaveTextContent('✓');
+        expect(screen.getByRole('button', { name: /Change status for Strength day/ })).toHaveTextContent('✓');
+        expect(screen.queryByRole('img', { name: 'Strength day: requirements met' })).not.toBeInTheDocument();
         expect(screen.getByLabelText('Main work session: completed')).toBeInTheDocument();
         const sessionLink = screen.getByRole('link', { name: /Main work.*20 minutes.*Start 2:00 PM.*End 2:20 PM/i });
         expect(sessionLink).toHaveAttribute('href', '/root-1/session/session-1');
@@ -118,9 +212,13 @@ describe('ProgramDayPane', () => {
     });
 
     it('shows an x only after an incomplete program day has closed', () => {
-        renderPane({ today: '2026-09-03' });
+        renderPane({
+            today: '2026-09-03',
+            query: { data: { detail: { ...detail, scheduled: true, state: 'scheduled_missed' } } },
+        });
 
-        expect(screen.getByRole('img', { name: 'Strength day: missed' })).toHaveTextContent('✗');
+        expect(screen.getByRole('button', { name: /Change status for Strength day/ })).toHaveTextContent('✗');
+        expect(screen.queryByRole('img', { name: 'Strength day: missed' })).not.toBeInTheDocument();
         expect(screen.queryByRole('link', { name: /Start Main work/ })).not.toBeInTheDocument();
     });
 

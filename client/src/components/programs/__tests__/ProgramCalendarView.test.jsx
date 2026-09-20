@@ -63,7 +63,7 @@ vi.mock('@fullcalendar/react', async () => {
                         Today
                     </button>
                 ) : null}
-                <div ref={dayRef} data-testid="mock-day-cell" className="fc-daygrid-day" data-date="2026-05-17">
+                <div ref={dayRef} role="gridcell" data-testid="mock-day-cell" className="fc-daygrid-day" data-date="2026-05-17">
                     <div className="fc-daygrid-day-frame">
                         <button type="button" data-program-block-label="true">Stale block label</button>
                     </div>
@@ -174,6 +174,31 @@ describe('ProgramCalendarView', () => {
         expect(container.querySelector('[data-selection-mode="multiple"]')).toBeInTheDocument();
         expect(screen.getByTestId('mock-calendar')).toHaveAttribute('data-selectable', 'true');
         expect(screen.getByTestId('mock-calendar')).toHaveAttribute('data-select-min-distance', '5');
+    });
+
+    it('selects scheduled cells without adding checkbox controls', async () => {
+        const onDateClick = vi.fn();
+        const { container } = renderCalendar({
+            blockCreationMode: true,
+            selectedStatusDates: ['2026-05-17'],
+            onDateClick,
+            dayStates: [{ date: '2026-05-17', state: 'scheduled_pending', scheduled: true }],
+        });
+
+        expect(container.querySelector('[data-selection-mode="multiple"]')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Select Status Days' })).not.toBeInTheDocument();
+        expect(screen.getByTestId('mock-calendar')).toHaveAttribute('data-selectable', 'true');
+        const cell = await screen.findByRole('gridcell', { name: '2026-05-17, scheduled program day, selected' });
+        expect(cell).toHaveAttribute('aria-selected', 'true');
+        expect(cell).toHaveAttribute('tabindex', '0');
+        expect(container.querySelector('[data-program-status-date]')).not.toBeInTheDocument();
+        fireEvent.keyDown(cell, { key: 'Enter', shiftKey: true });
+        expect(onDateClick).toHaveBeenCalledWith(expect.objectContaining({
+            dateStr: '2026-05-17',
+            jsEvent: expect.objectContaining({ shiftKey: true }),
+        }));
+        fireEvent.keyDown(cell, { key: ' ' });
+        expect(onDateClick).toHaveBeenCalledTimes(2);
     });
 
     it('renders configured SMART goal icons before calendar goal labels', () => {
@@ -306,8 +331,8 @@ describe('ProgramCalendarView', () => {
         expect(screen.getByTestId('mock-day-cell')).toHaveAttribute('data-calendar-background', 'program');
     });
 
-    it('shows an inline completion mark on program-day ribbons and clears stale state', () => {
-        const { rerender, props } = renderCalendar({
+    it('keeps program-day ribbons free of completion marks while announcing their state', () => {
+        const { container, rerender, props } = renderCalendar({
             calendarEvents: [
                 {
                     id: 'pday-program-1-2026-05-17-practice',
@@ -365,17 +390,23 @@ describe('ProgramCalendarView', () => {
 
         const cell = screen.getByTestId('mock-day-cell');
         expect(cell).toHaveAttribute('data-day-state', 'scheduled_partial');
-        expect(screen.getByRole('img', { name: 'Daily practice: requirements met' })).toHaveTextContent('✓');
-        expect(screen.getByRole('img', { name: 'Daily review: missed' })).toHaveTextContent('✗');
-        expect(screen.queryByRole('img', { name: /Future practice/ })).not.toBeInTheDocument();
+        expect(screen.getByText('Daily practice: partially complete')).toBeInTheDocument();
+        expect(screen.getByText('Daily review: partially complete')).toBeInTheDocument();
+        expect(container.querySelector('[data-program-day-complete]')).not.toBeInTheDocument();
         expect(screen.getByText('Daily practice').parentElement).toHaveStyle({
             '--program-day-pill-bg': 'color-mix(in srgb, #663333 13%, var(--color-bg-card))',
         });
 
+        rerender(<ProgramCalendarView {...props} dayStates={[{
+            date: '2026-05-17', state: 'scheduled_met', status_source: 'manual',
+            counts_as_success: true, closed: true,
+        }]} />);
+        expect(screen.queryByText('Manual')).not.toBeInTheDocument();
+
         rerender(<ProgramCalendarView {...props} dayStates={[]} />);
 
         expect(cell).not.toHaveAttribute('data-day-state');
-        expect(screen.getByRole('img', { name: 'Daily practice: requirements met' })).toBeInTheDocument();
-        expect(screen.queryByRole('img', { name: 'Daily review: missed' })).not.toBeInTheDocument();
+        expect(screen.getByText('Daily practice: requirements met')).toBeInTheDocument();
+        expect(screen.queryByText('Daily review: requirements met')).not.toBeInTheDocument();
     });
 });

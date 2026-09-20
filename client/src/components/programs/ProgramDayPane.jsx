@@ -7,6 +7,7 @@ import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import { formatDateValue, formatDurationHuman, formatLiteralDate } from '../../utils/dateUtils';
 import ProgramDayCompletionMark from './ProgramDayCompletionMark';
+import ProgramDayStatusMenu from './ProgramDayStatusMenu';
 import styles from './ProgramSidePane.module.css';
 
 function SessionSummary({ rootId, session, template, timezone }) {
@@ -43,6 +44,8 @@ export default function ProgramDayPane({
     onScheduleDay, onCreateDay,
     goals = [], onGoalClick, getGoalIcon, getGoalColor, getGoalSecondaryColor,
     timezone = 'UTC',
+    onSetDayStatus,
+    dayStatusUpdating = false,
 }) {
     const detail = query.data?.detail;
     if (query.isLoading && !detail) return <div className={styles.state} aria-busy="true">Loading day details…</div>;
@@ -76,13 +79,7 @@ export default function ProgramDayPane({
                     </div>
                 </section>
             ) : null}
-            {dayRequirements ? (
-                <p className={styles.explainer}>
-                    {dayRequirements.completed_template_ids.length} completed; {dayRequirements.required_template_ids.length} required
-                    {dayRequirements.completion_min_templates ? `; ${dayRequirements.completion_min_templates} needed to meet this day` : ''}.
-                </p>
-            ) : null}
-            {detail.occurrences.map((occurrence) => {
+            {detail.occurrences.map((occurrence, index) => {
                 const requirements = occurrence.requirements;
                 const completedSessions = occurrence.sessions.filter((session) => session.completed);
                 const outstandingTemplates = occurrence.templates.filter((template) => template.status !== 'completed');
@@ -95,7 +92,19 @@ export default function ProgramDayPane({
                                 <small style={{ color: occurrence.block.color || undefined }}>{occurrence.block.name}</small>
                                 <div className={styles.programDayTitleLine}>
                                     <h3>{occurrence.name}</h3>
-                                    {requirements.requirements_met || date < today ? (
+                                    {index === 0 && detail.scheduled ? (
+                                        <ProgramDayStatusMenu
+                                            name={occurrence.name}
+                                            date={date}
+                                            today={today}
+                                            state={detail.state}
+                                            manualStatus={detail.manual_status}
+                                            occurrenceCount={detail.occurrences.length}
+                                            pending={dayStatusUpdating}
+                                            onSetStatus={onSetDayStatus}
+                                        />
+                                    ) : null}
+                                    {index > 0 && (requirements.requirements_met || (date < today && !detail.manual_status)) ? (
                                         <ProgramDayCompletionMark
                                             complete={requirements.requirements_met}
                                             label={`${occurrence.name}: ${requirements.requirements_met ? 'requirements met' : 'missed'}`}
@@ -107,6 +116,12 @@ export default function ProgramDayPane({
                         <p className={styles.explainer}>
                             {requirements.completed_template_ids.length} of this definition’s templates completed.
                         </p>
+                        {index === 0 && dayRequirements ? (
+                            <p className={styles.explainer}>
+                                {dayRequirements.completed_template_ids.length} completed; {dayRequirements.required_template_ids.length} required
+                                {dayRequirements.completion_min_templates ? `; ${dayRequirements.completion_min_templates} needed to meet this day` : ''}.
+                            </p>
+                        ) : null}
                         {!requirements.requirements_met && date === today && outstandingTemplates.length ? (
                             <div className={styles.startList}>
                                 {outstandingTemplates.map((template) => {

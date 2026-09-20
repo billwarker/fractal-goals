@@ -1,6 +1,6 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
-from models import ActivityInstance, Program, ProgramBlock, ProgramDay, ProgramDayTemplate, Session, activity_goal_associations
+from models import ActivityInstance, Program, ProgramBlock, ProgramDay, ProgramDayStatusOverride, ProgramDayTemplate, Session, activity_goal_associations
 from models.program import program_goals
 from services.program_metrics_service import ProgramMetricsService
 from services.program_scope import resolve_program_scope, resolve_program_scopes
@@ -115,6 +115,95 @@ def test_metrics_rejects_oversized_and_partial_ranges(
     )
     assert (error, status) == ("Invalid date range", 400)
 
+
+def test_metrics_exact_dates_exclude_unselected_days_and_validate_selection(
+    db_session, sample_goal_hierarchy, sample_activity_definition, test_user,
+):
+    root = sample_goal_hierarchy["ultimate"]
+    program = Program(
+        root_id=root.id, name="Selected days", start_date=datetime(2026, 9, 1),
+        end_date=datetime(2026, 9, 10), weekly_schedule={},
+    )
+    db_session.add(program)
+    db_session.flush()
+    block = ProgramBlock(
+        program_id=program.id, name="Week", start_date=date(2026, 9, 1),
+        end_date=date(2026, 9, 10),
+    )
+    db_session.add(block)
+    db_session.flush()
+    for day_value, status in ((3, "complete"), (4, "complete"), (9, "rest")):
+        occurrence_date = date(2026, 9, day_value)
+        db_session.add(ProgramDay(
+            block_id=block.id, name="Practice", date=occurrence_date, day_number=day_value,
+        ))
+        db_session.add(ProgramDayStatusOverride(
+            program_id=program.id, date=occurrence_date, status=status,
+            set_by_user_id=test_user.id,
+        ))
+    db_session.execute(program_goals.insert().values(
+        program_id=program.id, goal_id=sample_goal_hierarchy["mid_term"].id,
+    ))
+    db_session.execute(activity_goal_associations.insert().values(
+        activity_id=sample_activity_definition.id,
+        goal_id=sample_goal_hierarchy["mid_term"].id,
+    ))
+    unselected_session = Session(
+        owner_id=test_user.id, root_id=root.id, program_id=program.id,
+        program_block_id=block.id, name="Between selected dates", completed=True,
+        session_start=datetime(2026, 9, 4, 12, tzinfo=timezone.utc),
+    )
+    db_session.add(unselected_session)
+    db_session.flush()
+    db_session.add(ActivityInstance(
+        session_id=unselected_session.id, root_id=root.id,
+        activity_definition_id=sample_activity_definition.id,
+        completed=True, duration_seconds=600,
+        time_stop=datetime(2026, 9, 4, 12, tzinfo=timezone.utc),
+    ))
+    db_session.commit()
+    service = ProgramMetricsService(db_session)
+
+    payload, error, status = service.get_program_metrics(
+        root.id, program.id, test_user.id, timezone_name="UTC",
+        dates="2026-09-09,2026-09-03,2026-09-03", as_of=date(2026, 9, 10),
+    )
+    assert (error, status) == (None, 200)
+    assert payload["window"]["dates"] == ["2026-09-03", "2026-09-09"]
+    assert (payload["window"]["total_days"], payload["window"]["observed_days"]) == (2, 2)
+    assert [item["date"] for item in payload["days"]] == ["2026-09-03", "2026-09-09"]
+    assert payload["adherence"]["met_days"] == 1
+    assert payload["adherence"]["scheduled_days_observed"] == 1
+    assert payload["adherence"]["manual_rest_days"] == 1
+    assert payload["adherence"]["current_streak"] == 0
+    assert payload["blocks"][0]["program_days"][0]["scheduled_occurrences"] == 1
+    assert payload["alignment"]["instances"]["total"] == 0
+    assert payload["execution"]["linked_sessions"] == 0
+    assert payload["blocks"][0]["linked_sessions"] == 0
+
+    bounded, error, status = service.get_program_metrics(
+        root.id, program.id, test_user.id, timezone_name="UTC",
+        range_start="2026-09-03", range_end="2026-09-09", as_of=date(2026, 9, 10),
+    )
+    assert (error, status) == (None, 200)
+    assert bounded["adherence"]["met_days"] == 2
+    assert bounded["alignment"]["instances"]["total"] == 1
+    assert bounded["execution"]["linked_sessions"] == 1
+
+    future_scope, error, status = service.get_program_metrics(
+        root.id, program.id, test_user.id, timezone_name="UTC",
+        dates="2026-09-03,2026-09-09", as_of=date(2026, 9, 4),
+    )
+    assert (error, status) == (None, 200)
+    assert future_scope["window"]["observed_days"] == 1
+    assert future_scope["window"]["total_days"] == 2
+
+    for invalid in ("", "2026-09-00", "2026-09-11", "2026-09-03,,2026-09-09"):
+        _, error, status = service.get_program_metrics(
+            root.id, program.id, test_user.id, timezone_name="UTC",
+            dates=invalid, as_of=date(2026, 9, 10),
+        )
+        assert (error, status) == ("Invalid selected dates", 400)
 
 def test_metrics_counts_completed_instances_in_unfinished_sessions_and_splits_effort(
     db_session, sample_goal_hierarchy, sample_activity_definition, test_user

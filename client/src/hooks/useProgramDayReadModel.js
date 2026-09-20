@@ -1,11 +1,11 @@
 import { useEffect, useMemo } from 'react';
-import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { fractalApi } from '../utils/api';
 import { getISOYMDInTimezone } from '../utils/dateUtils';
 import { queryKeys } from './queryKeys';
 
-const PROGRAM_DAY_READ_MODEL_SCHEMA_VERSION = 2;
+const PROGRAM_DAY_READ_MODEL_SCHEMA_VERSION = 3;
 
 function unwrapReadModelResponse(response) {
     const payload = response.data;
@@ -97,4 +97,19 @@ export function useProgramDayDetail(rootId, programId, timezone, date) {
         };
     }, [query.data?.pages]);
     return { ...query, data };
+}
+
+export function useUpdateProgramDayStatuses(rootId, programId) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data) => fractalApi.updateProgramDayStatuses(rootId, programId, data),
+        onSuccess: async () => {
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId, programId) }),
+                queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
+                queryClient.invalidateQueries({ queryKey: queryKeys.programs(rootId) }),
+                queryClient.invalidateQueries({ queryKey: queryKeys.programDayOptions(rootId) }),
+            ]);
+        },
+    });
 }

@@ -67,6 +67,22 @@ describe('createSessionProgramDay', () => {
         expect(view.isDayComplete).toBe(true);
     });
 
+    it('uses occurrence-level manual status without inventing completed sessions', () => {
+        const baseDay = {
+            program_id: 'program-1',
+            sessions: [{ template_id: 'practice', is_required: true }],
+            completed_template_ids: [],
+            completed_session_count: 0,
+        };
+        const complete = buildTodayProgramDayView([{ ...baseDay, manual_status: 'complete' }]);
+        expect(complete.isDayComplete).toBe(true);
+        expect(complete.completedCount).toBe(0);
+
+        const rest = buildTodayProgramDayView([{ ...baseDay, manual_status: 'rest' }]);
+        expect(rest.isDayRest).toBe(true);
+        expect(rest.isDayComplete).toBe(false);
+    });
+
     it('partitions templates without changing recency order', () => {
         const templates = [
             { id: 'other', updated_at: '2026-01-02' },

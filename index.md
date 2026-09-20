@@ -95,7 +95,26 @@ overlap, required/completed templates are deduplicated and the strongest configu
 `completion_min_templates` threshold applies once for that date. Scheduled completion requires
 exact program-day/date/template-linked, completed, non-deleted sessions.
 
-`ProgramDayReadModelService` emits schema v2, requires an IANA timezone, caps the complete
+Manual Complete and Rest statuses are stored once per program/calendar date and resolved by the
+same evaluator. Complete changes adherence and chain success without fabricating session evidence;
+Rest removes the scheduled date from adherence and bridges chains. Clearing a status restores
+automatic evaluation. Definition-level completion flags are legacy compatibility data and are not
+written or used by calendar, metrics, onboarding, create-session day options, or session-completion workflows.
+The day-review pane places one clickable effective-status icon beside the first scheduled day
+name: a blue circle while scheduled, a check when met, or an X when missed. Its dropdown escapes
+the pane's scroll clipping; when definitions overlap, its actions apply to every definition on
+that date. The calendar has one multi-day selection mode for block-range creation and bulk status
+changes on selected scheduled dates. Click-and-drag adds eligible scheduled dates crossed;
+the ensuing calendar background click does not cancel selection. Scheduled cells are keyboard-selectable and
+highlighted when selected, with no separate checkbox circles. The client expects program metrics
+calculation v4 so selected timeframe overviews use the same override-aware results as the calendar.
+Calendar day ribbons omit redundant completion checkmarks; their state remains available to
+assistive technology and in the day-review pane.
+In multi-day mode, the sidebar requests metrics for the exact selected scheduled dates, excluding
+gaps from adherence, evidence, and block totals. Non-contiguous selections use a compact
+"N selected days" heading rather than displaying the misleading first-to-last date range.
+
+`ProgramDayReadModelService` emits schema v3, requires an IANA timezone, caps the complete
 expanded chain window at `MAX_WINDOW_DAYS`, reports truncated context, and provides cursor-paged
 day detail. The client rejects unsupported schema versions. FullCalendar block labels are
 reconciled idempotently, cleaned on cell unmount, and activated through React event delegation.
@@ -105,6 +124,7 @@ Detailed design:
 - [Program calendar and chain read model](planning/programs-scoped-sidepane-chain-calendar.md)
 - [Program metrics](planning/program-metrics-insights.md)
 - [Program-aware session creation](planning/program-aware-create-session.md)
+- [Manual and bulk program-day statuses](planning/program-day-manual-statuses.md)
 
 ### Notes and analytics
 
@@ -140,6 +160,10 @@ and scoped; it is not unrestricted impersonation. Operational event history is r
 admin analytics and export according to the documented retention controls.
 
 ## Repository map
+
+Planned AI integration: [AI agent harness](planning/ai-agent-harness.md) describes
+delegated ChatGPT/Claude connectors, shared domain execution, and a later embedded
+assistant. This is a proposal; these runtime capabilities are not implemented yet.
 
 - `app.py`, `config.py`, `extensions.py` — application/runtime setup
 - `blueprints/` — HTTP routes

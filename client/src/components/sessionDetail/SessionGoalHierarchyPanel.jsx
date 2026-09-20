@@ -14,6 +14,7 @@ import { logError } from '../../utils/logger';
 import { fractalApi } from '../../utils/api';
 import { queryKeys } from '../../hooks/queryKeys';
 import { flattenGoals } from '../../utils/goalHelpers';
+import { buildProgramRenderScopeGoalIds, getProgramMetricScopeGoalIds } from '../../utils/programScope';
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 
 const GoalDetailModal = lazyWithRetry(() => import('../ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
@@ -48,15 +49,29 @@ function SessionGoalHierarchyPanel({
     const [createSubGoalParent, setCreateSubGoalParent] = useState(null);
     const [activeTarget, setActiveTarget] = useState(null);
     const [scopeModalOpen, setScopeModalOpen] = useState(false);
+    const programInfo = session?.program_info || null;
+    const programId = programInfo?.program_id || null;
     const { data: selectableGoalTree = null } = useQuery({
         queryKey: queryKeys.goalsTree(rootId),
         queryFn: async () => (await fractalApi.getGoals(rootId)).data || null,
         enabled: Boolean(rootId && scopeModalOpen && !readOnly),
     });
+    const { data: program = null } = useQuery({
+        queryKey: queryKeys.program(rootId, programId),
+        queryFn: async () => (await fractalApi.getProgram(rootId, programId)).data || null,
+        enabled: Boolean(rootId && programId && scopeModalOpen && !readOnly),
+        staleTime: 5 * 60 * 1000,
+    });
     const selectableGoals = useMemo(
         () => selectableGoalTree ? flattenGoals([selectableGoalTree]) : [],
         [selectableGoalTree]
     );
+    const programScopeGoalIds = useMemo(() => {
+        if (!programId || !selectableGoalTree) return [];
+        const scopeSource = program || localSessionData?.program_context || {};
+        const metricScopeIds = getProgramMetricScopeGoalIds(scopeSource, selectableGoalTree);
+        return Array.from(buildProgramRenderScopeGoalIds(selectableGoalTree, metricScopeIds));
+    }, [localSessionData?.program_context, program, programId, selectableGoalTree]);
     const activeTargetGoalId = activeTarget?._goalId || null;
     const { deleteTarget } = useTargetMutations(rootId, activeTargetGoalId);
 
@@ -274,6 +289,10 @@ function SessionGoalHierarchyPanel({
                 selectedGoalIds={Array.from(manualGoalIds)}
                 lockedGoalIds={sessionGoalsView?.automatic_goal_ids || []}
                 lockedGoalLabel="Included by session activities"
+                initialHideCompletedGoals
+                scopeGoalIds={programScopeGoalIds}
+                scopeLabel={programId ? (programInfo?.program_name || program?.name || 'program') : ''}
+                initialScopeEnabled={Boolean(programId)}
                 highlightSelectionAncestors
                 connectorHighlightMode="lineage"
                 onClose={() => setScopeModalOpen(false)}

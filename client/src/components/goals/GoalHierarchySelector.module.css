@@ -29,13 +29,16 @@
     position: absolute;
     top: 62px;
     right: 4px;
+    left: 4px;
     z-index: 5;
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    gap: 16px;
     margin-top: 0;
 }
 
-.hideCompletedControl {
+.hideCompletedControl,
+.filterControl {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -46,13 +49,15 @@
     user-select: none;
 }
 
-.hideCompletedControl input {
+.hideCompletedControl input,
+.filterControl input {
     position: absolute;
     opacity: 0;
     pointer-events: none;
 }
 
-.hideCompletedControl > span:first-of-type {
+.hideCompletedControl > span:first-of-type,
+.filterControl > span:first-of-type {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -67,17 +72,20 @@
     line-height: 1;
 }
 
-.hideCompletedControl:hover > span:first-of-type {
+.hideCompletedControl:hover > span:first-of-type,
+.filterControl:hover > span:first-of-type {
     border-color: var(--color-brand-primary);
     background: var(--color-bg-card-alt);
 }
 
-.hideCompletedControl input:checked + span {
+.hideCompletedControl input:checked + span,
+.filterControl input:checked + span {
     border-color: var(--color-brand-primary);
     background: var(--color-brand-primary);
 }
 
-.hideCompletedControl input:focus-visible + span {
+.hideCompletedControl input:focus-visible + span,
+.filterControl input:focus-visible + span {
     outline: 2px solid var(--color-focus-ring, rgba(80, 145, 245, 0.35));
     outline-offset: 2px;
 }
@@ -138,12 +146,14 @@
     position: absolute;
     top: 58px;
     right: 4px;
+    left: 4px;
     z-index: 5;
-    justify-content: flex-end;
+    justify-content: space-between;
     margin-top: 0;
 }
 
-.compactLayout .hideCompletedControl {
+.compactLayout .hideCompletedControl,
+.compactLayout .filterControl {
     font-size: 13px;
     font-weight: 600;
 }

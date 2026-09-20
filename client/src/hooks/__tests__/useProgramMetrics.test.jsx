@@ -17,7 +17,7 @@ const wrapperFor = (client) => function Wrapper({ children }) {
 describe('useProgramMetrics', () => {
     it('keys every result by root, program, timezone, and range', async () => {
         const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-        getProgramMetrics.mockResolvedValue({ data: { calculation_version: 3 } });
+        getProgramMetrics.mockResolvedValue({ data: { calculation_version: 4 } });
         const range = { start: '2025-01-01', end: '2025-12-31' };
         const { result } = renderHook(
             () => useProgramMetrics('root-1', 'program-1', 'America/Toronto', range),
@@ -32,7 +32,7 @@ describe('useProgramMetrics', () => {
         });
         expect(client.getQueryData(queryKeys.programMetrics(
             'root-1', 'program-1', 'America/Toronto', range.start, range.end,
-        ))).toEqual({ calculation_version: 3 });
+        ))).toEqual({ calculation_version: 4 });
     });
 
     it('rejects an incompatible metrics calculation version', async () => {
@@ -45,6 +45,26 @@ describe('useProgramMetrics', () => {
 
         await waitFor(() => expect(result.current.isError).toBe(true));
         expect(result.current.error.message).toMatch(/unsupported program metrics version/i);
+    });
+
+    it('requests and caches exact selected dates independently of the bounding range', async () => {
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        getProgramMetrics.mockResolvedValue({ data: { calculation_version: 4 } });
+        const { result, rerender } = renderHook(
+            ({ dates }) => useProgramMetrics('root-1', 'program-1', 'UTC', { dates }),
+            { initialProps: { dates: ['2026-09-09', '2026-09-03'] }, wrapper: wrapperFor(client) },
+        );
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+        expect(getProgramMetrics).toHaveBeenCalledWith('root-1', 'program-1', {
+            timezone: 'UTC', dates: '2026-09-03,2026-09-09',
+        });
+        rerender({ dates: ['2026-09-03', '2026-09-05'] });
+        await waitFor(() => expect(getProgramMetrics).toHaveBeenCalledWith('root-1', 'program-1', {
+            timezone: 'UTC', dates: '2026-09-03,2026-09-05',
+        }));
+        expect(client.getQueryData(queryKeys.programMetrics(
+            'root-1', 'program-1', 'UTC', null, null, '2026-09-03,2026-09-09',
+        ))).toEqual({ calculation_version: 4 });
     });
 
     it('schedules invalidation for the caller’s next local midnight', () => {

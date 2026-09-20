@@ -84,8 +84,8 @@ export const queryKeys = {
         ? ['programs', rootId, { timezone }]
         : ['programs', rootId],
     programMetricsRoot: (rootId) => ['program-metrics', rootId],
-    programMetrics: (rootId, programId, timezone, rangeStart = null, rangeEnd = null) => [
-        'program-metrics', rootId, programId, { timezone, rangeStart, rangeEnd },
+    programMetrics: (rootId, programId, timezone, rangeStart = null, rangeEnd = null, dates = null) => [
+        'program-metrics', rootId, programId, { timezone, rangeStart, rangeEnd, dates },
     ],
     session: (rootId, sessionId) => ['session', rootId, sessionId],
     sessionRoot: (rootId) => ['session', rootId],

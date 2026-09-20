@@ -264,6 +264,7 @@ class Events:
     PROGRAM_DELETED = 'program.deleted'
     PROGRAM_COMPLETED = 'program.completed'
     PROGRAM_DAY_COMPLETED = 'program.day_completed'
+    PROGRAM_DAY_STATUSES_UPDATED = 'program.day_statuses_updated'
     
     # Activity Definition events
     ACTIVITY_CREATED = 'activity.created'

@@ -58,6 +58,7 @@ export default function ProgramSidePane({
     scope = 'program',
     contextDate,
     selectedRange,
+    selectionLabel = null,
     dayDetailQuery,
     onProgramScope,
     onPreviousDay,
@@ -72,6 +73,8 @@ export default function ProgramSidePane({
     availablePrograms = [],
     onSelectProgramForDate,
     timezone = 'UTC',
+    onSetDayStatus,
+    dayStatusUpdating = false,
 }) {
     const getGoalDetails = (goalId) => goals.find((goal) => String(goal.id) === String(goalId)) || null;
     const [collapsedSections, setCollapsedSections] = useState({
@@ -127,7 +130,7 @@ export default function ProgramSidePane({
                         <span className={styles.rangeSummary}>
                             <span className={styles.rangeNavLabel}>Selected timeframe</span>
                             <span className={styles.rangeNavDate}>
-                                {formatProgramCalendarRange(selectedRange?.startDate, selectedRange?.endDate)}
+                                {selectionLabel || formatProgramCalendarRange(selectedRange?.startDate, selectedRange?.endDate)}
                             </span>
                         </span>
                     </nav>
@@ -150,6 +153,8 @@ export default function ProgramSidePane({
                     getGoalColor={getGoalColor}
                     getGoalSecondaryColor={getGoalSecondaryColor}
                     timezone={timezone}
+                    onSetDayStatus={onSetDayStatus}
+                    dayStatusUpdating={dayStatusUpdating}
                 />
             ) : null}
 

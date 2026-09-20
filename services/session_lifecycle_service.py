@@ -740,12 +740,6 @@ class SessionLifecycleService:
                     )
                     linked_goal_ids.add(ig_id)
 
-        if program_day_id:
-            from models import ProgramDay
-            program_day = self.db_session.query(ProgramDay).filter_by(id=program_day_id).first()
-            if program_day:
-                program_day.is_completed = program_day.check_completion()
-
         self.db_session.commit()
 
         if s_start or s_end:

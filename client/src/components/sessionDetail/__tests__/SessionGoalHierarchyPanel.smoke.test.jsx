@@ -16,6 +16,11 @@ let activeSessionMock = {
     sessionGoalsView: null,
 };
 
+const apiMock = vi.hoisted(() => ({
+    getGoals: vi.fn(),
+    getProgram: vi.fn(),
+}));
+
 vi.mock('../../../contexts/ActiveSessionContext', () => ({
     useActiveSessionData: () => activeSessionMock,
     useActiveSessionActions: () => ({
@@ -58,6 +63,7 @@ vi.mock('../../../contexts/GoalLevelsContext', async (importOriginal) => {
 
 vi.mock('../../../utils/api', () => ({
     fractalApi: {
+        ...apiMock,
         getGoalsForSelection: vi.fn(() => Promise.resolve({ data: [] })),
         getActivityGoals: vi.fn(() => Promise.resolve({ data: [] })),
         setActivityGoals: vi.fn(() => Promise.resolve({ data: [] })),
@@ -98,6 +104,8 @@ vi.mock('../../goalDetail/TargetAnalyticsModal', () => ({
 
 describe('SessionGoalHierarchyPanel smoke', () => {
     beforeEach(() => {
+        apiMock.getGoals.mockResolvedValue({ data: null });
+        apiMock.getProgram.mockResolvedValue({ data: null });
         activeSessionMock = {
             rootId: 'root-1',
             sessionId: 'session-1',
@@ -124,6 +132,53 @@ describe('SessionGoalHierarchyPanel smoke', () => {
                 session_activity_ids: ['activity-1'],
             }
         };
+    });
+
+    it('defaults the adjustment modal to the session program scope and hides completed goals', async () => {
+        activeSessionMock = {
+            ...activeSessionMock,
+            session: {
+                ...activeSessionMock.session,
+                program_info: { program_id: 'program-1', program_name: 'Strength' },
+            },
+        };
+        apiMock.getGoals.mockResolvedValue({
+            data: {
+                id: 'root-1', name: 'Root', type: 'UltimateGoal', children: [
+                    { id: 'program-goal', name: 'Program Goal', type: 'LongTermGoal', children: [] },
+                    { id: 'completed-program-goal', name: 'Completed Program Goal', type: 'LongTermGoal', completed: true, children: [] },
+                    { id: 'off-program-goal', name: 'Off Program Goal', type: 'LongTermGoal', children: [] },
+                ],
+            },
+        });
+        apiMock.getProgram.mockResolvedValue({
+            data: { id: 'program-1', name: 'Strength', scope_goal_ids: ['program-goal', 'completed-program-goal'] },
+        });
+
+        renderWithProviders(
+            <SessionGoalHierarchyPanel selectedActivity={null} onGoalClick={vi.fn()} />,
+            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false }
+        );
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Adjust scope' }));
+
+        const scopeControl = await screen.findByLabelText('Scope to Strength');
+        const completedControl = screen.getByLabelText('Hide completed goals');
+        expect(scopeControl).toBeChecked();
+        expect(completedControl).toBeChecked();
+        expect(await screen.findByText('Program Goal')).toBeInTheDocument();
+        await waitFor(() => {
+            expect(screen.queryByText('Completed Program Goal')).not.toBeInTheDocument();
+            expect(screen.queryByText('Off Program Goal')).not.toBeInTheDocument();
+        });
+
+        fireEvent.click(scopeControl);
+        fireEvent.click(completedControl);
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Adjust scope' }));
+
+        expect(screen.getByLabelText('Scope to Strength')).toBeChecked();
+        expect(screen.getByLabelText('Hide completed goals')).toBeChecked();
     });
 
     it('renders without runtime reference errors', async () => {

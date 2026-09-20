@@ -19,7 +19,7 @@ from sqlalchemy import event
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
 from config import config
-from models import PasswordResetToken, Program, ProgramBlock, ProgramDay, User, utc_now
+from models import PasswordResetToken, Program, ProgramBlock, ProgramDay, ProgramDayStatusOverride, User, utc_now
 from services.admin_service import hash_invite_key
 from services.email_service import EmailService, TEST_EMAIL_OUTBOX
 from services.quota_service import TIER_DEFAULT_LIMITS_SETTING_KEY
@@ -638,8 +638,14 @@ class TestPreferencesEndpoint:
             weekly_schedule={},
         )
         block = ProgramBlock(program=program, name='Foundation')
-        day = ProgramDay(block=block, name='Day 1', is_completed=True)
-        db_session.add_all([program, block, day])
+        day = ProgramDay(block=block, name='Day 1')
+        override = ProgramDayStatusOverride(
+            program=program,
+            date=datetime.now(timezone.utc).date(),
+            status='complete',
+            set_by_user_id=sample_ultimate_goal.owner_id,
+        )
+        db_session.add_all([program, block, day, override])
         db_session.commit()
 
         response = authed_client.get(

@@ -24,6 +24,7 @@ from models import (
     Program,
     ProgramBlock,
     ProgramDay,
+    ProgramDayStatusOverride,
     Session,
     SessionTemplate,
     Target,
@@ -100,6 +101,7 @@ class DataExportService:
             "programs": self._serialize_all(Program, root_id, serialize_program),
             "program_blocks": self._serialize_all(ProgramBlock, root_id, serialize_program_block),
             "program_days": self._serialize_all(ProgramDay, root_id, serialize_program_day),
+            "program_day_status_overrides": self._export_program_day_statuses(root_id),
             "notes": self._serialize_all(Note, root_id, serialize_note),
             "analytics_dashboards": self._serialize_all(AnalyticsDashboard, root_id, serialize_analytics_dashboard),
             "event_logs": self._serialize_all(EventLog, root_id, serialize_event_log),
@@ -113,6 +115,23 @@ class DataExportService:
         """
         rows = self.db_session.query(model).filter(model.root_id == root_id).all()
         return [serializer(row) for row in rows]
+
+    def _export_program_day_statuses(self, root_id: str) -> list:
+        rows = self.db_session.query(ProgramDayStatusOverride).join(Program).filter(
+            Program.root_id == root_id
+        ).order_by(
+            ProgramDayStatusOverride.date.asc(),
+            ProgramDayStatusOverride.id.asc(),
+        ).all()
+        return [{
+            "id": row.id,
+            "program_id": row.program_id,
+            "date": row.date.isoformat(),
+            "status": row.status,
+            "set_by_user_id": row.set_by_user_id,
+            "created_at": format_utc(row.created_at),
+            "updated_at": format_utc(row.updated_at),
+        } for row in rows]
 
     def _export_product_events(self, user_id: str) -> list:
         rows = (

@@ -159,7 +159,10 @@ def evaluate_date(occurrence_rows):
     }
 
 
-def build_day_facts(program, start, end, sessions, aligned_evidence, zone, local_today):
+def build_day_facts(
+    program, start, end, sessions, aligned_evidence, zone, local_today,
+    status_overrides=None,
+):
     """Build canonical date facts and occurrence evaluations for a display range."""
     occurrences_by_date = build_occurrences(program, start, end)
     sessions_by_occurrence = bucket_sessions(sessions, zone)
@@ -167,6 +170,10 @@ def build_day_facts(program, start, end, sessions, aligned_evidence, zone, local
     for item in aligned_evidence or []:
         evidence_by_date[item["date"]].append(item)
 
+    overrides_by_date = {
+        date_part(getattr(item, "date", None)): getattr(item, "status", None)
+        for item in (status_overrides or [])
+    }
     facts = []
     for day_value in iter_dates(start, end):
         occurrence_rows = []
@@ -191,28 +198,44 @@ def build_day_facts(program, start, end, sessions, aligned_evidence, zone, local
         aligned_items = evidence_by_date[day_value]
 
         if scheduled and requirements_met:
-            state = "scheduled_met"
+            automatic_state = "scheduled_met"
         elif scheduled and completed_count:
-            state = "scheduled_partial"
+            automatic_state = "scheduled_partial"
         elif scheduled and closed:
-            state = "scheduled_missed"
+            automatic_state = "scheduled_missed"
         elif scheduled:
-            state = "scheduled_pending"
+            automatic_state = "scheduled_pending"
         elif observed and aligned_items:
-            state = "unscheduled_evidence"
+            automatic_state = "unscheduled_evidence"
         elif observed:
+            automatic_state = "rest"
+        else:
+            automatic_state = "upcoming"
+
+        manual_status = overrides_by_date.get(day_value) if scheduled else None
+        if manual_status == "complete":
+            state = "scheduled_met"
+        elif manual_status == "rest":
             state = "rest"
         else:
-            state = "upcoming"
+            state = automatic_state
+        counts_as_success = scheduled and manual_status != "rest" and (
+            manual_status == "complete" or requirements_met
+        )
+        counts_toward_adherence = scheduled and manual_status != "rest"
 
         facts.append({
             "date": day_value,
             "state": state,
+            "automatic_state": automatic_state,
+            "status_source": "manual" if manual_status else "automatic",
+            "manual_status": manual_status,
             "scheduled": scheduled,
             "observed": observed,
             "closed": closed,
-            "counts_as_success": state == "scheduled_met",
-            "breaks_chain": closed and state in {"scheduled_partial", "scheduled_missed"},
+            "counts_toward_adherence": counts_toward_adherence,
+            "counts_as_success": counts_as_success,
+            "breaks_chain": counts_toward_adherence and closed and not counts_as_success,
             "requirements_met": requirements_met,
             "completed_template_count": completed_count,
             "required_template_count": required_count,

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, Float, ForeignKey, Text, Table
+from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, Float, ForeignKey, Text, Table, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import relationship
 import uuid
 from .base import Base, utc_now, JSON_TYPE
@@ -51,6 +51,12 @@ class Program(Base):
     weekly_schedule = Column(JSON_TYPE, nullable=False) # JSON object with days -> template IDs
     
     blocks = relationship("ProgramBlock", back_populates="program", cascade="all, delete-orphan")
+    day_status_overrides = relationship(
+        "ProgramDayStatusOverride",
+        back_populates="program",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     goals = relationship(
         "Goal",
         secondary=program_goals,
@@ -118,10 +124,6 @@ class ProgramDay(Base):
         viewonly=True
     )
 
-    def check_completion(self):
-        """Check if this program day's configured completion rules are satisfied."""
-        return evaluate_program_day_completion(self, self.completed_sessions)
-
 class ProgramDayTemplate(Base):
     __table__ = program_day_templates
 
@@ -136,9 +138,7 @@ class ProgramDayTemplate(Base):
     )
 
 class ProgramDaySession(Base):
-    """
-    Explicit state tracker bridging a ProgramDay's required Session Template to an executed Session.
-    """
+    """Historical ledger retained for analytics compatibility, never day-status authority."""
     __tablename__ = 'program_day_sessions'
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -153,6 +153,36 @@ class ProgramDaySession(Base):
     program_day = relationship("ProgramDay", backref="day_sessions")
     template = relationship("SessionTemplate")
     session = relationship("Session")
+
+
+class ProgramDayStatusOverride(Base):
+    """A user's explicit status for one program calendar date."""
+
+    __tablename__ = 'program_day_status_overrides'
+    __table_args__ = (
+        UniqueConstraint('program_id', 'date', name='uq_program_day_status_override_program_date'),
+        CheckConstraint("status IN ('complete', 'rest')", name='ck_program_day_status_override_status'),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    program_id = Column(
+        String,
+        ForeignKey('programs.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    date = Column(Date, nullable=False, index=True)
+    status = Column(String, nullable=False)
+    set_by_user_id = Column(
+        String,
+        ForeignKey('users.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    program = relationship('Program', back_populates='day_status_overrides')
 
 
 def get_program_day_template_rules(day):
@@ -180,29 +210,3 @@ def get_program_day_template_rules(day):
         for index, template in enumerate(getattr(day, 'templates', None) or [])
         if template is not None and not getattr(template, 'deleted_at', None)
     ]
-
-
-def evaluate_program_day_completion(day, completed_sessions):
-    rules = get_program_day_template_rules(day)
-    if not rules:
-        return False
-
-    completed_template_ids = {
-        session.template_id
-        for session in (completed_sessions or [])
-        if session.template_id and getattr(session, 'completed', False) and not getattr(session, 'deleted_at', None)
-    }
-    required_template_ids = {
-        rule['template_id']
-        for rule in rules
-        if rule['is_required']
-    }
-    min_templates = getattr(day, 'completion_min_templates', None)
-
-    required_passed = required_template_ids.issubset(completed_template_ids)
-    min_passed = True if not min_templates else len(completed_template_ids) >= min_templates
-    has_any_completion_requirement = bool(required_template_ids or min_templates)
-    if not has_any_completion_requirement and not completed_template_ids:
-        return False
-
-    return required_passed and min_passed

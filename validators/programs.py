@@ -3,6 +3,7 @@
 Re-exported by the validators package __init__, so existing
 `from validators import <Schema>` imports keep working.
 """
+from datetime import date
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from .core import (
@@ -252,6 +253,30 @@ class ProgramDayOccurrenceUnscheduleSchema(BaseModel):
         return v
 
 
+class ProgramDayStatusesUpdateSchema(BaseModel):
+    """Atomically set or clear manual statuses for scheduled program dates."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    dates: List[str] = Field(..., min_length=1, max_length=366)
+    status: str = Field(..., pattern=r'^(complete|rest|automatic)$')
+    timezone: str = Field(..., min_length=1)
+    acknowledge_completed_evidence: bool = False
+
+    @field_validator('dates')
+    @classmethod
+    def validate_dates(cls, values: List[str]) -> List[date]:
+        parsed = []
+        for value in values:
+            try:
+                parsed_value = date.fromisoformat(value)
+            except ValueError as exc:
+                raise ValueError('dates must be ISO calendar dates (YYYY-MM-DD)') from exc
+            if parsed_value.isoformat() != value:
+                raise ValueError('dates must be ISO calendar dates (YYYY-MM-DD)')
+            parsed.append(parsed_value)
+        return list(dict.fromkeys(parsed))
+
+
 class ProgramGoalDeadlineSchema(BaseModel):
     """Schema for setting a goal deadline through program calendar semantics."""
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -264,5 +289,3 @@ class ProgramGoalDeadlineSchema(BaseModel):
     def validate_deadline(cls, v: str) -> str:
         parse_date_string(v)
         return v
-
-

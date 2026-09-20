@@ -121,6 +121,51 @@
     background: transparent;
 }
 
+.dayStatusBulkBar {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-height: 52px;
+    padding: 8px 12px;
+    max-width: calc(100vw - 32px);
+    transform: translateX(-50%);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    box-shadow: 0 8px 30px color-mix(in srgb, black 22%, transparent);
+}
+
+.dayStatusBulkBar button {
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    cursor: pointer;
+}
+
+.dayStatusBulkBar button:disabled {
+    cursor: not-allowed;
+    opacity: .5;
+}
+.dayStatusSelectionHint { flex-basis: 100%; color: var(--color-text-secondary); font-size: 12px; line-height: 1.4; }
+
+@media (max-width: 720px) {
+    .dayStatusBulkBar {
+        position: fixed;
+        right: 8px;
+        bottom: calc(8px + env(safe-area-inset-bottom));
+        left: 8px;
+        flex-wrap: wrap;
+        transform: none;
+    }
+    .dayStatusBulkBar button { min-height: 44px; }
+}
+
 .blocksModePanel {
     border: none;
     background: transparent;

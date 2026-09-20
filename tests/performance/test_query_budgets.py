@@ -965,7 +965,22 @@ def test_get_program_metrics_query_and_response_budget(
     assert_response_budget(
         response, max_bytes=1_048_576, max_ms=750, elapsed_ms=elapsed_ms
     )
-    assert query_counter["total"] <= 8
+    # One bounded query loads occurrence-level status overrides for this window.
+    assert query_counter["total"] <= 9
+
+    first = sample_program_tree.start_date.date()
+    selected_dates = f"{first.isoformat()},{(first + timedelta(days=2)).isoformat()}"
+    query_counter["total"] = 0
+    selected_response, selected_elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{sample_program_tree.root_id}/programs/{sample_program_tree.id}/metrics"
+        f"?timezone=UTC&dates={selected_dates}",
+        query_counter=query_counter,
+    )
+    assert_response_budget(
+        selected_response, max_bytes=1_048_576, max_ms=750, elapsed_ms=selected_elapsed_ms
+    )
+    assert query_counter["total"] <= 9
 
 
 @pytest.mark.integration

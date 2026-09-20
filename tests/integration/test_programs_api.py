@@ -1,10 +1,13 @@
 import pytest
 import json
-from datetime import date, datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
+from datetime import date, datetime, timedelta, timezone
+from threading import Barrier
 from sqlalchemy import event
 from services.events import Events
-from models import Program, ProgramBlock, ProgramDay, ProgramDayTemplate, program_goals, program_block_goals
+from models import Program, ProgramBlock, ProgramDay, ProgramDayStatusOverride, ProgramDayTemplate, Session, get_engine, get_session, program_goals, program_block_goals
 from services.program_day_read_model_service import ProgramDayReadModelService
+from services.programs import ProgramService
 
 @pytest.fixture
 def sample_program(authed_client, sample_ultimate_goal):
@@ -112,7 +115,7 @@ class TestProgramCRUD:
         sample_goal_hierarchy,
         sample_session_template,
     ):
-        target_date = date.today()
+        target_date = datetime.now(timezone.utc).date()
         program = db_session.query(Program).filter_by(id=sample_program['id']).one()
         program.color = '#22c55e'
         program.start_date = datetime.combine(target_date, datetime.min.time())
@@ -188,7 +191,7 @@ class TestProgramCRUD:
     def test_program_day_read_model_returns_canonical_summary_and_detail(
         self, authed_client, db_session, sample_ultimate_goal, sample_program, sample_session_template
     ):
-        target_date = date.today()
+        target_date = datetime.now(timezone.utc).date()
         program = db_session.query(Program).filter_by(id=sample_program['id']).one()
         program.start_date = datetime.combine(target_date, datetime.min.time())
         program.end_date = datetime.combine(target_date, datetime.max.time())
@@ -213,7 +216,7 @@ class TestProgramCRUD:
         )
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload['schema_version'] == 2
+        assert payload['schema_version'] == 3
         assert payload['chain']['context_start'] == target_date.isoformat()
         assert payload['chain']['context_truncated_before'] is False
         assert payload['days'][0]['state'] == 'scheduled_pending'
@@ -254,6 +257,180 @@ class TestProgramCRUD:
             f'&detail_date=2026-01-01&timezone=UTC&session_cursor=invalid'
         ).status_code == 400
 
+    def test_manual_day_statuses_are_atomic_idempotent_and_override_read_models(
+        self, authed_client, db_session, sample_ultimate_goal, sample_program, sample_session_template
+    ):
+        today = datetime.now(timezone.utc).date()
+        future = today + timedelta(days=1)
+        program = db_session.query(Program).filter_by(id=sample_program['id']).one()
+        program.start_date = datetime.combine(today, datetime.min.time())
+        program.end_date = datetime.combine(today + timedelta(days=7), datetime.max.time())
+        block = db_session.query(ProgramBlock).filter_by(program_id=program.id).first()
+        block.start_date = today
+        block.end_date = today + timedelta(days=7)
+        days = [
+            ProgramDay(block_id=block.id, date=value, name=f'Day {value}')
+            for value in (today, future)
+        ]
+        db_session.add_all(days)
+        db_session.flush()
+        db_session.add_all([
+            ProgramDayTemplate(
+                program_day_id=day.id,
+                session_template_id=sample_session_template.id,
+                is_required=True,
+                order=0,
+            ) for day in days
+        ])
+        db_session.commit()
+        url = f'/api/{sample_ultimate_goal.id}/programs/{program.id}/day-statuses'
+
+        malformed = authed_client.patch(url, json={
+            'dates': [f'{today.isoformat()}T12:00:00Z'],
+            'status': 'complete',
+            'timezone': 'UTC',
+        })
+        assert malformed.status_code == 400
+
+        complete = authed_client.patch(url, json={
+            'dates': [today.isoformat(), today.isoformat()],
+            'status': 'complete',
+            'timezone': 'UTC',
+        })
+        assert complete.status_code == 200
+        assert complete.get_json()['updated_count'] == 1
+        assert db_session.query(ProgramDayStatusOverride).filter_by(
+            program_id=program.id, date=today, status='complete'
+        ).count() == 1
+
+        read_model = authed_client.get(
+            f'/api/{sample_ultimate_goal.id}/programs/{program.id}/day-read-model'
+            f'?range_start={today.isoformat()}&range_end={today.isoformat()}&timezone=UTC'
+        ).get_json()['days'][0]
+        assert read_model['automatic_state'] == 'scheduled_pending'
+        assert read_model['state'] == 'scheduled_met'
+        assert read_model['manual_status'] == 'complete'
+        assert read_model['requirements_met'] is False
+        options = authed_client.get(
+            f'/api/{sample_ultimate_goal.id}/programs/day-options'
+            f'?date={today.isoformat()}&timezone=UTC'
+        ).get_json()
+        assert next(row for row in options if row['day_id'] == days[0].id)['manual_status'] == 'complete'
+        assert all('is_completed' not in row for row in options)
+
+        rejected = authed_client.patch(url, json={
+            'dates': [today.isoformat(), future.isoformat()],
+            'status': 'complete',
+            'timezone': 'UTC',
+        })
+        assert rejected.status_code == 400
+        assert rejected.get_json()['code'] == 'ineligible_dates'
+        assert db_session.query(ProgramDayStatusOverride).filter_by(
+            program_id=program.id, date=future
+        ).count() == 0
+
+        outside = today + timedelta(days=8)
+        block.end_date = outside
+        days[1].date = outside
+        db_session.commit()
+        outside_response = authed_client.patch(url, json={
+            'dates': [outside.isoformat()], 'status': 'rest', 'timezone': 'UTC',
+        })
+        assert outside_response.status_code == 400
+        days[1].date = future
+        db_session.commit()
+
+        db_session.add(Session(
+            owner_id=sample_ultimate_goal.owner_id,
+            root_id=sample_ultimate_goal.id,
+            name='Completed linked work',
+            completed=True,
+            template_id=sample_session_template.id,
+            program_id=program.id,
+            program_block_id=block.id,
+            program_day_id=days[0].id,
+            session_start=datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc),
+        ))
+        db_session.commit()
+        needs_confirmation = authed_client.patch(url, json={
+            'dates': [today.isoformat()], 'status': 'rest', 'timezone': 'UTC',
+        })
+        assert needs_confirmation.status_code == 409
+        assert needs_confirmation.get_json()['code'] == 'completed_evidence_confirmation_required'
+        assert authed_client.patch(url, json={
+            'dates': [today.isoformat()],
+            'status': 'rest',
+            'timezone': 'UTC',
+            'acknowledge_completed_evidence': True,
+        }).status_code == 200
+        metrics = authed_client.get(
+            f'/api/{sample_ultimate_goal.id}/programs/{program.id}/metrics'
+            f'?range_start={today.isoformat()}&range_end={today.isoformat()}&timezone=UTC'
+        ).get_json()
+        assert metrics['days'][0]['state'] == 'rest'
+        assert metrics['days'][0]['requirements_met'] is True
+        assert metrics['adherence']['denominator_days'] == 0
+        assert metrics['adherence']['manual_rest_days'] == 1
+        assert metrics['templates'][0]['completed_occurrences'] == 1
+        options = authed_client.get(
+            f'/api/{sample_ultimate_goal.id}/programs/day-options'
+            f'?date={today.isoformat()}&timezone=UTC'
+        ).get_json()
+        assert next(row for row in options if row['day_id'] == days[0].id)['manual_status'] == 'rest'
+
+        assert authed_client.patch(url, json={
+            'dates': [future.isoformat()], 'status': 'rest', 'timezone': 'UTC',
+        }).status_code == 200
+        days[1].date = future + timedelta(days=1)
+        db_session.commit()
+        assert authed_client.patch(url, json={
+            'dates': [future.isoformat()], 'status': 'automatic', 'timezone': 'UTC',
+        }).status_code == 200
+        assert db_session.query(ProgramDayStatusOverride).filter_by(
+            program_id=program.id, date=future
+        ).count() == 0
+        assert authed_client.patch(url, json={
+            'dates': [today.isoformat()], 'status': 'automatic', 'timezone': 'UTC',
+        }).status_code == 200
+        assert db_session.query(ProgramDayStatusOverride).filter_by(
+            program_id=program.id, date=today
+        ).count() == 0
+
+    def test_concurrent_day_status_upserts_keep_one_occurrence_row(
+        self, db_session, sample_ultimate_goal, sample_program
+    ):
+        today = datetime.now(timezone.utc).date()
+        program = db_session.query(Program).filter_by(id=sample_program['id']).one()
+        program.start_date = datetime.combine(today, datetime.min.time())
+        program.end_date = datetime.combine(today, datetime.max.time())
+        block = db_session.query(ProgramBlock).filter_by(program_id=program.id).first()
+        block.start_date = today
+        block.end_date = today
+        db_session.add(ProgramDay(block_id=block.id, date=today, name='Concurrent day'))
+        db_session.commit()
+        barrier = Barrier(2)
+
+        def write_status(status):
+            worker_session = get_session(get_engine())
+            try:
+                barrier.wait(timeout=10)
+                return ProgramService.set_program_day_statuses(
+                    worker_session, sample_ultimate_goal.id, program.id,
+                    {'dates': [today], 'status': status, 'timezone': 'UTC'},
+                    sample_ultimate_goal.owner_id,
+                )
+            finally:
+                worker_session.close()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(write_status, ('complete', 'rest')))
+        assert {result['status'] for result in results} == {'complete', 'rest'}
+        db_session.expire_all()
+        rows = db_session.query(ProgramDayStatusOverride).filter_by(
+            program_id=program.id, date=today,
+        ).all()
+        assert len(rows) == 1
+        assert rows[0].status in {'complete', 'rest'}
     def test_get_specific_program(self, authed_client, sample_ultimate_goal, sample_program):
         """Test retrieving a specific program."""
         root_id = sample_ultimate_goal.id
@@ -276,7 +453,7 @@ class TestProgramCRUD:
         assert response.status_code == 200
         assert response.headers.get('ETag')
         payload = response.get_json()
-        assert payload['calculation_version'] == 3
+        assert payload['calculation_version'] == 4
         assert payload['window']['timezone'] == 'UTC'
         assert payload['semantics'] == {
             'attribution': 'current_state',
@@ -286,6 +463,14 @@ class TestProgramCRUD:
         }
         assert authed_client.get(f'{url}?timezone=Not/AZone').status_code == 400
         assert authed_client.get(f'{url}?range_start=2026-01-01').status_code == 400
+        first = sample_program['start_date'][:10]
+        third = (date.fromisoformat(first) + timedelta(days=2)).isoformat()
+        selected = authed_client.get(f'{url}?timezone=UTC&dates={third},{first}')
+        assert selected.status_code == 200
+        assert selected.get_json()['window']['dates'] == [first, third]
+        assert selected.get_json()['window']['total_days'] == 2
+        assert authed_client.get(f'{url}?timezone=UTC&dates={first}&range_start={first}').status_code == 400
+        assert authed_client.get(f'{url}?timezone=UTC&dates={first},not-a-date').status_code == 400
 
     def test_program_goals_do_not_auto_populate_block_goal_ids(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
         """Program-level goals should not appear as direct block associations."""
@@ -370,13 +555,20 @@ class TestProgramCRUD:
             event.remove(engine, "before_cursor_execute", capture_statement)
 
         assert (error, status) == (None, 200)
-        assert payload["schema_version"] == 2
+        assert payload["schema_version"] == 3
         assert len(statements) <= 40
 
-    def test_delete_program(self, authed_client, sample_ultimate_goal, sample_program):
+    def test_delete_program(self, authed_client, db_session, sample_ultimate_goal, sample_program):
         """Test deleting a program."""
         root_id = sample_ultimate_goal.id
         program_id = sample_program['id']
+        db_session.add(ProgramDayStatusOverride(
+            program_id=program_id,
+            date=datetime.now(timezone.utc).date(),
+            status='rest',
+            set_by_user_id=sample_ultimate_goal.owner_id,
+        ))
+        db_session.commit()
         
         response = authed_client.delete(f'/api/{root_id}/programs/{program_id}')
         assert response.status_code == 200
@@ -384,6 +576,9 @@ class TestProgramCRUD:
         # Verify deletion
         response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
         assert response.status_code == 404
+        assert db_session.query(ProgramDayStatusOverride).filter_by(
+            program_id=program_id
+        ).count() == 0
 
 @pytest.mark.integration
 class TestProgramStructure:

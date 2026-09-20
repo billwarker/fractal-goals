@@ -217,6 +217,27 @@
     user-select: none;
 }
 
+.selectedStatusCell :global(.fc-daygrid-day-frame) {
+    box-shadow: inset 0 0 0 3px var(--color-brand-primary);
+}
+
+.calendarContainerSelecting :global(.fc-daygrid-day[data-program-selectable-date]:focus-visible) {
+    outline: 2px solid var(--color-text-primary);
+    outline-offset: -5px;
+}
+
+.calendarContainerSelecting :global(.fc-daygrid-day[data-day-state]) {
+    cursor: pointer;
+}
+
+.restStatusLabel {
+    color: var(--color-text-muted);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
 /* ─── Custom Event Pills ─────────────────────────────────────────────────── */
 
 /* Reset FullCalendar's default event wrapper so our pill owns all styling */

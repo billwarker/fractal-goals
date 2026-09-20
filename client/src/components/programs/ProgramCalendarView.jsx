@@ -2,109 +2,9 @@ import React from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import GoalIcon from '../atoms/GoalIcon';
 import { getProgramDayStateMeta, indexProgramDayStates } from '../../utils/programDayState';
-import ProgramDayCompletionMark from './ProgramDayCompletionMark';
+import renderProgramCalendarEventContent from './ProgramCalendarEventContent';
 import styles from './ProgramCalendarView.module.css';
-
-function activateGoalEvent(eventInfo, onGoalActivate, jsEvent) {
-    if (!onGoalActivate) return;
-
-    jsEvent.preventDefault();
-    jsEvent.stopPropagation();
-    onGoalActivate({
-        ...eventInfo,
-        jsEvent: jsEvent.nativeEvent || jsEvent,
-    });
-}
-
-function renderEventContent(eventInfo, onGoalActivate, dayState) {
-    const { type, blockColor, isCompleted, goalIcon } = eventInfo.event.extendedProps;
-
-    // Block backgrounds render through FullCalendar background styling.
-    if (type === 'block_background') return null;
-
-    const title = eventInfo.event.title;
-
-    // Goal events use their configured color without a filled banner.
-    if (type === 'goal') {
-        return (
-            <div
-                className={`${styles.eventPill} ${styles.eventPillGoal}`}
-                style={{ background: 'transparent' }}
-                role={onGoalActivate ? 'button' : undefined}
-                tabIndex={onGoalActivate ? 0 : undefined}
-                aria-label={onGoalActivate ? `Open goal: ${title}` : undefined}
-                onClickCapture={onGoalActivate
-                    ? (event) => activateGoalEvent(eventInfo, onGoalActivate, event)
-                    : undefined}
-                onKeyDownCapture={onGoalActivate
-                    ? (event) => {
-                        if (event.key !== 'Enter' && event.key !== ' ') return;
-                        activateGoalEvent(eventInfo, onGoalActivate, event);
-                    }
-                    : undefined}
-            >
-                {goalIcon ? (
-                    <span className={styles.eventGoalIcon} aria-hidden="true">
-                        <GoalIcon
-                            shape={goalIcon.shape}
-                            color={goalIcon.color}
-                            secondaryColor={goalIcon.secondaryColor}
-                            isSmart={goalIcon.isSmart}
-                            size={13}
-                        />
-                    </span>
-                ) : null}
-                <span className={styles.eventPillText}>{title}</span>
-            </div>
-        );
-    }
-
-    if (type === 'program_day') {
-        const color = blockColor || 'var(--color-brand-primary)';
-        const bg = `color-mix(in srgb, ${color} 13%, var(--color-bg-card))`;
-        const showCompletionMark = Boolean(isCompleted || dayState?.closed);
-        return (
-            <div
-                className={`${styles.eventPill} ${styles.eventPillProgramDay}`}
-                style={{ '--program-day-pill-bg': bg }}
-            >
-                <span className={styles.eventPillText}>{title}</span>
-                {showCompletionMark ? (
-                    <ProgramDayCompletionMark
-                        complete={Boolean(isCompleted)}
-                        label={`${title}: ${isCompleted ? 'requirements met' : 'missed'}`}
-                        size="sm"
-                    />
-                ) : null}
-            </div>
-        );
-    }
-
-    if (type === 'template') {
-        return (
-            <div className={`${styles.eventPill} ${isCompleted ? styles.eventPillTemplateCompleted : styles.eventPillTemplate}`}>
-                <span className={styles.eventPillText}>{title}</span>
-            </div>
-        );
-    }
-
-    if (type === 'session') {
-        return (
-            <div className={`${styles.eventPill} ${isCompleted ? styles.eventPillSessionCompleted : styles.eventPillSession}`}>
-                <span className={styles.eventPillText}>{title}</span>
-            </div>
-        );
-    }
-
-    // Fallback
-    return (
-        <div className={styles.eventPill}>
-            <span className={styles.eventPillText}>{title}</span>
-        </div>
-    );
-}
 
 function formatCalendarCellDate(date) {
     if (!(date instanceof Date)) {
@@ -149,6 +49,9 @@ function ProgramCalendarView({
     dayStates = [],
     selectedProgramName = '',
     selectedProgramId = null,
+    selectedStatusDates = [],
+    selectionModeButtonRef,
+    statusActions = null,
 }) {
     const calendarRef = React.useRef(null);
     const calendarContainerRef = React.useRef(null);
@@ -157,6 +60,10 @@ function ProgramCalendarView({
     onEventClickRef.current = onEventClick;
     onBlockLabelClickRef.current = onBlockLabelClick;
     const dayStatesByDate = React.useMemo(() => indexProgramDayStates(dayStates), [dayStates]);
+    const selectedStatusDateSet = React.useMemo(
+        () => new Set(selectedStatusDates),
+        [selectedStatusDates],
+    );
     const programDayRibbonDates = React.useMemo(() => new Set(
         (calendarEvents || [])
             .filter((event) => event.extendedProps?.type === 'program_day'
@@ -164,7 +71,7 @@ function ProgramCalendarView({
             .map((event) => normalizeCalendarEventDate(event.start)),
     ), [calendarEvents, selectedProgramId]);
 
-    const renderCalendarEventContent = React.useCallback((eventInfo) => renderEventContent(
+    const renderCalendarEventContent = React.useCallback((eventInfo) => renderProgramCalendarEventContent(
         eventInfo,
         readOnly ? undefined : (clickInfo) => onEventClickRef.current?.(clickInfo),
         dayStatesByDate.get(normalizeCalendarEventDate(eventInfo.event.start)),
@@ -180,6 +87,9 @@ function ProgramCalendarView({
         }
         if (selectedDate && dateStr === selectedDate) {
             classNames.push(styles.selectedDayCell);
+        }
+        if (selectedStatusDateSet.has(dateStr)) {
+            classNames.push(styles.selectedStatusCell);
         }
         return classNames;
     };
@@ -254,6 +164,10 @@ function ProgramCalendarView({
         dayEl.style.removeProperty('--program-calendar-cell-color');
         dayEl.removeAttribute('data-calendar-background');
         dayEl.removeAttribute('data-day-state');
+        dayEl.removeAttribute('aria-selected');
+        dayEl.removeAttribute('aria-label');
+        dayEl.removeAttribute('tabindex');
+        dayEl.removeAttribute('data-program-selectable-date');
         frame.querySelectorAll(`[data-program-block-label], .${styles.blockCellLabel}`)
             .forEach((label) => label.remove());
         frame.querySelectorAll('[data-program-day-status]').forEach((status) => status.remove());
@@ -281,6 +195,14 @@ function ProgramCalendarView({
             }
         }
 
+        if (blockCreationMode && dayState?.scheduled) {
+            const selected = selectedStatusDateSet.has(dateStr);
+            dayEl.setAttribute('aria-selected', selected ? 'true' : 'false');
+            dayEl.setAttribute('aria-label', `${dateStr}, scheduled program day, ${selected ? 'selected' : 'not selected'}`);
+            dayEl.setAttribute('tabindex', '0');
+            dayEl.setAttribute('data-program-selectable-date', dateStr);
+        }
+
         if (blockLabel) {
             const labelButton = document.createElement('button');
             labelButton.type = 'button';
@@ -293,13 +215,17 @@ function ProgramCalendarView({
             labelButton.style.setProperty('--program-block-label-color', blockLabel.color);
             frame.appendChild(labelButton);
         }
-    }, [blockLabelsByDate, dayStatesByDate, getCellBackgrounds, programDayRibbonDates, selectedProgramName]);
+    }, [blockCreationMode, blockLabelsByDate, dayStatesByDate, getCellBackgrounds, programDayRibbonDates, selectedProgramName, selectedStatusDateSet]);
 
     const clearBlockLabelForCell = (dayEl) => {
         const frame = dayEl.querySelector('.fc-daygrid-day-frame');
         dayEl.style.removeProperty('--program-calendar-cell-color');
         dayEl.removeAttribute('data-calendar-background');
         dayEl.removeAttribute('data-day-state');
+        dayEl.removeAttribute('aria-selected');
+        dayEl.removeAttribute('aria-label');
+        dayEl.removeAttribute('tabindex');
+        dayEl.removeAttribute('data-program-selectable-date');
         frame?.querySelectorAll(`[data-program-block-label], .${styles.blockCellLabel}`)
             .forEach((label) => label.remove());
         frame?.querySelectorAll('[data-program-day-status]').forEach((status) => status.remove());
@@ -322,6 +248,15 @@ function ProgramCalendarView({
         event.preventDefault();
         event.stopPropagation();
         onBlockLabelClickRef.current?.(blockLabel);
+    };
+
+    const activateSelectableDay = (event) => {
+        const cell = event.target?.closest?.('[data-program-selectable-date]');
+        if (!blockCreationMode || !cell || cell !== event.target
+            || (event.key !== 'Enter' && event.key !== ' ')) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onDateClick?.({ dateStr: cell.dataset.programSelectableDate, jsEvent: event });
     };
 
     React.useEffect(() => {
@@ -347,10 +282,12 @@ function ProgramCalendarView({
         <div className={styles.headerActions}>
             <button
                 type="button"
+                ref={selectionModeButtonRef}
                 onClick={() => setBlockCreationMode(!blockCreationMode)}
                 className={`${styles.customBtn} ${styles.createModeBtn} ${blockCreationMode ? styles.createModeBtnActive : ''}`}
+                aria-pressed={blockCreationMode}
             >
-                {blockCreationMode ? 'Multi-Day Select On' : (isMobile ? 'Select Days' : 'Select Multiple Days')}
+                {blockCreationMode ? 'Selecting Multiple Days' : (isMobile ? 'Select Days' : 'Select Multiple Days')}
             </button>
             {selectedRangeLabel ? (
                 <span className={styles.selectionLabel}>{selectedRangeLabel}</span>
@@ -376,9 +313,10 @@ function ProgramCalendarView({
             data-selection-mode={blockCreationMode ? 'multiple' : undefined}
             onClick={readOnly ? undefined : onCalendarBackgroundClick}
             onClickCapture={readOnly ? undefined : activateBlockLabel}
-            onKeyDownCapture={readOnly ? undefined : activateBlockLabel}
+            onKeyDownCapture={readOnly ? undefined : (event) => { activateSelectableDay(event); activateBlockLabel(event); }}
             onPointerDownCapture={readOnly ? undefined : stopBlockLabelPointerEvent}
             onPointerUpCapture={readOnly ? undefined : stopBlockLabelPointerEvent}
+            onMouseDownCapture={readOnly ? undefined : stopBlockLabelPointerEvent}
             onTouchStartCapture={readOnly ? undefined : stopBlockLabelPointerEvent}
             onTouchEndCapture={readOnly ? undefined : stopBlockLabelPointerEvent}
         >
@@ -408,6 +346,8 @@ function ProgramCalendarView({
                     {blockControls}
                 </div>
             ) : blockControls}
+
+            {statusActions}
 
             <FullCalendar
                 ref={calendarRef}

@@ -92,7 +92,12 @@ class ActivityDefinition(Base):
     )
 
     group = relationship("ActivityGroup", backref="activities")
-    metric_definitions = relationship("MetricDefinition", backref="activity_definition", cascade="all, delete-orphan")
+    metric_definitions = relationship(
+        "MetricDefinition",
+        backref="activity_definition",
+        cascade="all, delete-orphan",
+        order_by=lambda: (MetricDefinition.created_at, MetricDefinition.id),
+    )
     split_definitions = relationship("SplitDefinition", backref="activity_definition", cascade="all, delete-orphan")
     tags = relationship("ActivityTag", back_populates="activity_definition", cascade="all, delete-orphan")
     progress_views = relationship(

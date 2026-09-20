@@ -2,11 +2,15 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import { useProgramDayDetail, useProgramDayRange } from '../useProgramDayReadModel';
+import { useProgramDayDetail, useProgramDayRange, useUpdateProgramDayStatuses } from '../useProgramDayReadModel';
 
 const getProgramDayReadModel = vi.fn();
+const updateProgramDayStatuses = vi.fn();
 vi.mock('../../utils/api', () => ({
-    fractalApi: { getProgramDayReadModel: (...args) => getProgramDayReadModel(...args) },
+    fractalApi: {
+        getProgramDayReadModel: (...args) => getProgramDayReadModel(...args),
+        updateProgramDayStatuses: (...args) => updateProgramDayStatuses(...args),
+    },
 }));
 
 describe('useProgramDayDetail', () => {
@@ -15,7 +19,7 @@ describe('useProgramDayDetail', () => {
         const wrapper = ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
         getProgramDayReadModel
             .mockResolvedValueOnce({ data: {
-                schema_version: 2,
+            schema_version: 3,
                 days: [{ date: '2026-09-02', state: 'scheduled_met' }],
                 detail: {
                     occurrences: [{ occurrence_key: 'day:date', sessions: [{ id: 'session-1' }] }],
@@ -24,7 +28,7 @@ describe('useProgramDayDetail', () => {
                 },
             } })
             .mockResolvedValueOnce({ data: {
-                schema_version: 2,
+                schema_version: 3,
                 days: [{ date: '2026-09-02', state: 'scheduled_met' }],
                 detail: {
                     occurrences: [{ occurrence_key: 'day:date', sessions: [{ id: 'session-2' }] }],
@@ -73,5 +77,28 @@ describe('useProgramDayDetail', () => {
 
         await waitFor(() => expect(result.current.isError).toBe(true));
         expect(result.current.error.message).toMatch(/unsupported program day data version/i);
+    });
+});
+
+describe('useUpdateProgramDayStatuses', () => {
+    it('sends one bulk mutation and invalidates program read models', async () => {
+        const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+        const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+        const wrapper = ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+        updateProgramDayStatuses.mockResolvedValueOnce({ data: { updated_count: 2 } });
+        const { result } = renderHook(
+            () => useUpdateProgramDayStatuses('root-1', 'program-1'),
+            { wrapper },
+        );
+
+        await act(async () => {
+            await result.current.mutateAsync({ dates: ['2026-09-01', '2026-09-03'], status: 'rest', timezone: 'UTC' });
+        });
+
+        expect(updateProgramDayStatuses).toHaveBeenCalledWith('root-1', 'program-1', expect.objectContaining({ status: 'rest' }));
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: ['program-day-read-model', 'root-1', 'program-1'] });
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: ['program-metrics', 'root-1'] });
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: ['programs', 'root-1'] });
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: ['program-day-options', 'root-1'] });
     });
 });

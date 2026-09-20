@@ -16,6 +16,16 @@ export function formatProgramCalendarRange(startValue, endValue) {
     return `${startLabel} – ${formatLiteralDate(endDate)}`;
 }
 
+export function formatProgramCalendarSelection(dates = []) {
+    if (!dates.length) return null;
+    const sorted = [...new Set(dates)].sort();
+    const contiguous = sorted.every((value, index) => index === 0
+        || Date.parse(`${value}T00:00:00Z`) - Date.parse(`${sorted[index - 1]}T00:00:00Z`) === 86400000);
+    return contiguous
+        ? formatProgramCalendarRange(sorted[0], sorted[sorted.length - 1])
+        : `${sorted.length} selected days`;
+}
+
 export function createProgramCalendarContext(today) {
     return {
         scope: 'program',

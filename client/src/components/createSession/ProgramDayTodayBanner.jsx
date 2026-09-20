@@ -15,20 +15,21 @@ function ProgramDayTodayBanner({
     minTemplates = 0,
     totalRequired = 0,
     isDayComplete = false,
+    isDayRest = false,
     onJumpToProgramDay,
 }) {
     const dayLabel = dayNumber ? `Day ${dayNumber}` : (dayName || 'Program day');
     return (
-        <section className={`${styles.banner} ${isDayComplete ? styles.complete : ''}`} style={{ '--program-day-color': blockColor }}>
+        <section className={`${styles.banner} ${isDayComplete || isDayRest ? styles.complete : ''}`} style={{ '--program-day-color': blockColor }}>
             <div className={styles.content}>
-                <strong>{isDayComplete ? 'Today’s program day is complete' : `Today is ${dayLabel}${dayName && dayName !== dayLabel ? ` — ${dayName}` : ''}`}</strong>
+                <strong>{isDayRest ? 'Today is a program rest day' : isDayComplete ? 'Today’s program day is complete' : `Today is ${dayLabel}${dayName && dayName !== dayLabel ? ` — ${dayName}` : ''}`}</strong>
                 <span className={styles.context}>
                     {blockName ? <span style={{ color: blockColor || 'var(--color-brand-primary)' }}>{blockName}</span> : null}
                     {programName ? <> · <ProgramName name={programName} color={programColor} /></> : null}
                 </span>
-                <span className={styles.progress}>{completedCount} / {minTemplates || totalRequired} complete</span>
+                {!isDayRest ? <span className={styles.progress}>{completedCount} / {minTemplates || totalRequired} complete</span> : null}
             </div>
-            {!isDayComplete ? <Button variant="secondary" size="sm" onClick={onJumpToProgramDay}>Start this day</Button> : null}
+            {!isDayComplete && !isDayRest ? <Button variant="secondary" size="sm" onClick={onJumpToProgramDay}>Start this day</Button> : null}
         </section>
     );
 }

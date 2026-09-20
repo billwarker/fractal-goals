@@ -186,14 +186,6 @@ def handle_session_completed(event: Event):
                 pending_events=pending_events,
             )
             
-        # Check Program Day Completion
-        from services.programs import ProgramService
-        ProgramService.check_program_day_completion(
-            db_session,
-            session_id,
-            pending_events=pending_events,
-        )
-
         db_session.commit()
         _emit_pending_events(pending_events)
 

@@ -268,7 +268,7 @@ describe('CreateSession quick-session flow', () => {
     });
 
     it('honors an exact program-day/template/date deep link and preserves unrelated query state', async () => {
-        const today = getISOYMDInTimezone(new Date(), 'UTC');
+        const today = getISOYMDInTimezone(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone);
         const day = {
             day_id: 'day-linked', day_name: 'Linked Day', program_id: 'program-1', program_name: 'Strength',
             sessions: [

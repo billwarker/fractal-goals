@@ -122,7 +122,14 @@ def serialize_activity_set(activity_set):
         "completed": activity_set.status == "completed",
         "duration_seconds": activity_set.duration_seconds,
         "notes": activity_set.notes,
-        "metrics": [serialize_metric_value(metric) for metric in (activity_set.metric_values or [])],
+        "metrics": [serialize_metric_value(metric) for metric in sorted(
+            activity_set.metric_values or [],
+            key=lambda metric: (
+                format_utc_precise(getattr(metric.definition, 'created_at', None)) or '',
+                metric.metric_definition_id,
+                metric.split_definition_id or '',
+            ),
+        )],
         "created_at": format_utc(activity_set.created_at),
         "updated_at": format_utc(activity_set.updated_at),
         "tag_assignment_version": activity_set.tag_assignment_version,
@@ -1130,16 +1137,8 @@ def serialize_program_day(day):
         "day_of_week": day.day_of_week or [],
         "templates": serialized_templates,
         "goal_ids": [g.id for g in (day.goals or [])],
-        "is_completed": day.is_completed,
         "completion_min_templates": getattr(day, 'completion_min_templates', None),
         "sessions": [serialize_program_day_session_light(s) for s in day.completed_sessions if not s.deleted_at],
-        "day_sessions": [{
-            "id": ds.id,
-            "session_template_id": ds.session_template_id,
-            "session_id": ds.session_id,
-            "execution_status": ds.execution_status,
-            "created_at": format_utc(ds.created_at)
-        } for ds in (day.day_sessions or [])]
     }
 
 def serialize_note(note):

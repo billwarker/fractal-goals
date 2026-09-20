@@ -202,6 +202,35 @@ def test_rest_bridges_between_met_dates_without_incrementing_run():
     assert facts[2]["run_length_at_date"] == 2
 
 
+def test_manual_statuses_override_effective_state_without_fabricating_evidence():
+    zone = ZoneInfo("UTC")
+    day_value = date(2026, 9, 1)
+    program, _day = scheduled_program(day_value, [template_rule("a")])
+
+    complete = build_day_facts(
+        program, day_value, day_value, [], [], zone, date(2026, 9, 2),
+        status_overrides=[SimpleNamespace(date=day_value, status="complete")],
+    )[0]
+    assert complete["automatic_state"] == "scheduled_missed"
+    assert complete["state"] == "scheduled_met"
+    assert complete["status_source"] == "manual"
+    assert complete["requirements_met"] is False
+    assert complete["completed_template_count"] == 0
+    assert complete["counts_as_success"] is True
+
+    rest = build_day_facts(
+        program, day_value, day_value,
+        [completed_session("a", day_value)], [], zone, date(2026, 9, 2),
+        status_overrides=[SimpleNamespace(date=day_value, status="rest")],
+    )[0]
+    assert rest["automatic_state"] == "scheduled_met"
+    assert rest["state"] == "rest"
+    assert rest["requirements_met"] is True
+    assert rest["counts_as_success"] is False
+    assert rest["counts_toward_adherence"] is False
+    assert rest["breaks_chain"] is False
+
+
 @pytest.mark.parametrize(
     ("length", "expected"),
     [

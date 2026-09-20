@@ -29,6 +29,9 @@ function GoalHierarchySelector({
     initialHideCompletedGoals = false,
     lockHideCompletedGoals = false,
     showHideCompletedControl = true,
+    scopeGoalIds = [],
+    scopeLabel = '',
+    initialScopeEnabled = false,
 }) {
     const {
         getGoalColor,
@@ -38,6 +41,7 @@ function GoalHierarchySelector({
     } = useGoalLevels();
     const [searchTerm, setSearchTerm] = useState('');
     const [hideCompletedGoals, setHideCompletedGoals] = useState(initialHideCompletedGoals);
+    const [scopeEnabled, setScopeEnabled] = useState(initialScopeEnabled);
     const [bulkConnectorGoalIds, setBulkConnectorGoalIds] = useState(() => new Set());
 
     const normalizedGoals = useMemo(
@@ -51,6 +55,10 @@ function GoalHierarchySelector({
     const lockedIdSet = useMemo(
         () => new Set(lockedGoalIds.map((goalId) => String(goalId))),
         [lockedGoalIds]
+    );
+    const scopeIdSet = useMemo(
+        () => new Set(scopeGoalIds.map((goalId) => String(goalId))),
+        [scopeGoalIds]
     );
     const effectiveSelectedIdSet = useMemo(
         () => new Set([...selectedIdSet, ...lockedIdSet]),
@@ -66,13 +74,16 @@ function GoalHierarchySelector({
     );
     const visibleGoals = useMemo(
         () => {
-            const filteredGoals = hideCompletedGoals
+            let filteredGoals = hideCompletedGoals
                 ? normalizedGoals.filter((goal) => !goal.completed)
                 : normalizedGoals;
+            if (scopeEnabled && scopeIdSet.size > 0) {
+                filteredGoals = filteredGoals.filter((goal) => scopeIdSet.has(String(goal.id)));
+            }
 
             return filterGoalsForSearch(filteredGoals, searchTerm);
         },
-        [hideCompletedGoals, normalizedGoals, searchTerm]
+        [hideCompletedGoals, normalizedGoals, scopeEnabled, scopeIdSet, searchTerm]
     );
     const selectedAncestorIdSet = useMemo(() => {
         if (!highlightSelectionAncestors) {
@@ -317,19 +328,33 @@ function GoalHierarchySelector({
                 </div>
             )}
 
-            {showHideCompletedControl && (
+            {(showHideCompletedControl || scopeLabel) && (
                 <div className={styles.optionsRow}>
-                    <label className={styles.hideCompletedControl}>
-                        <input
-                            type="checkbox"
-                            checked={hideCompletedGoals}
-                            disabled={lockHideCompletedGoals}
-                            onChange={(event) => setHideCompletedGoals(event.target.checked)}
-                            aria-label={lockHideCompletedGoals ? 'Completed goals are hidden' : 'Hide completed goals'}
-                        />
-                        <span aria-hidden="true">{hideCompletedGoals ? '✓' : ''}</span>
-                        <span>Hide completed goals</span>
-                    </label>
+                    {scopeLabel && (
+                        <label className={styles.filterControl}>
+                            <input
+                                type="checkbox"
+                                checked={scopeEnabled}
+                                onChange={(event) => setScopeEnabled(event.target.checked)}
+                                aria-label={`Scope to ${scopeLabel}`}
+                            />
+                            <span aria-hidden="true">{scopeEnabled ? '✓' : ''}</span>
+                            <span>Scope to {scopeLabel}</span>
+                        </label>
+                    )}
+                    {showHideCompletedControl && (
+                        <label className={styles.hideCompletedControl}>
+                            <input
+                                type="checkbox"
+                                checked={hideCompletedGoals}
+                                disabled={lockHideCompletedGoals}
+                                onChange={(event) => setHideCompletedGoals(event.target.checked)}
+                                aria-label={lockHideCompletedGoals ? 'Completed goals are hidden' : 'Hide completed goals'}
+                            />
+                            <span aria-hidden="true">{hideCompletedGoals ? '✓' : ''}</span>
+                            <span>Hide completed goals</span>
+                        </label>
+                    )}
                 </div>
             )}
 

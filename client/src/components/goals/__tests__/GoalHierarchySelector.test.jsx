@@ -238,6 +238,28 @@ describe('GoalHierarchySelector', () => {
         expect(screen.queryByText('Status Completed Goal')).not.toBeInTheDocument();
     });
 
+    it('can start scoped to a named goal set and reveal the full hierarchy on demand', () => {
+        render(
+            <GoalHierarchySelector
+                goals={goals}
+                selectedGoalIds={[]}
+                onSelectionChange={vi.fn()}
+                scopeGoalIds={['goal-root', 'goal-child']}
+                scopeLabel="Strength"
+                initialScopeEnabled
+            />
+        );
+
+        const scopeControl = screen.getByLabelText('Scope to Strength');
+        expect(scopeControl).toBeChecked();
+        expect(screen.getByText('Child Goal')).toBeInTheDocument();
+        expect(screen.queryByText('Grandchild Goal')).not.toBeInTheDocument();
+
+        fireEvent.click(scopeControl);
+
+        expect(screen.getByText('Grandchild Goal')).toBeInTheDocument();
+    });
+
     it('can enforce completed-goal filtering for creation flows', () => {
         render(
             <GoalHierarchySelector

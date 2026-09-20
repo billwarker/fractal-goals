@@ -19,6 +19,7 @@ from services.session_runtime import get_template_color
 from services.session_service import SessionService
 from services.program_scope import resolve_program_scopes
 from services.program_day_occurrences import bucket_sessions, evaluate_occurrence
+from services.program_status_override_queries import load_program_status_overrides
 
 logger = logging.getLogger(__name__)
 
@@ -488,6 +489,13 @@ class _ProgramDaysMixin:
         
         result = []
         scopes = resolve_program_scopes(session, root_id, [program.id for program in active_programs])
+        status_overrides = load_program_status_overrides(
+            session, [program.id for program in active_programs], today, today,
+        )
+        manual_status_by_program = {
+            program_id: rows[0].status
+            for program_id, rows in status_overrides.items()
+        }
         effective = func.coalesce(Session.session_start, Session.completed_at, Session.created_at)
         execution_sessions = session.query(Session).filter(
             Session.root_id == root_id,
@@ -549,7 +557,7 @@ class _ProgramDaysMixin:
                                     "day_name": day.name,
                                     "day_number": day.day_number,
                                     "day_date": format_utc(day.date),
-                                    "is_completed": evaluation["requirements_met"],
+                                    "manual_status": manual_status_by_program.get(program.id),
                                     "completion_min_templates": day.completion_min_templates,
                                     "sessions": session_details,
                                     "completed_session_count": len([

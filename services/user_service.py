@@ -9,7 +9,7 @@ from sqlalchemy.orm.attributes import flag_modified
 import models
 from config import config
 from models import User, utc_now
-from models import ActivityDefinition, ActivityGroup, ActivityInstance, Goal, MetricDefinition, MetricValue, Program, ProgramBlock, ProgramDay, Session, SessionTemplate
+from models import ActivityDefinition, ActivityGroup, ActivityInstance, Goal, MetricDefinition, MetricValue, Program, ProgramBlock, ProgramDayStatusOverride, Session, SessionTemplate
 from services.account_flags import clear_force_password_change
 from services.email_service import EmailSendError, EmailService
 from services.email_templates import (
@@ -224,10 +224,18 @@ class UserService:
         has_program_block = self.db_session.query(ProgramBlock.id).join(Program).filter(
             Program.root_id == root_id,
         ).first() is not None
-        has_completed_program_day = self.db_session.query(ProgramDay.id).join(ProgramBlock).join(Program).filter(
-            Program.root_id == root_id,
-            ProgramDay.is_completed.is_(True),
-        ).first() is not None
+        has_completed_program_day = (
+            self.db_session.query(Session.id).filter(
+                Session.root_id == root_id,
+                Session.program_day_id.isnot(None),
+                Session.completed.is_(True),
+                Session.deleted_at.is_(None),
+            ).first() is not None
+            or self.db_session.query(ProgramDayStatusOverride.id).join(Program).filter(
+                Program.root_id == root_id,
+                ProgramDayStatusOverride.status == 'complete',
+            ).first() is not None
+        )
         visited = set(state.get('visited') or [])
 
         return {

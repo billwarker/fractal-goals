@@ -189,6 +189,10 @@ def _get_event_description(event: Event):
         Events.PROGRAM_DELETED: f"Deleted program: {name}" if name else "Deleted program",
         Events.PROGRAM_COMPLETED: f"Completed program: {name}" if name else "Program completed",
         Events.PROGRAM_DAY_COMPLETED: f"Completed program day: {event.data.get('day_name', 'Unknown')}",
+        Events.PROGRAM_DAY_STATUSES_UPDATED: (
+            f"Set {event.data.get('date_count', 0)} program day status"
+            f"{'es' if event.data.get('date_count', 0) != 1 else ''} to {event.data.get('status', 'automatic')}"
+        ),
         
         Events.PROGRAM_BLOCK_CREATED: f"Created block: {event.data.get('block_name', 'Unknown')}",
         Events.PROGRAM_BLOCK_UPDATED: f"Updated block: {event.data.get('block_name', 'Unknown')}",

@@ -138,6 +138,7 @@ from .programs import (
     ProgramDayGoalAttachSchema,
     ProgramDayOccurrenceUnscheduleSchema,
     ProgramDayScheduleSchema,
+    ProgramDayStatusesUpdateSchema,
     ProgramDayTemplateConfigSchema,
     ProgramDayUpdateSchema,
     ProgramGoalDeadlineSchema,

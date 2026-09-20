@@ -6,7 +6,7 @@ from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
-from models import Program, Session, validate_root_goal
+from models import Program, ProgramDayStatusOverride, Session, validate_root_goal
 from services.program_day_occurrences import build_day_facts, date_part, summarize_chain_facts
 from services.program_metrics_service import MAX_WINDOW_DAYS, ProgramMetricsService
 from services.program_scope import resolve_program_scope
@@ -16,7 +16,7 @@ from services.session_runtime import get_session_template_color, get_session_tem
 
 
 class ProgramDayReadModelService:
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
     CHAIN_LOOKBACK_DAYS = MAX_WINDOW_DAYS
 
     def __init__(self, db_session):
@@ -71,13 +71,19 @@ class ProgramDayReadModelService:
         sessions = self._load_sessions(
             root_id, program_id, current_user_id, chain_start, chain_end, zone,
         )
+        status_overrides = self.db_session.query(ProgramDayStatusOverride).filter(
+            ProgramDayStatusOverride.program_id == program_id,
+            ProgramDayStatusOverride.date >= chain_start,
+            ProgramDayStatusOverride.date <= chain_end,
+        ).all()
         scope = resolve_program_scope(self.db_session, root_id, program_id)
         aligned_evidence = self._load_aligned_evidence(
             root_id, current_user_id, start, min(end, datetime.now(zone).date()), zone, scope.goal_ids
         )
         local_today = datetime.now(zone).date()
         all_facts = build_day_facts(
-            program, chain_start, chain_end, sessions, aligned_evidence, zone, local_today
+            program, chain_start, chain_end, sessions, aligned_evidence, zone, local_today,
+            status_overrides=status_overrides,
         )
         facts = [item for item in all_facts if start <= item["date"] <= end]
         payload = self._summary(program, facts, start, end, timezone_name)
@@ -176,7 +182,11 @@ class ProgramDayReadModelService:
                 "aligned_instance_count": len(fact["aligned_items"]),
                 "block_ids": block_ids,
             })
-        closed_scheduled = [item for item in facts if item["scheduled"] and (item["closed"] or item["counts_as_success"])]
+        closed_scheduled = [
+            item for item in facts
+            if item["counts_toward_adherence"]
+            and (item["closed"] or item["counts_as_success"])
+        ]
         return {
             "schema_version": self.SCHEMA_VERSION,
             "program_id": program.id,
@@ -190,6 +200,7 @@ class ProgramDayReadModelService:
             },
             "range_summary": {
                 "scheduled_dates": sum(item["scheduled"] for item in facts),
+                "adherence_eligible_dates": sum(item["counts_toward_adherence"] for item in facts),
                 "met_dates": sum(item["state"] == "scheduled_met" for item in facts),
                 "partial_dates": sum(item["state"] == "scheduled_partial" for item in facts),
                 "missed_dates": sum(item["state"] == "scheduled_missed" for item in facts),
@@ -197,6 +208,8 @@ class ProgramDayReadModelService:
                 "evidence_dates": sum(item["state"] == "unscheduled_evidence" for item in facts),
                 "rest_dates": sum(item["state"] == "rest" for item in facts),
                 "upcoming_dates": sum(item["state"] == "upcoming" for item in facts),
+                "manual_complete_dates": sum(item["manual_status"] == "complete" for item in facts),
+                "manual_rest_dates": sum(item["manual_status"] == "rest" for item in facts),
                 "closed_scheduled_dates": len(closed_scheduled),
                 "chain_breaks": chain_summary["chain_breaks"],
                 "longest_run_in_range": longest_range_run,
@@ -266,6 +279,12 @@ class ProgramDayReadModelService:
                 goals_touched.update(evidence["in_scope_ids"])
         return {
             "date": detail_date.isoformat(),
+            "state": fact["state"] if fact else None,
+            "automatic_state": fact["automatic_state"] if fact else None,
+            "status_source": fact["status_source"] if fact else "automatic",
+            "manual_status": fact["manual_status"] if fact else None,
+            "scheduled": fact["scheduled"] if fact else False,
+            "completed_template_count": fact["completed_template_count"] if fact else 0,
             "requirements": fact["date_evaluation"] if fact else None,
             "occurrences": occurrences,
             "other_sessions": [self._serialize_session(item) for item in other],
