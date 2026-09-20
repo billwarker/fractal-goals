@@ -30,6 +30,7 @@ client/
 docs/
 docker/
 tests/
+agent_adapter/tests/
 
 # Local environments, agent state, and generated artifacts never enter images.
 fractal-goals-venv/

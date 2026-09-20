@@ -44,11 +44,13 @@ class _ProgramHelpersMixin:
         return root
 
     @classmethod
-    def _commit(cls, session, *instances):
-        session.commit()
-        for instance in instances:
-            if instance is not None:
-                session.refresh(instance)
+    def _commit(cls, session, *instances, commit=True):
+        session.flush()
+        if commit:
+            session.commit()
+            for instance in instances:
+                if instance is not None:
+                    session.refresh(instance)
 
     @classmethod
     def _queue_or_emit_event(cls, pending_events, event):

@@ -206,7 +206,7 @@ class ActivityService:
             current_user_id,
         )
 
-    def create_activity(self, root_id, activity_name, data) -> ActivityDefinition:
+    def create_activity(self, root_id, activity_name, data, *, commit=True, pending_events=None) -> ActivityDefinition:
         """Handle full creation lifecycle of an ActivityDefinition including Metrics and Splits."""
         data = normalize_activity_payload({**data, 'name': activity_name})
         group_id = data.get('group_id')
@@ -266,18 +266,24 @@ class ActivityService:
         if goal_ids:
             self._replace_activity_goal_associations(new_activity.id, root_id, goal_ids)
 
-        self.db_session.commit()
-        self.db_session.refresh(new_activity)
-        
-        event_bus.emit(Event(Events.ACTIVITY_CREATED, {
+        self.db_session.flush()
+        event = Event(Events.ACTIVITY_CREATED, {
             'activity_id': new_activity.id,
             'activity_name': new_activity.name,
             'root_id': root_id
-        }, source='activity_service.create_activity'))
+        }, source='activity_service.create_activity')
+        if commit:
+            self.db_session.commit()
+            self.db_session.refresh(new_activity)
+            event_bus.emit(event)
+        elif pending_events is not None:
+            pending_events.append(event)
         
         return new_activity
 
-    def update_activity(self, root_id, activity, data) -> ActivityDefinition:
+    def update_activity(
+        self, root_id, activity, data, *, commit=True, pending_events=None,
+    ) -> ActivityDefinition:
         """Patch scalar fields, but replace metrics/splits/goal associations when those keys are present."""
         data = normalize_activity_payload(data, partial=True)
         if 'name' in data and (data['name'] or '').strip():
@@ -396,21 +402,36 @@ class ActivityService:
         if 'goal_ids' in data:
             self._replace_activity_goal_associations(activity.id, root_id, data.get('goal_ids', []))
 
-        self.db_session.commit()
-        self.db_session.refresh(activity)
+        if commit:
+            self.db_session.commit()
+            self.db_session.refresh(activity)
+        else:
+            self.db_session.flush()
         if 'goal_ids' in data:
             self.db_session.expire(activity, ['associated_goals'])
 
-        event_bus.emit(Event(Events.ACTIVITY_UPDATED, {
+        event = Event(Events.ACTIVITY_UPDATED, {
             'activity_id': activity.id,
             'activity_name': activity.name,
             'root_id': root_id,
             'updated_fields': list(data.keys())
-        }, source='activity_service.update_activity'))
+        }, source='activity_service.update_activity')
+        if pending_events is None:
+            event_bus.emit(event)
+        else:
+            pending_events.append(event)
         
         return activity
 
-    def create_activity_definition(self, root_id, current_user_id, data) -> ServiceResult[ActivityDefinition]:
+    def create_activity_definition(
+        self,
+        root_id,
+        current_user_id,
+        data,
+        *,
+        commit=True,
+        pending_events=None,
+    ) -> ServiceResult[ActivityDefinition]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -446,7 +467,13 @@ class ActivityService:
             return None, quota_error, quota_status
 
         activity_name = validated_data['name']
-        new_activity = self.create_activity(root_id, activity_name, validated_data)
+        new_activity = self.create_activity(
+            root_id,
+            activity_name,
+            validated_data,
+            commit=commit,
+            pending_events=pending_events,
+        )
         return new_activity, None, 201
 
     def update_activity_definition(
@@ -455,6 +482,9 @@ class ActivityService:
         activity_id,
         current_user_id,
         data,
+        *,
+        commit=True,
+        pending_events=None,
     ) -> ServiceResult[ActivityDefinition]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
@@ -514,7 +544,13 @@ class ActivityService:
             if quota_error:
                 return None, quota_error, quota_status
 
-        updated_activity = self.update_activity(root_id, activity, validated_data)
+        updated_activity = self.update_activity(
+            root_id,
+            activity,
+            validated_data,
+            commit=commit,
+            pending_events=pending_events,
+        )
         return updated_activity, None, 200
 
     def delete_activity(self, root_id, activity) -> None:

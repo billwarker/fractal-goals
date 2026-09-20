@@ -1,0 +1,81 @@
+.panel {
+    display: grid;
+    gap: 24px;
+}
+
+.section {
+    display: grid;
+    gap: 12px;
+}
+
+.section h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+}
+
+.section p {
+    margin: 0;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+
+.endpointRow,
+.connection {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 10px;
+}
+
+.endpointRow code {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--color-text-primary);
+}
+
+.connection > div {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
+
+.connection p,
+.muted {
+    color: var(--color-text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.connection button,
+.endpointRow button {
+    min-height: 40px;
+    flex: 0 0 auto;
+    border: 1px solid var(--color-border-card);
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: var(--color-bg-elevated);
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.connection button:focus-visible,
+.endpointRow button:focus-visible {
+    outline: 3px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.error {
+    color: var(--color-danger, #b42318);
+}
+
+@media (max-width: 600px) {
+    .endpointRow,
+    .connection {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}

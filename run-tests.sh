@@ -35,6 +35,7 @@ usage() {
     echo "Options:"
     echo "  all           Run all tests (default)"
     echo "  backend       Run all backend tests"
+    echo "  agent-adapter Run MCP adapter unit tests"
     echo "  frontend      Run all frontend tests"
     echo "  unit          Run only unit tests"
     echo "  integration   Run only integration tests"
@@ -192,6 +193,13 @@ run_backend_tests() {
     ensure_backend_tools
     check_backend_db
     backend_pytest_no_cov
+    run_agent_adapter_tests
+}
+
+run_agent_adapter_tests() {
+    print_message "$GREEN" "Running MCP adapter unit tests..."
+    ensure_backend_tools
+    (cd "$ROOT_DIR" && "$VENV_PYTHON" -m pytest -o addopts="" agent_adapter/tests/)
 }
 
 run_frontend_tests() {
@@ -205,6 +213,10 @@ run_dependency_audit() {
     ensure_backend_tools
     "$VENV_PYTHON" -m pip_audit \
         -r "$ROOT_DIR/requirements.txt" \
+        --cache-dir "${PIP_AUDIT_CACHE_DIR:-${TMPDIR:-/tmp}/fractal-goals-pip-audit-cache}" \
+        --progress-spinner off
+    "$VENV_PYTHON" -m pip_audit \
+        -r "$ROOT_DIR/agent_adapter/requirements.txt" \
         --cache-dir "${PIP_AUDIT_CACHE_DIR:-${TMPDIR:-/tmp}/fractal-goals-pip-audit-cache}" \
         --progress-spinner off
     (cd "$CLIENT_DIR" && "$NPM_BIN" audit --omit=dev)
@@ -413,6 +425,7 @@ run_with_coverage() {
     check_backend_db
     "$VENV_PYTHON" "$ROOT_DIR/scripts/check_backend_coverage_gate.py"
     backend_pytest --cov-report=html --cov-report=term-missing
+    run_agent_adapter_tests
     print_message "$GREEN" "Coverage report generated in htmlcov/index.html"
 }
 
@@ -465,6 +478,9 @@ main() {
             ;;
         backend)
             run_backend_tests
+            ;;
+        agent-adapter)
+            run_agent_adapter_tests
             ;;
         frontend)
             run_frontend_tests
@@ -530,7 +546,11 @@ main() {
             run_watch_mode
             ;;
         file)
-            run_specific_file "$2"
+            if [[ "${2:-}" == agent_adapter/* ]]; then
+                run_agent_adapter_tests
+            else
+                run_specific_file "${2:-}"
+            fi
             ;;
         help|--help|-h)
             usage

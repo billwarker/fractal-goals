@@ -1168,6 +1168,8 @@ def serialize_note(note):
         "created_at": format_utc(note.created_at),
         "updated_at": format_utc(note.updated_at),
         "goal_id": note.goal_id,
+        "agent_grant_id": getattr(note, "agent_grant_id", None),
+        "agent_run_id": getattr(note, "agent_run_id", None),
         "pinned_at": format_utc(note.pinned_at) if note.pinned_at else None,
         "is_pinned": note.pinned_at is not None,
     }

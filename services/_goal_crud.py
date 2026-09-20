@@ -154,20 +154,32 @@ class _GoalCrudMixin:
         }, source='goal_service.create_global_goal'))
         return new_goal, None, 201
 
-    def create_fractal_goal(self, root_id, current_user_id, data) -> ServiceResult[Goal]:
+    def create_fractal_goal(
+        self,
+        root_id,
+        current_user_id,
+        data,
+        *,
+        commit=True,
+        pending_events=None,
+    ) -> ServiceResult[Goal]:
         new_goal, error, status = self.create_fractal_goal_record(root_id, current_user_id, data)
         if error:
             return None, error, status
 
-        self.db_session.commit()
-        self.db_session.refresh(new_goal)
-        event_bus.emit(Event(Events.GOAL_CREATED, {
+        event = Event(Events.GOAL_CREATED, {
             'goal_id': new_goal.id,
             'goal_name': new_goal.name,
             'goal_type': data.get('type', 'Goal'),
             'parent_id': new_goal.parent_id,
             'root_id': new_goal.root_id,
-        }, source='goal_service.create_fractal_goal'))
+        }, source='goal_service.create_fractal_goal')
+        if commit:
+            self.db_session.commit()
+            self.db_session.refresh(new_goal)
+            event_bus.emit(event)
+        elif pending_events is not None:
+            pending_events.append(event)
         return new_goal, None, 201
 
     def create_fractal_goal_record(self, root_id, current_user_id, data) -> ServiceResult[Goal]:
@@ -226,7 +238,11 @@ class _GoalCrudMixin:
         if parent_id:
             parent_goal = self.db_session.query(Goal).options(
                 selectinload(Goal.level)
-            ).filter_by(id=parent_id, root_id=root_id).first()
+            ).filter_by(
+                id=parent_id,
+                root_id=root_id,
+                deleted_at=None,
+            ).first()
             if not parent_goal:
                 return None, "Parent goal not found in this fractal.", 400
             parent_capacity_error = self._validate_parent_capacity(
@@ -316,7 +332,9 @@ class _GoalCrudMixin:
             return None, *error
         return goal, None, 200
 
-    def update_fractal_goal(self, root_id, goal_id, current_user_id, data) -> ServiceResult[Goal]:
+    def update_fractal_goal(
+        self, root_id, goal_id, current_user_id, data, *, commit=True, pending_events=None,
+    ) -> ServiceResult[Goal]:
         data = normalize_goal_payload(data, partial=True)
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
@@ -338,17 +356,24 @@ class _GoalCrudMixin:
         if update_error:
             return None, *update_error
 
-        self.db_session.commit()
-        self.db_session.refresh(goal)
-        event_bus.emit(Event(Events.GOAL_UPDATED, {
+        if commit:
+            self.db_session.commit()
+            self.db_session.refresh(goal)
+        event = Event(Events.GOAL_UPDATED, {
             'goal_id': goal.id,
             'goal_name': goal.name,
             'root_id': goal.root_id or goal.id,
             'updated_fields': list(data.keys()),
-        }, source='goal_service.update_fractal_goal'))
+        }, source='goal_service.update_fractal_goal')
+        if pending_events is None:
+            event_bus.emit(event)
+        else:
+            pending_events.append(event)
         return goal, None, 200
 
-    def update_global_goal(self, goal_id, current_user_id, data) -> ServiceResult[Goal]:
+    def update_global_goal(
+        self, goal_id, current_user_id, data, *, commit=True, pending_events=None,
+    ) -> ServiceResult[Goal]:
         data = normalize_goal_payload(data, partial=True)
         goal, error = self._get_authorized_goal(goal_id, current_user_id)
         if error:
@@ -365,14 +390,19 @@ class _GoalCrudMixin:
         if update_error:
             return None, *update_error
 
-        self.db_session.commit()
-        self.db_session.refresh(goal)
-        event_bus.emit(Event(Events.GOAL_UPDATED, {
+        if commit:
+            self.db_session.commit()
+            self.db_session.refresh(goal)
+        event = Event(Events.GOAL_UPDATED, {
             'goal_id': goal.id,
             'goal_name': goal.name,
             'root_id': goal.root_id or goal.id,
             'updated_fields': list(data.keys()),
-        }, source='goal_service.update_global_goal'))
+        }, source='goal_service.update_global_goal')
+        if pending_events is None:
+            event_bus.emit(event)
+        else:
+            pending_events.append(event)
         return goal, None, 200
 
     def delete_global_goal(self, goal_id, current_user_id) -> ServiceResult[JsonDict]:

@@ -27,6 +27,36 @@ FEATURE_FLAG_DEFINITIONS: dict[str, JsonDict] = {
         "description": "Shows the analytics query console, SQL chart query inspector, and SQL authoring affordances.",
         "default_enabled": False,
     },
+    "ai_agent_connectors": {
+        "key": "ai_agent_connectors",
+        "label": "AI agent connectors",
+        "description": "Enables delegated AI connections, task proposals, and reviewed execution.",
+        "default_enabled": False,
+    },
+    "ai_agent_writes": {
+        "key": "ai_agent_writes",
+        "label": "AI agent write operations",
+        "description": "Allows approved AI proposals to change supported Fractal Goals records.",
+        "default_enabled": False,
+    },
+    "ai_agent_embedded": {
+        "key": "ai_agent_embedded",
+        "label": "Embedded AI assistant",
+        "description": "Enables bounded provider API chat after deployment privacy approval and API configuration.",
+        "default_enabled": False,
+    },
+    "ai_agent_embedded_openai": {
+        "key": "ai_agent_embedded_openai",
+        "label": "Embedded OpenAI provider",
+        "description": "Allows the embedded assistant to use the configured OpenAI API account.",
+        "default_enabled": False,
+    },
+    "ai_agent_embedded_anthropic": {
+        "key": "ai_agent_embedded_anthropic",
+        "label": "Embedded Anthropic provider",
+        "description": "Allows the embedded assistant to use the configured Anthropic API account.",
+        "default_enabled": False,
+    },
 }
 
 

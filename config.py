@@ -145,6 +145,25 @@ class Config:
         'Lax' if ENV in ('development', 'testing', 'local') else 'Strict'
     )
 
+    # The separately deployed MCP adapter is a resource server. The Flask app
+    # remains the authorization server and domain execution boundary.
+    AGENT_OAUTH_ISSUER = os.getenv('AGENT_OAUTH_ISSUER', '').rstrip('/')
+    AGENT_MCP_RESOURCE_URI = os.getenv('AGENT_MCP_RESOURCE_URI', '').rstrip('/')
+    AGENT_ADAPTER_ID = os.getenv('AGENT_ADAPTER_ID', 'fractal-agent-mcp')
+    AGENT_ADAPTER_SHARED_SECRET = os.getenv('AGENT_ADAPTER_SHARED_SECRET', '')
+    AGENT_BRIEF_RETENTION_DAYS = max(30, min(365, int(os.getenv('AGENT_BRIEF_RETENTION_DAYS', '180'))))
+    AGENT_ACCESS_TOKEN_TTL_SECONDS = max(300, min(3600, int(os.getenv('AGENT_ACCESS_TOKEN_TTL_SECONDS', '900'))))
+    AGENT_REFRESH_TOKEN_TTL_DAYS = max(1, min(365, int(os.getenv('AGENT_REFRESH_TOKEN_TTL_DAYS', '90'))))
+    AGENT_RUN_LEASE_SECONDS = max(15, min(300, int(os.getenv('AGENT_RUN_LEASE_SECONDS', '60'))))
+    AGENT_EMBEDDED_OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+    AGENT_EMBEDDED_ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
+    AGENT_EMBEDDED_OPENAI_MODEL = os.getenv('AGENT_EMBEDDED_OPENAI_MODEL', '').strip()
+    AGENT_EMBEDDED_ANTHROPIC_MODEL = os.getenv('AGENT_EMBEDDED_ANTHROPIC_MODEL', '').strip()
+    AGENT_EMBEDDED_PRIVACY_APPROVED = os.getenv('AGENT_EMBEDDED_PRIVACY_APPROVED', '').lower() == 'true'
+    AGENT_EMBEDDED_MAX_STEPS = max(1, min(8, int(os.getenv('AGENT_EMBEDDED_MAX_STEPS', '6'))))
+    AGENT_EMBEDDED_MAX_TOKENS = max(512, min(12000, int(os.getenv('AGENT_EMBEDDED_MAX_TOKENS', '8000'))))
+    AGENT_EMBEDDED_MAX_SECONDS = max(15, min(180, int(os.getenv('AGENT_EMBEDDED_MAX_SECONDS', '90'))))
+
     # Rate Limiting Storage URL (Redis-compatible, or memory:// for explicit private-beta mode)
     RATELIMIT_STORAGE_URI = os.getenv('RATELIMIT_STORAGE_URI', 'memory://')
     ALLOW_IN_MEMORY_RATELIMIT = os.getenv('ALLOW_IN_MEMORY_RATELIMIT', 'false').lower() in ('true', '1', 'yes')

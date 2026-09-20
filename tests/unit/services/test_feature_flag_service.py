@@ -12,11 +12,21 @@ def test_feature_flags_default_off_and_persisted(db_session):
         "goal_surface_configuration": False,
         "analytics_sql_explorer": False,
         "onboarding_v1": False,
+        "ai_agent_connectors": False,
+        "ai_agent_writes": False,
+        "ai_agent_embedded": False,
+        "ai_agent_embedded_openai": False,
+        "ai_agent_embedded_anthropic": False,
     }
     assert [item["key"] for item in payload["definitions"]] == [
         "onboarding_v1",
         "goal_surface_configuration",
         "analytics_sql_explorer",
+        "ai_agent_connectors",
+        "ai_agent_writes",
+        "ai_agent_embedded",
+        "ai_agent_embedded_openai",
+        "ai_agent_embedded_anthropic",
     ]
 
     updated, error, status = service.update_flags({"analytics_sql_explorer": True})

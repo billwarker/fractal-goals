@@ -51,6 +51,7 @@ from blueprints.public_api import public_bp
 from blueprints.health_api import health_bp
 from blueprints.telemetry_api import telemetry_bp
 from blueprints.circuits_api import circuits_bp
+from blueprints.agent_api import agent_bp, agent_internal_bp, agent_metadata_bp, agent_oauth_bp
 from services.completion_handlers import clear_achievement_context, clear_live_progress
 
 
@@ -119,6 +120,10 @@ def app(test_database_engine, test_database_reset_sql, monkeypatch):
     test_app.register_blueprint(health_bp)
     test_app.register_blueprint(telemetry_bp)
     test_app.register_blueprint(circuits_bp)
+    test_app.register_blueprint(agent_bp)
+    test_app.register_blueprint(agent_internal_bp)
+    test_app.register_blueprint(agent_oauth_bp)
+    test_app.register_blueprint(agent_metadata_bp)
 
     from blueprints.error_handlers import register_error_handlers
     register_error_handlers(test_app)

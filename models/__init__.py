@@ -31,6 +31,12 @@ from .program import (
 )
 from .common import AnalyticsDashboard, AnalyticsQueryProfile, AppSetting, Note, EventLog, PageSurfaceLayout
 from .product_event import ProductEvent
+from .agent import (
+    AgentOAuthClient, AgentGrant, AgentAuthorizationCode, AgentCredential,
+    AgentTaskBrief, AgentProposal, AgentApproval, AgentRun, AgentOperation,
+    AgentChangeCursor, AgentOutboxEvent,
+    AgentEmbeddedConversation, AgentEmbeddedMessage, AgentEmbeddedRun,
+)
 
 # Legacy ALIASES for backward compatibility (Optional)
 PracticeSession = Session

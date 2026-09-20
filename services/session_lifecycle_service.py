@@ -21,6 +21,7 @@ from models import (
     validate_root_goal,
 )
 from services import Event, Events, event_bus
+from services.session_creation_events import publish_session_creation_events
 from services.circuit_completion import circuit_completion_event_data, finalize_circuit_run
 from services.goal_type_utils import get_canonical_goal_type
 from services.payload_normalizers import normalize_session_payload
@@ -70,14 +71,15 @@ class SessionLifecycleService:
         self._get_effective_activity_goals = effective_activity_goals_resolver
         self._session_goals_has_source = None
 
-    def _recompute_and_attach_stats(self, session):
+    def _recompute_and_attach_stats(self, session, *, commit=True):
         if not session:
             return
         stats_service = SessionTemplateStatsService(self.db_session)
         computed = stats_service.recompute_for_session(session)
         session._template_stats = computed.get("template") or {}
         session._activity_duration_stats = computed.get("activity_durations") or {}
-        self.db_session.commit()
+        if commit:
+            self.db_session.commit()
 
     def get_active_session(self, root_id, current_user_id) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
@@ -333,6 +335,8 @@ class SessionLifecycleService:
         reserve_active_slot=True,
         initially_completed=False,
         allow_archived_definitions=False,
+        commit=True,
+        pending_events=None,
     ) -> ServiceResult[JsonDict]:
         data = normalize_session_payload(data)
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
@@ -740,7 +744,8 @@ class SessionLifecycleService:
                     )
                     linked_goal_ids.add(ig_id)
 
-        self.db_session.commit()
+        if commit:
+            self.db_session.commit()
 
         if s_start or s_end:
             params = {'id': new_session.id}
@@ -754,25 +759,18 @@ class SessionLifecycleService:
             if update_clauses:
                 sql = f"UPDATE sessions SET {', '.join(update_clauses)} WHERE id = :id"
                 self.db_session.execute(text(sql), params)
-                self.db_session.commit()
+                if commit:
+                    self.db_session.commit()
 
         self.db_session.refresh(new_session)
-        self._recompute_and_attach_stats(new_session)
+        self._recompute_and_attach_stats(new_session, commit=commit)
 
-        event_bus.emit(Event(Events.SESSION_CREATED, {
-            'session_id': new_session.id,
-            'session_name': new_session.name,
-            'root_id': root_id,
-            'goal_ids': [g.id for g in new_session.goals]
-        }, source='session_service.create_session'))
-
-        for run_payload in created_circuit_runs:
-            event_bus.emit(Event(Events.CIRCUIT_RUN_CREATED, {
-                'circuit_run_id': run_payload['id'],
-                'circuit_definition_id': run_payload.get('circuit_definition_id'),
-                'session_id': new_session.id,
-                'root_id': root_id,
-            }, source='session_service.create_session'))
+        publish_session_creation_events(
+            new_session,
+            root_id,
+            created_circuit_runs,
+            pending_events,
+        )
 
         return serialize_session(new_session), None, 201
 

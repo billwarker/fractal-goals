@@ -20,6 +20,7 @@ import {
 import styles from './SettingsModal.module.css';
 import { useOptionalOnboarding } from '../../contexts/OnboardingContext';
 import OnboardingSettingsPanel from '../onboarding/OnboardingSettingsPanel';
+import AgentConnectionsPanel from '../agent/AgentConnectionsPanel';
 
 const SettingsModalInner = ({ onClose }) => {
     const {
@@ -96,6 +97,12 @@ const SettingsModalInner = ({ onClose }) => {
                                 className={`${styles.tab} ${isMobile ? styles.tabMobile : styles.tabDesktop} ${activeTab === 'account' ? styles.tabActive : styles.tabInactive} ${activeTab === 'account' ? (isMobile ? styles.tabActiveMobile : styles.tabActiveDesktop) : (isMobile ? styles.tabInactiveMobile : styles.tabInactiveDesktop)}`}
                             >
                                 Account
+                            </div>
+                            <div
+                                onClick={() => setActiveTab('ai-connections')}
+                                className={`${styles.tab} ${isMobile ? styles.tabMobile : styles.tabDesktop} ${activeTab === 'ai-connections' ? styles.tabActive : styles.tabInactive} ${activeTab === 'ai-connections' ? (isMobile ? styles.tabActiveMobile : styles.tabActiveDesktop) : (isMobile ? styles.tabInactiveMobile : styles.tabInactiveDesktop)}`}
+                            >
+                                AI Connections
                             </div>
                             {onboarding?.enabled && (
                                 <div onClick={() => setActiveTab('getting-started')} className={`${styles.tab} ${isMobile ? styles.tabMobile : styles.tabDesktop} ${activeTab === 'getting-started' ? styles.tabActive : styles.tabInactive}`}>Getting Started</div>
@@ -301,6 +308,12 @@ const SettingsModalInner = ({ onClose }) => {
                         {activeTab === 'getting-started' && onboarding && (
                             <div className={styles.tabContent}>
                                 <OnboardingSettingsPanel onboarding={onboarding} />
+                            </div>
+                        )}
+
+                        {activeTab === 'ai-connections' && (
+                            <div className={styles.tabContent}>
+                                <AgentConnectionsPanel />
                             </div>
                         )}
 

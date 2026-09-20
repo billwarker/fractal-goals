@@ -303,7 +303,7 @@ def test_schedule_block_day_emits_program_day_scheduled_event(db_session, sample
     monkeypatch.setattr("services.events.event_bus.emit", lambda event: emitted.append(event))
     monkeypatch.setattr(
         "services.session_service.SessionService.create_session",
-        lambda self, root_id, current_user_id, payload: (
+        lambda self, root_id, current_user_id, payload, **_kwargs: (
             {'id': 'session-1', 'name': payload['name']},
             None,
             201,

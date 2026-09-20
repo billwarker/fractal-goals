@@ -176,8 +176,8 @@ featured publicly without your prior express consent.
 
 ## 5. Service providers
 
-We use a small number of third-party providers to run Fractal Goals. Each processes personal
-information only on our instructions.
+We use third-party providers to run Fractal Goals. Their roles and handling terms vary by
+service and configuration, as described below.
 
 | Provider | What they do | Where |
 |---|---|---|
@@ -185,9 +185,23 @@ information only on our instructions.
 | **Supabase** | Provides the managed PostgreSQL database storing your account and content | [CONFIRM REGION] |
 | **Resend** | Delivers transactional and security emails | United States |
 | **Google BigQuery** | Internal analytics warehouse (see [Section 6](#6-internal-analytics)) | [CONFIRM DATASET LOCATION] |
+| **OpenAI API** | Optional embedded assistant; receives the user's message, bounded fractal context requested by the assistant, and proposal/tool results | Determined by the configured API project and data controls |
+| **Anthropic API** | Optional embedded assistant; receives the user's message, bounded fractal context requested by the assistant, and proposal/tool results | Determined by the configured API account and data controls |
 
-We have data processing agreements in place with these providers. We do not use any other
-processors, and we will update this table before adding one.
+The embedded assistant is disabled by default. A deployment cannot make it available until
+the operator has reviewed and approved the configured provider's commercial terms, data
+controls, and applicable privacy disclosures. If enabled, the message and only the bounded
+context returned by the assistant's Fractal Goals tools are sent to that provider's API.
+Provider account settings and terms govern the provider's own retention and data use; see
+[OpenAI API data controls](https://platform.openai.com/docs/models/default-usage-policies-by-endpoint)
+and [Anthropic commercial terms](https://www.anthropic.com/legal/commercial-terms). API usage
+is billed to the provider account configured for Fractal Goals, not to a user's ChatGPT or
+Claude subscription. Assistant conversation messages are included in account export and are
+removed under the agent-history retention schedule or when the account is deleted.
+
+The deployment operator must confirm its provider agreements and processing locations before
+setting the embedded privacy approval switch. The configured provider and location should be
+kept current in this notice.
 
 ### International transfers
 
@@ -197,7 +211,9 @@ be transferred to and processed in the United States and Canada.**
 
 Canada is recognised by the European Commission as providing an adequate level of data
 protection for commercial organisations. For transfers to the United States, we rely on the
-Standard Contractual Clauses incorporated into our agreements with the providers above.
+transfer protections in applicable provider agreements. The embedded assistant's deployment
+gate requires the operator to confirm provider-specific safeguards and processing location
+before enabling that provider.
 
 ---
 

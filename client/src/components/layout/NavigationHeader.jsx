@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { useHeader } from '../../contexts/HeaderContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useRootGoal } from '../../hooks/useGoalQueries';
 import useIsMobile from '../../hooks/useIsMobile';
@@ -192,15 +193,22 @@ function FractalSwitcher({
 }
 
 // Navigation header component defined outside of App to avoid re-declaration
-export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
+export const NavigationHeader = ({ onOpenSettings, onOpenAgent, onHeightChange }) => {
     const location = useLocation();
     const { headerActions } = useHeader();
     const { user } = useAuth();
+    const { flags } = useFeatureFlags({ enabled: Boolean(user?.id) });
     const isMobile = useIsMobile();
     const navRef = useRef(null);
     // Event logs are platform telemetry surfaced through the admin usage
     // dashboard; the Logs page is admin-only.
     const showLogsNav = Boolean(user?.is_admin);
+    const showAgentAction = Boolean(
+        user?.id && (
+            isFeatureEnabled(flags, FEATURE_FLAGS.aiAgentConnectors)
+            || isFeatureEnabled(flags, FEATURE_FLAGS.aiAgentEmbedded)
+        ),
+    );
 
     const pathParts = location.pathname.split('/');
     const rootId = pathParts[1]; // First part after /
@@ -291,6 +299,11 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                         <button className={`nav-text-link ${styles.mobileBtn}`} onClick={handleOpenSettings}>
                             SETTINGS
                         </button>
+                        {showAgentAction && (
+                            <button className={`nav-text-link ${styles.mobileBtn}`} onClick={onOpenAgent}>
+                                ASK AI
+                            </button>
+                        )}
                         <Link className={`nav-text-link home-link ${styles.mobileBtn}`} to="/" onClick={handleRouteLinkClick}>
                             EXIT
                         </Link>
@@ -350,6 +363,12 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
                     )}
 
                     <div className={`nav-separator ${styles.navSeparator}`}></div>
+                    {showAgentAction && (
+                        <>
+                            <button className="nav-text-link" onClick={onOpenAgent}>ASK AI</button>
+                            <div className={`nav-separator ${styles.navSeparator}`}></div>
+                        </>
+                    )}
                     <button className="nav-text-link" onClick={handleOpenSettings}>
                         {isMobile ? 'SET' : 'SETTINGS'}
                     </button>
@@ -363,4 +382,3 @@ export const NavigationHeader = ({ onOpenSettings, onHeightChange }) => {
         </div>
     );
 };
-

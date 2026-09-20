@@ -7,12 +7,22 @@ export const FEATURE_FLAGS = {
     goalSurfaceConfiguration: 'goal_surface_configuration',
     analyticsSqlExplorer: 'analytics_sql_explorer',
     onboarding: 'onboarding_v1',
+    aiAgentConnectors: 'ai_agent_connectors',
+    aiAgentWrites: 'ai_agent_writes',
+    aiAgentEmbedded: 'ai_agent_embedded',
+    aiAgentEmbeddedOpenAI: 'ai_agent_embedded_openai',
+    aiAgentEmbeddedAnthropic: 'ai_agent_embedded_anthropic',
 };
 
 const DEFAULT_FLAGS = {
     [FEATURE_FLAGS.goalSurfaceConfiguration]: false,
     [FEATURE_FLAGS.analyticsSqlExplorer]: false,
     [FEATURE_FLAGS.onboarding]: false,
+    [FEATURE_FLAGS.aiAgentConnectors]: false,
+    [FEATURE_FLAGS.aiAgentWrites]: false,
+    [FEATURE_FLAGS.aiAgentEmbedded]: false,
+    [FEATURE_FLAGS.aiAgentEmbeddedOpenAI]: false,
+    [FEATURE_FLAGS.aiAgentEmbeddedAnthropic]: false,
 };
 
 export function normalizeFeatureFlags(flags) {

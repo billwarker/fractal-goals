@@ -26,7 +26,11 @@ logger = logging.getLogger(__name__)
 
 class _ProgramDaysMixin:
     @classmethod
-    def add_block_day(cls, session, root_id: str, program_id: str, block_id: str, data: Dict, current_user_id: str | None = None) -> Dict[str, Any]:
+    def add_block_day(
+        cls, session, root_id: str, program_id: str, block_id: str, data: Dict,
+        current_user_id: str | None = None, *, commit=True, pending_events=None,
+        create_only=False,
+    ) -> Dict[str, Any]:
         cls._require_root_access(session, root_id, current_user_id)
         block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
         if not block:
@@ -64,6 +68,8 @@ class _ProgramDaysMixin:
             day = None
             if target_date:
                 day = session.query(ProgramDay).filter_by(block_id=target.id, date=target_date).first()
+                if day and create_only:
+                    raise ValueError("A program day already exists on this date")
             
             if not day:
                 count = session.query(ProgramDay).filter_by(block_id=target.id).count()
@@ -98,16 +104,23 @@ class _ProgramDaysMixin:
                 'root_id': root_id,
             })
 
-        cls._commit(session)
+        cls._commit(session, commit=commit)
         for event_payload in emitted_days:
-            event_bus.emit(Event(Events.PROGRAM_DAY_CREATED, event_payload, source='cls.add_block_day'))
+            cls._queue_or_emit_event(
+                pending_events,
+                Event(Events.PROGRAM_DAY_CREATED, event_payload, source='cls.add_block_day'),
+            )
         return {
             "days": [serialize_program_day(day) for day in touched_days],
             "count": created_count,
         }
 
     @classmethod
-    def update_block_day(cls, session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict:
+    def update_block_day(
+        cls, session, root_id: str, program_id: str, block_id: str, day_id: str,
+        data: Dict, current_user_id: str | None = None, *, commit=True,
+        pending_events=None,
+    ) -> Dict:
         cls._require_root_access(session, root_id, current_user_id)
         day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
         if not day:
@@ -164,16 +177,17 @@ class _ProgramDaysMixin:
                         cls._validate_program_day_completion_min(t_day)
             except StopIteration: pass
 
-        cls._commit(session, day)
+        cls._commit(session, day, commit=commit)
 
-        event_bus.emit(Event(Events.PROGRAM_DAY_UPDATED, {
+        event = Event(Events.PROGRAM_DAY_UPDATED, {
             'day_id': day.id,
             'day_name': day.name,
             'block_id': block_id,
             'program_id': program_id,
             'root_id': root_id,
             'updated_fields': list(data.keys())
-        }, source='cls.update_block_day'))
+        }, source='cls.update_block_day')
+        cls._queue_or_emit_event(pending_events, event)
 
         return serialize_program_day(day)
 
@@ -256,7 +270,19 @@ class _ProgramDaysMixin:
         }
 
     @classmethod
-    def schedule_block_day(cls, session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict:
+    def schedule_block_day(
+        cls,
+        session,
+        root_id: str,
+        program_id: str,
+        block_id: str,
+        day_id: str,
+        data: Dict,
+        current_user_id: str | None = None,
+        *,
+        commit=True,
+        pending_events=None,
+    ) -> Dict:
         cls._require_root_access(session, root_id, current_user_id)
 
         block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
@@ -311,6 +337,8 @@ class _ProgramDaysMixin:
             root_id,
             current_user_id,
             session_payload,
+            commit=commit,
+            pending_events=pending_events,
         )
         if error_message:
             raise ValueError(error_message)
@@ -328,7 +356,7 @@ class _ProgramDaysMixin:
             if isinstance(scheduled_session, dict)
             else getattr(scheduled_session, 'name', None)
         )
-        event_bus.emit(Event(Events.PROGRAM_DAY_SCHEDULED, {
+        scheduled_event = Event(Events.PROGRAM_DAY_SCHEDULED, {
             'day_id': day.id,
             'day_name': day.name,
             'block_id': block_id,
@@ -337,7 +365,11 @@ class _ProgramDaysMixin:
             'scheduled_date': scheduled_date.isoformat(),
             'session_id': scheduled_session_id,
             'session_name': scheduled_session_name,
-        }, source='cls.schedule_block_day'))
+        }, source='cls.schedule_block_day')
+        if pending_events is None:
+            event_bus.emit(scheduled_event)
+        else:
+            pending_events.append(scheduled_event)
         return scheduled_session
 
     @classmethod

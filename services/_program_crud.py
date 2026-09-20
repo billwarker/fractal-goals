@@ -44,7 +44,10 @@ class _ProgramCrudMixin:
         return serialize_program(program, scope=resolve_program_scope(session, root_id, program.id), as_of=as_of)
 
     @classmethod
-    def create_block(cls, session, root_id: str, program_id: str, data: Dict, current_user_id: str | None = None) -> Dict:
+    def create_block(
+        cls, session, root_id: str, program_id: str, data: Dict,
+        current_user_id: str | None = None, *, commit=True, pending_events=None,
+    ) -> Dict:
         cls._require_root_access(session, root_id, current_user_id)
         program = get_owned_program(session, root_id, program_id)
         if not program:
@@ -66,17 +69,21 @@ class _ProgramCrudMixin:
         if data.get('goal_ids'):
             cls._replace_block_goals(session, new_block.id, data['goal_ids'], root_id)
 
-        cls._commit(session, new_block)
-        event_bus.emit(Event(Events.PROGRAM_BLOCK_CREATED, {
+        cls._commit(session, new_block, commit=commit)
+        event = Event(Events.PROGRAM_BLOCK_CREATED, {
             'block_id': new_block.id,
             'block_name': new_block.name,
             'program_id': program_id,
             'root_id': root_id,
-        }, source='cls.create_block'))
+        }, source='cls.create_block')
+        cls._queue_or_emit_event(pending_events, event)
         return serialize_program_block(new_block)
 
     @classmethod
-    def update_block(cls, session, root_id: str, program_id: str, block_id: str, data: Dict, current_user_id: str | None = None) -> Dict:
+    def update_block(
+        cls, session, root_id: str, program_id: str, block_id: str, data: Dict,
+        current_user_id: str | None = None, *, commit=True, pending_events=None,
+    ) -> Dict:
         cls._require_root_access(session, root_id, current_user_id)
         program = get_owned_program(session, root_id, program_id)
         if not program:
@@ -99,14 +106,15 @@ class _ProgramCrudMixin:
             cls._replace_block_goals(session, block.id, data['goal_ids'], root_id)
             session.expire(block, ['goals'])
 
-        cls._commit(session, block)
-        event_bus.emit(Event(Events.PROGRAM_BLOCK_UPDATED, {
+        cls._commit(session, block, commit=commit)
+        event = Event(Events.PROGRAM_BLOCK_UPDATED, {
             'block_id': block.id,
             'block_name': block.name,
             'program_id': program_id,
             'root_id': root_id,
             'updated_fields': list(data.keys()),
-        }, source='cls.update_block'))
+        }, source='cls.update_block')
+        cls._queue_or_emit_event(pending_events, event)
         return serialize_program_block(block)
 
     @classmethod
@@ -123,7 +131,10 @@ class _ProgramCrudMixin:
         cls._commit(session)
 
     @classmethod
-    def create_program(cls, session, root_id: str, validated_data: Dict, current_user_id: str | None = None) -> Dict:
+    def create_program(
+        cls, session, root_id: str, validated_data: Dict,
+        current_user_id: str | None = None, *, commit=True, pending_events=None,
+    ) -> Dict:
         cls._require_root_access(session, root_id, current_user_id)
         if current_user_id:
             quota_service = QuotaService(session)
@@ -164,13 +175,14 @@ class _ProgramCrudMixin:
         session.flush()
         cls._replace_program_goals(session, new_program.id, goal_ids, root_id)
         
-        cls._commit(session, new_program)
+        cls._commit(session, new_program, commit=commit)
 
-        event_bus.emit(Event(Events.PROGRAM_CREATED, {
+        event = Event(Events.PROGRAM_CREATED, {
             'program_id': new_program.id,
             'program_name': new_program.name,
             'root_id': root_id
-        }, source='cls.create_program'))
+        }, source='cls.create_program')
+        cls._queue_or_emit_event(pending_events, event)
         
         return serialize_program(
             new_program,
@@ -178,7 +190,10 @@ class _ProgramCrudMixin:
         )
 
     @classmethod
-    def update_program(cls, session, root_id: str, program_id: str, validated_data: Dict, current_user_id: str | None = None) -> Optional[Dict]:
+    def update_program(
+        cls, session, root_id: str, program_id: str, validated_data: Dict,
+        current_user_id: str | None = None, *, commit=True, pending_events=None,
+    ) -> Optional[Dict]:
         cls._require_root_access(session, root_id, current_user_id)
         program = get_owned_program(session, root_id, program_id)
         if not program:
@@ -215,14 +230,15 @@ class _ProgramCrudMixin:
             goal_ids = validated_data['selectedGoals']
             cls._replace_program_goals(session, program.id, goal_ids, root_id)
         
-        cls._commit(session, program)
-        
-        event_bus.emit(Event(Events.PROGRAM_UPDATED, {
+        cls._commit(session, program, commit=commit)
+
+        event = Event(Events.PROGRAM_UPDATED, {
             'program_id': program.id,
             'program_name': program.name,
             'root_id': root_id,
             'updated_fields': list(validated_data.keys())
-        }, source='cls.update_program'))
+        }, source='cls.update_program')
+        cls._queue_or_emit_event(pending_events, event)
         
         return serialize_program(
             program,

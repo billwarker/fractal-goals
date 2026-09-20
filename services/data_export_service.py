@@ -16,6 +16,16 @@ from models import (
     ActivityDefinition,
     ActivityGroup,
     ActivityInstance,
+    AgentApproval,
+    AgentEmbeddedConversation,
+    AgentEmbeddedMessage,
+    AgentEmbeddedRun,
+    AgentGrant,
+    AgentOAuthClient,
+    AgentOperation,
+    AgentProposal,
+    AgentRun,
+    AgentTaskBrief,
     AnalyticsDashboard,
     EventLog,
     Goal,
@@ -75,6 +85,9 @@ class DataExportService:
             "generated_at": format_utc(datetime.now(timezone.utc)),
             "account": serialize_user(user),
             "fractals": [self._export_root(root_id) for root_id in root_ids],
+            # OAuth bearer credentials and authorization codes are never
+            # exported; grants are represented only by consent metadata.
+            "ai_connections": self._export_agent_connections(user_id),
             # Usage events are the user's own telemetry rows. Included because
             # the Privacy Policy discloses collecting them, so a subject access
             # request should return them.
@@ -105,6 +118,112 @@ class DataExportService:
             "notes": self._serialize_all(Note, root_id, serialize_note),
             "analytics_dashboards": self._serialize_all(AnalyticsDashboard, root_id, serialize_analytics_dashboard),
             "event_logs": self._serialize_all(EventLog, root_id, serialize_event_log),
+            "ai_agent_history": self._export_agent_history(root_id),
+        }
+
+    def _export_agent_connections(self, user_id: str) -> list:
+        rows = self.db_session.query(AgentGrant, AgentOAuthClient).join(
+            AgentOAuthClient, AgentOAuthClient.id == AgentGrant.client_id,
+        ).filter(AgentGrant.user_id == user_id).order_by(AgentGrant.created_at).all()
+        return [{
+            "client_name": client.client_name,
+            "root_ids": list(grant.allowed_roots or []),
+            "scopes": sorted((grant.scopes or "").split()),
+            "created_at": format_utc(grant.created_at),
+            "expires_at": format_utc(grant.expires_at),
+            "revoked_at": format_utc(grant.revoked_at),
+        } for grant, client in rows]
+
+    def _export_agent_history(self, root_id: str) -> dict:
+        tasks = self.db_session.query(AgentTaskBrief).filter_by(root_id=root_id).order_by(
+            AgentTaskBrief.created_at,
+        ).all()
+        proposals = self.db_session.query(AgentProposal).filter_by(root_id=root_id).order_by(
+            AgentProposal.revision,
+        ).all()
+        runs = self.db_session.query(AgentRun).filter_by(root_id=root_id).order_by(
+            AgentRun.created_at,
+        ).all()
+        embedded_conversations = self.db_session.query(AgentEmbeddedConversation).filter_by(
+            root_id=root_id,
+        ).order_by(AgentEmbeddedConversation.created_at).all()
+        return {
+            "tasks": [{
+                "id": row.id,
+                "request_text": row.request_text,
+                "context": row.context,
+                "timezone": row.timezone,
+                "status": row.status,
+                "created_at": format_utc(row.created_at),
+                "expires_at": format_utc(row.expires_at),
+            } for row in tasks],
+            "proposals": [{
+                "id": row.id,
+                "task_id": row.task_id,
+                "revision": row.revision,
+                "proposal_hash": row.proposal_hash,
+                "operations": row.operations,
+                "preview": row.preview,
+                "status": row.status,
+                "created_at": format_utc(row.created_at),
+                "expires_at": format_utc(row.expires_at),
+                "approvals": [{
+                    "decision": approval.decision,
+                    "proposal_hash": approval.proposal_hash,
+                    "created_at": format_utc(approval.created_at),
+                } for approval in self.db_session.query(AgentApproval).filter_by(
+                    proposal_id=row.id,
+                ).order_by(AgentApproval.created_at).all()],
+            } for row in proposals],
+            "runs": [{
+                "id": run.id,
+                "proposal_id": run.proposal_id,
+                "status": run.status,
+                "trace_id": run.trace_id,
+                "created_at": format_utc(run.created_at),
+                "started_at": format_utc(run.started_at),
+                "finished_at": format_utc(run.finished_at),
+                "operations": [{
+                    "operation_id": operation.operation_id,
+                    "sequence": operation.sequence,
+                    "kind": operation.kind,
+                    "status": operation.status,
+                    "result": operation.result,
+                    "error_code": operation.error_code,
+                    "error_message": operation.error_message,
+                } for operation in self.db_session.query(AgentOperation).filter_by(
+                    run_id=run.id,
+                ).order_by(AgentOperation.sequence).all()],
+            } for run in runs],
+            "embedded_conversations": [{
+                "id": conversation.id,
+                "provider": conversation.provider,
+                "model": conversation.model,
+                "timezone": conversation.timezone,
+                "created_at": format_utc(conversation.created_at),
+                "updated_at": format_utc(conversation.updated_at),
+                "messages": [{
+                    "role": message.role,
+                    "content": message.content,
+                    "created_at": format_utc(message.created_at),
+                } for message in self.db_session.query(AgentEmbeddedMessage).filter_by(
+                    conversation_id=conversation.id,
+                ).order_by(AgentEmbeddedMessage.created_at).all()],
+                "runs": [{
+                    "status": run.status,
+                    "steps_used": run.steps_used,
+                    "step_budget": run.step_budget,
+                    "steps_used": run.steps_used,
+                    "tokens_used": run.tokens_used,
+                    "token_budget": run.token_budget,
+                    "proposal_id": run.proposal_id,
+                    "error_code": run.error_code,
+                    "created_at": format_utc(run.created_at),
+                    "finished_at": format_utc(run.finished_at),
+                } for run in self.db_session.query(AgentEmbeddedRun).filter_by(
+                    conversation_id=conversation.id,
+                ).order_by(AgentEmbeddedRun.created_at).all()],
+            } for conversation in embedded_conversations],
         }
 
     def _serialize_all(self, model, root_id: str, serializer) -> list:

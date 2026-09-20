@@ -161,9 +161,16 @@ admin analytics and export according to the documented retention controls.
 
 ## Repository map
 
-Planned AI integration: [AI agent harness](planning/ai-agent-harness.md) describes
-delegated ChatGPT/Claude connectors, shared domain execution, and a later embedded
-assistant. This is a proposal; these runtime capabilities are not implemented yet.
+AI agent harness: [implementation plan and delivery audit](planning/ai-agent-harness.md).
+The local runtime includes delegated OAuth, a separately deployed MCP adapter with
+host-facing safety annotations, reviewed task/proposal execution, safe reviewed updates
+and inverse proposals, and a first-party handoff/review UI. Its pinned-SDK Streamable
+HTTP protocol round-trip passes locally. An app-funded embedded assistant is implemented
+behind feature and deployment privacy gates. Connector and write flags default off until
+public-host compatibility and release gates pass. The local PostgreSQL-backed backend
+suite, fresh-database migration checks, frontend suite, and desktop/mobile browser
+workflows pass; provider keys, public host access, and live ChatGPT/Claude verification
+are not configured locally.
 
 - `app.py`, `config.py`, `extensions.py` — application/runtime setup
 - `blueprints/` — HTTP routes
@@ -190,9 +197,9 @@ Use `./run-tests.sh` as the canonical entry point:
 - `./run-tests.sh file <path>`
 
 Backend CI gates migration health, one complete unit/integration/performance/e2e
-coverage run, a production dependency audit, a logical backup/restore drill, and the
-production container. Consolidating the test layers avoids executing the same backend
-tests again only to collect coverage.
+coverage run, a production dependency audit, a logical backup/restore drill, and both
+the backend and isolated MCP adapter production containers. Consolidating the test
+layers avoids executing the same backend tests again only to collect coverage.
 `pytest.ini` owns the services/blueprints coverage scope and ratcheted threshold;
 `scripts/check_backend_coverage_gate.py` prevents CI from stripping it through `addopts`.
 `scripts/check_backend_maintainability.py` caps oversized backend modules and exception debt.
@@ -205,6 +212,9 @@ Backend tests build the schema once per pytest session and clear ORM rows in dep
 order between tests, preserving real commit and independent-connection semantics. Frontend tests use
 four isolated Vitest threads. The `all` command runs the complete backend and frontend
 suites concurrently and reports each result, reducing wall time without removing tests.
+The delegated MCP adapter has a separate offline-capable unit suite at
+`agent_adapter/tests/`, run with `./run-tests.sh agent-adapter` and in CI against the
+pinned MCP SDK. Its runtime dependencies remain isolated from the Flask application.
 See `tests/README.md` for full-suite execution details.
 
 Standing review rules—including boundary-case tests, broad-exception criteria, large-file

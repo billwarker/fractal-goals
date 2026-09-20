@@ -615,7 +615,17 @@ class NoteService:
         logger.info("Unpinned note %s", note_id)
         return serialize_note_display(note), None, 200
 
-    def create_note(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
+    def create_note(
+        self,
+        root_id,
+        current_user_id,
+        data,
+        *,
+        commit=True,
+        pending_events=None,
+        agent_grant_id=None,
+        agent_run_id=None,
+    ) -> ServiceResult[JsonDict]:
         data = normalize_note_payload(data)
         if 'nano_goal_id' in data:
             return None, "nano_goal_id is no longer supported", 400
@@ -707,12 +717,13 @@ class NoteService:
                 activity_set_id=activity_set_id,
                 content=content,
                 note_kind=note_kind,
+                agent_grant_id=agent_grant_id,
+                agent_run_id=agent_run_id,
             )
             self.db_session.add(note)
 
-        self.db_session.commit()
-        logger.info("Created note %s for %s %s", note.id, data['context_type'], note.context_id)
-        event_bus.emit(Event(
+        self.db_session.flush()
+        event = Event(
             Events.NOTE_CREATED,
             {
                 'note_id': note.id,
@@ -726,7 +737,13 @@ class NoteService:
                 'goal_id': note.goal_id,
             },
             source='note_service.create_note',
-        ))
+        )
+        if commit:
+            self.db_session.commit()
+            event_bus.emit(event)
+        elif pending_events is not None:
+            pending_events.append(event)
+        logger.info("Created note %s for %s %s", note.id, data['context_type'], note.context_id)
         return self._attach_program_names(serialize_note_display(note)), None, 201
 
     def update_note(self, root_id, note_id, current_user_id, data) -> ServiceResult[JsonDict]:

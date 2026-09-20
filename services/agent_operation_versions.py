@@ -1,0 +1,279 @@
+"""Stable snapshots for reviewed mutations in the delegated agent harness."""
+
+import datetime as dt
+
+from models import (
+    ActivityDefinition,
+    Goal,
+    MetricDefinition,
+    Program,
+    ProgramBlock,
+    ProgramDay,
+    SplitDefinition,
+    activity_goal_associations,
+    program_block_goals,
+    program_day_templates,
+    program_goals,
+)
+from services.agent_harness_common import AgentHarnessError, _digest
+
+
+def _columns(entity):
+    values = {}
+    for column in entity.__table__.columns:
+        value = getattr(entity, column.key)
+        if isinstance(value, dt.datetime):
+            value = (
+                value.replace(tzinfo=dt.timezone.utc)
+                if value.tzinfo is None
+                else value.astimezone(dt.timezone.utc)
+            )
+            value = value.isoformat()
+        elif isinstance(value, dt.date):
+            value = value.isoformat()
+        values[column.key] = value
+    return values
+
+
+def operation_state_hash(session, root_id, operation):
+    """Hash the entity and related state a reviewed update can affect."""
+    operation_type = operation["type"]
+    if operation_type == "update_goal":
+        goal = session.query(Goal).filter_by(
+            id=operation["goal_id"], root_id=root_id, deleted_at=None,
+        ).first()
+        if goal is None:
+            raise AgentHarnessError("Goal is no longer available", 409, "stale_context")
+        subtree = []
+        pending = [goal]
+        while pending:
+            current = pending.pop()
+            subtree.append({
+                "goal": _columns(current),
+                "targets": [
+                    _columns(target) for target in sorted(
+                        current.targets_rel or [], key=lambda row: row.id,
+                    )
+                ],
+            })
+            pending.extend(current.children)
+        subtree.sort(key=lambda item: item["goal"]["id"])
+        return _digest({"goal_subtree": subtree})
+
+    if operation_type in {"update_activity", "associate_activity_goals"}:
+        activity = session.query(ActivityDefinition).filter_by(
+            id=operation["activity_id"], root_id=root_id, deleted_at=None,
+        ).first()
+        if activity is None:
+            raise AgentHarnessError("Activity is no longer available", 409, "stale_context")
+        state = {"activity": _columns(activity)}
+        state["goal_ids"] = sorted(
+            row[0] for row in session.execute(
+                activity_goal_associations.select().with_only_columns(
+                    activity_goal_associations.c.goal_id
+                ).where(activity_goal_associations.c.activity_id == activity.id)
+            ).all()
+        )
+        if operation_type == "update_activity":
+            state["metrics"] = [
+                _columns(row) for row in session.query(MetricDefinition).filter_by(
+                    activity_id=activity.id,
+                ).order_by(MetricDefinition.id).all()
+            ]
+            state["splits"] = [
+                _columns(row) for row in session.query(SplitDefinition).filter_by(
+                    activity_id=activity.id,
+                ).order_by(SplitDefinition.id).all()
+            ]
+        return _digest(state)
+
+    if operation_type == "update_program":
+        program = session.query(Program).filter_by(
+            id=operation["program_id"], root_id=root_id,
+        ).first()
+        if program is None:
+            raise AgentHarnessError("Program is no longer available", 409, "stale_context")
+        goal_ids = session.execute(
+            program_goals.select().with_only_columns(program_goals.c.goal_id).where(
+                program_goals.c.program_id == program.id
+            )
+        ).all()
+        return _digest({"program": _columns(program), "goal_ids": sorted(row[0] for row in goal_ids)})
+
+    if operation_type == "update_block":
+        block = session.query(ProgramBlock).join(Program).filter(
+            ProgramBlock.id == operation["block_id"],
+            ProgramBlock.program_id == operation["program_id"],
+            Program.root_id == root_id,
+        ).first()
+        if block is None:
+            raise AgentHarnessError("Program block is no longer available", 409, "stale_context")
+        goal_ids = session.execute(
+            program_block_goals.select().with_only_columns(program_block_goals.c.goal_id).where(
+                program_block_goals.c.program_block_id == block.id
+            )
+        ).all()
+        return _digest({"block": _columns(block), "goal_ids": sorted(row[0] for row in goal_ids)})
+
+    if operation_type == "update_program_day":
+        day = session.query(ProgramDay).join(ProgramBlock).join(Program).filter(
+            ProgramDay.id == operation["day_id"],
+            ProgramDay.block_id == operation["block_id"],
+            ProgramBlock.program_id == operation["program_id"],
+            Program.root_id == root_id,
+        ).first()
+        if day is None:
+            raise AgentHarnessError("Program day is no longer available", 409, "stale_context")
+        links = session.execute(
+            program_day_templates.select().where(
+                program_day_templates.c.program_day_id == day.id
+            ).order_by(program_day_templates.c.order)
+        ).mappings().all()
+        return _digest({"day": _columns(day), "templates": [dict(link) for link in links]})
+
+    raise AgentHarnessError("This operation has no version snapshot", 400, "unsupported_operation")
+
+
+def operation_restore_payload(session, root_id, operation):
+    """Return a safe reviewed inverse payload for operations this harness can restore."""
+    kind = operation["type"]
+    data = operation.get("data", {})
+    supported = True
+    if kind == "update_goal":
+        goal = session.query(Goal).filter_by(
+            id=operation["goal_id"], root_id=root_id, deleted_at=None,
+        ).first()
+        if goal is None:
+            raise AgentHarnessError("Goal is no longer available", 409, "stale_context")
+        prior = {
+            "name": goal.name,
+            "description": goal.description,
+            "deadline": goal.deadline.date().isoformat() if goal.deadline else None,
+            "parent_id": goal.parent_id,
+            "completed_via_children": goal.completed_via_children,
+            "relevance_statement": goal.relevance_statement,
+            "inherit_parent_activities": goal.inherit_parent_activities,
+            "allow_manual_completion": goal.allow_manual_completion,
+            "track_activities": goal.track_activities,
+            "progress_settings": goal.progress_settings,
+        }
+        if "targets" in data or ("deadline" in data and goal.children):
+            supported = False
+        prior = {key: value for key, value in prior.items() if key in data}
+        return {"type": kind, "goal_id": goal.id, "data": prior,
+                "undo_supported": supported,
+                "reason": "Goal targets or cascading child deadlines require a dedicated inverse plan" if not supported else None}
+
+    if kind in {"update_activity", "associate_activity_goals"}:
+        activity = session.query(ActivityDefinition).filter_by(
+            id=operation["activity_id"], root_id=root_id, deleted_at=None,
+        ).first()
+        if activity is None:
+            raise AgentHarnessError("Activity is no longer available", 409, "stale_context")
+        goal_ids = sorted(row[0] for row in session.execute(
+            activity_goal_associations.select().with_only_columns(
+                activity_goal_associations.c.goal_id
+            ).where(activity_goal_associations.c.activity_id == activity.id)
+        ).all())
+        if kind == "associate_activity_goals":
+            return {"type": kind, "activity_id": activity.id,
+                    "goal_ids": goal_ids, "undo_supported": True}
+        prior = {
+            "name": activity.name,
+            "description": activity.description,
+            "group_id": activity.group_id,
+            "has_sets": activity.has_sets,
+            "has_metrics": activity.has_metrics,
+            "metrics_multiplicative": activity.metrics_multiplicative,
+            "has_splits": activity.has_splits,
+            "goal_ids": goal_ids,
+            "track_progress": activity.track_progress,
+            "progress_aggregation": activity.progress_aggregation,
+            "delta_display_mode": activity.delta_display_mode,
+        }
+        if "metrics" in data or "splits" in data:
+            supported = False
+        prior = {key: value for key, value in prior.items() if key in data}
+        return {"type": kind, "activity_id": activity.id, "data": prior,
+                "undo_supported": supported,
+                "reason": "Metric and split history needs a dedicated inverse plan" if not supported else None}
+
+    if kind == "update_program":
+        program = session.query(Program).filter_by(
+            id=operation["program_id"], root_id=root_id,
+        ).first()
+        if program is None:
+            raise AgentHarnessError("Program is no longer available", 409, "stale_context")
+        goal_ids = sorted(row[0] for row in session.execute(
+            program_goals.select().with_only_columns(program_goals.c.goal_id).where(
+                program_goals.c.program_id == program.id
+            )
+        ).all())
+        prior = {
+            "name": program.name,
+            "description": program.description,
+            "color": program.color,
+            "start_date": program.start_date.isoformat(),
+            "end_date": program.end_date.isoformat(),
+            "selectedGoals": goal_ids,
+        }
+        return {"type": kind, "program_id": program.id,
+                "data": {key: value for key, value in prior.items() if key in data},
+                "undo_supported": True}
+
+    if kind == "update_block":
+        block = session.query(ProgramBlock).join(Program).filter(
+            ProgramBlock.id == operation["block_id"],
+            ProgramBlock.program_id == operation["program_id"],
+            Program.root_id == root_id,
+        ).first()
+        if block is None:
+            raise AgentHarnessError("Program block is no longer available", 409, "stale_context")
+        goal_ids = sorted(row[0] for row in session.execute(
+            program_block_goals.select().with_only_columns(program_block_goals.c.goal_id).where(
+                program_block_goals.c.program_block_id == block.id
+            )
+        ).all())
+        prior = {"name": block.name,
+                         "start_date": block.start_date.isoformat() if block.start_date else None,
+                         "end_date": block.end_date.isoformat() if block.end_date else None,
+                         "color": block.color, "goal_ids": goal_ids}
+        return {"type": kind, "program_id": operation["program_id"], "block_id": block.id,
+                "data": {key: value for key, value in prior.items() if key in data},
+                "undo_supported": True}
+
+    if kind == "update_program_day":
+        day = session.query(ProgramDay).join(ProgramBlock).join(Program).filter(
+            ProgramDay.id == operation["day_id"],
+            ProgramDay.block_id == operation["block_id"],
+            ProgramBlock.program_id == operation["program_id"],
+            Program.root_id == root_id,
+        ).first()
+        if day is None:
+            raise AgentHarnessError("Program day is no longer available", 409, "stale_context")
+        links = session.execute(
+            program_day_templates.select().where(
+                program_day_templates.c.program_day_id == day.id
+            ).order_by(program_day_templates.c.order)
+        ).mappings().all()
+        prior = {
+                    "name": day.name,
+                    "date": day.date.isoformat() if day.date else None,
+                    "day_of_week": day.day_of_week or [],
+                    "completion_min_templates": day.completion_min_templates,
+                    "template_configs": [
+                        {"template_id": link["session_template_id"],
+                         "is_required": bool(link["is_required"]), "order": link["order"]}
+                        for link in links
+                    ],
+                    "cascade": False,
+                }
+        restore_data = {key: value for key, value in prior.items() if key in data}
+        if "template_ids" in data or "template_configs" in data:
+            restore_data["template_configs"] = prior["template_configs"]
+        return {"type": kind, "program_id": operation["program_id"],
+                "block_id": operation["block_id"], "day_id": day.id,
+                "data": restore_data,
+                "undo_supported": True}
+
+    return None

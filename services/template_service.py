@@ -141,7 +141,15 @@ class TemplateService:
         self.db_session.commit()
         return template, None, 200
 
-    def create_template(self, root_id, current_user_id, data) -> ServiceResult[SessionTemplate]:
+    def create_template(
+        self,
+        root_id,
+        current_user_id,
+        data,
+        *,
+        commit=True,
+        pending_events=None,
+    ) -> ServiceResult[SessionTemplate]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -171,12 +179,12 @@ class TemplateService:
             template_data=json.dumps(template_data) if template_data else None,
         )
         self.db_session.add(new_template)
-        self.db_session.commit()
-        self.db_session.refresh(new_template)
+        self.db_session.flush()
+        if commit:
+            self.db_session.refresh(new_template)
         stats_service = SessionTemplateStatsService(self.db_session)
         new_template._duration_stats = stats_service.recompute_template_stats(root_id, new_template.id) or {}
-        self.db_session.commit()
-        event_bus.emit(Event(
+        event = Event(
             Events.SESSION_TEMPLATE_CREATED,
             {
                 'template_id': new_template.id,
@@ -184,7 +192,12 @@ class TemplateService:
                 'root_id': root_id,
             },
             source='template_service.create_template',
-        ))
+        )
+        if commit:
+            self.db_session.commit()
+            event_bus.emit(event)
+        elif pending_events is not None:
+            pending_events.append(event)
         return new_template, None, 201
 
     def create_template_from_session(self, root_id, session_id, name, current_user_id) -> ServiceResult[SessionTemplate]:

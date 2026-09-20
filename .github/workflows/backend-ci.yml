@@ -90,9 +90,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-test.txt
+          pip install -r agent_adapter/requirements.txt
 
       - name: Audit production dependencies
-        run: python -m pip_audit -r requirements.txt --progress-spinner off
+        run: |
+          python -m pip_audit -r requirements.txt --progress-spinner off
+          python -m pip_audit -r agent_adapter/requirements.txt --progress-spinner off
 
       - name: Prepare Postgres test database
         run: |
@@ -132,6 +135,9 @@ jobs:
         run: |
           python scripts/check_backend_coverage_gate.py
           python -m pytest tests/unit tests/integration tests/performance tests/e2e --cov-report=xml --cov-report=html --cov-report=term-missing
+          AGENT_MCP_RESOURCE_URI=http://127.0.0.1:8000/mcp \
+          AGENT_OAUTH_ISSUER=http://127.0.0.1:5000 \
+            python -m pytest -o addopts="" agent_adapter/tests
 
       - name: Exercise logical backup and restore
         run: python scripts/check_backup_restore.py
@@ -155,3 +161,8 @@ jobs:
         run: |
           docker run --rm --entrypoint python fractal-backend:ci -m pip check
           docker run --rm --entrypoint gunicorn fractal-backend:ci --version
+      - name: Build and verify isolated MCP adapter image
+        run: |
+          docker build --file agent_adapter/Dockerfile --tag fractal-agent-adapter:ci .
+          docker run --rm --entrypoint python fractal-agent-adapter:ci -m pip check
+          docker run --rm --entrypoint python fractal-agent-adapter:ci -c "import agent_adapter.server"

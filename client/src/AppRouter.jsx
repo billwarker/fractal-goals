@@ -32,6 +32,7 @@ const Legal = lazyWithRetry(() => import('./pages/Legal'), 'pages/Legal');
 
 const LEGAL_PATHS = ['/privacy', '/terms'];
 const SettingsModal = lazyWithRetry(() => import('./components/modals/SettingsModal'), 'components/modals/SettingsModal');
+const AgentTaskDrawer = lazyWithRetry(() => import('./components/agent/AgentTaskDrawer'), 'components/agent/AgentTaskDrawer');
 const ForcePasswordChangeModal = lazyWithRetry(() => import('./components/modals/ForcePasswordChangeModal'), 'components/modals/ForcePasswordChangeModal');
 const LegalAcceptanceModal = lazyWithRetry(() => import('./components/modals/LegalAcceptanceModal'), 'components/modals/LegalAcceptanceModal');
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
@@ -63,6 +64,7 @@ function App() {
     const mustChangePassword = Boolean(isAuthenticated && user?.must_change_password);
     const legalAcceptanceRequired = Boolean(isAuthenticated && user?.legal_acceptance_required);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isAgentDrawerOpen, setIsAgentDrawerOpen] = useState(false);
     const isMobile = useIsMobile();
     const [navHeight, setNavHeight] = useState(() => (location.pathname === '/' ? 0 : (isMobile ? 56 : 60)));
     const adminParams = new URLSearchParams(location.search);
@@ -76,6 +78,7 @@ function App() {
     // checkbox and the landing footer both link here before an account exists.
     const showLegalPage = LEGAL_PATHS.includes(location.pathname);
     const showSelectionPage = location.pathname === '/' && !showLandingPage;
+    const activeRootId = location.pathname.split('/')[1] || '';
 
     // Determine page title based on path
     const getPageTitle = (pathname) => {
@@ -190,6 +193,7 @@ function App() {
                             trackEvent('settings_opened');
                             setIsSettingsOpen(true);
                         }}
+                        onOpenAgent={() => setIsAgentDrawerOpen(true)}
                         onHeightChange={setNavHeight}
                     />
                 )}
@@ -324,6 +328,15 @@ function App() {
                 <Suspense fallback={null}>
                     {isSettingsOpen && (
                         <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+                    )}
+                </Suspense>
+
+                <Suspense fallback={null}>
+                    {isAgentDrawerOpen && activeRootId && (
+                        <AgentTaskDrawer
+                            rootId={activeRootId}
+                            onClose={() => setIsAgentDrawerOpen(false)}
+                        />
                     )}
                 </Suspense>
 

@@ -383,8 +383,14 @@ class SessionService:
     def get_active_session(self, root_id, current_user_id) -> ServiceResult[JsonDict]:
         return self._session_lifecycle_service().get_active_session(root_id, current_user_id)
 
-    def create_session(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
-        return self._session_lifecycle_service().create_session(root_id, current_user_id, data)
+    def create_session(self, root_id, current_user_id, data, *, commit=True, pending_events=None) -> ServiceResult[JsonDict]:
+        return self._session_lifecycle_service().create_session(
+            root_id,
+            current_user_id,
+            data,
+            commit=commit,
+            pending_events=pending_events,
+        )
 
     def create_completed_quick_session(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         return self._session_lifecycle_service().create_completed_quick_session(root_id, current_user_id, data)

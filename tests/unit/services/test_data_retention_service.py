@@ -66,6 +66,12 @@ def test_prune_enforces_each_published_live_database_window(db_session):
         'email_webhook_events': 1,
         'admin_audit_events': 1,
         'beta_signup_requests': 1,
+        'agent_task_briefs': 0,
+        'agent_authorization_codes': 0,
+        'agent_credentials': 0,
+        'agent_grants': 0,
+        'agent_oauth_clients': 0,
+        'agent_embedded_conversations': 0,
     }
     assert db_session.query(ProductEvent).count() == 1
     assert db_session.query(BetaSignupRequest).one().email == 'pending@example.com'

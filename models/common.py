@@ -27,6 +27,8 @@ class Note(Base):
 
     content = Column(Text, nullable=False)
     note_kind = Column(String, nullable=True, index=True)
+    agent_grant_id = Column(String, ForeignKey('agent_grants.id', ondelete='SET NULL'), nullable=True, index=True)
+    agent_run_id = Column(String, ForeignKey('agent_runs.id', ondelete='SET NULL'), nullable=True, index=True)
     pinned_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=utc_now)

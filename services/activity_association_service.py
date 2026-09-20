@@ -72,7 +72,10 @@ class ActivityAssociationService:
                     )
         return valid_goal_ids
 
-    def set_activity_goals(self, root_id, activity_id, current_user_id, goal_ids) -> ServiceResult[ActivityDefinition]:
+    def set_activity_goals(
+        self, root_id, activity_id, current_user_id, goal_ids, *, commit=True,
+        pending_events=None,
+    ) -> ServiceResult[ActivityDefinition]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -83,15 +86,22 @@ class ActivityAssociationService:
 
         self.replace_activity_goal_associations(activity_id, root_id, goal_ids)
 
-        self.db_session.commit()
+        if commit:
+            self.db_session.commit()
+        else:
+            self.db_session.flush()
         self.db_session.expire(activity, ['associated_goals'])
 
-        event_bus.emit(Event(Events.ACTIVITY_UPDATED, {
+        event = Event(Events.ACTIVITY_UPDATED, {
             'activity_id': activity_id,
             'activity_name': activity.name,
             'root_id': root_id,
             'updated_fields': ['associated_goals'],
-        }, source='activity_service.set_activity_goals'))
+        }, source='activity_service.set_activity_goals')
+        if pending_events is None:
+            event_bus.emit(event)
+        else:
+            pending_events.append(event)
 
         return activity, None, 200
 

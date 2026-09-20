@@ -7,6 +7,12 @@ from sqlalchemy import delete
 from config import config
 from models import (
     AdminAuditEvent,
+    AgentAuthorizationCode,
+    AgentCredential,
+    AgentEmbeddedConversation,
+    AgentGrant,
+    AgentOAuthClient,
+    AgentTaskBrief,
     BetaSignupRequest,
     EmailDeliveryEvent,
     EmailWebhookEvent,
@@ -45,6 +51,8 @@ class DataRetentionService:
             "email_events": now - datetime.timedelta(days=config.EMAIL_EVENT_RETENTION_DAYS),
             "admin_audits": now - datetime.timedelta(days=config.ADMIN_AUDIT_RETENTION_DAYS),
             "beta_signups": now - datetime.timedelta(days=config.BETA_SIGNUP_CLOSED_RETENTION_DAYS),
+            "agent_history": now - datetime.timedelta(days=config.AGENT_BRIEF_RETENTION_DAYS),
+            "agent_credentials": now - datetime.timedelta(days=30),
         }
 
         counts = {
@@ -69,6 +77,35 @@ class DataRetentionService:
                 BetaSignupRequest,
                 BetaSignupRequest.status.in_(("invited", "dismissed")),
                 BetaSignupRequest.updated_at < cutoffs["beta_signups"],
+            ),
+            # Task cascades remove proposals, approvals, runs, operations, and
+            # any task-linked private prompt or diff at the same boundary.
+            "agent_task_briefs": self._delete(
+                AgentTaskBrief,
+                AgentTaskBrief.expires_at < now,
+                AgentTaskBrief.created_at < cutoffs["agent_history"],
+            ),
+            "agent_authorization_codes": self._delete(
+                AgentAuthorizationCode,
+                AgentAuthorizationCode.expires_at < now,
+            ),
+            "agent_credentials": self._delete(
+                AgentCredential,
+                (AgentCredential.expires_at < now)
+                | (AgentCredential.revoked_at < cutoffs["agent_credentials"]),
+            ),
+            "agent_grants": self._delete(
+                AgentGrant,
+                (AgentGrant.expires_at < now)
+                | (AgentGrant.revoked_at < cutoffs["agent_history"]),
+            ),
+            "agent_oauth_clients": self._delete(
+                AgentOAuthClient,
+                AgentOAuthClient.revoked_at < cutoffs["agent_history"],
+            ),
+            "agent_embedded_conversations": self._delete(
+                AgentEmbeddedConversation,
+                AgentEmbeddedConversation.updated_at < cutoffs["agent_history"],
             ),
         }
         self.db_session.commit()
