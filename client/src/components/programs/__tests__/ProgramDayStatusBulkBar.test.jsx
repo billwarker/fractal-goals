@@ -18,4 +18,22 @@ describe('ProgramDayStatusBulkBar', () => {
         expect(screen.getByRole('button', { name: 'Rest' })).toBeEnabled();
         expect(screen.getByRole('button', { name: 'Automatic' })).toBeEnabled();
     });
+
+    it('applies statuses only to scheduled dates while an event spans the whole selection', () => {
+        const onPlanTimeOff = vi.fn();
+        render(<ProgramDayStatusBulkBar
+            dates={['2026-09-12', '2026-09-13']}
+            scheduledDates={[]}
+            today="2026-09-10"
+            onApply={vi.fn()}
+            onPlanTimeOff={onPlanTimeOff}
+            onCancel={vi.fn()}
+        />);
+
+        expect(screen.getByText('2 selected · 0 scheduled')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Rest' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Automatic' })).toBeDisabled();
+        screen.getByRole('button', { name: 'Plan event…' }).click();
+        expect(onPlanTimeOff).toHaveBeenCalledTimes(1);
+    });
 });

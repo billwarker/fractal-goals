@@ -411,17 +411,16 @@ class AgentProposalPreviewMixin:
                 )
             except ValueError as error:
                 raise AgentHarnessError(str(error), 400, "validation_failed") from error
-            session_id = scheduled.get("id")
             return {
                 "operation_id": operation["operation_id"],
                 "type": operation["type"],
                 "action": "Schedule program day",
                 "name": scheduled.get("name"),
-                "session_start": scheduled.get("session_start"),
+                "date": scheduled.get("date"),
                 "program_day_id": operation["day_id"],
             }, {
-                "id": session_id,
-                "session_id": session_id,
+                "id": scheduled.get("id"),
+                "date": scheduled.get("date"),
                 "program_day_id": operation["day_id"],
                 "name": scheduled.get("name"),
                 "root_id": task.root_id,

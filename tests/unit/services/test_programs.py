@@ -4,7 +4,7 @@ from datetime import datetime, date, timezone, timedelta
 from unittest.mock import patch
 
 import models
-from models import Program, ProgramBlock, ProgramDay, Goal, Session, get_session
+from models import Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule, Goal, Session, get_session
 from services.programs import ProgramService
 from services.events import event_bus, Events, Event
 
@@ -301,14 +301,6 @@ def test_schedule_block_day_emits_program_day_scheduled_event(db_session, sample
 
     emitted = []
     monkeypatch.setattr("services.events.event_bus.emit", lambda event: emitted.append(event))
-    monkeypatch.setattr(
-        "services.session_service.SessionService.create_session",
-        lambda self, root_id, current_user_id, payload, **_kwargs: (
-            {'id': 'session-1', 'name': payload['name']},
-            None,
-            201,
-        ),
-    )
 
     result = ProgramService.schedule_block_day(
         db_session,
@@ -316,12 +308,15 @@ def test_schedule_block_day_emits_program_day_scheduled_event(db_session, sample
         sample_program.id,
         block.id,
         day.id,
-        {'session_start': datetime.now(timezone.utc).isoformat()},
+        {'date': date.today().isoformat()},
     )
 
-    assert result['id'] == 'session-1'
+    schedule_row = db_session.query(ProgramDayOccurrenceSchedule).filter_by(program_day_id=day.id).one()
+    assert result['id'] == schedule_row.id
+    assert result['date'] == date.today().isoformat()
     assert [event.name for event in emitted] == [Events.PROGRAM_DAY_SCHEDULED]
     assert emitted[0].data['day_name'] == 'Sched Day'
+    assert emitted[0].data['schedule_id'] == schedule_row.id
 
 
 def test_unschedule_block_day_occurrence_emits_program_day_unscheduled_event(db_session, sample_program, sample_goal_hierarchy, monkeypatch):

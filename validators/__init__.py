@@ -128,6 +128,7 @@ from .analytics import (
     AnalyticsQueryProfileUpdateSchema,
     AnalyticsQueryRunSchema,
 )
+from .calendar_periods import CalendarPeriodCreateSchema, CalendarPeriodUpdateSchema
 from .programs import (
     ProgramBlockGoalAttachSchema,
     ProgramBlockSchema,
@@ -139,6 +140,7 @@ from .programs import (
     ProgramDayOccurrenceUnscheduleSchema,
     ProgramDayScheduleSchema,
     ProgramDayStatusesUpdateSchema,
+    ProgramDaySessionCreditSchema,
     ProgramDayTemplateConfigSchema,
     ProgramDayUpdateSchema,
     ProgramGoalDeadlineSchema,
@@ -234,6 +236,8 @@ __all__ = [
     "PAGE_SURFACE_WIDGET_TYPES",
     "PageSurfaceCreateSchema",
     "PageSurfaceUpdateSchema",
+    "CalendarPeriodCreateSchema",
+    "CalendarPeriodUpdateSchema",
     "ProgramBlockGoalAttachSchema",
     "ProgramBlockSchema",
     "ProgramBlockUpdateSchema",
@@ -243,6 +247,7 @@ __all__ = [
     "ProgramDayGoalAttachSchema",
     "ProgramDayOccurrenceUnscheduleSchema",
     "ProgramDayScheduleSchema",
+    "ProgramDaySessionCreditSchema",
     "ProgramDayTemplateConfigSchema",
     "ProgramDayUpdateSchema",
     "ProgramGoalDeadlineSchema",

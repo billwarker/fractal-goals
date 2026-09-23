@@ -35,8 +35,8 @@ mode supports block-range creation and bulk status changes on arbitrary schedule
 Shift selection, click-and-drag across eligible scheduled cells, keyboard activation on scheduled cells, cancellation, and a
 persistent bulk action bar. Successful
 mutations invalidate day read models, program metrics, and program calendar data.
-Calendar day ribbons do not render extra completion checkmarks; their effective state is still
-announced to assistive technology and shown in the day pane.
+Calendar day ribbons now render the day pane's status symbol (superseded 2026-09-23; see
+[day review plan](program-day-review-summary-and-credit.md)).
 The selected-timeframe overview sends the exact selected dates to the metrics endpoint. Counts,
 evidence, blocks, and goal outcomes exclude unselected gaps; selected-day streaks reset across
 calendar gaps. Sparse selections show "N selected days" in headers, while contiguous selections

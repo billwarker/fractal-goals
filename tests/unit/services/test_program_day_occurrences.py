@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
@@ -309,3 +309,295 @@ def test_chain_roles_and_breaks_use_one_canonical_definition():
     assert [fact["chain_role"] for fact in facts] == ["start", "bridge", "end", "none", "none"]
     assert [fact["broke_active_chain"] for fact in facts] == [False, False, False, True, False]
     assert stats == {"current_streak": 0, "longest_streak": 2, "chain_breaks": 1}
+
+
+def credit_session(identifier, template_id, day_value, *, program_id=None, program_day_id=None, completed=True):
+    return SimpleNamespace(
+        id=identifier, template_id=template_id, program_id=program_id,
+        program_day_id=program_day_id, completed=completed, deleted_at=None,
+        session_start=datetime.combine(day_value, datetime.min.time(), tzinfo=timezone.utc),
+        completed_at=None, created_at=None,
+    )
+
+
+def stored_credit(session_id, day_value, disposition, template_id=None):
+    return SimpleNamespace(
+        session_id=session_id, date=day_value, disposition=disposition, template_id=template_id,
+    )
+
+
+def facts_for(program, day_value, sessions, credits=()):
+    return build_day_facts(
+        program, day_value, day_value, sessions, [], ZoneInfo("UTC"), day_value + timedelta(days=1),
+        session_credits=list(credits),
+    )[0]
+
+
+def test_unlinked_session_with_a_scheduled_template_is_template_matched():
+    day_value = date(2026, 9, 1)
+    program, _day = scheduled_program(day_value, [template_rule("a")])
+
+    fact = facts_for(program, day_value, [credit_session("s1", "a", day_value)])
+
+    assert fact["state"] == "scheduled_met"
+    assert fact["session_credits"]["s1"]["source"] == "template_match"
+    assert fact["occurrences"][0]["credits"][0]["source"] == "template_match"
+
+
+def test_session_linked_to_another_program_is_never_auto_credited():
+    day_value = date(2026, 9, 1)
+    program, _day = scheduled_program(day_value, [template_rule("a")])
+
+    fact = facts_for(program, day_value, [
+        credit_session("s1", "a", day_value, program_id="other-program"),
+    ])
+
+    assert fact["state"] == "scheduled_missed"
+    assert "s1" not in fact["session_credits"]
+
+
+def test_same_program_session_linked_to_another_day_matches_by_template():
+    day_value = date(2026, 9, 1)
+    program, _day = scheduled_program(day_value, [template_rule("a")])
+
+    fact = facts_for(program, day_value, [
+        credit_session("s1", "a", day_value, program_id="program-1", program_day_id="tuesday"),
+    ])
+
+    assert fact["requirements_met"] is True
+    assert fact["session_credits"]["s1"]["source"] == "template_match"
+
+
+def test_exact_link_wins_over_template_match():
+    day_value = date(2026, 9, 1)
+    program, _day = scheduled_program(day_value, [template_rule("a")])
+
+    fact = facts_for(program, day_value, [
+        credit_session("s1", "a", day_value, program_id="program-1", program_day_id="day-1"),
+    ])
+
+    assert fact["session_credits"]["s1"]["source"] == "linked"
+
+
+def test_manual_credit_counts_a_substitute_template():
+    day_value = date(2026, 9, 1)
+    program, _day = scheduled_program(day_value, [template_rule("a")])
+    session = credit_session("s1", "unrelated", day_value)
+
+    automatic = facts_for(program, day_value, [session])
+    manual = facts_for(program, day_value, [session], [stored_credit("s1", day_value, "credit", "a")])
+
+    assert automatic["state"] == "scheduled_missed"
+    assert manual["state"] == "scheduled_met"
+    assert manual["session_credits"]["s1"] | {"program_day_ids": None} == {
+        "source": "manual", "template_id": "a", "program_day_ids": None,
+        "excluded": False, "stored_disposition": "credit",
+    }
+
+
+def test_manual_credit_for_an_unscheduled_template_is_dormant():
+    day_value = date(2026, 9, 1)
+    program, _day = scheduled_program(day_value, [template_rule("a")])
+
+    fact = facts_for(
+        program, day_value, [credit_session("s1", "a", day_value)],
+        [stored_credit("s1", day_value, "credit", "removed-template")],
+    )
+
+    assert fact["session_credits"]["s1"]["source"] == "template_match"
+    assert fact["requirements_met"] is True
+
+
+def test_exclusion_removes_automatic_credit_but_keeps_the_fact():
+    day_value = date(2026, 9, 1)
+    program, _day = scheduled_program(day_value, [template_rule("a")])
+
+    fact = facts_for(
+        program, day_value, [credit_session("s1", "a", day_value)],
+        [stored_credit("s1", day_value, "exclude")],
+    )
+
+    assert fact["state"] == "scheduled_missed"
+    assert fact["occurrences"][0]["credits"] == []
+    assert fact["session_credits"]["s1"]["excluded"] is True
+
+
+def test_credits_on_another_local_date_are_dormant():
+    day_value = date(2026, 9, 1)
+    program, _day = scheduled_program(day_value, [template_rule("a")])
+    late_session = credit_session("s1", "unrelated", day_value)
+    late_session.session_start = datetime(2026, 9, 2, 1, tzinfo=timezone.utc)
+
+    fact = build_day_facts(
+        program, day_value, day_value, [late_session], [], ZoneInfo("America/Toronto"), date(2026, 9, 3),
+        session_credits=[stored_credit("s1", date(2026, 9, 2), "credit", "a")],
+    )[0]
+
+    # 01:00 UTC on Sep 2 is Sep 1 in Toronto; the Sep 2 credit row does not apply.
+    assert fact["session_credits"] == {}
+    assert fact["state"] == "scheduled_missed"
+
+
+def test_incomplete_template_match_is_attributed_but_never_completes_the_day():
+    day_value = date(2026, 9, 1)
+    program, _day = scheduled_program(day_value, [template_rule("a")])
+
+    fact = facts_for(program, day_value, [credit_session("s1", "a", day_value, completed=False)])
+
+    assert fact["occurrences"][0]["credits"][0]["source"] == "template_match"
+    assert fact["requirements_met"] is False
+
+
+def test_duplicate_template_sessions_count_once_toward_the_minimum():
+    day_value = date(2026, 9, 1)
+    program, _day = scheduled_program(
+        day_value, [template_rule("a"), template_rule("b", required=False)], minimum=2,
+    )
+
+    one_template = facts_for(program, day_value, [
+        credit_session("s1", "a", day_value), credit_session("s2", "a", day_value),
+    ])
+    two_templates = facts_for(program, day_value, [
+        credit_session("s1", "a", day_value), credit_session("s2", "b", day_value),
+    ])
+
+    assert (one_template["completed_template_count"], one_template["requirements_met"]) == (1, False)
+    assert (two_templates["completed_template_count"], two_templates["requirements_met"]) == (2, True)
+
+
+def period(identifier, start, end, *, protects=True, deleted=False):
+    return {
+        "id": identifier, "start_date": start, "end_date": end,
+        "protects_streaks": protects, "deleted_at": "gone" if deleted else None,
+    }
+
+
+def range_program(start, end, rules):
+    """A block covering start..end with one definition recurring every day."""
+    day = SimpleNamespace(
+        id="day-1", date=None, day_of_week=[
+            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+        ], template_links=rules, templates=[rule.template for rule in rules],
+        completion_min_templates=None, occurrence_schedules=[],
+    )
+    block = SimpleNamespace(id="block-1", start_date=start, end_date=end, days=[day])
+    return SimpleNamespace(id="program-1", blocks=[block])
+
+
+def period_facts(program, start, end, sessions=(), *, periods=(), overrides=(), today):
+    return build_day_facts(
+        program, start, end, list(sessions), [], ZoneInfo("UTC"), today,
+        status_overrides=list(overrides), periods=list(periods),
+    )
+
+
+def test_protecting_period_turns_unmet_days_into_rest_but_keeps_met_days():
+    start, end = date(2026, 9, 1), date(2026, 9, 5)
+    program = range_program(start, end, [template_rule("a")])
+    facts = period_facts(
+        program, start, end,
+        [credit_session("met", "a", date(2026, 9, 3), program_id="program-1", program_day_id="day-1")],
+        periods=[period("vacation", date(2026, 9, 2), date(2026, 9, 4))],
+        today=date(2026, 9, 10),
+    )
+    by_date = {fact["date"]: fact for fact in facts}
+
+    # Boundaries: the days just outside the period are unaffected.
+    assert by_date[date(2026, 9, 1)]["state"] == "scheduled_missed"
+    assert by_date[date(2026, 9, 5)]["state"] == "scheduled_missed"
+    assert (by_date[date(2026, 9, 2)]["state"], by_date[date(2026, 9, 2)]["status_source"]) == ("rest", "period")
+    assert by_date[date(2026, 9, 2)]["period_id"] == "vacation"
+    assert by_date[date(2026, 9, 2)]["counts_toward_adherence"] is False
+    assert by_date[date(2026, 9, 2)]["breaks_chain"] is False
+    assert by_date[date(2026, 9, 4)]["state"] == "rest"
+    met = by_date[date(2026, 9, 3)]
+    assert (met["state"], met["status_source"], met["counts_as_success"]) == ("scheduled_met", "automatic", True)
+    assert met["period_ids"] == ["vacation"]
+    assert by_date[date(2026, 9, 1)]["period_ids"] == []
+
+
+def test_period_rest_bridges_the_chain_without_extending_it():
+    start, end = date(2026, 9, 1), date(2026, 9, 4)
+    program = range_program(start, end, [template_rule("a")])
+    sessions = [
+        credit_session(f"s{day}", "a", date(2026, 9, day), program_id="program-1", program_day_id="day-1")
+        for day in (1, 4)
+    ]
+    facts = period_facts(
+        program, start, end, sessions,
+        periods=[period("trip", date(2026, 9, 2), date(2026, 9, 3))],
+        today=date(2026, 9, 10),
+    )
+
+    assert [fact["run_length_at_date"] for fact in facts] == [1, 1, 1, 2]
+    assert summarize_chain_facts(facts)["chain_breaks"] == 0
+
+
+def test_partial_day_inside_period_is_rest():
+    day_value = date(2026, 9, 2)
+    program = range_program(day_value, day_value, [template_rule("a"), template_rule("b")])
+    fact = period_facts(
+        program, day_value, day_value,
+        [credit_session("s1", "a", day_value, program_id="program-1", program_day_id="day-1")],
+        periods=[period("trip", day_value, day_value)], today=date(2026, 9, 10),
+    )[0]
+
+    assert (fact["automatic_state"], fact["state"]) == ("scheduled_partial", "rest")
+
+
+def test_manual_override_beats_period_and_unprotected_or_deleted_periods_do_nothing():
+    day_value = date(2026, 9, 2)
+    program = range_program(day_value, day_value, [template_rule("a")])
+    override = SimpleNamespace(date=day_value, status="complete")
+
+    manual = period_facts(
+        program, day_value, day_value, periods=[period("trip", day_value, day_value)],
+        overrides=[override], today=date(2026, 9, 10),
+    )[0]
+    informational = period_facts(
+        program, day_value, day_value, periods=[period("note", day_value, day_value, protects=False)],
+        today=date(2026, 9, 10),
+    )[0]
+    deleted = period_facts(
+        program, day_value, day_value, periods=[period("old", day_value, day_value, deleted=True)],
+        today=date(2026, 9, 10),
+    )[0]
+
+    assert (manual["state"], manual["status_source"]) == ("scheduled_met", "manual")
+    assert (informational["state"], informational["period_ids"]) == ("scheduled_missed", ["note"])
+    assert (deleted["state"], deleted["period_ids"]) == ("scheduled_missed", [])
+
+
+def test_future_protected_dates_are_planned_rest_and_unscheduled_dates_keep_their_state():
+    start, end = date(2026, 9, 1), date(2026, 9, 3)
+    program = range_program(date(2026, 9, 2), date(2026, 9, 2), [template_rule("a")])
+    facts = period_facts(
+        program, start, end, periods=[period("trip", start, end)], today=date(2026, 8, 30),
+    )
+
+    assert [(fact["state"], fact["status_source"]) for fact in facts] == [
+        ("upcoming", "automatic"), ("rest", "period"), ("upcoming", "automatic"),
+    ]
+    assert all(fact["period_ids"] == ["trip"] for fact in facts)
+
+
+def test_overlapping_periods_union_coverage_and_explicit_schedules_create_occurrences():
+    start, end = date(2026, 9, 1), date(2026, 9, 4)
+    rules = [template_rule("a")]
+    day = SimpleNamespace(
+        id="day-1", date=None, day_of_week=[], template_links=rules,
+        templates=[rule.template for rule in rules], completion_min_templates=None,
+        occurrence_schedules=[SimpleNamespace(date=date(2026, 9, 3))],
+    )
+    program = SimpleNamespace(id="program-1", blocks=[
+        SimpleNamespace(id="block-1", start_date=start, end_date=end, days=[day]),
+    ])
+    facts = period_facts(
+        program, start, end,
+        periods=[period("a", start, date(2026, 9, 2)), period("b", date(2026, 9, 2), end)],
+        today=date(2026, 9, 10),
+    )
+
+    assert [fact["period_ids"] for fact in facts] == [["a"], ["a", "b"], ["b"], ["b"]]
+    assert [fact["scheduled"] for fact in facts] == [False, False, True, False]
+    assert facts[2]["state"] == "rest"

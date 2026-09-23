@@ -55,7 +55,6 @@ vi.mock('@fullcalendar/react', async () => {
                 data-expand-rows={String(Boolean(props.expandRows))}
                 data-day-max-events={String(props.dayMaxEvents)}
                 data-selectable={String(Boolean(props.selectable))}
-                data-select-min-distance={String(props.selectMinDistance)}
                 data-header-left={props.headerToolbar.left}
             >
                 {props.headerToolbar.left.includes('contextualToday') ? (
@@ -168,12 +167,25 @@ describe('ProgramCalendarView', () => {
         expect(props.onTodayClick).toHaveBeenCalledTimes(1);
     });
 
-    it('marks the entire calendar as a multi-day selection surface while the mode is active', () => {
-        const { container } = renderCalendar({ blockCreationMode: true });
+    it('owns multi-day gestures itself instead of FullCalendar selection', () => {
+        const onDateClick = vi.fn();
+        const { container } = renderCalendar({
+            blockCreationMode: true,
+            onDateClick,
+            dayStates: [{ date: '2026-05-17', state: 'rest', scheduled: false }],
+            selectableDates: [{ date: '2026-05-17', scheduled: false }],
+        });
 
         expect(container.querySelector('[data-selection-mode="multiple"]')).toBeInTheDocument();
-        expect(screen.getByTestId('mock-calendar')).toHaveAttribute('data-selectable', 'true');
-        expect(screen.getByTestId('mock-calendar')).toHaveAttribute('data-select-min-distance', '5');
+        expect(screen.getByTestId('mock-calendar')).toHaveAttribute('data-selectable', 'false');
+        // Unscheduled dates inside the program are selectable in multi-day mode.
+        const cell = screen.getByRole('gridcell', { name: '2026-05-17, program date, not selected' });
+        cell.getBoundingClientRect = () => ({ left: 0, right: 100, top: 0, bottom: 100 });
+        const surface = container.querySelector('[data-selection-mode="multiple"]');
+        fireEvent.pointerDown(surface, { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
+        fireEvent.pointerUp(surface, { button: 0, pointerId: 1, clientX: 10, clientY: 10 });
+
+        expect(onDateClick).toHaveBeenCalledWith(expect.objectContaining({ dateStr: '2026-05-17' }));
     });
 
     it('selects scheduled cells without adding checkbox controls', async () => {
@@ -187,7 +199,6 @@ describe('ProgramCalendarView', () => {
 
         expect(container.querySelector('[data-selection-mode="multiple"]')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Select Status Days' })).not.toBeInTheDocument();
-        expect(screen.getByTestId('mock-calendar')).toHaveAttribute('data-selectable', 'true');
         const cell = await screen.findByRole('gridcell', { name: '2026-05-17, scheduled program day, selected' });
         expect(cell).toHaveAttribute('aria-selected', 'true');
         expect(cell).toHaveAttribute('tabindex', '0');
@@ -305,7 +316,6 @@ describe('ProgramCalendarView', () => {
         expect(calendar).toHaveAttribute('data-expand-rows', 'true');
         expect(calendar).toHaveAttribute('data-day-max-events', '3');
         expect(calendar).toHaveAttribute('data-selectable', 'false');
-        expect(calendar).toHaveAttribute('data-select-min-distance', '5');
         expect(screen.getByTestId('mock-day-cell')).toHaveStyle('--program-calendar-cell-color: #89cff0');
         expect(screen.getByTestId('mock-day-cell')).toHaveAttribute('data-calendar-background', 'block');
     });
@@ -331,7 +341,7 @@ describe('ProgramCalendarView', () => {
         expect(screen.getByTestId('mock-day-cell')).toHaveAttribute('data-calendar-background', 'program');
     });
 
-    it('keeps program-day ribbons free of completion marks while announcing their state', () => {
+    it('marks each selected-program date once with its status symbol while announcing its state', () => {
         const { container, rerender, props } = renderCalendar({
             calendarEvents: [
                 {
@@ -372,6 +382,7 @@ describe('ProgramCalendarView', () => {
                 {
                     date: '2026-05-17',
                     state: 'scheduled_partial',
+                    scheduled: true,
                     closed: true,
                     chain_role: 'none',
                     breaks_chain: true,
@@ -379,6 +390,7 @@ describe('ProgramCalendarView', () => {
                 {
                     date: '2026-05-18',
                     state: 'scheduled_pending',
+                    scheduled: true,
                     closed: false,
                     chain_role: 'none',
                     breaks_chain: false,
@@ -392,21 +404,45 @@ describe('ProgramCalendarView', () => {
         expect(cell).toHaveAttribute('data-day-state', 'scheduled_partial');
         expect(screen.getByText('Daily practice: partially complete')).toBeInTheDocument();
         expect(screen.getByText('Daily review: partially complete')).toBeInTheDocument();
-        expect(container.querySelector('[data-program-day-complete]')).not.toBeInTheDocument();
+        const statusOf = (title) => screen.getByText(title).parentElement
+            .querySelector('[data-program-day-status]')?.dataset.programDayStatus;
+        expect(statusOf('Daily practice')).toBe('missed');
+        expect(statusOf('Daily review')).toBeUndefined();
+        expect(statusOf('Future practice')).toBe('scheduled');
+        expect(container.querySelectorAll('[data-program-day-status]')).toHaveLength(2);
         expect(screen.getByText('Daily practice').parentElement).toHaveStyle({
             '--program-day-pill-bg': 'color-mix(in srgb, #663333 13%, var(--color-bg-card))',
         });
 
         rerender(<ProgramCalendarView {...props} dayStates={[{
             date: '2026-05-17', state: 'scheduled_met', status_source: 'manual',
-            counts_as_success: true, closed: true,
+            counts_as_success: true, closed: true, scheduled: true, manual_status: 'complete',
         }]} />);
         expect(screen.queryByText('Manual')).not.toBeInTheDocument();
+        expect(statusOf('Daily practice')).toBe('complete');
 
         rerender(<ProgramCalendarView {...props} dayStates={[]} />);
 
         expect(cell).not.toHaveAttribute('data-day-state');
         expect(screen.getByText('Daily practice: requirements met')).toBeInTheDocument();
         expect(screen.queryByText('Daily review: requirements met')).not.toBeInTheDocument();
+    });
+
+    it('re-decorating cells after new events never removes ribbon-owned status marks', () => {
+        const dayStates = [{ date: '2026-05-17', state: 'scheduled_pending', scheduled: true, closed: false }];
+        const { rerender, props } = renderCalendar({ dayStates, selectedProgramId: 'program-1' });
+        const frame = screen.getByTestId('mock-day-cell').querySelector('.fc-daygrid-day-frame');
+        // Stand-in for a React-rendered ProgramDayStatusMark inside a ribbon in this cell.
+        const ribbonMark = document.createElement('span');
+        ribbonMark.setAttribute('data-program-day-status', 'scheduled');
+        frame.appendChild(ribbonMark);
+
+        rerender(<ProgramCalendarView {...props} calendarEvents={[{
+            id: 'calendar-period-p1', title: 'Lisbon', start: '2026-05-17', end: '2026-05-19',
+            extendedProps: { type: 'calendar_period', period: { id: 'p1', protects_streaks: true }, kindLabel: 'Vacation' },
+        }]} />);
+
+        expect(frame.contains(ribbonMark)).toBe(true);
+        expect(frame.querySelectorAll('[data-program-cell-assistive]')).toHaveLength(1);
     });
 });

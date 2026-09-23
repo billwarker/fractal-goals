@@ -604,7 +604,7 @@ Required retirement records before merge:
 | Item | Owner | Target | Exit condition |
 |---|---|---|---|
 | Legacy `active-days` route/client adapter | Programs backend + client | Release N+1 | Supported clients use `day-options`; legacy telemetry is zero for the agreed window |
-| Duplicate-prone `ProgramDaySession` ledger | Programs backend | Next program-schema cleanup milestone | Add occurrence-aware uniqueness and a real status workflow, or remove the ledger and serializer field |
+| Duplicate-prone `ProgramDaySession` ledger | Programs backend | Next program-schema cleanup milestone | Unblocked: occurrence-aware credits now live in `program_day_session_credits` ([plan](program-day-review-summary-and-credit.md)); remove the ledger and serializer field |
 
 ### Phase 5 — documentation and rollout
 

@@ -12,6 +12,9 @@ export const fractalProgramsApi = {
     updateProgramDayStatuses: (rootId, programId, data) => axios.patch(
         `${API_BASE}/${rootId}/programs/${programId}/day-statuses`, data,
     ),
+    updateProgramDaySessionCredit: (rootId, programId, data) => axios.put(
+        `${API_BASE}/${rootId}/programs/${programId}/day-session-credits`, data,
+    ),
     createProgram: (rootId, data) => axios.post(`${API_BASE}/${rootId}/programs`, data),
     updateProgram: (rootId, programId, data) => axios.put(`${API_BASE}/${rootId}/programs/${programId}`, data),
     deleteProgram: (rootId, programId) => axios.delete(`${API_BASE}/${rootId}/programs/${programId}`),

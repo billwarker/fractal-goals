@@ -78,4 +78,27 @@ describe('ProgramOverview', () => {
         expect(screen.queryByText('Preparation')).not.toBeInTheDocument();
         expect(screen.getByText('Month 1')).toBeInTheDocument();
     });
+
+    it('explains days protected by events and lists overlapping events', () => {
+        render(<ProgramOverview metrics={{
+            ...metrics,
+            adherence: { ...metrics.adherence, period_rest_days: 3 },
+            periods: [
+                { id: 'p1', name: 'Lisbon', kind: 'vacation', start_date: '2026-09-10', end_date: '2026-09-17', protects_streaks: true },
+                { id: 'p2', name: 'Conference', kind: 'travel', start_date: '2026-09-20', end_date: '2026-09-21', protects_streaks: false },
+            ],
+        }} />);
+
+        const section = screen.getByRole('heading', { name: 'Events' }).closest('section');
+        expect(within(section).getByText(/3 days protected by events/)).toBeInTheDocument();
+        expect(within(section).getByText('Lisbon')).toBeInTheDocument();
+        expect(within(section).getByText((_, element) => element?.tagName === 'SPAN' && element.textContent === 'Sep 10 – Sep 17')).toBeInTheDocument();
+        expect(within(section).getByText('Not protecting streaks')).toBeInTheDocument();
+    });
+
+    it('omits the events section when nothing overlaps', () => {
+        render(<ProgramOverview metrics={metrics} />);
+
+        expect(screen.queryByRole('heading', { name: 'Events' })).not.toBeInTheDocument();
+    });
 });

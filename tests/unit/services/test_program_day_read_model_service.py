@@ -89,39 +89,6 @@ def test_chain_context_keeps_a_recent_program_start_and_the_requested_range():
     assert truncated is False
 
 
-def test_session_pagination_matches_a_full_merge_of_interleaved_streams():
-    start = datetime(2026, 9, 1, tzinfo=timezone.utc)
-
-    def session(identifier, minute):
-        return SimpleNamespace(
-            id=identifier,
-            session_start=start + timedelta(minutes=minute),
-            completed_at=None,
-            created_at=None,
-        )
-
-    linked = [(session(f"linked-{index:03}", index * 2), "day-1") for index in range(80)]
-    other = [session(f"other-{index:03}", index * 2 + 1) for index in range(151)]
-    complete_merge = linked + [(item, None) for item in other]
-    complete_merge.sort(
-        key=lambda entry: ProgramDayReadModelService._session_sort_key(entry[0])
-    )
-
-    for offset, limit in ((0, 23), (37, 23), (129, 23), (220, 23)):
-        page, has_more = ProgramDayReadModelService._paginate_session_entries(
-            linked,
-            other[:offset + limit + 1],
-            offset,
-            limit,
-        )
-        expected = complete_merge[offset:offset + limit]
-
-        assert [(item.id, day_id) for item, day_id in page] == [
-            (item.id, day_id) for item, day_id in expected
-        ]
-        assert has_more is (len(complete_merge) > offset + len(expected))
-
-
 @pytest.mark.parametrize("offset", [0, 1, 20, 999])
 def test_session_cursor_round_trips_non_negative_offsets(offset):
     cursor = ProgramDayReadModelService._encode_cursor(offset)
@@ -135,20 +102,3 @@ def test_session_cursor_round_trips_non_negative_offsets(offset):
 def test_session_cursor_rejects_malformed_negative_and_wrong_prefix_values(cursor):
     with pytest.raises(ValueError, match="Invalid cursor"):
         ProgramDayReadModelService._decode_cursor(cursor)
-
-
-def test_session_pagination_uses_timestamp_then_id_for_stable_ties():
-    timestamp = datetime(2026, 9, 1, tzinfo=timezone.utc)
-    linked = [(SimpleNamespace(
-        id="b", session_start=timestamp, completed_at=None, created_at=None,
-    ), "day-1")]
-    other = [SimpleNamespace(
-        id="a", session_start=timestamp, completed_at=None, created_at=None,
-    )]
-
-    page, has_more = ProgramDayReadModelService._paginate_session_entries(
-        linked, other, offset=0, limit=1
-    )
-
-    assert [(session.id, day_id) for session, day_id in page] == [("a", None)]
-    assert has_more is True

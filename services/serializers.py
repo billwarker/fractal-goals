@@ -1113,10 +1113,7 @@ def serialize_program_block(block):
 def serialize_program_day(day):
     """Serialize a ProgramDay object."""
     template_rules = {
-        link.session_template_id: {
-            "is_required": bool(link.is_required),
-            "order": link.order or 0,
-        }
+        link.session_template_id: {"is_required": bool(link.is_required), "order": link.order or 0}
         for link in (getattr(day, 'template_links', None) or [])
     }
     serialized_templates = []
@@ -1139,6 +1136,7 @@ def serialize_program_day(day):
         "goal_ids": [g.id for g in (day.goals or [])],
         "completion_min_templates": getattr(day, 'completion_min_templates', None),
         "sessions": [serialize_program_day_session_light(s) for s in day.completed_sessions if not s.deleted_at],
+        "scheduled_dates": [format_utc(row.date) for row in (day.occurrence_schedules or [])],
     }
 
 def serialize_note(note):

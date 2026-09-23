@@ -59,6 +59,12 @@ class Program(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    day_session_credits = relationship(
+        "ProgramDaySessionCredit",
+        back_populates="program",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     goals = relationship(
         "Goal",
         secondary=program_goals,
@@ -121,6 +127,16 @@ class ProgramDay(Base):
         overlaps="program_day,template,template_links"
     )
     completed_sessions = relationship("Session", back_populates="program_day")
+    # Explicit dates a reusable definition was scheduled on; always batch-loaded
+    # because the canonical occurrence evaluator reads them with every day.
+    occurrence_schedules = relationship(
+        "ProgramDayOccurrenceSchedule",
+        back_populates="program_day",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="selectin",
+        order_by="ProgramDayOccurrenceSchedule.date",
+    )
     
     goals = relationship(
         "Goal",
@@ -189,6 +205,63 @@ class ProgramDayStatusOverride(Base):
     updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
 
     program = relationship('Program', back_populates='day_status_overrides')
+
+
+class ProgramDayOccurrenceSchedule(Base):
+    """One explicit date on which a reusable program-day definition occurs."""
+
+    __tablename__ = 'program_day_occurrence_schedules'
+    __table_args__ = (
+        UniqueConstraint('program_day_id', 'date', name='uq_program_day_occurrence_schedule_day_date'),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    program_day_id = Column(
+        String, ForeignKey('program_days.id', ondelete='CASCADE'), nullable=False, index=True,
+    )
+    date = Column(Date, nullable=False, index=True)
+    created_by_user_id = Column(String, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+
+    program_day = relationship('ProgramDay', back_populates='occurrence_schedules')
+
+
+class ProgramDaySessionCredit(Base):
+    """A user's explicit credit or exclusion of one session for one program date.
+
+    ``credit`` counts the session as ``template_id`` on that date; ``exclude``
+    removes an automatic (linked or template-matched) credit. Rows only apply
+    while the session's effective local date equals ``date``.
+    """
+
+    __tablename__ = 'program_day_session_credits'
+    __table_args__ = (
+        UniqueConstraint(
+            'program_id', 'date', 'session_id',
+            name='uq_program_day_session_credit_program_date_session',
+        ),
+        CheckConstraint(
+            "disposition IN ('credit', 'exclude')",
+            name='ck_program_day_session_credit_disposition',
+        ),
+        CheckConstraint(
+            "(disposition = 'credit' AND template_id IS NOT NULL)"
+            " OR (disposition = 'exclude' AND template_id IS NULL)",
+            name='ck_program_day_session_credit_template',
+        ),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    program_id = Column(String, ForeignKey('programs.id', ondelete='CASCADE'), nullable=False, index=True)
+    date = Column(Date, nullable=False)
+    session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=False, index=True)
+    disposition = Column(String, nullable=False)
+    template_id = Column(String, ForeignKey('session_templates.id', ondelete='CASCADE'), nullable=True)
+    set_by_user_id = Column(String, ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+    program = relationship('Program', back_populates='day_session_credits')
 
 
 def get_program_day_template_rules(day):

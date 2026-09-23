@@ -1,6 +1,5 @@
 import { useCallback, useMemo } from 'react';
 import { fractalApi } from '../utils/api';
-import { localToISO } from '../utils/dateUtils';
 
 function normalizeRefreshers(refreshers) {
     if (typeof refreshers === 'function') {
@@ -121,14 +120,17 @@ export function useProgramLogic(rootId, program, refreshers) {
             return;
         }
 
-        await fractalApi.scheduleBlockDay(rootId, programId, blockId, templateDay.id, {
-            session_start: localToISO(
-                `${date} 12:00:00`,
-                Intl.DateTimeFormat().resolvedOptions().timeZone
-            ),
-        });
+        await fractalApi.scheduleBlockDay(rootId, programId, blockId, templateDay.id, { date });
         await invalidateScheduling();
     }, [invalidateProgram, invalidateScheduling, rootId, programId]);
+
+    const unscheduleDay = useCallback(async (blockId, dayId, date, timezone) => {
+        await fractalApi.unscheduleBlockDayOccurrence(rootId, programId, blockId, dayId, {
+            date,
+            timezone: timezone || 'UTC',
+        });
+        await invalidateScheduling();
+    }, [invalidateScheduling, rootId, programId]);
 
     // --- Goals ---
     const attachGoal = useCallback(async (blockId, { goal_id, deadline }) => {
@@ -144,6 +146,7 @@ export function useProgramLogic(rootId, program, refreshers) {
         copyDay,
         deleteDay,
         scheduleDay,
+        unscheduleDay,
         attachGoal,
     };
 }

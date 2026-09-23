@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 
-const PROGRAM_METRICS_CALCULATION_VERSION = 4;
+const PROGRAM_METRICS_CALCULATION_VERSION = 6;
 
 const millisecondsUntilNextLocalMidnight = () => {
     const now = new Date();

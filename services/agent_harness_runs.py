@@ -516,11 +516,10 @@ class AgentRunsMixin:
                 commit=False,
                 pending_events=pending_events,
             )
-            session_id = scheduled.get("id")
             result = {
-                "id": session_id,
-                "session_id": session_id,
+                "id": scheduled.get("id"),
                 "program_day_id": input_data["day_id"],
+                "date": scheduled.get("date"),
                 "name": scheduled.get("name"),
                 "root_id": locked_run.root_id,
                 "href": self._app_href(

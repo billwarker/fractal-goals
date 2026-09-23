@@ -2,7 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 
 import { subtractDaysToDateString } from '../utils/dateUtils';
 
-export function useProgramStatusSelection(scheduledDayStates, selectionMode, setSelectionMode) {
+/**
+ * Multi-day calendar selection. ``selectableDayStates`` are every date inside the
+ * selected program; day-status actions use only the scheduled subset
+ * (``selectedScheduledDates``) while time off spans the whole selection.
+ */
+export function useProgramStatusSelection(selectableDayStates, selectionMode, setSelectionMode) {
     const [selectedStatusDates, setSelectedStatusDates] = useState([]);
     const selectionModeButtonRef = useRef(null);
     const selectionAnchorRef = useRef(null);
@@ -32,7 +37,7 @@ export function useProgramStatusSelection(scheduledDayStates, selectionMode, set
     }, [selectionMode, setSelectionMode]);
 
     const toggleStatusDate = (date, { extend = false } = {}) => {
-        const eligibleDates = scheduledDayStates.map((day) => day.date).sort();
+        const eligibleDates = selectableDayStates.map((day) => day.date).sort();
         if (!eligibleDates.includes(date)) return;
         setSelectedStatusDates((current) => {
             const next = new Set(current);
@@ -55,13 +60,17 @@ export function useProgramStatusSelection(scheduledDayStates, selectionMode, set
         const end = subtractDaysToDateString(info.endStr, 1);
         setSelectedStatusDates((current) => [...new Set([
             ...current,
-            ...scheduledDayStates.filter((day) => day.date >= start && day.date <= end).map((day) => day.date),
+            ...selectableDayStates.filter((day) => day.date >= start && day.date <= end).map((day) => day.date),
         ])].sort());
         selectionAnchorRef.current = start;
     };
 
+    const scheduledDates = new Set(selectableDayStates.filter((day) => day.scheduled).map((day) => day.date));
+    const selectedScheduledDates = selectedStatusDates.filter((date) => scheduledDates.has(date));
+
     return {
         selectedStatusDates,
+        selectedScheduledDates,
         selectionModeButtonRef,
         setMultiDaySelectionMode,
         clearStatusSelection,

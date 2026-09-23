@@ -17,7 +17,7 @@ const wrapperFor = (client) => function Wrapper({ children }) {
 describe('useProgramMetrics', () => {
     it('keys every result by root, program, timezone, and range', async () => {
         const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-        getProgramMetrics.mockResolvedValue({ data: { calculation_version: 4 } });
+        getProgramMetrics.mockResolvedValue({ data: { calculation_version: 6 } });
         const range = { start: '2025-01-01', end: '2025-12-31' };
         const { result } = renderHook(
             () => useProgramMetrics('root-1', 'program-1', 'America/Toronto', range),
@@ -32,7 +32,7 @@ describe('useProgramMetrics', () => {
         });
         expect(client.getQueryData(queryKeys.programMetrics(
             'root-1', 'program-1', 'America/Toronto', range.start, range.end,
-        ))).toEqual({ calculation_version: 4 });
+        ))).toEqual({ calculation_version: 6 });
     });
 
     it('rejects an incompatible metrics calculation version', async () => {
@@ -49,7 +49,7 @@ describe('useProgramMetrics', () => {
 
     it('requests and caches exact selected dates independently of the bounding range', async () => {
         const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-        getProgramMetrics.mockResolvedValue({ data: { calculation_version: 4 } });
+        getProgramMetrics.mockResolvedValue({ data: { calculation_version: 6 } });
         const { result, rerender } = renderHook(
             ({ dates }) => useProgramMetrics('root-1', 'program-1', 'UTC', { dates }),
             { initialProps: { dates: ['2026-09-09', '2026-09-03'] }, wrapper: wrapperFor(client) },
@@ -64,7 +64,7 @@ describe('useProgramMetrics', () => {
         }));
         expect(client.getQueryData(queryKeys.programMetrics(
             'root-1', 'program-1', 'UTC', null, null, '2026-09-03,2026-09-09',
-        ))).toEqual({ calculation_version: 4 });
+        ))).toEqual({ calculation_version: 6 });
     });
 
     it('schedules invalidation for the caller’s next local midnight', () => {

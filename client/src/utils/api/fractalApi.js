@@ -1,4 +1,5 @@
 import { fractalActivitiesApi } from './fractalActivitiesApi';
+import { fractalCalendarPeriodsApi } from './fractalCalendarPeriodsApi';
 import { fractalGoalsApi } from './fractalGoalsApi';
 import { fractalMetaApi } from './fractalMetaApi';
 import { fractalNotesApi } from './fractalNotesApi';
@@ -11,6 +12,7 @@ export const fractalApi = {
     ...fractalSessionsApi,
     ...fractalActivitiesApi,
     ...fractalProgramsApi,
+    ...fractalCalendarPeriodsApi,
     ...fractalNotesApi,
     ...fractalMetaApi,
     ...fractalCircuitsApi,

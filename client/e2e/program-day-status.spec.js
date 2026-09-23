@@ -24,7 +24,7 @@ test('single and bulk program-day statuses persist in the calendar', async ({ pa
     expect(optionsBox.y).toBeGreaterThanOrEqual(0);
     expect(optionsBox.y + optionsBox.height).toBeLessThanOrEqual(page.viewportSize().height + 1);
     await statusOptions.getByRole('button', { name: 'Mark complete' }).click();
-    await expect(page.locator('.fc [data-program-day-complete]')).toHaveCount(0);
+    await expect(page.locator(`.fc-daygrid-day[data-date="${today}"] [data-program-day-status="complete"]`)).toHaveCount(1);
     const statusTrigger = dayCard.getByRole('button', { name: /Change status for Daily Practice/ });
     await expect(statusTrigger).toHaveAttribute('aria-expanded', 'false');
     await statusTrigger.click();

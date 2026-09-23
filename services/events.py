@@ -265,6 +265,10 @@ class Events:
     PROGRAM_COMPLETED = 'program.completed'
     PROGRAM_DAY_COMPLETED = 'program.day_completed'
     PROGRAM_DAY_STATUSES_UPDATED = 'program.day_statuses_updated'
+    PROGRAM_DAY_SESSION_CREDIT_UPDATED = 'program.day_session_credit_updated'
+    CALENDAR_PERIOD_CREATED = 'calendar_period.created'
+    CALENDAR_PERIOD_UPDATED = 'calendar_period.updated'
+    CALENDAR_PERIOD_DELETED = 'calendar_period.deleted'
     
     # Activity Definition events
     ACTIVITY_CREATED = 'activity.created'

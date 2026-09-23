@@ -20,6 +20,7 @@ from services._program_crud import _ProgramCrudMixin
 from services._program_days import _ProgramDaysMixin
 from services._program_goals import _ProgramGoalsMixin
 from services._program_day_statuses import _ProgramDayStatusesMixin
+from services._program_day_session_credits import _ProgramDaySessionCreditsMixin
 
 __all__ = ["ProgramService", "ProgramServiceValidationError"]
 
@@ -30,6 +31,7 @@ class ProgramService(
     _ProgramDaysMixin,
     _ProgramGoalsMixin,
     _ProgramDayStatusesMixin,
+    _ProgramDaySessionCreditsMixin,
 ):
     """Validated backend write/read path for programs, blocks, days, and
     program-driven goal scheduling. Composed from concern mixins; their

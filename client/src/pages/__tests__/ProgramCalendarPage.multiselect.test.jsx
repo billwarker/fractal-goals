@@ -104,6 +104,17 @@ vi.mock('../../hooks/useProgramDayReadModel', () => ({
         { date: '2026-09-08', scheduled: true },
     ] } }),
     useUpdateProgramDayStatuses: () => ({ mutateAsync: mutateStatuses, isPending: false }),
+    useSetProgramDaySessionCredit: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+const openPeriodEditor = vi.fn();
+vi.mock('../../hooks/useCalendarPeriods', () => ({
+    useCalendarPeriods: () => ({ data: [] }),
+    useCalendarPeriodEditor: () => ({
+        openCreate: openPeriodEditor,
+        openEdit: vi.fn(),
+        removePeriod: vi.fn(),
+        modalProps: { isOpen: false, period: null, onClose: vi.fn(), onSubmit: vi.fn(), onDelete: vi.fn() },
+    }),
 }));
 
 vi.mock('../../components/layout/PageHeader', () => ({

@@ -13,18 +13,14 @@ vi.mock('../../utils/api', () => ({
     },
 }));
 
-vi.mock('../../utils/dateUtils', () => ({
-    localToISO: vi.fn(() => '2026-03-16T12:00:00Z'),
-}));
-
 describe('useProgramLogic', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         addBlockDay.mockResolvedValue({ data: { message: 'ok' } });
-        scheduleBlockDay.mockResolvedValue({ data: { id: 'session-1' } });
+        scheduleBlockDay.mockResolvedValue({ data: { id: 'schedule-1', program_day_id: 'day-1', date: '2026-03-16' } });
     });
 
-    it('schedules an existing program day through the programs API', async () => {
+    it('schedules an existing program day as a dated occurrence', async () => {
         const refreshData = vi.fn().mockResolvedValue(undefined);
         const { result } = renderHook(() => useProgramLogic('root-1', { id: 'program-1', blocks: [] }, refreshData));
 
@@ -37,7 +33,7 @@ describe('useProgramLogic', () => {
             'program-1',
             'block-1',
             'day-1',
-            { session_start: '2026-03-16T12:00:00Z' }
+            { date: '2026-03-16' }
         );
         expect(refreshData).toHaveBeenCalledTimes(1);
         expect(addBlockDay).not.toHaveBeenCalled();

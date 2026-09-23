@@ -9,16 +9,21 @@ import logging
 from datetime import datetime, date, time, timedelta, timezone
 from typing import List, Dict, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from sqlalchemy import func
 
-from models import Program, ProgramBlock, ProgramDay, ProgramDayTemplate, Goal, Session, _safe_load_json
+from models import Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule, ProgramDayTemplate, Goal, Session, _safe_load_json
 from services import event_bus, Event, Events
 from services.owned_entity_queries import get_owned_program
 from services.serializers import format_utc, serialize_program_day, serialize_goal
 from services.session_runtime import get_template_color
-from services.session_service import SessionService
 from services.program_scope import resolve_program_scopes
-from services.program_day_occurrences import bucket_sessions, evaluate_occurrence
+from services.calendar_periods import load_calendar_periods
+from services.program_day_credits import load_program_credit_candidates, load_program_session_credits
+from services.program_day_occurrences import (
+    build_occurrences,
+    evaluate_occurrence,
+    program_day_scheduled_on,
+    resolve_occurrence_credits,
+)
 from services.program_status_override_queries import load_program_status_overrides
 
 logger = logging.getLogger(__name__)
@@ -306,67 +311,27 @@ class _ProgramDaysMixin:
         if not day:
             raise ValueError("Day not found")
 
-        session_start = data.get('session_start')
-        if not session_start:
-            raise ValueError("session_start is required")
-        try:
-            normalized_session_start = datetime.fromisoformat(str(session_start).replace('Z', '+00:00'))
-        except ValueError:
-            raise ValueError("Invalid session_start format")
-
-        scheduled_date = normalized_session_start.date()
+        scheduled_date = cls._resolve_schedule_date(data)
         if (
             block.start_date is not None and scheduled_date < block.start_date
         ) or (
             block.end_date is not None and scheduled_date > block.end_date
         ):
             raise ValueError("Scheduled date must be within the selected block date range")
+        if day.date is not None:
+            raise ValueError("Dated program days cannot be scheduled on another date")
+        if program_day_scheduled_on(day, block, scheduled_date):
+            raise ValueError("This program day already occurs on that date")
 
-        parent_ids = list(dict.fromkeys([
-            *[goal.id for goal in (block.goals or [])],
-            *[goal.id for goal in (program.goals or [])],
-        ]))
-        if not parent_ids:
-            parent_ids = [root_id]
-
-        session_payload = {
-            'name': day.name or f'Day {day.day_number or 1}',
-            'session_start': session_start,
-            'parent_ids': parent_ids,
-            'session_data': {
-                'program_context': {
-                    'day_id': day.id,
-                    'block_id': block.id,
-                    'program_id': program.id,
-                }
-            }
-        }
-
+        schedule_row = ProgramDayOccurrenceSchedule(
+            program_day_id=day.id,
+            date=scheduled_date,
+            created_by_user_id=current_user_id,
+        )
+        session.add(schedule_row)
         day.row_version += 1
+        cls._commit(session, day, commit=commit)
 
-        scheduled_session, error_message, status_code = SessionService(session).create_session(
-            root_id,
-            current_user_id,
-            session_payload,
-            commit=commit,
-            pending_events=pending_events,
-        )
-        if error_message:
-            raise ValueError(error_message)
-
-        if status_code != 201 or scheduled_session is None:
-            raise ValueError("Failed to schedule program day")
-
-        scheduled_session_id = (
-            scheduled_session.get('id')
-            if isinstance(scheduled_session, dict)
-            else getattr(scheduled_session, 'id', None)
-        )
-        scheduled_session_name = (
-            scheduled_session.get('name')
-            if isinstance(scheduled_session, dict)
-            else getattr(scheduled_session, 'name', None)
-        )
         scheduled_event = Event(Events.PROGRAM_DAY_SCHEDULED, {
             'day_id': day.id,
             'day_name': day.name,
@@ -374,14 +339,38 @@ class _ProgramDaysMixin:
             'program_id': program_id,
             'root_id': root_id,
             'scheduled_date': scheduled_date.isoformat(),
-            'session_id': scheduled_session_id,
-            'session_name': scheduled_session_name,
+            'schedule_id': schedule_row.id,
         }, source='cls.schedule_block_day')
         if pending_events is None:
             event_bus.emit(scheduled_event)
         else:
             pending_events.append(scheduled_event)
-        return scheduled_session
+        return {
+            "id": schedule_row.id,
+            "program_day_id": day.id,
+            "block_id": block_id,
+            "program_id": program_id,
+            "name": day.name,
+            "date": scheduled_date.isoformat(),
+        }
+
+    @staticmethod
+    def _resolve_schedule_date(data: Dict) -> date:
+        """Accept an ISO ``date``; ``session_start`` is a one-release compatibility input."""
+        raw_date = data.get('date')
+        if raw_date:
+            try:
+                return date.fromisoformat(str(raw_date))
+            except ValueError:
+                raise ValueError("Invalid date format")
+        session_start = data.get('session_start')
+        if not session_start:
+            raise ValueError("date is required")
+        try:
+            normalized = datetime.fromisoformat(str(session_start).replace('Z', '+00:00'))
+        except ValueError:
+            raise ValueError("Invalid session_start format")
+        return normalized.date()
 
     @classmethod
     def unschedule_block_day_occurrence(cls, session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict[str, Any]:
@@ -412,38 +401,38 @@ class _ProgramDaysMixin:
         except ZoneInfoNotFoundError:
             raise ValueError("Invalid timezone")
 
-        def get_session_program_day_id(session_obj: Session) -> str | None:
-            if session_obj.program_day_id:
-                return session_obj.program_day_id
-            attrs = _safe_load_json(getattr(session_obj, 'attributes', None), {})
-            return attrs.get('program_context', {}).get('day_id')
+        schedule_rows = session.query(ProgramDayOccurrenceSchedule).filter(
+            ProgramDayOccurrenceSchedule.program_day_id == day_id,
+            ProgramDayOccurrenceSchedule.date == target_date,
+        ).all()
+        for row in schedule_rows:
+            session.delete(row)
 
+        # Legacy placeholder sessions from the retired session-based scheduling:
+        # incomplete, activity-free sessions linked to this exact day and date.
         candidate_sessions = session.query(Session).filter(
             Session.root_id == root_id,
-            Session.deleted_at == None,
-            Session.completed == False,
+            Session.program_day_id == day_id,
+            Session.deleted_at.is_(None),
+            Session.completed.is_(False),
+            ~Session.activity_instances.any(),
         ).all()
-
         removed_session_ids: List[str] = []
         removed_session_names: Dict[str, str] = {}
         for scheduled_session in candidate_sessions:
-            if get_session_program_day_id(scheduled_session) != day_id:
-                continue
-
             session_dt = scheduled_session.session_start or scheduled_session.created_at
             if session_dt is None:
                 continue
             if session_dt.tzinfo is None:
                 session_dt = session_dt.replace(tzinfo=timezone.utc)
-
             if session_dt.astimezone(zone).date() != target_date:
                 continue
-
             scheduled_session.deleted_at = datetime.now(timezone.utc)
             removed_session_ids.append(scheduled_session.id)
             removed_session_names[scheduled_session.id] = scheduled_session.name
 
-        if removed_session_ids:
+        changed = bool(schedule_rows or removed_session_ids)
+        if changed:
             day.row_version += 1
         cls._commit(session, day)
 
@@ -454,7 +443,7 @@ class _ProgramDaysMixin:
                 'root_id': root_id
             }, source='cls.unschedule_block_day_occurrence'))
 
-        if removed_session_ids:
+        if changed:
             event_bus.emit(Event(Events.PROGRAM_DAY_UNSCHEDULED, {
                 'day_id': day.id,
                 'day_name': day.name,
@@ -462,12 +451,14 @@ class _ProgramDaysMixin:
                 'program_id': program_id,
                 'root_id': root_id,
                 'date': target_date.isoformat(),
+                'removed_schedule_count': len(schedule_rows),
                 'removed_session_ids': removed_session_ids,
                 'removed_count': len(removed_session_ids),
             }, source='cls.unschedule_block_day_occurrence'))
 
         return {
             "day": serialize_program_day(day),
+            "removed_schedule_count": len(schedule_rows),
             "removed_session_ids": removed_session_ids,
             "removed_count": len(removed_session_ids),
         }
@@ -551,16 +542,24 @@ class _ProgramDaysMixin:
             program_id: rows[0].status
             for program_id, rows in status_overrides.items()
         }
-        effective = func.coalesce(Session.session_start, Session.completed_at, Session.created_at)
-        execution_sessions = session.query(Session).filter(
-            Session.root_id == root_id,
-            Session.owner_id == current_user_id,
-            Session.program_id.in_([program.id for program in active_programs]),
-            Session.deleted_at.is_(None),
-            effective >= day_start,
-            effective < next_day_start,
-        ).all() if active_programs else []
-        sessions_by_occurrence = bucket_sessions(execution_sessions, zone)
+        protecting_period = next((
+            period for period in load_calendar_periods(session, root_id, current_user_id, today, today)
+            if period.protects_streaks
+        ), None)
+        stored_credits = load_program_session_credits(
+            session, [program.id for program in active_programs], today, today,
+        )
+        candidates = load_program_credit_candidates(
+            session, root_id, current_user_id, active_programs,
+            day_start, next_day_start, stored_credits,
+        )
+        credits_by_occurrence = {}
+        for program in active_programs:
+            program_credits, _session_facts = resolve_occurrence_credits(
+                build_occurrences(program, today, today), candidates[program.id], zone,
+                program_id=program.id, session_credits=stored_credits.get(program.id, []),
+            )
+            credits_by_occurrence.update(program_credits)
         
         for program in active_programs:
             program_scope = scopes.get(program.id)
@@ -594,9 +593,8 @@ class _ProgramDaysMixin:
                                         "order": template_rule.get("order", index),
                                     })
                                 
-                                evaluation = evaluate_occurrence(
-                                    day, sessions_by_occurrence[(day.id, today)]
-                                )
+                                occurrence_credits = credits_by_occurrence.get((day.id, today), [])
+                                evaluation = evaluate_occurrence(day, occurrence_credits)
                                 result.append({
                                     "program_id": program.id,
                                     "program_name": program.name,
@@ -613,12 +611,17 @@ class _ProgramDaysMixin:
                                     "day_number": day.day_number,
                                     "day_date": format_utc(day.date),
                                     "manual_status": manual_status_by_program.get(program.id),
+                                    "time_off": {
+                                        "id": protecting_period.id,
+                                        "name": protecting_period.name,
+                                        "kind": protecting_period.kind,
+                                    } if protecting_period else None,
                                     "completion_min_templates": day.completion_min_templates,
                                     "sessions": session_details,
-                                    "completed_session_count": len([
-                                        item for item in sessions_by_occurrence[(day.id, today)]
-                                        if item.completed
-                                    ]),
+                                    "completed_session_count": len({
+                                        entry["session"].id for entry in occurrence_credits
+                                        if entry["session"].completed
+                                    }),
                                     "completed_template_ids": evaluation["completed_template_ids"],
                                 })
         return result

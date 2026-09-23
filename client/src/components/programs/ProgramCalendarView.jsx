@@ -2,6 +2,8 @@ import React from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import useCalendarDragSelection from '../../hooks/useCalendarDragSelection';
+import { addDaysToDateString } from '../../utils/dateUtils';
 import { getProgramDayStateMeta, indexProgramDayStates } from '../../utils/programDayState';
 import renderProgramCalendarEventContent from './ProgramCalendarEventContent';
 import styles from './ProgramCalendarView.module.css';
@@ -50,6 +52,7 @@ function ProgramCalendarView({
     selectedProgramName = '',
     selectedProgramId = null,
     selectedStatusDates = [],
+    selectableDates = null,
     selectionModeButtonRef,
     statusActions = null,
 }) {
@@ -64,6 +67,11 @@ function ProgramCalendarView({
         () => new Set(selectedStatusDates),
         [selectedStatusDates],
     );
+    // Multi-day mode can select any date inside the selected program; without an
+    // explicit list it falls back to scheduled dates.
+    const selectableDateSet = React.useMemo(() => new Set(
+        (selectableDates || dayStates.filter((day) => day.scheduled)).map((day) => day.date),
+    ), [dayStates, selectableDates]);
     const programDayRibbonDates = React.useMemo(() => new Set(
         (calendarEvents || [])
             .filter((event) => event.extendedProps?.type === 'program_day'
@@ -71,11 +79,40 @@ function ProgramCalendarView({
             .map((event) => normalizeCalendarEventDate(event.start)),
     ), [calendarEvents, selectedProgramId]);
 
+    const selectableDateList = React.useMemo(() => [...selectableDateSet].sort(), [selectableDateSet]);
+    const dragSelection = useCalendarDragSelection({
+        enabled: !readOnly && Boolean(blockCreationMode),
+        containerRef: calendarContainerRef,
+        selectableDates: selectableDateList,
+        onToggleDate: (dateStr, jsEvent) => onDateClick?.({ dateStr, jsEvent }),
+        onSelectRange: (dates, jsEvent) => onDateSelect?.({
+            startStr: dates[0],
+            endStr: addDaysToDateString(dates[dates.length - 1], 1),
+            jsEvent,
+        }),
+    });
+    const dragPreviewDates = dragSelection.previewDates;
+
+    // The date-level status symbol sits on the first selected-program ribbon of each date.
+    const dateOwnerRibbonIds = React.useMemo(() => {
+        const idsByDate = new Map();
+        (calendarEvents || [])
+            .filter((event) => event.extendedProps?.type === 'program_day'
+                && selectedProgramId
+                && String(event.extendedProps?.programId) === String(selectedProgramId))
+            .forEach((event) => {
+                const date = normalizeCalendarEventDate(event.start);
+                if (!idsByDate.has(date)) idsByDate.set(date, event.id);
+            });
+        return new Set(idsByDate.values());
+    }, [calendarEvents, selectedProgramId]);
+
     const renderCalendarEventContent = React.useCallback((eventInfo) => renderProgramCalendarEventContent(
         eventInfo,
         readOnly ? undefined : (clickInfo) => onEventClickRef.current?.(clickInfo),
         dayStatesByDate.get(normalizeCalendarEventDate(eventInfo.event.start)),
-    ), [dayStatesByDate, readOnly]);
+        { ownsDate: dateOwnerRibbonIds.has(eventInfo.event.id) },
+    ), [dateOwnerRibbonIds, dayStatesByDate, readOnly]);
 
     const getDayCellClassNames = (dayInfo) => {
         const dateStr = dayInfo.dateStr || formatCalendarCellDate(dayInfo.date);
@@ -170,7 +207,7 @@ function ProgramCalendarView({
         dayEl.removeAttribute('data-program-selectable-date');
         frame.querySelectorAll(`[data-program-block-label], .${styles.blockCellLabel}`)
             .forEach((label) => label.remove());
-        frame.querySelectorAll('[data-program-day-status]').forEach((status) => status.remove());
+        frame.querySelectorAll('[data-program-cell-assistive]').forEach((status) => status.remove());
         frame.removeAttribute('data-block-label');
         frame.style.removeProperty('--program-block-label-color');
 
@@ -190,15 +227,17 @@ function ProgramCalendarView({
                 const status = document.createElement('span');
                 status.className = styles.dayStatusAssistive;
                 status.textContent = `${selectedProgramName || 'Selected program'}: ${stateMeta.label}`;
-                status.setAttribute('data-program-day-status', 'true');
+                // Only nodes this decorator injected carry this attribute; React-owned
+                // ribbon content (e.g. ProgramDayStatusMark) must never be removed here.
+                status.setAttribute('data-program-cell-assistive', 'true');
                 frame.appendChild(status);
             }
         }
 
-        if (blockCreationMode && dayState?.scheduled) {
-            const selected = selectedStatusDateSet.has(dateStr);
+        if (blockCreationMode && selectableDateSet.has(dateStr)) {
+            const selected = selectedStatusDateSet.has(dateStr) || dragPreviewDates.has(dateStr);
             dayEl.setAttribute('aria-selected', selected ? 'true' : 'false');
-            dayEl.setAttribute('aria-label', `${dateStr}, scheduled program day, ${selected ? 'selected' : 'not selected'}`);
+            dayEl.setAttribute('aria-label', `${dateStr}, ${dayState?.scheduled ? 'scheduled program day' : 'program date'}, ${selected ? 'selected' : 'not selected'}`);
             dayEl.setAttribute('tabindex', '0');
             dayEl.setAttribute('data-program-selectable-date', dateStr);
         }
@@ -215,7 +254,7 @@ function ProgramCalendarView({
             labelButton.style.setProperty('--program-block-label-color', blockLabel.color);
             frame.appendChild(labelButton);
         }
-    }, [blockCreationMode, blockLabelsByDate, dayStatesByDate, getCellBackgrounds, programDayRibbonDates, selectedProgramName, selectedStatusDateSet]);
+    }, [blockCreationMode, blockLabelsByDate, dayStatesByDate, dragPreviewDates, getCellBackgrounds, programDayRibbonDates, selectableDateSet, selectedProgramName, selectedStatusDateSet]);
 
     const clearBlockLabelForCell = (dayEl) => {
         const frame = dayEl.querySelector('.fc-daygrid-day-frame');
@@ -228,7 +267,7 @@ function ProgramCalendarView({
         dayEl.removeAttribute('data-program-selectable-date');
         frame?.querySelectorAll(`[data-program-block-label], .${styles.blockCellLabel}`)
             .forEach((label) => label.remove());
-        frame?.querySelectorAll('[data-program-day-status]').forEach((status) => status.remove());
+        frame?.querySelectorAll('[data-program-cell-assistive]').forEach((status) => status.remove());
     };
 
     const getBlockLabelFromEvent = (event) => {
@@ -319,6 +358,7 @@ function ProgramCalendarView({
             onMouseDownCapture={readOnly ? undefined : stopBlockLabelPointerEvent}
             onTouchStartCapture={readOnly ? undefined : stopBlockLabelPointerEvent}
             onTouchEndCapture={readOnly ? undefined : stopBlockLabelPointerEvent}
+            {...dragSelection.handlers}
         >
             {useMobileToolbar ? (
                 <div className={styles.mobileControlRow}>
@@ -368,11 +408,17 @@ function ProgramCalendarView({
                 expandRows={compact}
                 dayMaxEvents={compact ? 3 : 5}
                 eventOrder="sortOrder"
-                selectable={!readOnly && blockCreationMode}
-                selectMinDistance={5}
-                select={readOnly ? undefined : onDateSelect}
-                dateClick={readOnly ? undefined : onDateClick}
-                eventClick={readOnly ? undefined : onEventClick}
+                // Multi-day mode owns click and drag through useCalendarDragSelection,
+                // so FullCalendar's own selection, date clicks, and event clicks stand down.
+                selectable={false}
+                dateClick={readOnly || blockCreationMode ? undefined : onDateClick}
+                eventClick={readOnly ? undefined : (info) => {
+                    if (blockCreationMode) {
+                        info.jsEvent?.preventDefault?.();
+                        return;
+                    }
+                    onEventClick?.(info);
+                }}
                 eventContent={renderCalendarEventContent}
                 datesSet={onDatesSet}
                 dayCellClassNames={readOnly ? undefined : getDayCellClassNames}

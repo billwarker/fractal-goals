@@ -1,7 +1,8 @@
 import React from 'react';
 
 import GoalIcon from '../atoms/GoalIcon';
-import { getProgramDayStateMeta } from '../../utils/programDayState';
+import { getProgramDayStateMeta, getProgramDayStatusSymbol } from '../../utils/programDayState';
+import ProgramDayStatusMark from './ProgramDayStatusMark';
 import styles from './ProgramCalendarView.module.css';
 
 function activateGoalEvent(eventInfo, onGoalActivate, jsEvent) {
@@ -11,7 +12,7 @@ function activateGoalEvent(eventInfo, onGoalActivate, jsEvent) {
     onGoalActivate({ ...eventInfo, jsEvent: jsEvent.nativeEvent || jsEvent });
 }
 
-export default function renderProgramCalendarEventContent(eventInfo, onGoalActivate, dayState) {
+export default function renderProgramCalendarEventContent(eventInfo, onGoalActivate, dayState, { ownsDate = false } = {}) {
     const { type, blockColor, isCompleted, goalIcon } = eventInfo.event.extendedProps;
     if (type === 'block_background') return null;
     const title = eventInfo.event.title;
@@ -51,7 +52,44 @@ export default function renderProgramCalendarEventContent(eventInfo, onGoalActiv
             >
                 <span className={styles.eventPillText}>{title}</span>
                 {isRest ? <span className={styles.restStatusLabel}>Rest</span> : null}
+                {ownsDate && dayState?.status_source === 'period' ? (
+                    <span className={styles.dayStatusAssistive}>(protected by an event)</span>
+                ) : null}
+                {ownsDate && dayState?.scheduled ? (
+                    <ProgramDayStatusMark
+                        status={getProgramDayStatusSymbol({
+                            state: dayState.state, manualStatus: dayState.manual_status, closed: dayState.closed,
+                        })}
+                        size="sm"
+                        decorative
+                        className={styles.ribbonStatusMark}
+                    />
+                ) : null}
                 {statusLabel ? <span className={styles.dayStatusAssistive}>{title}: {statusLabel}</span> : null}
+            </div>
+        );
+    }
+
+    if (type === 'calendar_period') {
+        const { kindLabel, period } = eventInfo.event.extendedProps;
+        const protects = period?.protects_streaks;
+        return (
+            <div className={`${styles.eventPill} ${styles.eventPillCalendarPeriod}`}>
+                <span className={styles.eventPillText}>
+                    <span className={styles.calendarPeriodKind}>{kindLabel}</span> · {title}
+                </span>
+                <span className={styles.dayStatusAssistive}>
+                    {protects ? ', protecting streaks' : ', streaks not protected'}
+                </span>
+            </div>
+        );
+    }
+
+    if (type === 'completed_session') {
+        return (
+            <div className={`${styles.eventPill} ${styles.eventPillCompletedSession}`}>
+                <span className={styles.eventPillText}>{title}</span>
+                <span className={styles.dayStatusAssistive}>Completed session: {title}</span>
             </div>
         );
     }

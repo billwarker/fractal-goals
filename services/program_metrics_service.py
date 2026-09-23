@@ -4,17 +4,25 @@ from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 import logging
 import time as time_module
-from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from models import ActivityInstance, Program, ProgramBlock, ProgramDay, ProgramDayTemplate, Session, Target, validate_root_goal
 from services.analytics_engine import build_scoped_dataset_query, get_analytics_dataset
+from services.calendar_periods import load_calendar_periods, serialize_calendar_period
 from services.effective_goal_activities import resolve_effective_goals_by_activity
 from services.goal_contribution import resolve_contribution_goal
 from services.goal_loading import load_fractal_goals_for_serialization
 from services.goal_type_utils import get_canonical_goal_type
 from services.program_scope import resolve_program_scope, resolve_program_scopes
+from services.program_day_credits import (
+    completed_credits_by_occurrence_template,
+    credited_block_ids_by_session,
+    load_program_credit_candidates,
+    load_program_session_credits,
+    local_date_utc_bounds,
+)
 from services.program_day_occurrences import build_day_facts, summarize_chain_facts
+from services.program_day_summary import allocate_equal_split
 from services.program_status_override_queries import load_program_status_overrides
 from services.serializers import calculate_smart_status
 from services.session_filters import resolve_timezone, session_duration_seconds_from_row
@@ -24,7 +32,7 @@ from services.service_types import JsonDict, ServiceResult
 
 logger = logging.getLogger(__name__)
 MAX_WINDOW_DAYS = 366
-CALCULATION_VERSION = 4
+CALCULATION_VERSION = 6
 MINIMUM_SUFFICIENCY_DAYS = 7
 
 
@@ -68,19 +76,33 @@ class ProgramMetricsService:
             days.selectinload(ProgramDay.templates),
         )
 
-    def load_aligned_evidence(self, root_id, current_user_id, start, end, zone, scope_ids):
-        """Return governed evidence resolved to a program scope for a local-date window."""
-        if end < start:
-            return []
-        window = {"observation_start": start, "observation_end": end}
-        rows = self._load_evidence(root_id, current_user_id, window, zone)
-        goals_by_id = load_fractal_goals_for_serialization(
-            self.db_session, root_id, include_group_activities=True
-        )
+    def load_resolved_evidence(
+        self, root_id, current_user_id, zone, scope_ids, *,
+        start=None, end=None, session_ids=None, goals_by_id=None,
+    ):
+        """Return all completed activity evidence resolved against a program scope.
+
+        Select either a local-date window (``start``/``end``) or explicit
+        ``session_ids``. Returns ``(resolved_items, goals_by_id)`` so callers can
+        reuse the loaded goal graph for a second resolution; ``goals_by_id`` stays
+        ``None`` when no evidence required loading it.
+        """
+        if session_ids is not None:
+            rows = self._evidence_query(root_id, current_user_id).filter(
+                ActivityInstance.session_id.in_(list(session_ids))
+            ).all() if session_ids else []
+        else:
+            window = {"observation_start": start, "observation_end": end}
+            rows = self._load_evidence(root_id, current_user_id, window, zone) if start and end and start <= end else []
+        if not rows:
+            return [], goals_by_id
+        if goals_by_id is None:
+            goals_by_id = load_fractal_goals_for_serialization(
+                self.db_session, root_id, include_group_activities=True
+            )
         activity_ids = {row.activity_definition_id for row in rows if row.activity_definition_id}
         effective_goals = resolve_effective_goals_by_activity(goals_by_id, activity_ids)
-        resolved = self._resolve_evidence(rows, effective_goals, goals_by_id, scope_ids, zone)
-        return [item for item in resolved if item["in_scope_ids"]]
+        return self._resolve_evidence(rows, effective_goals, goals_by_id, scope_ids, zone), goals_by_id
 
     def get_program_metrics(
         self,
@@ -150,13 +172,20 @@ class ProgramMetricsService:
         activity_ids = {row.activity_definition_id for row in evidence_rows if row.activity_definition_id}
         effective_goals = resolve_effective_goals_by_activity(goals_by_id, activity_ids)
         evidence = self._resolve_evidence(evidence_rows, effective_goals, goals_by_id, scope.goal_ids, zone)
-        program_sessions = self._load_program_sessions(
-            root_id, program.id, current_user_id, window, zone
+        session_credits = load_program_session_credits(
+            self.db_session, [program.id], window["display_start"], window["display_end"]
         )
+        utc_start, utc_end = local_date_utc_bounds(window["display_start"], window["display_end"], zone)
+        program_sessions = load_program_credit_candidates(
+            self.db_session, root_id, current_user_id, [program], utc_start, utc_end, session_credits,
+        )[program.id]
         targets = self._load_targets(root_id, current_user_id, scope.goal_ids)
         status_overrides = load_program_status_overrides(
             self.db_session, [program.id], window["display_start"], window["display_end"]
         )[program.id]
+        periods = load_calendar_periods(
+            self.db_session, root_id, current_user_id, window["display_start"], window["display_end"],
+        )
 
         payload = self._aggregate(
             program=program,
@@ -170,6 +199,8 @@ class ProgramMetricsService:
             timezone_name=timezone_name or "UTC",
             local_today=local_today,
             status_overrides=status_overrides,
+            session_credits=session_credits[program.id],
+            periods=periods,
         )
         duration_ms = round((time_module.perf_counter() - started) * 1000, 2)
         logger.info(
@@ -244,26 +275,14 @@ class ProgramMetricsService:
         ).filter(Program.id.in_(ordered_ids)).all()
         programs_by_id = {item.id: item for item in loaded_programs}
         programs = [programs_by_id[item_id] for item_id in ordered_ids]
-        utc_start = datetime.combine(overall_window["observation_start"], time.min, tzinfo=zone).astimezone(timezone.utc)
-        utc_end = datetime.combine(overall_window["observation_end"] + timedelta(days=1), time.min, tzinfo=zone).astimezone(timezone.utc)
-        effective = func.coalesce(Session.session_start, Session.completed_at, Session.created_at)
-        all_program_sessions = self.db_session.query(Session).filter(
-            Session.root_id == root_id,
-            Session.owner_id == current_user_id,
-            Session.program_id.in_(ordered_ids),
-            Session.deleted_at.is_(None),
-            effective >= utc_start,
-            effective < utc_end,
-        ).all()
-        sessions_by_program = defaultdict(list)
-        for session in all_program_sessions:
-            sessions_by_program[session.program_id].append(session)
-        overrides_by_program = load_program_status_overrides(
-            self.db_session,
-            ordered_ids,
-            overall_window["observation_start"],
-            overall_window["observation_end"],
+        observation = (overall_window["observation_start"], overall_window["observation_end"])
+        credits_by_program = load_program_session_credits(self.db_session, ordered_ids, *observation)
+        utc_start, utc_end = local_date_utc_bounds(*observation, zone)
+        sessions_by_program = load_program_credit_candidates(
+            self.db_session, root_id, current_user_id, programs, utc_start, utc_end, credits_by_program,
         )
+        overrides_by_program = load_program_status_overrides(self.db_session, ordered_ids, *observation)
+        periods = load_calendar_periods(self.db_session, root_id, current_user_id, *observation)
         rows = []
         for program in programs:
             window = windows[program.id]
@@ -285,6 +304,8 @@ class ProgramMetricsService:
                 zone,
                 local_today,
                 status_overrides=overrides_by_program[program.id],
+                session_credits=credits_by_program[program.id],
+                periods=periods,
             )
             scheduled_facts = [item for item in facts if item["counts_toward_adherence"]]
             observed_scheduled = [
@@ -392,10 +413,7 @@ class ProgramMetricsService:
         end = datetime.combine(window["observation_end"] + timedelta(days=1), time.min, tzinfo=zone).astimezone(timezone.utc)
         return start, end
 
-    def _load_evidence(self, root_id, current_user_id, window, zone):
-        start, end = self._utc_bounds(window, zone)
-        if not start:
-            return []
+    def _evidence_query(self, root_id, current_user_id):
         dataset = get_analytics_dataset("activity_instances")
         effective_at = dataset.fields["effective_at"].expression
         return build_scoped_dataset_query(
@@ -404,8 +422,6 @@ class ProgramMetricsService:
             Session.root_id == root_id,
             Session.deleted_at.is_(None),
             ActivityInstance.completed.is_(True),
-            effective_at >= start,
-            effective_at < end,
         ).with_entities(
             ActivityInstance.id,
             ActivityInstance.session_id,
@@ -414,33 +430,16 @@ class ProgramMetricsService:
             effective_at.label("effective_at"),
             Session.program_id,
             Session.program_block_id,
-        ).all()
+        )
 
-    def _load_program_sessions(self, root_id, program_id, current_user_id, window, zone):
-        start = datetime.combine(window["display_start"], time.min, tzinfo=zone).astimezone(timezone.utc)
-        end = datetime.combine(window["display_end"] + timedelta(days=1), time.min, tzinfo=zone).astimezone(timezone.utc)
-        dataset = get_analytics_dataset("sessions")
-        effective_at = dataset.fields["effective_at"].expression
-        return build_scoped_dataset_query(
-            self.db_session, "sessions", [root_id], current_user_id
-        ).filter(
-            Session.program_id == program_id,
-            Session.completed.is_(True),
+    def _load_evidence(self, root_id, current_user_id, window, zone):
+        start, end = self._utc_bounds(window, zone)
+        if not start:
+            return []
+        effective_at = get_analytics_dataset("activity_instances").fields["effective_at"].expression
+        return self._evidence_query(root_id, current_user_id).filter(
             effective_at >= start,
             effective_at < end,
-        ).with_entities(
-            Session.id,
-            Session.template_id,
-            Session.program_day_id,
-            Session.program_block_id,
-            Session.total_duration_seconds,
-            Session.duration_minutes,
-            Session.session_start,
-            Session.session_end,
-            Session.completed_at,
-            Session.created_at,
-            Session.completed,
-            effective_at.label("effective_at"),
         ).all()
 
     def _load_targets(self, root_id, current_user_id, scope_ids):
@@ -480,7 +479,7 @@ class ProgramMetricsService:
             })
         return resolved
 
-    def _aggregate(self, *, program, scope, goals_by_id, evidence, program_sessions, targets, window, zone, timezone_name, local_today, status_overrides):
+    def _aggregate(self, *, program, scope, goals_by_id, evidence, program_sessions, targets, window, zone, timezone_name, local_today, status_overrides, session_credits=(), periods=()):
         program_start, program_end = _date_part(program.start_date), _date_part(program.end_date)
         if local_today < program_start:
             status = "upcoming"
@@ -505,7 +504,16 @@ class ProgramMetricsService:
             zone,
             local_today,
             status_overrides=status_overrides,
+            session_credits=session_credits,
+            periods=periods,
         )
+        credited_blocks_by_session = credited_block_ids_by_session(day_facts)
+        # Execution metrics describe completed sessions linked to or credited to
+        # this program; unlinked template matches only count once credited.
+        program_sessions = [
+            item for item in program_sessions
+            if item.completed and (item.program_id == program.id or item.id in credited_blocks_by_session)
+        ]
         selected_dates = window.get("selected_dates")
         if selected_dates is not None:
             day_facts = [fact for fact in day_facts if fact["date"] in selected_dates]
@@ -544,6 +552,7 @@ class ProgramMetricsService:
                 "automatic_state": fact["automatic_state"],
                 "status_source": fact["status_source"],
                 "manual_status": fact["manual_status"],
+                "period_id": fact["period_id"],
                 "observed": observed,
                 "closed": fact["closed"],
                 "met": met,
@@ -572,14 +581,7 @@ class ProgramMetricsService:
         aligned_duration = sum(item["duration"] for item in aligned)
         total_duration = sum(item["duration"] for item in evidence)
 
-        coverage = defaultdict(lambda: {"instances": 0, "duration": 0.0, "last": None})
-        for item in aligned:
-            allocation = item["duration"] / len(item["in_scope_ids"]) if item["in_scope_ids"] else 0
-            for goal_id in item["in_scope_ids"]:
-                row = coverage[goal_id]
-                row["instances"] += 1
-                row["duration"] += allocation
-                row["last"] = max(filter(None, [row["last"], item["timestamp"]]))
+        coverage = allocate_equal_split(aligned, lambda item: item["in_scope_ids"])
 
         targets_by_goal = defaultdict(list)
         for target in targets:
@@ -618,13 +620,7 @@ class ProgramMetricsService:
                 "targets_met_in_window": sum(in_selected_window(target.completed_at) for target in goal_targets),
             })
 
-        other_groups = defaultdict(lambda: {"instances": 0, "duration": 0.0})
-        for item in other:
-            goal_ids = item["out_scope_ids"] or {None}
-            allocation = item["duration"] / len(goal_ids)
-            for goal_id in goal_ids:
-                other_groups[goal_id]["instances"] += 1
-                other_groups[goal_id]["duration"] += allocation
+        other_groups = allocate_equal_split(other, lambda item: item["out_scope_ids"] or {None})
         other_goals = [{
             "goal_id": goal_id,
             "name": goals_by_id[goal_id].name if goal_id in goals_by_id else "Unassociated",
@@ -632,10 +628,7 @@ class ProgramMetricsService:
             "allocated_duration_seconds": round(values["duration"]),
         } for goal_id, values in other_groups.items()]
 
-        sessions_by_occurrence = defaultdict(list)
-        for session in program_sessions:
-            local_day = _local_date(session.session_start or session.completed_at or session.created_at, zone)
-            sessions_by_occurrence[(session.program_day_id, local_day, session.template_id)].append(session)
+        sessions_by_occurrence = completed_credits_by_occurrence_template(day_facts)
         template_stats = defaultdict(lambda: {"scheduled": 0, "completed": 0, "extra": 0, "required": False, "last": None, "template": None})
         for day_obj, _block, day_value, link in template_occurrences:
             stats = template_stats[link.session_template_id]
@@ -646,7 +639,7 @@ class ProgramMetricsService:
             if matches and day_value <= (window["observation_end"] or date.min):
                 stats["completed"] += 1
                 stats["extra"] += max(0, len(matches) - 1)
-                latest = max(_as_utc(item.completed_at or item.effective_at) for item in matches)
+                latest = max(_as_utc(item.completed_at or item.session_start or item.created_at) for item in matches)
                 stats["last"] = max(filter(None, [stats["last"], latest]))
         templates = [{
             "template_id": template_id,
@@ -687,7 +680,10 @@ class ProgramMetricsService:
                 continue
             block_days = [item for item in days if block.id in item["block_ids"]]
             program_day_stats = program_day_stats_by_block[block.id]
-            block_sessions = [item for item in program_sessions if item.program_block_id == block.id]
+            block_sessions = [
+                item for item in program_sessions
+                if item.program_block_id == block.id or block.id in credited_blocks_by_session.get(item.id, ())
+            ]
             block_evidence = [
                 item for item in evidence
                 if item["program_block_id"] == block.id
@@ -770,7 +766,9 @@ class ProgramMetricsService:
                 "longest_streak": longest_streak, "unscheduled_days_with_evidence": unscheduled_evidence,
                 "manual_complete_days": sum(item["manual_status"] == "complete" for item in days),
                 "manual_rest_days": sum(item["manual_status"] == "rest" for item in days),
+                "period_rest_days": sum(item["status_source"] == "period" for item in days),
             },
+            "periods": [serialize_calendar_period(period) for period in periods],
             "alignment": {
                 "instances": {"aligned": len(aligned), "total": len(evidence), "rate": _rate(len(aligned), len(evidence))},
                 "duration_seconds": {"aligned": aligned_duration, "total": total_duration, "rate": _rate(aligned_duration, total_duration)},

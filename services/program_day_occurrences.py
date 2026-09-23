@@ -36,17 +36,41 @@ def effective_session_date(session, zone):
     return value.astimezone(zone).date()
 
 
+def explicit_schedule_dates(day):
+    """Dates a reusable definition was explicitly scheduled on."""
+    return {
+        date_part(row.date)
+        for row in getattr(day, "occurrence_schedules", None) or []
+        if getattr(row, "date", None)
+    }
+
+
+def _within_block(block, target_date):
+    block_start = date_part(block.start_date)
+    block_end = date_part(block.end_date)
+    return bool(block_start and block_end and block_start <= target_date <= block_end)
+
+
 def program_day_scheduled_on(day, block, target_date):
     if day.date:
         return date_part(day.date) == target_date
-    block_start = date_part(block.start_date)
-    block_end = date_part(block.end_date)
-    if not block_start or not block_end or not (block_start <= target_date <= block_end):
+    if not _within_block(block, target_date):
         return False
+    if target_date in explicit_schedule_dates(day):
+        return True
     names = day.day_of_week if isinstance(day.day_of_week, list) else (
         [day.day_of_week] if day.day_of_week else []
     )
     return bool(names and target_date.strftime("%A") in names)
+
+
+def program_day_explicitly_scheduled_on(day, block, target_date):
+    """True only for an explicit schedule row, not a dated or weekday definition."""
+    return (
+        not day.date
+        and _within_block(block, target_date)
+        and target_date in explicit_schedule_dates(day)
+    )
 
 
 def build_occurrences(program, start: date, end: date):
@@ -60,8 +84,10 @@ def build_occurrences(program, start: date, end: date):
         for day in block.days or []:
             if day.date:
                 candidates = [date_part(day.date)]
-            else:
+            elif day.day_of_week:
                 candidates = iter_dates(block_start, block_end)
+            else:
+                candidates = sorted(explicit_schedule_dates(day))
             for day_value in candidates:
                 if not day_value or not (start <= day_value <= end):
                     continue
@@ -70,26 +96,99 @@ def build_occurrences(program, start: date, end: date):
     return grouped
 
 
-def bucket_sessions(sessions, zone):
-    grouped = defaultdict(list)
+def _session_counts_for_program(session, program_id):
+    session_program_id = getattr(session, "program_id", None)
+    return session_program_id is None or session_program_id == program_id
+
+
+def resolve_occurrence_credits(occurrences_by_date, sessions, zone, *, program_id=None, session_credits=None):
+    """Attribute sessions to scheduled occurrences with an explicit credit source.
+
+    Precedence for one (date, session): a stored exclusion removes an automatic
+    credit; a stored manual credit counts the session as its chosen scheduled
+    template; otherwise an exact program-day link wins; otherwise a completed or
+    running session whose template is scheduled that date is template-matched,
+    unless it is explicitly linked to a different program. Stored rows are
+    dormant when the session's effective local date or the schedule no longer
+    matches, so evaluation falls back to automatic behavior.
+
+    Returns ``(credits_by_occurrence, session_credits_by_date)`` where the first
+    maps ``(program_day_id, date)`` to ``{session, template_id, source}`` entries
+    and the second maps ``date`` to ``{session_id: presentation facts}``.
+    """
+    sessions_by_date = defaultdict(list)
     for session in sessions or []:
-        program_day_id = getattr(session, "program_day_id", None)
+        if getattr(session, "deleted_at", None):
+            continue
         local_date = effective_session_date(session, zone)
-        if program_day_id and local_date:
-            grouped[(program_day_id, local_date)].append(session)
-    return grouped
+        if local_date in occurrences_by_date:
+            sessions_by_date[local_date].append(session)
+    stored_by_key = {
+        (date_part(getattr(row, "date", None)), getattr(row, "session_id", None)): row
+        for row in session_credits or []
+    }
+
+    credits_by_occurrence = defaultdict(list)
+    session_credits_by_date = defaultdict(dict)
+    for day_value, occurrence_rows in occurrences_by_date.items():
+        linked_day_ids = {row["program_day"].id for row in occurrence_rows}
+        day_ids_by_template = defaultdict(list)
+        for row in occurrence_rows:
+            for rule in get_program_day_template_rules(row["program_day"]):
+                day_ids_by_template[rule["template_id"]].append(row["program_day"].id)
+        for session in sessions_by_date.get(day_value, []):
+            stored = stored_by_key.get((day_value, session.id))
+            disposition = getattr(stored, "disposition", None)
+            template_id = getattr(session, "template_id", None)
+            source = None
+            target_day_ids = []
+            if disposition == "credit" and stored.template_id in day_ids_by_template:
+                source = "manual"
+                template_id = stored.template_id
+                target_day_ids = day_ids_by_template[template_id]
+            elif getattr(session, "program_day_id", None) in linked_day_ids:
+                source = "linked"
+                target_day_ids = [session.program_day_id]
+            elif template_id in day_ids_by_template and _session_counts_for_program(session, program_id):
+                source = "template_match"
+                target_day_ids = day_ids_by_template[template_id]
+            excluded = disposition == "exclude" and source in {"linked", "template_match"}
+            if source and not excluded:
+                for program_day_id in dict.fromkeys(target_day_ids):
+                    credits_by_occurrence[(program_day_id, day_value)].append({
+                        "session": session,
+                        "template_id": template_id,
+                        "source": source,
+                    })
+            if source or stored is not None:
+                session_credits_by_date[day_value][session.id] = {
+                    "source": source,
+                    "template_id": template_id if source else None,
+                    "program_day_ids": list(dict.fromkeys(target_day_ids)),
+                    "excluded": excluded,
+                    "stored_disposition": disposition,
+                }
+    return credits_by_occurrence, session_credits_by_date
+
+
+def _credited_item(item):
+    """Normalize a credit entry or a directly linked session to (session, template_id)."""
+    if isinstance(item, dict):
+        return item["session"], item["template_id"]
+    return item, getattr(item, "template_id", None)
 
 
 def evaluate_occurrence(day, sessions):
+    """Evaluate one occurrence from credit entries (or directly linked sessions)."""
     rules = get_program_day_template_rules(day)
     configured_template_ids = {rule["template_id"] for rule in rules}
     completed_template_ids = {
-        session.template_id
-        for session in sessions or []
+        template_id
+        for session, template_id in map(_credited_item, sessions or [])
         if getattr(session, "completed", False)
         and not getattr(session, "deleted_at", None)
-        and getattr(session, "template_id", None)
-        and session.template_id in configured_template_ids
+        and template_id
+        and template_id in configured_template_ids
     }
     required_template_ids = {
         rule["template_id"] for rule in rules if rule["is_required"]
@@ -159,13 +258,46 @@ def evaluate_date(occurrence_rows):
     }
 
 
+def index_period_coverage(periods, start, end):
+    """Map each date in ``start..end`` to covering and streak-protecting period IDs.
+
+    Periods may be ORM rows or dicts. Coverage is bounded to the requested
+    range, so work is proportional to the window rather than the period span.
+    """
+    covering = defaultdict(list)
+    protecting = defaultdict(list)
+
+    def read(period, key):
+        return period.get(key) if isinstance(period, dict) else getattr(period, key, None)
+
+    for period in periods or []:
+        if read(period, "deleted_at"):
+            continue
+        first = max(start, date_part(read(period, "start_date")))
+        last = min(end, date_part(read(period, "end_date")))
+        for day_value in iter_dates(first, last) if first <= last else ():
+            covering[day_value].append(read(period, "id"))
+            if read(period, "protects_streaks"):
+                protecting[day_value].append(read(period, "id"))
+    return covering, protecting
+
+
 def build_day_facts(
     program, start, end, sessions, aligned_evidence, zone, local_today,
-    status_overrides=None,
+    status_overrides=None, session_credits=None, periods=None,
 ):
-    """Build canonical date facts and occurrence evaluations for a display range."""
+    """Build canonical date facts and occurrence evaluations for a display range.
+
+    ``sessions`` are credit candidates (see ``program_day_credits``); each
+    occurrence row exposes its attributed ``credits`` and the distinct
+    ``sessions`` behind them, and each fact exposes per-session credit facts.
+    """
     occurrences_by_date = build_occurrences(program, start, end)
-    sessions_by_occurrence = bucket_sessions(sessions, zone)
+    covering_periods, protecting_periods = index_period_coverage(periods, start, end)
+    credits_by_occurrence, session_credits_by_date = resolve_occurrence_credits(
+        occurrences_by_date, sessions, zone,
+        program_id=getattr(program, "id", None), session_credits=session_credits,
+    )
     evidence_by_date = defaultdict(list)
     for item in aligned_evidence or []:
         evidence_by_date[item["date"]].append(item)
@@ -179,11 +311,14 @@ def build_day_facts(
         occurrence_rows = []
         for occurrence in occurrences_by_date.get(day_value, []):
             day = occurrence["program_day"]
-            occurrence_sessions = sessions_by_occurrence[(day.id, day_value)]
-            evaluation = evaluate_occurrence(day, occurrence_sessions)
+            occurrence_credits = credits_by_occurrence.get((day.id, day_value), [])
+            evaluation = evaluate_occurrence(day, occurrence_credits)
             occurrence_rows.append({
                 **occurrence,
-                "sessions": occurrence_sessions,
+                "credits": occurrence_credits,
+                "sessions": list({
+                    entry["session"].id: entry["session"] for entry in occurrence_credits
+                }.values()),
                 "evaluation": evaluation,
             })
 
@@ -212,24 +347,32 @@ def build_day_facts(
         else:
             automatic_state = "upcoming"
 
+        # Precedence: manual override, then a streak-protecting period (only for
+        # dates that would not otherwise be met), then automatic evaluation.
         manual_status = overrides_by_date.get(day_value) if scheduled else None
+        protecting_ids = protecting_periods.get(day_value, [])
+        period_rest = bool(
+            scheduled and not manual_status and protecting_ids and not requirements_met
+        )
         if manual_status == "complete":
             state = "scheduled_met"
-        elif manual_status == "rest":
+        elif manual_status == "rest" or period_rest:
             state = "rest"
         else:
             state = automatic_state
         counts_as_success = scheduled and manual_status != "rest" and (
             manual_status == "complete" or requirements_met
         )
-        counts_toward_adherence = scheduled and manual_status != "rest"
+        counts_toward_adherence = scheduled and manual_status != "rest" and not period_rest
 
         facts.append({
             "date": day_value,
             "state": state,
             "automatic_state": automatic_state,
-            "status_source": "manual" if manual_status else "automatic",
+            "status_source": "manual" if manual_status else ("period" if period_rest else "automatic"),
             "manual_status": manual_status,
+            "period_id": protecting_ids[0] if period_rest else None,
+            "period_ids": covering_periods.get(day_value, []),
             "scheduled": scheduled,
             "observed": observed,
             "closed": closed,
@@ -244,6 +387,7 @@ def build_day_facts(
             "date_evaluation": date_evaluation,
             "occurrences": occurrence_rows,
             "aligned_items": aligned_items,
+            "session_credits": session_credits_by_date.get(day_value, {}),
         })
 
     apply_chain_facts(facts)

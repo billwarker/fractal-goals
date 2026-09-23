@@ -60,12 +60,12 @@ export default function ProgramSidePane({
     selectedRange,
     selectionLabel = null,
     dayDetailQuery,
-    onProgramScope,
     onPreviousDay,
     onNextDay,
     today,
     blocks,
     onScheduleDay,
+    onUnscheduleDay,
     onCreateDay,
     getGoalIcon,
     getGoalColor,
@@ -75,6 +75,9 @@ export default function ProgramSidePane({
     timezone = 'UTC',
     onSetDayStatus,
     dayStatusUpdating = false,
+    onSetSessionCredit,
+    sessionCreditUpdating = false,
+    onEditPeriod,
 }) {
     const getGoalDetails = (goalId) => goals.find((goal) => String(goal.id) === String(goalId)) || null;
     const [collapsedSections, setCollapsedSections] = useState({
@@ -90,19 +93,13 @@ export default function ProgramSidePane({
         <aside className={styles.sidePane} aria-label="Program side pane">
             {scope === 'day' ? (
                 <header className={styles.dayReviewHeader}>
-                    <div className={styles.dayReviewTopline}>
-                        <Button unstyled className={styles.programCrumb} onClick={onProgramScope}>
-                            <span aria-hidden="true">‹</span>
-                            <span>{program?.name || 'Program'}</span>
-                        </Button>
-                        <SidePaneHeaderButton className={styles.collapseButton} onClick={onCollapse}>Collapse</SidePaneHeaderButton>
-                    </div>
                     <div className={styles.dayReviewHeading}>
                         <Button unstyled className={styles.dayNavButton} onClick={onPreviousDay} aria-label="Previous day">‹</Button>
                         <div className={styles.dayReviewTitle}>
                             <h2>{formatLiteralDate(contextDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h2>
                         </div>
                         <Button unstyled className={styles.dayNavButton} onClick={onNextDay} aria-label="Next day">›</Button>
+                        <SidePaneHeaderButton className={styles.collapseButton} onClick={onCollapse}>Collapse</SidePaneHeaderButton>
                     </div>
                 </header>
             ) : <SidePaneHeader
@@ -123,10 +120,6 @@ export default function ProgramSidePane({
                     }}
                 /> : (
                     <nav className={styles.scopeNav} aria-label="Program scope">
-                        <Button unstyled className={styles.programCrumb} onClick={onProgramScope}>
-                            <span aria-hidden="true">‹</span>
-                            <span>{program?.name || 'Program'}</span>
-                        </Button>
                         <span className={styles.rangeSummary}>
                             <span className={styles.rangeNavLabel}>Selected timeframe</span>
                             <span className={styles.rangeNavDate}>
@@ -146,6 +139,7 @@ export default function ProgramSidePane({
                     program={program}
                     blocks={blocks}
                     onScheduleDay={onScheduleDay}
+                    onUnscheduleDay={onUnscheduleDay}
                     onCreateDay={onCreateDay}
                     goals={goals}
                     onGoalClick={onGoalClick}
@@ -155,6 +149,9 @@ export default function ProgramSidePane({
                     timezone={timezone}
                     onSetDayStatus={onSetDayStatus}
                     dayStatusUpdating={dayStatusUpdating}
+                    onSetSessionCredit={onSetSessionCredit}
+                    onEditPeriod={onEditPeriod}
+                    sessionCreditUpdating={sessionCreditUpdating}
                 />
             ) : null}
 

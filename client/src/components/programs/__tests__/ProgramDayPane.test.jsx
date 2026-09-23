@@ -27,9 +27,10 @@ const detail = {
         templates: [{
             id: 'template-1', name: 'Main work', color: '#336699', status: 'pending',
         }],
-        sessions: [],
+        credits: [],
     }],
-    other_sessions: [],
+    can_edit_credits: false,
+    sessions: [],
 };
 
 function renderPane(overrides = {}) {
@@ -194,8 +195,9 @@ describe('ProgramDayPane', () => {
                     completed_template_ids: ['template-1'],
                 },
                 templates: [{ ...detail.occurrences[0].templates[0], status: 'completed' }],
-                sessions: [completedSession],
+                credits: [{ session_id: 'session-1', template_id: 'template-1', source: 'linked' }],
             }],
+            sessions: [{ ...completedSession, relation: 'credited', credit: { source: 'linked', template_id: 'template-1' } }],
         };
         renderPane({ query: { data: { detail: completedDetail } } });
 
@@ -231,8 +233,9 @@ describe('ProgramDayPane', () => {
             occurrences: [{
                 ...detail.occurrences[0],
                 templates: [{ ...detail.occurrences[0].templates[0], status: 'in_progress' }],
-                sessions: [activeSession],
+                credits: [{ session_id: 'session-active', template_id: 'template-1', source: 'template_match' }],
             }],
+            sessions: [{ ...activeSession, relation: 'credited', credit: { source: 'template_match' } }],
         };
         renderPane({ query: { data: { detail: activeDetail } } });
 
@@ -267,7 +270,7 @@ describe('ProgramDayPane', () => {
         const onCreateDay = vi.fn();
         const reusable = { id: 'reusable-1', name: 'Reusable', date: null };
         renderPane({
-            query: { data: { detail: { occurrences: [], other_sessions: [] } } },
+            query: { data: { detail: { occurrences: [], sessions: [] } } },
             blocks: [{ id: 'block-1', name: 'Foundation', days: [reusable] }],
             onScheduleDay,
             onCreateDay,

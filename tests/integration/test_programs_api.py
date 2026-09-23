@@ -216,7 +216,7 @@ class TestProgramCRUD:
         )
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload['schema_version'] == 3
+        assert payload['schema_version'] == 5
         assert payload['chain']['context_start'] == target_date.isoformat()
         assert payload['chain']['context_truncated_before'] is False
         assert payload['days'][0]['state'] == 'scheduled_pending'
@@ -453,7 +453,7 @@ class TestProgramCRUD:
         assert response.status_code == 200
         assert response.headers.get('ETag')
         payload = response.get_json()
-        assert payload['calculation_version'] == 4
+        assert payload['calculation_version'] == 6
         assert payload['window']['timezone'] == 'UTC'
         assert payload['semantics'] == {
             'attribution': 'current_state',
@@ -555,7 +555,7 @@ class TestProgramCRUD:
             event.remove(engine, "before_cursor_execute", capture_statement)
 
         assert (error, status) == (None, 200)
-        assert payload["schema_version"] == 3
+        assert payload["schema_version"] == 5
         assert len(statements) <= 40
 
     def test_delete_program(self, authed_client, db_session, sample_ultimate_goal, sample_program):
@@ -801,112 +801,88 @@ class TestProgramStructure:
         assert response.status_code == 400
         assert response.get_json()['error'] == 'Goal deadline must be within the selected block date range'
 
-    def test_schedule_block_day_endpoint_creates_program_session(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
-        """Scheduling a program day should be owned by the programs service/API, not assembled in the client."""
-        root_id = sample_ultimate_goal.id
-        program_id = sample_program['id']
-        mid_term_goal = sample_goal_hierarchy['mid_term']
-        short_term_goal = sample_goal_hierarchy['short_term']
-
-        update_response = authed_client.put(
-            f'/api/{root_id}/programs/{program_id}',
-            json={'selectedGoals': [mid_term_goal.id]}
-        )
-        assert update_response.status_code == 200
-
-        program_response = authed_client.get(f'/api/{root_id}/programs/{program_id}')
-        program_data = program_response.get_json()
-        block_id = program_data['blocks'][0]['id']
-        block_start_date = program_data['blocks'][0]['start_date']
-        scoped_deadline = (
-            datetime.strptime(block_start_date, '%Y-%m-%d') + timedelta(days=1)
-        ).strftime('%Y-%m-%d')
-
-        attach_response = authed_client.post(
-            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/goals',
-            json={
-                'goal_id': short_term_goal.id,
-                'deadline': scoped_deadline,
-            }
-        )
-        assert attach_response.status_code == 200
-
-        add_day_response = authed_client.post(
-            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days',
-            json={'name': 'Schedule Me'}
-        )
-        assert add_day_response.status_code == 201
-
-        refreshed_program = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
-        block = next(entry for entry in refreshed_program['blocks'] if entry['id'] == block_id)
-        day_id = next(day['id'] for day in block['days'] if day.get('name') == 'Schedule Me')
-        scheduled_date = block['start_date']
-
-        schedule_response = authed_client.post(
-            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days/{day_id}/schedule',
-            json={'session_start': f'{scheduled_date}T12:00:00Z'}
-        )
-        assert schedule_response.status_code == 201
-
-        scheduled_session = schedule_response.get_json()
-        assert scheduled_session['program_day_id'] == day_id
-        assert scheduled_session['program_info']['program_id'] == program_id
-        assert scheduled_session['program_info']['program_color'] == sample_program['color']
-        assert scheduled_session['program_info']['block_name'] == block['name']
-        assert scheduled_session['program_info']['block_color'] == block['color']
-        assert scheduled_session['program_info']['day_name'] == 'Schedule Me'
-        assert scheduled_session['program_info']['day_number'] is not None
-        assert any(goal['id'] == short_term_goal.id for goal in scheduled_session['session_goals'])
-
-    def test_unschedule_block_day_occurrence_soft_deletes_matching_session(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
-        root_id = sample_ultimate_goal.id
-        program_id = sample_program['id']
-        mid_term_goal = sample_goal_hierarchy['mid_term']
-        short_term_goal = sample_goal_hierarchy['short_term']
-
-        authed_client.put(
-            f'/api/{root_id}/programs/{program_id}',
-            json={'selectedGoals': [mid_term_goal.id]}
-        )
-
+    def _reusable_day(self, authed_client, root_id, program_id, name):
         program_data = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
-        block_id = program_data['blocks'][0]['id']
-        scoped_deadline = (
-            datetime.strptime(program_data['blocks'][0]['start_date'], '%Y-%m-%d') + timedelta(days=1)
-        ).strftime('%Y-%m-%d')
-
-        authed_client.post(
-            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/goals',
-            json={
-                'goal_id': short_term_goal.id,
-                'deadline': scoped_deadline,
-            }
+        block = program_data['blocks'][0]
+        response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block["id"]}/days',
+            json={'name': name},
         )
-        authed_client.post(
-            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days',
-            json={'name': 'Recurring Day'}
-        )
+        assert response.status_code == 201
+        refreshed = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        block = next(entry for entry in refreshed['blocks'] if entry['id'] == block['id'])
+        day_id = next(day['id'] for day in block['days'] if day.get('name') == name)
+        return block, day_id
 
-        refreshed_program = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
-        block = next(entry for entry in refreshed_program['blocks'] if entry['id'] == block_id)
-        day_id = next(day['id'] for day in block['days'] if day.get('name') == 'Recurring Day')
+    def _detail_occurrences(self, authed_client, root_id, program_id, day_value):
+        payload = authed_client.get(
+            f'/api/{root_id}/programs/{program_id}/day-read-model'
+            f'?range_start={day_value}&range_end={day_value}&detail_date={day_value}&timezone=UTC'
+        ).get_json()
+        return payload['detail']['occurrences']
+
+    def test_schedule_block_day_endpoint_creates_dated_occurrence(
+        self, authed_client, db_session, sample_ultimate_goal, sample_program,
+    ):
+        """Scheduling adds an occurrence the canonical evaluator sees, never a placeholder session."""
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        block, day_id = self._reusable_day(authed_client, root_id, program_id, 'Schedule Me')
         scheduled_date = block['start_date']
+        url = f'/api/{root_id}/programs/{program_id}/blocks/{block["id"]}/days/{day_id}/schedule'
 
-        schedule_response = authed_client.post(
-            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days/{day_id}/schedule',
-            json={'session_start': f'{scheduled_date}T12:00:00Z'}
-        )
-        assert schedule_response.status_code == 201
-        session_id = schedule_response.get_json()['id']
+        response = authed_client.post(url, json={'date': scheduled_date})
 
-        unschedule_response = authed_client.post(
-            f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days/{day_id}/unschedule',
-            json={'date': scheduled_date, 'timezone': 'UTC'}
+        assert response.status_code == 201
+        assert response.get_json() | {'id': None} == {
+            'id': None, 'program_day_id': day_id, 'block_id': block['id'],
+            'program_id': program_id, 'name': 'Schedule Me', 'date': scheduled_date,
+        }
+        assert db_session.query(Session).filter_by(root_id=root_id).count() == 0
+        occurrences = self._detail_occurrences(authed_client, root_id, program_id, scheduled_date)
+        assert [(row['program_day_id'], row['scheduled_explicitly']) for row in occurrences] == [(day_id, True)]
+        program = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        scheduled_day = next(day for entry in program['blocks'] for day in entry['days'] if day['id'] == day_id)
+        assert scheduled_day['scheduled_dates'] == [scheduled_date]
+
+        duplicate = authed_client.post(url, json={'date': scheduled_date})
+        assert duplicate.status_code == 400
+        assert 'already occurs' in duplicate.get_json()['error']
+        outside = authed_client.post(url, json={'date': '1999-01-01'})
+        assert outside.status_code == 400
+        assert authed_client.post(url, json={}).status_code == 400
+        assert authed_client.post(url, json={'date': '2026-9-1'}).status_code == 400
+
+        next_date = (date.fromisoformat(scheduled_date) + timedelta(days=1)).isoformat()
+        legacy = authed_client.post(url, json={'session_start': f'{next_date}T12:00:00Z'})
+        assert legacy.status_code == 201
+        assert legacy.get_json()['date'] == next_date
+
+    def test_unschedule_block_day_occurrence_removes_schedule_and_legacy_placeholder(
+        self, authed_client, db_session, test_user, sample_ultimate_goal, sample_program,
+    ):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        block, day_id = self._reusable_day(authed_client, root_id, program_id, 'Recurring Day')
+        scheduled_date = block['start_date']
+        base = f'/api/{root_id}/programs/{program_id}/blocks/{block["id"]}/days/{day_id}'
+        assert authed_client.post(f'{base}/schedule', json={'date': scheduled_date}).status_code == 201
+        placeholder = Session(
+            owner_id=test_user.id, root_id=root_id, name='Recurring Day', completed=False,
+            program_id=program_id, program_day_id=day_id,
+            session_start=datetime.combine(date.fromisoformat(scheduled_date), datetime.min.time(), tzinfo=timezone.utc)
+            + timedelta(hours=12),
         )
-        assert unschedule_response.status_code == 200
-        payload = unschedule_response.get_json()
-        assert payload['removed_count'] == 1
-        assert payload['removed_session_ids'] == [session_id]
+        db_session.add(placeholder)
+        db_session.commit()
+
+        response = authed_client.post(f'{base}/unschedule', json={'date': scheduled_date, 'timezone': 'UTC'})
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['removed_schedule_count'] == 1
+        assert payload['removed_session_ids'] == [placeholder.id]
+        assert self._detail_occurrences(authed_client, root_id, program_id, scheduled_date) == []
 
     def test_unschedule_block_day_occurrence_emits_program_day_unscheduled(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy, monkeypatch):
         root_id = sample_ultimate_goal.id

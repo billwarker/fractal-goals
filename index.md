@@ -95,8 +95,14 @@ client recomputation.
 `services/program_day_occurrences.py` is the canonical calendar evaluator. It owns the seven
 day states, stable chain roles, and per-calendar-day completion semantics. When definitions
 overlap, required/completed templates are deduplicated and the strongest configured
-`completion_min_templates` threshold applies once for that date. Scheduled completion requires
-exact program-day/date/template-linked, completed, non-deleted sessions.
+`completion_min_templates` threshold applies once for that date. Scheduled completion credits
+completed, non-deleted sessions on the occurrence's local date from one of three sources: an exact
+program-day link, a template match (an unlinked or same-program session using a scheduled template),
+or a manual credit mapping the session to a scheduled template. Stored exclusions remove automatic
+credit. `program_day_session_credits` holds manual credits/exclusions per program/date/session; rows
+are dormant when the session's local date or the schedule no longer matches. Every evaluator caller
+loads candidates through `services/program_day_credits.py`, so calendar, metrics (calculation v5),
+day review, and Create Session day options attribute sessions identically.
 
 Manual Complete and Rest statuses are stored once per program/calendar date and resolved by the
 same evaluator. Complete changes adherence and chain success without fabricating session evidence;
@@ -106,18 +112,39 @@ written or used by calendar, metrics, onboarding, create-session day options, or
 The day-review pane places one clickable effective-status icon beside the first scheduled day
 name: a blue circle while scheduled, a check when met, or an X when missed. Its dropdown escapes
 the pane's scroll clipping; when definitions overlap, its actions apply to every definition on
-that date. The calendar has one multi-day selection mode for block-range creation and bulk status
-changes on selected scheduled dates. Click-and-drag adds eligible scheduled dates crossed;
-the ensuing calendar background click does not cancel selection. Scheduled cells are keyboard-selectable and
-highlighted when selected, with no separate checkbox circles. The client expects program metrics
-calculation v4 so selected timeframe overviews use the same override-aware results as the calendar.
-Calendar day ribbons omit redundant completion checkmarks; their state remains available to
-assistive technology and in the day-review pane.
+that date. The calendar has one multi-day selection mode for block ranges, bulk statuses, and
+calendar events. Any date inside the selected program is selectable; `useCalendarDragSelection` owns
+the gestures (press-and-drag selects the range between cells, including over event ribbons, with a
+live preview; a press without movement toggles one date; Shift extends), so FullCalendar's own
+selection and clicks stand down in that mode. Status actions apply only to the scheduled subset;
+**Plan event** spans the whole selection. Cells are keyboard-selectable and highlighted when selected.
+The client expects program metrics calculation v6 and day read model schema v5.
+Calendar day ribbons use the same status symbol as the day-review pane (check, X, or blue circle from
+`getProgramDayStatusSymbol` and `ProgramDayStatusMark`), shown once per date on the selected program's
+first ribbon; the symbol is decorative beside the ribbon's assistive state text.
+Reusable definitions are scheduled onto dates through `program_day_occurrence_schedules`
+(`schedule_block_day` writes a row, never a placeholder session); the evaluator treats those dates
+as occurrences, and the day pane keeps "Plan this day" available for today and future dates, with
+"Remove from this date" for explicit schedules. Calendar events (`calendar_periods`,
+`services/calendar_periods.py`, `/api/<root_id>/calendar-periods`) are fractal-wide, named spans such
+as vacations. Precedence for a scheduled date is manual override, then a streak-protecting event
+(only when the date would not otherwise be met; it becomes rest with `status_source: "period"`),
+then automatic evaluation. Events render as hatched spanning bars, as a banner in the day pane, and
+as a protected-day count in the overview.
 In multi-day mode, the sidebar requests metrics for the exact selected scheduled dates, excluding
 gaps from adherence, evidence, and block totals. Non-contiguous selections use a compact
 "N selected days" heading rather than displaying the misleading first-to-last date range.
 
-`ProgramDayReadModelService` emits schema v3, requires an IANA timezone, caps the complete
+The day-review pane is review-first: its one session list covers every session on the date, labelled
+credited (with source), off-plan, or other program, with per-session goal alignment (the same
+equal-split allocation as program metrics, via `services/program_day_summary.py`) and server-provided
+credit options. Off-plan sessions sit inside the first program-day card; planning actions appear only
+for today and future unscheduled dates. Range summaries list each observed date's completed sessions
+(any program, `id` and `name`); the calendar names them as plain text only on dates
+without a selected-program ribbon (scheduled dates keep just the ribbon and its status symbol); the legacy
+program-payload session events are not rendered on the Programs page.
+
+`ProgramDayReadModelService` emits schema v4, requires an IANA timezone, caps the complete
 expanded chain window at `MAX_WINDOW_DAYS`, reports truncated context, and provides cursor-paged
 day detail. The client rejects unsupported schema versions. FullCalendar block labels are
 reconciled idempotently, cleaned on cell unmount, and activated through React event delegation.
@@ -128,6 +155,8 @@ Detailed design:
 - [Program metrics](planning/program-metrics-insights.md)
 - [Program-aware session creation](planning/program-aware-create-session.md)
 - [Manual and bulk program-day statuses](planning/program-day-manual-statuses.md)
+- [Day review summary and session credit](planning/program-day-review-summary-and-credit.md)
+- [Calendar events and occurrence scheduling](planning/program-calendar-periods-and-scheduling.md)
 
 ### Notes and analytics
 

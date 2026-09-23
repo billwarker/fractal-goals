@@ -293,6 +293,7 @@
     background: transparent;
 }
 
+/* Goal deadlines and unscheduled completed sessions share one text treatment. */
 .eventPillGoal {
     color: var(--color-text-primary);
 }
@@ -389,6 +390,42 @@
 /* Unlinked session completed */
 .eventPillSessionCompleted {
     background: color-mix(in srgb, var(--color-brand-success) 11%, var(--color-bg-card));
+    color: var(--color-text-primary);
+}
+
+.ribbonStatusMark {
+    position: relative;
+    z-index: 2;
+}
+
+/* Time off spans its dates as a hatched, neutral bar above program ribbons. */
+.eventPillCalendarPeriod {
+    min-height: 18px;
+    border: 1px dashed color-mix(in srgb, var(--color-text-muted) 55%, transparent);
+    background:
+        repeating-linear-gradient(
+            -45deg,
+            color-mix(in srgb, var(--color-text-muted) 16%, transparent) 0 4px,
+            transparent 4px 9px
+        ),
+        color-mix(in srgb, var(--color-bg-card) 70%, transparent);
+    color: var(--color-text-primary);
+}
+
+.calendarPeriodKind {
+    font-weight: 700;
+}
+
+@media (forced-colors: active) {
+    .eventPillCalendarPeriod { border-color: CanvasText; background: Canvas; }
+}
+
+/* Completed session on a date with no scheduled program day: plain text,
+   matching the goal-deadline text treatment (.eventPillGoal). */
+.eventPillCompletedSession {
+    min-height: 16px;
+    padding-block: 0;
+    background: transparent;
     color: var(--color-text-primary);
 }
 
@@ -633,4 +670,12 @@
     :global(.fc-daygrid-day-number) {
         font-size: 12px !important;
     }
+}
+
+/* Multi-day mode: pointer gestures select cells, so suppress text selection and
+   touch panning on selectable cells while the mode is on. */
+.calendarContainerSelecting :global(.fc-daygrid-day[data-program-selectable-date]) {
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
 }

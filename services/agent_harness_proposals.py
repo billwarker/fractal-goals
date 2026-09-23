@@ -394,6 +394,9 @@ class AgentProposalsMixin:
                     for row in template_links
                 ],
             },
+            "occurrence_schedules": sorted(
+                _iso(row.date) for row in (day.occurrence_schedules or [])
+            ),
             "scheduled_sessions": [
                 {
                     "id": row.id,

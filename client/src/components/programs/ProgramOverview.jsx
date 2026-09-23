@@ -3,8 +3,10 @@ import PropTypes from 'prop-types';
 
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import GoalIcon from '../atoms/GoalIcon';
+import { formatLiteralDate } from '../../utils/dateUtils';
 import styles from './ProgramOverview.module.css';
 
+const SHORT_DATE = { year: undefined, month: 'short', day: 'numeric' };
 const formatPercent = (value) => value == null ? '—' : `${Math.round(value * 100)}%`;
 const formatEffortShare = (value) => value > 0 && value < 0.01 ? '<1%' : formatPercent(value);
 
@@ -69,6 +71,29 @@ export default function ProgramOverview({ metrics, loading = false, error = null
                     </div>
                 ))}
             </dl>
+
+            {metrics.periods?.length || metrics.adherence.period_rest_days ? (
+                <section className={styles.section} aria-labelledby="program-time-off-title">
+                    <div className={styles.sectionHeading}>
+                        <h2 id="program-time-off-title">Events</h2>
+                    </div>
+                    {metrics.adherence.period_rest_days ? (
+                        <p className={styles.timeOffSummary}>
+                            {metrics.adherence.period_rest_days} {metrics.adherence.period_rest_days === 1 ? 'day' : 'days'} protected
+                            by events; they don’t count against adherence or break your streak.
+                        </p>
+                    ) : null}
+                    <ul className={styles.timeOffList}>
+                        {(metrics.periods || []).map((period) => (
+                            <li key={period.id}>
+                                <strong>{period.name}</strong>
+                                <span>{formatLiteralDate(period.start_date, SHORT_DATE)} – {formatLiteralDate(period.end_date, SHORT_DATE)}</span>
+                                {period.protects_streaks ? null : <small>Not protecting streaks</small>}
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ) : null}
 
             <section className={styles.section} aria-labelledby="program-block-results-title">
                 <div className={styles.sectionHeading}>

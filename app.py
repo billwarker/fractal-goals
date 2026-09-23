@@ -36,6 +36,7 @@ from blueprints.goal_levels_api import goal_levels_bp
 from blueprints.templates_api import templates_bp
 from blueprints.timers_api import timers_bp
 from blueprints.programs_api import programs_bp
+from blueprints.calendar_periods_api import calendar_periods_bp
 from blueprints.notes_api import notes_bp
 from blueprints.dashboards_api import dashboards_bp
 from blueprints.page_surface_api import page_surface_bp
@@ -191,6 +192,7 @@ app.register_blueprint(goal_levels_bp)
 app.register_blueprint(templates_bp)
 app.register_blueprint(timers_bp)
 app.register_blueprint(programs_bp)
+app.register_blueprint(calendar_periods_bp)
 app.register_blueprint(notes_bp)
 app.register_blueprint(dashboards_bp)
 app.register_blueprint(page_surface_bp)

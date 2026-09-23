@@ -1,0 +1,28 @@
+.mark {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    font-family: system-ui, sans-serif;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.sm { width: 14px; height: 14px; font-size: 13px; }
+.md { width: 21px; height: 21px; font-size: 20px; }
+.complete { color: var(--color-brand-success); }
+.missed { color: var(--color-brand-danger); }
+
+.circle {
+    box-sizing: border-box;
+    width: 81%;
+    height: 81%;
+    border: 2px solid #69a9ff;
+    border-radius: 50%;
+}
+
+.sm .circle { border-width: 1.5px; }
+
+@media (forced-colors: active) {
+    .circle { border-color: CanvasText; }
+}

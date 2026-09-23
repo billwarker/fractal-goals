@@ -14,6 +14,7 @@ from validators import (
     ProgramDayScheduleSchema,
     ProgramDayOccurrenceUnscheduleSchema,
     ProgramDayStatusesUpdateSchema,
+    ProgramDaySessionCreditSchema,
     ProgramGoalDeadlineSchema,
     ProgramBlockSchema,
     ProgramBlockUpdateSchema,
@@ -178,6 +179,37 @@ def update_program_day_statuses(current_user, root_id, program_id, validated_dat
     except ValueError as exc:
         session.rollback()
         return jsonify({"error": str(exc)}), 400
+    finally:
+        session.close()
+
+
+@programs_bp.route('/<root_id>/programs/<program_id>/day-session-credits', methods=['PUT'])
+@token_required
+@validate_request(ProgramDaySessionCreditSchema)
+def update_program_day_session_credit(current_user, root_id, program_id, validated_data):
+    """Credit, exclude, or restore automatic attribution of one session on one date."""
+    session = get_db_session()
+    try:
+        result = ProgramService.set_program_day_session_credit(
+            session, root_id, program_id, validated_data, current_user.id
+        )
+        day_value = result["date"]
+        day, error, status = ProgramDayReadModelService(session).get(
+            root_id,
+            program_id,
+            current_user.id,
+            range_start=day_value,
+            range_end=day_value,
+            timezone_name=validated_data["timezone"],
+            detail_date=day_value,
+            session_limit=20,
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify({**result, "day": day})
+    except ProgramServiceValidationError as exc:
+        session.rollback()
+        return _program_service_error_response(exc)
     finally:
         session.close()
 
@@ -423,10 +455,10 @@ def copy_block_day(current_user, root_id, program_id, block_id, day_id, validate
 @token_required
 @validate_request(ProgramDayScheduleSchema)
 def schedule_block_day(current_user, root_id, program_id, block_id, day_id, validated_data):
-    """Schedule an existing program day by creating a session in program context."""
+    """Schedule a reusable program day as an occurrence on one calendar date."""
     session = get_db_session()
     try:
-        scheduled_session = ProgramService.schedule_block_day(
+        occurrence = ProgramService.schedule_block_day(
             session,
             root_id,
             program_id,
@@ -435,7 +467,7 @@ def schedule_block_day(current_user, root_id, program_id, block_id, day_id, vali
             validated_data,
             current_user.id,
         )
-        return jsonify(scheduled_session), 201
+        return jsonify(occurrence), 201
     except ValueError as e:
         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
@@ -449,7 +481,7 @@ def schedule_block_day(current_user, root_id, program_id, block_id, day_id, vali
 @token_required
 @validate_request(ProgramDayOccurrenceUnscheduleSchema)
 def unschedule_block_day_occurrence(current_user, root_id, program_id, block_id, day_id, validated_data):
-    """Unschedule sessions for a specific program-day occurrence on a calendar date."""
+    """Remove an explicitly scheduled program-day occurrence from a calendar date."""
     session = get_db_session()
     try:
         result = ProgramService.unschedule_block_day_occurrence(

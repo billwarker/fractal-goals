@@ -5,7 +5,7 @@ import { fractalApi } from '../utils/api';
 import { getISOYMDInTimezone } from '../utils/dateUtils';
 import { queryKeys } from './queryKeys';
 
-const PROGRAM_DAY_READ_MODEL_SCHEMA_VERSION = 3;
+const PROGRAM_DAY_READ_MODEL_SCHEMA_VERSION = 5;
 
 function unwrapReadModelResponse(response) {
     const payload = response.data;
@@ -79,19 +79,12 @@ export function useProgramDayDetail(rootId, programId, timezone, date) {
         const pages = query.data?.pages || [];
         const first = pages[0];
         if (!first) return undefined;
-        const occurrences = (first.detail?.occurrences || []).map((occurrence) => ({
-            ...occurrence,
-            sessions: pages.flatMap((page) => (
-                page.detail?.occurrences?.find((item) => item.occurrence_key === occurrence.occurrence_key)?.sessions || []
-            )),
-        }));
         const last = pages[pages.length - 1];
         return {
             ...first,
             detail: first.detail ? {
                 ...first.detail,
-                occurrences,
-                other_sessions: pages.flatMap((page) => page.detail?.other_sessions || []),
+                sessions: pages.flatMap((page) => page.detail?.sessions || []),
                 sessions_page: last.detail?.sessions_page,
             } : null,
         };
@@ -99,17 +92,50 @@ export function useProgramDayDetail(rootId, programId, timezone, date) {
     return { ...query, data };
 }
 
+function invalidateProgramDayDependents(queryClient, rootId, programId, { except = null } = {}) {
+    const exceptHash = except ? JSON.stringify(except) : null;
+    return Promise.all([
+        queryClient.invalidateQueries({
+            queryKey: queryKeys.programDayReadModelRoot(rootId, programId),
+            ...(exceptHash ? { predicate: (query) => JSON.stringify(query.queryKey) !== exceptHash } : {}),
+        }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.programs(rootId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.programDayOptions(rootId) }),
+    ]);
+}
+
 export function useUpdateProgramDayStatuses(rootId, programId) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (data) => fractalApi.updateProgramDayStatuses(rootId, programId, data),
-        onSuccess: async () => {
-            await Promise.all([
-                queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId, programId) }),
-                queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
-                queryClient.invalidateQueries({ queryKey: queryKeys.programs(rootId) }),
-                queryClient.invalidateQueries({ queryKey: queryKeys.programDayOptions(rootId) }),
-            ]);
+        onSuccess: () => invalidateProgramDayDependents(queryClient, rootId, programId),
+    });
+}
+
+/**
+ * Credit, exclude, or restore automatic attribution of one session on one date.
+ * The response carries the refreshed first detail page, which replaces the
+ * cached day detail directly; every other dependent projection is invalidated.
+ */
+export function useSetProgramDaySessionCredit(rootId, programId, timezone) {
+    const queryClient = useQueryClient();
+    const zone = timezone || 'UTC';
+    return useMutation({
+        mutationFn: async ({ date, sessionId, disposition, templateId = null }) => {
+            const response = await fractalApi.updateProgramDaySessionCredit(rootId, programId, {
+                date,
+                session_id: sessionId,
+                disposition,
+                timezone: zone,
+                ...(templateId ? { template_id: templateId } : {}),
+            });
+            return { ...response.data, day: unwrapReadModelResponse({ data: response.data.day }) };
+        },
+        onSuccess: (result, { date }) => {
+            const detailKey = queryKeys.programDayReadModel(rootId, programId, zone, date, date, date);
+            queryClient.setQueryData(detailKey, { pages: [result.day], pageParams: [null] });
+            return invalidateProgramDayDependents(queryClient, rootId, programId, { except: detailKey });
         },
     });
 }

@@ -3,19 +3,15 @@
 .programHeader, .scopedHeader { padding: 14px 16px; }
 .scopedHeader { align-items: stretch; }
 .scopeNav { min-width: 0; display: grid; gap: 10px; }
-.programCrumb { width: fit-content; max-width: 100%; display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: var(--color-text-secondary); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
-.programCrumb span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.programCrumb:hover { color: var(--color-brand-primary); }
-.programCrumb:focus-visible, .dayNavButton:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
+.dayNavButton:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
 .dayNavButton { width: 32px; height: 32px; padding: 0; border: 1px solid var(--color-border); border-radius: var(--border-radius-sm); background: var(--color-bg-input); color: var(--color-text-primary); font-size: 18px; line-height: 1; cursor: pointer; }
 .dayNavButton:hover { border-color: var(--color-border-hover); background: var(--color-bg-card-hover); }
 .rangeSummary { min-width: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .rangeNavLabel { color: var(--color-text-muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .rangeNavDate { display: block; min-width: 0; color: var(--color-text-primary); font-size: 13px; font-weight: 700; line-height: 1.2; white-space: nowrap; }
 .collapseButton { min-height: 32px; padding-inline: 10px; }
-.dayReviewHeader { display: grid; gap: 16px; padding: 14px 16px 16px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-sidebar); }
-.dayReviewTopline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.dayReviewHeading { display: grid; grid-template-columns: 32px minmax(0, 1fr) 32px; align-items: center; gap: 10px; }
+.dayReviewHeader { display: grid; padding: 14px 16px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-sidebar); }
+.dayReviewHeading { display: grid; grid-template-columns: 32px minmax(0, 1fr) 32px auto; align-items: center; gap: 10px; }
 .dayReviewTitle { min-width: 0; min-height: 32px; display: flex; align-items: center; justify-content: center; text-align: center; }
 .dayReviewTitle h2 { margin: 0; color: var(--color-text-primary); font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
 .embeddedSidebar { width: 100%; height: 100%; border-right: none; background: var(--color-bg-sidebar); }
@@ -72,16 +68,18 @@
 .primaryAction:hover { filter: brightness(1.08); }
 .primaryAction:disabled { cursor: wait; opacity: .65; }
 .actionList { display: grid; gap: 8px; }
+.periodBanner { display: grid; gap: 4px; padding: 12px 14px; border: 1px dashed color-mix(in srgb, var(--color-text-muted) 55%, transparent); border-radius: var(--border-radius-md); background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--color-text-muted) 9%, transparent) 0 4px, transparent 4px 9px), var(--color-bg-card); }
+.periodBannerHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--color-text-primary); font-size: 14px; }
+.periodBannerMeta { color: var(--color-text-muted); font-size: 12px; font-weight: 600; }
+.quietAction { justify-self: start; min-height: 28px; padding: 0; border: 0; background: transparent; color: var(--color-text-muted); font: inherit; font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.quietAction:hover { color: var(--color-brand-danger); }
+.quietAction:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
 .actionList button { min-height: 36px; padding: 7px 11px; border: 1px solid var(--color-border); border-radius: var(--border-radius-sm); background: var(--color-bg-input); color: var(--color-text-primary); cursor: pointer; text-align: left; transition: background .16s ease, border-color .16s ease, color .16s ease; }
 .actionList button:hover { border-color: var(--color-border-hover); background: var(--color-bg-card-hover); }
 .dayStatusMenuRoot { flex: 0 0 auto; }
 .dayStatusTrigger { display: grid; width: 24px; height: 24px; padding: 0; place-items: center; border: 0; border-radius: 4px; background: transparent; cursor: pointer; }
 .dayStatusTrigger:hover { background: color-mix(in srgb, var(--color-brand-primary) 10%, transparent); }
 .dayStatusTrigger:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 1px; }
-.dayStatusIcon { display: inline-flex; width: 21px; height: 21px; align-items: center; justify-content: center; font: 600 20px/1 system-ui, sans-serif; }
-.dayStatusTriggercomplete .dayStatusIcon { color: var(--color-brand-success); }
-.dayStatusTriggermissed .dayStatusIcon { color: var(--color-brand-danger); }
-.dayStatusCircle { width: 17px; height: 17px; border: 2px solid #69a9ff; border-radius: 50%; }
 .dayStatusDropdown { position: fixed; z-index: 10000; display: grid; box-sizing: border-box; width: min(300px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); gap: 8px; padding: 12px; overflow: auto; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); background: var(--color-bg-card); box-shadow: var(--shadow-lg); color: var(--color-text-primary); font-size: 12px; }
 .dayStatusDropdown > strong { font-size: 13px; }
 .dayStatusDropdown > span, .dayStatusDropdown p { margin: 0; color: var(--color-text-secondary); line-height: 1.4; }
@@ -92,6 +90,26 @@
 .goalList { display: grid; gap: 4px; }
 .goalList button { display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 5px 6px; border: 0; border-radius: var(--border-radius-sm); background: transparent; color: var(--color-text-primary); cursor: pointer; text-align: left; }
 .goalList button:hover { background: var(--color-bg-card-hover); }
+.offPlanGroup { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--color-border) 62%, transparent); }
+.offPlanGroup h4 { margin: 0; color: var(--color-text-primary); font-size: 13px; font-weight: 700; }
+.alignmentCompact { display: grid; min-width: 0; grid-template-columns: 56px auto; align-items: center; gap: 8px; }
+.alignmentBar { display: block; width: 100%; height: 6px; }
+.alignmentTrack { fill: color-mix(in srgb, var(--color-text-muted) 22%, transparent); }
+.alignmentFill { fill: var(--color-brand-success); }
+.alignmentText { color: var(--color-text-muted); font-size: 11px; font-weight: 600; line-height: 1.4; }
+.sessionFooter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 24px; }
+.creditLabel { padding: 2px 7px; border: 1px solid color-mix(in srgb, var(--color-border) 90%, transparent); border-radius: 999px; color: var(--color-text-secondary); font-size: 11px; font-weight: 600; }
+.creditInlineAction { margin-left: auto; min-height: 28px; padding: 3px 10px; border: 1px solid var(--color-border); border-radius: var(--border-radius-sm); background: var(--color-bg-input); color: var(--color-text-primary); font-size: 12px; font-weight: 600; cursor: pointer; }
+.creditInlineAction:hover:not(:disabled) { border-color: var(--color-border-hover); background: var(--color-bg-card-hover); }
+.creditInlineAction:disabled, .creditMenuTrigger:disabled { cursor: wait; opacity: .6; }
+.creditMenuRoot { margin-left: auto; }
+.creditMenuTrigger { display: grid; width: 28px; height: 28px; padding: 0; place-items: center; border: 1px solid transparent; border-radius: var(--border-radius-sm); background: transparent; color: var(--color-text-secondary); font-size: 16px; line-height: 1; cursor: pointer; }
+.creditMenuTrigger:hover:not(:disabled) { border-color: var(--color-border); background: var(--color-bg-card-hover); color: var(--color-text-primary); }
+.creditInlineAction:focus-visible, .creditMenuTrigger:focus-visible, .creditMenu button:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
+.creditMenu { z-index: 10000; display: grid; box-sizing: border-box; gap: 6px; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); background: var(--color-bg-card); box-shadow: var(--shadow-lg); }
+.creditMenu button { min-height: 38px; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: var(--border-radius-sm); background: var(--color-bg-input); color: var(--color-text-primary); cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; text-align: left; }
+.creditMenu button:hover:not(:disabled) { border-color: var(--color-border-hover); background: var(--color-bg-card-hover); }
+.creditMenu button:disabled { cursor: wait; opacity: .6; }
 
 @media (max-width: 980px) {
     .sidePane { width: 100%; height: auto; position: static; max-height: none; border-left: none; border-bottom: 1px solid var(--color-border); }
@@ -103,11 +121,17 @@
     .mobileSidePaneSheet .sidePane { flex: 1; width: 100%; height: 100%; min-height: 0; border: none; overflow: hidden; }
     .sidePaneViewToggle :global(button[role="tab"]) { min-height: 44px; }
     .programHeader, .scopedHeader { padding: 18px 16px 14px; }
-    .dayReviewHeader { padding: 18px 16px 16px; }
+    .dayReviewHeader { padding: 16px; }
     .dayNavButton { width: 44px; height: 44px; }
-    .dayReviewHeading { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+    .dayReviewHeading { grid-template-columns: 44px minmax(0, 1fr) 44px auto; }
     .collapseButton { min-height: 44px; }
     .scopedContent { padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)); }
     .dayStatusTrigger { width: 44px; height: 44px; }
     .dayStatusDropdown button { min-height: 44px; }
+    .creditMenuTrigger, .creditInlineAction { min-width: 44px; min-height: 44px; }
+    .creditMenu button { min-height: 44px; }
+}
+@media (forced-colors: active) {
+    .alignmentTrack { fill: GrayText; }
+    .alignmentFill { fill: Highlight; }
 }

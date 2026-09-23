@@ -12,6 +12,8 @@ export const queryKeys = {
     circuits: (rootId, includeArchived = false) => ['circuits', rootId, { includeArchived }],
     circuit: (rootId, circuitId) => ['circuit', rootId, circuitId],
     sessionCircuitRuns: (rootId, sessionId) => ['circuit-runs', rootId, sessionId],
+    calendarPeriodsRoot: (rootId) => ['calendar-periods', rootId],
+    calendarPeriods: (rootId, start, end) => ['calendar-periods', rootId, { start, end }],
     programDayOptions: (rootId, date = null, timezone = null) => [
         'program-day-options', rootId, ...(date ? [{ date, timezone }] : []),
     ],

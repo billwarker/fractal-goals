@@ -35,6 +35,9 @@ export function useProgramsCalendarData(rootId, {
         });
     }, [programsQuery.data]);
 
+    // Completed sessions come from the canonical program day read model, which
+    // applies the same credit rules as the day pane; the program payload only
+    // carries program-day-linked sessions.
     const calendarEvents = useMemo(() => buildProgramsCalendarEvents(
         sortedPrograms,
         goals,
@@ -42,7 +45,7 @@ export function useProgramsCalendarData(rootId, {
         getGoalTextColor || (() => '#ffffff'),
         timezone,
         { getGoalSecondaryColor, getGoalIcon },
-    ), [getGoalColor, getGoalIcon, getGoalSecondaryColor, getGoalTextColor, goals, sortedPrograms, timezone]);
+    ).filter((event) => event.extendedProps?.type !== 'session'), [getGoalColor, getGoalIcon, getGoalSecondaryColor, getGoalTextColor, goals, sortedPrograms, timezone]);
 
     const blockLabels = useMemo(
         () => sortedPrograms.flatMap((program, programIndex) => buildProgramBlockLabels({

@@ -334,7 +334,7 @@ class ScheduleProgramDayOperation(BaseModel):
     program_id: str = Field(min_length=1, max_length=80, description="Opaque ID of the containing program.")
     block_id: str = Field(min_length=1, max_length=80, description="Opaque ID of the containing block.")
     day_id: str = Field(min_length=1, max_length=80, description="Opaque ID of an existing day in the block.")
-    data: "StrictProgramDayScheduleSchema" = Field(description="Scheduling date and time values validated against this fractal's timezone and program bounds.")
+    data: "StrictProgramDayScheduleSchema" = Field(description="The calendar date (ISO YYYY-MM-DD) to add this reusable day on, within the block's dates. session_start is accepted for compatibility; only its date is used.")
 
 
 class StrictProgramDayScheduleSchema(ProgramDayScheduleSchema):

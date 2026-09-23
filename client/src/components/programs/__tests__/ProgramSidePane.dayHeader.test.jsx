@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 import ProgramSidePane from '../ProgramSidePane';
@@ -23,11 +23,10 @@ describe('ProgramSidePane day heading', () => {
                     goals={[]}
                     scope="day"
                     contextDate="2026-09-02"
-                    dayDetailQuery={{ data: { detail: { occurrences: [], other_sessions: [] } } }}
+                    dayDetailQuery={{ data: { detail: { occurrences: [], sessions: [] } } }}
                     blocks={[]}
                     onPreviousDay={onPreviousDay}
                     onNextDay={onNextDay}
-                    onProgramScope={vi.fn()}
                     onCollapse={vi.fn()}
                 />
             </MemoryRouter>,
@@ -35,6 +34,11 @@ describe('ProgramSidePane day heading', () => {
 
         expect(screen.getByRole('heading', { name: 'Wednesday, September 2, 2026' })).toBeInTheDocument();
         expect(screen.queryByText('Day review')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Strong Finish/ })).not.toBeInTheDocument();
+        const heading = screen.getByRole('heading', { name: 'Wednesday, September 2, 2026' });
+        const row = heading.closest('div').parentElement;
+        expect(row.className).toContain('dayReviewHeading');
+        expect(within(row).getByRole('button', { name: 'Collapse' })).toBeInTheDocument();
         expect(screen.queryByRole('img', { name: 'requirements met' })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
         fireEvent.click(screen.getByRole('button', { name: 'Next day' }));
@@ -51,7 +55,6 @@ describe('ProgramSidePane day heading', () => {
                     scope="range"
                     selectedRange={{ startDate: '2026-09-02', endDate: '2026-09-08' }}
                     programMetricsLoading
-                    onProgramScope={vi.fn()}
                     onCollapse={vi.fn()}
                 />
             </MemoryRouter>,

@@ -9,7 +9,7 @@ from models import (
     AgentApproval, AgentChangeCursor, AgentGrant, AgentOAuthClient,
     AgentOperation, AgentOutboxEvent,
     AgentProposal, AgentRun, AgentTaskBrief, AppSetting, EventLog, Note, Program,
-    ProgramBlock, ProgramDay, SessionTemplate, program_day_templates,
+    ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule, SessionTemplate, program_day_templates,
     Goal, Session, utc_now,
 )
 from services.agent_harness_service import AgentHarnessError, AgentHarnessService
@@ -531,12 +531,12 @@ def test_reviewed_workflow_resolves_temporary_references_through_program_day_and
     assert all(row["status"] == "succeeded" for row in completed["operations"])
     assert completed["operations"][1]["result"]["id"]
     scheduled_result = completed["operations"][4]["result"]
-    scheduled_session = db_session.query(Session).filter_by(
-        id=scheduled_result["session_id"],
-        root_id=sample_ultimate_goal.id,
+    schedule_row = db_session.query(ProgramDayOccurrenceSchedule).filter_by(
+        id=scheduled_result["id"],
     ).one()
-    assert scheduled_session.program_day_id == scheduled_result["program_day_id"]
-    assert db_session.query(Session).filter_by(root_id=sample_ultimate_goal.id).count() == 1
+    assert schedule_row.program_day_id == scheduled_result["program_day_id"]
+    assert schedule_row.date.isoformat() == scheduled_result["date"]
+    assert db_session.query(Session).filter_by(root_id=sample_ultimate_goal.id).count() == 0
     assert run["id"] == completed["id"]
 
     context = service.get_goal_context(test_user.id, sample_ultimate_goal.id)
@@ -554,6 +554,9 @@ def test_scheduling_existing_program_day_rejects_stale_preview(
 
     _enable_agent_flags(db_session)
     start_date = date.today() + timedelta(days=80)
+    # The definition recurs on Mondays; schedule it explicitly on another weekday.
+    while start_date.strftime("%A") == "Monday":
+        start_date += timedelta(days=1)
     end_date = start_date + timedelta(days=14)
     program = ProgramService.create_program(
         db_session,
@@ -607,14 +610,17 @@ def test_scheduling_existing_program_day_rejects_stale_preview(
         {"session_start": f"{start_date.isoformat()}T09:00:00Z"},
         test_user.id,
     )
-    assert db_session.query(Session).filter_by(root_id=sample_ultimate_goal.id).count() == 1
+    assert db_session.query(Session).filter_by(root_id=sample_ultimate_goal.id).count() == 0
+    assert db_session.query(ProgramDayOccurrenceSchedule).filter_by(
+        program_day_id=day["id"], date=start_date,
+    ).count() == 1
 
     service.decide_proposal(test_user.id, proposal["id"], proposal["proposal_hash"], "approve")
     run = service.run_once("worker-test")
 
     assert run["status"] == "failed"
     assert run["operations"][0]["error"]["code"] == "stale_context"
-    assert db_session.query(Session).filter_by(root_id=sample_ultimate_goal.id).count() == 1
+    assert db_session.query(ProgramDayOccurrenceSchedule).filter_by(program_day_id=day["id"]).count() == 1
 
 
 def test_goal_update_is_version_checked_and_undo_requires_a_new_approval(

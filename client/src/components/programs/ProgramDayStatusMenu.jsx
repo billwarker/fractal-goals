@@ -1,19 +1,21 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { getProgramDayStatusSymbol } from '../../utils/programDayState';
+import ProgramDayStatusMark from './ProgramDayStatusMark';
 import styles from './ProgramSidePane.module.css';
 
 export default function ProgramDayStatusMenu({
-    name, date, today, state, manualStatus, occurrenceCount, pending, onSetStatus,
+    name, date, today, state, manualStatus, occurrenceCount, pending, onSetStatus, periodName = null,
 }) {
     const [open, setOpen] = useState(false);
     const menuId = useId();
     const rootRef = useRef(null);
     const triggerRef = useRef(null);
     const dropdownRef = useRef(null);
-    const statusLabel = manualStatus ? `Manual ${manualStatus}` : 'Automatic from completed sessions';
-    const iconState = state === 'scheduled_met' || manualStatus === 'complete' ? 'complete'
-        : date < today && state !== 'rest' && manualStatus !== 'rest' ? 'missed' : 'scheduled';
+    const statusLabel = manualStatus ? `Manual ${manualStatus}`
+        : periodName ? `Rest (${periodName})` : 'Automatic from completed sessions';
+    const iconState = getProgramDayStatusSymbol({ state, manualStatus, closed: date < today });
 
     useLayoutEffect(() => {
         if (!open) return undefined;
@@ -71,16 +73,19 @@ export default function ProgramDayStatusMenu({
             <button
                 type="button"
                 ref={triggerRef}
-                className={`${styles.dayStatusTrigger} ${styles[`dayStatusTrigger${iconState}`]}`}
+                className={styles.dayStatusTrigger}
                 aria-label={`Change status for ${name} on ${date}: ${statusLabel}`}
                 aria-expanded={open}
                 aria-controls={menuId}
                 onClick={() => setOpen((current) => !current)}
-            ><span className={styles.dayStatusIcon} aria-hidden="true">{iconState === 'complete' ? '✓' : iconState === 'missed' ? '✗' : <span className={styles.dayStatusCircle} />}</span></button>
+            ><ProgramDayStatusMark status={iconState} decorative /></button>
             {open ? createPortal(
                 <div id={menuId} ref={dropdownRef} className={styles.dayStatusDropdown} role="group" aria-label="Day status options">
                     <strong>Day status</strong>
                     <span role="status">{statusLabel}</span>
+                    {periodName && !manualStatus ? (
+                        <p>An event protects this day. Choosing a status here overrides it for this date only.</p>
+                    ) : null}
                     {occurrenceCount > 1 ? (
                         <p>This status applies to every scheduled definition on this date.</p>
                     ) : null}

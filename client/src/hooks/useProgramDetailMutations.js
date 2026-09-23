@@ -115,6 +115,16 @@ export function useProgramDetailMutations({
         }
     }, [actions, onScheduleDaySaved]);
 
+    const unscheduleDay = useCallback(async (blockId, dayId, date, timezone) => {
+        try {
+            await actions.unscheduleDay(blockId, dayId, date, timezone);
+            notify.success('Removed from this date');
+        } catch (error) {
+            logError('Failed to remove scheduled day:', error);
+            notify.error(`Failed to remove scheduled day: ${formatError(error)}`);
+        }
+    }, [actions]);
+
     const saveAttachedGoal = useCallback(async ({ goal_id, deadline }) => {
         try {
             await actions.attachGoal(attachBlockId, { goal_id, deadline });
@@ -189,6 +199,7 @@ export function useProgramDetailMutations({
         copyDay,
         deleteDay,
         scheduleDay,
+        unscheduleDay,
         saveAttachedGoal,
         updateGoal,
         toggleGoalCompletion,

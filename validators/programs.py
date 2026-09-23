@@ -233,10 +233,34 @@ class ProgramDayCopySchema(BaseModel):
 
 
 class ProgramDayScheduleSchema(BaseModel):
-    """Schema for scheduling an existing program day onto the calendar."""
+    """Schedule a reusable program day onto one calendar date.
+
+    ``date`` is canonical. ``session_start`` is accepted for one release so
+    existing agent proposals keep validating; its date part is used.
+    """
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    session_start: str = Field(..., min_length=1)
+    date: Optional[str] = Field(None, min_length=10, max_length=10)
+    session_start: Optional[str] = Field(None, min_length=1)
+
+    @field_validator('date')
+    @classmethod
+    def validate_date(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        try:
+            parsed = date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError('date must be an ISO calendar date (YYYY-MM-DD)') from exc
+        if parsed.isoformat() != value:
+            raise ValueError('date must be an ISO calendar date (YYYY-MM-DD)')
+        return value
+
+    @model_validator(mode='after')
+    def require_date(self):
+        if not self.date and not self.session_start:
+            raise ValueError('date is required')
+        return self
 
 
 class ProgramDayOccurrenceUnscheduleSchema(BaseModel):
@@ -275,6 +299,36 @@ class ProgramDayStatusesUpdateSchema(BaseModel):
                 raise ValueError('dates must be ISO calendar dates (YYYY-MM-DD)')
             parsed.append(parsed_value)
         return list(dict.fromkeys(parsed))
+
+
+class ProgramDaySessionCreditSchema(BaseModel):
+    """Credit, exclude, or restore automatic attribution of a session on one date."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    date: str = Field(..., min_length=10, max_length=10)
+    session_id: str = Field(..., min_length=1)
+    timezone: str = Field(..., min_length=1)
+    disposition: str = Field(..., pattern=r'^(credit|exclude|automatic)$')
+    template_id: Optional[str] = Field(None, min_length=1)
+
+    @field_validator('date')
+    @classmethod
+    def validate_date(cls, value: str) -> date:
+        try:
+            parsed = date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError('date must be an ISO calendar date (YYYY-MM-DD)') from exc
+        if parsed.isoformat() != value:
+            raise ValueError('date must be an ISO calendar date (YYYY-MM-DD)')
+        return parsed
+
+    @model_validator(mode='after')
+    def validate_template(self):
+        if self.disposition == 'credit' and not self.template_id:
+            raise ValueError('template_id is required to credit a session')
+        if self.disposition != 'credit' and self.template_id:
+            raise ValueError('template_id is only allowed when crediting a session')
+        return self
 
 
 class ProgramGoalDeadlineSchema(BaseModel):

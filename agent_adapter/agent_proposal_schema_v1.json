@@ -478,7 +478,7 @@
         },
         "data": {
           "$ref": "#/$defs/StrictProgramDayScheduleSchema",
-          "description": "Scheduling date and time values validated against this fractal's timezone and program bounds."
+          "description": "The calendar date (ISO YYYY-MM-DD) to add this reusable day on, within the block's dates. session_start is accepted for compatibility; only its date is used."
         },
         "day_id": {
           "description": "Opaque ID of an existing day in the block.",
@@ -1892,15 +1892,34 @@
     "StrictProgramDayScheduleSchema": {
       "additionalProperties": false,
       "properties": {
+        "date": {
+          "anyOf": [
+            {
+              "maxLength": 10,
+              "minLength": 10,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date"
+        },
         "session_start": {
-          "minLength": 1,
-          "title": "Session Start",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Start"
         }
       },
-      "required": [
-        "session_start"
-      ],
       "title": "StrictProgramDayScheduleSchema",
       "type": "object"
     },

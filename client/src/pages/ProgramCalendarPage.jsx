@@ -7,6 +7,7 @@ import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import ProgramBlockView from '../components/programs/ProgramBlockView';
 import ProgramCalendarView from '../components/programs/ProgramCalendarView';
+import CalendarPeriodModal from '../components/programs/CalendarPeriodModal';
 import ProgramDayStatusBulkBar from '../components/programs/ProgramDayStatusBulkBar';
 import ResponsiveProgramSidePane from '../components/programs/ResponsiveProgramSidePane';
 import Modal from '../components/atoms/Modal';
@@ -24,13 +25,20 @@ import { useProgramGoalSets } from '../hooks/useProgramGoalSets';
 import { useProgramMetrics } from '../hooks/useProgramMetrics';
 import { useProgramCalendarSelection } from '../hooks/useProgramCalendarSelection';
 import { useProgramStatusSelection } from '../hooks/useProgramStatusSelection';
-import { useProgramDayDetail, useProgramDayRange, useUpdateProgramDayStatuses } from '../hooks/useProgramDayReadModel';
+import {
+    useProgramDayDetail,
+    useProgramDayRange,
+    useSetProgramDaySessionCredit,
+    useUpdateProgramDayStatuses,
+} from '../hooks/useProgramDayReadModel';
 import { useProgramsCalendarData } from '../hooks/useProgramsCalendarData';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { formatLiteralDate, getISOYMDInTimezone, subtractDaysToDateString } from '../utils/dateUtils';
 import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
+import { buildCalendarPeriodEvents, buildUnscheduledSessionEvents } from '../utils/programDayState';
+import { useCalendarPeriodEditor, useCalendarPeriods } from '../hooks/useCalendarPeriods';
 import { createProgramCalendarContext, formatProgramCalendarSelection, getProgramOverviewMetricsRange, programCalendarContextReducer } from '../utils/programCalendarContext';
 import { getProgramColor } from '../utils/programViewModel';
 import { getProgramStatus, isProgramActive } from '../utils/programGoalWindow';
@@ -156,6 +164,14 @@ function ProgramCalendarPage() {
         calendarScope === 'day' ? contextDate : null,
     );
     const dayStatusMutation = useUpdateProgramDayStatuses(rootId, displayProgram?.id);
+    const sessionCreditMutation = useSetProgramDaySessionCredit(rootId, displayProgram?.id, timezone);
+    const periodEditor = useCalendarPeriodEditor(rootId);
+    const fallbackPeriods = useCalendarPeriods(rootId, visibleCalendarRange, { enabled: !displayProgram }).data;
+    const calendarEventsWithSessions = useMemo(() => [
+        ...calendarEvents,
+        ...buildUnscheduledSessionEvents(dayRangeQuery.data?.days, displayProgram?.id, calendarEvents),
+        ...buildCalendarPeriodEvents(dayRangeQuery.data?.periods || fallbackPeriods, displayProgram?.id),
+    ], [calendarEvents, dayRangeQuery.data, displayProgram?.id, fallbackPeriods]);
     const displayGoals = detailGoals?.length ? detailGoals : goals;
 
     const {
@@ -216,20 +232,17 @@ function ProgramCalendarPage() {
         setIsSidePaneVisible,
     });
 
-    const scheduledDayStates = useMemo(
-        () => (dayRangeQuery.data?.days || []).filter((day) => day.scheduled),
-        [dayRangeQuery.data?.days],
-    );
+    const selectableDayStates = useMemo(() => (dayRangeQuery.data?.days || []).filter((day) => (
+        isProgramActive(displayProgram, day.date))), [dayRangeQuery.data?.days, displayProgram]);
     const {
         selectedStatusDates,
+        selectedScheduledDates,
         selectionModeButtonRef,
         setMultiDaySelectionMode,
         clearStatusSelection,
         toggleStatusDate,
         selectStatusRange,
-    } = useProgramStatusSelection(
-        scheduledDayStates, blockCreationMode, setBlockCreationModeForCalendar,
-    );
+    } = useProgramStatusSelection(selectableDayStates, blockCreationMode, setBlockCreationModeForCalendar);
     const selectedTimeframeDates = blockCreationMode ? selectedStatusDates : [];
     const selectedTimeframeLabel = formatProgramCalendarSelection(selectedTimeframeDates);
     const overviewMetricsRange = selectedTimeframeDates.length
@@ -269,6 +282,7 @@ function ProgramCalendarPage() {
         copyDay,
         deleteDay,
         scheduleDay,
+        unscheduleDay,
         saveAttachedGoal,
         updateGoal,
         toggleGoalCompletion,
@@ -361,14 +375,6 @@ function ProgramCalendarPage() {
                         {getStatusLabel(displayProgramStatus)}
                     </span>
                 ) : null}
-                {contextBlock ? (
-                    <span
-                        className={styles.blockBadge}
-                        style={{ borderColor: contextBlockColor, color: contextBlockColor, background: `color-mix(in srgb, ${contextBlockColor} 14%, transparent)` }}
-                    >
-                        {contextBlock.name}
-                    </span>
-                ) : null}
                 {selectedTimeframeLabel ? <span>{selectedTimeframeLabel}</span>
                     : selectedRangeText ? <span>Selected {selectedRangeText}</span> : null}
             </span>
@@ -432,8 +438,27 @@ function ProgramCalendarPage() {
         }
     };
 
+    const updateSessionCredit = async (session, disposition, templateId = null) => {
+        if (!displayProgram || !contextDate) return false;
+        try {
+            await sessionCreditMutation.mutateAsync({
+                date: contextDate, sessionId: session.id, disposition, templateId,
+            });
+            const templateName = session.credit_options?.find((option) => option.template_id === templateId)?.name;
+            notify.success(disposition === 'credit'
+                ? `${session.name} now counts as ${templateName || 'a scheduled template'}`
+                : disposition === 'exclude'
+                    ? `${session.name} no longer counts toward this day`
+                    : `${session.name} uses automatic credit`);
+            return true;
+        } catch (error) {
+            notify.error(error.response?.data?.error || 'Session credit could not be updated');
+            return false;
+        }
+    };
+
     const applyBulkDayStatus = async (status) => {
-        if (await updateDayStatuses(selectedStatusDates, status)) {
+        if (await updateDayStatuses(selectedScheduledDates, status)) {
             setMultiDaySelectionMode(false);
         }
     };
@@ -473,6 +498,7 @@ function ProgramCalendarPage() {
         if (eventType === 'block_background' || eventType === 'program_background') {
             return;
         }
+        if (eventType === 'calendar_period') return periodEditor.openEdit(info.event.extendedProps.period);
 
         if (eventType === 'goal') {
             const goalId = info.event.extendedProps?.goalId || info.event.extendedProps?.id;
@@ -723,7 +749,7 @@ function ProgramCalendarPage() {
                             <div className={styles.loading}>Loading programs...</div>
                         ) : viewMode === 'calendar' ? (
                             <ProgramCalendarView
-                                calendarEvents={calendarEvents}
+                                calendarEvents={calendarEventsWithSessions}
                                 blockLabels={blockLabels}
                                 blockCreationMode={blockCreationMode}
                                 setBlockCreationMode={setMultiDaySelectionMode}
@@ -751,13 +777,16 @@ function ProgramCalendarPage() {
                                 selectedProgramName={displayProgram?.name || ''}
                                 selectedProgramId={displayProgram?.id || null}
                                 selectedStatusDates={selectedStatusDates}
+                                selectableDates={selectableDayStates}
                                 selectionModeButtonRef={selectionModeButtonRef}
                                 statusActions={blockCreationMode && selectedStatusDates.length ? (
                                     <ProgramDayStatusBulkBar
                                         dates={selectedStatusDates}
+                                        scheduledDates={selectedScheduledDates}
                                         today={todayInTimezone}
                                         pending={dayStatusMutation.isPending}
                                         onApply={applyBulkDayStatus}
+                                        onPlanTimeOff={() => periodEditor.openCreate(selectedStatusDates)}
                                         onCancel={() => setMultiDaySelectionMode(false)}
                                     />
                                 ) : null}
@@ -805,14 +834,12 @@ function ProgramCalendarPage() {
                     selectedRange={selectedCalendarRange}
                     selectionLabel={selectedTimeframeLabel}
                     dayDetailQuery={dayDetailQuery}
-                    onProgramScope={() => dispatchCalendarContext({
-                        type: 'focus_program', programId: displayProgram?.id, date: contextDate,
-                    })}
                     onPreviousDay={() => moveScopedDay(-1)}
                     onNextDay={() => moveScopedDay(1)}
                     today={todayInTimezone}
                     blocks={sortedBlocks}
                     onScheduleDay={scheduleDay}
+                    onUnscheduleDay={(blockId, dayId, date) => unscheduleDay(blockId, dayId, date, timezone || 'UTC')}
                     onCreateDay={handleCreateDayForDate}
                     getGoalIcon={getGoalIcon}
                     getGoalColor={getGoalColor}
@@ -824,9 +851,13 @@ function ProgramCalendarPage() {
                     timezone={timezone || 'UTC'}
                     onSetDayStatus={(status) => updateDayStatuses([contextDate], status)}
                     dayStatusUpdating={dayStatusMutation.isPending}
+                    onEditPeriod={periodEditor.openEdit}
+                    onSetSessionCredit={updateSessionCredit}
+                    sessionCreditUpdating={sessionCreditMutation.isPending}
                 />
             </div>
 
+            <CalendarPeriodModal {...periodEditor.modalProps} />
             <ProgramBuilder
                 isOpen={builderState.open}
                 onClose={closeBuilder}
@@ -958,6 +989,10 @@ function ProgramCalendarPage() {
                             <span className={styles.optionDescription}>
                                 Copy this program's goals, blocks, and planned days into a new date range.
                             </span>
+                        </button>
+                        <button className={styles.optionButton} onClick={() => { closeProgramOptions(); setViewMode('calendar'); setMultiDaySelectionMode(true, { restoreFocus: false }); }} disabled={!displayProgram}>
+                            <span className={styles.optionTitle}>Plan an Event</span>
+                            <span className={styles.optionDescription}>Select days on the calendar, then choose Plan event (e.g. a vacation that protects streaks).</span>
                         </button>
                         <button
                             className={styles.optionButton}

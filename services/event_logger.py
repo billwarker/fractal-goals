@@ -198,6 +198,12 @@ def _get_event_description(event: Event):
             f"Set {event.data.get('date_count', 0)} program day status"
             f"{'es' if event.data.get('date_count', 0) != 1 else ''} to {event.data.get('status', 'automatic')}"
         ),
+        Events.CALENDAR_PERIOD_CREATED: f"Added time off: {event.data.get('calendar_period_name', 'Unknown')}",
+        Events.CALENDAR_PERIOD_UPDATED: f"Updated time off: {event.data.get('calendar_period_name', 'Unknown')}",
+        Events.CALENDAR_PERIOD_DELETED: f"Removed time off: {event.data.get('calendar_period_name', 'Unknown')}",
+        Events.PROGRAM_DAY_SESSION_CREDIT_UPDATED: (
+            f"Set program day session credit to {event.data.get('disposition', 'automatic')}"
+        ),
         
         Events.PROGRAM_BLOCK_CREATED: f"Created block: {event.data.get('block_name', 'Unknown')}",
         Events.PROGRAM_BLOCK_UPDATED: f"Updated block: {event.data.get('block_name', 'Unknown')}",

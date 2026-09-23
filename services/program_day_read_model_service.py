@@ -2,12 +2,25 @@
 
 from collections import defaultdict
 import base64
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import func, or_
 from sqlalchemy.orm import selectinload
 from models import Program, ProgramDayStatusOverride, Session, validate_root_goal
-from services.program_day_occurrences import build_day_facts, date_part, summarize_chain_facts
+from services.program_day_credits import (
+    effective_session_timestamp,
+    load_program_credit_candidates,
+    load_program_session_credits,
+    local_date_utc_bounds,
+)
+from services.program_day_occurrences import (
+    build_day_facts,
+    date_part,
+    effective_session_date,
+    program_day_explicitly_scheduled_on,
+    summarize_chain_facts,
+)
+from services.calendar_periods import load_calendar_periods, serialize_calendar_period
+from services.program_day_summary import session_alignment
 from services.program_metrics_service import MAX_WINDOW_DAYS, ProgramMetricsService
 from services.program_scope import resolve_program_scope
 from services.programs import ProgramService
@@ -16,8 +29,11 @@ from services.session_runtime import get_session_template_color, get_session_tem
 
 
 class ProgramDayReadModelService:
-    SCHEMA_VERSION = 3
+    SCHEMA_VERSION = 5
     CHAIN_LOOKBACK_DAYS = MAX_WINDOW_DAYS
+    # A hard safety bound for one local date; the summary covers every loaded
+    # session while the session list itself is cursor-paged.
+    MAX_DETAIL_DAY_SESSIONS = 500
 
     def __init__(self, db_session):
         self.db_session = db_session
@@ -68,25 +84,40 @@ class ProgramDayReadModelService:
         chain_start, chain_end, chain_context_truncated = self._resolve_chain_window(
             program_start, program_end, start, end
         )
-        sessions = self._load_sessions(
-            root_id, program_id, current_user_id, chain_start, chain_end, zone,
-        )
+        session_credits = load_program_session_credits(
+            self.db_session, [program.id], chain_start, chain_end,
+        )[program.id]
+        utc_start, utc_end = local_date_utc_bounds(chain_start, chain_end, zone)
+        sessions = load_program_credit_candidates(
+            self.db_session, root_id, current_user_id, [program], utc_start, utc_end,
+            {program.id: session_credits},
+        )[program.id]
         status_overrides = self.db_session.query(ProgramDayStatusOverride).filter(
             ProgramDayStatusOverride.program_id == program_id,
             ProgramDayStatusOverride.date >= chain_start,
             ProgramDayStatusOverride.date <= chain_end,
         ).all()
+        periods = load_calendar_periods(self.db_session, root_id, current_user_id, chain_start, chain_end)
         scope = resolve_program_scope(self.db_session, root_id, program_id)
-        aligned_evidence = self._load_aligned_evidence(
-            root_id, current_user_id, start, min(end, datetime.now(zone).date()), zone, scope.goal_ids
+        range_evidence, goals_by_id = ProgramMetricsService(self.db_session).load_resolved_evidence(
+            root_id, current_user_id, zone, scope.goal_ids,
+            start=start, end=min(end, datetime.now(zone).date()),
         )
+        aligned_evidence = [item for item in range_evidence if item["in_scope_ids"]]
         local_today = datetime.now(zone).date()
         all_facts = build_day_facts(
             program, chain_start, chain_end, sessions, aligned_evidence, zone, local_today,
-            status_overrides=status_overrides,
+            status_overrides=status_overrides, session_credits=session_credits, periods=periods,
         )
         facts = [item for item in all_facts if start <= item["date"] <= end]
-        payload = self._summary(program, facts, start, end, timezone_name)
+        completed_by_date = self._load_completed_sessions_by_date(
+            root_id, current_user_id, start, min(end, local_today), zone,
+        )
+        payload = self._summary(program, facts, start, end, timezone_name, completed_by_date)
+        payload["periods"] = [
+            serialize_calendar_period(period) for period in periods
+            if period.start_date <= end and period.end_date >= start
+        ]
         payload["chain"]["context_start"] = chain_start.isoformat()
         payload["chain"]["context_truncated_before"] = chain_context_truncated
         previous = next((item for item in all_facts if item["date"] == start - timedelta(days=1)), None)
@@ -101,7 +132,8 @@ class ProgramDayReadModelService:
         )
         if detail:
             payload["detail"] = self._detail(
-                root_id, current_user_id, program, facts, detail, zone, limit, cursor_offset
+                root_id, current_user_id, program, facts, detail, zone, limit, cursor_offset,
+                scope_goal_ids=scope.goal_ids, local_today=local_today, goals_by_id=goals_by_id,
             )
         return payload, None, 200
 
@@ -116,27 +148,7 @@ class ProgramDayReadModelService:
         chain_start = max(program_start, start - timedelta(days=lookback_days))
         return chain_start, chain_end, program_start < chain_start
 
-    def _load_sessions(self, root_id, program_id, current_user_id, start, end, zone):
-        utc_start = datetime.combine(start, time.min, tzinfo=zone).astimezone(timezone.utc)
-        utc_end = datetime.combine(end + timedelta(days=1), time.min, tzinfo=zone).astimezone(timezone.utc)
-        effective = func.coalesce(Session.session_start, Session.completed_at, Session.created_at)
-        return self.db_session.query(Session).options(selectinload(Session.template)).filter(
-            Session.root_id == root_id,
-            Session.owner_id == current_user_id,
-            Session.program_id == program_id,
-            Session.deleted_at.is_(None),
-            effective >= utc_start,
-            effective < utc_end,
-        ).order_by(effective.asc(), Session.id.asc()).all()
-
-    def _load_aligned_evidence(self, root_id, current_user_id, start, end, zone, scope_ids):
-        if end < start:
-            return []
-        return ProgramMetricsService(self.db_session).load_aligned_evidence(
-            root_id, current_user_id, start, end, zone, scope_ids
-        )
-
-    def _summary(self, program, facts, start, end, timezone_name):
+    def _summary(self, program, facts, start, end, timezone_name, completed_by_date):
         chain_summary = summarize_chain_facts(facts)
         template_stats = defaultdict(lambda: {
             "name": "Deleted template", "color": None,
@@ -181,6 +193,10 @@ class ProgramDayReadModelService:
                 ),
                 "aligned_instance_count": len(fact["aligned_items"]),
                 "block_ids": block_ids,
+                "completed_sessions": [
+                    self._serialize_calendar_session(item)
+                    for item in completed_by_date.get(fact["date"], [])
+                ],
             })
         closed_scheduled = [
             item for item in facts
@@ -210,6 +226,7 @@ class ProgramDayReadModelService:
                 "upcoming_dates": sum(item["state"] == "upcoming" for item in facts),
                 "manual_complete_dates": sum(item["manual_status"] == "complete" for item in facts),
                 "manual_rest_dates": sum(item["manual_status"] == "rest" for item in facts),
+                "period_rest_dates": sum(item["status_source"] == "period" for item in facts),
                 "closed_scheduled_dates": len(closed_scheduled),
                 "chain_breaks": chain_summary["chain_breaks"],
                 "longest_run_in_range": longest_range_run,
@@ -223,60 +240,63 @@ class ProgramDayReadModelService:
             "days": days,
         }
 
-    def _detail(self, root_id, current_user_id, program, facts, detail_date, zone, limit, offset):
+    def _detail(self, root_id, current_user_id, program, facts, detail_date, zone, limit, offset,
+                *, scope_goal_ids, local_today, goals_by_id=None):
         fact = next((item for item in facts if item["date"] == detail_date), None)
         occurrence_rows = fact["occurrences"] if fact else []
-        linked_entries = [
-            (session, row["program_day"].id)
-            for row in occurrence_rows for session in row["sessions"]
-        ]
-        other_rows = self._load_other_sessions(
-            root_id, current_user_id, program.id, detail_date, zone, offset + limit + 1
+        credit_facts = fact["session_credits"] if fact else {}
+        day_sessions = self._load_day_sessions(root_id, current_user_id, detail_date, zone)
+        evidence, _goals_by_id = ProgramMetricsService(self.db_session).load_resolved_evidence(
+            root_id, current_user_id, zone, scope_goal_ids,
+            session_ids=[session.id for session in day_sessions], goals_by_id=goals_by_id,
         )
-        page, has_more = self._paginate_session_entries(
-            linked_entries, other_rows, offset, limit
-        )
-        selected_ids = {session.id for session, _day_id in page}
+        evidence_by_session = defaultdict(list)
+        for item in evidence:
+            evidence_by_session[item["session_id"]].append(item)
+        date_evaluation = fact["date_evaluation"] if fact else None
+        can_edit_credits = bool(fact and fact["scheduled"] and detail_date <= local_today)
+        credit_options = self._credit_options(occurrence_rows, date_evaluation) if can_edit_credits else []
+
+        page = day_sessions[offset:offset + limit]
+        has_more = len(day_sessions) > offset + len(page)
         occurrences = []
-        if fact:
-            for row in occurrence_rows:
-                day = row["program_day"]
-                sessions = [
-                    self._serialize_session(session)
-                    for session in row["sessions"] if session.id in selected_ids
-                ]
-                completed_ids = set(row["evaluation"]["completed_template_ids"])
-                occurrences.append({
-                    "occurrence_key": f"{day.id}:{detail_date.isoformat()}",
-                    "program_day_id": day.id,
-                    "block": {"id": row["block"].id, "name": row["block"].name, "color": row["block"].color},
-                    "name": day.name,
-                    "definition_note": day.notes,
-                    "goal_ids": [goal.id for goal in day.goals or []],
-                    "requirements": row["evaluation"],
-                    "templates": [
-                        {
-                            "id": rule.session_template_id,
-                            "name": rule.template.name if rule.template else "Deleted template",
-                            "description": rule.template.description if rule.template else None,
-                            "color": get_template_color(rule.template.template_data) if rule.template else None,
-                            "is_required": bool(rule.is_required),
-                            "order": rule.order or 0,
-                            "status": "completed" if rule.session_template_id in completed_ids else (
-                                "in_progress" if any(
-                                    session.template_id == rule.session_template_id and not session.completed
-                                    for session in row["sessions"]
-                                ) else "pending"
-                            ),
-                        } for rule in day.template_links or [] if rule.template is not None
-                    ],
-                    "sessions": sessions,
-                })
-        other = [session for session, day_id in page if day_id is None]
-        goals_touched = set()
-        if fact:
-            for evidence in fact["aligned_items"]:
-                goals_touched.update(evidence["in_scope_ids"])
+        for row in occurrence_rows:
+            day = row["program_day"]
+            completed_ids = set(row["evaluation"]["completed_template_ids"])
+            occurrences.append({
+                "occurrence_key": f"{day.id}:{detail_date.isoformat()}",
+                "program_day_id": day.id,
+                "scheduled_explicitly": program_day_explicitly_scheduled_on(day, row["block"], detail_date),
+                "block": {"id": row["block"].id, "name": row["block"].name, "color": row["block"].color},
+                "name": day.name,
+                "definition_note": day.notes,
+                "goal_ids": [goal.id for goal in day.goals or []],
+                "requirements": row["evaluation"],
+                "templates": [
+                    {
+                        "id": rule.session_template_id,
+                        "name": rule.template.name,
+                        "description": rule.template.description,
+                        "color": get_template_color(rule.template.template_data),
+                        "is_required": bool(rule.is_required),
+                        "order": rule.order or 0,
+                        "status": "completed" if rule.session_template_id in completed_ids else (
+                            "in_progress" if any(
+                                entry["template_id"] == rule.session_template_id
+                                and not entry["session"].completed
+                                for entry in row["credits"]
+                            ) else "pending"
+                        ),
+                    } for rule in day.template_links or [] if rule.template is not None
+                ],
+                "credits": [
+                    {
+                        "session_id": entry["session"].id,
+                        "template_id": entry["template_id"],
+                        "source": entry["source"],
+                    } for entry in row["credits"]
+                ],
+            })
         return {
             "date": detail_date.isoformat(),
             "state": fact["state"] if fact else None,
@@ -285,10 +305,15 @@ class ProgramDayReadModelService:
             "manual_status": fact["manual_status"] if fact else None,
             "scheduled": fact["scheduled"] if fact else False,
             "completed_template_count": fact["completed_template_count"] if fact else 0,
-            "requirements": fact["date_evaluation"] if fact else None,
+            "requirements": date_evaluation,
             "occurrences": occurrences,
-            "other_sessions": [self._serialize_session(item) for item in other],
-            "goals_touched_ids": sorted(goals_touched),
+            "can_edit_credits": can_edit_credits,
+            "sessions": [
+                self._serialize_day_session(
+                    session, program.id, credit_facts.get(session.id),
+                    evidence_by_session[session.id], credit_options,
+                ) for session in page
+            ],
             "sessions_page": {
                 "limit": limit,
                 "returned": len(page),
@@ -298,28 +323,45 @@ class ProgramDayReadModelService:
         }
 
     @staticmethod
-    def _encode_cursor(offset):
-        return base64.urlsafe_b64encode(f"sessions:{offset}".encode()).decode().rstrip("=")
-
-    @staticmethod
-    def _session_sort_key(session):
-        value = session.session_start or session.completed_at or session.created_at
-        if value and value.tzinfo is None:
-            value = value.replace(tzinfo=timezone.utc)
-        return (value or datetime.min.replace(tzinfo=timezone.utc), session.id)
+    def _credit_options(occurrence_rows, date_evaluation):
+        """Scheduled templates still outstanding on the date, in schedule order."""
+        completed = set((date_evaluation or {}).get("completed_template_ids") or [])
+        options = {}
+        for row in occurrence_rows:
+            for rule in sorted(row["program_day"].template_links or [], key=lambda item: item.order or 0):
+                template = rule.template
+                if template is None or getattr(template, "deleted_at", None):
+                    continue
+                if rule.session_template_id in completed or rule.session_template_id in options:
+                    continue
+                options[rule.session_template_id] = {
+                    "template_id": rule.session_template_id,
+                    "name": template.name,
+                    "color": get_template_color(template.template_data),
+                }
+        return list(options.values())
 
     @classmethod
-    def _paginate_session_entries(cls, linked_entries, other_rows, offset, limit):
-        """Page two independently ordered streams without dropping either source.
+    def _serialize_day_session(cls, session, program_id, credit_fact, evidence, credit_options):
+        relation = cls._session_relation(session, program_id, credit_fact)
+        credited = relation == "credited"
+        return {
+            **cls._serialize_session(session),
+            "program_id": session.program_id,
+            "relation": relation,
+            "credit": {
+                "source": credit_fact["source"],
+                "template_id": credit_fact["template_id"],
+                "program_day_ids": credit_fact["program_day_ids"],
+            } if credited else None,
+            "excluded": bool(credit_fact and credit_fact["excluded"]),
+            "alignment": session_alignment(evidence),
+            "credit_options": credit_options if session.completed and not credited else [],
+        }
 
-        The caller loads the first ``offset + limit + 1`` rows of the other stream.
-        No later row from that sorted stream can enter the same prefix after merging,
-        even when every linked row sorts ahead of it.
-        """
-        entries = list(linked_entries) + [(session, None) for session in other_rows]
-        entries.sort(key=lambda entry: cls._session_sort_key(entry[0]))
-        page = entries[offset:offset + limit]
-        return page, len(entries) > offset + len(page)
+    @staticmethod
+    def _encode_cursor(offset):
+        return base64.urlsafe_b64encode(f"sessions:{offset}".encode()).decode().rstrip("=")
 
     @staticmethod
     def _decode_cursor(cursor):
@@ -336,20 +378,49 @@ class ProgramDayReadModelService:
         except (ValueError, UnicodeDecodeError, base64.binascii.Error) as exc:
             raise ValueError("Invalid cursor") from exc
 
-    def _load_other_sessions(self, root_id, current_user_id, program_id, day_value, zone, limit):
-        if limit <= 0:
-            return []
-        start = datetime.combine(day_value, time.min, tzinfo=zone).astimezone(timezone.utc)
-        end = datetime.combine(day_value + timedelta(days=1), time.min, tzinfo=zone).astimezone(timezone.utc)
-        effective = func.coalesce(Session.session_start, Session.completed_at, Session.created_at)
+    def _load_completed_sessions_by_date(self, root_id, current_user_id, start, end, zone):
+        """Completed sessions of the owner in any program, bucketed by local date."""
+        grouped = defaultdict(list)
+        if end < start:
+            return grouped
+        utc_start, utc_end = local_date_utc_bounds(start, end, zone)
+        effective = effective_session_timestamp()
+        rows = self.db_session.query(Session).options(selectinload(Session.template)).filter(
+            Session.root_id == root_id,
+            Session.owner_id == current_user_id,
+            Session.deleted_at.is_(None),
+            Session.completed.is_(True),
+            effective >= utc_start,
+            effective < utc_end,
+        ).order_by(effective.asc(), Session.id.asc()).all()
+        for session in rows:
+            grouped[effective_session_date(session, zone)].append(session)
+        return grouped
+
+    @staticmethod
+    def _session_relation(session, program_id, credit_fact):
+        if credit_fact and credit_fact["source"] and not credit_fact["excluded"]:
+            return "credited"
+        if session.program_id and session.program_id != program_id:
+            return "other_program"
+        return "off_plan"
+
+    @staticmethod
+    def _serialize_calendar_session(session):
+        """Compact calendar projection; the day detail carries full session facts."""
+        return {"id": session.id, "name": get_session_template_name(session) or session.name}
+
+    def _load_day_sessions(self, root_id, current_user_id, day_value, zone):
+        """Every non-deleted session of the owner on one local date, in any program."""
+        start, end = local_date_utc_bounds(day_value, day_value, zone)
+        effective = effective_session_timestamp()
         return self.db_session.query(Session).options(selectinload(Session.template)).filter(
             Session.root_id == root_id,
             Session.owner_id == current_user_id,
             Session.deleted_at.is_(None),
-            or_(Session.program_id.is_(None), Session.program_id != program_id),
             effective >= start,
             effective < end,
-        ).order_by(effective.asc(), Session.id.asc()).limit(limit).all()
+        ).order_by(effective.asc(), Session.id.asc()).limit(self.MAX_DETAIL_DAY_SESSIONS).all()
 
     @staticmethod
     def _serialize_session(session):
