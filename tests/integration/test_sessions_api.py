@@ -971,6 +971,47 @@ class TestSessionCRUDEndpoints:
         assert by_id[instance_ids[1]]['time_start'] is None
         assert by_id[instance_ids[1]]['time_stop'] is None
         assert by_id[instance_ids[1]]['duration_seconds'] is None
+
+    def test_completing_session_closes_a_running_activity_work_interval(
+        self, authed_client, db_session, sample_practice_session, sample_activity_definition
+    ):
+        root_id = sample_practice_session.root_id
+        session_id = sample_practice_session.id
+
+        created = authed_client.post(
+            f'/api/{root_id}/sessions/{session_id}/activities',
+            json={'activity_definition_id': sample_activity_definition.id},
+        )
+        assert created.status_code == 201
+        instance_id = created.get_json()['id']
+
+        started = authed_client.post(f'/api/{root_id}/activity-instances/{instance_id}/start')
+        assert started.status_code == 200
+        assert db_session.query(SessionWorkInterval).filter_by(
+            session_id=session_id,
+            ended_at=None,
+        ).count() == 1
+
+        completed = authed_client.put(
+            f'/api/{root_id}/sessions/{session_id}',
+            json={'completed': True},
+        )
+        assert completed.status_code == 200, completed.get_json()
+
+        db_session.expire_all()
+        instance = db_session.get(ActivityInstance, instance_id)
+        assert instance.completed is True
+        assert instance.time_stop is not None
+        assert instance.duration_seconds is not None
+        assert db_session.query(SessionWorkInterval).filter_by(
+            session_id=session_id,
+            ended_at=None,
+        ).count() == 0
+
+        activities = authed_client.get(f'/api/{root_id}/sessions/{session_id}/activities')
+        assert activities.status_code == 200
+        payload = next(item for item in activities.get_json() if item['id'] == instance_id)
+        assert payload['time_stop'] is not None
     
     def test_delete_session(self, authed_client, sample_practice_session):
         """Test deleting a session."""

@@ -79,7 +79,10 @@ Primary code: `services/session_*`, `services/activity_*`, `services/progress_se
 `services/timer_service.py`, `blueprints/sessions_api.py`, and the matching client hooks/views.
 
 Timer mutations persist the timer state and derived duration statistics in one
-transaction, then emit immutable event payloads after commit. `services/timer_loading.py`
+transaction, then emit immutable event payloads after commit. Completing a session is also a
+terminal timer boundary: its open ordinary activity work interval is closed in the same
+transaction before the session is committed; circuit-child timing remains owned by the circuit
+clock. `services/timer_loading.py`
 owns their response loading contract. Work-interval row locks may be reused only
 inside the same SQLAlchemy transaction or savepoint.
 

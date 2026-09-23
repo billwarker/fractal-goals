@@ -128,7 +128,7 @@ function SessionActivityItem({
         let intervalId;
 
         const updateTimerLocal = () => {
-            if (exercise.time_start && !exercise.time_stop) {
+            if (exercise.time_start && !exercise.time_stop && !exercise.completed) {
                 const start = new Date(exercise.time_start).getTime();
                 const now = Date.now();
 
@@ -159,7 +159,7 @@ function SessionActivityItem({
             }
         };
 
-        if (exercise.time_start && !exercise.time_stop) {
+        if (exercise.time_start && !exercise.time_stop && !exercise.completed) {
             updateTimerLocal();
 
             const isSessionPaused = session?.is_paused || session?.attributes?.is_paused || false;
@@ -174,6 +174,7 @@ function SessionActivityItem({
     }, [
         exercise.time_start,
         exercise.time_stop,
+        exercise.completed,
         exercise.duration_seconds,
         exercise.total_paused_seconds,
         exercise.target_duration_seconds,
@@ -183,7 +184,7 @@ function SessionActivityItem({
         session?.attributes?.last_paused_at,
         onUpdate,
     ]);
-    const isRunning = Boolean(exercise.time_start && !exercise.time_stop);
+    const isRunning = Boolean(exercise.time_start && !exercise.time_stop && !exercise.completed);
     const effectiveTarget = exercise.target_duration_seconds;
     const isCountingDown = isRunning && Boolean(effectiveTarget);
     const countdownRemaining = isCountingDown ? Math.max(0, effectiveTarget - realtimeDuration) : null;
@@ -377,7 +378,7 @@ function SessionActivityItem({
         resolveSplitId,
     ]);
     // Fetch live progress comparison while the activity is incomplete and no completion result yet
-    const isCompleted = Boolean(exercise.time_stop);
+    const isCompleted = Boolean(exercise.time_stop || exercise.completed);
     const activityProgress = exercise?.progress_comparison || null;
     const { progressComparison: liveProgressComparison } = useProgressComparison(
         rootId,

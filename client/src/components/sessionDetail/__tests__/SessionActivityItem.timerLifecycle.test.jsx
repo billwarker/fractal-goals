@@ -317,4 +317,57 @@ it('hides relative timer adjustment controls when the activity is not selected',
         expect(screen.queryByRole('button', { name: 'Adjust start time' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Adjust stop time' })).not.toBeInTheDocument();
     });
+
+it('does not keep accruing a timer after the activity is marked complete', () => {
+        vi.useFakeTimers();
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-completed-session',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    sets: [],
+                    metrics: [],
+                    time_start: '2026-07-04T13:21:14.000Z',
+                    time_stop: null,
+                    duration_seconds: 540,
+                    completed: true,
+                    target_duration_seconds: 1,
+                }}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                onOpenGoals={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false,
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        vi.advanceTimersByTime(3000);
+
+        expect(updateTimer).not.toHaveBeenCalled();
+        vi.useRealTimers();
+    });
 });

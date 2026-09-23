@@ -39,6 +39,7 @@ from services.session_runtime import (
 from services.session_structure import build_duplicate_session_data, extract_activity_definition_id
 from services.session_template_stats_service import SessionTemplateStatsService
 from services.program_scope import resolve_program_scope
+from services.work_interval_service import WorkIntervalService
 
 
 def _parse_iso_datetime_strict(value) -> datetime | None:
@@ -931,6 +932,14 @@ class SessionLifecycleService:
                         session.attributes['session_data']['session_end'] = None
                         session.attributes['session_data']['total_duration_seconds'] = None
                         flag_modified(session, "attributes")
+
+                # Session completion is a terminal boundary for ordinary activity
+                # work. Close the canonical interval before finalizing the instance
+                # fields so reads cannot resurrect a timer from an open interval.
+                WorkIntervalService(self.db_session).close_open(
+                    session.id,
+                    ended_at=completion_time.replace(tzinfo=None),
+                )
 
                 instances = self.db_session.query(ActivityInstance).filter(
                     ActivityInstance.session_id == session.id,
