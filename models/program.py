@@ -49,6 +49,8 @@ class Program(Base):
     completion_percentage = Column(Float, nullable=True)
     
     weekly_schedule = Column(JSON_TYPE, nullable=False) # JSON object with days -> template IDs
+    row_version = Column(Integer, nullable=False, default=1, server_default='1')
+    __mapper_args__ = {'version_id_col': row_version}
     
     blocks = relationship("ProgramBlock", back_populates="program", cascade="all, delete-orphan")
     day_status_overrides = relationship(
@@ -75,6 +77,8 @@ class ProgramBlock(Base):
     end_date = Column(Date, nullable=True)
     color = Column(String)
     is_completed = Column(Boolean, default=False)
+    row_version = Column(Integer, nullable=False, default=1, server_default='1')
+    __mapper_args__ = {'version_id_col': row_version}
     
     program = relationship("Program", back_populates="blocks")
     days = relationship("ProgramDay", back_populates="block", cascade="all, delete-orphan", order_by="ProgramDay.day_number")
@@ -99,6 +103,8 @@ class ProgramDay(Base):
     
     day_of_week = Column(JSON_TYPE)
     completion_min_templates = Column(Integer, nullable=True)
+    row_version = Column(Integer, nullable=False, default=1, server_default='1')
+    __mapper_args__ = {'version_id_col': row_version}
 
     block = relationship("ProgramBlock", back_populates="days")
     template_links = relationship(

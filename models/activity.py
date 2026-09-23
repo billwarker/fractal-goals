@@ -28,6 +28,7 @@ class FractalMetricDefinition(Base):
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
+    row_version = Column(Integer, nullable=False, server_default=sa.text('1'), default=1)
 
     __table_args__ = (
         sa.CheckConstraint('precision >= 0 AND precision <= 6', name='ck_fractal_metric_precision'),
@@ -90,6 +91,7 @@ class ActivityDefinition(Base):
         nullable=True,
         index=True,
     )
+    row_version = Column(Integer, nullable=False, default=1, server_default=sa.text('1'))
 
     group = relationship("ActivityGroup", backref="activities")
     metric_definitions = relationship(
@@ -125,6 +127,7 @@ class ActivityDefinition(Base):
             name='ck_activity_definitions_delta_display_mode',
         ),
     )
+    __mapper_args__ = {'version_id_col': row_version}
 
 class MetricDefinition(Base):
     __tablename__ = 'metric_definitions'

@@ -114,6 +114,7 @@ class _GoalCrudMixin:
             )
 
             if parent:
+                parent.row_version += 1
                 current = parent
                 while current.parent_id:
                     current = get_goal_by_id(self.db_session, current.parent_id)
@@ -282,6 +283,8 @@ class _GoalCrudMixin:
                 root_id=root_id,
                 owner_id=current_user_id,
             )
+            if parent_goal:
+                parent_goal.row_version += 1
             self.db_session.add(new_goal)
             self.db_session.flush()
 

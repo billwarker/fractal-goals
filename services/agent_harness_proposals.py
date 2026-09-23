@@ -3,15 +3,11 @@
 import datetime as dt
 import secrets
 from urllib.parse import quote
-from models import AgentApproval, AgentOperation, AgentProposal, AgentRun, AgentTaskBrief, Goal, Program, ProgramBlock, ProgramDay, SessionTemplate, program_day_templates, utc_now
-from services.activity_service import ActivityService
-from services.goal_service import GoalService, sync_goal_targets
-from services.note_service import NoteService
-from services.goal_type_utils import get_canonical_goal_type
+from models import AgentApproval, AgentOperation, AgentProposal, AgentRun, AgentTaskBrief, Goal, Program, ProgramBlock, ProgramDay, Session, SessionTemplate, program_day_templates, utc_now
 from validators.agent import AgentProposalSchema
 
 from services.agent_harness_common import AgentHarnessError, PROPOSAL_TTL_HOURS, _aware, _digest, _iso, _model_data
-from services.agent_operation_versions import operation_restore_payload, operation_state_hash
+from services.agent_operation_versions import operation_state_hash
 
 
 class AgentProposalsMixin:
@@ -97,6 +93,7 @@ class AgentProposalsMixin:
         grant_id=None,
         allowed_roots=None,
         expected_state_hashes=None,
+        commit=True,
     ):
         task = self._get_task_row(user_id, task_id)
         if allowed_roots is not None and task.root_id not in allowed_roots:
@@ -130,6 +127,8 @@ class AgentProposalsMixin:
                     "update_program": "program_id",
                     "update_block": "block_id",
                     "update_program_day": "day_id",
+                    "update_session": "session_id",
+                    "update_metric": "metric_id",
                 }.get(operation["type"])
                 if target_field and str(operation.get(target_field, "")).startswith("$ref:"):
                     raise AgentHarnessError(
@@ -140,7 +139,7 @@ class AgentProposalsMixin:
                 resolved = self._resolve_references(operation, preview_refs)
                 if operation["type"] in {
                     "update_goal", "update_activity", "associate_activity_goals",
-                    "update_program", "update_block", "update_program_day",
+                    "update_program", "update_block", "update_program_day", "update_session", "update_metric",
                 }:
                     actual_state_hash = operation_state_hash(
                         self.db_session, task.root_id, resolved,
@@ -165,6 +164,7 @@ class AgentProposalsMixin:
                         resolved["program_id"],
                         resolved["block_id"],
                         resolved["day_id"],
+                        operation=resolved,
                     )
                 summary, result = self._validate_and_preview_operation(
                     task, user_id, resolved
@@ -191,7 +191,10 @@ class AgentProposalsMixin:
         )
         task.status = "proposal_ready"
         self.db_session.add(proposal)
-        self.db_session.commit()
+        if commit:
+            self.db_session.commit()
+        else:
+            self.db_session.flush()
         return self.serialize_proposal(proposal)
 
     def create_undo_proposal(self, user_id, run_id):
@@ -265,373 +268,6 @@ class AgentProposalsMixin:
             {"operations": inverses},
             expected_state_hashes=expected_state_hashes,
         )
-    def _validate_and_preview_operation(self, task, user_id, operation):
-        self._root(task.root_id, user_id)
-        if operation["type"] == "update_goal":
-            before = operation_restore_payload(self.db_session, task.root_id, operation)
-            service = GoalService(self.db_session, sync_targets=sync_goal_targets)
-            entity, error, status = service.update_fractal_goal(
-                task.root_id,
-                operation["goal_id"],
-                user_id,
-                operation["data"],
-                commit=False,
-                pending_events=[],
-            )
-            if error:
-                raise AgentHarnessError(str(error), status, "validation_failed")
-            return {
-                "operation_id": operation["operation_id"],
-                "type": operation["type"],
-                "action": "Update goal",
-                "id": entity.id,
-                "name": entity.name,
-                "updated_fields": list(operation["data"].keys()),
-                "changes": operation["data"],
-                "before": before.get("data", {}),
-            }, {"id": entity.id, "name": entity.name, "root_id": task.root_id,
-                "href": self._app_href(task.root_id, "goals")}
-        if operation["type"] in {"update_activity", "associate_activity_goals"}:
-            before = operation_restore_payload(self.db_session, task.root_id, operation)
-            service = ActivityService(self.db_session)
-            if operation["type"] == "update_activity":
-                entity, error, status = service.update_activity_definition(
-                    task.root_id,
-                    operation["activity_id"],
-                    user_id,
-                    operation["data"],
-                    commit=False,
-                    pending_events=[],
-                )
-                fields = list(operation["data"].keys())
-            else:
-                from services.activity_association_service import ActivityAssociationService
-
-                entity, error, status = ActivityAssociationService(self.db_session).set_activity_goals(
-                    task.root_id,
-                    operation["activity_id"],
-                    user_id,
-                    operation["goal_ids"],
-                    commit=False,
-                    pending_events=[],
-                )
-                fields = ["associated_goals"]
-            if error:
-                raise AgentHarnessError(str(error), status, "validation_failed")
-            return {
-                "operation_id": operation["operation_id"],
-                "type": operation["type"],
-                "action": "Update activity" if operation["type"] == "update_activity" else "Change activity goal associations",
-                "id": entity.id,
-                "name": entity.name,
-                "updated_fields": fields,
-                "changes": operation.get("data", {"goal_ids": operation.get("goal_ids", [])}),
-                "before": before.get("data", {"goal_ids": before.get("goal_ids", [])}),
-                "before_goal_names": self._goal_names(
-                    task.root_id,
-                    before.get("goal_ids") or before.get("data", {}).get("goal_ids") or [],
-                ),
-                "goal_ids": list(operation.get("goal_ids") or operation.get("data", {}).get("goal_ids") or []),
-                "goal_names": self._goal_names(
-                    task.root_id,
-                    operation.get("goal_ids") or operation.get("data", {}).get("goal_ids") or [],
-                ),
-            }, {"id": entity.id, "name": entity.name, "root_id": task.root_id,
-                "href": self._app_href(task.root_id, "manage-activities")}
-        if operation["type"] in {"update_program", "update_block", "update_program_day"}:
-            from services.programs import ProgramService
-
-            before = operation_restore_payload(self.db_session, task.root_id, operation)
-            try:
-                if operation["type"] == "update_program":
-                    entity = ProgramService.update_program(
-                        self.db_session, task.root_id, operation["program_id"],
-                        operation["data"], user_id, commit=False, pending_events=[],
-                    )
-                    entity_id = operation["program_id"]
-                elif operation["type"] == "update_block":
-                    entity = ProgramService.update_block(
-                        self.db_session, task.root_id, operation["program_id"],
-                        operation["block_id"], operation["data"], user_id,
-                        commit=False, pending_events=[],
-                    )
-                    entity_id = operation["block_id"]
-                else:
-                    entity = ProgramService.update_block_day(
-                        self.db_session, task.root_id, operation["program_id"],
-                        operation["block_id"], operation["day_id"],
-                        operation["data"], user_id, commit=False, pending_events=[],
-                    )
-                    entity_id = operation["day_id"]
-            except ValueError as exc:
-                raise AgentHarnessError(str(exc), 400, "validation_failed") from exc
-            if entity is None:
-                raise AgentHarnessError("Program was not found", 404, "not_found")
-            before_data = before.get("data", {})
-            preview_relations = {}
-            goal_field = {
-                "update_program": "selectedGoals",
-                "update_block": "goal_ids",
-            }.get(operation["type"])
-            if goal_field and goal_field in operation["data"]:
-                preview_relations = {
-                    "before_goal_names": self._goal_names(
-                        task.root_id, before_data.get(goal_field) or [],
-                    ),
-                    "goal_names": self._goal_names(
-                        task.root_id, operation["data"].get(goal_field) or [],
-                    ),
-                }
-            if operation["type"] == "update_program_day" and (
-                "template_ids" in operation["data"] or "template_configs" in operation["data"]
-            ):
-                preview_relations = {
-                    "before_template_names": self._template_names(
-                        task.root_id, before_data.get("template_configs"),
-                    ),
-                    "template_names": self._template_names(
-                        task.root_id,
-                        operation["data"].get("template_configs")
-                        or operation["data"].get("template_ids"),
-                    ),
-                }
-            return {
-                "operation_id": operation["operation_id"],
-                "type": operation["type"],
-                "action": "Update program structure",
-                "id": entity_id,
-                "name": entity.get("name"),
-                "updated_fields": list(operation["data"].keys()),
-                "changes": operation["data"],
-                "before": before_data,
-                **preview_relations,
-            }, {"id": entity_id, "name": entity.get("name"), "root_id": task.root_id,
-                "href": self._app_href(task.root_id, "programs", operation["program_id"])}
-        if operation["type"] == "create_goal":
-            service = GoalService(self.db_session, sync_targets=sync_goal_targets)
-            entity, error, status = service.create_fractal_goal(
-                task.root_id,
-                user_id,
-                operation["data"],
-                commit=False,
-                pending_events=[],
-            )
-            if error:
-                raise AgentHarnessError(str(error), status, "validation_failed")
-            result = {
-                "id": entity.id,
-                "name": entity.name,
-                "root_id": entity.root_id,
-                "href": self._app_href(task.root_id, "goals"),
-            }
-            return {
-                "operation_id": operation["operation_id"],
-                "type": operation["type"],
-                "action": "Create goal",
-                "name": entity.name,
-                "goal_type": get_canonical_goal_type(entity),
-                "parent_id": entity.parent_id,
-                "deadline": entity.deadline.isoformat() if entity.deadline else None,
-            }, result
-        if operation["type"] == "create_activity":
-            service = ActivityService(self.db_session)
-            entity, error, status = service.create_activity_definition(
-                task.root_id,
-                user_id,
-                operation["data"],
-                commit=False,
-                pending_events=[],
-            )
-            if error:
-                raise AgentHarnessError(str(error), status, "validation_failed")
-            return {
-                "operation_id": operation["operation_id"],
-                "type": operation["type"],
-                "action": "Create activity",
-                "name": entity.name,
-                "goal_ids": list(operation["data"].get("goal_ids") or []),
-                "goal_names": self._goal_names(
-                    task.root_id,
-                    operation["data"].get("goal_ids") or [],
-                ),
-            }, {
-                "id": entity.id,
-                "name": entity.name,
-                "root_id": task.root_id,
-                "href": self._app_href(task.root_id, "manage-activities"),
-            }
-        if operation["type"] == "create_note":
-            service = NoteService(self.db_session)
-            entity, error, status = service.create_note(
-                task.root_id,
-                user_id,
-                operation["data"],
-                commit=False,
-                pending_events=[],
-            )
-            if error:
-                raise AgentHarnessError(str(error), status, "validation_failed")
-            result = {
-                "id": entity["id"],
-                "root_id": task.root_id,
-                "href": self._app_href(task.root_id, "notes"),
-            }
-            return {
-                "operation_id": operation["operation_id"],
-                "type": operation["type"],
-                "action": "Add note",
-                "context_type": entity.get("context_type"),
-                "context_id": entity.get("context_id"),
-                "content": entity.get("content"),
-            }, result
-        if operation["type"] == "create_template":
-            from services.template_service import TemplateService
-
-            entity, error, status = TemplateService(self.db_session).create_template(
-                task.root_id, user_id, operation["data"], commit=False, pending_events=[]
-            )
-            if error:
-                raise AgentHarnessError(str(error), status, "validation_failed")
-            return {
-                "operation_id": operation["operation_id"],
-                "type": operation["type"],
-                "action": "Create session template",
-                "name": entity.name,
-            }, {
-                "id": entity.id,
-                "name": entity.name,
-                "root_id": task.root_id,
-                "href": self._app_href(task.root_id, "manage-session-templates"),
-            }
-        if operation["type"] == "create_program":
-            from services.programs import ProgramService
-
-            entity = ProgramService.create_program(
-                self.db_session,
-                task.root_id,
-                operation["data"],
-                user_id,
-                commit=False,
-                pending_events=[],
-            )
-            return {
-                "operation_id": operation["operation_id"],
-                "type": operation["type"],
-                "action": "Create program",
-                "name": entity.get("name"),
-                "start_date": entity.get("start_date"),
-                "end_date": entity.get("end_date"),
-                "goal_names": self._goal_names(
-                    task.root_id,
-                    operation["data"].get("selectedGoals") or [],
-                ),
-            }, {
-                "id": entity["id"],
-                "name": entity.get("name"),
-                "root_id": task.root_id,
-                "href": self._app_href(task.root_id, "programs", entity["id"]),
-            }
-        if operation["type"] == "create_block":
-            from services.programs import ProgramService
-
-            entity = ProgramService.create_block(
-                self.db_session,
-                task.root_id,
-                operation["program_id"],
-                operation["data"],
-                user_id,
-                commit=False,
-                pending_events=[],
-            )
-            return {
-                "operation_id": operation["operation_id"],
-                "type": operation["type"],
-                "action": "Create program block",
-                "name": entity.get("name"),
-                "start_date": entity.get("start_date"),
-                "end_date": entity.get("end_date"),
-                "goal_names": self._goal_names(
-                    task.root_id,
-                    operation["data"].get("goal_ids") or [],
-                ),
-            }, {
-                "id": entity["id"],
-                "name": entity.get("name"),
-                "root_id": task.root_id,
-                "href": self._app_href(
-                    task.root_id, "programs", operation["program_id"],
-                ),
-            }
-        if operation["type"] == "create_program_day":
-            from services.programs import ProgramService
-
-            result = ProgramService.add_block_day(
-                self.db_session,
-                task.root_id,
-                operation["program_id"],
-                operation["block_id"],
-                operation["data"],
-                user_id,
-                commit=False,
-                pending_events=[],
-                create_only=True,
-            )
-            first_day = (result.get("days") or [{}])[0]
-            return {
-                "operation_id": operation["operation_id"],
-                "type": operation["type"],
-                "action": "Create program day",
-                "name": first_day.get("name"),
-                "date": first_day.get("date"),
-                "day_of_week": first_day.get("day_of_week"),
-                "templates": [
-                    {"id": item["id"], "name": item["name"]}
-                    for item in (first_day.get("templates") or [])[:10]
-                ],
-            }, {
-                "id": first_day.get("id"),
-                "name": first_day.get("name"),
-                "root_id": task.root_id,
-                "href": self._app_href(
-                    task.root_id, "programs", operation["program_id"],
-                ),
-            }
-        if operation["type"] == "schedule_program_day":
-            from services.programs import ProgramService
-
-            try:
-                scheduled = ProgramService.schedule_block_day(
-                    self.db_session,
-                    task.root_id,
-                    operation["program_id"],
-                    operation["block_id"],
-                    operation["day_id"],
-                    operation["data"],
-                    user_id,
-                    commit=False,
-                    pending_events=[],
-                )
-            except ValueError as error:
-                raise AgentHarnessError(str(error), 400, "validation_failed") from error
-            session_id = scheduled.get("id")
-            return {
-                "operation_id": operation["operation_id"],
-                "type": operation["type"],
-                "action": "Schedule program day",
-                "name": scheduled.get("name"),
-                "session_start": scheduled.get("session_start"),
-                "program_day_id": operation["day_id"],
-            }, {
-                "id": session_id,
-                "session_id": session_id,
-                "program_day_id": operation["day_id"],
-                "name": scheduled.get("name"),
-                "root_id": task.root_id,
-                "href": self._app_href(
-                    task.root_id, "programs", operation["program_id"],
-                ),
-            }
-        raise AgentHarnessError("Unsupported operation type", 400, "unsupported_operation")
     def queue_approved_proposal(self, proposal_id, user_id):
         proposal = self.db_session.query(AgentProposal).filter(
             AgentProposal.id == proposal_id,
@@ -661,6 +297,7 @@ class AgentProposalsMixin:
                 user_id=user_id,
                 grant_id=task.grant_id,
                 root_id=proposal.root_id,
+                execution_origin=("connector" if task.grant_id else task.execution_origin),
                 status="queued",
                 fencing_token=0,
                 trace_id=secrets.token_hex(16),
@@ -680,22 +317,31 @@ class AgentProposalsMixin:
             task.status = "queued"
         self.db_session.commit()
         return self.serialize_run(run)
-    def _program_day_state_hash(self, root_id, program_id, block_id, day_id):
-        program = self.db_session.query(Program).filter_by(
+    def _program_day_state_hash(self, root_id, program_id, block_id, day_id, *, operation=None, for_update=False):
+        program_query = self.db_session.query(Program).filter_by(
             id=program_id,
             root_id=root_id,
-        ).first()
-        block = self.db_session.query(ProgramBlock).filter_by(
+        ).populate_existing()
+        if for_update:
+            program_query = program_query.with_for_update()
+        program = program_query.first()
+        block_query = self.db_session.query(ProgramBlock).filter_by(
             id=block_id,
             program_id=program_id,
-        ).first()
-        day = self.db_session.query(ProgramDay).filter_by(
+        ).populate_existing()
+        if for_update:
+            block_query = block_query.with_for_update()
+        block = block_query.first()
+        day_query = self.db_session.query(ProgramDay).filter_by(
             id=day_id,
             block_id=block_id,
-        ).first()
+        ).populate_existing()
+        if for_update:
+            day_query = day_query.with_for_update()
+        day = day_query.first()
         if not program or not block or not day:
             raise AgentHarnessError("The program day changed or is no longer available", 409, "stale_context")
-        template_links = self.db_session.query(
+        template_query = self.db_session.query(
             program_day_templates.c.order,
             program_day_templates.c.is_required,
             SessionTemplate.name,
@@ -706,7 +352,18 @@ class AgentProposalsMixin:
         ).filter(
             program_day_templates.c.program_day_id == day.id,
             SessionTemplate.deleted_at.is_(None),
-        ).order_by(program_day_templates.c.order, SessionTemplate.name).all()
+        ).order_by(program_day_templates.c.order, SessionTemplate.name)
+        if for_update:
+            template_query = template_query.with_for_update()
+        template_links = template_query.all()
+        scheduled_query = self.db_session.query(Session).filter(
+            Session.root_id == root_id,
+            Session.program_day_id == day.id,
+            Session.deleted_at.is_(None),
+        ).order_by(Session.id).populate_existing()
+        if for_update:
+            scheduled_query = scheduled_query.with_for_update()
+        scheduled_sessions = scheduled_query.all()
         return _digest({
             "root_id": root_id,
             "program": {
@@ -737,6 +394,16 @@ class AgentProposalsMixin:
                     for row in template_links
                 ],
             },
+            "scheduled_sessions": [
+                {
+                    "id": row.id,
+                    "session_start": _iso(row.session_start),
+                    "session_end": _iso(row.session_end),
+                    "completed": bool(row.completed),
+                    "deleted_at": _iso(row.deleted_at),
+                }
+                for row in scheduled_sessions
+            ],
         })
     def serialize_proposal(self, proposal):
         return {

@@ -1,370 +1,218 @@
-# AI agent integration and execution harness
+# Embedded AI chat and background execution plan
 
-Status: local implementation includes the delegated harness, reviewed create/update
-workflows, and an optional app-funded embedded assistant. Connector and embedded
-features remain disabled until their release gates pass. Audit updated September 20,
-2026.
+Status: implementation pass updated September 22, 2026. This supersedes the
+connector-first plan. The primary UI is now an embedded persistent chat with background
+planning, reviewed previews and explicit acceptance. The prior 6.5/10 audit assessed a
+narrower implementation and remains historical. Keep features gated until the checks
+below pass.
 
-## Recommendation and product boundary
+## Product objective
 
-Build one Fractal Goals capability and execution layer, exposed through a remote MCP
-server to ChatGPT and Claude. Connection management, task briefs, change review,
-execution history, and a separately funded embedded assistant now use that shared
-layer locally. Hosted provider integrations remain opt-in and gated.
+Users describe work in Fractal's chat window. A fully embedded agent finds relevant
+records, asks conversational clarification when needed, prepares changes, and presents
+a preview. Only after the user accepts does a background worker apply those exact
+operations through existing domain APIs/services.
 
-These are distinct experiences:
+Remove “Focus this handoff on specific items,” its multi-select controls, and manual
+entity-focus selection. The primary flow must not require choosing a connected service,
+copying a handoff, or opening ChatGPT/Claude. Context discovery is the agent's job.
 
-| Experience | Where reasoning runs | Funding and access | Recommendation |
-| --- | --- | --- | --- |
-| Connect Fractal Goals to ChatGPT/Claude | In the user's AI product | That product's access rules and usage limits | First release |
-| Describe work and review results in Fractal Goals, hand off to connected AI | Brief/review in Fractal; conversation in AI product | Same connector arrangement | First release; explicit handoff |
-| Fully embedded chat and background agent | Provider API called by our backend | App-funded API usage; subscription portability is not assumed | Implemented locally; gated release |
+Use the existing app-funded provider API backend as the implementation baseline:
+server-side credentials, explicit usage disclosure, privacy gates and spending caps.
+Consumer subscriptions are not assumed to fund embedded inference. Existing MCP
+connections are an optional separate integration; public-host OAuth/MCP verification
+is not a dependency of embedded release. Provider API validation remains required.
 
-OAuth here means the AI product signs into **Fractal Goals** with the user's consent.
-It does not mean our backend receives a general right to spend their AI subscription.
-Anthropic explicitly requires prior approval for third-party products to offer
-claude.ai login or rate limits through the Agent SDK. Its remote connectors provide
-the appropriate user-product integration. [Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/overview),
-[Claude custom connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
+## User journey
 
-OpenAI's current ChatGPT plugin documentation supports MCP over Streamable HTTP at
-`/mcp`, account authorization with resource-bound OAuth tokens, and optional UI.
-Developer-mode access depends on account/workspace policy. Public plugin submission
-requires a stable public HTTPS endpoint; a private development tunnel does not replace
-that submission endpoint. Use MCP Inspector before connecting the target ChatGPT
-account, then verify the OAuth client registration method, token audience, tool
-annotations, confirmation behavior, and account policy in the compatibility spike.
-Do not promise availability to every subscriber. [OpenAI authentication guide](https://developers.openai.com/plugins/build/auth),
-[ChatGPT connection and testing guide](https://developers.openai.com/plugins/deploy/connect-chatgpt),
-[MCP server guide](https://developers.openai.com/plugins/build/mcp-server).
+1. Open persistent, non-modal chat from the authenticated app shell. Preserve the
+   conversation across navigation/minimizing and restore it after reload.
+2. Enter a request such as “Build a four-week program for my running goal, schedule
+   three sessions each week with distance and duration metrics, and leave a note.”
+3. Capture the current fractal, route/entity and timezone as validated context hints.
+   The agent searches additional owned records automatically and shows concise progress.
+4. Ask in chat if names, dates, units or targets are ambiguous. Names/links in a
+   clarification are useful; a mandatory focus-picker form is not.
+5. Show a review card: additions, before/after edits, named associations, dates,
+   metric units/values, and downstream completion/progress effects. Actions are
+   **Accept and apply**, **Request changes**, and **Reject**.
+6. Acceptance queues the exact proposal revision. Show durable progress, results with
+   record links, partial failures, and **Cancel remaining work**. Refresh affected pages
+   even when chat is minimized. Follow-up requests produce new reviewed proposals.
 
-Anthropic's current custom-connector guide documents Streamable HTTP, OAuth dynamic
-client registration, and token refresh for remote MCP servers. It also limits connector
-availability by Claude plan and, for work accounts, organization role. This matches the
-adapter's selected transport and grant features at the documentation level only; verify
-the account entitlement, DCR client settings, expiry/refresh, and confirmation UX in a
-real Claude account before release. [Anthropic remote MCP connector guide](https://support.anthropic.com/en/articles/11503834-building-custom-integrations-via-remote-mcp-servers).
+Planning may continue while the tab is closed. A proposal waiting for acceptance never
+writes domain records. Accepted execution may continue without an open tab. This is
+request-triggered background work; recurring autonomous schedules are a future scope.
 
-Do not collect consumer session cookies, copy CLI OAuth tokens to the server, or
-market an unverified subscription-to-API bridge. A local companion is a separate
-product investigation, not a dependency of this design.
+## Required create/update capabilities
 
-## Implementation audit
+Every capability needs scoped retrieval, canonical validation, preview, authorization,
+version preconditions, durable execution and affected-query metadata. A route's existence
+alone does not establish that the agent supports it.
 
-The shared local harness and first-party review surface now exist. This is an
-implementation audit, not a production certification; remote host interoperability
-has not been exercised.
+| Domain | Required behavior | Important distinction |
+| --- | --- | --- |
+| Goals | Create hierarchy nodes; update supported fields, dates, targets and associations | Preview parent, cascading deadlines and target effects |
+| Sessions | Create planned sessions from templates or explicit activities; update details and contents | Scheduling is distinct from recording work and completion |
+| Activities | Create/update definitions and goal associations; add/update session instances | Definition-wide edits differ from a single session's edits |
+| Metrics | Create/update definitions and units; record/correct explicitly requested activity values and sets | Changing measurement structure differs from changing recorded results |
+| Programs | Create/update programs, blocks, days, schedules and template links | Use canonical dates, timezone and occurrence evaluation |
+| Notes | Create and update notes/comments on supported goal/session/activity targets | Show the content diff and linked target |
+| Templates | Create/update reusable templates needed by session/program requests | Preview reuse versus modification and downstream scope |
 
-- Flask owns Authlib authorization code + PKCE, dynamic client registration, resource
-  metadata, delegated scopes/root grants, short-lived internal credentials, refresh
-  rotation/replay revocation, connection revocation, task/proposal/run APIs, and the
-  independent execution authorization checks. The MCP adapter has no database access.
-- The operation ledger, proposal hash/approval binding, leases, idempotent operation
-  results, cancellation, per-operation transaction/event handling, retention, export,
-  and account deletion integration are implemented. Goal, activity, note, template,
-  program, block, reusable program-day definition, and scheduled session occurrence
-  creation use canonical services.
-- Reviewed updates cover goal, activity, program, block, and program-day fields, plus
-  activity-to-goal association changes. Preview records before/after values and binds
-  an entity-and-relationship snapshot into the proposal; execution rejects stale
-  snapshots. Undo creates a fresh approval proposal and is offered only for reversible
-  field changes. Goal target changes, cascading child deadlines, and activity metric or
-  split history are explicitly rejected for undo rather than guessed.
-- Temporary operation references support dependent creates in a single proposal.
-  Proposal validation runs the canonical services inside a rollback-only savepoint.
-  Program context queries apply per-parent limits in the database.
-- Settings, task handoff, entity context selection, review/history, cancellation, and
-  affected-record navigation are wired through shared TanStack Query keys.
-- The embedded API supports OpenAI and Anthropic server-side keys, bounded context and
-  proposal tools, persisted provider checkpoints, step/token/time limits, cancellation,
-  and in-app conversation history. Its proposals still require the same first-party
-  approval and execution path. `ai_agent_embedded` defaults off and an explicit
-  deployment privacy/terms approval switch must also be enabled.
-- `ai_agent_connectors`, `ai_agent_writes`, `ai_agent_embedded`,
-  `ai_agent_embedded_openai`, and `ai_agent_embedded_anthropic` default to disabled.
-  Embedded providers require both their individual switch and the umbrella/privacy
-  gates. Disabling a provider cancels queued turns and signals active turns to stop at
-  the next checkpoint while preserving history. A configured public MCP endpoint,
-  target ChatGPT/Claude accounts, and deployment credentials are not available here,
-  so Stage 0 and Stage 3 host evidence remain open.
-- Provider SDK dependency pins are resolver-compatible (`typing_extensions==4.16.0`,
-  `idna==3.18`); the application, MCP adapter, and frontend production dependency audits
-  pass with no known vulnerabilities.
-- The pinned `Authlib==1.8.0` dependency is installed in the local virtual environment.
-  The PostgreSQL-backed backend suite passes (1,000 tests) at 80.88% coverage, above the
-  80% repository gate. The 19 harness tests
-  cover concurrent apply, grant revocation during execution, approval mutation,
-  pre/post-commit crashes, expired-lease recovery, partial progress, quotas, deleted
-  parents, invalid goal types, duplicate dates, and missing templates. Seven strict
-  schema cases reject extra fields across create and schedule operations. All 1,209
-  frontend tests pass and its coverage thresholds pass (66.5% lines). Frontend lint,
-  production build, responsive and maintainability checks pass; the desktop/mobile
-  browser workflows pass (4 tests). Backend maintainability and Python compilation
-  pass. On a fresh temporary PostgreSQL database, Alembic upgrade, schema check,
-  downgrade, re-upgrade, and schema check all pass.
-- The seven-case MCP adapter suite covers transport, the OAuth resource-metadata
-  challenge and bearer authentication, schemas, safety annotations, and prompt-boundary
-  behavior. The complete suite passes inside the
-  production image with the pinned SDK, including a real Streamable HTTP
-  initialize/list/call round-trip, delegated-token verification, token exchange, and a
-  scoped backend tool call. Both production images build locally; image dependency
-  checks pass, and the adapter imports from its image. CI runs adapter tests against the
-  pinned SDK and builds/import-checks both images.
+Reuse goal/target, session lifecycle/activity, metric/set/progress, activity association,
+program/calendar, note and template services. Confirmed HTTP seams include session
+POST/PUT and session activity/metric PUT routes in `blueprints/sessions_api.py`,
+activity/fractal-metric POST/PUT in `blueprints/activities_api.py`, and note POST/PUT in
+`blueprints/notes_api.py`. Inventory exact schemas/service owners before each addition.
 
-Deliberate boundaries: proposal writes do not delete records, mark goals complete, or
-change manual calendar statuses or session completion evidence. Undo is a separate
-reviewed inverse proposal and is limited to supported reversible updates.
+Do not infer that planned work was performed. Explicit requests to record results or
+complete a session require distinct lifecycle operations with their progress effects in
+the preview. This revises the old blanket exclusion of completion evidence: permit it
+only through deliberately designed/tested operations, never incidental generic fields.
+Standalone manual calendar status overrides and record deletion remain outside this scope.
 
-Distance to S+ production quality: Stage 0 needs a public endpoint and OAuth/MCP
-verification in both target products. Stage 3 needs MCP Inspector, reconnect/revoke,
-rollback, privacy/distribution, and mobile/keyboard checks. Embedded release also needs
-approved provider terms/privacy, deployment keys/models, provider smoke tests, and
-production cost and abuse monitoring.
-
-## User experience
-
-1. Settings → AI connections: select ChatGPT or Claude, connect the Fractal account,
-   choose allowed fractals and read/write permissions, and see connection status/revoke.
-2. A goal/program action opens “Ask AI” with the current entity already selected.
-   Example: “Create six practice activities for this goal and schedule three days
-   a week for four weeks, starting next Monday. Leave a note explaining the plan.”
-3. Save an authenticated task brief containing the request, entity IDs, timezone,
-   and optional limits. Supply a copyable handoff instruction with its opaque ID.
-   Open the provider using a documented link if supported; otherwise use copy/open
-   guidance. Do not assume arbitrary prompts can be injected into provider chats.
-4. The external agent reads the brief and scoped context, resolves ambiguity, and
-   submits a structured proposal. Preview shows additions, edits, dates, associations,
-   and notes using real app names. Missing dates/templates/parents become questions.
-5. User approves the proposal in Fractal Goals. Execute its exact stored operations;
-   show progress, affected-record links, errors, and any remaining work.
-6. A later opt-in “Allow routine changes” policy can authorize bounded operations
-   within selected roots and limits without repeated app approvals. Provider-host
-   confirmations may still apply. Larger edits and destructive actions require review.
-
-The connector flow includes in-app intent capture and review, with reasoning performed
-after an explicit provider handoff. The embedded flow provides in-app reasoning through
-the configured provider API once its feature, privacy, and deployment gates are met.
-
-## Architecture and ownership
+## Architecture and implementation reuse
 
 ```mermaid
 flowchart TD
-  A[ChatGPT or Claude] --> B[Remote MCP adapter]
-  C[Fractal task and review UI] --> D[Flask agent endpoints]
-  E[Embedded API agent] --> D
-  B --> D
-  D --> F[Capability registry and execution service]
-  F --> G[Existing validators and domain services]
-  G --> H[PostgreSQL and committed domain events]
-  H --> I[Run status and affected record versions]
-  I --> C
+  A[Persistent Fractal chat] --> B[Authenticated conversation and turn API]
+  B --> C[Durable planning worker and provider API]
+  C --> D[Scoped search and canonical operation registry]
+  C --> E[Immutable proposal and preview]
+  E --> A
+  A --> F[Accept exact proposal revision]
+  F --> G[Durable execution worker]
+  G --> H[Existing validators and domain services]
+  H --> I[Domain records, operation ledger and reliable events]
+  I --> J[Chat results and shell refresh]
 ```
 
-The MCP adapter calls authenticated Fractal HTTP endpoints. Existing single-operation
-routes remain reusable; new proposal/run endpoints compose the same services where
-durability or batching requires it. Never call Flask view functions internally or
-reimplement goal/program rules in the MCP process. Any route-only rules required by
-both paths move into their canonical validator/service as part of the change.
+Reuse `AgentChatPopover`, proposal review, embedded conversation/execution services,
+operation registry and worker infrastructure. Keep HTTP routes thin; new orchestration
+endpoints compose canonical services, not Flask view functions or parallel CRUD code.
+Never run inference in a database transaction or expose provider credentials to clients.
 
-Use an official maintained MCP SDK in a small separately deployed adapter, keeping
-Flask and SQLAlchemy as the domain runtime. Choose Python if its tested client/protocol
-support meets the spike; otherwise use the official TypeScript SDK for this transport
-boundary. It receives no database credentials and cannot call arbitrary URLs.
+The model may read and submit proposals but cannot approve them. Generate model-visible
+schemas from the canonical registry and expose relevant domains/tools progressively,
+so schema overhead does not exhaust the turn. Optional adapters consume that same
+contract without participating in the embedded execution path.
 
-Use public HTTPS Streamable HTTP, strict tool schemas and structured results. Pin
-SDK/protocol versions to a tested ChatGPT/Claude compatibility matrix. The current MCP
-transport documentation resolves to 2026-07-28; verify client support before adopting
-new protocol behavior, retaining only compatibility paths the matrix requires.
-[MCP transport specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports).
+## Automatic context instead of manual selection
 
-## Initial tools and API mapping
+Bind a conversation to an owned fractal. Route/entity IDs are hints, not permission.
+Capture scope per turn so navigation cannot silently retarget background work. Make a
+fractal switch explicit in conversation and clear in the preview. Derive identity from
+authentication and validate every referenced record, root and relationship.
 
-Paths below include the `/api` prefix. Expose a curated capability set, not every route.
+Provide paged search by name/type/date and lookup by ID for all required domains,
+including historical sessions and metric units. Resolve ambiguity conversationally;
+resolve newly created entities through proposal dependencies. Preserve tenant isolation
+and soft-delete rules in search, history, preview and execution.
 
-| Capability | Existing route/service reuse |
-| --- | --- |
-| Read scoped context | `GET /api/<root_id>/goals`, goals detail, activities, programs, templates; compose bounded summaries |
-| Create/update goals | `POST /api/<root_id>/goals`; `PUT /api/<root_id>/goals/<goal_id>` |
-| Create/update activities and associate goals | `POST`/`PUT /api/<root_id>/activities`; `POST /api/<root_id>/activities/<activity_id>/goals` |
-| Create/update program structure | Existing program, block, and block-day POST/PUT routes in `blueprints/programs_api.py` |
-| Schedule day occurrences | Existing block-day `/schedule` operation; use canonical calendar evaluator for preview |
-| Leave comments | `POST /api/<root_id>/notes`; preserve existing supported note targets |
-| Reuse/build session templates | Existing template API and service; add to the initial capability inventory during spike |
-| Preview/apply/read task | New agent task/proposal/run endpoints, composing the above domain operations |
+Bound bytes and nested records, not just top-level rows. Truncation must provide usable
+continuations, and page size one must not return identical retry instructions forever.
+Treat notes/retrieved content as data that cannot expand permissions or approve writes.
 
-Suggested MCP tools: `list_fractals`, `get_task`, `get_goal_context`,
-`list_activities`, `get_program_context`, `list_templates`, `propose_changes`,
-`get_proposal`, `apply_proposal`, `get_run`. Proposal operations use a discriminated,
-allowlisted schema: `create_goal`, `update_goal`, `create_activity`, `update_activity`,
-`associate_activity_goals`, `create_template`, `create_program`, `update_program`,
-`create_block`, `update_block`, `create_program_day`, `update_program_day`,
-`schedule_program_day`, `create_note`.
+Remove focus-picker UI, state, styles and tests that exist solely for that form. Retain
+useful server-side scope/lookup primitives and replace picker tests with automatic
+retrieval, ambiguity and no-selector acceptance tests.
 
-Each enabled operation defines its required scope, validator, handler, preview,
-output, and affected query roots. Scheduling an existing program day binds a hash of
-its source state; all writes revalidate ownership and canonical service constraints
-when executed. Temporary proposal references resolve newly created parents/templates
-before dependents execute. Return IDs, links, pagination/truncation indicators, and
-typed recoverable errors.
-Start with a proposed maximum of 50 operations per proposal and bounded context
-pages; measure and tune these limits in the spike. No arbitrary SQL, shell, HTTP,
-or browser-driving tool is needed.
+## Preview and acceptance contract
 
-Activity definitions are planned work, not completed activity instances. Program-day
-creation must not invent completed sessions. Goal completion and manual calendar
-statuses are separate capabilities deferred until explicitly designed. Notes remain
-notes; add agent/run provenance without inventing a competing comment table.
+Persist an immutable proposal revision with operations, dependency order, affected
+entity names, initial versions, semantic diffs and derived impacts. Group large plans
+by domain with counts and expandable details. Preview actual dates/timezones, units,
+associations and completion/target effects. Ambiguity blocks readiness for acceptance.
 
-The local allowlist includes goal and activity updates, activity-to-goal association
-changes, program/block/program-day updates, and the original create/schedule/note
-operations. Existing manual calendar statuses, completed sessions, and record deletion
-remain outside the agent capability set.
+Acceptance binds the exact proposal hash/revision, user, root and expiry. Requesting
+changes creates a new revision and invalidates old acceptance. Only authenticated
+first-party approval records authorize writes; model claims of approval are insufficient.
+Initially accept/reject the complete proposal and request refinements through chat.
+Partial acceptance is deferred until dependency-safe selection is designed.
 
-## Delegated access
+At execution revalidate ownership, quotas, versions and lifecycle rules. External edits
+require renewed review; earlier approved operations in the same proposal must not be
+mistaken for external changes. Do not use preview-generated timestamps as execution
+preconditions. Reject unsupported overlaps before review rather than partially applying
+a predictably invalid plan.
 
-Use an established OAuth authorization-server implementation with existing Fractal
-login as the consent identity. Implement authorization code + PKCE S256, protected
-resource metadata, issuer discovery, strict redirect validation, audience validation,
-short-lived access tokens, refresh rotation where supported, and revocation.
-Prefer Client ID Metadata Documents where supported; pre-registration or DCR are
-compatibility choices verified against each host. Validate metadata fetching against
-SSRF and unsafe redirects. [MCP authorization](https://modelcontextprotocol.io/specification/latest/basic/authorization),
-[OpenAI authentication](https://developers.openai.com/plugins/build/auth).
+Atomicity is per operation unless a composite explicitly shares one transaction. Domain
+mutation, operation result, change cursor and durable events commit together. Retries
+must not duplicate sessions, metrics, notes or successful earlier steps. Report partial
+progress honestly. Undo is a newly reviewed inverse against current versions; disclose
+where safe undo is unavailable.
 
-Persist grants mapping `(user, client, allowed_roots, scopes, expiry, revoked_at)`.
-Use domain scopes such as `goals:read`, `goals:write`, `activities:write`,
-`programs:write`, and `notes:write`. Derive the actor from validated credentials;
-tool arguments never supply authoritative user IDs. Check every referenced entity,
-root, soft-delete status, quota, and current grant at read and execution time.
+## Background execution and production controls
 
-The MCP token's audience is the MCP server. Do not blindly forward it to an API
-with a different audience or substitute a full-power app JWT. Establish a supported
-token exchange issuing a short-lived internal API credential with the same or
-narrower user/root/scopes, bound to the adapter. The Flask execution boundary checks
-that delegated principal independently. Treat this as a spike acceptance gate.
+Separate planning-turn states, proposal states and execution states. Persist queued,
+running, awaiting-user and terminal planning states, plus awaiting-review, accepted,
+rejected, expired and superseded proposal states. Durable status/results survive worker
+restarts, reloads and closed tabs; polling or SSE is merely delivery. Show useful action
+summaries rather than private model reasoning.
 
-Approval is bound to the immutable proposal hash/version, actor, root, and expiry.
-`apply_proposal` can consume valid approval but cannot manufacture it. In default
-review mode only the authenticated first-party UI can approve. Model statements
-such as “the user approved” are not authorization evidence. Scope upgrades and
-revocation work server-side even if the host caches tools or tokens.
+Reserve realistic provider input/output usage before calls, including schema/context
+overhead. Enforce cumulative turn/time/tool limits and daily user/deployment spending
+caps, with fenced attempts and persistent usage/checkpoints. Define unknown-outcome
+recovery without uncontrolled retries. Bound submission rates, queues/concurrency, and
+alert on stuck work and spend. Recheck account eligibility, ownership, provider/write
+flags and cancellation at checkpoints.
 
-## Reliable execution and review
+Embedded-only execution and shell refresh must work with connectors disabled. Cancelling
+planning differs from cancelling accepted execution; stopping cannot undo committed
+writes. Keep history readable when new work is disabled.
 
-Persist task briefs, immutable proposal revisions, approval records, runs, and
-operations. Keep provider connection metadata separate from domain records.
-An external conversation ID is optional metadata, not a trusted execution identity.
+Session/metric support requires a renewed event-consumer audit: target evaluation,
+completion cascades and required read-model effects are correctness-critical. Use
+transactional handling or durable acknowledgement/retry/deduplication. Durable EventLog
+alone does not prove those effects occurred. Verify retention/export/account deletion
+for conversation, usage, proposal, result and audit records.
 
-Run states: `queued → running → succeeded | partially_succeeded | failed | cancelled`;
-proposals independently track `draft → awaiting_approval → approved | rejected | expired`.
-Cancellation stops subsequent operations; it cannot reverse an already committed write.
+## Delivery plan and S+ acceptance
 
-- Preview performs real schema/ownership/reference validation and evaluates dates in
-  the user's IANA timezone; execution revalidates against current state.
-- Use integer row versions or reliable ETags for mutations and relationship sets.
-  Reject stale edits with a conflict and require a new preview rather than overwrite.
-- Stable `(grant/user, proposal revision, operation ID)` idempotency plus an input hash
-  prevents replay. Reject reuse with different input. Store the operation result and
-  domain mutation in the same database transaction.
-- Refactor only participating services to accept an explicit unit of work while
-  preserving their current default single-call commit behavior. Avoid a ledger write
-  after a separately committed domain mutation: that leaves a crash duplication window.
-- Start with atomicity per operation and durable ordered partial progress for the
-  complete proposal. Stop dependent operations after failure; expose actual successful
-  IDs. Do not advertise atomic batches until a shared transaction actually supports them.
-- A worker claims operations with leases and fencing, records durable results, and
-  resumes after restart. Transactional event/outbox handling prevents premature events.
-  Bounded retries apply only to transient failures; ambiguous timeouts consult the ledger.
-- Undo is a new reviewed inverse proposal with current-version/dependency checks.
-  Do not silently delete records that have since accumulated user work.
-
-Store action summaries, before/after diffs, actor/provider/grant IDs and trace IDs.
-Do not log credentials or private model reasoning. Set retention/export/deletion rules
-for briefs, diffs, and run records using the existing account lifecycle.
-
-Read user notes as untrusted content; they cannot expand permissions or become system
-instructions. Minimize provider-visible data and exclude unrelated roots by construction.
-
-## Client integration and embedded phase
-
-Connection settings, the task drawer, proposal diff/review, and run history are
-implemented. Keep state in TanStack Query with shared agent query keys. Poll active
-tasks/runs with bounded backoff and refresh on focus; also poll a scoped change cursor
-while relevant screens are active so provider-originated runs appear without a locally
-started task.
-Committed results identify affected entity/query roots for narrow invalidation.
-SSE can replace active polling later without changing the durable status contract.
-
-The embedded path uses pinned official provider clients, a bounded tool loop, provider
-checkpoints, cancellation, and concurrent-run limits. API keys remain server-side,
-provider billing is disclosed, and inference runs outside database transactions. The
-privacy approval switch remains off until deployment review. A managed agent runtime
-is optional after comparing cost and operational fit; API MCP support can reuse the
-connector surface where appropriate. [OpenAI API MCP tools](https://developers.openai.com/api/docs/guides/tools-connectors-mcp).
-
-## Delivery plan and S+ acceptance gates
-
-| Stage | Deliverable | Current state and remaining evidence |
+| Stage | Deliverable | Exit evidence |
 | --- | --- | --- |
-| 0. Compatibility spike | Disposable public MCP endpoint, OAuth/exchange proof, one scoped read and reviewed note write in both hosts | Not run: public endpoint and target-product accounts are unavailable. Use MCP Inspector, then perform real target-account OAuth registration, audience/resource, token expiry/refresh, reconnect/revoke, tool annotation/confirmation, and protocol-matrix checks without production data. Anthropic documents Streamable HTTP, DCR, and refresh; verify account entitlement and actual host behavior. |
-| 1. Shared foundation | Delegated grants, capability schemas, task/proposal/run models, operation unit of work | Implemented and locally verified. The full PostgreSQL suite, including recovery/fault tests and independent embedded-provider switches, passes above the 80% gate; fresh-database migration upgrade/check/downgrade/re-upgrade/check passes. |
-| 2. Reviewed workflows | Create/schedule, reviewed updates, independent associations, safe undo, task/review/history UI | Implemented and locally verified. Backend coverage gate, all 1,207 frontend tests and frontend coverage thresholds pass. |
-| 3. Connector release | Host packaging, onboarding, capability descriptions, feature-flag rollout | Adapter protocol, unauthenticated OAuth challenge, delegated auth/exchange, scoped tool calls, and host-facing tool annotations pass against the pinned SDK in a local Streamable HTTP round-trip; its production image builds and imports, and flags are off. Deployment, MCP Inspector, real ChatGPT/Claude smoke tests, privacy/distribution review, accessibility checks, and rollback drill remain. |
-| 4. Embedded assistant | In-app conversational loop and explicit API billing | Implemented locally behind the feature and privacy gates. Provider keys/models, privacy/terms approval, provider smoke tests, production cost monitoring, and operational review remain. |
+| E0 — Foundation fixes | A1 sequential-write correctness; R7/A3 realistic budgets; A4 bounded discovery; embedded schema parity | Realistic-input, concurrency, crash/replay regressions and a scoped provider API read/propose smoke test |
+| E1 — Embedded vertical slice | Wire shell chat to turn API/worker; remove handoff and focus UI; preview/accept a goal or note change | Browser → API → worker → preview → approval → real domain write, connectors disabled; zero unapproved writes |
+| E2 — Required domains | Sessions, metric definitions/values, note/template updates and related lifecycle tools | Create/update cases for every domain and a combined goal/program/session/metric request with correct derived effects |
+| E3 — Background and review completeness | Revisions, durable progress, recovery, cancellation, refresh and safe undo | Minimize/navigate/reload/close-reopen; stale review, expiry, overlapping writes, replay and partial-failure tests |
+| E4 — Production qualification | Provider evaluation, configuration, accessibility, costs and operations | Actual API evaluations, queue/spend alerts, rollback drill, required repository gates and deployment smoke tests |
 
-Acceptance suite includes cross-tenant nested IDs, revoked grants during a run,
-duplicate apply and concurrent delivery, crash immediately before/after commit,
-changed proposal after approval, concurrent manual edits, quota exhaustion, soft-deleted
-parents, invalid goal levels, repeated dates, DST boundaries, overlapping program days,
-missing templates, malicious note instructions, and partial dependency failure.
+Extend `planning/evals/ai-agent-harness-v1.json` with sessions, metric schema versus value
+changes, note edits, ambiguous references, contextual discovery, conversational revisions
+and full embedded multi-turn workflows. Every domain requires an end-to-end success
+case plus important boundaries/failures. Retain the target of at least 95% correct
+completion on unambiguous supported tasks over repeated trials per enabled provider;
+unauthorized/unapproved writes and duplicate effects must be zero in the fault suite.
+These are release targets, not achieved results.
 
-The deterministic local suite covers cross-tenant nested IDs, concurrent duplicate
-apply, revoked grants during a run, pre/post-commit crashes, restart recovery,
-changed proposals after approval, concurrent manual edits, quota exhaustion,
-soft-deleted parents, invalid goal levels, repeated dates, missing templates, and
-partial dependency failure. Existing calendar tests cover DST boundaries and
-overlapping program days. Adapter prompt-boundary tests assert that notes and briefs
-stay untrusted and that `apply_proposal` never approves. The versioned evaluation set
-at `planning/evals/ai-agent-harness-v1.json` covers all
-four requested workflows, ambiguity, unsupported actions, injection resistance, and
-follow-ups. It is authored but has not been run against providers. Proposed launch
-threshold: at least 95% correct
-completion on unambiguous supported tasks across repeated trials per host, and zero
-unauthorized writes or duplicate effects in the deterministic fault suite. Treat these
-as release targets, not measured results. Record latency/tool counts and set budgets
-from the spike; rerun evaluations after schema, prompt, SDK or provider changes.
+Run repository backend/frontend, coverage, lint, maintainability, dependency, migration,
+container/build and browser gates after implementation. Browser tests simulate only
+provider responses while using real Flask/workers and domain writes. Separately record
+actual provider API smoke/evaluation evidence. Public ChatGPT/Claude OAuth/MCP tests
+gate only optional connectors and do not block an otherwise qualified embedded release.
 
-Run the repository's required backend/frontend, coverage, lint, maintainability,
-migration, dependency, production-build and browser gates for implementation. Verify
-keyboard/mobile review, loading/error states, external-change refresh, multi-worker
-restart, and revocation manually where host behavior cannot be automated.
+## Latest audit alignment and completion audit
 
-Use a separate feature flag for each app-funded API provider, with the existing shared
-connector switch and write-capability switch. A write kill switch stops new operations
-without hiding history. Roll back application capabilities without destructive schema
-rollback. Remove experimental adapters and duplicate mutation/validation logic as the
-shared layer becomes canonical; unrelated cleanup stays out of scope.
+The [latest audit intent addendum](ai-agent-harness-production-review-2026-09-20.md)
+reopens embedded UI/refresh acceptance, makes budgets and discovery primary blockers,
+and adds session/metric lifecycle and preview requirements. A1's sequential same-entity
+failure is fixed with semantic state hashes and optimistic versions, while independent
+concurrency and lifecycle effects remain release gates. A2's nullable adapter defect is
+fixed locally; external connector parity still needs host verification. A5 evidence gaps
+remain open. Earlier test counts are historical, not new-scope acceptance.
 
-## Completion audit
+The embedded chat, background planning path, immutable preview/acceptance boundary,
+automatic context retrieval and canonical session/metric operations are implemented
+locally behind deployment flags. S+ still requires E0–E4 evidence, full lifecycle
+effects, browser and recovery coverage, measured provider usage, and operational and
+deployment qualification. Optional connectors remain a separate release track.
 
-The local implementation covers the shared OAuth/API boundary, adapter, durable
-reviewed create/update/association workflows, safe undo, embedded API turns, first-party
-UI, feature flags, evaluation cases, and account data lifecycle. The PostgreSQL-backed
-backend suite passes 1,000 tests at 80.88% coverage; all 1,209 frontend tests pass at
-66.5% line coverage. The seven-test MCP adapter suite
-covers safety annotations and protocol behavior against the pinned SDK.
-Frontend lint, production build, responsive/browser checks, frontend/backend
-maintainability checks, Python compilation, and `git diff --check` pass. Both
-production images build locally and pass dependency checks; the adapter imports from
-its image. Fresh-database Alembic upgrade, schema check, downgrade, re-upgrade, and
-schema check pass. Application and MCP adapter dependency audits and the frontend
-production dependency audit report no known vulnerabilities. The local evaluation
-cases are not measured provider results.
+Current local evidence includes 13 embedded worker tests, 9 schema and adapter parity
+tests, 32 reviewed harness tests including two approved updates to one goal, 17 session
+service tests, frontend agent component tests, lint, production build, maintainability,
+responsive checks, backend compilation and a single Alembic head. A full suite, fresh
+migration rehearsal, real provider evaluation, browser worker flow and deployment
+operations evidence are still required before enabling the flags.
 
-Production release is not complete until the Stage 0 and Stage 3 public-host evidence
-above is collected and the evaluation set is run against configured providers. The
-public endpoint, target-product accounts, deployment credentials, provider approvals/keys,
-and production monitoring are unavailable locally. Embedded release requires the
-provider, privacy, cost-monitoring, and operational evidence listed above.
-
-Suggested commit: `feat: complete reviewed AI agent harness and embedded assistant`
+Suggested commit: `docs: prioritize embedded AI chat with reviewed background changes`

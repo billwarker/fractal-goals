@@ -24,6 +24,7 @@ from services.events import Event, Events, event_bus
 from services.goal_contribution import resolve_contribution_goal
 from services.goal_loading import load_fractal_goals_for_serialization
 from services.goal_target_rules import check_metric_value, check_metrics_meet_target
+from services.goal_target_helpers import as_utc
 from services.serializers import (
     format_utc,
     serialize_activity_instance,
@@ -116,6 +117,7 @@ def _reconcile_target_conditions(db_session, target, metrics) -> None:
 
 
 def sync_goal_targets(db_session, goal, incoming_targets) -> None:
+    goal.row_version += 1
     current_targets = {target.id: target for target in goal.targets_rel if target.deleted_at is None}
     incoming_ids = {target.get('id') for target in incoming_targets if target.get('id')}
 
@@ -229,6 +231,7 @@ class GoalTargetService:
             completed=False,
         )
         self.db_session.add(new_target)
+        goal.row_version += 1
         self.db_session.flush()
 
         for metric in metrics:
@@ -266,6 +269,7 @@ class GoalTargetService:
             return None, "Target not found", 404
 
         target.deleted_at = datetime.now(timezone.utc)
+        goal.row_version += 1
         self.db_session.commit()
         event_bus.emit(Event(Events.TARGET_DELETED, {
             'target_id': target.id,
@@ -321,6 +325,7 @@ class GoalTargetService:
             metrics = normalize_target_metrics(data.get('metrics'))
             _reconcile_target_conditions(self.db_session, target, metrics)
 
+        goal.row_version += 1
         self.db_session.commit()
         self.db_session.refresh(target)
         event_bus.emit(Event(Events.TARGET_UPDATED, {
@@ -424,7 +429,7 @@ class GoalTargetService:
 
         serialized_instances = []
         for instance in instances:
-            occurred_at = self._as_utc(instance.time_stop or instance.time_start or instance.created_at)
+            occurred_at = as_utc(instance.time_stop or instance.time_start or instance.created_at)
             if not occurred_at or (effective_start and occurred_at < effective_start) or (effective_end and occurred_at > effective_end):
                 continue
             contributes = any(
@@ -515,8 +520,8 @@ class GoalTargetService:
 
         # Effective window: explicit start_date, else the target creation date.
         # `since='all'` removes the lower bound so the full history is returned.
-        effective_start = None if since == 'all' else self._as_utc(target.start_date or target.created_at)
-        effective_end = self._as_utc(target.end_date)
+        effective_start = None if since == 'all' else as_utc(target.start_date or target.created_at)
+        effective_end = as_utc(target.end_date)
 
         activity_def = history.activity_definition(target.activity_id) if history is not None else self._load_activity_definition(root_id, target.activity_id)
 
@@ -570,16 +575,10 @@ class GoalTargetService:
 
         return result
 
-    @staticmethod
-    def _as_utc(value):
-        if value is None:
-            return None
-        return value.astimezone(timezone.utc) if value.tzinfo else value.replace(tzinfo=timezone.utc)
-
     def _build_target_summary(self, target, serialized_instances, activity_def=None) -> JsonDict:
         """Per-condition progress aggregates over the contributing instances."""
         now = datetime.now(timezone.utc)
-        created_at = self._as_utc(target.created_at)
+        created_at = as_utc(target.created_at)
 
         metric_defs = [metric for metric in (getattr(activity_def, 'metric_definitions', None) or []) if not metric.deleted_at]
 
@@ -688,7 +687,7 @@ class GoalTargetService:
             'days_since_created': (now - created_at).days if created_at else None,
             'conditions': conditions,
             'completed': bool(target.completed),
-            'completed_at': format_utc(self._as_utc(target.completed_at)) if target.completed_at else None,
+            'completed_at': format_utc(as_utc(target.completed_at)) if target.completed_at else None,
             'completed_session_id': target.completed_session_id,
             'completed_instance_id': target.completed_instance_id,
         }

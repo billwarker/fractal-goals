@@ -30,9 +30,9 @@ const cases = [
     ['get change cursor', () => agentApi.getChangeCursor('root/1'), 'get', ['/api/agent/changes/root%2F1']],
     ['list embedded providers', () => agentApi.listEmbeddedProviders(), 'get', ['/api/agent/embedded/providers']],
     ['list embedded conversations', () => agentApi.listEmbeddedConversations('root-1'), 'get', ['/api/agent/embedded/conversations', { params: { root_id: 'root-1' } }]],
-    ['get embedded conversation', () => agentApi.getEmbeddedConversation('conversation/1'), 'get', ['/api/agent/embedded/conversations/conversation%2F1']],
+    ['get embedded conversation', () => agentApi.getEmbeddedConversation('conversation/1'), 'get', ['/api/agent/embedded/conversations/conversation%2F1', { params: {} }]],
     ['start embedded conversation', () => agentApi.startEmbeddedConversation({ root_id: 'root-1' }), 'post', ['/api/agent/embedded/conversations', { root_id: 'root-1' }]],
-    ['send embedded message', () => agentApi.sendEmbeddedMessage('conversation/1', { text: 'hello' }), 'post', ['/api/agent/embedded/conversations/conversation%2F1/messages', { text: 'hello' }]],
+    ['send embedded message', () => agentApi.sendEmbeddedMessage('conversation/1', { message: 'hello' }), 'post', ['/api/agent/embedded/conversations/conversation%2F1/messages', { message: 'hello' }]],
     ['cancel embedded run', () => agentApi.cancelEmbeddedRun('run/1'), 'post', ['/api/agent/embedded/runs/run%2F1/cancel']],
 ];
 

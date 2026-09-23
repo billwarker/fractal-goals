@@ -3,6 +3,7 @@
 from pathlib import Path
 import os
 import signal
+import subprocess
 import sys
 import uuid
 
@@ -11,6 +12,10 @@ os.environ["ENV"] = "testing"
 os.environ["FLASK_DEBUG"] = "false"
 os.environ["SENTRY_DSN"] = ""
 os.environ["RATELIMIT_ENABLED"] = "false"
+os.environ["AGENT_MCP_RESOURCE_URI"] = "https://mcp.browser.invalid/mcp"
+os.environ["AGENT_OAUTH_ISSUER"] = "https://issuer.browser.invalid"
+os.environ["AGENT_ADAPTER_ID"] = "browser-test-adapter"
+os.environ["AGENT_ADAPTER_SHARED_SECRET"] = "browser-test-only-shared-secret"
 
 from config import config
 from sqlalchemy import create_engine, text
@@ -32,8 +37,12 @@ def main():
     try:
         import models
         from models import (
+            AgentGrant,
+            AgentCredential,
+            AgentOAuthClient,
             ActivityDefinition,
             ActivityInstance,
+            AppSetting,
             Goal,
             GoalLevel,
             Program,
@@ -68,6 +77,16 @@ def main():
             )
             db.add(ultimate_level)
             db.flush()
+            db.add(AppSetting(
+                key="feature_flags",
+                value={
+                    "ai_agent_connectors": True,
+                    "ai_agent_writes": True,
+                    "ai_agent_embedded": False,
+                    "ai_agent_embedded_openai": False,
+                    "ai_agent_embedded_anthropic": False,
+                },
+            ))
             for suffix in ("desktop", "mobile"):
                 root_id = f"browser-root-{suffix}"
                 db.add(
@@ -80,6 +99,52 @@ def main():
                     )
                 )
                 db.flush()
+                oauth_client = AgentOAuthClient(
+                    id=f"browser-agent-client-{suffix}",
+                    client_id=f"browser-agent-client-{suffix}",
+                    client_name=f"Browser AI {suffix}",
+                    redirect_uris=[],
+                )
+                db.add(oauth_client)
+                db.flush()
+                db.add(AgentGrant(
+                    id=f"browser-agent-grant-{suffix}",
+                    user_id=user.id,
+                    client_id=oauth_client.id,
+                    allowed_roots=[root_id],
+                    scopes="goals:read goals:write notes:write",
+                    audience=config.AGENT_MCP_RESOURCE_URI,
+                    expires_at=now + timedelta(days=30),
+                ))
+                settings_client = AgentOAuthClient(
+                    id=f"browser-settings-agent-client-{suffix}",
+                    client_id=f"browser-settings-agent-client-{suffix}",
+                    client_name=f"Browser AI Settings {suffix}",
+                    redirect_uris=[],
+                )
+                db.add(settings_client)
+                db.flush()
+                db.add(AgentGrant(
+                    id=f"browser-settings-agent-grant-{suffix}",
+                    user_id=user.id,
+                    client_id=settings_client.id,
+                    allowed_roots=[root_id],
+                    scopes="goals:read",
+                    audience=config.AGENT_MCP_RESOURCE_URI,
+                    expires_at=now + timedelta(days=30),
+                ))
+                db.flush()
+                from services.agent_access_service import _token_hash
+                db.add(AgentCredential(
+                    id=f"browser-agent-credential-{suffix}",
+                    token_hash=_token_hash(f"browser-agent-access-token-{suffix}"),
+                    token_type="access",
+                    grant_id=f"browser-agent-grant-{suffix}",
+                    client_id=f"browser-agent-client-{suffix}",
+                    audience=config.AGENT_MCP_RESOURCE_URI,
+                    scopes="goals:read goals:write notes:write",
+                    expires_at=now + timedelta(days=30),
+                ))
                 today = now.date()
                 db.add(
                     Program(
@@ -152,8 +217,25 @@ def main():
             db.commit()
         from app import app
 
+        worker_environment = os.environ.copy()
+        worker_environment["AGENT_WORKER_IDLE_SECONDS"] = "10"
+        worker = subprocess.Popen(
+            [sys.executable, str(Path(__file__).resolve().with_name("run_agent_worker.py"))],
+            env=worker_environment,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
         signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-        app.run(host="127.0.0.1", port=8012, use_reloader=False)
+        try:
+            app.run(host="127.0.0.1", port=8012, use_reloader=False)
+        finally:
+            worker.terminate()
+            try:
+                worker.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                worker.kill()
+                worker.wait(timeout=5)
     finally:
         if engine is not None:
             models.remove_session()

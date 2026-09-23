@@ -125,11 +125,11 @@ class ActivityService:
     def list_fractal_metrics(self, root_id, current_user_id) -> ServiceResult[list]:
         return ActivityMetricService(self.db_session).list_fractal_metrics(root_id, current_user_id)
 
-    def create_fractal_metric(self, root_id, current_user_id, data) -> ServiceResult:
-        return ActivityMetricService(self.db_session).create_fractal_metric(root_id, current_user_id, data)
+    def create_fractal_metric(self, root_id, current_user_id, data, *, commit=True, pending_events=None) -> ServiceResult:
+        return ActivityMetricService(self.db_session).create_fractal_metric(root_id, current_user_id, data, commit=commit, pending_events=pending_events)
 
-    def update_fractal_metric(self, root_id, metric_id, current_user_id, data) -> ServiceResult:
-        return ActivityMetricService(self.db_session).update_fractal_metric(root_id, metric_id, current_user_id, data)
+    def update_fractal_metric(self, root_id, metric_id, current_user_id, data, *, commit=True, pending_events=None) -> ServiceResult:
+        return ActivityMetricService(self.db_session).update_fractal_metric(root_id, metric_id, current_user_id, data, commit=commit, pending_events=pending_events)
 
     def delete_fractal_metric(self, root_id, metric_id, current_user_id) -> ServiceResult[JsonDict]:
         return ActivityMetricService(self.db_session).delete_fractal_metric(root_id, metric_id, current_user_id)
@@ -309,6 +309,7 @@ class ActivityService:
 
         # Update metrics if provided
         if 'metrics' in data:
+            activity.row_version += 1
             metrics_data = normalize_activity_metrics(data.get('metrics'))
             existing_metrics = self.db_session.query(MetricDefinition).filter(
                 MetricDefinition.activity_id == activity.id,
@@ -369,6 +370,7 @@ class ActivityService:
 
         # Update splits if provided
         if 'splits' in data:
+            activity.row_version += 1
             splits_data = normalize_activity_splits(data.get('splits'))
             existing_splits = self.db_session.query(SplitDefinition).filter(
                 SplitDefinition.activity_id == activity.id,

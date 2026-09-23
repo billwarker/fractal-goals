@@ -1,7 +1,16 @@
 import pytest
 from pydantic import ValidationError
+import json
+from pathlib import Path
 
 from validators.agent import AgentProposalSchema
+from services.agent_operation_registry import (
+    AGENT_PROPOSAL_SCHEMA_VERSION,
+    OPERATION_REGISTRY,
+    proposal_json_schema,
+)
+from services.agent_embedded_service import AgentEmbeddedService
+from agent_adapter.proposal_schema import AgentProposalSchema as AdapterAgentProposalSchema
 
 
 @pytest.mark.parametrize("operation", [
@@ -66,3 +75,43 @@ def test_agent_create_payloads_reject_fields_outside_the_reviewed_contract(opera
         AgentProposalSchema.model_validate({"operations": [operation]})
 
     assert any(error["type"] == "extra_forbidden" for error in captured.value.errors())
+
+
+@pytest.mark.unit
+def test_registry_embedded_tools_and_adapter_artifact_share_the_canonical_schema():
+    schema = proposal_json_schema()
+    item_schema = schema["properties"]["operations"]["items"]
+    operation_types = {
+        schema["$defs"][variant["$ref"].rsplit("/", 1)[-1]]["properties"]["type"]["const"]
+        for variant in item_schema["oneOf"]
+    }
+    assert operation_types == set(OPERATION_REGISTRY)
+    assert schema["schema_version"] == AGENT_PROPOSAL_SCHEMA_VERSION
+
+    adapter_artifact = Path(__file__).resolve().parents[2] / "agent_adapter" / "agent_proposal_schema_v1.json"
+    assert json.loads(adapter_artifact.read_text()) == schema
+
+    for provider, argument_key in (("openai", "parameters"), ("anthropic", "input_schema")):
+        proposal_tool = AgentEmbeddedService._tool_definitions(provider)[1]
+        provider_schema = proposal_tool.get(argument_key, proposal_tool.get("input_schema"))
+        definitions = provider_schema.get("$defs", {})
+        provider_types = {
+            definitions[variant["$ref"].rsplit("/", 1)[-1]]["properties"]["type"]["const"]
+            for variant in provider_schema["properties"]["operations"]["items"]["oneOf"]
+        }
+        assert provider_types == operation_types
+
+
+@pytest.mark.unit
+def test_adapter_preserves_explicit_null_for_nullable_update_fields():
+    payload = {"operations": [{
+        "operation_id": "goal-1",
+        "type": "update_goal",
+        "goal_id": "goal-id",
+        "data": {"description": None},
+    }]}
+    backend = AgentProposalSchema.model_validate(payload)
+    adapter = AdapterAgentProposalSchema.model_validate(payload)
+    assert backend.operations[0].data.description is None
+    assert adapter.operations[0].data.description is None
+    assert adapter.model_dump(exclude_unset=True)["operations"][0]["data"] == {"description": None}

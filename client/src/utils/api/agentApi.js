@@ -18,9 +18,17 @@ export const agentApi = {
     createUndoProposal: (runId) => axios.post(`${agentPath}/runs/${encodeURIComponent(runId)}/undo-proposal`),
     getChangeCursor: (rootId) => axios.get(`${agentPath}/changes/${encodeURIComponent(rootId)}`),
     listEmbeddedProviders: () => axios.get(`${agentPath}/embedded/providers`),
-    listEmbeddedConversations: (rootId) => axios.get(`${agentPath}/embedded/conversations`, { params: { root_id: rootId } }),
-    getEmbeddedConversation: (conversationId) => axios.get(`${agentPath}/embedded/conversations/${encodeURIComponent(conversationId)}`),
+    listEmbeddedConversations: (rootId) => axios.get(`${agentPath}/embedded/conversations`, {
+        params: rootId ? { root_id: rootId } : {},
+    }),
+    getEmbeddedConversation: (conversationId, params = {}) => axios.get(
+        `${agentPath}/embedded/conversations/${encodeURIComponent(conversationId)}`,
+        { params },
+    ),
     startEmbeddedConversation: (data) => axios.post(`${agentPath}/embedded/conversations`, data),
-    sendEmbeddedMessage: (conversationId, data) => axios.post(`${agentPath}/embedded/conversations/${encodeURIComponent(conversationId)}/messages`, data),
+    sendEmbeddedMessage: (conversationId, data) => axios.post(
+        `${agentPath}/embedded/conversations/${encodeURIComponent(conversationId)}/messages`,
+        data,
+    ),
     cancelEmbeddedRun: (runId) => axios.post(`${agentPath}/embedded/runs/${encodeURIComponent(runId)}/cancel`),
 };

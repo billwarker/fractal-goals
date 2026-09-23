@@ -194,6 +194,21 @@ class GoalWorkflowService:
         if capacity_error:
             return None, capacity_error, 400
 
+        # The reviewed agent snapshot includes parent/child relationships. Lock
+        # both parents in stable ID order and advance their versions so a manual
+        # move conflicts with an agent preview that captured either subtree.
+        parents = self.db_session.query(Goal).filter(
+            Goal.id.in_((current_parent.id, new_parent.id)),
+            Goal.root_id == root_id,
+            Goal.deleted_at.is_(None),
+        ).order_by(Goal.id).with_for_update().all()
+        if len(parents) != 2:
+            self.db_session.rollback()
+            return None, "Goal parent changed while moving the goal", 409
+
+        parent_by_id = {parent.id: parent for parent in parents}
+        parent_by_id[current_parent.id].row_version += 1
+        parent_by_id[new_parent.id].row_version += 1
         goal.parent_id = new_parent_id
         self.db_session.commit()
         self.db_session.refresh(goal)

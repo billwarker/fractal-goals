@@ -40,6 +40,11 @@ class _GoalHelpersMixin:
         return activity, None
 
     def _associate_goal_with_activity(self, goal_id, activity_id) -> None:
+        activity = self.db_session.query(ActivityDefinition).filter_by(
+            id=activity_id,
+        ).populate_existing().with_for_update().first()
+        if not activity:
+            return
         existing = self.db_session.execute(
             activity_goal_associations.select().where(
                 activity_goal_associations.c.activity_id == activity_id,
@@ -55,8 +60,8 @@ class _GoalHelpersMixin:
                 goal_id=goal_id,
             )
         )
+        activity.row_version += 1
         goal = get_goal_by_id(self.db_session, goal_id, load_associations=False)
-        activity = self.db_session.query(ActivityDefinition).filter_by(id=activity_id).first()
         if goal and activity:
             append_goal_association_event(
                 self.db_session,
@@ -296,6 +301,8 @@ class _GoalHelpersMixin:
         if level_error:
             return None, (level_error, 400)
 
+        old_parent_id = goal.parent_id
+
         if 'deadline' in data:
             deadline, deadline_error = self._parse_deadline(data['deadline'])
             if deadline_error:
@@ -341,6 +348,12 @@ class _GoalHelpersMixin:
                 if parent_capacity_error:
                     return None, (parent_capacity_error, 400)
             goal.parent_id = new_parent_id
+            if new_parent_id != old_parent_id:
+                parent_ids = sorted(value for value in (old_parent_id, new_parent_id) if value)
+                for parent in self.db_session.query(Goal).filter(
+                    Goal.id.in_(parent_ids),
+                ).order_by(Goal.id).populate_existing().with_for_update().all():
+                    parent.row_version += 1
 
         if allow_extended_fields:
             if 'relevance_statement' in data:

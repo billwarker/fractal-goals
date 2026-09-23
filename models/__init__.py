@@ -36,6 +36,7 @@ from .agent import (
     AgentTaskBrief, AgentProposal, AgentApproval, AgentRun, AgentOperation,
     AgentChangeCursor, AgentOutboxEvent,
     AgentEmbeddedConversation, AgentEmbeddedMessage, AgentEmbeddedRun,
+    AgentEmbeddedDailyBudget, AgentEmbeddedUsage,
 )
 
 # Legacy ALIASES for backward compatibility (Optional)

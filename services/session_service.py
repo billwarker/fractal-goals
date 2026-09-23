@@ -404,12 +404,17 @@ class SessionService:
         session_id,
         current_user_id,
         data,
+        *,
+        commit=True,
+        pending_events=None,
     ) -> ServiceResult[JsonDict]:
         return self._session_lifecycle_service().update_session(
             root_id,
             session_id,
             current_user_id,
             data,
+            commit=commit,
+            pending_events=pending_events,
         )
 
     def delete_session(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:

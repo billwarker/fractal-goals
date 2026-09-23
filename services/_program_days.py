@@ -285,15 +285,24 @@ class _ProgramDaysMixin:
     ) -> Dict:
         cls._require_root_access(session, root_id, current_user_id)
 
-        block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
-        if not block:
-            raise ValueError("Block not found")
-
-        program = get_owned_program(session, root_id, program_id)
+        # Keep scheduling in the same lock order used by reviewed snapshots:
+        # program, block, day. Ordinary UI schedules advance the same row
+        # version used by agent proposals.
+        program = session.query(Program).filter_by(
+            id=program_id, root_id=root_id,
+        ).populate_existing().with_for_update().first()
         if not program:
             raise ValueError("Program not found")
 
-        day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
+        block = session.query(ProgramBlock).filter_by(
+            id=block_id, program_id=program_id,
+        ).populate_existing().with_for_update().first()
+        if not block:
+            raise ValueError("Block not found")
+
+        day = session.query(ProgramDay).filter_by(
+            id=day_id, block_id=block_id,
+        ).populate_existing().with_for_update().first()
         if not day:
             raise ValueError("Day not found")
 
@@ -332,6 +341,8 @@ class _ProgramDaysMixin:
                 }
             }
         }
+
+        day.row_version += 1
 
         scheduled_session, error_message, status_code = SessionService(session).create_session(
             root_id,
@@ -376,11 +387,21 @@ class _ProgramDaysMixin:
     def unschedule_block_day_occurrence(cls, session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict[str, Any]:
         cls._require_root_access(session, root_id, current_user_id)
 
-        block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
+        program = session.query(Program).filter_by(
+            id=program_id, root_id=root_id,
+        ).populate_existing().with_for_update().first()
+        if not program:
+            raise ValueError("Program not found")
+
+        block = session.query(ProgramBlock).filter_by(
+            id=block_id, program_id=program_id,
+        ).populate_existing().with_for_update().first()
         if not block:
             raise ValueError("Block not found")
 
-        day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
+        day = session.query(ProgramDay).filter_by(
+            id=day_id, block_id=block_id,
+        ).populate_existing().with_for_update().first()
         if not day:
             raise ValueError("Day not found")
 
@@ -422,7 +443,9 @@ class _ProgramDaysMixin:
             removed_session_ids.append(scheduled_session.id)
             removed_session_names[scheduled_session.id] = scheduled_session.name
 
-        cls._commit(session)
+        if removed_session_ids:
+            day.row_version += 1
+        cls._commit(session, day)
 
         for session_id in removed_session_ids:
             event_bus.emit(Event(Events.SESSION_DELETED, {

@@ -38,6 +38,7 @@ class Session(Base):
     
     completed = Column(Boolean, default=False)
     completed_at = Column(DateTime, nullable=True)
+    row_version = Column(Integer, nullable=False, server_default=sa.text('1'), default=1)
 
     __table_args__ = (
         sa.Index('ix_sessions_root_deleted_completed', 'root_id', 'deleted_at', 'completed'),

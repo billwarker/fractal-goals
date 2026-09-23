@@ -24,6 +24,8 @@ AGENT_SCOPES = frozenset({
     "activities:write",
     "programs:write",
     "notes:write",
+    "sessions:write",
+    "metrics:write",
 })
 ACCESS_TOKEN_TYPE = "access"
 REFRESH_TOKEN_TYPE = "refresh"

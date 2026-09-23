@@ -176,6 +176,7 @@ class _GoalLifecycleMixin:
                     goal_id=new_goal.id,
                 )
             )
+            activity.row_version += 1
             append_goal_association_event(
                 self.db_session,
                 root_id=root_id,

@@ -1,17 +1,20 @@
 import pytest
 from datetime import date, timedelta
 from concurrent.futures import ThreadPoolExecutor
-from threading import Barrier
+from threading import Barrier, Event
 from sqlalchemy.orm import sessionmaker
+from config import config
 
 from models import (
     AgentApproval, AgentChangeCursor, AgentGrant, AgentOAuthClient,
     AgentOperation, AgentOutboxEvent,
-    AgentProposal, AgentRun, AgentTaskBrief, AppSetting, Note, ProgramDay,
+    AgentProposal, AgentRun, AgentTaskBrief, AppSetting, EventLog, Note, Program,
+    ProgramBlock, ProgramDay, SessionTemplate, program_day_templates,
     Goal, Session, utc_now,
 )
 from services.agent_harness_service import AgentHarnessError, AgentHarnessService
 from services.agent_operation_versions import operation_state_hash
+from services.agent_harness_runs import _enabled_run_origins
 from services.feature_flag_service import FEATURE_FLAGS_SETTING_KEY
 
 
@@ -36,6 +39,100 @@ def _note_proposal():
             },
         }],
     }
+
+
+@pytest.mark.parametrize(("flags", "privacy_approved", "expected"), [
+    ({"ai_agent_writes": False, "ai_agent_connectors": True}, True, set()),
+    ({"ai_agent_writes": True, "ai_agent_connectors": False}, False, {"first_party"}),
+    ({"ai_agent_writes": True, "ai_agent_connectors": True}, False, {"first_party", "connector"}),
+    ({"ai_agent_writes": True, "ai_agent_embedded": True, "ai_agent_embedded_openai": True}, True,
+     {"first_party", "embedded_openai"}),
+    ({"ai_agent_writes": True, "ai_agent_embedded": True, "ai_agent_embedded_openai": False,
+      "ai_agent_embedded_anthropic": True}, True, {"first_party", "embedded_anthropic"}),
+    ({"ai_agent_writes": True, "ai_agent_connectors": True, "ai_agent_embedded": True,
+      "ai_agent_embedded_openai": True}, True, {"first_party", "connector", "embedded_openai"}),
+])
+@pytest.mark.unit
+def test_run_origin_gates_are_independent(flags, privacy_approved, expected, monkeypatch):
+    monkeypatch.setattr(config, "AGENT_EMBEDDED_PRIVACY_APPROVED", privacy_approved)
+    assert _enabled_run_origins(flags) == expected
+
+
+@pytest.mark.unit
+def test_embedded_only_origin_executes_without_enabling_external_connectors(
+    db_session, test_user, sample_ultimate_goal, monkeypatch,
+):
+    setting = db_session.get(AppSetting, "feature_flags") or AppSetting(key="feature_flags", value={})
+    setting.value = {
+        "ai_agent_connectors": False,
+        "ai_agent_writes": True,
+        "ai_agent_embedded": True,
+        "ai_agent_embedded_openai": True,
+    }
+    db_session.add(setting)
+    db_session.commit()
+    monkeypatch.setattr(config, "AGENT_EMBEDDED_PRIVACY_APPROVED", True)
+    service = AgentHarnessService(db_session)
+    task = service.create_task(test_user.id, {
+        "root_id": sample_ultimate_goal.id,
+        "request_text": "Leave a planning note.",
+        "timezone": "UTC",
+    }, execution_origin="embedded_openai")
+    payload = _note_proposal()
+    payload["operations"][0]["data"]["context_id"] = sample_ultimate_goal.id
+    proposal = service.create_proposal(test_user.id, task["id"], payload)
+    service.decide_proposal(test_user.id, proposal["id"], proposal["proposal_hash"], "approve")
+
+    result = service.run_once("worker-embedded-origin")
+
+    assert result["status"] == "succeeded"
+    assert db_session.get(AppSetting, "feature_flags").value["ai_agent_connectors"] is False
+
+
+@pytest.mark.unit
+def test_embedded_provider_flag_change_stops_unstarted_operations(
+    db_session, test_user, sample_ultimate_goal, monkeypatch,
+):
+    setting = AppSetting(key="feature_flags", value={
+        "ai_agent_connectors": False,
+        "ai_agent_writes": True,
+        "ai_agent_embedded": True,
+        "ai_agent_embedded_openai": True,
+    })
+    db_session.add(setting)
+    db_session.commit()
+    monkeypatch.setattr(config, "AGENT_EMBEDDED_PRIVACY_APPROVED", True)
+    service = AgentHarnessService(db_session)
+    task = service.create_task(test_user.id, {
+        "root_id": sample_ultimate_goal.id,
+        "request_text": "Leave two reviewed notes.",
+        "timezone": "UTC",
+    }, execution_origin="embedded_openai")
+    payload = _note_proposal()
+    payload["operations"] = [
+        {**payload["operations"][0], "operation_id": "first"},
+        {**payload["operations"][0], "operation_id": "second"},
+    ]
+    payload["operations"][0]["data"]["context_id"] = sample_ultimate_goal.id
+    payload["operations"][1]["data"]["context_id"] = sample_ultimate_goal.id
+    proposal = service.create_proposal(test_user.id, task["id"], payload)
+    service.decide_proposal(test_user.id, proposal["id"], proposal["proposal_hash"], "approve")
+    execute = service._execute_operation
+
+    def disable_after_first(run, operation, worker_id, fencing_token):
+        result = execute(run, operation, worker_id, fencing_token)
+        if operation.operation_id == "first":
+            current_flags = db_session.get(AppSetting, "feature_flags")
+            current_flags.value = {**current_flags.value, "ai_agent_embedded_openai": False}
+            db_session.commit()
+        return result
+
+    service._execute_operation = disable_after_first
+    result = service.run_once("worker-origin-change")
+
+    assert result["status"] == "partially_succeeded"
+    assert [operation["status"] for operation in result["operations"]] == ["succeeded", "failed"]
+    assert result["operations"][1]["error"]["code"] == "feature_disabled"
 
 
 def test_approved_proposal_commits_domain_write_with_operation_ledger_and_is_idempotent(
@@ -75,6 +172,43 @@ def test_approved_proposal_commits_domain_write_with_operation_ledger_and_is_ide
     # cannot duplicate its note or ledger result.
     assert service.run_once("worker-test") is None
     assert db_session.query(Note).filter_by(root_id=sample_ultimate_goal.id).count() == 1
+
+
+@pytest.mark.unit
+def test_two_approved_updates_to_one_goal_share_a_deterministic_precondition(
+    db_session, test_user, sample_ultimate_goal,
+):
+    """Earlier reviewed edits must not invalidate later edits in the same proposal."""
+    _enable_agent_flags(db_session)
+    service = AgentHarnessService(db_session)
+    task = service.create_task(test_user.id, {
+        "root_id": sample_ultimate_goal.id,
+        "request_text": "Rename the goal and clarify its description.",
+        "timezone": "UTC",
+    })
+    proposal = service.create_proposal(test_user.id, task["id"], {"operations": [
+        {
+            "operation_id": "rename-goal",
+            "type": "update_goal",
+            "goal_id": sample_ultimate_goal.id,
+            "data": {"name": "Renamed goal"},
+        },
+        {
+            "operation_id": "describe-goal",
+            "type": "update_goal",
+            "goal_id": sample_ultimate_goal.id,
+            "data": {"description": "Clarified after the rename."},
+        },
+    ]})
+    service.decide_proposal(test_user.id, proposal["id"], proposal["proposal_hash"], "approve")
+
+    result = service.run_once("worker-sequential-updates")
+
+    assert result["status"] == "succeeded"
+    assert [item["status"] for item in result["operations"]] == ["succeeded", "succeeded"]
+    db_session.refresh(sample_ultimate_goal)
+    assert sample_ultimate_goal.name == "Renamed goal"
+    assert sample_ultimate_goal.description == "Clarified after the rename."
 
 
 def test_proposal_cannot_reference_an_entity_from_another_fractal(
@@ -464,16 +598,23 @@ def test_scheduling_existing_program_day_rejects_stale_preview(
             "data": {"session_start": f"{start_date.isoformat()}T09:00:00Z"},
         }],
     })
-    day_row = db_session.query(ProgramDay).filter_by(id=day["id"]).one()
-    day_row.name = "Changed after preview"
-    db_session.commit()
+    ProgramService.schedule_block_day(
+        db_session,
+        sample_ultimate_goal.id,
+        program["id"],
+        block["id"],
+        day["id"],
+        {"session_start": f"{start_date.isoformat()}T09:00:00Z"},
+        test_user.id,
+    )
+    assert db_session.query(Session).filter_by(root_id=sample_ultimate_goal.id).count() == 1
 
     service.decide_proposal(test_user.id, proposal["id"], proposal["proposal_hash"], "approve")
     run = service.run_once("worker-test")
 
     assert run["status"] == "failed"
     assert run["operations"][0]["error"]["code"] == "stale_context"
-    assert db_session.query(Session).filter_by(root_id=sample_ultimate_goal.id).count() == 0
+    assert db_session.query(Session).filter_by(root_id=sample_ultimate_goal.id).count() == 1
 
 
 def test_goal_update_is_version_checked_and_undo_requires_a_new_approval(
@@ -529,6 +670,8 @@ def test_goal_update_is_version_checked_and_undo_requires_a_new_approval(
     with pytest.raises(AgentHarnessError, match="changed after the original run"):
         service.create_undo_proposal(test_user.id, updated_run["id"])
     assert sample_ultimate_goal.name == "Manual edit after run"
+
+
     assert db_session.query(AgentTaskBrief).filter_by(user_id=test_user.id).count() == task_count_before_stale_undo
 
     safe_undo_task = service.create_task(test_user.id, {
@@ -572,6 +715,161 @@ def test_goal_update_is_version_checked_and_undo_requires_a_new_approval(
     undo_run = service.run_once("worker-test")
     assert undo_run["status"] == "succeeded"
     assert sample_ultimate_goal.name == "Manual edit after run"
+
+@pytest.mark.unit
+def test_manual_goal_edit_between_review_hash_and_execution_lock_survives(
+    db_session, test_user, sample_ultimate_goal, monkeypatch,
+):
+    from sqlalchemy.orm import sessionmaker
+    import services.agent_harness_runs as runs_module
+
+    _enable_agent_flags(db_session)
+    service = AgentHarnessService(db_session)
+    task = service.create_task(test_user.id, {
+        "root_id": sample_ultimate_goal.id,
+        "request_text": "Rename the root goal.",
+        "timezone": "UTC",
+    })
+    proposal = service.create_proposal(test_user.id, task["id"], {"operations": [{
+        "operation_id": "rename-root-race",
+        "type": "update_goal",
+        "goal_id": sample_ultimate_goal.id,
+        "data": {"name": "Agent name"},
+    }]})
+    service.decide_proposal(test_user.id, proposal["id"], proposal["proposal_hash"], "approve")
+
+    hash_read = Event()
+    resume_execution = Event()
+    original_hash = runs_module.operation_state_hash
+
+    def pause_after_initial_hash(*args, for_update=False, **kwargs):
+        result = original_hash(*args, for_update=for_update, **kwargs)
+        if not for_update and not hash_read.is_set():
+            hash_read.set()
+            assert resume_execution.wait(timeout=10)
+        return result
+
+    monkeypatch.setattr(runs_module, "operation_state_hash", pause_after_initial_hash)
+    independent_sessions = sessionmaker(bind=db_session.get_bind(), expire_on_commit=False)
+
+    def execute_on_independent_connection():
+        with independent_sessions() as worker_session:
+            return AgentHarnessService(worker_session).run_once("worker-race")
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        execution = executor.submit(execute_on_independent_connection)
+        assert hash_read.wait(timeout=10)
+        with independent_sessions() as manual_session:
+            manual_goal = manual_session.query(Goal).filter_by(id=sample_ultimate_goal.id).one()
+            manual_goal.name = "Manual name survives"
+            manual_session.commit()
+        resume_execution.set()
+        run = execution.result(timeout=15)
+
+    db_session.expire_all()
+    assert run["status"] == "failed"
+    assert run["operations"][0]["error"]["code"] == "stale_context"
+    assert db_session.get(Goal, sample_ultimate_goal.id).name == "Manual name survives"
+
+
+@pytest.mark.unit
+def test_goal_subtree_snapshot_queries_are_bounded(query_counter, db_session, sample_goal_hierarchy):
+    query_counter["total"] = 0
+
+    operation_state_hash(db_session, sample_goal_hierarchy["ultimate"].id, {
+        "type": "update_goal",
+        "goal_id": sample_goal_hierarchy["ultimate"].id,
+    })
+
+    assert query_counter["total"] <= 12
+
+
+@pytest.mark.unit
+def test_selected_program_and_template_pagination_reaches_beyond_initial_context(
+    db_session, test_user, sample_ultimate_goal,
+):
+    from datetime import datetime, timedelta
+
+    start = datetime(2026, 1, 1)
+    programs = [Program(
+        id=f"program-page-{index}",
+        root_id=sample_ultimate_goal.id,
+        name=f"Program {index}",
+        start_date=start + timedelta(days=index),
+        end_date=start + timedelta(days=index + 14),
+        weekly_schedule={},
+    ) for index in range(6)]
+    selected_block = ProgramBlock(
+        id="selected-program-block",
+        program_id=programs[5].id,
+        name="Selected block",
+        start_date=start.date(),
+        end_date=(start + timedelta(days=14)).date(),
+    )
+    selected_day = ProgramDay(
+        id="selected-program-day",
+        block_id=selected_block.id,
+        name="Selected day",
+        day_number=1,
+    )
+    templates = [SessionTemplate(
+        id=f"selected-template-{index}",
+        root_id=sample_ultimate_goal.id,
+        name=f"Template {index}",
+        template_data={"session_type": "normal", "sections": []},
+    ) for index in range(8)]
+    db_session.add_all([*programs, selected_block, selected_day, *templates])
+    db_session.flush()
+    db_session.execute(program_day_templates.insert(), [
+        {"program_day_id": selected_day.id, "session_template_id": template.id,
+         "order": index, "is_required": True}
+        for index, template in enumerate(templates)
+    ])
+    db_session.commit()
+
+    service = AgentHarnessService(db_session)
+    catalog_page = service.get_goal_context(
+        test_user.id,
+        sample_ultimate_goal.id,
+        programs_offset=5,
+        page_size=1,
+    )["programs"]["catalog"]
+    detail = service.get_program_context(
+        test_user.id,
+        sample_ultimate_goal.id,
+        program_id=programs[5].id,
+        block_id=selected_block.id,
+        day_id=selected_day.id,
+        templates_offset=7,
+        limit=1,
+    )
+
+    assert catalog_page["items"][0]["id"] == programs[5].id
+    assert detail["selected"]["day"]["templates"]["items"][0]["id"] == templates[7].id
+
+
+@pytest.mark.unit
+def test_outbox_dispatch_commits_deduplicated_event_history_before_ack(
+    db_session, test_user, sample_ultimate_goal,
+):
+    event_id = "agent-outbox-event-once"
+    db_session.add(AgentOutboxEvent(
+        event_type="goal.updated",
+        payload={
+            "id": event_id,
+            "data": {"root_id": sample_ultimate_goal.id, "goal_id": sample_ultimate_goal.id,
+                     "name": "Updated goal"},
+            "source": "agent-harness",
+            "timestamp": utc_now().isoformat(),
+        },
+    ))
+    db_session.commit()
+
+    service = AgentHarnessService(db_session)
+    assert service.dispatch_outbox() == 1
+    assert db_session.query(EventLog).filter_by(event_id=event_id).count() == 1
+    assert service.dispatch_outbox() == 0
+    assert db_session.query(EventLog).filter_by(event_id=event_id).count() == 1
 
 
 def test_proposal_rejects_forward_or_unknown_temporary_references(

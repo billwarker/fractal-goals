@@ -32,7 +32,7 @@ const Legal = lazyWithRetry(() => import('./pages/Legal'), 'pages/Legal');
 
 const LEGAL_PATHS = ['/privacy', '/terms'];
 const SettingsModal = lazyWithRetry(() => import('./components/modals/SettingsModal'), 'components/modals/SettingsModal');
-const AgentTaskDrawer = lazyWithRetry(() => import('./components/agent/AgentTaskDrawer'), 'components/agent/AgentTaskDrawer');
+const AgentChatPopover = lazyWithRetry(() => import('./components/agent/AgentChatPopover'), 'components/agent/AgentChatPopover');
 const ForcePasswordChangeModal = lazyWithRetry(() => import('./components/modals/ForcePasswordChangeModal'), 'components/modals/ForcePasswordChangeModal');
 const LegalAcceptanceModal = lazyWithRetry(() => import('./components/modals/LegalAcceptanceModal'), 'components/modals/LegalAcceptanceModal');
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
@@ -42,6 +42,7 @@ import { usePageViewTelemetry } from './hooks/usePageViewTelemetry';
 import { trackEvent } from './utils/telemetry';
 import { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicLandingLocation } from './utils/marketingHost';
 import GettingStartedChecklist from './components/onboarding/GettingStartedChecklist';
+import AgentChangeSubscription from './components/agent/AgentChangeSubscription';
 
 export { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicLandingLocation, isPublicMarketingHost } from './utils/marketingHost';
 
@@ -64,7 +65,8 @@ function App() {
     const mustChangePassword = Boolean(isAuthenticated && user?.must_change_password);
     const legalAcceptanceRequired = Boolean(isAuthenticated && user?.legal_acceptance_required);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [isAgentDrawerOpen, setIsAgentDrawerOpen] = useState(false);
+    const [isAgentChatOpen, setIsAgentChatOpen] = useState(false);
+    const [hasOpenedAgentChat, setHasOpenedAgentChat] = useState(false);
     const isMobile = useIsMobile();
     const [navHeight, setNavHeight] = useState(() => (location.pathname === '/' ? 0 : (isMobile ? 56 : 60)));
     const adminParams = new URLSearchParams(location.search);
@@ -79,6 +81,13 @@ function App() {
     const showLegalPage = LEGAL_PATHS.includes(location.pathname);
     const showSelectionPage = location.pathname === '/' && !showLandingPage;
     const activeRootId = location.pathname.split('/')[1] || '';
+    const agentShellAvailable = isAuthenticated && Boolean(activeRootId)
+        && !showSelectionPage
+        && !showLandingPage
+        && !showLegalPage
+        && !redirectDeprecatedLandingRoute
+        && location.pathname !== '/admin'
+        && location.pathname !== '/reset-password';
 
     // Determine page title based on path
     const getPageTitle = (pathname) => {
@@ -177,6 +186,7 @@ function App() {
     return (
         <HeaderProvider>
             <div className="app-container">
+                <AgentChangeSubscription rootId={activeRootId} authenticated={isAuthenticated} />
                 {mustChangePassword && (
                     <Suspense fallback={null}>
                         <ForcePasswordChangeModal />
@@ -193,7 +203,10 @@ function App() {
                             trackEvent('settings_opened');
                             setIsSettingsOpen(true);
                         }}
-                        onOpenAgent={() => setIsAgentDrawerOpen(true)}
+                        onOpenAgent={() => {
+                            setHasOpenedAgentChat(true);
+                            setIsAgentChatOpen(true);
+                        }}
                         onHeightChange={setNavHeight}
                     />
                 )}
@@ -332,10 +345,12 @@ function App() {
                 </Suspense>
 
                 <Suspense fallback={null}>
-                    {isAgentDrawerOpen && activeRootId && (
-                        <AgentTaskDrawer
+                    {hasOpenedAgentChat && agentShellAvailable && (
+                        <AgentChatPopover
+                            key={activeRootId}
                             rootId={activeRootId}
-                            onClose={() => setIsAgentDrawerOpen(false)}
+                            isOpen={isAgentChatOpen}
+                            onClose={() => setIsAgentChatOpen(false)}
                         />
                     )}
                 </Suspense>

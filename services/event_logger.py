@@ -1,5 +1,6 @@
 import logging
 import models
+from sqlalchemy.exc import IntegrityError
 from models import EventLog, get_session
 from services.events import event_bus, Event, EventHandlerFailure, Events
 from concurrent.futures import ThreadPoolExecutor
@@ -44,12 +45,16 @@ def setup_event_logging():
                         description=description,
                         payload=evt.data,
                         source=evt.source or 'system',
+                        event_id=evt.id,
                         timestamp=evt.timestamp
                     )
                     db_session.add(log_entry)
                     db_session.commit()
                 except Exception as e:
                     db_session.rollback()
+                    if isinstance(e, IntegrityError) and evt.id:
+                        if db_session.query(models.EventLog.id).filter_by(event_id=evt.id).first():
+                            return
                     logger.error(f"Failed to log event {evt.name} to database: {e}")
                 finally:
                     db_session.close()

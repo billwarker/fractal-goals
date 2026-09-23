@@ -192,6 +192,10 @@ class _ProgramHelpersMixin:
 
     @classmethod
     def _apply_program_day_template_configs(cls, session, day: ProgramDay, template_configs: List[Dict[str, Any]]):
+        day = session.query(ProgramDay).filter_by(
+            id=day.id,
+        ).populate_existing().with_for_update().one()
+        day.row_version += 1
         session.query(ProgramDayTemplate).filter(
             ProgramDayTemplate.program_day_id == day.id
         ).delete(synchronize_session=False)
@@ -257,6 +261,12 @@ class _ProgramHelpersMixin:
 
     @classmethod
     def _replace_program_goals(cls, session, program_id: str, goal_ids: List[str], root_id: str) -> List[Goal]:
+        program = session.query(Program).filter_by(
+            id=program_id, root_id=root_id,
+        ).populate_existing().with_for_update().first()
+        if not program:
+            raise ValueError("Program not found")
+        program.row_version += 1
         goal_ids = list(dict.fromkeys(goal_ids or []))
         goals = []
         if goal_ids:
@@ -282,6 +292,13 @@ class _ProgramHelpersMixin:
 
     @classmethod
     def _replace_block_goals(cls, session, block_id: str, goal_ids: List[str], root_id: str):
+        block = session.query(ProgramBlock).join(Program).filter(
+            ProgramBlock.id == block_id,
+            Program.root_id == root_id,
+        ).populate_existing().with_for_update(of=ProgramBlock).first()
+        if not block:
+            raise ValueError("Program block not found")
+        block.row_version += 1
         goal_ids = list(dict.fromkeys(goal_ids or []))
         goals = []
         if goal_ids:

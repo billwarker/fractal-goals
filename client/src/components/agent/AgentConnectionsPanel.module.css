@@ -19,6 +19,49 @@
     line-height: 1.5;
 }
 
+.modelNote {
+    padding: 12px;
+    border-left: 3px solid var(--color-brand-primary, #5b55d8);
+    background: var(--color-bg-elevated);
+    border-radius: 4px;
+}
+
+.providers {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    gap: 12px;
+}
+
+.providerCard {
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 10px;
+}
+
+.providerCard h4 {
+    margin: 0;
+    color: var(--color-text-primary);
+}
+
+.providerCard > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.providerCard a {
+    color: var(--color-link, var(--color-text-primary));
+    font-weight: 600;
+}
+
+.providerCard a:focus-visible {
+    outline: 3px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
 .endpointRow,
 .connection {
     display: flex;

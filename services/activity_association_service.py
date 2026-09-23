@@ -30,6 +30,12 @@ class ActivityAssociationService:
         return root, None
 
     def replace_activity_goal_associations(self, activity_id, root_id, goal_ids) -> list[str]:
+        activity = self.db_session.query(ActivityDefinition).filter_by(
+            id=activity_id,
+            root_id=root_id,
+        ).populate_existing().with_for_update().first()
+        if not activity:
+            return []
         goal_ids = normalize_id_list(goal_ids)
         valid_goal_ids = []
         if goal_ids:
@@ -53,8 +59,8 @@ class ActivityAssociationService:
             activity_goal_associations.c.goal_id,
             valid_goal_ids,
         )
-        activity = self.db_session.query(ActivityDefinition).filter_by(id=activity_id).first()
-        if activity:
+        if delta.added_ids or delta.removed_ids:
+            activity.row_version += 1
             for action, changed_goal_ids in (
                 ("associated", delta.added_ids),
                 ("disassociated", delta.removed_ids),
@@ -80,7 +86,9 @@ class ActivityAssociationService:
         if error:
             return None, *error
 
-        activity = self.db_session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
+        activity = self.db_session.query(ActivityDefinition).filter_by(
+            id=activity_id, root_id=root_id,
+        ).populate_existing().with_for_update().first()
         if not activity:
             return None, "Activity not found", 404
 
@@ -110,7 +118,9 @@ class ActivityAssociationService:
         if error:
             return None, *error
 
-        activity = self.db_session.query(ActivityDefinition).filter_by(id=activity_id, root_id=root_id).first()
+        activity = self.db_session.query(ActivityDefinition).filter_by(
+            id=activity_id, root_id=root_id,
+        ).populate_existing().with_for_update().first()
         if not activity:
             return None, "Activity not found", 404
 
@@ -122,6 +132,7 @@ class ActivityAssociationService:
         )
         if result.rowcount == 0:
             return None, "Association not found", 404
+        activity.row_version += 1
 
         append_goal_association_event(
             self.db_session,
@@ -177,6 +188,19 @@ class ActivityAssociationService:
         valid_activity_ids = {row[0] for row in valid_activities}
         valid_group_ids = {row[0] for row in valid_groups}
 
+        existing_activity_ids = {
+            row[0] for row in self.db_session.execute(
+                activity_goal_associations.select().with_only_columns(
+                    activity_goal_associations.c.activity_id,
+                ).where(activity_goal_associations.c.goal_id == goal_id)
+            ).all()
+        }
+        activity_rows = self.db_session.query(ActivityDefinition).filter(
+            ActivityDefinition.id.in_(sorted(existing_activity_ids | valid_activity_ids)),
+            ActivityDefinition.root_id == root_id,
+        ).order_by(ActivityDefinition.id).populate_existing().with_for_update().all()
+        activities_by_id = {activity.id: activity for activity in activity_rows}
+
         activity_delta = reconcile_association_rows(
             self.db_session,
             activity_goal_associations,
@@ -195,11 +219,13 @@ class ActivityAssociationService:
         )
 
         changed_activity_ids = activity_delta.added_ids | activity_delta.removed_ids
-        activities_by_id = dict(
-            self.db_session.query(ActivityDefinition.id, ActivityDefinition.name).filter(
-                ActivityDefinition.id.in_(changed_activity_ids)
-            ).all()
-        ) if changed_activity_ids else {}
+        for activity_id in changed_activity_ids:
+            activity = activities_by_id.get(activity_id)
+            if activity:
+                activity.row_version += 1
+        activity_names = {
+            activity_id: activity.name for activity_id, activity in activities_by_id.items()
+        }
         changed_group_ids = group_delta.added_ids | group_delta.removed_ids
         groups_by_id = dict(
             self.db_session.query(ActivityGroup.id, ActivityGroup.name).filter(
@@ -207,7 +233,7 @@ class ActivityAssociationService:
             ).all()
         ) if changed_group_ids else {}
         for kind, delta, names in (
-            ("activity", activity_delta, activities_by_id),
+            ("activity", activity_delta, activity_names),
             ("activity_group", group_delta, groups_by_id),
         ):
             for action, changed_ids in (

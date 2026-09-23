@@ -3,7 +3,7 @@
 import uuid
 
 import sqlalchemy as sa
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Column, Date, DateTime, ForeignKey, Integer, String, Text
 
 from .base import Base, JSON_TYPE, utc_now
 
@@ -137,6 +137,7 @@ class AgentTaskBrief(Base):
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     grant_id = Column(String, ForeignKey("agent_grants.id", ondelete="SET NULL"), nullable=True)
     root_id = Column(String, ForeignKey("goals.id", ondelete="CASCADE"), nullable=False)
+    execution_origin = Column(String(32), nullable=False, default="first_party")
     request_text = Column(Text, nullable=False)
     context = Column(JSON_TYPE, nullable=False, default=dict)
     timezone = Column(String(64), nullable=False)
@@ -195,6 +196,7 @@ class AgentRun(Base):
     user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     grant_id = Column(String, ForeignKey("agent_grants.id", ondelete="SET NULL"), nullable=True)
     root_id = Column(String, ForeignKey("goals.id", ondelete="CASCADE"), nullable=False)
+    execution_origin = Column(String(32), nullable=False, default="first_party")
     status = Column(String(32), nullable=False, default="queued")
     lease_owner = Column(String(128), nullable=True)
     lease_expires_at = Column(DateTime, nullable=True)
@@ -310,9 +312,48 @@ class AgentEmbeddedRun(Base):
     proposal_id = Column(String, ForeignKey("agent_proposals.id", ondelete="SET NULL"), nullable=True)
     lease_owner = Column(String(128), nullable=True)
     lease_expires_at = Column(DateTime, nullable=True)
+    fencing_token = Column(Integer, nullable=False, default=0, server_default='0')
+    provider_call_sequence = Column(Integer, nullable=False, default=0, server_default='0')
     cancel_requested_at = Column(DateTime, nullable=True)
     started_at = Column(DateTime, nullable=True)
     finished_at = Column(DateTime, nullable=True)
     error_code = Column(String(64), nullable=True)
     error_message = Column(String(500), nullable=True)
     created_at = Column(DateTime, nullable=False, default=utc_now)
+
+
+class AgentEmbeddedDailyBudget(Base):
+    __tablename__ = "agent_embedded_daily_budgets"
+
+    scope_key = Column(String(128), primary_key=True)
+    usage_date = Column(Date, primary_key=True)
+    reserved_microdollars = Column(BigInteger, nullable=False, default=0, server_default='0')
+    charged_microdollars = Column(BigInteger, nullable=False, default=0, server_default='0')
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+
+
+class AgentEmbeddedUsage(Base):
+    __tablename__ = "agent_embedded_usage"
+    __table_args__ = (
+        sa.UniqueConstraint("run_id", "call_number", name="uq_agent_embedded_usage_run_call"),
+        sa.Index("ix_agent_embedded_usage_user_date", "user_id", "usage_date"),
+        sa.Index("ix_agent_embedded_usage_status_created", "status", "created_at"),
+    )
+
+    id = Column(String, primary_key=True, default=_id)
+    run_id = Column(String, ForeignKey("agent_embedded_runs.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    usage_date = Column(Date, nullable=False)
+    call_number = Column(Integer, nullable=False)
+    fencing_token = Column(Integer, nullable=False)
+    provider = Column(String(16), nullable=False)
+    model = Column(String(120), nullable=False)
+    status = Column(String(16), nullable=False, default="reserved")
+    estimated_input_tokens = Column(Integer, nullable=False)
+    reserved_output_tokens = Column(Integer, nullable=False)
+    actual_input_tokens = Column(Integer, nullable=True)
+    actual_output_tokens = Column(Integer, nullable=True)
+    reserved_microdollars = Column(BigInteger, nullable=False)
+    actual_microdollars = Column(BigInteger, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    completed_at = Column(DateTime, nullable=True)

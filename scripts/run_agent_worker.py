@@ -19,9 +19,11 @@ if PROJECT_ROOT not in sys.path:
 from models import get_scoped_session, remove_session  # noqa: E402
 from services.agent_harness_service import AgentHarnessService  # noqa: E402
 from services.agent_embedded_service import AgentEmbeddedService  # noqa: E402
+from services import init_services  # noqa: E402
 
 
 def main():
+    init_services()
     stopping = False
 
     def request_stop(_signal, _frame):

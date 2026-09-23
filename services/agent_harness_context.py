@@ -56,26 +56,34 @@ class AgentContextMixin:
         if root_id and root_id not in (grant.allowed_roots or []):
             raise AgentHarnessError("Fractal is outside the AI connection's allowed scope", 403, "root_forbidden")
         return grant
-    def get_goal_context(self, user_id, root_id, *, goals_offset=0, activities_offset=0):
+    def get_goal_context(
+        self, user_id, root_id, *, goals_offset=0, activities_offset=0,
+        programs_offset=0, templates_offset=0, page_size=None,
+    ):
         root = self._root(root_id, user_id)
+        page_size = min(100, max(1, int(page_size))) if page_size is not None else None
+        goal_page_limit = min(MAX_CONTEXT_GOALS, page_size or MAX_CONTEXT_GOALS)
+        activity_page_limit = min(MAX_CONTEXT_ACTIVITIES, page_size or MAX_CONTEXT_ACTIVITIES)
+        program_page_limit = min(MAX_CONTEXT_PROGRAMS, page_size or MAX_CONTEXT_PROGRAMS)
+        template_page_limit = min(MAX_CONTEXT_TEMPLATES, page_size or MAX_CONTEXT_TEMPLATES)
         goals = self.db_session.query(Goal).filter(
             Goal.root_id == root_id,
             Goal.deleted_at.is_(None),
-        ).order_by(Goal.created_at, Goal.id).offset(max(0, goals_offset)).limit(MAX_CONTEXT_GOALS + 1).all()
+        ).order_by(Goal.created_at, Goal.id).offset(max(0, goals_offset)).limit(goal_page_limit + 1).all()
         activities = self.db_session.query(ActivityDefinition).filter(
             ActivityDefinition.root_id == root_id,
             ActivityDefinition.deleted_at.is_(None),
         ).order_by(ActivityDefinition.name, ActivityDefinition.id).offset(
             max(0, activities_offset)
-        ).limit(MAX_CONTEXT_ACTIVITIES + 1).all()
+        ).limit(activity_page_limit + 1).all()
         programs = self.db_session.query(Program).filter(
             Program.root_id == root_id,
-        ).order_by(Program.start_date, Program.id).limit(MAX_CONTEXT_PROGRAMS + 1).all()
+        ).order_by(Program.start_date, Program.id).offset(max(0, programs_offset)).limit(program_page_limit + 1).all()
         templates = self.db_session.query(SessionTemplate).filter(
             SessionTemplate.root_id == root_id,
             SessionTemplate.archived_at.is_(None),
             SessionTemplate.deleted_at.is_(None),
-        ).order_by(SessionTemplate.name, SessionTemplate.id).limit(MAX_CONTEXT_TEMPLATES + 1).all()
+        ).order_by(SessionTemplate.name, SessionTemplate.id).offset(max(0, templates_offset)).limit(template_page_limit + 1).all()
 
         goal_items = [
             {
@@ -87,13 +95,20 @@ class AgentContextMixin:
                 "deadline": row.deadline.isoformat() if row.deadline else None,
                 "completed": bool(row.completed),
             }
-            for row in goals[:MAX_CONTEXT_GOALS]
+            for row in goals[:goal_page_limit]
         ]
         activity_items = [
             {"id": row.id, "name": row.name, "description": row.description, "group_id": row.group_id}
-            for row in activities[:MAX_CONTEXT_ACTIVITIES]
+            for row in activities[:activity_page_limit]
         ]
-        detailed_programs = programs[:5]
+        # Keep nested detail proportional to the requested page. A page size of
+        # one must be a genuinely small recovery page, rather than a catalog
+        # page that still expands five programs and their descendants.
+        nested_program_limit = min(5, program_page_limit)
+        nested_block_limit = min(9, max(1, page_size or 9))
+        nested_day_limit = min(11, max(1, page_size or 11))
+        nested_template_limit = min(5, max(1, page_size or 5))
+        detailed_programs = programs[:nested_program_limit]
         program_context = []
         block_rows = []
         days_by_block = {}
@@ -112,7 +127,7 @@ class AgentContextMixin:
                 ).label("rank"),
             ).filter(ProgramBlock.program_id.in_(program_ids)).subquery()
             block_rows = self.db_session.query(ranked_blocks).filter(
-                ranked_blocks.c.rank <= 9,
+                    ranked_blocks.c.rank <= nested_block_limit,
             ).order_by(ranked_blocks.c.program_id, ranked_blocks.c.rank).all()
             block_ids = [row.id for row in block_rows]
 
@@ -131,7 +146,7 @@ class AgentContextMixin:
                     ).label("rank"),
                 ).filter(ProgramDay.block_id.in_(block_ids)).subquery()
                 day_rows = self.db_session.query(ranked_days).filter(
-                    ranked_days.c.rank <= 11,
+                        ranked_days.c.rank <= nested_day_limit,
                 ).order_by(ranked_days.c.block_id, ranked_days.c.rank).all()
 
             day_ids = [row.id for row in day_rows]
@@ -154,7 +169,7 @@ class AgentContextMixin:
                     SessionTemplate.deleted_at.is_(None),
                 ).subquery()
                 template_rows = self.db_session.query(ranked_templates).filter(
-                    ranked_templates.c.rank <= 5,
+                    ranked_templates.c.rank <= nested_template_limit,
                 ).order_by(ranked_templates.c.program_day_id, ranked_templates.c.rank).all()
                 for row in template_rows:
                     templates_by_day.setdefault(row.program_day_id, []).append(
@@ -175,7 +190,7 @@ class AgentContextMixin:
                     "day_of_week": day.day_of_week or [],
                     "completion_min_templates": day.completion_min_templates,
                     "templates": templates_by_day.get(day.id, []),
-                    "templates_truncated": template_counts.get(day.id, 0) > 5,
+                        "templates_truncated": template_counts.get(day.id, 0) > nested_template_limit,
                 })
             blocks_by_program = {}
             for block in block_rows:
@@ -185,8 +200,8 @@ class AgentContextMixin:
                     "name": block.name,
                     "start_date": _iso(block.start_date),
                     "end_date": _iso(block.end_date),
-                    "days": days[:10],
-                    "days_truncated": len(days) > 10,
+                    "days": days[:nested_day_limit],
+                    "days_truncated": len(days) > nested_day_limit,
                 })
 
             for program in detailed_programs:
@@ -196,39 +211,200 @@ class AgentContextMixin:
                     "name": program.name,
                     "start_date": _iso(program.start_date),
                     "end_date": _iso(program.end_date),
-                    "blocks": blocks[:8],
-                    "blocks_truncated": len(blocks) > 8,
+                    "blocks": blocks[:nested_block_limit],
+                    "blocks_truncated": len(blocks) > nested_block_limit,
                 })
         return {
             "root": {"id": root_id, "name": root.name},
             "goals": {
                 "items": goal_items,
                 "offset": max(0, goals_offset),
-                "next_offset": max(0, goals_offset) + len(goal_items) if len(goals) > MAX_CONTEXT_GOALS else None,
-                "truncated": len(goals) > MAX_CONTEXT_GOALS,
+                "next_offset": max(0, goals_offset) + len(goal_items) if len(goals) > goal_page_limit else None,
+                "truncated": len(goals) > goal_page_limit,
             },
             "activities": {
                 "items": activity_items,
                 "offset": max(0, activities_offset),
                 "next_offset": max(0, activities_offset) + len(activity_items)
-                if len(activities) > MAX_CONTEXT_ACTIVITIES else None,
-                "truncated": len(activities) > MAX_CONTEXT_ACTIVITIES,
+                if len(activities) > activity_page_limit else None,
+                "truncated": len(activities) > activity_page_limit,
             },
             "programs": {
                 "items": program_context,
-                "truncated": len(programs) > 5,
-                "details_truncated": len(programs) > 5
-                or any(len(blocks_by_program.get(row.id, [])) > 8 for row in detailed_programs)
-                or any(len(days_by_block.get(block.id, [])) > 10 for block in block_rows)
+                "catalog": {
+                    "items": [
+                        {"id": row.id, "name": row.name,
+                         "start_date": _iso(row.start_date), "end_date": _iso(row.end_date)}
+                        for row in programs[:program_page_limit]
+                    ],
+                    "offset": max(0, programs_offset),
+                    "next_offset": max(0, programs_offset) + min(len(programs), program_page_limit)
+                    if len(programs) > program_page_limit else None,
+                },
+                "truncated": len(programs) > program_page_limit,
+                "details_truncated": len(programs) > nested_program_limit
+                or any(len(blocks_by_program.get(row.id, [])) > nested_block_limit for row in detailed_programs)
+                or any(len(days_by_block.get(block.id, [])) > nested_day_limit for block in block_rows)
                 or any(count > 5 for count in template_counts.values()),
             },
             "templates": {
                 "items": [
                     {"id": row.id, "name": row.name, "description": row.description}
-                    for row in templates[:MAX_CONTEXT_TEMPLATES]
+                    for row in templates[:template_page_limit]
                 ],
-                "truncated": len(templates) > MAX_CONTEXT_TEMPLATES,
+                "offset": max(0, templates_offset),
+                "next_offset": max(0, templates_offset) + min(len(templates), template_page_limit)
+                if len(templates) > template_page_limit else None,
+                "truncated": len(templates) > template_page_limit,
             },
+        }
+
+    def get_program_context(
+        self, user_id, root_id, *, offset=0, limit=50, program_id=None,
+        block_offset=0, block_id=None, day_offset=0, day_id=None,
+        templates_offset=0,
+    ):
+        """Page program entities and resolve selected descendants by scoped ID."""
+        root = self._root(root_id, user_id)
+        page_size = min(100, max(1, int(limit or 50)))
+        offset = max(0, int(offset or 0))
+        programs_query = self.db_session.query(Program).filter_by(root_id=root_id).order_by(
+            Program.start_date, Program.id,
+        )
+        if program_id:
+            programs_query = programs_query.filter(Program.id == program_id)
+            if not programs_query.first():
+                raise AgentHarnessError("Program is not available in this fractal", 404, "not_found")
+        else:
+            programs_query = programs_query.offset(offset)
+        programs = programs_query.limit(page_size + 1).all()
+        has_more_programs = len(programs) > page_size
+        programs = programs[:page_size]
+
+        def program_item(row):
+            return {
+                "id": row.id,
+                "name": row.name,
+                "description": row.description,
+                "start_date": _iso(row.start_date),
+                "end_date": _iso(row.end_date),
+            }
+
+        result = {
+            "root": {"id": root_id, "name": root.name},
+            "items": [program_item(row) for row in programs],
+            "offset": offset,
+            "next_offset": offset + len(programs) if has_more_programs else None,
+            "selected": None,
+        }
+        if not program_id:
+            return result
+
+        program = programs[0]
+        blocks_query = self.db_session.query(ProgramBlock).filter_by(
+            program_id=program.id,
+        ).order_by(ProgramBlock.start_date, ProgramBlock.id)
+        selected_block = None
+        if block_id:
+            selected_block = blocks_query.filter(ProgramBlock.id == block_id).first()
+            if not selected_block:
+                raise AgentHarnessError("Block is not available in this program", 404, "not_found")
+        blocks = blocks_query.offset(max(0, int(block_offset or 0))).limit(page_size + 1).all()
+        has_more_blocks = len(blocks) > page_size
+        blocks = blocks[:page_size]
+        selected = {
+            "program": program_item(program),
+            "blocks": {
+                "items": [{
+                    "id": row.id, "name": row.name,
+                    "start_date": _iso(row.start_date), "end_date": _iso(row.end_date),
+                } for row in blocks],
+                "offset": max(0, int(block_offset or 0)),
+                "next_offset": max(0, int(block_offset or 0)) + len(blocks) if has_more_blocks else None,
+            },
+        }
+        result["selected"] = selected
+        if not block_id:
+            return result
+
+        days_query = self.db_session.query(ProgramDay).filter_by(
+            block_id=selected_block.id,
+        ).order_by(ProgramDay.day_number, ProgramDay.id)
+        selected_day = None
+        if day_id:
+            selected_day = days_query.filter(ProgramDay.id == day_id).first()
+            if not selected_day:
+                raise AgentHarnessError("Day is not available in this block", 404, "not_found")
+        days = days_query.offset(max(0, int(day_offset or 0))).limit(page_size + 1).all()
+        has_more_days = len(days) > page_size
+        days = days[:page_size]
+        selected["block"] = {
+            "id": selected_block.id,
+            "name": selected_block.name,
+            "days": {
+                "items": [{
+                    "id": row.id, "name": row.name, "day_number": row.day_number,
+                    "date": _iso(row.date), "day_of_week": row.day_of_week or [],
+                } for row in days],
+                "offset": max(0, int(day_offset or 0)),
+                "next_offset": max(0, int(day_offset or 0)) + len(days) if has_more_days else None,
+            },
+        }
+        if not day_id:
+            return result
+
+        template_query = self.db_session.query(
+            SessionTemplate.id,
+            SessionTemplate.name,
+            SessionTemplate.description,
+            program_day_templates.c.order,
+            program_day_templates.c.is_required,
+        ).join(
+            program_day_templates,
+            program_day_templates.c.session_template_id == SessionTemplate.id,
+        ).filter(
+            program_day_templates.c.program_day_id == selected_day.id,
+            SessionTemplate.root_id == root_id,
+            SessionTemplate.deleted_at.is_(None),
+        ).order_by(program_day_templates.c.order, SessionTemplate.name, SessionTemplate.id)
+        templates = template_query.offset(max(0, int(templates_offset or 0))).limit(page_size + 1).all()
+        has_more_templates = len(templates) > page_size
+        templates = templates[:page_size]
+        selected["day"] = {
+            "id": selected_day.id,
+            "name": selected_day.name,
+            "day_number": selected_day.day_number,
+            "date": _iso(selected_day.date),
+            "templates": {
+                "items": [{
+                    "id": row.id, "name": row.name, "description": row.description,
+                    "order": row.order, "is_required": bool(row.is_required),
+                } for row in templates],
+                "offset": max(0, int(templates_offset or 0)),
+                "next_offset": max(0, int(templates_offset or 0)) + len(templates)
+                if has_more_templates else None,
+            },
+        }
+        return result
+
+    def list_templates(self, user_id, root_id, *, offset=0, limit=100):
+        """Page reusable templates within one owned fractal."""
+        root = self._root(root_id, user_id)
+        page_size = min(100, max(1, int(limit or 100)))
+        offset = max(0, int(offset or 0))
+        rows = self.db_session.query(SessionTemplate).filter(
+            SessionTemplate.root_id == root_id,
+            SessionTemplate.archived_at.is_(None),
+            SessionTemplate.deleted_at.is_(None),
+        ).order_by(SessionTemplate.name, SessionTemplate.id).offset(offset).limit(page_size + 1).all()
+        has_more = len(rows) > page_size
+        return {
+            "root": {"id": root_id, "name": root.name},
+            "items": [{
+                "id": row.id, "name": row.name, "description": row.description,
+            } for row in rows[:page_size]],
+            "offset": offset,
+            "next_offset": offset + min(len(rows), page_size) if has_more else None,
         }
     @staticmethod
     def serialize_task(task):
@@ -252,10 +428,16 @@ class AgentContextMixin:
         if not task:
             raise AgentHarnessError("Task not found or expired", 404, "not_found")
         return task
-    def create_task(self, user_id, data, *, grant_id=None):
+    def create_task(self, user_id, data, *, grant_id=None, execution_origin="first_party", commit=True):
         brief = AgentTaskBriefSchema.model_validate(data)
         self._root(brief.root_id, user_id)
         grant = self._grant(grant_id or brief.grant_id, user_id, brief.root_id)
+        if grant:
+            execution_origin = "connector"
+        if execution_origin not in {
+            "first_party", "connector", "embedded_openai", "embedded_anthropic",
+        }:
+            raise AgentHarnessError("Unsupported trusted task origin", 400, "invalid_origin")
         try:
             ZoneInfo(brief.timezone)
         except ZoneInfoNotFoundError as error:
@@ -293,6 +475,7 @@ class AgentContextMixin:
             user_id=user_id,
             grant_id=grant.id if grant else None,
             root_id=brief.root_id,
+            execution_origin=execution_origin,
             request_text=brief.request_text,
             context=brief.context,
             timezone=brief.timezone,
@@ -301,7 +484,10 @@ class AgentContextMixin:
             expires_at=utc_now() + dt.timedelta(hours=TASK_TTL_HOURS),
         )
         self.db_session.add(task)
-        self.db_session.commit()
+        if commit:
+            self.db_session.commit()
+        else:
+            self.db_session.flush()
         return self.serialize_task(task)
     def get_task(self, user_id, task_id, *, grant_id=None, allowed_roots=None):
         task = self.db_session.query(AgentTaskBrief).filter(

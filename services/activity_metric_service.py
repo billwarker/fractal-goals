@@ -137,7 +137,7 @@ class ActivityMetricService:
 
         return metrics, None, 200
 
-    def create_fractal_metric(self, root_id, current_user_id, data) -> ServiceResult[FractalMetricDefinition]:
+    def create_fractal_metric(self, root_id, current_user_id, data, *, commit=True, pending_events=None) -> ServiceResult[FractalMetricDefinition]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -227,19 +227,26 @@ class ActivityMetricService:
             sort_order=data.get('sort_order') if data.get('sort_order') is not None else (max_order or 0) + 1,
         )
         self.db_session.add(metric)
-        self.db_session.commit()
-        self.db_session.refresh(metric)
+        if commit:
+            self.db_session.commit()
+            self.db_session.refresh(metric)
+        else:
+            self.db_session.flush()
         metric._activity_count = 0
 
-        event_bus.emit(Event(Events.FRACTAL_METRIC_CREATED, {
+        event = Event(Events.FRACTAL_METRIC_CREATED, {
             'metric_id': metric.id,
             'name': metric.name,
             'root_id': root_id,
-        }, source='activity_service.create_fractal_metric'))
+        }, source='activity_service.create_fractal_metric')
+        if pending_events is not None:
+            pending_events.append(event)
+        else:
+            event_bus.emit(event)
 
         return metric, None, 201
 
-    def update_fractal_metric(self, root_id, metric_id, current_user_id, data) -> ServiceResult[FractalMetricDefinition]:
+    def update_fractal_metric(self, root_id, metric_id, current_user_id, data, *, commit=True, pending_events=None) -> ServiceResult[FractalMetricDefinition]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -247,6 +254,7 @@ class ActivityMetricService:
         metric = self._get_active_fractal_metric(root_id, metric_id)
         if not metric:
             return None, "Metric not found", 404
+        metric.row_version = (metric.row_version or 1) + 1
         old_storage_size = QuotaService._payload_size(
             metric.name,
             metric.unit,
@@ -342,17 +350,24 @@ class ActivityMetricService:
         if 'sort_order' in data and data.get('sort_order') is not None:
             metric.sort_order = data['sort_order']
 
-        self.db_session.commit()
-        self.db_session.refresh(metric)
+        if commit:
+            self.db_session.commit()
+            self.db_session.refresh(metric)
+        else:
+            self.db_session.flush()
 
         metric._activity_count = self._activity_count_for_metric(metric.id)
 
-        event_bus.emit(Event(Events.FRACTAL_METRIC_UPDATED, {
+        event = Event(Events.FRACTAL_METRIC_UPDATED, {
             'metric_id': metric.id,
             'name': metric.name,
             'root_id': root_id,
             'updated_fields': list(data.keys()),
-        }, source='activity_service.update_fractal_metric'))
+        }, source='activity_service.update_fractal_metric')
+        if pending_events is not None:
+            pending_events.append(event)
+        else:
+            event_bus.emit(event)
 
         return metric, None, 200
 

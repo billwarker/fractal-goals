@@ -204,7 +204,8 @@ export const NavigationHeader = ({ onOpenSettings, onOpenAgent, onHeightChange }
     // dashboard; the Logs page is admin-only.
     const showLogsNav = Boolean(user?.is_admin);
     const showAgentAction = Boolean(
-        user?.id && (
+        user?.id
+        && (
             isFeatureEnabled(flags, FEATURE_FLAGS.aiAgentConnectors)
             || isFeatureEnabled(flags, FEATURE_FLAGS.aiAgentEmbedded)
         ),

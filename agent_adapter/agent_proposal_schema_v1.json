@@ -1,0 +1,2878 @@
+{
+  "$defs": {
+    "AssociateActivityGoalsOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "activity_id": {
+          "description": "Opaque ID of an existing activity in the task's fractal.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Activity Id",
+          "type": "string"
+        },
+        "goal_ids": {
+          "description": "Goal IDs in this fractal, or $ref:<operation_id> references to goals created earlier in this proposal. Maximum 200.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 200,
+          "title": "Goal Ids",
+          "type": "array"
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "associate_activity_goals",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "activity_id",
+        "goal_ids"
+      ],
+      "title": "AssociateActivityGoalsOperation",
+      "type": "object"
+    },
+    "CreateActivityOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StrictActivityCreateSchema",
+          "description": "Activity definition fields validated by the Fractal activity schema."
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "create_activity",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "data"
+      ],
+      "title": "CreateActivityOperation",
+      "type": "object"
+    },
+    "CreateBlockOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StrictProgramBlockCreateSchema",
+          "description": "Block name, dates, color, and optional goal IDs."
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "program_id": {
+          "description": "Opaque ID of the containing program, or $ref:<operation_id> for a program created earlier in this proposal.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Program Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "create_block",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "program_id",
+        "data"
+      ],
+      "title": "CreateBlockOperation",
+      "type": "object"
+    },
+    "CreateGoalOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StrictGoalCreateSchema",
+          "description": "Goal fields to create. parent_id may refer to a goal created earlier in this proposal using $ref:<operation_id>. Allowed goal types are UltimateGoal, LongTermGoal, MidTermGoal, ShortTermGoal, and ImmediateGoal."
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "create_goal",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "data"
+      ],
+      "title": "CreateGoalOperation",
+      "type": "object"
+    },
+    "CreateMetricOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StrictMetricCreateSchema"
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "create_metric",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "data"
+      ],
+      "title": "CreateMetricOperation",
+      "type": "object"
+    },
+    "CreateNoteOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/NoteCreateSchema",
+          "description": "Note content and an in-fractal context reference."
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "create_note",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "data"
+      ],
+      "title": "CreateNoteOperation",
+      "type": "object"
+    },
+    "CreateProgramDayOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "block_id": {
+          "description": "Opaque ID of the containing block, or $ref:<operation_id> for a block created earlier in this proposal.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Block Id",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/StrictProgramDayCreateSchema",
+          "description": "Program day fields, including optional template_configs and template IDs."
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "program_id": {
+          "description": "Opaque ID of the containing program, or $ref:<operation_id> for a program created earlier in this proposal.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Program Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "create_program_day",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "program_id",
+        "block_id",
+        "data"
+      ],
+      "title": "CreateProgramDayOperation",
+      "type": "object"
+    },
+    "CreateProgramOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StrictProgramCreateSchema",
+          "description": "Program name, date range, and selected goal IDs. Goal references may use $ref:<operation_id> for goals created earlier in this proposal."
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "create_program",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "data"
+      ],
+      "title": "CreateProgramOperation",
+      "type": "object"
+    },
+    "CreateSessionOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StrictSessionCreateSchema",
+          "description": "Session fields. A session must reference a goal, template, or program context."
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "create_session",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "data"
+      ],
+      "title": "CreateSessionOperation",
+      "type": "object"
+    },
+    "CreateTemplateOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StrictTemplateCreateSchema",
+          "description": "Reusable session template fields validated by the Fractal template schema."
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "create_template",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "data"
+      ],
+      "title": "CreateTemplateOperation",
+      "type": "object"
+    },
+    "NoteCreateSchema": {
+      "additionalProperties": false,
+      "description": "Schema for creating a note.",
+      "properties": {
+        "activity_definition_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Activity Definition Id"
+        },
+        "activity_instance_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Activity Instance Id"
+        },
+        "activity_set_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Activity Set Id"
+        },
+        "content": {
+          "maxLength": 5000,
+          "minLength": 1,
+          "title": "Content",
+          "type": "string"
+        },
+        "context_id": {
+          "minLength": 1,
+          "title": "Context Id",
+          "type": "string"
+        },
+        "context_type": {
+          "pattern": "^(root|goal|session|program|activity_instance|activity_definition|circuit_run|circuit_round)$",
+          "title": "Context Type",
+          "type": "string"
+        },
+        "goal_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal Id"
+        },
+        "note_kind": {
+          "anyOf": [
+            {
+              "pattern": "^(goal_completion)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note Kind"
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Id"
+        }
+      },
+      "required": [
+        "content",
+        "context_type",
+        "context_id"
+      ],
+      "title": "NoteCreateSchema",
+      "type": "object"
+    },
+    "ProgramDayTemplateConfigSchema": {
+      "description": "Completion metadata for a session template attached to a program day.",
+      "properties": {
+        "is_required": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": true,
+          "title": "Is Required"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "title": "Order"
+        },
+        "template_id": {
+          "title": "Template Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "template_id"
+      ],
+      "title": "ProgramDayTemplateConfigSchema",
+      "type": "object"
+    },
+    "ScheduleProgramDayOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "block_id": {
+          "description": "Opaque ID of the containing block.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Block Id",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/StrictProgramDayScheduleSchema",
+          "description": "Scheduling date and time values validated against this fractal's timezone and program bounds."
+        },
+        "day_id": {
+          "description": "Opaque ID of an existing day in the block.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Day Id",
+          "type": "string"
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "program_id": {
+          "description": "Opaque ID of the containing program.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Program Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "schedule_program_day",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "program_id",
+        "block_id",
+        "day_id",
+        "data"
+      ],
+      "title": "ScheduleProgramDayOperation",
+      "type": "object"
+    },
+    "StrictActivityCreateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "delta_display_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Delta Display Mode"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 5000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "goal_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal Ids"
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Id"
+        },
+        "has_metrics": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Has Metrics"
+        },
+        "has_sets": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Has Sets"
+        },
+        "has_splits": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Has Splits"
+        },
+        "metrics": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metrics"
+        },
+        "metrics_multiplicative": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Metrics Multiplicative"
+        },
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "progress_aggregation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Progress Aggregation"
+        },
+        "splits": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Splits"
+        },
+        "track_progress": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Track Progress"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "StrictActivityCreateSchema",
+      "type": "object"
+    },
+    "StrictActivityUpdateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "delta_display_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Delta Display Mode"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 5000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "goal_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal Ids"
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Id"
+        },
+        "has_metrics": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Metrics"
+        },
+        "has_sets": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Sets"
+        },
+        "has_splits": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Has Splits"
+        },
+        "metrics": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metrics"
+        },
+        "metrics_multiplicative": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metrics Multiplicative"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "progress_aggregation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Progress Aggregation"
+        },
+        "splits": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Splits"
+        },
+        "track_progress": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Track Progress"
+        }
+      },
+      "title": "StrictActivityUpdateSchema",
+      "type": "object"
+    },
+    "StrictBlockUpdateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "pattern": "^#[0-9A-Fa-f]{6}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "end_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Date"
+        },
+        "goal_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal Ids"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "start_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Date"
+        }
+      },
+      "title": "StrictBlockUpdateSchema",
+      "type": "object"
+    },
+    "StrictGoalCreateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "activity_definition_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Activity Definition Id"
+        },
+        "allow_manual_completion": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": true,
+          "title": "Allow Manual Completion"
+        },
+        "completed_via_children": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Completed Via Children"
+        },
+        "deadline": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deadline"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 5000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "inherit_parent_activities": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Inherit Parent Activities"
+        },
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "relevance_statement": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Relevance Statement"
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Id"
+        },
+        "targets": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Targets"
+        },
+        "track_activities": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": true,
+          "title": "Track Activities"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "StrictGoalCreateSchema",
+      "type": "object"
+    },
+    "StrictGoalUpdateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_manual_completion": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Allow Manual Completion"
+        },
+        "completed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed"
+        },
+        "completed_via_children": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed Via Children"
+        },
+        "deadline": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deadline"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 5000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "inherit_parent_activities": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inherit Parent Activities"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "progress_settings": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Progress Settings"
+        },
+        "relevance_statement": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Relevance Statement"
+        },
+        "targets": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Targets"
+        },
+        "track_activities": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Track Activities"
+        }
+      },
+      "title": "StrictGoalUpdateSchema",
+      "type": "object"
+    },
+    "StrictMetricCreateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "default_progress_aggregation": {
+          "anyOf": [
+            {
+              "enum": [
+                "last",
+                "sum",
+                "max",
+                "yield"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Progress Aggregation"
+        },
+        "default_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Value"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "higher_is_better": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Higher Is Better"
+        },
+        "input_type": {
+          "default": "number",
+          "enum": [
+            "number",
+            "integer",
+            "duration"
+          ],
+          "title": "Input Type",
+          "type": "string"
+        },
+        "is_additive": {
+          "default": true,
+          "title": "Is Additive",
+          "type": "boolean"
+        },
+        "is_multiplicative": {
+          "default": true,
+          "title": "Is Multiplicative",
+          "type": "boolean"
+        },
+        "max_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Value"
+        },
+        "min_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Value"
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "precision": {
+          "anyOf": [
+            {
+              "maximum": 6,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Precision"
+        },
+        "predefined_values": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 100,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Predefined Values"
+        },
+        "sort_order": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sort Order"
+        },
+        "unit": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "unit"
+      ],
+      "title": "StrictMetricCreateSchema",
+      "type": "object"
+    },
+    "StrictMetricUpdateSchema": {
+      "additionalProperties": false,
+      "description": "Patch schema: omitted fields must preserve the existing definition.",
+      "properties": {
+        "default_progress_aggregation": {
+          "anyOf": [
+            {
+              "enum": [
+                "last",
+                "sum",
+                "max",
+                "yield"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Progress Aggregation"
+        },
+        "default_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Value"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "higher_is_better": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Higher Is Better"
+        },
+        "input_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "number",
+                "integer",
+                "duration"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input Type"
+        },
+        "is_additive": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Is Additive"
+        },
+        "is_multiplicative": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Is Multiplicative"
+        },
+        "max_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Value"
+        },
+        "min_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Value"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "precision": {
+          "anyOf": [
+            {
+              "maximum": 6,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Precision"
+        },
+        "predefined_values": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 100,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Predefined Values"
+        },
+        "sort_order": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sort Order"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        }
+      },
+      "title": "StrictMetricUpdateSchema",
+      "type": "object"
+    },
+    "StrictProgramBlockCreateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "pattern": "^#[0-9A-Fa-f]{6}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "end_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Date"
+        },
+        "goal_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal Ids"
+        },
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "start_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Date"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "StrictProgramBlockCreateSchema",
+      "type": "object"
+    },
+    "StrictProgramCreateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "pattern": "^#[0-9A-Fa-f]{6}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 5000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "end_date": {
+          "title": "End Date",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "selectedGoals": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selectedgoals"
+        },
+        "start_date": {
+          "title": "Start Date",
+          "type": "string"
+        },
+        "weeklySchedule": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weeklyschedule"
+        }
+      },
+      "required": [
+        "name",
+        "start_date",
+        "end_date"
+      ],
+      "title": "StrictProgramCreateSchema",
+      "type": "object"
+    },
+    "StrictProgramDayCreateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "cascade": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Cascade"
+        },
+        "completion_min_templates": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completion Min Templates"
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date"
+        },
+        "day_of_week": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Day Of Week"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "template_configs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/StrictProgramDayTemplateConfigSchema"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Configs"
+        },
+        "template_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Id"
+        },
+        "template_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Ids"
+        }
+      },
+      "title": "StrictProgramDayCreateSchema",
+      "type": "object"
+    },
+    "StrictProgramDayScheduleSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "session_start": {
+          "minLength": 1,
+          "title": "Session Start",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_start"
+      ],
+      "title": "StrictProgramDayScheduleSchema",
+      "type": "object"
+    },
+    "StrictProgramDayTemplateConfigSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "is_required": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": true,
+          "title": "Is Required"
+        },
+        "order": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 0,
+          "title": "Order"
+        },
+        "template_id": {
+          "title": "Template Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "template_id"
+      ],
+      "title": "StrictProgramDayTemplateConfigSchema",
+      "type": "object"
+    },
+    "StrictProgramDayUpdateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "cascade": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Cascade"
+        },
+        "completion_min_templates": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completion Min Templates"
+        },
+        "date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date"
+        },
+        "day_of_week": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Day Of Week"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "template_configs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ProgramDayTemplateConfigSchema"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Configs"
+        },
+        "template_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Ids"
+        }
+      },
+      "title": "StrictProgramDayUpdateSchema",
+      "type": "object"
+    },
+    "StrictProgramUpdateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "anyOf": [
+            {
+              "pattern": "^#[0-9A-Fa-f]{6}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Color"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 5000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "end_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Date"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "selectedGoals": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Selectedgoals"
+        },
+        "start_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Date"
+        },
+        "weeklySchedule": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Weeklyschedule"
+        }
+      },
+      "title": "StrictProgramUpdateSchema",
+      "type": "object"
+    },
+    "StrictSessionCreateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 5000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "duration_minutes": {
+          "anyOf": [
+            {
+              "maximum": 1440,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Minutes"
+        },
+        "goal_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal Ids"
+        },
+        "immediate_goal_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Immediate Goal Ids"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "Untitled Session",
+          "title": "Name"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        },
+        "parent_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Ids"
+        },
+        "session_data": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Data"
+        },
+        "session_end": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session End"
+        },
+        "session_start": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Start"
+        },
+        "template_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Id"
+        },
+        "total_duration_seconds": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total Duration Seconds"
+        }
+      },
+      "title": "StrictSessionCreateSchema",
+      "type": "object"
+    },
+    "StrictSessionUpdateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "completed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 5000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "duration_minutes": {
+          "anyOf": [
+            {
+              "maximum": 1440,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Minutes"
+        },
+        "goal_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal Ids"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "session_data": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Data"
+        },
+        "session_end": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session End"
+        },
+        "session_start": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Session Start"
+        },
+        "template_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Id"
+        },
+        "total_duration_seconds": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total Duration Seconds"
+        }
+      },
+      "title": "StrictSessionUpdateSchema",
+      "type": "object"
+    },
+    "StrictTemplateCreateSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 5000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "is_archived": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": false,
+          "title": "Is Archived"
+        },
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "template_data": {
+          "additionalProperties": true,
+          "title": "Template Data",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "template_data"
+      ],
+      "title": "StrictTemplateCreateSchema",
+      "type": "object"
+    },
+    "UpdateActivityOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "activity_id": {
+          "description": "Opaque ID of an existing activity in the task's fractal.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Activity Id",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/StrictActivityUpdateSchema",
+          "description": "Supported editable activity definition fields."
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "update_activity",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "activity_id",
+        "data"
+      ],
+      "title": "UpdateActivityOperation",
+      "type": "object"
+    },
+    "UpdateBlockOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "block_id": {
+          "description": "Opaque ID of an existing block in the program.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Block Id",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/StrictBlockUpdateSchema",
+          "description": "Supported block name, date range, color, and goal IDs."
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "program_id": {
+          "description": "Opaque ID of the containing program.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Program Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "update_block",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "program_id",
+        "block_id",
+        "data"
+      ],
+      "title": "UpdateBlockOperation",
+      "type": "object"
+    },
+    "UpdateGoalOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StrictGoalUpdateSchema",
+          "description": "Supported reviewed fields: name, description, deadline, parent_id, targets, child completion, activity inheritance, manual completion, activity tracking, and progress settings."
+        },
+        "goal_id": {
+          "description": "Opaque ID of an existing goal in the task's fractal.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Goal Id",
+          "type": "string"
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "update_goal",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "goal_id",
+        "data"
+      ],
+      "title": "UpdateGoalOperation",
+      "type": "object"
+    },
+    "UpdateMetricOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StrictMetricUpdateSchema"
+        },
+        "metric_id": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Metric Id",
+          "type": "string"
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "update_metric",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "metric_id",
+        "data"
+      ],
+      "title": "UpdateMetricOperation",
+      "type": "object"
+    },
+    "UpdateProgramDayOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "block_id": {
+          "description": "Opaque ID of the containing block.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Block Id",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/StrictProgramDayUpdateSchema",
+          "description": "Supported program-day fields. Cascading updates are rejected."
+        },
+        "day_id": {
+          "description": "Opaque ID of an existing day in the block.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Day Id",
+          "type": "string"
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "program_id": {
+          "description": "Opaque ID of the containing program.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Program Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "update_program_day",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "program_id",
+        "block_id",
+        "day_id",
+        "data"
+      ],
+      "title": "UpdateProgramDayOperation",
+      "type": "object"
+    },
+    "UpdateProgramOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StrictProgramUpdateSchema",
+          "description": "Supported program fields; schedule replacement is not supported by reviewed updates."
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "program_id": {
+          "description": "Opaque ID of an existing program in the task's fractal.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Program Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "update_program",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "program_id",
+        "data"
+      ],
+      "title": "UpdateProgramOperation",
+      "type": "object"
+    },
+    "UpdateSessionOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/StrictSessionUpdateSchema",
+          "description": "Supported session fields such as name, description, duration, dates, completion, and session data."
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "session_id": {
+          "description": "Opaque ID of an existing session in the task's fractal.",
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Session Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "update_session",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "session_id",
+        "data"
+      ],
+      "title": "UpdateSessionOperation",
+      "type": "object"
+    }
+  },
+  "$id": "https://fractal-goals.invalid/schemas/agent-proposal-v1.0.0.json",
+  "additionalProperties": false,
+  "properties": {
+    "operations": {
+      "description": "Ordered, reviewed changes. Use $ref:<operation_id> only for IDs returned by an earlier create operation. Every operation is scoped to the task's fractal and is validated before user approval.",
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "associate_activity_goals": "#/$defs/AssociateActivityGoalsOperation",
+            "create_activity": "#/$defs/CreateActivityOperation",
+            "create_block": "#/$defs/CreateBlockOperation",
+            "create_goal": "#/$defs/CreateGoalOperation",
+            "create_metric": "#/$defs/CreateMetricOperation",
+            "create_note": "#/$defs/CreateNoteOperation",
+            "create_program": "#/$defs/CreateProgramOperation",
+            "create_program_day": "#/$defs/CreateProgramDayOperation",
+            "create_session": "#/$defs/CreateSessionOperation",
+            "create_template": "#/$defs/CreateTemplateOperation",
+            "schedule_program_day": "#/$defs/ScheduleProgramDayOperation",
+            "update_activity": "#/$defs/UpdateActivityOperation",
+            "update_block": "#/$defs/UpdateBlockOperation",
+            "update_goal": "#/$defs/UpdateGoalOperation",
+            "update_metric": "#/$defs/UpdateMetricOperation",
+            "update_program": "#/$defs/UpdateProgramOperation",
+            "update_program_day": "#/$defs/UpdateProgramDayOperation",
+            "update_session": "#/$defs/UpdateSessionOperation"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/CreateGoalOperation"
+          },
+          {
+            "$ref": "#/$defs/UpdateGoalOperation"
+          },
+          {
+            "$ref": "#/$defs/CreateActivityOperation"
+          },
+          {
+            "$ref": "#/$defs/UpdateActivityOperation"
+          },
+          {
+            "$ref": "#/$defs/AssociateActivityGoalsOperation"
+          },
+          {
+            "$ref": "#/$defs/CreateNoteOperation"
+          },
+          {
+            "$ref": "#/$defs/CreateSessionOperation"
+          },
+          {
+            "$ref": "#/$defs/UpdateSessionOperation"
+          },
+          {
+            "$ref": "#/$defs/CreateMetricOperation"
+          },
+          {
+            "$ref": "#/$defs/UpdateMetricOperation"
+          },
+          {
+            "$ref": "#/$defs/CreateTemplateOperation"
+          },
+          {
+            "$ref": "#/$defs/CreateProgramOperation"
+          },
+          {
+            "$ref": "#/$defs/UpdateProgramOperation"
+          },
+          {
+            "$ref": "#/$defs/UpdateBlockOperation"
+          },
+          {
+            "$ref": "#/$defs/UpdateProgramDayOperation"
+          },
+          {
+            "$ref": "#/$defs/CreateBlockOperation"
+          },
+          {
+            "$ref": "#/$defs/CreateProgramDayOperation"
+          },
+          {
+            "$ref": "#/$defs/ScheduleProgramDayOperation"
+          }
+        ]
+      },
+      "maxItems": 50,
+      "minItems": 1,
+      "title": "Operations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "operations"
+  ],
+  "schema_version": "1.0.0",
+  "title": "AgentProposalSchema",
+  "type": "object"
+}

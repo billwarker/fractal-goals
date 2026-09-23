@@ -74,7 +74,15 @@ def get_first_party_agent_context(current_user, root_id):
     db_session = get_db_session()
     try:
         _require_enabled(db_session)
-        return jsonify(AgentHarnessService(db_session).get_goal_context(current_user.id, root_id))
+        return jsonify(AgentHarnessService(db_session).get_goal_context(
+            current_user.id,
+            root_id,
+            goals_offset=request.args.get("goals_offset", 0, type=int),
+            activities_offset=request.args.get("activities_offset", 0, type=int),
+            programs_offset=request.args.get("programs_offset", 0, type=int),
+            templates_offset=request.args.get("templates_offset", 0, type=int),
+            page_size=request.args.get("page_size", type=int),
+        ))
     except (AgentHarnessError, AgentAccessError) as error:
         return _json_error(error)
     finally:
@@ -286,7 +294,16 @@ def start_embedded_agent_conversation(current_user):
 def get_embedded_agent_conversation(current_user, conversation_id):
     db_session = get_db_session()
     try:
-        return jsonify(AgentEmbeddedService(db_session).get_conversation(current_user.id, conversation_id))
+        try:
+            page_size = int(request.args.get("limit", 50))
+        except (TypeError, ValueError):
+            raise AgentHarnessError("limit must be an integer", 400, "invalid_limit")
+        return jsonify(AgentEmbeddedService(db_session).get_conversation(
+            current_user.id,
+            conversation_id,
+            before=request.args.get("before"),
+            limit=page_size,
+        ))
     except (AgentHarnessError, AgentAccessError) as error:
         return _json_error(error)
     finally:

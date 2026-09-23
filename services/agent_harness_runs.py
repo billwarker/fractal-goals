@@ -3,17 +3,33 @@
 import logging
 import datetime as dt
 from sqlalchemy import or_
+from sqlalchemy.orm.exc import StaleDataError
 from config import config
-from models import AgentApproval, AgentChangeCursor, AgentOperation, AgentOutboxEvent, AgentProposal, AgentRun, AgentTaskBrief, utc_now
+from models import AgentApproval, AgentChangeCursor, AgentOperation, AgentOutboxEvent, AgentProposal, AgentRun, AgentTaskBrief, EventLog, Goal, utc_now
 from services.activity_service import ActivityService
 from services.goal_service import GoalService, sync_goal_targets
 from services.note_service import NoteService
 from services.goal_type_utils import get_canonical_goal_type
 
-from services.agent_harness_common import AgentHarnessError, _aware, _digest, _iso
+from services.agent_harness_common import AgentHarnessError, _aware, _digest
 from services.agent_operation_versions import operation_restore_payload, operation_state_hash
+from services.agent_operation_registry import OPERATION_REGISTRY
 
 logger = logging.getLogger(__name__)
+
+
+def _enabled_run_origins(agent_flags):
+    if not agent_flags.get("ai_agent_writes"):
+        return set()
+    origins = {"first_party"}
+    if agent_flags.get("ai_agent_connectors"):
+        origins.add("connector")
+    if config.AGENT_EMBEDDED_PRIVACY_APPROVED and agent_flags.get("ai_agent_embedded"):
+        if agent_flags.get("ai_agent_embedded_openai"):
+            origins.add("embedded_openai")
+        if agent_flags.get("ai_agent_embedded_anthropic"):
+            origins.add("embedded_anthropic")
+    return origins
 
 
 class AgentRunsMixin:
@@ -168,22 +184,8 @@ class AgentRunsMixin:
         grant = None
         if locked_run.grant_id:
             grant = self._grant(locked_run.grant_id, locked_run.user_id, locked_run.root_id)
-        required_scope = {
-            "create_goal": "goals:write",
-            "update_goal": "goals:write",
-            "create_activity": "activities:write",
-            "update_activity": "activities:write",
-            "associate_activity_goals": "activities:write",
-            "create_note": "notes:write",
-            "create_template": "programs:write",
-            "create_program": "programs:write",
-            "update_program": "programs:write",
-            "create_block": "programs:write",
-            "update_block": "programs:write",
-            "create_program_day": "programs:write",
-            "update_program_day": "programs:write",
-            "schedule_program_day": "programs:write",
-        }.get(operation.kind)
+        operation_metadata = OPERATION_REGISTRY.get(operation.kind)
+        required_scope = operation_metadata["scope"] if operation_metadata else None
         if grant and required_scope not in set((grant.scopes or "").split()):
             raise AgentHarnessError("The AI connection no longer grants this write", 403, "insufficient_scope")
         operation.status = "running"
@@ -210,6 +212,34 @@ class AgentRunsMixin:
                 409,
                 "stale_context",
             )
+        if expected_state_hash:
+            locked_state_hash = operation_state_hash(
+                self.db_session,
+                locked_run.root_id,
+                input_data,
+                for_update=True,
+            )
+            if locked_state_hash != expected_state_hash:
+                raise AgentHarnessError(
+                    "The reviewed record changed while execution was starting; create and approve a new proposal",
+                    409,
+                    "stale_context",
+                )
+        if operation.kind == "schedule_program_day":
+            expected_source_hash = input_data.get("expected_source_hash")
+            if expected_source_hash and expected_source_hash != self._program_day_state_hash(
+                locked_run.root_id,
+                input_data["program_id"],
+                input_data["block_id"],
+                input_data["day_id"],
+                operation=input_data,
+                for_update=True,
+            ):
+                raise AgentHarnessError(
+                    "The program day changed after review; create and approve a new proposal",
+                    409,
+                    "stale_context",
+                )
         inverse = operation_restore_payload(
             self.db_session, locked_run.root_id, input_data,
         )
@@ -353,6 +383,50 @@ class AgentRunsMixin:
                 "root_id": locked_run.root_id,
                 "href": self._app_href(locked_run.root_id, "notes"),
             }
+        elif operation.kind in {"create_session", "update_session"}:
+            from services.session_service import SessionService
+
+            service = SessionService(self.db_session)
+            if operation.kind == "create_session":
+                entity, error, status = service.create_session(
+                    locked_run.root_id, locked_run.user_id, input_data["data"],
+                    commit=False, pending_events=pending_events,
+                )
+                entity_id = entity.get("id") if entity else None
+            else:
+                entity, error, status = service.update_session(
+                    locked_run.root_id, input_data["session_id"], locked_run.user_id,
+                    input_data["data"], commit=False, pending_events=pending_events,
+                )
+                entity_id = input_data["session_id"]
+            if error:
+                raise AgentHarnessError(str(error), status, "validation_failed")
+            result = {
+                "id": entity_id,
+                "name": entity.get("name") if entity else None,
+                "root_id": locked_run.root_id,
+                "href": self._app_href(locked_run.root_id, "sessions"),
+            }
+        elif operation.kind in {"create_metric", "update_metric"}:
+            service = ActivityService(self.db_session)
+            if operation.kind == "create_metric":
+                entity, error, status = service.create_fractal_metric(
+                    locked_run.root_id, locked_run.user_id, input_data["data"],
+                    commit=False, pending_events=pending_events,
+                )
+            else:
+                entity, error, status = service.update_fractal_metric(
+                    locked_run.root_id, input_data["metric_id"], locked_run.user_id,
+                    input_data["data"], commit=False, pending_events=pending_events,
+                )
+            if error:
+                raise AgentHarnessError(str(error), status, "validation_failed")
+            result = {
+                "id": entity.id,
+                "name": entity.name,
+                "root_id": locked_run.root_id,
+                "href": self._app_href(locked_run.root_id, "metrics"),
+            }
         elif operation.kind == "create_template":
             from services.template_service import TemplateService
 
@@ -430,18 +504,7 @@ class AgentRunsMixin:
         elif operation.kind == "schedule_program_day":
             from services.programs import ProgramService
 
-            expected_source_hash = input_data.pop("expected_source_hash", None)
-            if expected_source_hash and expected_source_hash != self._program_day_state_hash(
-                locked_run.root_id,
-                input_data["program_id"],
-                input_data["block_id"],
-                input_data["day_id"],
-            ):
-                raise AgentHarnessError(
-                    "The program day changed after review; create and approve a new proposal",
-                    409,
-                    "stale_context",
-                )
+            input_data.pop("expected_source_hash", None)
             scheduled = ProgramService.schedule_block_day(
                 self.db_session,
                 locked_run.root_id,
@@ -478,11 +541,13 @@ class AgentRunsMixin:
         operation.result = result
         operation.finished_at = utc_now()
         for event in pending_events:
+            event_data = dict(event.data or {})
+            event_data.setdefault("root_id", locked_run.root_id)
             self.db_session.add(AgentOutboxEvent(
                 event_type=event.name,
                 payload={
                     "id": event.id,
-                    "data": event.data,
+                    "data": event_data,
                     "source": event.source,
                     "timestamp": event.timestamp.isoformat(),
                 },
@@ -509,7 +574,9 @@ class AgentRunsMixin:
         from services.feature_flag_service import FeatureFlagService
 
         flags, error, _ = FeatureFlagService(self.db_session).get_flags()
-        if error or not (flags.get("flags", {}).get("ai_agent_connectors") and flags.get("flags", {}).get("ai_agent_writes")):
+        agent_flags = flags.get("flags", {}) if not error and flags else {}
+        enabled_origins = _enabled_run_origins(agent_flags)
+        if not enabled_origins:
             self.dispatch_outbox()
             return None
         now = utc_now()
@@ -518,6 +585,7 @@ class AgentRunsMixin:
                 AgentRun.status == "queued",
                 (AgentRun.status == "running") & (AgentRun.lease_expires_at < now),
             ),
+            AgentRun.execution_origin.in_(enabled_origins),
         ).order_by(AgentRun.created_at, AgentRun.id).with_for_update(skip_locked=True).first()
         if not run:
             self.dispatch_outbox()
@@ -556,12 +624,9 @@ class AgentRunsMixin:
             try:
                 flags, error, _ = FeatureFlagService(self.db_session).get_flags()
                 agent_flags = flags.get("flags", {})
-                if error or not (
-                    agent_flags.get("ai_agent_connectors")
-                    and agent_flags.get("ai_agent_writes")
-                ):
+                if error or current_run.execution_origin not in _enabled_run_origins(agent_flags):
                     raise AgentHarnessError(
-                        "AI writes were paused by an administrator",
+                        "This proposal's execution channel was paused by an administrator",
                         409,
                         "feature_disabled",
                     )
@@ -576,6 +641,22 @@ class AgentRunsMixin:
                     fencing_token,
                     error.code,
                     error.message,
+                )
+                if committed:
+                    succeeded += 1
+                    continue
+                failed = True
+                stop_sequence = operation.sequence
+                break
+            except StaleDataError:
+                self.db_session.rollback()
+                committed = self._record_operation_failure(
+                    run_id,
+                    operation.operation_id,
+                    worker_id,
+                    fencing_token,
+                    "stale_context",
+                    "The record changed during execution; create and approve a new proposal.",
                 )
                 if committed:
                     succeeded += 1
@@ -642,6 +723,8 @@ class AgentRunsMixin:
         if not rows:
             return 0
         from services.events import Event, event_bus
+        from services.event_logger import _get_entity_info, _get_event_description
+        emitted_events = []
         for row in rows:
             payload = row.payload or {}
             timestamp = payload.get("timestamp")
@@ -649,96 +732,39 @@ class AgentRunsMixin:
                 event_time = dt.datetime.fromisoformat(timestamp) if timestamp else utc_now()
             except ValueError:
                 event_time = utc_now()
-            event_bus.emit(Event(
+            event_data = payload.get("data") or {}
+            event = Event(
                 row.event_type,
-                payload.get("data") or {},
+                event_data,
                 id=payload.get("id") or row.id,
                 timestamp=event_time,
                 source=payload.get("source"),
-            ))
+            )
+            root_id = event.data.get("root_id")
+            root_exists = bool(root_id and self.db_session.query(Goal.id).filter_by(
+                id=root_id,
+                deleted_at=None,
+            ).first())
+            if root_exists and not self.db_session.query(EventLog.id).filter_by(
+                event_id=event.id,
+            ).first():
+                entity_type, entity_id = _get_entity_info(event)
+                self.db_session.add(EventLog(
+                    root_id=root_id,
+                    event_type=event.name,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    description=_get_event_description(event),
+                    payload=event.data,
+                    source=event.source or "system",
+                    event_id=event.id,
+                    timestamp=event.timestamp,
+                ))
             row.dispatched_at = utc_now()
+            emitted_events.append(event)
         self.db_session.commit()
+        # EventBus consumers are best-effort in-process handlers. The durable
+        # event-history consumer and dispatch acknowledgement committed above.
+        for event in emitted_events:
+            event_bus.emit(event)
         return len(rows)
-    def serialize_run(self, run, *, include_operations=False):
-        result = {
-            "id": run.id,
-            "proposal_id": run.proposal_id,
-            "root_id": run.root_id,
-            "status": run.status,
-            "trace_id": run.trace_id,
-            "created_at": _iso(run.created_at),
-            "started_at": _iso(run.started_at),
-            "finished_at": _iso(run.finished_at),
-            "cancel_requested": run.cancel_requested_at is not None,
-        }
-        if include_operations:
-            result["operations"] = [
-                {
-                    "id": row.operation_id,
-                    "sequence": row.sequence,
-                    "type": row.kind,
-                    "status": row.status,
-                    "result": row.result,
-                    "error": (
-                        {"code": row.error_code, "message": row.error_message}
-                        if row.error_code else None
-                    ),
-                }
-                for row in self.db_session.query(AgentOperation).filter_by(
-                    run_id=run.id
-                ).order_by(AgentOperation.sequence).all()
-            ]
-        return result
-    def get_run(self, user_id, run_id, *, allowed_roots=None):
-        run = self.db_session.query(AgentRun).filter(
-            AgentRun.id == run_id,
-            AgentRun.user_id == user_id,
-        ).first()
-        if not run or (allowed_roots is not None and run.root_id not in allowed_roots):
-            raise AgentHarnessError("Run not found", 404, "not_found")
-        return self.serialize_run(run, include_operations=True)
-    def get_change_cursor(self, user_id, root_id, *, allowed_roots=None):
-        if allowed_roots is not None and root_id not in allowed_roots:
-            raise AgentHarnessError("Fractal is outside the AI connection's allowed scope", 403, "root_forbidden")
-        self._root(root_id, user_id)
-        cursor = self.db_session.get(AgentChangeCursor, (user_id, root_id))
-        return {"root_id": root_id, "cursor": cursor.cursor if cursor else 0}
-    def list_runs(self, user_id, *, root_id=None, allowed_roots=None, limit=50, before=None):
-        query = self.db_session.query(AgentRun).filter(AgentRun.user_id == user_id)
-        if root_id:
-            if allowed_roots is not None and root_id not in allowed_roots:
-                raise AgentHarnessError("Fractal is outside the AI connection's allowed scope", 403, "root_forbidden")
-            query = query.filter(AgentRun.root_id == root_id)
-        elif allowed_roots is not None:
-            query = query.filter(AgentRun.root_id.in_(allowed_roots))
-        if before:
-            query = query.filter(AgentRun.created_at < before)
-        page_size = min(100, max(1, limit))
-        rows = query.order_by(AgentRun.created_at.desc(), AgentRun.id.desc()).limit(page_size + 1).all()
-        visible_rows = rows[:page_size]
-        run_ids = [run.id for run in visible_rows]
-        operations_by_run = {}
-        if run_ids:
-            operations = self.db_session.query(AgentOperation).filter(
-                AgentOperation.run_id.in_(run_ids),
-            ).order_by(AgentOperation.run_id, AgentOperation.sequence).all()
-            for operation in operations:
-                operations_by_run.setdefault(operation.run_id, []).append({
-                    "id": operation.operation_id,
-                    "sequence": operation.sequence,
-                    "type": operation.kind,
-                    "status": operation.status,
-                    "result": operation.result,
-                    "error": (
-                        {"code": operation.error_code, "message": operation.error_message}
-                        if operation.error_code else None
-                    ),
-                })
-        items = [self.serialize_run(run) for run in visible_rows]
-        for item in items:
-            item["operations"] = operations_by_run.get(item["id"], [])
-        return {
-            "items": items,
-            "truncated": len(rows) > page_size,
-            "next_before": _iso(rows[page_size - 1].created_at) if len(rows) > page_size else None,
-        }

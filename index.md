@@ -161,16 +161,17 @@ admin analytics and export according to the documented retention controls.
 
 ## Repository map
 
-AI agent harness: [implementation plan and delivery audit](planning/ai-agent-harness.md).
-The local runtime includes delegated OAuth, a separately deployed MCP adapter with
-host-facing safety annotations, reviewed task/proposal execution, safe reviewed updates
-and inverse proposals, and a first-party handoff/review UI. Its pinned-SDK Streamable
-HTTP protocol round-trip passes locally. An app-funded embedded assistant is implemented
-behind feature and deployment privacy gates. Connector and write flags default off until
-public-host compatibility and release gates pass. The local PostgreSQL-backed backend
-suite, fresh-database migration checks, frontend suite, and desktop/mobile browser
-workflows pass; provider keys, public host access, and live ChatGPT/Claude verification
-are not configured locally.
+AI agent harness: [implementation plan](planning/ai-agent-harness.md) and
+[production review with latest intent addendum](planning/ai-agent-harness-production-review-2026-09-20.md).
+The current implementation contains delegated OAuth/MCP, reviewed proposal execution,
+and a fully embedded, persistent chat shell backed by the gated provider worker.
+The September 22 target replaces the handoff-first flow, removes manual entity-focus
+selection, and supports reviewed create/update proposals across goals, sessions,
+activities, metrics, programs, notes and templates. The agent discovers scoped context
+automatically; users preview and accept an immutable proposal before domain writes occur.
+Existing domain services remain canonical. Optional connectors have separate release
+gates. The embedded vertical slice and local correctness fixes are implemented behind
+feature flags; provider, browser, operations and deployment evidence remain release gates.
 
 - `app.py`, `config.py`, `extensions.py` — application/runtime setup
 - `blueprints/` — HTTP routes

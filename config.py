@@ -159,9 +159,19 @@ class Config:
     AGENT_EMBEDDED_ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')
     AGENT_EMBEDDED_OPENAI_MODEL = os.getenv('AGENT_EMBEDDED_OPENAI_MODEL', '').strip()
     AGENT_EMBEDDED_ANTHROPIC_MODEL = os.getenv('AGENT_EMBEDDED_ANTHROPIC_MODEL', '').strip()
+    # Explicit, operator-maintained USD per million input/output tokens for the
+    # configured model. Zero leaves embedded inference unavailable until priced.
+    AGENT_EMBEDDED_OPENAI_INPUT_USD_PER_MILLION = max(0.0, float(os.getenv('AGENT_EMBEDDED_OPENAI_INPUT_USD_PER_MILLION', '0')))
+    AGENT_EMBEDDED_OPENAI_OUTPUT_USD_PER_MILLION = max(0.0, float(os.getenv('AGENT_EMBEDDED_OPENAI_OUTPUT_USD_PER_MILLION', '0')))
+    AGENT_EMBEDDED_ANTHROPIC_INPUT_USD_PER_MILLION = max(0.0, float(os.getenv('AGENT_EMBEDDED_ANTHROPIC_INPUT_USD_PER_MILLION', '0')))
+    AGENT_EMBEDDED_ANTHROPIC_OUTPUT_USD_PER_MILLION = max(0.0, float(os.getenv('AGENT_EMBEDDED_ANTHROPIC_OUTPUT_USD_PER_MILLION', '0')))
+    AGENT_EMBEDDED_DAILY_USER_BUDGET_USD = max(0.0, float(os.getenv('AGENT_EMBEDDED_DAILY_USER_BUDGET_USD', '2')))
+    AGENT_EMBEDDED_DAILY_DEPLOYMENT_BUDGET_USD = max(0.0, float(os.getenv('AGENT_EMBEDDED_DAILY_DEPLOYMENT_BUDGET_USD', '25')))
     AGENT_EMBEDDED_PRIVACY_APPROVED = os.getenv('AGENT_EMBEDDED_PRIVACY_APPROVED', '').lower() == 'true'
     AGENT_EMBEDDED_MAX_STEPS = max(1, min(8, int(os.getenv('AGENT_EMBEDDED_MAX_STEPS', '6'))))
-    AGENT_EMBEDDED_MAX_TOKENS = max(512, min(12000, int(os.getenv('AGENT_EMBEDDED_MAX_TOKENS', '8000'))))
+    # Tool schemas are part of each provider request. Keep enough input budget for
+    # the canonical operation contract plus the user's context and bounded output.
+    AGENT_EMBEDDED_MAX_TOKENS = max(1024, min(24000, int(os.getenv('AGENT_EMBEDDED_MAX_TOKENS', '16000'))))
     AGENT_EMBEDDED_MAX_SECONDS = max(15, min(180, int(os.getenv('AGENT_EMBEDDED_MAX_SECONDS', '90'))))
 
     # Rate Limiting Storage URL (Redis-compatible, or memory:// for explicit private-beta mode)

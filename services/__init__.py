@@ -25,16 +25,22 @@ from services.event_logger import setup_event_logging
 from services.analytics_cache import setup_analytics_cache_invalidation
 from services.analytics_query_cache import setup_analytics_query_cache_invalidation
 
+_services_initialized = False
+
 
 def init_services():
     """
     Initialize all services.
     Call this on application startup.
     """
+    global _services_initialized
+    if _services_initialized:
+        return
     init_completion_handlers()
     setup_event_logging()
     setup_analytics_cache_invalidation()
     setup_analytics_query_cache_invalidation()
+    _services_initialized = True
     # Add future service initializations here
 
 

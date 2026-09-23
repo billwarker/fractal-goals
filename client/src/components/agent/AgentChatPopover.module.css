@@ -1,0 +1,312 @@
+.dialog {
+    position: fixed;
+    z-index: calc(var(--z-modal) - 1);
+    top: calc(var(--app-nav-height, 0px) + 12px);
+    right: 18px;
+    display: flex;
+    width: min(460px, calc(100vw - 28px));
+    height: min(760px, calc(100dvh - var(--app-nav-height, 0px) - 24px));
+    min-height: 320px;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--color-border-card);
+    border-radius: 16px;
+    background: var(--color-bg-elevated);
+    box-shadow: 0 18px 60px rgb(0 0 0 / 24%);
+    color: var(--color-text-primary);
+}
+
+.header {
+    display: flex;
+    min-height: 64px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--color-border-card);
+    background: var(--color-bg-card, var(--color-bg-elevated));
+}
+
+.headerTitle {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+}
+
+.headerTitle h2,
+.headerTitle p {
+    margin: 0;
+}
+
+.headerTitle h2 {
+    font-size: 1rem;
+}
+
+.headerTitle p {
+    margin-top: 2px;
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+}
+
+.statusDot {
+    width: 10px;
+    height: 10px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--color-success, #18864b);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-success, #18864b) 16%, transparent);
+}
+
+.minimizeButton {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border: 1px solid var(--color-border-card);
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.minimizeButton span {
+    font-size: 1.4rem;
+    line-height: 1;
+}
+
+.content {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+}
+
+.messageList {
+    display: grid;
+    min-height: 0;
+    flex: 1;
+    align-content: start;
+    gap: 12px;
+    overflow: auto;
+    padding: 14px;
+    overscroll-behavior: contain;
+}
+
+.message {
+    width: fit-content;
+    max-width: 94%;
+    padding: 11px 13px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 14px;
+    overflow-wrap: anywhere;
+}
+
+.message > strong {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.82rem;
+}
+
+.message p {
+    margin: 5px 0 0;
+    line-height: 1.45;
+    white-space: pre-wrap;
+}
+
+.assistantMessage {
+    justify-self: start;
+    background: var(--color-bg-secondary);
+}
+
+.userMessage {
+    justify-self: end;
+    background: color-mix(in srgb, var(--color-link, #2563eb) 12%, var(--color-bg-elevated));
+}
+
+.form {
+    display: grid;
+    flex: 0 0 auto;
+    gap: 8px;
+    padding: 12px 14px max(12px, env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--color-border-card);
+    background: var(--color-bg-card, var(--color-bg-elevated));
+}
+
+.form label {
+    font-size: 0.85rem;
+    font-weight: 650;
+}
+
+.form select,
+.form textarea {
+    width: 100%;
+    border: 1px solid var(--color-border-card);
+    border-radius: 9px;
+    background: var(--color-bg-elevated);
+    color: inherit;
+    font: inherit;
+    padding: 9px 11px;
+}
+
+.composer {
+    display: grid;
+    gap: 7px;
+}
+
+.form textarea {
+    min-height: 64px;
+    max-height: 130px;
+    resize: vertical;
+}
+
+.formFooter,
+.sectionHeading,
+.proposalHeading,
+.reviewActions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 9px;
+}
+
+.formFooter span {
+    color: var(--color-text-secondary);
+    font-size: 0.73rem;
+}
+
+.dialog button {
+    min-height: 38px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 8px;
+    padding: 7px 11px;
+    background: var(--color-bg-elevated);
+    color: inherit;
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.formFooter button,
+.reviewActions button:last-child {
+    border-color: var(--color-link, #2563eb);
+    background: var(--color-link, #2563eb);
+    color: white;
+}
+
+.dialog button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.dialog button:focus-visible,
+.dialog a:focus-visible,
+.dialog select:focus-visible,
+.dialog textarea:focus-visible,
+.dialog summary:focus-visible {
+    outline: 3px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.section {
+    display: grid;
+    gap: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border-card);
+}
+
+.section h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.sectionHeading {
+    align-items: flex-start;
+}
+
+.proposal {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 10px;
+    background: var(--color-bg-elevated);
+}
+
+.status {
+    color: var(--color-text-secondary);
+    font-size: 0.85rem;
+    text-transform: capitalize;
+}
+
+.previewItem {
+    display: grid;
+    gap: 4px;
+    padding: 9px 0;
+    border-top: 1px solid var(--color-border-card);
+}
+
+.previewItem span,
+.previewItem p {
+    overflow-wrap: anywhere;
+    color: var(--color-text-secondary);
+}
+
+.changeList {
+    display: grid;
+    grid-template-columns: minmax(95px, 0.35fr) minmax(0, 1fr);
+    gap: 4px 9px;
+    margin: 6px 0 0;
+    font-size: 0.86rem;
+}
+
+.changeList dt {
+    color: var(--color-text-secondary);
+    text-transform: capitalize;
+}
+
+.changeList dd {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.changeList dd strong {
+    color: var(--color-text-secondary);
+    font-weight: 600;
+}
+
+.notice {
+    color: var(--color-text-secondary);
+}
+
+.error {
+    color: var(--color-danger, #b42318);
+}
+
+@media (max-width: 600px) {
+    .dialog {
+        top: calc(var(--app-nav-height, 0px) + 8px);
+        right: 8px;
+        width: calc(100vw - 16px);
+        height: calc(100dvh - var(--app-nav-height, 0px) - 16px);
+        min-height: 250px;
+        border-radius: 13px;
+    }
+
+    .messageList {
+        padding: 11px;
+    }
+
+    .form {
+        padding: 10px 11px max(10px, env(safe-area-inset-bottom, 0px));
+    }
+
+    .sectionHeading {
+        flex-direction: column;
+    }
+
+}

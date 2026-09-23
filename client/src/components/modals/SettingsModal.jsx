@@ -21,6 +21,14 @@ import styles from './SettingsModal.module.css';
 import { useOptionalOnboarding } from '../../contexts/OnboardingContext';
 import OnboardingSettingsPanel from '../onboarding/OnboardingSettingsPanel';
 import AgentConnectionsPanel from '../agent/AgentConnectionsPanel';
+import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../../hooks/useFeatureFlags';
+
+const SETTINGS_TABS = [
+    { id: 'general', label: 'General' },
+    { id: 'styling', label: 'Goal Characteristics' },
+    { id: 'account', label: 'Account' },
+    { id: 'ai-connections', label: 'AI Connections' },
+];
 
 const SettingsModalInner = ({ onClose }) => {
     const {
@@ -36,6 +44,8 @@ const SettingsModalInner = ({ onClose }) => {
     const { user, accountUsage, accountUsageLoading, availableFractals, fractalsLoading, selectedQuotaRootIds, setSelectedQuotaRootIds, passwordData, setPasswordData, emailData, setEmailData, deleteData, setDeleteData, exportPassword, setExportPassword, isExporting, quotaRows, displayTier, displayStatus, quotaScopeLabel, handleQuotaRootToggle, handlePasswordUpdate, handleEmailUpdate, handleExportData, handleDeleteAccount, handleCancelDeletion } = useAccountSettings(activeTab);
     const { activeRootId } = useGoals();
     const isMobile = useIsMobile();
+    const { flags } = useFeatureFlags();
+    const connectorsEnabled = isFeatureEnabled(flags, FEATURE_FLAGS.aiAgentConnectors);
     const onboarding = useOptionalOnboarding();
     const [availableTimezones] = useState(getAvailableTimezones);
     const { progressSettings, activeGoalWindowDays, updateProgressSettings } = useRootProgressSettings(activeRootId);
@@ -79,35 +89,23 @@ const SettingsModalInner = ({ onClose }) => {
                 <div className={`${styles.body} ${isMobile ? styles.bodyMobile : styles.bodyDesktop}`}>
                     {/* Sidebar */}
                     <div className={`${styles.sidebar} ${isMobile ? styles.sidebarMobile : styles.sidebarDesktop}`}>
-                        <div className={`${styles.tabMenu} ${isMobile ? styles.tabMenuMobile : styles.tabMenuDesktop}`}>
-                            <div
-                                onClick={() => setActiveTab('general')}
-                                className={`${styles.tab} ${isMobile ? styles.tabMobile : styles.tabDesktop} ${activeTab === 'general' ? styles.tabActive : styles.tabInactive} ${activeTab === 'general' ? (isMobile ? styles.tabActiveMobile : styles.tabActiveDesktop) : (isMobile ? styles.tabInactiveMobile : styles.tabInactiveDesktop)}`}
-                            >
-                                General
-                            </div>
-                            <div
-                                onClick={() => setActiveTab('styling')}
-                                className={`${styles.tab} ${isMobile ? styles.tabMobile : styles.tabDesktop} ${activeTab === 'styling' ? styles.tabActive : styles.tabInactive} ${activeTab === 'styling' ? (isMobile ? styles.tabActiveMobile : styles.tabActiveDesktop) : (isMobile ? styles.tabInactiveMobile : styles.tabInactiveDesktop)}`}
-                            >
-                                Goal Characteristics
-                            </div>
-                            <div
-                                onClick={() => setActiveTab('account')}
-                                className={`${styles.tab} ${isMobile ? styles.tabMobile : styles.tabDesktop} ${activeTab === 'account' ? styles.tabActive : styles.tabInactive} ${activeTab === 'account' ? (isMobile ? styles.tabActiveMobile : styles.tabActiveDesktop) : (isMobile ? styles.tabInactiveMobile : styles.tabInactiveDesktop)}`}
-                            >
-                                Account
-                            </div>
-                            <div
-                                onClick={() => setActiveTab('ai-connections')}
-                                className={`${styles.tab} ${isMobile ? styles.tabMobile : styles.tabDesktop} ${activeTab === 'ai-connections' ? styles.tabActive : styles.tabInactive} ${activeTab === 'ai-connections' ? (isMobile ? styles.tabActiveMobile : styles.tabActiveDesktop) : (isMobile ? styles.tabInactiveMobile : styles.tabInactiveDesktop)}`}
-                            >
-                                AI Connections
-                            </div>
-                            {onboarding?.enabled && (
-                                <div onClick={() => setActiveTab('getting-started')} className={`${styles.tab} ${isMobile ? styles.tabMobile : styles.tabDesktop} ${activeTab === 'getting-started' ? styles.tabActive : styles.tabInactive}`}>Getting Started</div>
-                            )}
-                        </div>
+                        <nav
+                            aria-label="Settings sections"
+                            className={`${styles.tabMenu} ${isMobile ? styles.tabMenuMobile : styles.tabMenuDesktop}`}
+                        >
+                            {[...SETTINGS_TABS, ...(onboarding?.enabled ? [{ id: 'getting-started', label: 'Getting Started' }] : [])]
+                                .map(({ id, label }) => (
+                                    <button
+                                        key={id}
+                                        type="button"
+                                        aria-pressed={activeTab === id}
+                                        onClick={() => setActiveTab(id)}
+                                        className={`${styles.tab} ${isMobile ? styles.tabMobile : styles.tabDesktop} ${activeTab === id ? styles.tabActive : styles.tabInactive} ${activeTab === id ? (isMobile ? styles.tabActiveMobile : styles.tabActiveDesktop) : (isMobile ? styles.tabInactiveMobile : styles.tabInactiveDesktop)}`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                        </nav>
 
                         {/* Legal Footer in Sidebar */}
                         {!isMobile && (
@@ -313,7 +311,7 @@ const SettingsModalInner = ({ onClose }) => {
 
                         {activeTab === 'ai-connections' && (
                             <div className={styles.tabContent}>
-                                <AgentConnectionsPanel />
+                                <AgentConnectionsPanel enabled={connectorsEnabled} />
                             </div>
                         )}
 

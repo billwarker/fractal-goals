@@ -135,6 +135,7 @@ class EventLog(Base):
         # Global time-window aggregation (admin usage) and BigQuery export
         # keyset pagination.
         sa.Index('ix_event_logs_timestamp_id', 'timestamp', 'id'),
+        sa.UniqueConstraint('event_id', name='uq_event_logs_event_id'),
     )
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -148,6 +149,7 @@ class EventLog(Base):
     payload = Column(JSON_TYPE, nullable=True)
     
     source = Column(String, nullable=True)
+    event_id = Column(String(80), nullable=True)
     timestamp = Column(DateTime, default=utc_now)
 
 

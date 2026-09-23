@@ -7,6 +7,7 @@ from blueprints.api_utils import get_db_session
 from config import config
 from services.agent_access_service import AgentAccessError, AgentAccessService, _scope_set
 from services.agent_harness_service import AgentHarnessError, AgentHarnessService
+from services.agent_operation_registry import OPERATION_REGISTRY
 from blueprints.agent_api_common import (
     agent_internal_bp,
     agent_database_boundary,
@@ -89,8 +90,41 @@ def internal_goal_context():
             body.get("root_id", ""),
             goals_offset=body.get("goals_offset", 0),
             activities_offset=body.get("activities_offset", 0),
+            programs_offset=body.get("programs_offset", 0),
+            templates_offset=body.get("templates_offset", 0),
+            page_size=body.get("page_size"),
         )) if body.get("root_id") in principal["roots"] else (_json_error(
             AgentHarnessError("Fractal is outside the AI connection's allowed scope", 403, "root_forbidden")
+        ))
+    except (AgentHarnessError, AgentAccessError) as error:
+        return _json_error(error)
+    finally:
+        db_session.close()
+
+@agent_internal_bp.post("/program-context")
+def internal_program_context():
+    db_session = get_db_session()
+    try:
+        _require_enabled(db_session)
+        principal = _internal_principal(db_session)
+        _require_internal_scopes(principal, "goals:read")
+        body = request.get_json(silent=True) or {}
+        root_id = body.get("root_id", "")
+        if root_id not in principal["roots"]:
+            return _json_error(AgentHarnessError(
+                "Fractal is outside the AI connection's allowed scope", 403, "root_forbidden",
+            ))
+        return jsonify(AgentHarnessService(db_session).get_program_context(
+            principal["user_id"],
+            root_id,
+            offset=body.get("offset", 0),
+            limit=body.get("limit", 50),
+            program_id=body.get("program_id"),
+            block_offset=body.get("block_offset", 0),
+            block_id=body.get("block_id"),
+            day_offset=body.get("day_offset", 0),
+            day_id=body.get("day_id"),
+            templates_offset=body.get("templates_offset", 0),
         ))
     except (AgentHarnessError, AgentAccessError) as error:
         return _json_error(error)
@@ -124,24 +158,8 @@ def internal_create_proposal(task_id):
         principal = _internal_principal(db_session)
         body = request.get_json(silent=True) or {}
         proposal = AgentProposalSchema.model_validate(body)
-        operation_scopes = {
-            "create_goal": "goals:write",
-            "update_goal": "goals:write",
-            "create_activity": "activities:write",
-            "update_activity": "activities:write",
-            "associate_activity_goals": "activities:write",
-            "create_note": "notes:write",
-            "create_template": "programs:write",
-            "create_program": "programs:write",
-            "update_program": "programs:write",
-            "create_block": "programs:write",
-            "update_block": "programs:write",
-            "create_program_day": "programs:write",
-            "update_program_day": "programs:write",
-            "schedule_program_day": "programs:write",
-        }
         required = {
-            operation_scopes[operation.type]
+            OPERATION_REGISTRY[operation.type]["scope"]
             for operation in proposal.operations
         }
         _require_internal_scopes(principal, *required)
@@ -189,25 +207,9 @@ def internal_apply_proposal(proposal_id):
             proposal_id,
             allowed_roots=principal["roots"],
         )
-        scope_for_type = {
-            "create_goal": "goals:write",
-            "update_goal": "goals:write",
-            "create_activity": "activities:write",
-            "update_activity": "activities:write",
-            "associate_activity_goals": "activities:write",
-            "create_note": "notes:write",
-            "create_template": "programs:write",
-            "create_program": "programs:write",
-            "update_program": "programs:write",
-            "create_block": "programs:write",
-            "update_block": "programs:write",
-            "create_program_day": "programs:write",
-            "update_program_day": "programs:write",
-            "schedule_program_day": "programs:write",
-        }
         _require_internal_scopes(
             principal,
-            *{scope_for_type[operation["type"]] for operation in proposal["operations"]},
+            *{OPERATION_REGISTRY[operation["type"]]["scope"] for operation in proposal["operations"]},
         )
         return jsonify(AgentHarnessService(db_session).queue_approved_proposal(
             proposal_id,

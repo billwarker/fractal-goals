@@ -139,11 +139,13 @@ class Goal(Base):
     paused_at = Column(DateTime, nullable=True)
     targets = Column(JSON_TYPE, nullable=True) # Legacy JSON column
     progress_settings = Column(JSON_TYPE, nullable=True)  # Root-level progress config (ignored on non-root goals)
+    row_version = Column(Integer, nullable=False, default=1, server_default=sa.text('1'))
     
     __table_args__ = (
         sa.Index('ix_goals_root_deleted_level', 'root_id', 'deleted_at', 'level_id'),
         sa.Index('ix_goals_root_parent_deleted', 'root_id', 'parent_id', 'deleted_at'),
     )
+    __mapper_args__ = {'version_id_col': row_version}
 
     level = relationship("GoalLevel")
     owner = relationship("User", back_populates="goals")

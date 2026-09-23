@@ -398,10 +398,11 @@ class SessionLifecycleService:
                     joinedload(models.ProgramDay.block).joinedload(models.ProgramBlock.program)
                 ).filter(
                     models.ProgramDay.id == requested_day_id
-                ).first()
+                ).populate_existing().with_for_update(of=models.ProgramDay).first()
                 if p_day and p_day.block and p_day.block.program and p_day.block.program.root_id == root_id:
                     program_day_id = requested_day_id
                     new_session.program_day_id = program_day_id
+                    p_day.row_version += 1
                     new_session.program_id = p_day.block.program.id
                     new_session.program_block_id = p_day.block.id
                     program_context['program_id'] = p_day.block.program.id
@@ -874,6 +875,9 @@ class SessionLifecycleService:
         session_id,
         current_user_id,
         data,
+        *,
+        commit=True,
+        pending_events=None,
     ) -> ServiceResult[JsonDict]:
         data = normalize_session_payload(data, partial=True)
         completed_circuit_runs = []
@@ -889,7 +893,7 @@ class SessionLifecycleService:
 
         if not session:
             return None, "Session not found", 404
-
+        session.row_version = (session.row_version or 1) + 1
         if 'name' in data:
             session.name = data['name']
         if 'description' in data:
@@ -1028,17 +1032,20 @@ class SessionLifecycleService:
         if should_recompute_completed_duration:
             self._finalize_paused_session_duration(session, session.session_end or session.completed_at)
 
-        self.db_session.commit()
-        self._recompute_and_attach_stats(session)
+        if commit:
+            self.db_session.commit()
+        self._recompute_and_attach_stats(session, commit=commit)
+        queue_event = lambda event: (pending_events.append if pending_events is not None else event_bus.emit)(event)
 
         for circuit_run in completed_circuit_runs:
-            event_bus.emit(Event(
+            event = Event(
                 Events.CIRCUIT_RUN_COMPLETED,
                 circuit_completion_event_data(circuit_run, root_id),
                 source='session_service.update_session',
-            ))
+            )
+            queue_event(event)
 
-        event_bus.emit(Event(
+        event = Event(
             Events.SESSION_UPDATED,
             {
                 'session_id': session.id,
@@ -1047,10 +1054,11 @@ class SessionLifecycleService:
                 'updated_fields': list(data.keys())
             },
             source='session_service.update_session'
-        ))
+        )
+        queue_event(event)
 
         if data.get('completed') and session.completed:
-            event_bus.emit(Event(
+            event = Event(
                 Events.SESSION_COMPLETED,
                 {
                     'session_id': session.id,
@@ -1059,7 +1067,8 @@ class SessionLifecycleService:
                 },
                 source='session_service.update_session',
                 context={'db_session': self.db_session},
-            ))
+            )
+            queue_event(event)
 
         return serialize_session(session), None, 200
 
