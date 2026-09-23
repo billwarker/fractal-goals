@@ -66,3 +66,27 @@ def remove_circuit_run_item(session, run_id):
     data["sections"] = sections
     session.attributes = attrs
     flag_modified(session, "attributes")
+
+
+def circuit_owned_instance_ids(db_session, session_id):
+    """IDs of activity instances owned by a session's circuits (slots and round members).
+
+    Circuit timing belongs to the parent circuit clock, so session-level
+    lifecycle work (e.g. completion) must skip these instances.
+    """
+    run_join = models.CircuitRun.id == models.CircuitRunSlot.circuit_run_id
+    ids = {instance_id for (instance_id,) in db_session.query(models.CircuitRunSlot.activity_instance_id).join(
+        models.CircuitRun, run_join,
+    ).filter(
+        models.CircuitRun.session_id == session_id,
+        models.CircuitRunSlot.activity_instance_id.is_not(None),
+    ).all()}
+    ids.update(instance_id for (instance_id,) in db_session.query(models.CircuitRoundMember.activity_instance_id).join(
+        models.CircuitRound, models.CircuitRound.id == models.CircuitRoundMember.circuit_round_id,
+    ).join(
+        models.CircuitRun, models.CircuitRun.id == models.CircuitRound.circuit_run_id,
+    ).filter(
+        models.CircuitRun.session_id == session_id,
+        models.CircuitRoundMember.activity_instance_id.is_not(None),
+    ).all())
+    return ids

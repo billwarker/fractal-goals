@@ -10,10 +10,7 @@ import models
 from models import (
     ActivityDefinition,
     ActivityInstance,
-    CircuitRound,
-    CircuitRoundMember,
     CircuitRun,
-    CircuitRunSlot,
     CircuitDefinition,
     Goal,
     Session,
@@ -39,6 +36,7 @@ from services.session_runtime import (
 from services.session_structure import build_duplicate_session_data, extract_activity_definition_id
 from services.session_template_stats_service import SessionTemplateStatsService
 from services.program_scope import resolve_program_scope
+from services.circuit_session_items import circuit_owned_instance_ids
 from services.work_interval_service import WorkIntervalService
 
 
@@ -945,23 +943,7 @@ class SessionLifecycleService:
                     ActivityInstance.session_id == session.id,
                     ActivityInstance.deleted_at == None
                 ).all()
-                circuit_instance_ids = {instance_id for (instance_id,) in self.db_session.query(CircuitRunSlot.activity_instance_id).join(
-                    CircuitRun,
-                    CircuitRun.id == CircuitRunSlot.circuit_run_id,
-                ).filter(
-                    CircuitRun.session_id == session.id,
-                    CircuitRunSlot.activity_instance_id.is_not(None),
-                ).all()}
-                circuit_instance_ids.update(instance_id for (instance_id,) in self.db_session.query(CircuitRoundMember.activity_instance_id).join(
-                    CircuitRound,
-                    CircuitRound.id == CircuitRoundMember.circuit_round_id,
-                ).join(
-                    CircuitRun,
-                    CircuitRun.id == CircuitRound.circuit_run_id,
-                ).filter(
-                    CircuitRun.session_id == session.id,
-                    CircuitRoundMember.activity_instance_id.is_not(None),
-                ).all())
+                circuit_instance_ids = circuit_owned_instance_ids(self.db_session, session.id)
                 for instance in instances:
                     if instance.id in circuit_instance_ids:
                         continue
