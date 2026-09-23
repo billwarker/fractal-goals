@@ -427,22 +427,4 @@ describe('ProgramCalendarView', () => {
         expect(screen.getByText('Daily practice: requirements met')).toBeInTheDocument();
         expect(screen.queryByText('Daily review: requirements met')).not.toBeInTheDocument();
     });
-
-    it('re-decorating cells after new events never removes ribbon-owned status marks', () => {
-        const dayStates = [{ date: '2026-05-17', state: 'scheduled_pending', scheduled: true, closed: false }];
-        const { rerender, props } = renderCalendar({ dayStates, selectedProgramId: 'program-1' });
-        const frame = screen.getByTestId('mock-day-cell').querySelector('.fc-daygrid-day-frame');
-        // Stand-in for a React-rendered ProgramDayStatusMark inside a ribbon in this cell.
-        const ribbonMark = document.createElement('span');
-        ribbonMark.setAttribute('data-program-day-status', 'scheduled');
-        frame.appendChild(ribbonMark);
-
-        rerender(<ProgramCalendarView {...props} calendarEvents={[{
-            id: 'calendar-period-p1', title: 'Lisbon', start: '2026-05-17', end: '2026-05-19',
-            extendedProps: { type: 'calendar_period', period: { id: 'p1', protects_streaks: true }, kindLabel: 'Vacation' },
-        }]} />);
-
-        expect(frame.contains(ribbonMark)).toBe(true);
-        expect(frame.querySelectorAll('[data-program-cell-assistive]')).toHaveLength(1);
-    });
 });

@@ -4,9 +4,12 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import useCalendarDragSelection from '../../hooks/useCalendarDragSelection';
 import { addDaysToDateString } from '../../utils/dateUtils';
+import { applyStreakDecoration, clearStreakDecoration } from '../../utils/programCalendarStreaks';
 import { getProgramDayStateMeta, indexProgramDayStates } from '../../utils/programDayState';
 import renderProgramCalendarEventContent from './ProgramCalendarEventContent';
 import styles from './ProgramCalendarView.module.css';
+
+const STREAK_CLASS_NAMES = { label: styles.streakLength, line: styles.streakLine, assistive: styles.dayStatusAssistive };
 
 function formatCalendarCellDate(date) {
     if (!(date instanceof Date)) {
@@ -208,6 +211,7 @@ function ProgramCalendarView({
         frame.querySelectorAll(`[data-program-block-label], .${styles.blockCellLabel}`)
             .forEach((label) => label.remove());
         frame.querySelectorAll('[data-program-cell-assistive]').forEach((status) => status.remove());
+        clearStreakDecoration(dayEl, frame);
         frame.removeAttribute('data-block-label');
         frame.style.removeProperty('--program-block-label-color');
 
@@ -233,6 +237,8 @@ function ProgramCalendarView({
                 frame.appendChild(status);
             }
         }
+
+        applyStreakDecoration(dayEl, frame, dayState, STREAK_CLASS_NAMES);
 
         if (blockCreationMode && selectableDateSet.has(dateStr)) {
             const selected = selectedStatusDateSet.has(dateStr) || dragPreviewDates.has(dateStr);
@@ -268,6 +274,7 @@ function ProgramCalendarView({
         frame?.querySelectorAll(`[data-program-block-label], .${styles.blockCellLabel}`)
             .forEach((label) => label.remove());
         frame?.querySelectorAll('[data-program-cell-assistive]').forEach((status) => status.remove());
+        clearStreakDecoration(dayEl, frame);
     };
 
     const getBlockLabelFromEvent = (event) => {

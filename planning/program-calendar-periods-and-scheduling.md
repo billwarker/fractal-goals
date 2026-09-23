@@ -20,6 +20,10 @@ tests and client component/hook tests. Deviations and follow-ups agreed during i
   per user. The local backfill produced one schedule row.
 - **Agent schema:** the published proposal schema keeps `session_start` as a compatibility input for
   `schedule_program_day`; `date` is now accepted and canonical.
+- **Streak chain:** the calendar now renders the previously deferred chain as a thin green line on
+  the date row, linking met days (dashed across bridging rest/event days), with a compact "Nd"
+  length on each run's last day. It supersedes the "no chain line" note in
+  programs-scoped-sidepane-chain-calendar.md.
 - **Budgets:** metrics +2 queries (schedules batch, periods), comparison +2, day detail 34.
 
 ## Context

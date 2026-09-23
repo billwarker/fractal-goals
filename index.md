@@ -122,6 +122,10 @@ The client expects program metrics calculation v6 and day read model schema v5.
 Calendar day ribbons use the same status symbol as the day-review pane (check, X, or blue circle from
 `getProgramDayStatusSymbol` and `ProgramDayStatusMark`), shown once per date on the selected program's
 first ribbon; the symbol is decorative beside the ribbon's assistive state text.
+Streaks are drawn from the server's `chain_role`/`run_length_at_date` (never recomputed in the
+client): a thin green line on the date row starts mid-cell on a run's first day, crosses member days,
+is dashed across bridging rest/event days, and ends in a compact length ("3d", full text in the
+tooltip and assistive text) on the run's last day (`utils/programCalendarStreaks.js`).
 Reusable definitions are scheduled onto dates through `program_day_occurrence_schedules`
 (`schedule_block_day` writes a row, never a placeholder session); the evaluator treats those dates
 as occurrences, and the day pane keeps "Plan this day" available for today and future dates, with

@@ -679,3 +679,105 @@
     touch-action: none;
     user-select: none;
 }
+
+/* Streak chain: a thin green line on the date row links consecutive met days
+   (from chain_role). It starts mid-cell on a run's first day, crosses member
+   days, is dashed across rest/event days that bridge the run, and on the last
+   day flows into a compact length ("──── 3d"). */
+.calendarContainer :global(.fc-daygrid-day[data-streak-link="start"]) :global(.fc-daygrid-day-frame)::before,
+.calendarContainer :global(.fc-daygrid-day[data-streak-link="middle"]) :global(.fc-daygrid-day-frame)::before,
+.calendarContainer :global(.fc-daygrid-day[data-streak-link="bridge"]) :global(.fc-daygrid-day-frame)::before {
+    /* FullCalendar uses this pseudo-element as a clearfix (display: table), which
+       would shrink an absolute line to zero width; force a block box. The line
+       extends over the 1px cell borders so a run reads as one continuous line. */
+    content: '';
+    display: block;
+    clear: none;
+    position: absolute;
+    top: 15px;
+    left: -1px;
+    right: -1px;
+    z-index: 3;
+    height: 2px;
+    background: var(--color-brand-success);
+    pointer-events: none;
+}
+
+.calendarContainer :global(.fc-daygrid-day[data-streak-link="start"]) :global(.fc-daygrid-day-frame)::before {
+    left: 50%;
+    border-radius: 999px 0 0 999px;
+}
+
+.calendarContainer :global(.fc-daygrid-day[data-streak-link="bridge"]) :global(.fc-daygrid-day-frame)::before {
+    background: repeating-linear-gradient(90deg, var(--color-brand-success) 0 5px, transparent 5px 9px);
+}
+
+.streakLength {
+    position: absolute;
+    top: 9px;
+    left: -1px;
+    right: 34px;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 14px;
+    color: var(--color-brand-success);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    pointer-events: auto;
+}
+
+.streakLine {
+    flex: 1 1 auto;
+    height: 2px;
+    border-radius: 0 999px 999px 0;
+    background: var(--color-brand-success);
+}
+
+.calendarContainerCompact :global(.fc-daygrid-day[data-streak-link]) :global(.fc-daygrid-day-frame)::before {
+    top: 11px;
+}
+
+.calendarContainerCompact .streakLength {
+    top: 5px;
+    right: 26px;
+    font-size: 9px;
+}
+
+/* The streak line passes behind the date number: back the number with the
+   cell's own colour (and the selected-day tint when that cell is selected). */
+.calendarContainer :global(.fc-daygrid-day[data-streak-link][data-calendar-background]) :global(.fc-daygrid-day-number) {
+    padding-inline: 4px;
+    background: color-mix(
+        in srgb,
+        var(--program-calendar-cell-color) var(--program-calendar-color-weight),
+        var(--color-bg-card)
+    );
+}
+
+.calendarContainer .selectedDayCell[data-streak-link] :global(.fc-daygrid-day-number) {
+    background: color-mix(in srgb, var(--color-brand-primary) 10%, var(--color-bg-card));
+}
+
+/* Block labels sit on the same row; back them with the cell colour so the
+   streak line passes behind the text instead of through it. */
+.calendarContainer [data-calendar-background] .blockCellLabel {
+    right: auto;
+    padding-right: 4px;
+    background: color-mix(
+        in srgb,
+        var(--program-calendar-cell-color) var(--program-calendar-color-weight),
+        var(--color-bg-card)
+    );
+}
+
+@media (forced-colors: active) {
+    .calendarContainer :global(.fc-daygrid-day[data-streak-link]) :global(.fc-daygrid-day-frame)::before,
+    .streakLine {
+        background: Highlight;
+    }
+    .streakLength { color: Highlight; }
+}
