@@ -118,6 +118,7 @@ def handle_session_completed(event: Event):
         db_session.commit()
         _emit_pending_events(pending_events)
 
+    # Handler boundary: roll back and log; a failed cascade must not fail the emitter.
     except Exception as e:
         db_session.rollback()
         logger.exception(f"Error handling session completion: {e}")
@@ -166,6 +167,7 @@ def handle_activity_instance_updated(event: Event):
             db_session.commit()
         _emit_pending_events(pending_events)
 
+    # Handler boundary: roll back and log; a failed cascade must not fail the emitter.
     except Exception as e:
         db_session.rollback()
         logger.exception(f"Error handling activity instance update: {e}")
@@ -204,12 +206,13 @@ def handle_activity_metrics_updated(event: Event):
         comparison = None
         try:
             comparison = ProgressService(db_session).get_progress_for_instance(instance_id)
-        except Exception as progress_err:
+        except Exception as progress_err:  # Live progress is best-effort; the metric update must still commit.
             logger.warning("Error calculating dynamic progress for instance %s: %s", instance_id, progress_err)
 
         db_session.commit()
         _emit_pending_events(pending_events)
         set_live_progress(instance_id, comparison)
+    # Handler boundary: roll back and log; a failed cascade must not fail the emitter.
     except Exception as e:
         db_session.rollback()
         logger.exception(f"Error handling activity metrics update: {e}")
@@ -244,6 +247,7 @@ def handle_activity_instance_completed(event: Event):
         )
         db_session.commit()
         _emit_pending_events(pending_events)
+    # Handler boundary: roll back and log; a failed cascade must not fail the emitter.
     except Exception as e:
         db_session.rollback()
         logger.exception(f"Error handling activity instance completion: {e}")
@@ -266,6 +270,7 @@ def handle_activity_instance_deleted(event: Event):
         _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events)
         db_session.commit()
         _emit_pending_events(pending_events)
+    # Handler boundary: roll back and log; a failed cascade must not fail the emitter.
     except Exception as e:
         db_session.rollback()
         logger.exception(f"Error handling activity instance deletion: {e}")
@@ -310,6 +315,7 @@ def handle_goal_completed(event: Event):
         db_session.commit()
         _emit_pending_events(pending_events)
 
+    # Handler boundary: roll back and log; a failed cascade must not fail the emitter.
     except Exception as e:
         db_session.rollback()
         logger.exception(f"Error handling goal completion: {e}")

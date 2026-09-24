@@ -88,10 +88,6 @@ def create_goal(current_user, validated_data):
         db_session.rollback()
         logger.exception("Error creating goal")
         return internal_error(logger, "Error creating goal")
-    except Exception:
-        db_session.rollback()
-        logger.exception("Unexpected error creating goal")
-        return internal_error(logger, "Error creating goal")
     finally:
         db_session.close()
 
@@ -496,10 +492,6 @@ def create_fractal_goal(current_user, root_id, validated_data):
         db_session.rollback()
         logger.exception("Error creating fractal goal")
         return internal_error(logger, "Error creating fractal goal")
-    except Exception:
-        db_session.rollback()
-        logger.exception("Unexpected error creating fractal goal")
-        return internal_error(logger, "Error creating fractal goal")
     finally:
         db_session.close()
 
@@ -752,9 +744,6 @@ def get_eligible_move_parents(current_user, root_id: str, goal_id: str):
         if error:
             return jsonify({'error': error}), status
         return jsonify({'eligible_parents': result}), 200
-    except Exception:
-        logger.exception("Error fetching eligible move parents")
-        return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
 

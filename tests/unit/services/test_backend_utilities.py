@@ -1,3 +1,4 @@
+import pytest
 from types import SimpleNamespace
 
 from models import _safe_load_json
@@ -68,15 +69,17 @@ def test_analytics_cache_invalidation_via_event_bus(monkeypatch):
 def test_analytics_cache_logs_redis_failures_and_uses_local_fallback(monkeypatch, caplog):
     analytics_cache._ANALYTICS_BY_ROOT.clear()
 
+    from redis.exceptions import ConnectionError as RedisConnectionError
+
     class BrokenRedis:
         def get(self, _key):
-            raise ConnectionError("read unavailable")
+            raise RedisConnectionError("read unavailable")
 
         def setex(self, _key, _ttl, _payload):
-            raise ConnectionError("write unavailable")
+            raise RedisConnectionError("write unavailable")
 
         def delete(self, _key):
-            raise ConnectionError("delete unavailable")
+            raise RedisConnectionError("delete unavailable")
 
     monkeypatch.setattr(analytics_cache, "_get_redis_client", lambda: BrokenRedis())
 
@@ -89,6 +92,17 @@ def test_analytics_cache_logs_redis_failures_and_uses_local_fallback(monkeypatch
     assert "cache read failed for root_id=root-fallback" in caplog.text
     assert "cache invalidation failed for root_id=root-fallback" in caplog.text
     assert analytics_cache._ANALYTICS_BY_ROOT == {}
+
+
+def test_analytics_cache_does_not_hide_non_redis_errors(monkeypatch):
+    class BuggyRedis:
+        def get(self, _key):
+            raise RuntimeError("programming error")
+
+    monkeypatch.setattr(analytics_cache, "_get_redis_client", lambda: BuggyRedis())
+
+    with pytest.raises(RuntimeError, match="programming error"):
+        analytics_cache.get_analytics("root-bug")
 
 
 def _make_goal(level_name=None, parent=None):

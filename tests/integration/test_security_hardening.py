@@ -201,3 +201,24 @@ def test_uncaught_database_error_returns_json_500(client, auth_headers, monkeypa
 
     assert response.status_code == 500
     assert response.get_json() == {'error': 'Internal server error'}
+
+
+def test_uncaught_application_error_returns_json_500(client, auth_headers, sample_ultimate_goal, monkeypatch):
+    from services.goal_service import GoalService
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError('unexpected')
+
+    monkeypatch.setattr(GoalService, 'get_eligible_move_parents', fail)
+
+    response = client.get(
+        f'/api/{sample_ultimate_goal.id}/goals/{sample_ultimate_goal.id}/eligible-parents',
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 500
+    assert response.get_json() == {'error': 'Internal server error'}
+
+
+def test_http_errors_keep_their_status_under_the_json_error_handler(client):
+    assert client.get('/api/definitely-not-a-route').status_code == 404

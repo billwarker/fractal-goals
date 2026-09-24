@@ -13,9 +13,11 @@ build/
 .env
 .env.local
 .env.development
-.env.testing
 .env.production
 !.env.example
+# Intentionally tracked: CI and tests/test_env.py load it. It may only point at a
+# local disposable database and must never hold secrets (tests/unit/test_env_files.py).
+!.env.testing
 
 # Virtual Environments
 fractal-goals-venv/

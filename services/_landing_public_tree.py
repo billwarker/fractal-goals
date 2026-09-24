@@ -20,6 +20,7 @@ from services._landing_common import (
     LANDING_EXAMPLE_NOTES_LIMIT,
     LANDING_EXAMPLE_TIMELINE_LIMIT,
 )
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 
@@ -386,7 +387,7 @@ class _LandingPublicTreeMixin:
 
         try:
             programs = ProgramService.get_programs(self.db_session, root.id, owner_id)
-        except Exception:
+        except SQLAlchemyError:
             logger.warning(
                 "Landing snapshot could not load programs for root_id=%s",
                 root.id,

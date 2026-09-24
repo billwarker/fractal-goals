@@ -4,6 +4,8 @@ import json
 import logging
 from typing import Any, Dict, Optional
 
+from redis.exceptions import RedisError
+
 from services.events import event_bus, Event
 from config import config
 
@@ -26,7 +28,7 @@ def _get_redis_client():
         import redis
         _REDIS_CLIENT = redis.Redis.from_url(storage_uri, decode_responses=True)
         return _REDIS_CLIENT
-    except Exception:
+    except (RedisError, ValueError):
         logger.warning("Redis analytics cache is unavailable; using local cache", exc_info=True)
         return None
 
@@ -41,7 +43,7 @@ def get_analytics(root_id: str) -> Optional[dict]:
         try:
             raw = redis_client.get(_cache_key(root_id))
             return json.loads(raw) if raw else None
-        except Exception:
+        except (RedisError, ValueError):
             logger.warning("Redis analytics cache read failed for root_id=%s", root_id, exc_info=True)
 
     now = time.time()
@@ -62,7 +64,7 @@ def set_analytics(root_id: str, payload: dict, ttl_seconds: int = _DEFAULT_TTL_S
         try:
             redis_client.setex(_cache_key(root_id), ttl_seconds, json.dumps(payload, default=str))
             return
-        except Exception:
+        except (RedisError, TypeError, ValueError):
             logger.warning("Redis analytics cache write failed for root_id=%s", root_id, exc_info=True)
 
     with _LOCK:
@@ -77,7 +79,7 @@ def invalidate_root(root_id: str) -> None:
     if redis_client:
         try:
             redis_client.delete(_cache_key(root_id))
-        except Exception:
+        except RedisError:
             logger.warning("Redis analytics cache invalidation failed for root_id=%s", root_id, exc_info=True)
 
     with _LOCK:

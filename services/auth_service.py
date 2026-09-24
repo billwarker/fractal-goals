@@ -17,6 +17,7 @@ from services.serializers import serialize_user
 from services.admin_service import AdminService
 from services.quota_service import DEFAULT_STORAGE_LIMIT_BYTES, QuotaService
 from services.service_types import JsonDict, ServiceResult
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 
@@ -322,7 +323,7 @@ class AuthService:
             # send_email already marked the delivery event failed; keep it.
             self.db_session.commit()
             logger.warning("Password changed notice email failed for user_id=%s", user.id)
-        except Exception:
+        except SQLAlchemyError:
             self.db_session.rollback()
             logger.exception("Password changed notice email errored for user_id=%s", user.id)
 

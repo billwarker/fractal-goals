@@ -161,6 +161,7 @@ jobs:
         run: |
           docker run --rm --entrypoint python fractal-backend:ci -m pip check
           docker run --rm --entrypoint gunicorn fractal-backend:ci --version
+          docker run --rm --entrypoint sh fractal-backend:ci -c '! command -v gcc && ! command -v cc'
       - name: Build and verify isolated MCP adapter image
         run: |
           docker build --file agent_adapter/Dockerfile --tag fractal-agent-adapter:ci .

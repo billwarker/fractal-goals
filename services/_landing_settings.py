@@ -33,6 +33,7 @@ from services._landing_common import (
     LANDING_GOAL_BULLET_DEFAULTS,
     LANDING_TREE_VIEW_SETTING_KEYS,
 )
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 
@@ -265,7 +266,7 @@ class _LandingSettingsMixin:
 
         try:
             programs = ProgramService.get_programs(self.db_session, root.id, owner_id)
-        except Exception:
+        except SQLAlchemyError:
             logger.warning(
                 "Landing options could not load programs for root_id=%s",
                 root.id,

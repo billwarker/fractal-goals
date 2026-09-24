@@ -3,6 +3,7 @@ import logging
 
 from flask import jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
+from werkzeug.exceptions import HTTPException
 
 from services.ops_log import log_ops_event
 
@@ -18,6 +19,14 @@ def register_error_handlers(app):
         failed unit of work, so routes need no per-endpoint rollback boilerplate.
         """
         logger.exception("Unhandled database error method=%s path=%s", request.method, request.path)
+        return jsonify({'error': 'Internal server error'}), 500
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(e):
+        """Keep API failures JSON and logged; HTTP errors (404, 405, 429...) pass through."""
+        if isinstance(e, HTTPException):
+            return e
+        logger.exception("Unhandled error method=%s path=%s", request.method, request.path)
         return jsonify({'error': 'Internal server error'}), 500
 
     @app.errorhandler(429)

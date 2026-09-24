@@ -21,6 +21,7 @@ from services.serializers import calculate_smart_status, format_utc, serialize_u
 from services.template_service import STARTER_TEMPLATE_NAME
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, ServiceResult
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 
@@ -486,7 +487,7 @@ class UserService:
             # send_email already marked the delivery event failed; keep it.
             self.db_session.commit()
             logger.warning("Security notice email failed template=%s user_id=%s", template_key, user_id)
-        except Exception:
+        except SQLAlchemyError:
             self.db_session.rollback()
             logger.exception("Security notice email errored template=%s user_id=%s", template_key, user_id)
 

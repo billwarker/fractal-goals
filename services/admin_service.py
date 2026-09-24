@@ -104,9 +104,9 @@ class AdminService(_AdminBetaSignupsMixin):
         it describes: an audit row without its action, or an action without its
         audit row, would both be worse than useless.
 
-        Never raises. An audit failure must not roll back a completed
-        administrative action, but it is logged loudly because a silent gap in
-        the trail undermines what the Privacy Policy says about access.
+        Database failures never raise: an audit failure must not roll back a
+        completed administrative action, but it is logged loudly because a
+        silent gap in the trail undermines what the Privacy Policy says about access.
         """
         try:
             self.db_session.add(AdminAuditEvent(
@@ -117,7 +117,7 @@ class AdminService(_AdminBetaSignupsMixin):
                 target_label=(f"user:{target.id}" if target is not None else None),
                 event_metadata=metadata or None,
             ))
-        except Exception:  # pragma: no cover - defensive
+        except SQLAlchemyError:  # pragma: no cover - defensive
             logger.exception("Failed to record admin audit event action=%s", action)
 
     @staticmethod

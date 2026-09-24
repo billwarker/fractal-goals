@@ -92,7 +92,7 @@ class _LandingStaticSnapshotMixin:
                 temp_name = temp_file.name
             os.replace(temp_name, destination)
             return "ok"
-        except Exception:
+        except OSError:
             if temp_name:
                 try:
                     os.unlink(temp_name)

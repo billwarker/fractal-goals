@@ -18,7 +18,10 @@ SIZE_BACKLOG = {
 # workers each need a containment boundary for durable failure state. The
 # embedded boundary also sanitizes third-party SDK errors before persistence.
 MAX_ROUTE_SQLALCHEMY_CATCHES = 185
-MAX_BROAD_CATCHES = 38
+# Remaining broad catches are containment boundaries: event bus/handlers,
+# background jobs, external SDKs (GCS, email, AI providers), readiness, and
+# never-fail logging. Narrow any new catch to the failure it expects.
+MAX_BROAD_CATCHES = 20
 
 
 def _line_count(path: Path) -> int:
