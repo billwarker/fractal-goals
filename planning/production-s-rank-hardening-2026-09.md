@@ -261,3 +261,63 @@ WS4 (baseline last, once code positions are stable) → WS7.
 - Splitting the large frontend pages (`Admin.jsx`, `ProgramCalendarPage.jsx`, `FractalGoals.jsx`).
 - Migrating models to SQLAlchemy `Mapped[]`, which would remove most baseline type errors.
 - Protecting accounts from deliberate lockout, since attackers can lock an account today.
+
+---
+
+## Delivery record — 2026-09-24
+
+Branch `production-s-rank-hardening`, 13 commits. All workstreams delivered.
+
+### Verification
+
+- Backend: **1,100 passed**, plus the new revocation, proxy and error-handler tests. Coverage is
+  **81.16%**; the gate is 80%.
+  Frontend: **279 files / 1,264 tests passed**. MCP adapter: **7 passed**.
+- `./run-tests.sh lint` is green, which covers ESLint, the frontend and backend maintainability
+  gates, basedpyright (0 new errors against a 1,234-error baseline) and `tsc` (0 errors).
+- Migration `a4c6e8f0b2d5` passes upgrade → check → downgrade → upgrade → check on a scratch
+  database.
+- The production image builds and passes `pip check`. Gunicorn is 26.2.0, native extensions
+  import, and there is **no compiler in the runtime image** (345 MB).
+- Every WS5 split was checked line for line: each moved line exists verbatim in the original,
+  and each module has an acyclic import graph.
+
+### Where delivery differs from the plan
+
+- **Password change** revokes every *other* session and reissues a token for the device that
+  made the change, rather than signing everyone out. Before this, the client cleared the cookie
+  but kept an in-memory token, so the user was signed out only on reload.
+- **App-level JSON 500 handlers** for `SQLAlchemyError` and unexpected exceptions were added.
+  The new endpoint needs no per-route rollback boilerplate, and three ad-hoc route catches were
+  removed.
+- **AdminService** also lost its beta-signup queue and pure helpers (move-only), because the
+  revocation calls would otherwise have pushed it past its no-growth cap.
+- **`create_session` and `_publish_landing_examples_locked`** were split into named phases
+  (extract-method, same statement order). Two missing failure-path tests were added:
+  compressed-size 413 and static-delivery 503.
+- **TypeScript 7** enables `strict` by default. The client check sets `strict: false`, as
+  intended for incremental `checkJs`. The 28 remaining findings were typing gaps, not live bugs.
+  Optional `timezone` and `attachedGoalIds` are now documented as optional.
+- **`./run-tests.sh agent-adapter`** now sets the same `AGENT_*` variables as CI. Before, the
+  local `all` run failed one adapter test, and it did so on `main` too.
+
+### Rollout (operator)
+
+1. Create the `TRUSTED_PROXY_SECRET` secret, then deploy
+   ([runbook](../docs/architecture/PROXY_AND_SESSIONS_RUNBOOK.md)).
+2. Confirm `TRUSTED_PROXY_HOPS=3` from one `xff="..."` access-log line.
+3. Beta testers log in once, because legacy tokens lack the session claims.
+
+### Known issues and follow-ups
+
+- **Pre-existing, blocks release:** three Playwright workflows fail identically on `main`:
+  - AI handoff dialog (desktop and mobile)
+  - desktop bulk program-day "3 selected"
+
+  Fix them before relying on the browser CI gate.
+- Give mixins a typed host (for example `self: "SessionLifecycleService"`), and migrate
+  models to SQLAlchemy `Mapped[]`. Together these account for most of the 1,234 baselined
+  errors.
+- Redis rate-limit storage and more than one instance (S+).
+- Split the large frontend pages.
+- Protect accounts from deliberate lockout by attackers.

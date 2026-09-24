@@ -200,7 +200,11 @@ run_backend_tests() {
 run_agent_adapter_tests() {
     print_message "$GREEN" "Running MCP adapter unit tests..."
     ensure_backend_tools
-    (cd "$ROOT_DIR" && "$VENV_PYTHON" -m pytest -o addopts="" agent_adapter/tests/)
+    # Match CI: the adapter's protocol test needs a resource URI and issuer to advertise.
+    (cd "$ROOT_DIR" && \
+        AGENT_MCP_RESOURCE_URI="${AGENT_MCP_RESOURCE_URI:-http://127.0.0.1:8000/mcp}" \
+        AGENT_OAUTH_ISSUER="${AGENT_OAUTH_ISSUER:-http://127.0.0.1:5000}" \
+        "$VENV_PYTHON" -m pytest -o addopts="" agent_adapter/tests/)
 }
 
 run_frontend_tests() {

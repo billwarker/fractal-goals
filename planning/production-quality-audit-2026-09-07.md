@@ -1,5 +1,40 @@
 # Production quality audit — 2026-09-07, remediated 2026-09-09
 
+## Addendum — 2026-09-24 independent re-review and hardening
+
+An independent review on 2026-09-24 rated the codebase **A− (82/100)**. The 2026-09-09
+score of 98 missed two production defects, a red `main`, and some maintainability debt:
+
+- **Rate limiting keyed on the proxy, not the client.** Every request reaches Flask
+  through nginx and Cloud Run with no `ProxyFix`, so all users shared one rate-limit bucket
+  (10 logins/min and 500 requests/hour, across everyone).
+- **Session tokens could not be revoked.** Logout, password changes and admin resets left
+  tokens valid, and refresh could chain them indefinitely.
+- **A date-dependent agent-harness test** failed about 3 days in 7.
+- **Maintainability:** no static type checking, six backend modules over 1,000 lines, and
+  38 broad exception catches.
+
+These were remediated in
+[Production S-Rank Hardening](production-s-rank-hardening-2026-09.md) (branch
+`production-s-rank-hardening`):
+
+| Area | Before | After |
+|---|---|---|
+| Security | B | S: attested proxy identity; versioned, bounded, revocable sessions with audience separation |
+| Operations (single instance) | B− | A+: two-stage image with no compiler; forwarded chain logged; runbook |
+| Maintainability | B+ | S: largest backend module 936 lines (was 1,563); type ratchets; broad catches 38 → 20 |
+| Testing and CI | A+ | S: deterministic dates; new boundary tests; typecheck and no-compiler gates in CI |
+
+**Result: S (about 95) for a single-instance private beta.** S+ requires shared rate-limit
+storage (Redis) and more than one instance, which are deliberately out of scope.
+
+**Open release blocker (existed before this work):** three Playwright workflows fail
+identically on `main`:
+- AI handoff dialog, desktop and mobile
+- desktop bulk program-day selection count
+
+They must be fixed before the browser CI gate is green.
+
 ## S+ remediation result — 2026-09-09
 
 **98/100 (S+): the repository now has passing release gates, bounded production
