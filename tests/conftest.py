@@ -56,6 +56,10 @@ from blueprints.agent_api import agent_bp, agent_internal_bp, agent_metadata_bp,
 from services.completion_handlers import clear_achievement_context, clear_live_progress
 
 
+TEST_PROXY_HOPS = 3
+TEST_PROXY_SECRET = 'test-proxy-secret-that-is-at-least-32-chars'
+
+
 @pytest.fixture(scope='session')
 def test_database_engine():
     """Build the schema once; individual tests still use real transactions."""
@@ -91,6 +95,9 @@ def app(test_database_engine, test_database_reset_sql, monkeypatch):
     # Load configuration to get DATABASE_URL
     from config import config
     test_app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
+    # Mirror production: forwarded headers are trusted only from the attested proxy.
+    from request_identity import configure_request_identity
+    configure_request_identity(test_app, hops=TEST_PROXY_HOPS, secret=TEST_PROXY_SECRET)
     
     # Enable CORS
     CORS(test_app, resources={

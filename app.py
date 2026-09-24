@@ -11,6 +11,7 @@ import logging
 import time
 
 from extensions import limiter
+from request_identity import configure_request_identity
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 import os
@@ -72,6 +73,7 @@ app = Flask(__name__)
 app.config['ENV'] = config.ENV
 app.config['DEBUG'] = config.DEBUG
 app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
+configure_request_identity(app)
 app.config['COMPRESS_LEVEL'] = 6
 app.config['COMPRESS_MIN_SIZE'] = 512
 app.config['COMPRESS_MIMETYPES'] = [

@@ -179,6 +179,12 @@ class Config:
     ALLOW_IN_MEMORY_RATELIMIT = os.getenv('ALLOW_IN_MEMORY_RATELIMIT', 'false').lower() in ('true', '1', 'yes')
     WEB_CONCURRENCY = int(os.getenv('WEB_CONCURRENCY', '1'))
 
+    # Client identity behind the frontend proxy (see request_identity.py). Zero
+    # disables forwarded-header trust; production requires the attested chain.
+    TRUSTED_PROXY_HOPS = max(0, int(os.getenv('TRUSTED_PROXY_HOPS', '0')))
+    TRUSTED_PROXY_SECRET = os.getenv('TRUSTED_PROXY_SECRET', '')
+    MIN_TRUSTED_PROXY_SECRET_LENGTH = 32
+
     # Observability
     SENTRY_TRACES_SAMPLE_RATE = float(os.getenv(
         'SENTRY_TRACES_SAMPLE_RATE',
@@ -245,6 +251,16 @@ class Config:
                     )
             elif cls.EMAIL_PROVIDER not in ('disabled', 'test'):
                 raise ValueError("CRITICAL: EMAIL_PROVIDER must be one of disabled, test, or resend")
+
+            if cls.TRUSTED_PROXY_HOPS < 1:
+                raise ValueError(
+                    f"CRITICAL: TRUSTED_PROXY_HOPS must be set in {cls.ENV} so rate limits key on the real client"
+                )
+            if len(cls.TRUSTED_PROXY_SECRET) < cls.MIN_TRUSTED_PROXY_SECRET_LENGTH:
+                raise ValueError(
+                    f"CRITICAL: TRUSTED_PROXY_SECRET must be at least "
+                    f"{cls.MIN_TRUSTED_PROXY_SECRET_LENGTH} characters in {cls.ENV}"
+                )
 
     @classmethod
     def get_database_url(cls):
