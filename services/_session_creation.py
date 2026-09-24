@@ -2,8 +2,10 @@
 """
 
 import copy
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import uuid
+from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import joinedload
 import models
@@ -30,6 +32,25 @@ from services.session_runtime import (
 )
 from services.program_scope import resolve_program_scope
 from services._session_lifecycle_common import _parse_iso_datetime_strict
+
+
+@dataclass
+class _SessionDraft:
+    """Mutable state shared by the create_session phases for one new session."""
+
+    root_id: str
+    current_user_id: str
+    data: dict
+    quota_service: QuotaService
+    new_session: Session
+    session_data: dict
+    template_session_type: str | None
+    allow_archived_definitions: bool
+    template: Any = None
+    template_payload: dict = field(default_factory=dict)
+    program_day_id: str | None = None
+    program_goal_ids: set | None = None
+    created_circuit_runs: list = field(default_factory=list)
 
 
 class _SessionCreationMixin:
@@ -90,12 +111,60 @@ class _SessionCreationMixin:
 
         session_data_dict = models._safe_load_json(data.get('session_data'), {})
         new_session.attributes = copy.deepcopy(session_data_dict)
-        template = None
-        template_payload = {}
-        template_session_type = get_template_session_type(session_data_dict)
+        draft = _SessionDraft(
+            root_id=root_id,
+            current_user_id=current_user_id,
+            data=data,
+            quota_service=quota_service,
+            new_session=new_session,
+            session_data=session_data_dict,
+            template_session_type=get_template_session_type(session_data_dict),
+            allow_archived_definitions=allow_archived_definitions,
+        )
 
-        program_day_id = None
-        program_goal_ids = None
+        error = self._apply_program_context(draft) or self._apply_template(draft)
+        if error:
+            return (None, *error)
+
+        self.db_session.add(new_session)
+        self.db_session.flush()
+
+        is_quick_template = draft.template_session_type == SESSION_TYPE_QUICK
+        if is_quick_template:
+            error = self._instantiate_quick_activities(draft)
+        else:
+            error = self._instantiate_section_items(draft)
+        if error:
+            return (None, *error)
+
+        new_session.attributes = copy.deepcopy(draft.session_data)
+
+        error = self._link_session_goals(draft, is_quick_template=is_quick_template)
+        if error:
+            return (None, *error)
+
+        if commit:
+            self.db_session.commit()
+
+        self._persist_session_times(new_session.id, s_start, s_end, commit=commit)
+
+        self.db_session.refresh(new_session)
+        self._recompute_and_attach_stats(new_session, commit=commit)
+
+        publish_session_creation_events(
+            new_session,
+            root_id,
+            draft.created_circuit_runs,
+            pending_events,
+        )
+
+        return serialize_session(new_session), None, 201
+
+    def _apply_program_context(self, draft):
+        """Bind a program day or program from ``program_context`` and resolve its goal scope."""
+        new_session = draft.new_session
+        session_data_dict = draft.session_data
+        root_id = draft.root_id
         if new_session.attributes:
             program_context = session_data_dict.get('program_context')
             goal_scope_enabled = not isinstance(program_context, dict) or program_context.get('goal_scope_enabled') is not False
@@ -107,8 +176,8 @@ class _SessionCreationMixin:
                     models.ProgramDay.id == requested_day_id
                 ).populate_existing().with_for_update(of=models.ProgramDay).first()
                 if p_day and p_day.block and p_day.block.program and p_day.block.program.root_id == root_id:
-                    program_day_id = requested_day_id
-                    new_session.program_day_id = program_day_id
+                    draft.program_day_id = requested_day_id
+                    new_session.program_day_id = draft.program_day_id
                     p_day.row_version += 1
                     new_session.program_id = p_day.block.program.id
                     new_session.program_block_id = p_day.block.id
@@ -121,11 +190,11 @@ class _SessionCreationMixin:
                     program_context['day_name'] = p_day.name
                     program_context['day_number'] = p_day.day_number
                     if goal_scope_enabled:
-                        program_goal_ids = set(resolve_program_scope(
+                        draft.program_goal_ids = set(resolve_program_scope(
                             self.db_session, root_id, p_day.block.program.id
                         ).goal_ids)
                 else:
-                    return None, "Invalid program day context for this fractal", 400
+                    return "Invalid program day context for this fractal", 400
             elif program_context and program_context.get('program_id'):
                 requested_program_id = program_context['program_id']
                 program = self.db_session.query(models.Program).filter(
@@ -133,9 +202,9 @@ class _SessionCreationMixin:
                     models.Program.root_id == root_id,
                 ).first()
                 if not program:
-                    return None, "Invalid program context for this fractal", 400
+                    return "Invalid program context for this fractal", 400
                 if goal_scope_enabled:
-                    program_goal_ids = set(resolve_program_scope(
+                    draft.program_goal_ids = set(resolve_program_scope(
                         self.db_session, root_id, program.id
                     ).goal_ids)
                 program_context['program_name'] = program.name
@@ -148,30 +217,37 @@ class _SessionCreationMixin:
                         None,
                     )
                     if not block:
-                        return None, "Invalid program block context for this program", 400
+                        return "Invalid program block context for this program", 400
                     program_context['block_name'] = block.name
                     program_context['block_color'] = block.color or program.color
                     new_session.program_block_id = block.id
+        return None
 
+    def _apply_template(self, draft):
+        """Load the session template and seed session data (type, color, sections) from it."""
+        new_session = draft.new_session
+        session_data_dict = draft.session_data
         if new_session.template_id:
             template = self.db_session.query(models.SessionTemplate).filter(
                 models.SessionTemplate.id == new_session.template_id,
-                models.SessionTemplate.root_id == root_id,
+                models.SessionTemplate.root_id == draft.root_id,
                 models.SessionTemplate.deleted_at == None
             ).first()
             if not template:
-                return None, "Template not found in this fractal", 404
+                return "Template not found in this fractal", 404
+            draft.template = template
             template_payload = models._safe_load_json(template.template_data, {})
-            template_session_type = get_template_session_type(template_payload)
+            draft.template_payload = template_payload
+            draft.template_session_type = get_template_session_type(template_payload)
 
             session_data_dict.setdefault('template_id', template.id)
             session_data_dict.setdefault('template_name', template.name)
-            session_data_dict.setdefault('session_type', template_session_type)
+            session_data_dict.setdefault('session_type', draft.template_session_type)
             session_data_dict.setdefault('template_color', get_template_color(template_payload) or DEFAULT_TEMPLATE_COLOR)
 
-            if template_session_type == SESSION_TYPE_QUICK:
-                if program_day_id:
-                    return None, "Quick session templates cannot be used from a program day", 400
+            if draft.template_session_type == SESSION_TYPE_QUICK:
+                if draft.program_day_id:
+                    return "Quick session templates cannot be used from a program day", 400
                 if not new_session.session_start:
                     new_session.session_start = datetime.now(timezone.utc)
             elif isinstance(session_data_dict, dict) and not session_data_dict.get('sections'):
@@ -184,191 +260,211 @@ class _SessionCreationMixin:
                         session_data_dict['total_duration_minutes'] = template_payload.get('total_duration_minutes')
 
             new_session.attributes = copy.deepcopy(session_data_dict)
+        return None
 
-        self.db_session.add(new_session)
-        self.db_session.flush()
-
-        inherited_goal_map = {}
-        created_circuit_runs = []
-
-        def collect_section_exercises(input_sections):
-            local_activity_ids = set()
-            local_section_exercises = []
-            local_circuit_items = []
-            for section_index, section in enumerate(input_sections or []):
-                if not isinstance(section, dict):
+    def _collect_section_exercises(self, input_sections):
+        local_activity_ids = set()
+        local_section_exercises = []
+        local_circuit_items = []
+        for section_index, section in enumerate(input_sections or []):
+            if not isinstance(section, dict):
+                continue
+            raw_exercises = section.get('items') or section.get('exercises') or section.get('activities') or []
+            normalized = []
+            for item_index, exercise in enumerate(raw_exercises):
+                if isinstance(exercise, dict) and exercise.get('type') == 'circuit':
+                    circuit_definition_id = exercise.get('circuit_definition_id')
+                    if circuit_definition_id:
+                        local_circuit_items.append((section_index, item_index, circuit_definition_id))
                     continue
-                raw_exercises = section.get('items') or section.get('exercises') or section.get('activities') or []
-                normalized = []
-                for item_index, exercise in enumerate(raw_exercises):
-                    if isinstance(exercise, dict) and exercise.get('type') == 'circuit':
-                        circuit_definition_id = exercise.get('circuit_definition_id')
-                        if circuit_definition_id:
-                            local_circuit_items.append((section_index, item_index, circuit_definition_id))
-                        continue
-                    activity_id = self._extract_activity_definition_id(exercise)
-                    if not activity_id:
-                        continue
-                    local_activity_ids.add(activity_id)
-                    normalized.append((exercise, activity_id))
-                local_section_exercises.append((section, normalized))
-            return local_activity_ids, local_section_exercises, local_circuit_items
+                activity_id = self._extract_activity_definition_id(exercise)
+                if not activity_id:
+                    continue
+                local_activity_ids.add(activity_id)
+                normalized.append((exercise, activity_id))
+            local_section_exercises.append((section, normalized))
+        return local_activity_ids, local_section_exercises, local_circuit_items
 
-        is_quick_template = template_session_type == SESSION_TYPE_QUICK
+    def _instantiate_quick_activities(self, draft):
+        """Create the 1-5 flat activity instances a quick-session template lists."""
+        template_payload = draft.template_payload
+        quick_items = template_payload.get('activities', []) if isinstance(template_payload, dict) else []
+        normalized_quick_items = self._normalize_template_activities(quick_items)
+        if not (1 <= len(normalized_quick_items) <= 5):
+            return "Quick sessions must include between 1 and 5 activities", 400
 
-        if is_quick_template:
-            quick_items = template_payload.get('activities', []) if isinstance(template_payload, dict) else []
-            normalized_quick_items = self._normalize_template_activities(quick_items)
-            if not (1 <= len(normalized_quick_items) <= 5):
-                return None, "Quick sessions must include between 1 and 5 activities", 400
+        unique_activity_def_ids = {activity_id for _, activity_id in normalized_quick_items}
+        activities_query = self.db_session.query(ActivityDefinition).filter(
+            ActivityDefinition.id.in_(unique_activity_def_ids),
+            ActivityDefinition.root_id == draft.root_id,
+        )
+        if not (draft.allow_archived_definitions or draft.template):
+            activities_query = activities_query.filter(ActivityDefinition.deleted_at == None)
+        activities = activities_query.all()
+        found_activity_ids = {a.id for a in activities}
+        missing_activity_ids = unique_activity_def_ids - found_activity_ids
+        if missing_activity_ids:
+            return f"Invalid activity IDs for this fractal: {', '.join(sorted(missing_activity_ids))}", 400
 
-            unique_activity_def_ids = {activity_id for _, activity_id in normalized_quick_items}
-            activities_query = self.db_session.query(ActivityDefinition).filter(
-                ActivityDefinition.id.in_(unique_activity_def_ids),
-                ActivityDefinition.root_id == root_id,
+        _, quota_error, quota_status = draft.quota_service.check_available(
+            draft.current_user_id,
+            "activity_instances",
+            len(normalized_quick_items),
+        )
+        if quota_error:
+            return quota_error, quota_status
+
+        created_activity_ids = []
+        for raw_item, activity_id in normalized_quick_items:
+            raw_dict = raw_item if isinstance(raw_item, dict) else {}
+            instance_id = raw_dict.get('instance_id') or str(uuid.uuid4())
+            instance = ActivityInstance(
+                id=instance_id,
+                session_id=draft.new_session.id,
+                activity_definition_id=activity_id,
+                root_id=draft.root_id,
             )
-            if not (allow_archived_definitions or template):
-                activities_query = activities_query.filter(ActivityDefinition.deleted_at == None)
-            activities = activities_query.all()
-            found_activity_ids = {a.id for a in activities}
-            missing_activity_ids = unique_activity_def_ids - found_activity_ids
-            if missing_activity_ids:
-                return None, f"Invalid activity IDs for this fractal: {', '.join(sorted(missing_activity_ids))}", 400
+            self.db_session.add(instance)
+            self.db_session.flush()
+            created_activity_ids.append(instance_id)
 
-            _, quota_error, quota_status = quota_service.check_available(
-                current_user_id,
-                "activity_instances",
-                len(normalized_quick_items),
-            )
-            if quota_error:
-                return None, quota_error, quota_status
+        draft.session_data['activity_ids'] = created_activity_ids
+        draft.session_data.pop('sections', None)
+        return None
 
-            created_activity_ids = []
-            for raw_item, activity_id in normalized_quick_items:
-                raw_dict = raw_item if isinstance(raw_item, dict) else {}
-                instance_id = raw_dict.get('instance_id') or str(uuid.uuid4())
+    def _instantiate_section_items(self, draft):
+        """Create activity instances and circuit runs for the session's (or template's) sections."""
+        session_data_dict = draft.session_data
+        template = draft.template
+        template_payload = draft.template_payload
+        sections = session_data_dict.get('sections', []) if isinstance(session_data_dict, dict) else []
+        activity_def_ids, section_exercises, circuit_items = self._collect_section_exercises(sections)
+
+        if not activity_def_ids and not circuit_items and template:
+            template_sections = template_payload.get('sections', []) if isinstance(template_payload, dict) else []
+            template_activity_ids, template_section_exercises, template_circuit_items = self._collect_section_exercises(template_sections)
+            if template_activity_ids or template_circuit_items:
+                session_data_dict['sections'] = template_sections
+                sections = session_data_dict.get('sections', [])
+                activity_def_ids = template_activity_ids
+                section_exercises = template_section_exercises
+                circuit_items = template_circuit_items
+
+        if activity_def_ids:
+            error = self._instantiate_section_activities(draft, activity_def_ids, section_exercises)
+            if error:
+                return error
+
+        if circuit_items:
+            return self._attach_section_circuits(draft, sections, circuit_items)
+        return None
+
+    def _instantiate_section_activities(self, draft, activity_def_ids, section_exercises):
+        activities_query = self.db_session.query(ActivityDefinition).options(
+            joinedload(ActivityDefinition.associated_goals)
+        ).filter(
+            ActivityDefinition.id.in_(activity_def_ids),
+            ActivityDefinition.root_id == draft.root_id,
+        )
+        if not (draft.allow_archived_definitions or draft.template):
+            activities_query = activities_query.filter(ActivityDefinition.deleted_at == None)
+        activities = activities_query.all()
+        found_activity_ids = {a.id for a in activities}
+        missing_activity_ids = activity_def_ids - found_activity_ids
+        if missing_activity_ids:
+            return f"Invalid activity IDs for this fractal: {', '.join(sorted(missing_activity_ids))}", 400
+        instance_increment = sum(len(normalized_exercises) for _, normalized_exercises in section_exercises)
+        _, quota_error, quota_status = draft.quota_service.check_available(
+            draft.current_user_id,
+            "activity_instances",
+            instance_increment,
+        )
+        if quota_error:
+            return quota_error, quota_status
+        activity_map = {a.id: a for a in activities}
+
+        for section, normalized_exercises in section_exercises:
+            if section.get('id') and not section.get('template_section_id'):
+                section['template_section_id'] = section.get('id')
+            section_activity_ids = []
+            section_items = []
+            for exercise, activity_id in normalized_exercises:
+                if activity_id not in activity_map:
+                    continue
+                instance_id = exercise.get('instance_id') or str(uuid.uuid4())
                 instance = ActivityInstance(
                     id=instance_id,
-                    session_id=new_session.id,
+                    session_id=draft.new_session.id,
                     activity_definition_id=activity_id,
-                    root_id=root_id,
+                    root_id=draft.root_id
                 )
                 self.db_session.add(instance)
                 self.db_session.flush()
-                created_activity_ids.append(instance_id)
+                section_activity_ids.append(instance_id)
+                section_items.append({'type': 'activity', 'activity_instance_id': instance_id})
 
-            session_data_dict['activity_ids'] = created_activity_ids
-            session_data_dict.pop('sections', None)
-        else:
-            sections = session_data_dict.get('sections', []) if isinstance(session_data_dict, dict) else []
-            activity_def_ids, section_exercises, circuit_items = collect_section_exercises(sections)
+            section['items'] = section_items
+            section.pop('activity_ids', None)
+            section.pop('exercises', None)
+            section.pop('activities', None)
+            if 'estimated_duration_minutes' not in section and section.get('duration_minutes') is not None:
+                section['estimated_duration_minutes'] = section.get('duration_minutes')
+        return None
 
-            if not activity_def_ids and not circuit_items and template:
-                template_sections = template_payload.get('sections', []) if isinstance(template_payload, dict) else []
-                template_activity_ids, template_section_exercises, template_circuit_items = collect_section_exercises(template_sections)
-                if template_activity_ids or template_circuit_items:
-                    session_data_dict['sections'] = template_sections
-                    sections = session_data_dict.get('sections', [])
-                    activity_def_ids = template_activity_ids
-                    section_exercises = template_section_exercises
-                    circuit_items = template_circuit_items
+    def _attach_section_circuits(self, draft, sections, circuit_items):
+        from services.circuit_service import CircuitService
 
-            if activity_def_ids:
-                activities_query = self.db_session.query(ActivityDefinition).options(
-                    joinedload(ActivityDefinition.associated_goals)
-                ).filter(
-                    ActivityDefinition.id.in_(activity_def_ids),
-                    ActivityDefinition.root_id == root_id,
+        new_session = draft.new_session
+        for section in sections:
+            if not isinstance(section, dict) or not isinstance(section.get('items'), list):
+                continue
+            section['items'] = [
+                item
+                for item in section['items']
+                if not (
+                    isinstance(item, dict)
+                    and item.get('type') == 'circuit'
+                    and item.get('circuit_definition_id')
                 )
-                if not (allow_archived_definitions or template):
-                    activities_query = activities_query.filter(ActivityDefinition.deleted_at == None)
-                activities = activities_query.all()
-                found_activity_ids = {a.id for a in activities}
-                missing_activity_ids = activity_def_ids - found_activity_ids
-                if missing_activity_ids:
-                    return None, f"Invalid activity IDs for this fractal: {', '.join(sorted(missing_activity_ids))}", 400
-                instance_increment = sum(len(normalized_exercises) for _, normalized_exercises in section_exercises)
-                _, quota_error, quota_status = quota_service.check_available(
-                    current_user_id,
-                    "activity_instances",
-                    instance_increment,
-                )
-                if quota_error:
-                    return None, quota_error, quota_status
-                activity_map = {a.id: a for a in activities}
+            ]
+        # Activity occurrences are normalized above in the local payload.
+        # Publish that canonical state before circuit insertion reads and
+        # augments the session's typed item list.
+        new_session.attributes = copy.deepcopy(draft.session_data)
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(new_session, 'attributes')
+        circuit_service = CircuitService(self.db_session)
+        for section_index, item_index, circuit_definition_id in circuit_items:
+            created_run, circuit_error, circuit_status = circuit_service.create_run(
+                draft.root_id, new_session.id, draft.current_user_id,
+                {
+                    'circuit_definition_id': circuit_definition_id,
+                    'section_index': section_index,
+                    'item_index': item_index,
+                },
+                commit=False,
+                emit=False,
+                allow_archived=bool(draft.template or draft.allow_archived_definitions),
+                attach_goals=False,
+            )
+            if circuit_error:
+                self.db_session.rollback()
+                return circuit_error, circuit_status
+            draft.created_circuit_runs.append(created_run)
+            # create_run updates the persisted session JSON. Keep the local
+            # canonical payload in sync so the final assignment cannot
+            # overwrite the newly inserted typed circuit item.
+            draft.session_data = copy.deepcopy(new_session.attributes)
+        return None
 
-                for section, normalized_exercises in section_exercises:
-                    if section.get('id') and not section.get('template_section_id'):
-                        section['template_section_id'] = section.get('id')
-                    section_activity_ids = []
-                    section_items = []
-                    for exercise, activity_id in normalized_exercises:
-                        if activity_id not in activity_map:
-                            continue
-                        instance_id = exercise.get('instance_id') or str(uuid.uuid4())
-                        instance = ActivityInstance(
-                            id=instance_id,
-                            session_id=new_session.id,
-                            activity_definition_id=activity_id,
-                            root_id=root_id
-                        )
-                        self.db_session.add(instance)
-                        self.db_session.flush()
-                        section_activity_ids.append(instance_id)
-                        section_items.append({'type': 'activity', 'activity_instance_id': instance_id})
-
-                    section['items'] = section_items
-                    section.pop('activity_ids', None)
-                    section.pop('exercises', None)
-                    section.pop('activities', None)
-                    if 'estimated_duration_minutes' not in section and section.get('duration_minutes') is not None:
-                        section['estimated_duration_minutes'] = section.get('duration_minutes')
-
-            if circuit_items:
-                from services.circuit_service import CircuitService
-
-                for section in sections:
-                    if not isinstance(section, dict) or not isinstance(section.get('items'), list):
-                        continue
-                    section['items'] = [
-                        item
-                        for item in section['items']
-                        if not (
-                            isinstance(item, dict)
-                            and item.get('type') == 'circuit'
-                            and item.get('circuit_definition_id')
-                        )
-                    ]
-                # Activity occurrences are normalized above in the local payload.
-                # Publish that canonical state before circuit insertion reads and
-                # augments the session's typed item list.
-                new_session.attributes = copy.deepcopy(session_data_dict)
-                from sqlalchemy.orm.attributes import flag_modified
-                flag_modified(new_session, 'attributes')
-                circuit_service = CircuitService(self.db_session)
-                for section_index, item_index, circuit_definition_id in circuit_items:
-                    created_run, circuit_error, circuit_status = circuit_service.create_run(
-                        root_id, new_session.id, current_user_id,
-                        {
-                            'circuit_definition_id': circuit_definition_id,
-                            'section_index': section_index,
-                            'item_index': item_index,
-                        },
-                        commit=False,
-                        emit=False,
-                        allow_archived=bool(template or allow_archived_definitions),
-                        attach_goals=False,
-                    )
-                    if circuit_error:
-                        self.db_session.rollback()
-                        return None, circuit_error, circuit_status
-                    created_circuit_runs.append(created_run)
-                    # create_run updates the persisted session JSON. Keep the local
-                    # canonical payload in sync so the final assignment cannot
-                    # overwrite the newly inserted typed circuit item.
-                    session_data_dict = copy.deepcopy(new_session.attributes)
-
-        new_session.attributes = copy.deepcopy(session_data_dict)
+    def _link_session_goals(self, draft, *, is_quick_template):
+        """Link activity-derived, manual, and immediate goals, honouring program goal scope."""
+        new_session = draft.new_session
+        root_id = draft.root_id
+        data = draft.data
+        program_goal_ids = draft.program_goal_ids
+        session_data_dict = draft.session_data
+        inherited_goal_map = {}
 
         if not is_quick_template:
             created_definition_ids = {
@@ -419,7 +515,7 @@ class _SessionCreationMixin:
                     Goal.deleted_at == None
                 ).first()
                 if not goal_obj:
-                    return None, f"Goal not found in this fractal: {goal_id}", 400
+                    return f"Goal not found in this fractal: {goal_id}", 400
                 if goal_id in linked_goal_ids:
                     continue
                 self.db_session.execute(
@@ -439,9 +535,9 @@ class _SessionCreationMixin:
                     Goal.deleted_at == None
                 ).first()
                 if not goal:
-                    return None, f"Immediate goal not found in this fractal: {ig_id}", 400
+                    return f"Immediate goal not found in this fractal: {ig_id}", 400
                 if get_canonical_goal_type(goal) != 'ImmediateGoal':
-                    return None, f"Goal is not an ImmediateGoal: {ig_id}", 400
+                    return f"Goal is not an ImmediateGoal: {ig_id}", 400
                 if ig_id not in linked_goal_ids:
                     self.db_session.execute(
                         session_goals.insert().values(
@@ -451,12 +547,12 @@ class _SessionCreationMixin:
                         )
                     )
                     linked_goal_ids.add(ig_id)
+        return None
 
-        if commit:
-            self.db_session.commit()
-
+    def _persist_session_times(self, session_id, s_start, s_end, *, commit):
+        """Write explicit start/end times with SQL so ORM defaults cannot replace them."""
         if s_start or s_end:
-            params = {'id': new_session.id}
+            params = {'id': session_id}
             update_clauses = []
             if s_start:
                 update_clauses.append("session_start = :start")
@@ -469,18 +565,6 @@ class _SessionCreationMixin:
                 self.db_session.execute(text(sql), params)
                 if commit:
                     self.db_session.commit()
-
-        self.db_session.refresh(new_session)
-        self._recompute_and_attach_stats(new_session, commit=commit)
-
-        publish_session_creation_events(
-            new_session,
-            root_id,
-            created_circuit_runs,
-            pending_events,
-        )
-
-        return serialize_session(new_session), None, 201
 
     def create_completed_quick_session(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         create_payload = {key: value for key, value in data.items() if key != 'activity_instances'}

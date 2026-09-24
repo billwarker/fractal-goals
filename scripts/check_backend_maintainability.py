@@ -8,16 +8,11 @@ from pathlib import Path
 
 MAX_SOURCE_LINES = 800
 SIZE_BACKLOG = {
-    "services/landing_publish_service.py": 1634,
-    "services/progress_service.py": 1391,
-    "services/analytics_engine.py": 1344,
-    "services/serializers.py": 1286,
-    "services/program_metrics_service.py": 849,
-    "services/session_lifecycle_service.py": 1111,
-    "services/completion_handlers.py": 1075,
+    # Remaining decomposition backlog, capped at current size: shrink, never grow.
+    "services/program_metrics_service.py": 847,
     "blueprints/activities_api.py": 936,
     "blueprints/goals_api.py": 838,
-    "services/note_service.py": 835,
+    "services/note_service.py": 833,
 }
 # The AI API adds one shared database boundary; the delegated and embedded
 # workers each need a containment boundary for durable failure state. The

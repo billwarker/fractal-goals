@@ -1183,6 +1183,46 @@ def test_publish_landing_examples_rejects_oversized_snapshot_without_changing_pu
 
 
 @pytest.mark.integration
+def test_publish_landing_examples_rejects_oversized_compressed_snapshot(
+    admin_client,
+    admin_landing_fractal,
+    monkeypatch,
+):
+    monkeypatch.setattr(config, 'LANDING_EXAMPLES_MAX_COMPRESSED_BYTES', 1)
+
+    rejected = admin_client.post(
+        '/api/admin/landing-examples/publish',
+        data=_landing_example_payload(admin_landing_fractal.id),
+        content_type='application/json',
+    )
+
+    assert rejected.status_code == 413
+    assert rejected.get_json()['error'].startswith('Compressed landing snapshot is too large to publish')
+    assert admin_client.get('/api/public/landing-examples').get_json()['published_at'] is None
+
+
+@pytest.mark.integration
+def test_publish_leaves_publication_unchanged_when_static_delivery_fails(
+    db_session,
+    admin_landing_fractal,
+    monkeypatch,
+):
+    from services.landing_publish_service import LandingPublishService
+
+    service = LandingPublishService(db_session)
+    monkeypatch.setattr(service, '_write_landing_static_snapshot', lambda *args, **kwargs: 'failed')
+
+    payload, error, status = service.publish_landing_examples(
+        examples_override=json.loads(_landing_example_payload(admin_landing_fractal.id))['examples'],
+    )
+
+    assert payload is None
+    assert status == 503
+    assert 'delivery failed' in error
+    assert service._get_app_setting_value('landing_example_cache', None) is None
+
+
+@pytest.mark.integration
 def test_publish_restores_static_snapshot_when_database_commit_fails(
     db_session,
     admin_landing_fractal,
