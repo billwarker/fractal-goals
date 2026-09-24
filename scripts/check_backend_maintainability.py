@@ -16,7 +16,6 @@ SIZE_BACKLOG = {
     "services/session_lifecycle_service.py": 1111,
     "services/completion_handlers.py": 1075,
     "blueprints/activities_api.py": 936,
-    "services/admin_service.py": 877,
     "blueprints/goals_api.py": 838,
     "services/note_service.py": 835,
 }

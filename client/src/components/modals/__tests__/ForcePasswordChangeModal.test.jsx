@@ -8,12 +8,14 @@ const {
     setUser,
     updatePassword,
     getMe,
+    setAccessToken,
     notify,
 } = vi.hoisted(() => ({
     logout: vi.fn(),
     setUser: vi.fn(),
     updatePassword: vi.fn(),
     getMe: vi.fn(),
+    setAccessToken: vi.fn(),
     notify: {
         success: vi.fn(),
     },
@@ -35,6 +37,7 @@ vi.mock('../../../utils/api', () => ({
         updatePassword: (...args) => updatePassword(...args),
         getMe: (...args) => getMe(...args),
     },
+    setAccessToken: (...args) => setAccessToken(...args),
 }));
 
 function fillForm({ current = 'TempPass1', next = 'Newpassword456', confirm = 'Newpassword456' } = {}) {
@@ -73,6 +76,20 @@ describe('ForcePasswordChangeModal', () => {
             expect(setUser).toHaveBeenCalledWith({ id: 'user-a', must_change_password: false });
         });
         expect(notify.success).toHaveBeenCalled();
+    });
+
+    it('continues on the replacement token before reloading the user', async () => {
+        updatePassword.mockResolvedValue({ data: { message: 'ok', token: 'replacement-token' } });
+        render(<ForcePasswordChangeModal />);
+
+        fillForm();
+        fireEvent.click(screen.getByRole('button', { name: 'Update Password' }));
+
+        await waitFor(() => {
+            expect(setUser).toHaveBeenCalled();
+        });
+        expect(setAccessToken).toHaveBeenCalledWith('replacement-token');
+        expect(setAccessToken.mock.invocationCallOrder[0]).toBeLessThan(getMe.mock.invocationCallOrder[0]);
     });
 
     it('blocks submission when the confirmation does not match', async () => {

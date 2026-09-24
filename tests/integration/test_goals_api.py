@@ -21,6 +21,7 @@ from datetime import timezone
 import uuid
 
 from models import ActivityDefinition, Goal, GoalLevel, Session, SessionTemplate, Target
+from tests.conftest import session_token_for
 
 
 @pytest.mark.integration
@@ -968,7 +969,6 @@ class TestGlobalGoalEndpointProtection:
     def test_endpoints_return_404_for_wrong_owner(
         self, client, db_session, sample_ultimate_goal, method, endpoint_kind
     ):
-        import jwt
         from config import config
         from models import User, Target
 
@@ -983,10 +983,7 @@ class TestGlobalGoalEndpointProtection:
         db_session.add(other_user)
         db_session.commit()
 
-        token = jwt.encode({
-            'user_id': other_user.id,
-            'exp': datetime.now(timezone.utc) + timedelta(hours=24)
-        }, config.JWT_SECRET_KEY, algorithm="HS256")
+        token = session_token_for(other_user)
 
         headers = {
             'Authorization': f'Bearer {token}',

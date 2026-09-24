@@ -15,6 +15,7 @@ const {
         getMe: vi.fn(),
         login: vi.fn(),
         logout: vi.fn(),
+        revokeAllSessions: vi.fn(),
         refresh: vi.fn(),
         getCsrf: vi.fn(),
         signup: vi.fn(),
@@ -46,7 +47,7 @@ function createQueryClient() {
 }
 
 function AuthHarness() {
-    const { user, login, logout, setUser, loading } = useAuth();
+    const { user, login, logout, signOutEverywhere, setUser, loading } = useAuth();
     return (
         <div>
             <div data-testid="loading">{String(loading)}</div>
@@ -55,6 +56,7 @@ function AuthHarness() {
             <button onClick={() => login('user-a', 'password', { rememberMe: true })}>Remember Login A</button>
             <button onClick={() => login('user-b', 'password')}>Login B</button>
             <button onClick={() => logout()}>Logout</button>
+            <button onClick={() => signOutEverywhere().catch(() => {})}>Sign Out Everywhere</button>
             <button onClick={() => setUser({ id: user?.id, username: 'renamed' })}>Update Same User</button>
         </div>
     );
@@ -174,6 +176,49 @@ describe('AuthContext cache boundary', () => {
             expect(screen.getByTestId('user-id')).toHaveTextContent('user-a');
         });
         expect(queryClient.getQueryData(['fractals', 'user-a'])).toEqual([{ id: 'root-a' }]);
+    });
+
+    it('ends the local session after revoking every session', async () => {
+        const { queryClient } = renderAuthHarness();
+        authApi.revokeAllSessions.mockResolvedValueOnce({ data: { message: 'ok' } });
+        authApi.login.mockResolvedValueOnce({
+            data: { token: 'token-a', user: { id: 'user-a', username: 'alpha' } },
+        });
+        fireEvent.click(screen.getByText('Login A'));
+        await waitFor(() => {
+            expect(screen.getByTestId('user-id')).toHaveTextContent('user-a');
+        });
+        queryClient.setQueryData(['fractals', 'user-a'], [{ id: 'root-a' }]);
+
+        fireEvent.click(screen.getByText('Sign Out Everywhere'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+        });
+        expect(authApi.revokeAllSessions).toHaveBeenCalledTimes(1);
+        expect(authApi.logout).not.toHaveBeenCalled();
+        expect(clearAccessToken).toHaveBeenCalled();
+        expect(queryClient.getQueryData(['fractals', 'user-a'])).toBeUndefined();
+    });
+
+    it('keeps the local session when revoking every session fails', async () => {
+        renderAuthHarness();
+        authApi.revokeAllSessions.mockRejectedValueOnce({ response: { status: 500 } });
+        authApi.login.mockResolvedValueOnce({
+            data: { token: 'token-a', user: { id: 'user-a', username: 'alpha' } },
+        });
+        fireEvent.click(screen.getByText('Login A'));
+        await waitFor(() => {
+            expect(screen.getByTestId('user-id')).toHaveTextContent('user-a');
+        });
+
+        fireEvent.click(screen.getByText('Sign Out Everywhere'));
+
+        await waitFor(() => {
+            expect(authApi.revokeAllSessions).toHaveBeenCalledTimes(1);
+        });
+        expect(screen.getByTestId('user-id')).toHaveTextContent('user-a');
+        expect(clearAccessToken).not.toHaveBeenCalled();
     });
 
     it('clears cached query data on logout', async () => {

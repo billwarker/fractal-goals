@@ -1,7 +1,7 @@
-"""Shared account-state flags stored in the User.preferences JSON blob.
+"""Shared account-state helpers: preference flags and session revocation.
 
 Kept separate from AdminService so auth, serializers, and user services can
-read/clear the flags without importing admin logic.
+read/clear account state without importing admin logic.
 """
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -28,3 +28,13 @@ def clear_force_password_change(user) -> bool:
     user.preferences = updated
     flag_modified(user, "preferences")
     return True
+
+
+def revoke_user_sessions(user) -> None:
+    """Invalidate every outstanding session token for ``user``.
+
+    Tokens carry the session version they were issued under; incrementing it
+    rejects them all. The caller owns the commit, in the same transaction as
+    the change that motivated the revocation.
+    """
+    user.session_version = (user.session_version or 0) + 1

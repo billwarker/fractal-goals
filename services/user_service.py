@@ -10,7 +10,7 @@ import models
 from config import config
 from models import User, utc_now
 from models import ActivityDefinition, ActivityGroup, ActivityInstance, Goal, MetricDefinition, MetricValue, Program, ProgramBlock, ProgramDayStatusOverride, Session, SessionTemplate
-from services.account_flags import clear_force_password_change
+from services.account_flags import clear_force_password_change, revoke_user_sessions
 from services.email_service import EmailSendError, EmailService
 from services.email_templates import (
     render_account_erasure_requested_email,
@@ -499,6 +499,7 @@ class UserService:
 
         user.set_password(data['new_password'])
         cleared_forced_change = clear_force_password_change(user)
+        revoke_user_sessions(user)
         self.db_session.commit()
         logger.info(
             "Updated password for user_id=%s cleared_forced_change=%s",

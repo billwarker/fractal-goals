@@ -33,12 +33,14 @@ FORCE_PASSWORD_CHANGE_EXEMPT_ENDPOINTS = frozenset({
     'auth.get_me',
     'auth.get_csrf_token',
     'auth.update_password',
+    'auth.revoke_all_sessions',
 })
 
 LEGAL_ACCEPTANCE_EXEMPT_ENDPOINTS = frozenset({
     'auth.get_me',
     'auth.get_csrf_token',
     'auth.update_password',
+    'auth.revoke_all_sessions',
     'auth.accept_legal_documents',
     'auth.delete_account',
     'auth.export_account_data',
@@ -423,6 +425,23 @@ def logout():
     _clear_auth_cookie(response)
     return response, 200
 
+@auth_bp.route('/sessions/revoke', methods=['POST'])
+@token_required
+@limiter.limit("5 per minute")
+def revoke_all_sessions(current_user):
+    """Sign out of every device by revoking all outstanding session tokens."""
+    db_session = get_db_session()
+    try:
+        payload, error, status = AuthService(db_session).revoke_all_sessions(current_user.id)
+        if error:
+            return jsonify({'error': error}), status
+        response = jsonify(payload)
+        _clear_auth_cookie(response)
+        _clear_csrf_cookie(response)
+        return response, status
+    finally:
+        db_session.close()
+
 @auth_bp.route('/preferences', methods=['PATCH'])
 @token_required
 @validate_request(UserPreferencesUpdateSchema)
@@ -492,8 +511,15 @@ def update_password(current_user, validated_data):
         payload, error, status = service.update_password(current_user.id, validated_data)
         if error:
             return jsonify({'error': error}), status
-        response = jsonify(payload)
-        _clear_auth_cookie(response)
+        # The change revoked every session; only this device receives a replacement.
+        previous_token, _ = _get_request_token()
+        session, error, session_status = AuthService(db_session).reissue_current_session(
+            current_user.id, previous_token,
+        )
+        if error:
+            return jsonify({'error': error}), session_status
+        response = jsonify({**payload, **session})
+        _set_auth_cookie(response, session['token'], remember_me=session['remember_me'])
         return response, status
     except SQLAlchemyError:
         db_session.rollback()

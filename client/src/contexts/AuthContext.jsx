@@ -148,14 +148,26 @@ export function AuthProvider({ children }) {
         }
     };
 
+    const endLocalSession = () => {
+        authVersionRef.current += 1;
+        clearAccessToken();
+        replaceUser(null);
+    };
+
     const logout = async () => {
         try {
             await authApi.logout();
         } finally {
-            authVersionRef.current += 1;
-            clearAccessToken();
-            replaceUser(null);
+            endLocalSession();
         }
+    };
+
+    // Unlike logout, a failed revocation must not look like success: other
+    // devices would still be signed in, so the local session is kept and the
+    // error propagates to the caller.
+    const signOutEverywhere = async () => {
+        await authApi.revokeAllSessions();
+        endLocalSession();
     };
 
     const value = {
@@ -165,6 +177,7 @@ export function AuthProvider({ children }) {
         login,
         signup,
         logout,
+        signOutEverywhere,
         setUser: replaceUser,
         isAuthenticated: !!user
     };

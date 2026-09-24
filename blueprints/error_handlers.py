@@ -1,10 +1,25 @@
 """App-level error handlers shared by the production app and the test app."""
+import logging
+
 from flask import jsonify, request
+from sqlalchemy.exc import SQLAlchemyError
 
 from services.ops_log import log_ops_event
 
+logger = logging.getLogger(__name__)
+
 
 def register_error_handlers(app):
+    @app.errorhandler(SQLAlchemyError)
+    def handle_database_error(e):
+        """Return the standard JSON 500 for database failures routes do not catch.
+
+        The request-scoped session is removed at teardown, which rolls back the
+        failed unit of work, so routes need no per-endpoint rollback boilerplate.
+        """
+        logger.exception("Unhandled database error method=%s path=%s", request.method, request.path)
+        return jsonify({'error': 'Internal server error'}), 500
+
     @app.errorhandler(429)
     def handle_rate_limit_exceeded(e):
         """Return JSON for rate-limit hits and make them visible in the logs."""

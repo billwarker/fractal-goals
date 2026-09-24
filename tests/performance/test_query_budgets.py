@@ -4,7 +4,6 @@ import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
-import jwt
 
 from config import config
 from models import (
@@ -26,6 +25,7 @@ from models import (
     User,
     activity_goal_associations,
 )
+from tests.conftest import session_token_for
 
 
 def assert_response_budget(
@@ -253,14 +253,7 @@ def large_account_dataset(db_session, test_user):
 
 
 def auth_headers_for(user):
-    token = jwt.encode(
-        {
-            "user_id": user.id,
-            "exp": datetime.now(timezone.utc) + timedelta(hours=24),
-        },
-        config.JWT_SECRET_KEY,
-        algorithm="HS256",
-    )
+    token = session_token_for(user)
     return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
 

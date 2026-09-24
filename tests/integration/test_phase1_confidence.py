@@ -1,11 +1,10 @@
 import json
 import uuid
+from types import SimpleNamespace
 from datetime import datetime, timedelta, timezone
 
-import jwt
 import pytest
 
-from config import config
 from models import (
     ActivityDefinition,
     ActivityGroup,
@@ -18,17 +17,11 @@ from models import (
     TargetMetricCondition,
     session_goals,
 )
+from tests.conftest import session_token_for
 
 
-def _make_token(user_id, *, expires_delta=timedelta(hours=1)):
-    return jwt.encode(
-        {
-            "user_id": user_id,
-            "exp": datetime.now(timezone.utc) + expires_delta,
-        },
-        config.JWT_SECRET_KEY,
-        algorithm="HS256",
-    )
+def _make_token(user, *, expires_delta=timedelta(hours=1)):
+    return session_token_for(user, expires_delta=expires_delta)
 
 
 @pytest.mark.integration
@@ -42,7 +35,7 @@ class TestPhase1AuthConfidence:
         assert "error" in response.get_json()
 
     def test_protected_endpoint_rejects_token_for_missing_user(self, client):
-        token = _make_token(str(uuid.uuid4()))
+        token = _make_token(SimpleNamespace(id=str(uuid.uuid4()), session_version=0))
         response = client.get(
             "/api/auth/me",
             headers={"Authorization": f"Bearer {token}"},
@@ -58,7 +51,7 @@ class TestPhase1AuthConfidence:
     def test_refresh_rejects_disabled_user(self, client, db_session, test_user):
         test_user.is_active = False
         db_session.commit()
-        token = _make_token(test_user.id, expires_delta=timedelta(hours=-1))
+        token = _make_token(test_user, expires_delta=timedelta(hours=-1))
         response = client.post(
             "/api/auth/refresh",
             headers={"Authorization": f"Bearer {token}"},

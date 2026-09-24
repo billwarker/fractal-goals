@@ -186,3 +186,18 @@ def test_production_cors_exposes_csrf_header(client):
     assert response.status_code in (200, 204)
     exposed_headers = response.headers.get('Access-Control-Expose-Headers', '').lower()
     assert 'x-csrf-token' in exposed_headers
+
+
+def test_uncaught_database_error_returns_json_500(client, auth_headers, monkeypatch):
+    from sqlalchemy.exc import OperationalError
+    from services.auth_service import AuthService
+
+    def fail(*_args, **_kwargs):
+        raise OperationalError('SELECT 1', {}, Exception('database unavailable'))
+
+    monkeypatch.setattr(AuthService, 'revoke_all_sessions', fail)
+
+    response = client.post('/api/auth/sessions/revoke', headers=auth_headers)
+
+    assert response.status_code == 500
+    assert response.get_json() == {'error': 'Internal server error'}

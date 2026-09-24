@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 
-import jwt
 import pytest
 from sqlalchemy import text
 
@@ -34,17 +33,11 @@ from models import (
     activity_goal_associations,
 )
 from services.email_service import EmailService, TEST_EMAIL_OUTBOX
+from tests.conftest import session_headers_for
 
 
 def auth_headers_for(user):
-    import datetime
-    from datetime import timezone
-
-    token = jwt.encode({
-        'user_id': user.id,
-        'exp': datetime.datetime.now(timezone.utc) + datetime.timedelta(hours=24),
-    }, config.JWT_SECRET_KEY, algorithm="HS256")
-    return {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+    return session_headers_for(user)
 
 
 def free_limits_with(**overrides):
@@ -1794,6 +1787,8 @@ def test_temporary_password_forces_change_before_api_access(admin_client, client
         headers=user_headers,
     )
     assert change_response.status_code == 200
+    assert client.get('/api/auth/account/usage', headers=user_headers).status_code == 401
+    user_headers['Authorization'] = f"Bearer {json.loads(change_response.data)['token']}"
 
     unblocked_response = client.get('/api/auth/account/usage', headers=user_headers)
     assert unblocked_response.status_code == 200

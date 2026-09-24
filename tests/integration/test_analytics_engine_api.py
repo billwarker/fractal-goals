@@ -1,21 +1,14 @@
 from datetime import datetime, timezone
 import uuid
 
-import jwt
 
 from config import config
 from models import Session, User
+from tests.conftest import session_headers_for
 
 
 def _auth_headers_for(user):
-    token = jwt.encode({
-        'user_id': user.id,
-        'exp': datetime.now(timezone.utc).timestamp() + 3600,
-    }, config.JWT_SECRET_KEY, algorithm="HS256")
-    return {
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/json',
-    }
+    return session_headers_for(user)
 
 
 def _create_admin(db_session):

@@ -6,6 +6,7 @@ export const authApi = {
     forgotPassword: (data) => axios.post(`${API_BASE}/auth/password/forgot`, data),
     resetPassword: (data) => axios.post(`${API_BASE}/auth/password/reset`, data),
     logout: () => axios.post(`${API_BASE}/auth/logout`, {}),
+    revokeAllSessions: () => axios.post(`${API_BASE}/auth/sessions/revoke`, {}),
     refresh: (token) => axios.post(
         `${API_BASE}/auth/refresh`,
         {},

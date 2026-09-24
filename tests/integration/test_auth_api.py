@@ -24,6 +24,7 @@ from services.admin_service import hash_invite_key
 from services.email_service import EmailService, TEST_EMAIL_OUTBOX
 from services.quota_service import TIER_DEFAULT_LIMITS_SETTING_KEY
 from services.user_service import UserService
+from tests.conftest import session_token_for
 
 
 def create_invite_key(db_session, raw_key='fg_invite_test'):
@@ -863,7 +864,16 @@ class TestPasswordChangeEndpoint:
             content_type='application/json'
         )
         assert response.status_code == 200
-        
+        replacement = json.loads(response.data)
+        assert replacement['token']
+        assert 'fractal_auth_token=' in response.headers.get('Set-Cookie', '')
+
+        # Every earlier session is revoked; the acting device continues with its replacement.
+        assert authed_client.get('/api/auth/me').status_code == 401
+        assert client.get(
+            '/api/auth/me', headers={'Authorization': f"Bearer {replacement['token']}"},
+        ).status_code == 200
+
         # Verify we can login with new password
         login_payload = {
             'username_or_email': 'testuser',
@@ -1169,14 +1179,8 @@ class TestTokenRefreshEndpoint:
     """Test token refresh endpoint."""
     
     def test_refresh_token_success(self, client, test_user):
-        import jwt
-        from datetime import datetime, timedelta, timezone
-        from config import config
         # Create an expired token within refresh window
-        token = jwt.encode({
-            'user_id': test_user.id,
-            'exp': datetime.now(timezone.utc) - timedelta(hours=1)
-        }, config.JWT_SECRET_KEY, algorithm='HS256')
+        token = session_token_for(test_user, expires_delta=-timedelta(hours=1))
         
         response = client.post(
             '/api/auth/refresh',
@@ -1251,14 +1255,8 @@ class TestTokenRefreshEndpoint:
         assert 'Max-Age=' in csrf_cookie_header
 
     def test_refresh_token_past_window(self, client, test_user):
-        import jwt
-        from datetime import datetime, timedelta, timezone
-        from config import config
         # Token expired 8 days ago (window is 7 days)
-        token = jwt.encode({
-            'user_id': test_user.id,
-            'exp': datetime.now(timezone.utc) - timedelta(days=8)
-        }, config.JWT_SECRET_KEY, algorithm='HS256')
+        token = session_token_for(test_user, expires_delta=-timedelta(days=8))
         
         response = client.post(
             '/api/auth/refresh',
@@ -1395,7 +1393,7 @@ class TestForcePasswordChangeEnforcement:
         assert response.status_code == 200
         assert json.loads(response.data)['must_change_password'] is True
 
-    def test_password_change_clears_flag_and_unblocks(self, authed_client, db_session, test_user):
+    def test_password_change_clears_flag_and_unblocks(self, authed_client, client, db_session, test_user):
         EmailService.clear_test_outbox()
         self._force_password_change(db_session, test_user)
 
@@ -1405,11 +1403,12 @@ class TestForcePasswordChangeEnforcement:
             content_type='application/json',
         )
         assert change_response.status_code == 200
+        replacement_headers = {'Authorization': f"Bearer {json.loads(change_response.data)['token']}"}
 
-        unblocked_response = authed_client.get('/api/auth/account/usage')
+        unblocked_response = client.get('/api/auth/account/usage', headers=replacement_headers)
         assert unblocked_response.status_code == 200
 
-        me_response = authed_client.get('/api/auth/me')
+        me_response = client.get('/api/auth/me', headers=replacement_headers)
         assert json.loads(me_response.data)['must_change_password'] is False
 
         notices = [email for email in TEST_EMAIL_OUTBOX if email['template_key'] == 'password_changed_notice']

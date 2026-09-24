@@ -206,22 +206,22 @@
     color: var(--color-text-primary);
 }
 
-.themeRow {
+.actionRow {
     display: flex;
     gap: 16px;
 }
 
-.themeRowMobile {
+.actionRowMobile {
     align-items: flex-start;
     flex-direction: column;
 }
 
-.themeRowDesktop {
+.actionRowDesktop {
     align-items: center;
     flex-direction: row;
 }
 
-.themeText {
+.actionRowText {
     color: var(--color-text-secondary);
     font-size: 14px;
 }
