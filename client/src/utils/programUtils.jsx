@@ -23,7 +23,7 @@ export const isBlockActive = (block) => {
 
 /**
  * Render an "Active" badge component for active blocks
- * @returns {JSX.Element} - The active badge component
+ * @returns {import('react').JSX.Element} - The active badge component
  */
 export const ActiveBlockBadge = () => (
     <span style={{

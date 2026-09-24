@@ -45,7 +45,7 @@ export function formatLastUsed(value) {
     const today = new Date();
     const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const startOfUsedDay = new Date(usedAt.getFullYear(), usedAt.getMonth(), usedAt.getDate());
-    const diffDays = Math.round((startOfToday - startOfUsedDay) / 86400000);
+    const diffDays = Math.round((startOfToday.getTime() - startOfUsedDay.getTime()) / 86400000);
 
     if (diffDays === 0) return 'Last used today';
     if (diffDays === 1) return 'Last used yesterday';

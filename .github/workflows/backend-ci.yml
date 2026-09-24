@@ -131,6 +131,9 @@ jobs:
           python -m compileall -q blueprints services models validators app.py config.py
           python scripts/check_backend_maintainability.py
 
+      - name: Static type check (baseline ratchet)
+        run: basedpyright
+
       - name: Run Coverage Suite
         run: |
           python scripts/check_backend_coverage_gate.py

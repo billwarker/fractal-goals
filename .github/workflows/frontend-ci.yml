@@ -33,6 +33,9 @@ jobs:
       - name: Lint
         run: npm run lint -- --max-warnings=0
 
+      - name: Type check
+        run: npm run typecheck
+
       - name: Frontend Tests and Coverage
         run: npm run test:coverage
 

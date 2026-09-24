@@ -22,7 +22,7 @@ from services.goal_type_utils import get_canonical_goal_type
 from services.payload_normalizers import normalize_session_payload
 from services.quota_service import QuotaService
 from services.serializers import serialize_session
-from services.service_types import JsonDict, ServiceResult
+from services.service_types import ErrorPayload, JsonDict, ServiceResult
 from services.session_activity_service import SessionActivityService
 from services.session_runtime import (
     DEFAULT_TEMPLATE_COLOR,
@@ -34,6 +34,10 @@ from services.program_scope import resolve_program_scope
 from services._session_lifecycle_common import _parse_iso_datetime_strict
 
 
+# A create_session phase returns None to continue, or (message, status) to stop.
+PhaseError = tuple[ErrorPayload, int] | None
+
+
 @dataclass
 class _SessionDraft:
     """Mutable state shared by the create_session phases for one new session."""
@@ -43,7 +47,7 @@ class _SessionDraft:
     data: dict
     quota_service: QuotaService
     new_session: Session
-    session_data: dict
+    session_data: Any  # decoded session JSON; phases guard its shape as the original flow did
     template_session_type: str | None
     allow_archived_definitions: bool
     template: Any = None
@@ -124,7 +128,8 @@ class _SessionCreationMixin:
 
         error = self._apply_program_context(draft) or self._apply_template(draft)
         if error:
-            return (None, *error)
+            message, status = error
+            return None, message, status
 
         self.db_session.add(new_session)
         self.db_session.flush()
@@ -135,13 +140,15 @@ class _SessionCreationMixin:
         else:
             error = self._instantiate_section_items(draft)
         if error:
-            return (None, *error)
+            message, status = error
+            return None, message, status
 
         new_session.attributes = copy.deepcopy(draft.session_data)
 
         error = self._link_session_goals(draft, is_quick_template=is_quick_template)
         if error:
-            return (None, *error)
+            message, status = error
+            return None, message, status
 
         if commit:
             self.db_session.commit()
@@ -160,7 +167,7 @@ class _SessionCreationMixin:
 
         return serialize_session(new_session), None, 201
 
-    def _apply_program_context(self, draft):
+    def _apply_program_context(self, draft) -> PhaseError:
         """Bind a program day or program from ``program_context`` and resolve its goal scope."""
         new_session = draft.new_session
         session_data_dict = draft.session_data
@@ -223,7 +230,7 @@ class _SessionCreationMixin:
                     new_session.program_block_id = block.id
         return None
 
-    def _apply_template(self, draft):
+    def _apply_template(self, draft) -> PhaseError:
         """Load the session template and seed session data (type, color, sections) from it."""
         new_session = draft.new_session
         session_data_dict = draft.session_data
@@ -285,7 +292,7 @@ class _SessionCreationMixin:
             local_section_exercises.append((section, normalized))
         return local_activity_ids, local_section_exercises, local_circuit_items
 
-    def _instantiate_quick_activities(self, draft):
+    def _instantiate_quick_activities(self, draft) -> PhaseError:
         """Create the 1-5 flat activity instances a quick-session template lists."""
         template_payload = draft.template_payload
         quick_items = template_payload.get('activities', []) if isinstance(template_payload, dict) else []
@@ -332,7 +339,7 @@ class _SessionCreationMixin:
         draft.session_data.pop('sections', None)
         return None
 
-    def _instantiate_section_items(self, draft):
+    def _instantiate_section_items(self, draft) -> PhaseError:
         """Create activity instances and circuit runs for the session's (or template's) sections."""
         session_data_dict = draft.session_data
         template = draft.template
@@ -359,7 +366,7 @@ class _SessionCreationMixin:
             return self._attach_section_circuits(draft, sections, circuit_items)
         return None
 
-    def _instantiate_section_activities(self, draft, activity_def_ids, section_exercises):
+    def _instantiate_section_activities(self, draft, activity_def_ids, section_exercises) -> PhaseError:
         activities_query = self.db_session.query(ActivityDefinition).options(
             joinedload(ActivityDefinition.associated_goals)
         ).filter(
@@ -411,7 +418,7 @@ class _SessionCreationMixin:
                 section['estimated_duration_minutes'] = section.get('duration_minutes')
         return None
 
-    def _attach_section_circuits(self, draft, sections, circuit_items):
+    def _attach_section_circuits(self, draft, sections, circuit_items) -> PhaseError:
         from services.circuit_service import CircuitService
 
         new_session = draft.new_session
@@ -457,7 +464,7 @@ class _SessionCreationMixin:
             draft.session_data = copy.deepcopy(new_session.attributes)
         return None
 
-    def _link_session_goals(self, draft, *, is_quick_template):
+    def _link_session_goals(self, draft, *, is_quick_template) -> PhaseError:
         """Link activity-derived, manual, and immediate goals, honouring program goal scope."""
         new_session = draft.new_session
         root_id = draft.root_id

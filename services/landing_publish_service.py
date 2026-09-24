@@ -91,7 +91,8 @@ class LandingPublishService(
         for item in examples:
             published, error = self._build_published_example(item, showcase_warnings)
             if error:
-                return (None, *error)
+                message, status = error
+                return None, message, status
             published_examples.append(published)
 
         cache = {
@@ -108,7 +109,8 @@ class LandingPublishService(
         compressed_bytes = len(compressed_snapshot)
         error = self._landing_snapshot_size_error(snapshot_bytes, compressed_bytes)
         if error:
-            return (None, *error)
+            message, status = error
+            return None, message, status
 
         delivery_started = perf_counter()
         static_snapshot, error = self._deliver_and_commit_landing_snapshot(
@@ -120,7 +122,8 @@ class LandingPublishService(
             compressed_bytes=compressed_bytes,
         )
         if error:
-            return (None, *error)
+            message, status = error
+            return None, message, status
         committed_ms = round((perf_counter() - publish_started) * 1000)
         delivery_ms = round((perf_counter() - delivery_started) * 1000)
         total_ms = round((perf_counter() - publish_started) * 1000)
@@ -212,7 +215,7 @@ class LandingPublishService(
         )
         return published, None
 
-    def _landing_snapshot_size_error(self, snapshot_bytes, compressed_bytes):
+    def _landing_snapshot_size_error(self, snapshot_bytes, compressed_bytes) -> tuple[str, int] | None:
         """Reject snapshots over the expanded or transfer size limits, rolling back the draft."""
         if snapshot_bytes > config.LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES:
             self.db_session.rollback()

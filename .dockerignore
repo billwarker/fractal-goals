@@ -44,3 +44,7 @@ backups/
 *.sql
 logs/
 supabase/
+
+# Static analysis config and baseline are CI-only.
+.basedpyright/
+pyrightconfig.json
