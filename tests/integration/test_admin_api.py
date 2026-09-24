@@ -1069,7 +1069,7 @@ def test_publish_keeps_valid_analytics_view_while_reconciling_stale_selection(
 
 @pytest.mark.integration
 def test_publish_landing_examples_static_delivery_contract(admin_client, admin_landing_fractal, monkeypatch, tmp_path):
-    import services.landing_publish_service as landing_publish_module
+    import services._landing_static_snapshot as landing_snapshot_module
 
     def publish(expected_status=200):
         response = admin_client.post(
@@ -1124,7 +1124,7 @@ def test_publish_landing_examples_static_delivery_contract(admin_client, admin_l
             assert name == 'landing-snapshots'
             return _StaticBucket()
 
-    monkeypatch.setattr(landing_publish_module.storage, 'Client', _StaticClient)
+    monkeypatch.setattr(landing_snapshot_module.storage, 'Client', _StaticClient)
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_GCS_BUCKET', 'landing-snapshots')
     gcs_publish = publish()
     assert gcs_publish['static_snapshot'] == 'ok'
