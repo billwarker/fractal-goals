@@ -48,6 +48,41 @@ describe('programViewModel calendar builders', () => {
         expect(events.some((event) => event.extendedProps?.type === 'block_label')).toBe(false);
     });
 
+    it('places reusable days on explicit schedule dates alongside weekday recurrences', () => {
+        const scheduledProgram = {
+            ...program,
+            blocks: [{
+                ...program.blocks[0],
+                days: [{
+                    id: 'day-1',
+                    name: 'Planche Focus',
+                    date: null,
+                    // 2026-05-19 is a Tuesday; the 21st duplicates it; the 24th is outside the block.
+                    day_of_week: ['Tuesday'],
+                    scheduled_dates: ['2026-05-21', '2026-05-19', '2026-05-24'],
+                    templates: [],
+                }],
+            }],
+        };
+
+        const dates = buildProgramDayOccurrences({ program: scheduledProgram }).map((row) => row.date);
+
+        expect(dates).toEqual(['2026-05-19', '2026-05-21']);
+    });
+
+    it('places a reusable day with only explicit schedules and no weekdays', () => {
+        const scheduledProgram = {
+            ...program,
+            blocks: [{
+                ...program.blocks[0],
+                days: [{ id: 'day-1', date: null, day_of_week: [], scheduled_dates: ['2026-05-23'], templates: [] }],
+            }],
+        };
+
+        expect(buildProgramDayOccurrences({ program: scheduledProgram }).map((row) => row.date))
+            .toEqual(['2026-05-23']);
+    });
+
     it('builds explicit block-label metadata for the first date of each block', () => {
         expect(buildProgramBlockLabels({ program, includeProgramId: true })).toEqual([
             expect.objectContaining({

@@ -41,8 +41,12 @@ export function buildTemplateActivityCatalogue(activities = [], circuits = []) {
     ];
 }
 
+export function isTemplateCircuitItem(item) {
+    return item.item_type === 'circuit';
+}
+
 export function canUseTemplateItemInQuickSession(item) {
-    return item.item_type !== 'circuit';
+    return !isTemplateCircuitItem(item);
 }
 
 export function getTemplateItemKey(item, index) {

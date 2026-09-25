@@ -4,7 +4,7 @@ import { fractalApi } from '../../utils/api';
 import { queryKeys } from '../../hooks/queryKeys';
 import { useActivityGroups, useActivities } from '../../hooks/useActivityQueries';
 import { useSessionTemplates } from '../../hooks/useSessionTemplateQueries';
-import { useCircuits } from '../../hooks/useCircuitQueries';
+import { useCircuits, useCreateCircuitDefinition } from '../../hooks/useCircuitQueries';
 import { formatLiteralDate, getDatePart } from '../../utils/dateUtils';
 import TemplateBuilderModal from './TemplateBuilderModal';
 import Modal from '../atoms/Modal';
@@ -18,6 +18,8 @@ import { isQuickSession } from '../../utils/sessionRuntime';
 
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { logError } from '../../utils/logger';
+import { formatError } from '../../utils/mutationNotify';
+import notify from '../../utils/notify';
 import { buildTemplateActivityCatalogue } from './templateBuilderItems';
 
 function getInitialSelectedDaysOfWeek(initialData) {
@@ -94,6 +96,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
     const { activities = [] } = useActivities(rootId);
     const { activityGroups = [] } = useActivityGroups(rootId);
     const { data: circuits = [] } = useCircuits(rootId);
+    const createCircuitDefinition = useCreateCircuitDefinition(rootId);
     const templateActivities = useMemo(
         () => buildTemplateActivityCatalogue(activities, circuits),
         [activities, circuits],
@@ -212,7 +215,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
             await saveTemplateMutation.mutateAsync({ payload, templateId });
         } catch (err) {
             logError("Failed to save template", err);
-            // Show error - could add alert modal here
+            notify.error(`Failed to save template: ${formatError(err)}`);
         }
     };
 
@@ -406,6 +409,8 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                 activities={templateActivities}
                 activityGroups={activityGroups}
                 rootId={rootId}
+                stackLevel={1}
+                onCreateCircuitDefinition={createCircuitDefinition}
             />
 
             <DeleteConfirmModal

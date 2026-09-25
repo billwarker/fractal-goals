@@ -124,12 +124,21 @@ export function getProgramDayScheduledDates(day, block) {
         return [explicitDate];
     }
 
-    const activeDays = getProgramDayWeekdayIndexes(day);
-    if (!blockStart || !blockEnd || activeDays.length === 0) {
+    if (!blockStart || !blockEnd) {
         return [];
     }
 
-    return getRecurringDatesWithinRange(blockStart, blockEnd, activeDays);
+    // Mirrors services/program_day_occurrences.program_day_scheduled_on: a reusable
+    // definition occurs on its explicit schedule dates and its weekdays, within the block.
+    const explicitScheduleDates = (day?.scheduled_dates || [])
+        .map(getDatePart)
+        .filter((dateStr) => dateStr && dateStr >= blockStart && dateStr <= blockEnd);
+    const activeDays = getProgramDayWeekdayIndexes(day);
+    const recurringDates = activeDays.length
+        ? getRecurringDatesWithinRange(blockStart, blockEnd, activeDays)
+        : [];
+
+    return [...new Set([...explicitScheduleDates, ...recurringDates])].sort();
 }
 
 /**

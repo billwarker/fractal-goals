@@ -33,6 +33,12 @@ export function useCircuitDefinitionMutations(rootId) {
     return { createMutation, updateMutation, archiveMutation };
 }
 
+/** Creates a circuit definition and resolves to the saved definition (with its id). */
+export function useCreateCircuitDefinition(rootId) {
+    const { mutateAsync } = useCircuitDefinitionMutations(rootId).createMutation;
+    return useCallback(async (payload) => (await mutateAsync(payload))?.data, [mutateAsync]);
+}
+
 
 export function useCircuitRunActions(rootId, sessionId) {
     const queryClient = useQueryClient();

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import styles from './TemplateBuilderModal.module.css';
 import Modal from '../atoms/Modal';
@@ -11,6 +12,7 @@ import Input from '../atoms/Input';
 import Select from '../atoms/Select';
 import TextArea from '../atoms/TextArea';
 import ActivitySelectorPanel from '../common/ActivitySelectorPanel';
+import CircuitBuilderModal from '../circuits/CircuitBuilderModal';
 
 import EmptyState from '../common/EmptyState';
 import SectionHeader from '../common/SectionHeader';
@@ -22,14 +24,17 @@ import {
     SESSION_TYPE_NORMAL,
     SESSION_TYPE_QUICK,
 } from '../../utils/sessionRuntime';
+import { prepareCircuitDefinitionCopy } from '../../utils/circuitDefinition';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import {
     buildActivityGroupOptions,
     buildActivityPreview,
     buildInitialTemplate,
+    buildTemplateActivityCatalogue,
     canUseTemplateItemInQuickSession,
     createSectionId,
     getTemplateItemKey,
+    isTemplateCircuitItem,
     serializeTemplateItem,
 } from './templateBuilderItems';
 
@@ -40,6 +45,8 @@ function TemplateBuilderModalContent({
     activities,
     activityGroups = [],
     initialTemplate,
+    stackLevel = 0,
+    onCreateCircuitDefinition,
 }) {
     const [currentTemplate, setCurrentTemplate] = useState(initialTemplate);
     const [showSectionModal, setShowSectionModal] = useState(false);
@@ -53,12 +60,29 @@ function TemplateBuilderModalContent({
         default_activity_group_id: '',
     });
     const [alertModal, setAlertModal] = useState({ show: false, title: '', message: '' });
+    const [circuitBuilder, setCircuitBuilder] = useState(null);
+    const [circuitError, setCircuitError] = useState('');
+    const [isSavingCircuit, setIsSavingCircuit] = useState(false);
 
     const isExistingTemplate = Boolean(editingTemplate?.id);
     const isQuickTemplate = currentTemplate.sessionType === SESSION_TYPE_QUICK;
     const selectableActivities = isQuickTemplate
         ? activities.filter(canUseTemplateItemInQuickSession)
         : activities;
+    // Sections pick activities and circuits through the picker's type toggle, so circuits
+    // are not buried in the activity list's "Ungrouped" bucket.
+    const sectionActivityDefinitions = useMemo(
+        () => activities.filter((item) => !isTemplateCircuitItem(item)),
+        [activities],
+    );
+    const sectionCircuits = useMemo(
+        () => activities.filter(isTemplateCircuitItem),
+        [activities],
+    );
+    const sectionCircuitById = useMemo(
+        () => new Map(sectionCircuits.map((circuit) => [circuit.id, circuit])),
+        [sectionCircuits],
+    );
     const totalDuration = currentTemplate.sections.reduce((sum, section) => sum + section.duration_minutes, 0);
     const activityGroupOptions = useMemo(
         () => buildActivityGroupOptions(activityGroups),
@@ -186,18 +210,23 @@ function TemplateBuilderModalContent({
             return;
         }
 
+        addItemToSection(selectedSectionIndex, activityToAdd);
+        resetActivityPicker();
+    };
+
+    const addItemToSection = (sectionIndex, item) => {
         setCurrentTemplate((previous) => {
             const updatedSections = [...previous.sections];
-            const targetSection = updatedSections[selectedSectionIndex];
+            const targetSection = updatedSections[sectionIndex];
             if (!targetSection) {
                 return previous;
             }
 
-            updatedSections[selectedSectionIndex] = {
+            updatedSections[sectionIndex] = {
                 ...targetSection,
                 activities: [
                     ...(targetSection.activities || []),
-                    activityToAdd,
+                    item,
                 ],
             };
 
@@ -206,7 +235,37 @@ function TemplateBuilderModalContent({
                 sections: updatedSections,
             };
         });
+    };
+
+    const openCircuitBuilder = (mode, circuit = null) => {
+        setCircuitError('');
+        setCircuitBuilder({ mode, circuit, sectionIndex: selectedSectionIndex });
         resetActivityPicker();
+    };
+
+    const closeCircuitBuilder = () => {
+        setCircuitBuilder(null);
+        setCircuitError('');
+    };
+
+    // Creates the reusable circuit definition, then adds it to the section the picker was opened from.
+    const saveCircuitDefinition = async (payload) => {
+        if (!circuitBuilder) return;
+        setCircuitError('');
+        setIsSavingCircuit(true);
+        try {
+            const createdCircuit = await onCreateCircuitDefinition(payload);
+            if (!createdCircuit?.id) {
+                throw new Error('The circuit was created without a usable definition ID.');
+            }
+            const [circuitItem] = buildTemplateActivityCatalogue([], [createdCircuit]);
+            addItemToSection(circuitBuilder.sectionIndex, buildActivityPreview(circuitItem));
+            setCircuitBuilder(null);
+        } catch (error) {
+            setCircuitError(error?.response?.data?.error || error.message || 'Unable to create circuit');
+        } finally {
+            setIsSavingCircuit(false);
+        }
     };
 
     const handleSelectSectionDefaultGroup = (sectionIndex, group) => {
@@ -379,6 +438,7 @@ function TemplateBuilderModalContent({
                 title={isExistingTemplate ? 'Edit Template' : 'Create Template'}
                 size="xl"
                 className={styles.builderModal}
+                stackLevel={stackLevel}
             >
                 <ModalBody>
                     <div className={styles.contentArea}>
@@ -694,10 +754,24 @@ function TemplateBuilderModalContent({
                                                         {showActivityModal && selectedSectionIndex === sectionIndex && (
                                                             <div className={styles.inlineActivitySelector}>
                                                                 <ActivitySelectorPanel
-                                                                    activities={selectableActivities}
+                                                                    activities={sectionActivityDefinitions}
+                                                                    circuits={sectionCircuits}
+                                                                    showTypeToggle={true}
                                                                     activityGroups={activityGroups}
                                                                     onClose={resetActivityPicker}
                                                                     onSelectActivity={handleAddActivity}
+                                                                    onSelectCircuit={(circuit) => handleAddActivity(
+                                                                        sectionCircuitById.get(circuit.id) || circuit,
+                                                                    )}
+                                                                    onCreateCircuitDefinition={onCreateCircuitDefinition
+                                                                        ? () => openCircuitBuilder('create')
+                                                                        : undefined}
+                                                                    onCopyCircuitDefinition={onCreateCircuitDefinition
+                                                                        ? (circuit) => openCircuitBuilder(
+                                                                            'copy',
+                                                                            prepareCircuitDefinitionCopy(circuit),
+                                                                        )
+                                                                        : undefined}
                                                                     onSelectGroup={(group) => handleSelectSectionDefaultGroup(sectionIndex, group)}
                                                                     allowGroupSelection={true}
                                                                     groupSelectionLabel="Set as Default"
@@ -728,7 +802,25 @@ function TemplateBuilderModalContent({
                 </ModalFooter>
             </Modal>
 
-            {showSectionModal && (
+            {circuitBuilder && (
+                <CircuitBuilderModal
+                    isOpen
+                    circuit={circuitBuilder.circuit}
+                    isCopy={circuitBuilder.mode === 'copy'}
+                    activities={sectionActivityDefinitions}
+                    activityGroups={activityGroups}
+                    onClose={closeCircuitBuilder}
+                    onSave={saveCircuitDefinition}
+                    errorMessage={circuitError}
+                    isSaving={isSavingCircuit}
+                    stackLevel={stackLevel + 1}
+                />
+            )}
+
+            {/* Secondary dialogs portal to <body> like the builder itself; rendered inline they
+                inherit a host page's stacking context (e.g. .page-reveal's transform) and sit
+                hidden beneath the builder. */}
+            {showSectionModal && createPortal(
                 <ModalBackdrop
                     className={styles.secondaryModalOverlay}
                     onClose={resetSectionEditor}
@@ -790,10 +882,11 @@ function TemplateBuilderModalContent({
                             </Button>
                         </div>
                     </div>
-                </ModalBackdrop>
+                </ModalBackdrop>,
+                document.body,
             )}
 
-            {alertModal.show && (
+            {alertModal.show && createPortal(
                 <ModalBackdrop
                     className={styles.secondaryModalOverlay}
                     style={{ zIndex: 3400 }}
@@ -818,7 +911,8 @@ function TemplateBuilderModalContent({
                             OK
                         </button>
                     </div>
-                </ModalBackdrop>
+                </ModalBackdrop>,
+                document.body,
             )}
         </>
     );

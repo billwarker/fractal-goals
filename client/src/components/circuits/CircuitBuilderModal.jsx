@@ -35,6 +35,7 @@ export default function CircuitBuilderModal({
     isSaving,
     definitionCreated = false,
     errorMessage = '',
+    stackLevel = 0,
 }) {
     const [draft, setDraft] = useState(() => draftFromCircuit(circuit));
     const [showActivitySelector, setShowActivitySelector] = useState(false);
@@ -94,7 +95,7 @@ export default function CircuitBuilderModal({
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="lg">
+        <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="lg" stackLevel={stackLevel}>
             <ModalBody>
                 <div className={styles.form}>
                     <label>

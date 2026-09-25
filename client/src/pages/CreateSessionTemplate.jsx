@@ -6,7 +6,7 @@ import { queryKeys } from '../hooks/queryKeys';
 import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
 import { useActivities, useActivityGroups } from '../hooks/useActivityQueries';
 import { useSessionTemplates } from '../hooks/useSessionTemplateQueries';
-import { useCircuits } from '../hooks/useCircuitQueries';
+import { useCircuits, useCreateCircuitDefinition } from '../hooks/useCircuitQueries';
 import notify from '../utils/notify';
 import TemplateCard from '../components/TemplateCard';
 import TemplateBuilderModal from '../components/modals/TemplateBuilderModal';
@@ -71,6 +71,7 @@ function CreateSessionTemplate() {
     const { activities = [], isLoading: activitiesLoading, error: activitiesError } = useActivities(rootId);
     const { activityGroups = [], isLoading: activityGroupsLoading, error: activityGroupsError } = useActivityGroups(rootId);
     const { data: circuits = [], isLoading: circuitsLoading, error: circuitsError } = useCircuits(rootId);
+    const createCircuitDefinition = useCreateCircuitDefinition(rootId);
     const templateActivities = useMemo(
         () => buildTemplateActivityCatalogue(activities, circuits),
         [activities, circuits],
@@ -308,6 +309,7 @@ function CreateSessionTemplate() {
                 activities={templateActivities}
                 activityGroups={activityGroups}
                 rootId={rootId}
+                onCreateCircuitDefinition={createCircuitDefinition}
             />
 
             {/* Delete Confirmation Modal */}
