@@ -25,7 +25,7 @@ class TestFractalGoalEndpoints:
         assert response.status_code == 201
         data = json.loads(response.data)
         assert data['name'] == 'Scoped Goal'
-        assert data['attributes']['type'] == 'LongTermGoal'
+        assert data['type'] == 'LongTermGoal'
 
     def test_get_fractal_goals(self, authed_client, sample_goal_hierarchy):
         """Test listing goals for a fractal."""

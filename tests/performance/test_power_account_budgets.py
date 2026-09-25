@@ -182,11 +182,11 @@ class _HeaderClient:
         return self._client.get(url, headers=self._headers)
 
 
-# Byte budgets record the September 2026 shapes; tighten them when payloads shrink.
+# Byte budgets track the slim goal payload (no duplicated attributes or per-goal level settings).
 @pytest.mark.parametrize(("path", "max_queries", "max_bytes"), [
-    ("/goals", 8, 620_000),
-    ("/goals/selection", 12, 150_000),
-    ("/sessions?limit=20", 20, 380_000),
+    ("/goals", 8, 360_000),
+    ("/goals/selection", 12, 90_000),
+    ("/sessions?limit=20", 20, 310_000),
     ("/sessions/analytics-summary", 14, 700_000),
     ("/goals/analytics", 14, 460_000),
 ])
@@ -217,7 +217,7 @@ def test_power_account_session_goals_view_budget(client, query_counter, power_ac
         client, f"/api/fractal/{root_id}/sessions/{session_id}/goals-view", power_account_dataset["headers"], query_counter,
     )
 
-    assert_response_budget(response, max_bytes=150_000, max_ms=5000, elapsed_ms=elapsed_ms)
+    assert_response_budget(response, max_bytes=40_000, max_ms=5000, elapsed_ms=elapsed_ms)
     assert query_counter["total"] <= 24
 
 
@@ -242,7 +242,7 @@ def test_power_account_program_day_read_model_budget(client, query_counter, powe
 def test_power_account_global_goal_list_budget(client, query_counter, power_account_dataset):
     response, elapsed_ms = _budget_get(client, "/api/goals", power_account_dataset["headers"], query_counter)
 
-    assert_response_budget(response, max_bytes=650_000, max_ms=5000, elapsed_ms=elapsed_ms)
+    assert_response_budget(response, max_bytes=380_000, max_ms=5000, elapsed_ms=elapsed_ms)
     assert query_counter["total"] <= 10
 
 
