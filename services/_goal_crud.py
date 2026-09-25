@@ -329,6 +329,14 @@ class _GoalCrudMixin:
             return None, "Goal not found", 404
         return goal, None, 200
 
+    def load_goal_subtree(self, goal: Goal) -> Goal:
+        """Return ``goal`` with its whole subtree bulk-loaded for serialize_goal.
+
+        Serializing a goal with children otherwise lazy-loads every descendant's
+        level, targets, and associations one query at a time.
+        """
+        return self._load_fractal_goals_for_serialization(goal.root_id or goal.id).get(goal.id, goal)
+
     def get_global_goal(self, goal_id, current_user_id) -> ServiceResult[Goal]:
         goal, error = self._get_authorized_goal(goal_id, current_user_id)
         if error:

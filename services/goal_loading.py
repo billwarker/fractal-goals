@@ -5,15 +5,26 @@ from sqlalchemy.orm.attributes import set_committed_value
 from models import ActivityGroup, Goal, Target
 
 
-def goal_serializer_load_options(*, include_group_activities=False):
-    """Eager-load relationships touched by serialize_goal and goal timeline views."""
-    options = [
-        with_loader_criteria(Goal, Goal.deleted_at.is_(None), include_aliases=True),
+def goal_serializer_relationship_loaders():
+    """Relationship loaders for everything serialize_goal reads.
+
+    Usable at the top level or nested under a relationship that yields goals,
+    e.g. ``selectinload(Session.goals).options(*goal_serializer_relationship_loaders())``.
+    """
+    return [
         joinedload(Goal.level),
         selectinload(Goal.targets_rel).joinedload(Target.metric_conditions),
         selectinload(Goal.associated_activities),
         selectinload(Goal.associated_activity_groups),
         selectinload(Goal.pause_intervals),
+    ]
+
+
+def goal_serializer_load_options(*, include_group_activities=False):
+    """Eager-load relationships touched by serialize_goal and goal timeline views."""
+    options = [
+        with_loader_criteria(Goal, Goal.deleted_at.is_(None), include_aliases=True),
+        *goal_serializer_relationship_loaders(),
     ]
     if include_group_activities:
         options.append(selectinload(Goal.associated_activity_groups).selectinload(ActivityGroup.activities))

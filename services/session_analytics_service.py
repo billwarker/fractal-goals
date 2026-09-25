@@ -46,6 +46,8 @@ class SessionAnalyticsService:
                 Session.duration_minutes,
                 Session.total_paused_seconds,
                 Session.attributes,
+                # ProgressService.compute_comparisons_for_instances reads it per session.
+                Session.deleted_at,
             ),
         )
 

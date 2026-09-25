@@ -14,6 +14,7 @@ from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
 from services.view_serializers import serialize_fractal_summary, serialize_goal_selection_item
 from services.serializers import serialize_goal
+from services.goal_loading import goal_serializer_relationship_loaders
 from services.events import Event, Events, event_bus
 from services.template_service import seed_default_template
 from services.user_service import UserService
@@ -68,7 +69,7 @@ class _GoalFractalsMixin:
         roots = roots_q.all()
         if not roots:
             return None, "No goals found", 404
-        return [serialize_goal(root) for root in roots], None, 200
+        return [serialize_goal(self.load_goal_subtree(root)) for root in roots], None, 200
 
     def create_fractal(self, current_user_id, data) -> ServiceResult[Goal]:
         quota_service = QuotaService(self.db_session)
@@ -193,7 +194,8 @@ class _GoalFractalsMixin:
             return None, "Fractal not found or access denied", 404
 
         st_goals = self.db_session.query(Goal).join(GoalLevel, Goal.level_id == GoalLevel.id).options(
-            selectinload(Goal.children),
+            # serialize_goal reads each immediate goal's level, targets, and associations.
+            selectinload(Goal.children).options(*goal_serializer_relationship_loaders()),
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups),
         ).filter(

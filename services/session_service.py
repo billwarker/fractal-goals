@@ -5,7 +5,7 @@ from sqlalchemy.orm import joinedload, selectinload, with_loader_criteria
 from models import ActivityDefinition, ActivityInstance, ActivitySet, CircuitRun, CircuitRound, Goal, Target, MetricValue, ProgramBlock, ProgramDay, Session, validate_root_goal
 import models
 from services.effective_goal_activities import resolve_effective_goals_by_activity
-from services.goal_loading import load_fractal_goals_for_serialization
+from services.goal_loading import goal_serializer_relationship_loaders, load_fractal_goals_for_serialization
 from services.service_types import JsonDict, ServiceResult
 from services.serializers import serialize_session
 from services.session_template_stats_service import SessionTemplateStatsService
@@ -73,8 +73,7 @@ class SessionService:
     @staticmethod
     def _session_read_options():
         return (
-            selectinload(Session.goals).joinedload(Goal.level),
-            selectinload(Session.goals).selectinload(Goal.targets_rel).joinedload(Target.metric_conditions),
+            selectinload(Session.goals).options(*goal_serializer_relationship_loaders()),
             joinedload(Session.template),
             selectinload(Session.notes_list),
             selectinload(Session.activity_instances).joinedload(ActivityInstance.definition).joinedload(ActivityDefinition.group),
