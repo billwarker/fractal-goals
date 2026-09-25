@@ -1,4 +1,4 @@
-import dagre from 'dagre';
+import dagre from '@dagrejs/dagre';
 
 import { buildGraphMetricsFromSummary, getActiveLineageIds, getInactiveNodeIds } from '../../hooks/useFlowTreeMetrics';
 import { getValidChildTypes } from '../../utils/goalHelpers';
@@ -58,7 +58,9 @@ export const getLayoutedElements = (nodes, edges, direction = 'TB', compact = fa
         dagreGraph.setEdge(edge.source, edge.target);
     });
 
-    dagre.layout(dagreGraph);
+    // Keep siblings in insertion order (children are pre-sorted by the level's
+    // sort_children_by). This also reproduces the pre-@dagrejs/dagre layout exactly.
+    dagre.layout(dagreGraph, { disableOptimalOrderHeuristic: true });
 
     const layoutedNodes = nodes.map((node) => {
         const nodeWithPosition = dagreGraph.node(node.id);

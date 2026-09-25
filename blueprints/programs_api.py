@@ -24,7 +24,7 @@ from validators import (
 )
 from services.programs import ProgramService, ProgramServiceValidationError
 from blueprints.auth_api import token_required
-from blueprints.api_utils import get_db_session, internal_error, parse_optional_pagination, etag_json_response
+from blueprints.api_utils import get_db_session, internal_error, parse_optional_pagination
 from services import event_bus, Event, Events
 from services.program_metrics_service import ProgramMetricsService
 from services.program_day_read_model_service import ProgramDayReadModelService
@@ -64,7 +64,7 @@ def get_programs(current_user, root_id):
         limit, offset = parse_optional_pagination(request, max_limit=200)
         if limit is not None:
             programs = programs[offset: offset + limit]
-        return etag_json_response(programs)
+        return jsonify(programs)
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
     except SQLAlchemyError:
@@ -87,7 +87,7 @@ def get_program(current_user, root_id, program_id):
         program = ProgramService.get_program(session, root_id, program_id, current_user.id, as_of=as_of)
         if program is None:
             return jsonify({"error": "Program not found"}), 404
-        return etag_json_response(program)
+        return jsonify(program)
     except ValueError as e:
         return jsonify({"error": str(e)}), 404
     except SQLAlchemyError:
@@ -115,7 +115,7 @@ def get_program_metrics(current_user, root_id, program_id):
         )
         if error:
             return jsonify({"error": error}), status
-        response = etag_json_response(payload)
+        response = jsonify(payload)
         logger.info(
             "program_metrics_response program_id=%s calculation_version=%s response_bytes=%s request_ms=%.2f",
             program_id, payload.get("calculation_version"), len(response.get_data()),
@@ -153,7 +153,7 @@ def get_program_day_read_model(current_user, root_id, program_id):
         )
         if error:
             return jsonify({"error": error}), status
-        return etag_json_response(payload)
+        return jsonify(payload)
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error building program day read model")
@@ -229,7 +229,7 @@ def get_program_metrics_comparison(current_user, root_id):
         )
         if error:
             return jsonify({"error": error}), status
-        response = etag_json_response(payload)
+        response = jsonify(payload)
         logger.info(
             "program_metrics_comparison_response program_count=%s calculation_version=%s response_bytes=%s request_ms=%.2f",
             len(payload.get("programs", [])), payload.get("calculation_version"), len(response.get_data()),

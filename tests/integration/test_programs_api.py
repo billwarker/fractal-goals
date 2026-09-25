@@ -445,13 +445,12 @@ class TestProgramCRUD:
         assert 'scope_seed_goal_ids' in data
         assert 'scope_goal_ids' in data
 
-    def test_program_metrics_contract_etag_and_validation(
+    def test_program_metrics_contract_and_validation(
         self, authed_client, sample_ultimate_goal, sample_program
     ):
         url = f'/api/{sample_ultimate_goal.id}/programs/{sample_program["id"]}/metrics'
         response = authed_client.get(f'{url}?timezone=UTC')
         assert response.status_code == 200
-        assert response.headers.get('ETag')
         payload = response.get_json()
         assert payload['calculation_version'] == 6
         assert payload['window']['timezone'] == 'UTC'

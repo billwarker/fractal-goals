@@ -1,4 +1,4 @@
-import { buildGraphPresentation } from '../flowTreeGraphUtils';
+import { buildGraphPresentation, getLayoutedElements } from '../flowTreeGraphUtils';
 
 describe('buildGraphPresentation', () => {
     it('limits the graph to an explicit program lineage scope', () => {
@@ -341,5 +341,23 @@ describe('buildGraphPresentation', () => {
         expect(parent.position.y).toBeGreaterThan(root.position.y);
         expect(child.position.y).toBeGreaterThan(parent.position.y);
         expect(graph.edges.every((edge) => edge.type === 'step')).toBe(true);
+    });
+});
+
+describe('getLayoutedElements sibling order', () => {
+    it.each([['TB', 'x'], ['LR', 'y']])('keeps siblings in input order (%s)', (direction, axis) => {
+        const childIds = ['c-a', 'c-b', 'c-c', 'c-d', 'c-e'];
+        const nodes = [{ id: 'root', data: {} }, ...childIds.map((id) => ({ id, data: {} }))];
+        const grandchildren = childIds.flatMap((id) => [0, 1, 2].map((i) => ({ id: `${id}-${i}`, data: {} })));
+        const edges = [
+            ...childIds.map((id) => ({ id: `root-${id}`, source: 'root', target: id })),
+            ...grandchildren.map((node) => ({ id: `e-${node.id}`, source: node.id.slice(0, 3), target: node.id })),
+        ];
+
+        const { nodes: layouted } = getLayoutedElements([...nodes, ...grandchildren], edges, direction);
+        const position = (id) => layouted.find((node) => node.id === id).position[axis];
+
+        const childPositions = childIds.map(position);
+        expect([...childPositions].sort((a, b) => a - b)).toEqual(childPositions);
     });
 });

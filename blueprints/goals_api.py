@@ -22,7 +22,6 @@ from blueprints.api_utils import (
     get_db_session,
     internal_error,
     parse_optional_pagination,
-    etag_json_response,
     require_owned_root,
 )
 from services.serializers import (
@@ -56,7 +55,7 @@ def get_goals(current_user):
         payload, error, status = service.list_global_goals(current_user.id, limit, offset or 0)
         if error:
             return jsonify({"error": error}), status
-        return etag_json_response(payload, status=status)
+        return jsonify(payload), status
     finally:
         db_session.close()
 
@@ -440,7 +439,7 @@ def get_fractal_goals(current_user, root_id):
         root, error, status = service.get_fractal_tree(root_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
-        return etag_json_response(serialize_goal(root), status=status)
+        return jsonify(serialize_goal(root)), status
         
     except SQLAlchemyError:
         db_session.rollback()
@@ -463,7 +462,7 @@ def get_active_goals_for_selection(current_user, root_id):
         result, error, status = service.get_active_goals_for_selection(root_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
-        return etag_json_response(result, status=status)
+        return jsonify(result), status
         
     except SQLAlchemyError:
         db_session.rollback()
@@ -614,13 +613,13 @@ def get_goal_analytics(current_user, root_id):
 
         cached = get_analytics(root_id)
         if cached is not None:
-            return etag_json_response(cached)
+            return jsonify(cached)
         service = GoalAnalyticsService(db_session)
         payload, error, status = service.get_goal_analytics(root_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
         set_analytics(root_id, payload)
-        return etag_json_response(payload, status=status)
+        return jsonify(payload), status
         
     except SQLAlchemyError:
         db_session.rollback()
