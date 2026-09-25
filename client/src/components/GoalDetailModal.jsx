@@ -14,7 +14,7 @@ import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
 import { importWithRetry } from '../utils/lazyWithRetry';
 import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
-import { getParentGoalInfo } from './goals/goalDetailUtils';
+import { buildLiveSmartGoal, getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalDetailModalRenderSurface from './goalDetail/GoalDetailModalRenderSurface';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
 import { logError } from '../utils/logger';
@@ -602,29 +602,15 @@ function GoalDetailModal({
         onAddChild(goal);
     };
 
-    const goalForSmart = {
-        ...goal,
-        attributes: {
-            ...goal?.attributes,
-            description: description,
-            targets: Array.isArray(targets) ? targets : [],
-            associated_activity_ids: associatedActivities ? associatedActivities.map(a => a.id) : [],
-            deadline: deadline,
-            relevance_statement: relevanceStatement,
-            completed_via_children: completedViaChildren,
-            inherit_parent_activities: inheritParentActivities,
-            // CRITICAL: Remove pre-calculated status so helper recalculates using our overrides
-            smart_status: undefined,
-            is_smart: undefined
-        },
-        // Also override top-level props if they exist there (the helper checks both)
-        description: description,
-        targets: Array.isArray(targets) ? targets : [],
-        deadline: deadline,
-        relevance_statement: relevanceStatement,
-        completed_via_children: completedViaChildren,
-        inherit_parent_activities: inheritParentActivities
-    };
+    const goalForSmart = buildLiveSmartGoal(goal, {
+        description,
+        targets,
+        associatedActivityIds: associatedActivities ? associatedActivities.map((a) => a.id) : [],
+        deadline,
+        relevanceStatement,
+        completedViaChildren,
+        inheritParentActivities,
+    });
 
     // For modal mode, check isOpen
     if (displayMode === 'modal' && !isOpen) return null;
