@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useAuth } from '../contexts/AuthContext';
-import { authApi, globalApi } from '../utils/api';
+import { authApi, globalApi, setAccessToken } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
 import { buildQuotaRows, toggleQuotaRootId } from '../components/modals/settingsModalUtils';
 
 export function useAccountSettings(activeTab) {
-    const { user, setUser } = useAuth();
+    const { user, setUser, signOutEverywhere } = useAuth();
     const [accountUsage, setAccountUsage] = useState(null);
     const [accountUsageLoading, setAccountUsageLoading] = useState(false);
     const [availableFractals, setAvailableFractals] = useState([]);
@@ -95,8 +95,10 @@ export function useAccountSettings(activeTab) {
     const handlePasswordUpdate = async (e) => {
         e.preventDefault();
         try {
-            await authApi.updatePassword(passwordData);
-            notify.success('Password updated successfully');
+            const res = await authApi.updatePassword(passwordData);
+            // The change signed out every other device; this one continues on its replacement token.
+            if (res.data?.token) setAccessToken(res.data.token);
+            notify.success('Password updated. Other devices have been signed out.');
             setPasswordData({ current_password: '', new_password: '' });
         } catch (err) {
             notify.error(`Failed to update password: ${formatError(err)}`);
@@ -161,6 +163,18 @@ export function useAccountSettings(activeTab) {
         }
     };
 
+    const handleSignOutEverywhere = async () => {
+        const confirmed = window.confirm(
+            'Sign out of all devices?\n\nEvery session, including this one, will end and you will need to log in again.'
+        );
+        if (!confirmed) return;
+        try {
+            await signOutEverywhere();
+        } catch (err) {
+            notify.error(`Failed to sign out of all devices: ${formatError(err)}`);
+        }
+    };
+
     const handleCancelDeletion = async () => {
         try {
             await authApi.cancelAccountDeletion();
@@ -172,5 +186,5 @@ export function useAccountSettings(activeTab) {
         }
     };
 
-    return { user, accountUsage, accountUsageLoading, availableFractals, fractalsLoading, selectedQuotaRootIds, setSelectedQuotaRootIds, passwordData, setPasswordData, emailData, setEmailData, deleteData, setDeleteData, exportPassword, setExportPassword, isExporting, quotaRows, displayTier, displayStatus, quotaScopeLabel, handleQuotaRootToggle, handlePasswordUpdate, handleEmailUpdate, handleExportData, handleDeleteAccount, handleCancelDeletion };
+    return { user, accountUsage, accountUsageLoading, availableFractals, fractalsLoading, selectedQuotaRootIds, setSelectedQuotaRootIds, passwordData, setPasswordData, emailData, setEmailData, deleteData, setDeleteData, exportPassword, setExportPassword, isExporting, quotaRows, displayTier, displayStatus, quotaScopeLabel, handleQuotaRootToggle, handlePasswordUpdate, handleEmailUpdate, handleExportData, handleDeleteAccount, handleCancelDeletion, handleSignOutEverywhere };
 }

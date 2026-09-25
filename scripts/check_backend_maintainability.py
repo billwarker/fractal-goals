@@ -8,23 +8,20 @@ from pathlib import Path
 
 MAX_SOURCE_LINES = 800
 SIZE_BACKLOG = {
-    "services/landing_publish_service.py": 1634,
-    "services/progress_service.py": 1391,
-    "services/analytics_engine.py": 1344,
-    "services/serializers.py": 1286,
-    "services/program_metrics_service.py": 849,
-    "services/session_lifecycle_service.py": 1111,
-    "services/completion_handlers.py": 1075,
+    # Remaining decomposition backlog, capped at current size: shrink, never grow.
+    "services/program_metrics_service.py": 847,
     "blueprints/activities_api.py": 936,
-    "services/admin_service.py": 877,
     "blueprints/goals_api.py": 838,
-    "services/note_service.py": 835,
+    "services/note_service.py": 833,
 }
 # The AI API adds one shared database boundary; the delegated and embedded
 # workers each need a containment boundary for durable failure state. The
 # embedded boundary also sanitizes third-party SDK errors before persistence.
 MAX_ROUTE_SQLALCHEMY_CATCHES = 185
-MAX_BROAD_CATCHES = 38
+# Remaining broad catches are containment boundaries: event bus/handlers,
+# background jobs, external SDKs (GCS, email, AI providers), readiness, and
+# never-fail logging. Narrow any new catch to the failure it expects.
+MAX_BROAD_CATCHES = 20
 
 
 def _line_count(path: Path) -> int:

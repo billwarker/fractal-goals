@@ -6,6 +6,7 @@ import pytest
 
 from models import ActivityDefinition, ActivityGroup, ActivityInstance, Session, User, session_goals
 from services.analytics_cache import invalidate_root
+from tests.conftest import session_token_for
 
 
 @pytest.mark.integration
@@ -78,7 +79,6 @@ class TestGoalAnalyticsService:
         db_session,
         sample_ultimate_goal,
     ):
-        import jwt
         from config import config
 
         root_id = sample_ultimate_goal.id
@@ -98,10 +98,7 @@ class TestGoalAnalyticsService:
         db_session.add(other_user)
         db_session.commit()
 
-        token = jwt.encode({
-            "user_id": other_user.id,
-            "exp": datetime.now(timezone.utc) + timedelta(hours=24),
-        }, config.JWT_SECRET_KEY, algorithm="HS256")
+        token = session_token_for(other_user)
 
         response = client.get(
             f"/api/{root_id}/goals/analytics",

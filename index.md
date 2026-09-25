@@ -195,6 +195,17 @@ data export, and account deletion form the account boundary. Admin support acces
 and scoped; it is not unrestricted impersonation. Operational event history is retained for
 admin analytics and export according to the documented retention controls.
 
+Session tokens carry the session audience, `users.session_version`, and the original login
+time. Password change/reset, admin resets, suspension, and "Sign out of all devices" increment
+the version, revoking every outstanding token; a password change reissues one for the acting
+device. Refresh cannot extend a session past `SESSION_MAX_LIFETIME_DAYS`.
+
+Rate limits key on the real client: `request_identity.py` trusts `X-Forwarded-For` only for
+requests attested by the nginx frontend's `TRUSTED_PROXY_SECRET`, at `TRUSTED_PROXY_HOPS`.
+Production refuses to start without both. Uncaught database and application errors return the
+standard JSON 500 from `blueprints/error_handlers.py`. See the
+[proxy and sessions runbook](docs/architecture/PROXY_AND_SESSIONS_RUNBOOK.md).
+
 ## Repository map
 
 AI agent harness: [implementation plan](planning/ai-agent-harness.md) and
@@ -209,9 +220,11 @@ Existing domain services remain canonical. Optional connectors have separate rel
 gates. The embedded vertical slice and local correctness fixes are implemented behind
 feature flags; provider, browser, operations and deployment evidence remain release gates.
 
-- `app.py`, `config.py`, `extensions.py` — application/runtime setup
+- `app.py`, `config.py`, `extensions.py`, `request_identity.py` — application/runtime setup
 - `blueprints/` — HTTP routes
-- `services/` — domain logic and read models
+- `services/` — domain logic and read models; large services compose private `_<domain>_*.py`
+  mixins or modules behind a stable public module (goals, sessions, progress, analytics,
+  serializers, landing publication, completion handlers, admin)
 - `models/` — ORM models and database session setup
 - `validators/` — input validation
 - `migrations/` — Alembic revisions
@@ -228,7 +241,8 @@ Use `./run-tests.sh` as the canonical entry point:
 - `./run-tests.sh backend` / `frontend` / `all`
 - `./run-tests.sh coverage`
 - `./run-tests.sh browser` / `restore-drill`
-- `./run-tests.sh lint`
+- `./run-tests.sh lint` (includes type checks and both maintainability gates)
+- `./run-tests.sh typecheck`
 - `./run-tests.sh maintain`
 - `./run-tests.sh audit`
 - `./run-tests.sh file <path>`
@@ -240,6 +254,9 @@ layers avoids executing the same backend tests again only to collect coverage.
 `pytest.ini` owns the services/blueprints coverage scope and ratcheted threshold;
 `scripts/check_backend_coverage_gate.py` prevents CI from stripping it through `addopts`.
 `scripts/check_backend_maintainability.py` caps oversized backend modules and exception debt.
+Static types ratchet: basedpyright checks all backend application code against
+`.basedpyright/baseline.json` (new errors fail; fixed ones drop out), and TypeScript `checkJs`
+covers the client API layer, query keys, and pure view models with zero errors.
 Frontend CI gates its production dependency audit, zero-warning lint, all-source
 coverage, production build, responsive source checks, maintainability budgets, and
 desktop/mobile Chromium workflows against the real Flask app and a disposable
@@ -266,6 +283,9 @@ The broader production assessment, release-gate gaps, and test-speed evidence ar
 ## Practical invariants
 
 - Preserve tenant isolation and soft-delete filters in every new query.
+- Revoke sessions (`revoke_user_sessions`) in the same transaction as any credential or
+  account-status change.
+- Catch the failure you expect; `except Exception` is reserved for containment boundaries.
 - Keep routes thin and transactions/events service-owned.
 - Reuse canonical serializers, formatters, query keys, and domain evaluators.
 - Bound date ranges, pagination, query count, and payload size at API boundaries.

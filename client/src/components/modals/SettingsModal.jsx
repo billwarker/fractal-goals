@@ -41,7 +41,7 @@ const SettingsModalInner = ({ onClose }) => {
     const { preference, setPreference } = useTimezone();
 
     const [activeTab, setActiveTab] = useState('general');
-    const { user, accountUsage, accountUsageLoading, availableFractals, fractalsLoading, selectedQuotaRootIds, setSelectedQuotaRootIds, passwordData, setPasswordData, emailData, setEmailData, deleteData, setDeleteData, exportPassword, setExportPassword, isExporting, quotaRows, displayTier, displayStatus, quotaScopeLabel, handleQuotaRootToggle, handlePasswordUpdate, handleEmailUpdate, handleExportData, handleDeleteAccount, handleCancelDeletion } = useAccountSettings(activeTab);
+    const { user, accountUsage, accountUsageLoading, availableFractals, fractalsLoading, selectedQuotaRootIds, setSelectedQuotaRootIds, passwordData, setPasswordData, emailData, setEmailData, deleteData, setDeleteData, exportPassword, setExportPassword, isExporting, quotaRows, displayTier, displayStatus, quotaScopeLabel, handleQuotaRootToggle, handlePasswordUpdate, handleEmailUpdate, handleExportData, handleDeleteAccount, handleCancelDeletion, handleSignOutEverywhere } = useAccountSettings(activeTab);
     const { activeRootId } = useGoals();
     const isMobile = useIsMobile();
     const { flags } = useFeatureFlags();
@@ -178,8 +178,8 @@ const SettingsModalInner = ({ onClose }) => {
                                     <h3 className={styles.sectionTitle}>
                                         Interface Theme
                                     </h3>
-                                    <div className={`${styles.themeRow} ${isMobile ? styles.themeRowMobile : styles.themeRowDesktop}`}>
-                                        <div className={styles.themeText}>
+                                    <div className={`${styles.actionRow} ${isMobile ? styles.actionRowMobile : styles.actionRowDesktop}`}>
+                                        <div className={styles.actionRowText}>
                                             Current Mode: <strong>{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</strong>
                                         </div>
                                         <button
@@ -421,6 +421,25 @@ const SettingsModalInner = ({ onClose }) => {
                                             Update Password
                                         </button>
                                     </form>
+                                </section>
+
+                                {/* Active Sessions */}
+                                <section>
+                                    <h3 className={styles.sectionTitle}>
+                                        Active Sessions
+                                    </h3>
+                                    <div className={`${styles.actionRow} ${isMobile ? styles.actionRowMobile : styles.actionRowDesktop}`}>
+                                        <div className={styles.actionRowText}>
+                                            Sign out on every device where you're logged in, including this one.
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleSignOutEverywhere}
+                                            className={styles.secondaryButton}
+                                        >
+                                            Sign out of all devices
+                                        </button>
+                                    </div>
                                 </section>
 
                                 {/* Change Email */}

@@ -10,7 +10,7 @@ import models
 from config import config
 from models import User, utc_now
 from models import ActivityDefinition, ActivityGroup, ActivityInstance, Goal, MetricDefinition, MetricValue, Program, ProgramBlock, ProgramDayStatusOverride, Session, SessionTemplate
-from services.account_flags import clear_force_password_change
+from services.account_flags import clear_force_password_change, revoke_user_sessions
 from services.email_service import EmailSendError, EmailService
 from services.email_templates import (
     render_account_erasure_requested_email,
@@ -21,6 +21,7 @@ from services.serializers import calculate_smart_status, format_utc, serialize_u
 from services.template_service import STARTER_TEMPLATE_NAME
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, ServiceResult
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 
@@ -486,7 +487,7 @@ class UserService:
             # send_email already marked the delivery event failed; keep it.
             self.db_session.commit()
             logger.warning("Security notice email failed template=%s user_id=%s", template_key, user_id)
-        except Exception:
+        except SQLAlchemyError:
             self.db_session.rollback()
             logger.exception("Security notice email errored template=%s user_id=%s", template_key, user_id)
 
@@ -499,6 +500,7 @@ class UserService:
 
         user.set_password(data['new_password'])
         cleared_forced_change = clear_force_password_change(user)
+        revoke_user_sessions(user)
         self.db_session.commit()
         logger.info(
             "Updated password for user_id=%s cleared_forced_change=%s",

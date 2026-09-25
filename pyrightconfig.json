@@ -1,0 +1,19 @@
+{
+  "include": [
+    "services",
+    "blueprints",
+    "models",
+    "validators",
+    "app.py",
+    "config.py",
+    "extensions.py",
+    "request_identity.py",
+    "account_tiers.py"
+  ],
+  "exclude": ["**/__pycache__", "fractal-goals-venv", "tests", "migrations", "client", "agent_adapter"],
+  "venvPath": ".",
+  "venv": "fractal-goals-venv",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "standard",
+  "reportMissingModuleSource": "none"
+}

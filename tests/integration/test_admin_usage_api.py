@@ -2,22 +2,14 @@ import datetime
 import json
 import uuid
 
-import jwt
 import pytest
 
-from config import config
 from models import EmailDeliveryEvent, EventLog, Goal, ProductEvent, User, utc_now
+from tests.conftest import session_headers_for
 
 
 def auth_headers_for(user):
-    token = jwt.encode({
-        'user_id': user.id,
-        'exp': datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24),
-    }, config.JWT_SECRET_KEY, algorithm="HS256")
-    return {
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/json',
-    }
+    return session_headers_for(user)
 
 
 @pytest.fixture

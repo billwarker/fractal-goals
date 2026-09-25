@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": [
+      "vite/client"
+    ],
+    "strict": false
+  },
+  "include": [
+    "src/types/**/*.d.ts",
+    "src/utils/api/**/*.js",
+    "src/hooks/queryKeys.js",
+    "src/utils/programViewModel.js",
+    "src/utils/programCalendarStreaks.js",
+    "src/utils/programDayState.js",
+    "src/utils/dateRange.js",
+    "src/utils/sessionTime.js",
+    "src/utils/durationStats.js",
+    "src/utils/progressAggregations.js"
+  ],
+  "exclude": [
+    "**/__tests__/**",
+    "**/*.test.js",
+    "**/*.test.jsx"
+  ]
+}

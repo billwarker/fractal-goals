@@ -77,7 +77,7 @@ export function calculateTotalCompletedDuration(sessionData, activityInstances, 
     if (sessionData.session_end && sessionData.session_start) {
         const start = new Date(sessionData.session_start);
         const end = new Date(sessionData.session_end);
-        const diffSeconds = Math.floor((end - start) / 1000);
+        const diffSeconds = Math.floor((end.getTime() - start.getTime()) / 1000);
         return diffSeconds > 0 ? diffSeconds : 0;
     }
 

@@ -88,7 +88,7 @@ export const formatDateInTimezone = (dateValue, timezone, options = {}) => {
 
     const date = typeof dateValue === 'string' ? parseAnyDate(dateValue) : dateValue;
 
-    const defaultOptions = {
+    /** @type {Intl.DateTimeFormatOptions} */ const defaultOptions = {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -146,7 +146,7 @@ export const formatLiteralDate = (dateValue, options = {}) => {
     // Or just use Intl.DateTimeFormat with 'UTC' to be safe.
     const date = new Date(Date.UTC(year, month - 1, day));
 
-    const defaultOptions = {
+    /** @type {Intl.DateTimeFormatOptions} */ const defaultOptions = {
         year: 'numeric',
         month: 'short',
         day: 'numeric',

@@ -7,18 +7,22 @@ from models import Goal, Program, ProgramBlock, program_goals, program_block_goa
 from models import Session, ActivityInstance
 import services.completion_handlers as completion_handlers
 from services.completion_handlers import (
-    _check_metric_value,
-    _check_metrics_meet_target,
-    _check_parent_completion,
-    _evaluate_threshold_target,
-    _evaluate_sum_target,
-    _evaluate_frequency_target,
     handle_activity_metrics_updated,
     handle_activity_instance_updated,
 )
+from services._completion_programs import _check_parent_completion
+from services._completion_targets import (
+    _evaluate_threshold_target,
+    _evaluate_sum_target,
+    _evaluate_frequency_target,
+)
+from services.goal_target_rules import (
+    check_metric_value as _check_metric_value,
+    check_metrics_meet_target as _check_metrics_meet_target,
+)
 from services.events import Event, Events
 from services.programs import ProgramService
-from services.session_lifecycle_service import _parse_iso_datetime_strict
+from services._session_lifecycle_common import _parse_iso_datetime_strict
 from services.session_service import SessionService
 
 
@@ -246,7 +250,7 @@ class TestSessionServicePublicFlows:
     ):
         service = SessionService(db_session)
         emitted = []
-        monkeypatch.setattr("services.session_lifecycle_service.event_bus.emit", lambda event: emitted.append(event.name))
+        monkeypatch.setattr("services.events.event_bus.emit", lambda event: emitted.append(event.name))
         sample_activity_instance.time_start = datetime.now(timezone.utc)
         db_session.commit()
 

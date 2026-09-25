@@ -27,6 +27,13 @@ def _enable_agent_flags(db_session):
     db_session.commit()
 
 
+def _next_weekday(start, weekday_name):
+    """Return the first date on or after ``start`` that falls on ``weekday_name``."""
+    while start.strftime("%A") != weekday_name:
+        start += timedelta(days=1)
+    return start
+
+
 def _note_proposal():
     return {
         "operations": [{
@@ -452,7 +459,7 @@ def test_reviewed_workflow_resolves_temporary_references_through_program_day_and
         "request_text": "Build a practice program and explain its plan.",
         "timezone": "America/Toronto",
     })
-    start_date = date.today() + timedelta(days=60)
+    start_date = _next_weekday(date.today() + timedelta(days=60), "Tuesday")
     end_date = start_date + timedelta(days=27)
     proposal = service.create_proposal(test_user.id, task["id"], {
         "operations": [
@@ -545,6 +552,61 @@ def test_reviewed_workflow_resolves_temporary_references_through_program_day_and
     practice_day = context["programs"]["items"][0]["blocks"][0]["days"][0]
     assert practice_day["name"] == "Practice day"
     assert practice_day["templates"][0]["name"] == "Practice session"
+
+
+def test_scheduling_a_date_the_program_day_already_recurs_on_is_rejected_in_preview(
+    db_session, test_user, sample_ultimate_goal,
+):
+    _enable_agent_flags(db_session)
+    service = AgentHarnessService(db_session)
+    task = service.create_task(test_user.id, {
+        "root_id": sample_ultimate_goal.id,
+        "request_text": "Build a practice program.",
+        "timezone": "America/Toronto",
+    })
+    start_date = _next_weekday(date.today() + timedelta(days=60), "Monday")
+    end_date = start_date + timedelta(days=27)
+
+    with pytest.raises(AgentHarnessError) as raised:
+        service.create_proposal(test_user.id, task["id"], {
+            "operations": [
+                {
+                    "operation_id": "program",
+                    "type": "create_program",
+                    "data": {
+                        "name": "Recurring plan",
+                        "start_date": start_date.isoformat(),
+                        "end_date": end_date.isoformat(),
+                        "selectedGoals": [sample_ultimate_goal.id],
+                    },
+                },
+                {
+                    "operation_id": "block",
+                    "type": "create_block",
+                    "program_id": "$ref:program",
+                    "data": {"name": "Block", "start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
+                },
+                {
+                    "operation_id": "day",
+                    "type": "create_program_day",
+                    "program_id": "$ref:program",
+                    "block_id": "$ref:block",
+                    "data": {"name": "Practice day", "day_of_week": ["Monday", "Wednesday", "Friday"]},
+                },
+                {
+                    "operation_id": "schedule",
+                    "type": "schedule_program_day",
+                    "program_id": "$ref:program",
+                    "block_id": "$ref:block",
+                    "day_id": "$ref:day",
+                    "data": {"session_start": f"{start_date.isoformat()}T09:00:00Z"},
+                },
+            ],
+        })
+
+    assert raised.value.code == "validation_failed"
+    assert "already occurs on that date" in str(raised.value)
+    assert db_session.query(ProgramDayOccurrenceSchedule).count() == 0
 
 
 def test_scheduling_existing_program_day_rejects_stale_preview(

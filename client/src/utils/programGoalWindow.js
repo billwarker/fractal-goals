@@ -299,6 +299,9 @@ export function pruneProgramGoalTreeForWindow(goal, startDate, endDate) {
     }];
 }
 
+/**
+ * @param {{ program?: any, goals?: any[], getGoalDetails?: (goalId: string) => any }} [options]
+ */
 export function buildProgramGoalScope({
     program,
     goals = [],

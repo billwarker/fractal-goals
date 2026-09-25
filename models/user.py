@@ -1,6 +1,6 @@
 import sqlalchemy as sa
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, BigInteger, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 import uuid
 from .base import Base, utc_now, JSON_TYPE
@@ -51,6 +51,10 @@ class User(Base):
     last_login_at = Column(DateTime, nullable=True)
     failed_login_count = Column(Integer, default=0)
     locked_until = Column(DateTime, nullable=True)
+    # Incremented to revoke every outstanding session token for this user.
+    session_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=sa.text('0'),
+    )
     
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

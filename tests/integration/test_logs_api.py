@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import pytest
 
 from models import EventLog, User
+from tests.conftest import session_headers_for
 
 
 @pytest.fixture
@@ -22,15 +23,8 @@ def admin_user(db_session):
 
 @pytest.fixture
 def admin_client(client, admin_user):
-    from config import config
-    import jwt
-    import datetime
 
-    token = jwt.encode({
-        "user_id": admin_user.id,
-        "exp": datetime.datetime.now(timezone.utc) + datetime.timedelta(hours=24),
-    }, config.JWT_SECRET_KEY, algorithm="HS256")
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    headers = session_headers_for(admin_user)
 
     class AdminClient:
         def delete(self, *args, **kwargs):

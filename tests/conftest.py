@@ -56,6 +56,31 @@ from blueprints.agent_api import agent_bp, agent_internal_bp, agent_metadata_bp,
 from services.completion_handlers import clear_achievement_context, clear_live_progress
 
 
+def session_token_for(user, *, expires_delta=None, **kwargs):
+    """Mint a real session token; ``expires_delta`` shifts its expiry from now."""
+    from config import config
+    from services.auth_service import AuthService
+
+    if expires_delta is not None:
+        kwargs['issued_at'] = (
+            datetime.now(timezone.utc)
+            + expires_delta
+            - timedelta(hours=config.JWT_EXPIRATION_HOURS)
+        )
+    return AuthService.issue_token(user, **kwargs)
+
+
+def session_headers_for(user):
+    return {
+        'Authorization': f'Bearer {session_token_for(user)}',
+        'Content-Type': 'application/json',
+    }
+
+
+TEST_PROXY_HOPS = 3
+TEST_PROXY_SECRET = 'test-proxy-secret-that-is-at-least-32-chars'
+
+
 @pytest.fixture(scope='session')
 def test_database_engine():
     """Build the schema once; individual tests still use real transactions."""
@@ -91,6 +116,9 @@ def app(test_database_engine, test_database_reset_sql, monkeypatch):
     # Load configuration to get DATABASE_URL
     from config import config
     test_app.config['MAX_CONTENT_LENGTH'] = config.MAX_CONTENT_LENGTH
+    # Mirror production: forwarded headers are trusted only from the attested proxy.
+    from request_identity import configure_request_identity
+    configure_request_identity(test_app, hops=TEST_PROXY_HOPS, secret=TEST_PROXY_SECRET)
     
     # Enable CORS
     CORS(test_app, resources={
@@ -244,20 +272,7 @@ def test_user(db_session):
 @pytest.fixture(scope='function')
 def auth_headers(client, test_user):
     """Return auth headers for the test user."""
-    from config import config
-    import jwt
-    import datetime
-    
-    # Generate token
-    token = jwt.encode({
-        'user_id': test_user.id,
-        'exp': datetime.datetime.now(timezone.utc) + datetime.timedelta(hours=24)
-    }, config.JWT_SECRET_KEY, algorithm="HS256")
-    
-    return {
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/json'
-    }
+    return session_headers_for(test_user)
 
 
 @pytest.fixture(scope='function')

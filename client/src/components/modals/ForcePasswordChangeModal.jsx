@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useForm } from '../../hooks/useForm';
-import { authApi } from '../../utils/api';
+import { authApi, setAccessToken } from '../../utils/api';
 import { logError } from '../../utils/logger';
 import notify from '../../utils/notify';
 import Modal from '../atoms/Modal';
@@ -47,10 +47,12 @@ function ForcePasswordChangeModal() {
     const onSubmit = async (formValues) => {
         setGeneralError(null);
         try {
-            await authApi.updatePassword({
+            const changed = await authApi.updatePassword({
                 current_password: formValues.currentPassword,
                 new_password: formValues.newPassword,
             });
+            // The change revoked every earlier session; continue on the replacement token.
+            if (changed.data?.token) setAccessToken(changed.data.token);
             const res = await authApi.getMe();
             setUser(res.data);
             notify.success('Password updated. Welcome back!');

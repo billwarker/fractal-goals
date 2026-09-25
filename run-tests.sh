@@ -52,7 +52,8 @@ usage() {
     echo "  db-up         Start local Postgres test database with Docker Compose"
     echo "  db-down       Stop local Postgres containers"
     echo "  db-reset      Recreate local Postgres containers and volumes"
-    echo "  lint          Run frontend lint and maintainability checks"
+    echo "  lint          Run lint, type checks, and maintainability gates"
+    echo "  typecheck     Run backend (basedpyright) and frontend (tsc) type checks"
     echo "  audit         Run Python and frontend production dependency audits"
     echo "  fix           Run frontend auto-fixes and maintainability checks"
     echo "  maintain      Run frontend maintainability and responsive audits"
@@ -199,7 +200,11 @@ run_backend_tests() {
 run_agent_adapter_tests() {
     print_message "$GREEN" "Running MCP adapter unit tests..."
     ensure_backend_tools
-    (cd "$ROOT_DIR" && "$VENV_PYTHON" -m pytest -o addopts="" agent_adapter/tests/)
+    # Match CI: the adapter's protocol test needs a resource URI and issuer to advertise.
+    (cd "$ROOT_DIR" && \
+        AGENT_MCP_RESOURCE_URI="${AGENT_MCP_RESOURCE_URI:-http://127.0.0.1:8000/mcp}" \
+        AGENT_OAUTH_ISSUER="${AGENT_OAUTH_ISSUER:-http://127.0.0.1:5000}" \
+        "$VENV_PYTHON" -m pytest -o addopts="" agent_adapter/tests/)
 }
 
 run_frontend_tests() {
@@ -315,11 +320,22 @@ run_frontend_maintainability() {
     frontend_npm_script check:responsive
 }
 
+run_typecheck() {
+    print_message "$GREEN" "Running static type checks (new errors fail; see .basedpyright/baseline.json)..."
+    activate_venv
+    (cd "$ROOT_DIR" && basedpyright)
+    ensure_frontend_tools
+    frontend_npm_script typecheck
+}
+
 run_lint() {
-    print_message "$GREEN" "Running lint and maintainability checks..."
+    print_message "$GREEN" "Running lint, type, and maintainability checks..."
     ensure_frontend_tools
     frontend_npm_script lint
     run_frontend_maintainability
+    run_typecheck
+    activate_venv
+    (cd "$ROOT_DIR" && python scripts/check_backend_maintainability.py)
 }
 
 run_fix() {
@@ -532,6 +548,9 @@ main() {
             ;;
         lint)
             run_lint
+            ;;
+        typecheck)
+            run_typecheck
             ;;
         audit)
             run_dependency_audit

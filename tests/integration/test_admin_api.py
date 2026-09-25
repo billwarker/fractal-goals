@@ -4,7 +4,6 @@ import uuid
 from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 
-import jwt
 import pytest
 from sqlalchemy import text
 
@@ -34,17 +33,11 @@ from models import (
     activity_goal_associations,
 )
 from services.email_service import EmailService, TEST_EMAIL_OUTBOX
+from tests.conftest import session_headers_for
 
 
 def auth_headers_for(user):
-    import datetime
-    from datetime import timezone
-
-    token = jwt.encode({
-        'user_id': user.id,
-        'exp': datetime.datetime.now(timezone.utc) + datetime.timedelta(hours=24),
-    }, config.JWT_SECRET_KEY, algorithm="HS256")
-    return {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+    return session_headers_for(user)
 
 
 def free_limits_with(**overrides):
@@ -1076,7 +1069,7 @@ def test_publish_keeps_valid_analytics_view_while_reconciling_stale_selection(
 
 @pytest.mark.integration
 def test_publish_landing_examples_static_delivery_contract(admin_client, admin_landing_fractal, monkeypatch, tmp_path):
-    import services.landing_publish_service as landing_publish_module
+    import services._landing_static_snapshot as landing_snapshot_module
 
     def publish(expected_status=200):
         response = admin_client.post(
@@ -1131,7 +1124,7 @@ def test_publish_landing_examples_static_delivery_contract(admin_client, admin_l
             assert name == 'landing-snapshots'
             return _StaticBucket()
 
-    monkeypatch.setattr(landing_publish_module.storage, 'Client', _StaticClient)
+    monkeypatch.setattr(landing_snapshot_module.storage, 'Client', _StaticClient)
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_GCS_BUCKET', 'landing-snapshots')
     gcs_publish = publish()
     assert gcs_publish['static_snapshot'] == 'ok'
@@ -1187,6 +1180,46 @@ def test_publish_landing_examples_rejects_oversized_snapshot_without_changing_pu
     unchanged = admin_client.get('/api/public/landing-examples').get_json()
     assert unchanged['published_at'] == initial_payload['published_at']
     assert unchanged['revision'] == initial_payload['revision']
+
+
+@pytest.mark.integration
+def test_publish_landing_examples_rejects_oversized_compressed_snapshot(
+    admin_client,
+    admin_landing_fractal,
+    monkeypatch,
+):
+    monkeypatch.setattr(config, 'LANDING_EXAMPLES_MAX_COMPRESSED_BYTES', 1)
+
+    rejected = admin_client.post(
+        '/api/admin/landing-examples/publish',
+        data=_landing_example_payload(admin_landing_fractal.id),
+        content_type='application/json',
+    )
+
+    assert rejected.status_code == 413
+    assert rejected.get_json()['error'].startswith('Compressed landing snapshot is too large to publish')
+    assert admin_client.get('/api/public/landing-examples').get_json()['published_at'] is None
+
+
+@pytest.mark.integration
+def test_publish_leaves_publication_unchanged_when_static_delivery_fails(
+    db_session,
+    admin_landing_fractal,
+    monkeypatch,
+):
+    from services.landing_publish_service import LandingPublishService
+
+    service = LandingPublishService(db_session)
+    monkeypatch.setattr(service, '_write_landing_static_snapshot', lambda *args, **kwargs: 'failed')
+
+    payload, error, status = service.publish_landing_examples(
+        examples_override=json.loads(_landing_example_payload(admin_landing_fractal.id))['examples'],
+    )
+
+    assert payload is None
+    assert status == 503
+    assert 'delivery failed' in error
+    assert service._get_app_setting_value('landing_example_cache', None) is None
 
 
 @pytest.mark.integration
@@ -1794,6 +1827,8 @@ def test_temporary_password_forces_change_before_api_access(admin_client, client
         headers=user_headers,
     )
     assert change_response.status_code == 200
+    assert client.get('/api/auth/account/usage', headers=user_headers).status_code == 401
+    user_headers['Authorization'] = f"Bearer {json.loads(change_response.data)['token']}"
 
     unblocked_response = client.get('/api/auth/account/usage', headers=user_headers)
     assert unblocked_response.status_code == 200

@@ -35,6 +35,7 @@ from services.app_settings import (
 from services.events import Events
 from services.service_types import JsonDict, ServiceResult
 from services.telemetry_service import DEFAULT_RETENTION_DAYS, TelemetryService
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 
@@ -382,7 +383,7 @@ class AdminUsageService:
                 {"table_name": table_name},
             ).scalar()
             return int(result) if result is not None else None
-        except Exception:
+        except SQLAlchemyError:
             logger.warning("Failed to read relation size for %s", table_name, exc_info=True)
             return None
 
@@ -415,7 +416,7 @@ class AdminUsageService:
                   AND n.nspname NOT IN ('pg_catalog', 'information_schema')
                 ORDER BY pg_total_relation_size(c.oid) DESC, n.nspname, c.relname
             """)).mappings().all()
-        except Exception:
+        except SQLAlchemyError:
             logger.warning("Failed to read database storage breakdown", exc_info=True)
             return {"total_bytes": None, "relation_bytes": None, "other_bytes": None, "relations": []}
 

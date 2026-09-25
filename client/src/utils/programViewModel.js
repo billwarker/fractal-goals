@@ -132,6 +132,9 @@ export function getProgramDayScheduledDates(day, block) {
     return getRecurringDatesWithinRange(blockStart, blockEnd, activeDays);
 }
 
+/**
+ * @param {{ program?: any, blockFilter?: (block: any) => boolean, programIndex?: number }} [options]
+ */
 export function buildProgramDayOccurrences({
     program,
     blockFilter = () => true,
@@ -239,7 +242,7 @@ export function buildProgramDaysMap(blocks = []) {
 export function sortProgramBlocks(blocks = []) {
     return [...blocks].sort((left, right) => {
         if (left.start_date && right.start_date) {
-            return new Date(left.start_date) - new Date(right.start_date);
+            return new Date(left.start_date).getTime() - new Date(right.start_date).getTime();
         }
         return 0;
     });
@@ -253,6 +256,9 @@ export function getProgramColor(program, index = 0) {
     return blockColor || PROGRAM_COLORS[index % PROGRAM_COLORS.length];
 }
 
+/**
+ * @param {{ program?: any, includeProgramId?: boolean, programIndex?: number }} [options]
+ */
 export function buildProgramBlockLabels({
     program,
     includeProgramId = false,
@@ -294,6 +300,20 @@ export function getProgramGoalIds(program) {
     ]);
 }
 
+/**
+ * @param {object} options
+ * @param {any} options.program
+ * @param {any[]} [options.goals]
+ * @param {any[]} [options.sessions]
+ * @param {string} [options.timezone] IANA zone; omitted means the viewer's local zone.
+ * @param {Function} options.getGoalColor
+ * @param {Function} options.getGoalTextColor
+ * @param {Function} options.getGoalSecondaryColor
+ * @param {Function} options.getGoalIcon
+ * @param {Set<string>} [options.attachedGoalIds] Defaults to the program's own goals.
+ * @param {boolean} [options.includeProgramId]
+ * @param {number} [options.programIndex]
+ */
 export function buildProgramCalendarEvents({
     program,
     goals = [],
@@ -647,6 +667,7 @@ function getDaysBetween(dateValue, targetValue) {
     return Math.ceil((target.getTime() - start.getTime()) / 86400000);
 }
 
+/** @param {{ program: any, sessions?: any[], programDaysMap: Map<string, any>, attachedGoalIds?: Set<string>, getGoalDetails: (goalId: string) => any, timezone?: string }} options Omitted timezone means the viewer's local zone. */
 export function buildDemoProgramMetrics({ program, sessions = [], programDaysMap, attachedGoalIds, getGoalDetails, timezone }) {
     if (!program) {
         return null;
@@ -686,6 +707,7 @@ export function buildDemoProgramMetrics({ program, sessions = [], programDaysMap
 }
 
 export function buildBlockGoalsByBlockId({ sortedBlocks = [], associatedGoals = [] }) {
+    /** @type {Array<[string, any[]]>} */
     const entries = sortedBlocks.map((block) => {
         const seenGoalIds = new Set();
         const blockGoals = associatedGoals
@@ -702,7 +724,7 @@ export function buildBlockGoalsByBlockId({ sortedBlocks = [], associatedGoals = 
                 const rightDeadline = getGoalDeadline(right);
 
                 if (leftDeadline && rightDeadline) {
-                    return new Date(leftDeadline) - new Date(rightDeadline);
+                    return new Date(leftDeadline).getTime() - new Date(rightDeadline).getTime();
                 }
                 if (leftDeadline) {
                     return -1;
@@ -719,6 +741,7 @@ export function buildBlockGoalsByBlockId({ sortedBlocks = [], associatedGoals = 
     return new Map(entries);
 }
 
+/** @param {{ activeBlock: any, sessions?: any[], program: any, programDaysMap: Map<string, any>, blockGoalsByBlockId: Map<string, any[]>, timezone?: string }} options Omitted timezone means the viewer's local zone. */
 export function buildBlockMetrics({ activeBlock, sessions = [], program, programDaysMap, blockGoalsByBlockId, timezone }) {
     if (!activeBlock) {
         return null;

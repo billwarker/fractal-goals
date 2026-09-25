@@ -9,7 +9,7 @@ import jwt
 from account_tiers import DEFAULT_ACCOUNT_TIER
 from config import config
 from models import BetaSignupRequest, EmailDeliveryEvent, PasswordResetToken, User, utc_now
-from services.account_flags import clear_force_password_change
+from services.account_flags import clear_force_password_change, revoke_user_sessions
 from services.email_service import EmailSendError, EmailService
 from services.ops_log import log_ops_event
 from services.email_templates import render_password_changed_email, render_password_reset_email
@@ -17,8 +17,11 @@ from services.serializers import serialize_user
 from services.admin_service import AdminService
 from services.quota_service import DEFAULT_STORAGE_LIMIT_BYTES, QuotaService
 from services.service_types import JsonDict, ServiceResult
+from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
+
+SESSION_TOKEN_AUDIENCE = "fractal:session"
 
 
 class AuthService:
@@ -26,13 +29,42 @@ class AuthService:
         self.db_session = db_session
 
     @staticmethod
-    def issue_token(user_id: str, *, remember_me: bool = False) -> str:
+    def issue_token(
+        user: User,
+        *,
+        remember_me: bool = False,
+        auth_time: int | None = None,
+        issued_at: datetime.datetime | None = None,
+    ) -> str:
+        """Issue a session token bound to the user's current session version.
+
+        ``auth_time`` is the original login instant and is carried unchanged
+        through refreshes so a session cannot outlive SESSION_MAX_LIFETIME_DAYS.
+        """
+        now = issued_at or datetime.datetime.now(datetime.timezone.utc)
         return jwt.encode({
-            'user_id': user_id,
+            'aud': SESSION_TOKEN_AUDIENCE,
+            'user_id': user.id,
+            'sv': user.session_version or 0,
             'remember_me': bool(remember_me),
-            'exp': datetime.datetime.now(datetime.timezone.utc)
-            + datetime.timedelta(hours=config.JWT_EXPIRATION_HOURS),
+            'iat': now,
+            'auth_time': int(now.timestamp()) if auth_time is None else int(auth_time),
+            'exp': now + datetime.timedelta(hours=config.JWT_EXPIRATION_HOURS),
         }, config.JWT_SECRET_KEY, algorithm="HS256")
+
+    @staticmethod
+    def _decode_session_token(token: str, *, verify_exp: bool = True) -> JsonDict:
+        return jwt.decode(
+            token,
+            config.JWT_SECRET_KEY,
+            algorithms=["HS256"],
+            audience=SESSION_TOKEN_AUDIENCE,
+            options={"verify_exp": verify_exp, "require": ["exp", "user_id", "sv", "auth_time"]},
+        )
+
+    @staticmethod
+    def _session_is_current(user: User, claims: JsonDict) -> bool:
+        return claims.get('sv') == (user.session_version or 0)
 
     def _find_user_for_login(self, username_or_email: str):
         return self.db_session.query(User).filter(
@@ -58,7 +90,7 @@ class AuthService:
 
     def get_current_user_for_token(self, token: str) -> ServiceResult[User]:
         try:
-            data = jwt.decode(token, config.JWT_SECRET_KEY, algorithms=["HS256"])
+            data = self._decode_session_token(token)
         except jwt.ExpiredSignatureError:
             return None, 'Token has expired', 401
         except jwt.InvalidTokenError:
@@ -69,6 +101,8 @@ class AuthService:
             return None, 'User not found', 401
         if not current_user.is_active:
             return None, 'User account is suspended', 403
+        if not self._session_is_current(current_user, data):
+            return None, 'Session has been revoked', 401
 
         logger.debug("Resolved auth token for user_id=%s", current_user.id)
         self.db_session.expunge(current_user)
@@ -232,12 +266,41 @@ class AuthService:
         user.failed_login_count = 0
         user.locked_until = None
         clear_force_password_change(user)
+        revoke_user_sessions(user)
         reset_token.used_at = utc_now()
         self.db_session.commit()
         logger.info("Password reset completed for user_id=%s", user.id)
         log_ops_event("auth.password_reset_completed", user_id=user.id)
         self._send_password_changed_notice(user)
         return {"message": "Password reset successfully. Please log in with your new password."}, None, 200
+
+    def reissue_current_session(self, user_id: str, previous_token: str) -> ServiceResult[JsonDict]:
+        """Keep the acting device signed in after a credential change revoked every session.
+
+        The replacement starts a new absolute lifetime because the user just
+        re-proved their password; ``remember_me`` carries over from the old token.
+        """
+        user = self.db_session.get(User, user_id)
+        if not user:
+            return None, 'User not found', 404
+        try:
+            remember_me = bool(self._decode_session_token(previous_token, verify_exp=False).get('remember_me'))
+        except jwt.InvalidTokenError:
+            remember_me = False
+        return {
+            'token': self.issue_token(user, remember_me=remember_me),
+            'remember_me': remember_me,
+        }, None, 200
+
+    def revoke_all_sessions(self, user_id: str) -> ServiceResult[JsonDict]:
+        user = self.db_session.get(User, user_id)
+        if not user:
+            return None, 'User not found', 404
+        revoke_user_sessions(user)
+        self.db_session.commit()
+        logger.info("Revoked all sessions for user_id=%s", user.id)
+        log_ops_event("auth.sessions_revoked", user_id=user.id)
+        return {"message": "Signed out of all devices"}, None, 200
 
     def _send_password_changed_notice(self, user):
         """Best-effort security notification; must never fail the reset."""
@@ -260,36 +323,40 @@ class AuthService:
             # send_email already marked the delivery event failed; keep it.
             self.db_session.commit()
             logger.warning("Password changed notice email failed for user_id=%s", user.id)
-        except Exception:
+        except SQLAlchemyError:
             self.db_session.rollback()
             logger.exception("Password changed notice email errored for user_id=%s", user.id)
 
     def refresh_token(self, token: str) -> ServiceResult[JsonDict]:
         try:
-            data = jwt.decode(
-                token,
-                config.JWT_SECRET_KEY,
-                algorithms=["HS256"],
-                options={"verify_exp": False},
-            )
-            exp_timestamp = data.get('exp', 0)
-            exp_time = datetime.datetime.fromtimestamp(exp_timestamp, tz=datetime.timezone.utc)
-            refresh_window = datetime.timedelta(days=getattr(config, 'JWT_REFRESH_WINDOW_DAYS', 7))
-
-            if datetime.datetime.now(datetime.timezone.utc) > (exp_time + refresh_window):
+            data = self._decode_session_token(token, verify_exp=False)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            exp_time = datetime.datetime.fromtimestamp(data['exp'], tz=datetime.timezone.utc)
+            refresh_window = datetime.timedelta(days=config.JWT_REFRESH_WINDOW_DAYS)
+            if now > (exp_time + refresh_window):
                 return None, 'Refresh window expired. Please log in again.', 401
+
+            auth_time = datetime.datetime.fromtimestamp(data['auth_time'], tz=datetime.timezone.utc)
+            if now > auth_time + datetime.timedelta(days=config.SESSION_MAX_LIFETIME_DAYS):
+                return None, 'Session expired. Please log in again.', 401
         except jwt.InvalidTokenError:
             return None, 'Invalid token', 401
-        except (TypeError, ValueError):
-            return None, 'Failed to refresh token', 500
+        except (TypeError, ValueError, OverflowError, OSError):
+            return None, 'Invalid token', 401
 
         user = self.db_session.query(User).filter_by(id=data['user_id']).first()
         if not user or not user.is_active:
             return None, 'User account is suspended', 403
+        if not self._session_is_current(user, data):
+            return None, 'Session has been revoked', 401
 
         logger.info("Refreshed auth token for user_id=%s", user.id)
         return {
-            'token': self.issue_token(user.id, remember_me=bool(data.get('remember_me'))),
+            'token': self.issue_token(
+                user,
+                remember_me=bool(data.get('remember_me')),
+                auth_time=data['auth_time'],
+            ),
             'remember_me': bool(data.get('remember_me')),
             'user': serialize_user(user),
         }, None, 200
@@ -344,7 +411,7 @@ class AuthService:
         logger.info("Logged in user_id=%s", user.id)
 
         return {
-            'token': self.issue_token(user.id, remember_me=bool(data.get('remember_me'))),
+            'token': self.issue_token(user, remember_me=bool(data.get('remember_me'))),
             'remember_me': bool(data.get('remember_me')),
             'user': serialize_user(user),
         }, None, 200

@@ -17,6 +17,7 @@ import sqlalchemy as sa
 
 from models import EmailDeliveryEvent, EmailWebhookEvent, EventLog, ProductEvent, User, format_utc, utc_now
 from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, get_app_setting, set_app_setting
+from google.api_core.exceptions import GoogleAPIError
 
 logger = logging.getLogger(__name__)
 
@@ -433,7 +434,7 @@ class AnalyticsExportService:
                 bq_table.time_partitioning.expiration_ms = expiration_ms
                 self.bq_client.update_table(bq_table, ["time_partitioning"])
                 self._emit(f"Applied {ANALYTICS_RETENTION_DAYS}d retention table={table}")
-        except Exception as exc:  # pragma: no cover - defensive
+        except GoogleAPIError as exc:  # pragma: no cover - requires BigQuery
             logger.warning("Could not apply retention table=%s error=%s", table, exc)
 
     def _prune_warehouse_table(self, table, timestamp_column):
