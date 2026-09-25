@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { readLocalStorageValue, writeLocalStorageValue } from './useFlowTreePreferences';
+import { readLocalStorageValue, writeLocalStorageValue } from '../utils/localPreferences';
 
 const STORAGE_KEY = 'create-session-preferences';
 const STORAGE_VERSION = 1;

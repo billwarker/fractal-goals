@@ -23,7 +23,7 @@ function isInObservedWindow(block, windowData) {
     return Boolean(block.adherence?.scheduled_days_observed || block.linked_sessions);
 }
 
-export default function ProgramOverview({ metrics, loading = false, error = null }) {
+export default function ProgramOverview({ metrics, loading = false, error = null, onEditPeriod = null }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const goalCoverage = useMemo(() => (
         [...(metrics?.goal_coverage || [])]
@@ -84,13 +84,27 @@ export default function ProgramOverview({ metrics, loading = false, error = null
                         </p>
                     ) : null}
                     <ul className={styles.timeOffList}>
-                        {(metrics.periods || []).map((period) => (
-                            <li key={period.id}>
-                                <strong>{period.name}</strong>
-                                <span>{formatLiteralDate(period.start_date, SHORT_DATE)} – {formatLiteralDate(period.end_date, SHORT_DATE)}</span>
-                                {period.protects_streaks ? null : <small>Not protecting streaks</small>}
-                            </li>
-                        ))}
+                        {(metrics.periods || []).map((period) => {
+                            const content = (
+                                <>
+                                    <strong>{period.name}</strong>
+                                    <span>{formatLiteralDate(period.start_date, SHORT_DATE)} – {formatLiteralDate(period.end_date, SHORT_DATE)}</span>
+                                    {period.protects_streaks ? null : <small>Not protecting streaks</small>}
+                                </>
+                            );
+                            return (
+                                <li key={period.id}>
+                                    {onEditPeriod ? (
+                                        <button
+                                            type="button"
+                                            className={styles.timeOffItem}
+                                            onClick={() => onEditPeriod(period)}
+                                            aria-label={`Edit event ${period.name}`}
+                                        >{content}</button>
+                                    ) : <div className={styles.timeOffItem}>{content}</div>}
+                                </li>
+                            );
+                        })}
                     </ul>
                 </section>
             ) : null}
@@ -191,4 +205,5 @@ ProgramOverview.propTypes = {
     metrics: PropTypes.object,
     loading: PropTypes.bool,
     error: PropTypes.object,
+    onEditPeriod: PropTypes.func,
 };

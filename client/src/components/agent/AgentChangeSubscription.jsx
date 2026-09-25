@@ -9,6 +9,7 @@ const changedRootQueryKeys = (rootId) => [
     queryKeys.goals(rootId),
     queryKeys.activities(rootId),
     queryKeys.programs(rootId),
+    queryKeys.programCalendarRoot(rootId),
     ['program', rootId],
     queryKeys.programDayReadModelRoot(rootId),
     queryKeys.sessions(rootId),

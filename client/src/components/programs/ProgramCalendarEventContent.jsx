@@ -42,7 +42,6 @@ export default function renderProgramCalendarEventContent(eventInfo, onGoalActiv
 
     if (type === 'program_day') {
         const color = blockColor || 'var(--color-brand-primary)';
-        const isRest = dayState?.state === 'rest';
         const statusLabel = getProgramDayStateMeta(dayState?.state)?.label
             || (isCompleted ? 'requirements met' : null);
         return (
@@ -51,7 +50,6 @@ export default function renderProgramCalendarEventContent(eventInfo, onGoalActiv
                 style={{ '--program-day-pill-bg': `color-mix(in srgb, ${color} 13%, var(--color-bg-card))` }}
             >
                 <span className={styles.eventPillText}>{title}</span>
-                {isRest ? <span className={styles.restStatusLabel}>Rest</span> : null}
                 {ownsDate && dayState?.status_source === 'period' ? (
                     <span className={styles.dayStatusAssistive}>(protected by an event)</span>
                 ) : null}

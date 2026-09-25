@@ -93,8 +93,9 @@ export function useProgramCalendarSelection({
     }, [dispatchCalendarContext, displayProgram, programs, setBlockCreationMode, today]);
 
     const selectBlockRange = useCallback(({ startDate, endDate, programId }) => {
-        const program = programs.find((candidate) => candidate.id === programId)
-            || (displayProgram?.id === programId ? displayProgram : null);
+        const program = displayProgram?.id === programId
+            ? displayProgram
+            : programs.find((candidate) => candidate.id === programId) || null;
         updateRangeContext({ startDate, endDate, program });
         setIsSidePaneVisible(true);
     }, [displayProgram, programs, setIsSidePaneVisible, updateRangeContext]);

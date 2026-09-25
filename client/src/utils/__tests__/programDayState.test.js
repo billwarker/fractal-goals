@@ -67,7 +67,10 @@ describe('getProgramDayStatusSymbol', () => {
         [{ state: 'scheduled_missed', closed: true }, 'missed'],
         [{ state: 'scheduled_partial', closed: false }, 'scheduled'],
         [{ state: 'scheduled_pending', closed: false }, 'scheduled'],
-        [{ state: 'rest', manualStatus: 'rest', closed: true }, 'scheduled'],
+        [{ state: 'rest', manualStatus: 'rest', closed: true }, 'rest'],
+        [{ state: 'rest', closed: false }, 'rest'],
+        [{ state: 'scheduled_met', manualStatus: 'rest', closed: true }, 'rest'],
+        [{ state: 'rest', manualStatus: 'complete', closed: true }, 'complete'],
     ])('maps %o to %s', (input, expected) => {
         expect(getProgramDayStatusSymbol(input)).toBe(expected);
     });

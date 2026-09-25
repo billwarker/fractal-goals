@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { fractalApi } from '../utils/api';
 import { getISOYMDInTimezone } from '../utils/dateUtils';
@@ -44,7 +44,11 @@ function useReadModel(rootId, programId, timezone, rangeStart, rangeEnd, detailD
             ...(detailDate ? { detail_date: detailDate } : {}),
         })),
         enabled: Boolean(rootId && programId && rangeStart && rangeEnd),
-        placeholderData: detailDate ? undefined : keepPreviousData,
+        placeholderData: detailDate ? undefined : (previousData, previousQuery) => (
+            String(previousQuery?.queryKey?.[2]) === String(programId)
+                ? previousData
+                : undefined
+        ),
         staleTime: 60 * 1000,
     });
 }

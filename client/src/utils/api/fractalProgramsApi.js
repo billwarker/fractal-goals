@@ -2,6 +2,7 @@ import { API_BASE, axios } from './core';
 
 export const fractalProgramsApi = {
     getPrograms: (rootId, params) => axios.get(`${API_BASE}/${rootId}/programs`, params ? { params } : undefined),
+    getProgramSummaries: (rootId, params) => axios.get(`${API_BASE}/${rootId}/programs/calendar`, params ? { params } : undefined),
     getProgram: (rootId, programId, params) => axios.get(`${API_BASE}/${rootId}/programs/${programId}`, params ? { params } : undefined),
     getProgramMetrics: (rootId, programId, params = {}) => axios.get(
         `${API_BASE}/${rootId}/programs/${programId}/metrics`, { params },

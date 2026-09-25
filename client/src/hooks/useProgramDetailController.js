@@ -75,9 +75,10 @@ export function useProgramDetailController({ goals = [] }) {
 
     const handleCreateDayForDate = useCallback((blockId, date) => {
         setSelectedBlockId(blockId);
+        // A day created from a calendar date starts as a specific-dates day on that date.
         setDayModalInitialData({
             name: '',
-            date,
+            scheduled_dates: [date],
             day_of_week: [],
             templates: [],
         });

@@ -1,5 +1,6 @@
 import {
     addDaysToDateString,
+    formatLiteralDate,
     getDatePart,
     getDaysRemaining,
     getISOYMDInTimezone,
@@ -97,6 +98,62 @@ function getProgramDayWeekdayIndexes(day) {
     return [...new Set(dayOfWeek
         .map((dayName) => DAY_NAME_TO_INDEX[dayName])
         .filter((value) => value !== undefined))];
+}
+
+export const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+export function getProgramDayWeekdays(day) {
+    const dayOfWeek = Array.isArray(day?.day_of_week)
+        ? day.day_of_week
+        : (day?.day_of_week ? [day.day_of_week] : []);
+    return WEEKDAY_NAMES.filter((name) => dayOfWeek.includes(name));
+}
+
+/** A definition's specific dates: its explicit schedule rows plus any legacy fixed date. */
+export function getProgramDaySpecificDates(day) {
+    const dates = [...(day?.scheduled_dates || []), day?.date]
+        .map(getDatePart)
+        .filter(Boolean);
+    return [...new Set(dates)].sort();
+}
+
+function joinWithAnd(parts) {
+    if (parts.length <= 1) return parts[0] || '';
+    return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
+
+const formatShortDate = (value) => formatLiteralDate(value, { year: undefined });
+
+/** "Every Monday, Wednesday and Friday in the block." */
+export function formatWeekdaySchedule(weekdays = []) {
+    const ordered = WEEKDAY_NAMES.filter((name) => weekdays.includes(name));
+    if (!ordered.length) return '';
+    if (ordered.length === 7) return 'Every day in the block.';
+    return `Every ${joinWithAnd(ordered)} in the block.`;
+}
+
+/** "1 date · Sep 26" or "3 dates · Sep 26 – Oct 10". */
+export function formatSpecificDatesSummary(dates = []) {
+    const sorted = [...dates].sort();
+    if (!sorted.length) return '';
+    const count = `${sorted.length} date${sorted.length === 1 ? '' : 's'}`;
+    const range = sorted.length === 1
+        ? formatShortDate(sorted[0])
+        : `${formatShortDate(sorted[0])} – ${formatShortDate(sorted[sorted.length - 1])}`;
+    return `${count} · ${range}`;
+}
+
+/** Compact schedule label for a program-day card: weekdays, dates, or both. */
+export function getProgramDayScheduleLabel(day) {
+    const weekdays = getProgramDayWeekdays(day);
+    const dates = getProgramDaySpecificDates(day);
+    if (weekdays.length) {
+        const weekdayLabel = weekdays.length === 7 ? 'Daily' : weekdays.map((name) => name.slice(0, 3)).join(' · ');
+        return dates.length ? `${weekdayLabel} · +${dates.length} date${dates.length === 1 ? '' : 's'}` : weekdayLabel;
+    }
+    if (!dates.length) return '';
+    if (dates.length <= 2) return dates.map(formatShortDate).join(', ');
+    return `${formatShortDate(dates[0])} +${dates.length - 1} more`;
 }
 
 export function getProgramDayTemplateRules(dayOrOccurrence) {
@@ -297,6 +354,25 @@ export function buildProgramBlockLabels({
             blockId: block.id,
             blockColor,
             color: getThemedContrastColor(blockColor),
+        }];
+    });
+}
+
+/** Calendar labels for each program, using summary data only. */
+export function buildProgramSummaryLabels(programs = []) {
+    return programs.flatMap((program, programIndex) => {
+        const date = getDatePart(program?.start_date);
+        if (!date || !program?.id || !program?.name) return [];
+        const color = getProgramColor(program, programIndex);
+        return [{
+            id: `program-label-${program.id}`,
+            title: program.name,
+            date,
+            startDate: date,
+            endDate: getDatePart(program.end_date) || date,
+            programId: program.id,
+            labelType: 'program',
+            color: getThemedContrastColor(color),
         }];
     });
 }
@@ -595,7 +671,7 @@ export function buildProgramCalendarEvents({
     return events;
 }
 
-export function buildProgramsCalendarEvents(programs = [], goals = [], getGoalColor, getGoalTextColor, timezone, goalIconHelpers = {}) {
+export function buildProgramsCalendarEvents(programs = [], goals = [], getGoalColor, getGoalTextColor, timezone, goalIconHelpers = {}, detailedProgram = undefined) {
     const events = [];
     const goalEventIds = new Set();
 
@@ -623,10 +699,13 @@ export function buildProgramsCalendarEvents(programs = [], goals = [], getGoalCo
             });
         }
 
-        const programEvents = buildProgramCalendarEvents({
-            program,
+        const detail = detailedProgram === undefined
+            ? program
+            : (String(detailedProgram?.id) === String(program.id) ? detailedProgram : null);
+        const programEvents = detail ? buildProgramCalendarEvents({
+            program: detail,
             goals,
-            sessions: flattenProgramSessions(program),
+            sessions: flattenProgramSessions(detail),
             timezone,
             getGoalColor,
             getGoalTextColor,
@@ -634,7 +713,7 @@ export function buildProgramsCalendarEvents(programs = [], goals = [], getGoalCo
             getGoalIcon: goalIconHelpers.getGoalIcon,
             includeProgramId: true,
             programIndex,
-        });
+        }) : [];
 
         programEvents.forEach((event) => {
             if (event.extendedProps?.type === 'goal' && event.extendedProps?.id) {

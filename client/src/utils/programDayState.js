@@ -14,11 +14,16 @@ export function indexProgramDayStates(days = []) {
     return new Map((days || []).map((day) => [day.date, day]));
 }
 
-/** Symbol shared by the calendar ribbon and day pane: complete, missed, or scheduled. */
+/**
+ * Symbol shared by the calendar ribbon, day pane, and status menus: complete,
+ * rest, missed, or scheduled. A manual status wins over the evaluated state.
+ */
 export function getProgramDayStatusSymbol({ state, manualStatus = null, closed = false }) {
-    if (state === 'scheduled_met' || manualStatus === 'complete') return 'complete';
-    if (closed && state !== 'rest' && manualStatus !== 'rest') return 'missed';
-    return 'scheduled';
+    if (manualStatus === 'complete') return 'complete';
+    if (manualStatus === 'rest') return 'rest';
+    if (state === 'scheduled_met') return 'complete';
+    if (state === 'rest') return 'rest';
+    return closed ? 'missed' : 'scheduled';
 }
 
 export function getProgramDayStateMeta(state) {

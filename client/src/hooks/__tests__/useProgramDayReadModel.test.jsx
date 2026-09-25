@@ -90,6 +90,31 @@ describe('useProgramDayDetail', () => {
         await waitFor(() => expect(result.current.isError).toBe(true));
         expect(result.current.error.message).toMatch(/unsupported program day data version/i);
     });
+
+    it('does not show the previous program day data while a different program loads', async () => {
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        const wrapper = ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+        let finishSecondRequest;
+        getProgramDayReadModel
+            .mockResolvedValueOnce({ data: { schema_version: 5, days: [{ date: '2026-09-02', program_id: 'program-1' }] } })
+            .mockImplementationOnce(() => new Promise((resolve) => { finishSecondRequest = resolve; }));
+        let programId = 'program-1';
+
+        const { result, rerender } = renderHook(
+            () => useProgramDayRange('root-1', programId, 'UTC', { start: '2026-09-01', end: '2026-09-30' }),
+            { wrapper },
+        );
+        await waitFor(() => expect(result.current.data?.days[0]?.program_id).toBe('program-1'));
+
+        programId = 'program-2';
+        rerender();
+        expect(result.current.data).toBeUndefined();
+
+        await act(async () => finishSecondRequest({
+            data: { schema_version: 5, days: [{ date: '2026-09-02', program_id: 'program-2' }] },
+        }));
+        await waitFor(() => expect(result.current.data?.days[0]?.program_id).toBe('program-2'));
+    });
 });
 
 describe('useUpdateProgramDayStatuses', () => {

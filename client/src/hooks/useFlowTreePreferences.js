@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import {
+    readLocalStorageValue,
+    writeLocalStorageValue,
+} from '../utils/localPreferences';
+
 const STORAGE_KEY = 'flowtree-view-settings';
 const STORAGE_VERSION = 2;
 const DEFAULT_VIEW_SETTINGS = Object.freeze({
@@ -8,30 +13,6 @@ const DEFAULT_VIEW_SETTINGS = Object.freeze({
     hideCompletedGoals: false,
     showMetricsOverlay: false,
 });
-
-export function readLocalStorageValue(key) {
-    try {
-        return globalThis.localStorage?.getItem?.(key) ?? null;
-    } catch {
-        return null;
-    }
-}
-
-export function writeLocalStorageValue(key, value) {
-    try {
-        globalThis.localStorage?.setItem?.(key, value);
-    } catch {
-        // Optional preferences should not interrupt rendering in restricted storage contexts.
-    }
-}
-
-export function removeLocalStorageValue(key) {
-    try {
-        globalThis.localStorage?.removeItem?.(key);
-    } catch {
-        // Optional preferences should not interrupt rendering in restricted storage contexts.
-    }
-}
 
 function normalizeStoredPreferences(rawValue) {
     if (!rawValue) return null;

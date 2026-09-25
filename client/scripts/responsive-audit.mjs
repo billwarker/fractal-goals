@@ -210,9 +210,9 @@ const checks = [
     file: 'src/components/programs/ProgramCalendarView.module.css',
     patterns: [
       /@media\s*\(max-width:\s*768px\)[\s\S]*?\.calendarContainer\s*\{[^}]*min-height:\s*640px;[^}]*height:\s*auto;/,
-      /\.mobileControlRow\s*\{[^}]*display:\s*flex;[^}]*justify-content:\s*space-between;[^}]*flex-wrap:\s*wrap;/s,
-      /\.calendarContainerMobileToolbar :global\(\.fc-toolbar-chunk:first-child\),[\s\S]*?:global\(\.fc-toolbar-chunk:last-child\)\s*\{[^}]*display:\s*none !important;/,
-      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.headerActions\s*\{[^}]*position:\s*static;[^}]*min-height:\s*44px;/,
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.pageToolbar\s*\{[^}]*grid-template-areas:[^;]*"nav actions"[^;]*"title title";/,
+      /\.toolbarButton,\s*\.continuousToggle\s*\{[^}]*min-width:\s*44px;[^}]*height:\s*44px;/s,
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.headerActions\s*\{[^}]*min-height:\s*44px;/,
       /\.customBtn\s*\{[^}]*min-height:\s*44px;/s,
       /:global\(\.fc-button\)\s*\{[^}]*min-height:\s*44px !important;/s,
     ],

@@ -98,6 +98,12 @@ class _ProgramDaysMixin:
             if 'template_configs' in data or 'template_ids' in data or 'template_id' in data:
                 cls._apply_program_day_template_configs(session, day, template_configs)
             cls._validate_program_day_completion_min(day)
+            # Explicit dates are bound to the origin block's range; cascades copy the
+            # definition (name, templates, weekdays) but never its dates.
+            if 'scheduled_dates' in data and target is block:
+                cls._sync_occurrence_schedules(
+                    day, block, data.get('scheduled_dates') or [], current_user_id,
+                )
             
             created_count += 1
             touched_days.append(day)
@@ -127,7 +133,23 @@ class _ProgramDaysMixin:
         pending_events=None,
     ) -> Dict:
         cls._require_root_access(session, root_id, current_user_id)
-        day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
+        syncs_schedule = 'scheduled_dates' in data
+        block = None
+        day_query = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id)
+        if syncs_schedule:
+            # Same program -> block -> day lock order as schedule_block_day.
+            program = session.query(Program).filter_by(
+                id=program_id, root_id=root_id,
+            ).populate_existing().with_for_update().first()
+            if not program:
+                raise ValueError("Program not found")
+            block = session.query(ProgramBlock).filter_by(
+                id=block_id, program_id=program_id,
+            ).populate_existing().with_for_update().first()
+            if not block:
+                raise ValueError("Block not found")
+            day_query = day_query.populate_existing().with_for_update()
+        day = day_query.first()
         if not day:
              raise ValueError("Day not found")
         
@@ -163,6 +185,13 @@ class _ProgramDaysMixin:
         if update_sessions:
             cls._apply_program_day_template_configs(session, day, template_configs)
         cls._validate_program_day_completion_min(day)
+
+        scheduled_dates_added: List[date] = []
+        scheduled_dates_removed: List[date] = []
+        if syncs_schedule:
+            scheduled_dates_added, scheduled_dates_removed = cls._sync_occurrence_schedules(
+                day, block, data.get('scheduled_dates') or [], current_user_id,
+            )
         
         if cascade:
             all_blocks = session.query(ProgramBlock).filter_by(program_id=program_id).all()
@@ -190,7 +219,9 @@ class _ProgramDaysMixin:
             'block_id': block_id,
             'program_id': program_id,
             'root_id': root_id,
-            'updated_fields': list(data.keys())
+            'updated_fields': list(data.keys()),
+            'scheduled_dates_added': [value.isoformat() for value in scheduled_dates_added],
+            'scheduled_dates_removed': [value.isoformat() for value in scheduled_dates_removed],
         }, source='cls.update_block_day')
         cls._queue_or_emit_event(pending_events, event)
 
@@ -273,6 +304,46 @@ class _ProgramDaysMixin:
             "days": [serialize_program_day(day) for day in copied_days],
             "count": copied_count,
         }
+
+    @staticmethod
+    def _sync_occurrence_schedules(day, block, scheduled_dates, current_user_id=None):
+        """Make ``day``'s explicit occurrence dates exactly ``scheduled_dates``.
+
+        Specific dates are stored only as occurrence schedule rows, so saving them
+        also retires a legacy ``program_days.date`` in place: the day keeps its id,
+        and linked sessions, credits, and manual statuses stay attached. Removing a
+        date leaves its sessions intact; they simply stop counting as scheduled.
+        Returns the (added, removed) dates.
+        """
+        wanted = {
+            value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
+            for value in scheduled_dates
+        }
+        if wanted and (block.start_date is None or block.end_date is None):
+            raise ValueError("The block needs start and end dates before days can be scheduled on specific dates")
+        block_start, block_end = block.start_date, block.end_date
+        if isinstance(block_start, datetime):
+            block_start = block_start.date()
+        if isinstance(block_end, datetime):
+            block_end = block_end.date()
+        if any(value < block_start or value > block_end for value in wanted):
+            raise ValueError("Scheduled date must be within the selected block date range")
+
+        existing = {row.date: row for row in day.occurrence_schedules or []}
+        removed = sorted(set(existing) - wanted)
+        added = sorted(wanted - set(existing))
+        for value in removed:
+            day.occurrence_schedules.remove(existing[value])
+        for value in added:
+            day.occurrence_schedules.append(ProgramDayOccurrenceSchedule(
+                date=value, created_by_user_id=current_user_id,
+            ))
+        converted_legacy_date = day.date is not None
+        if converted_legacy_date:
+            day.date = None
+        if added or removed or converted_legacy_date:
+            day.row_version = (day.row_version or 1) + 1
+        return added, removed
 
     @classmethod
     def schedule_block_day(

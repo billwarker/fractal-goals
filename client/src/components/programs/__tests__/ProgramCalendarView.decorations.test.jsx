@@ -55,9 +55,9 @@ vi.mock('@fullcalendar/react', async () => {
                 data-expand-rows={String(Boolean(props.expandRows))}
                 data-day-max-events={String(props.dayMaxEvents)}
                 data-selectable={String(Boolean(props.selectable))}
-                data-header-left={props.headerToolbar.left}
+                data-header-left={props.headerToolbar ? props.headerToolbar.left : ''}
             >
-                {props.headerToolbar.left.includes('contextualToday') ? (
+                {props.headerToolbar && props.headerToolbar.left.includes('contextualToday') ? (
                     <button type="button" onClick={props.customButtons.contextualToday.click}>
                         Today
                     </button>

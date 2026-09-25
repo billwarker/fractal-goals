@@ -1,4 +1,6 @@
 .calendarContainer {
+    display: flex;
+    flex-direction: column;
     height: calc(100vh - 200px);
     min-height: 500px;
     background: var(--color-bg-card);
@@ -86,6 +88,7 @@
     position: relative;
     z-index: 5;
     min-width: 24px;
+    font-weight: 400 !important;
     text-align: right;
 }
 
@@ -123,41 +126,95 @@
     border: 0;
 }
 
+.calendarBody {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* One page toolbar: navigation + continuous toggle | title | multi-day actions. */
+.pageToolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas: "nav title actions";
+    align-items: center;
+    gap: 12px;
+    min-height: 34px;
+    margin-bottom: 24px;
+}
+
+.toolbarNavigation {
+    grid-area: nav;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-self: start;
+}
+
+.toolbarTitle {
+    grid-area: title;
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 1.15rem;
+    font-weight: 700;
+    white-space: nowrap;
+    text-align: center;
+}
+
 .headerActions {
-    position: absolute;
-    top: 32px;
-    right: 24px;
-    z-index: 10;
+    grid-area: actions;
     display: flex;
     gap: 8px;
     align-items: center;
+    justify-self: end;
 }
 
-.mobileControlRow,
-.mobileNavigation {
-    display: none;
-}
-
-.mobileNavButton {
-    min-width: 44px;
-    min-height: 44px;
+.toolbarButton {
+    min-width: 34px;
+    height: 34px;
     padding: 0 12px;
     border: 1px solid var(--color-border);
     border-radius: 0;
     background: var(--color-bg-secondary);
     color: var(--color-text-primary);
+    font: inherit;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
 }
 
-.mobileNavButton:hover {
+.toolbarButton:hover {
     background: var(--color-bg-hover);
 }
 
-.mobileNavButton:focus-visible {
+.toolbarButton:focus-visible,
+.continuousToggle:has(input:focus-visible) {
     outline: 2px solid var(--color-brand-primary);
     outline-offset: 2px;
+}
+
+.continuousToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 8px;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+}
+
+.continuousToggle input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--color-brand-primary);
+    cursor: pointer;
+}
+
+.continuousToggle:has(input:checked) {
+    color: var(--color-text-primary);
 }
 
 /* Base style for custom buttons */
@@ -230,14 +287,6 @@
     cursor: pointer;
 }
 
-.restStatusLabel {
-    color: var(--color-text-muted);
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-}
-
 /* ─── Custom Event Pills ─────────────────────────────────────────────────── */
 
 /* Reset FullCalendar's default event wrapper so our pill owns all styling */
@@ -306,7 +355,7 @@
 
 .blockCellLabel {
     position: absolute;
-    top: 7px;
+    top: calc(7px + var(--program-label-offset, 0px));
     left: 7px;
     right: 36px;
     z-index: 6;
@@ -327,6 +376,11 @@
     text-align: left;
     cursor: pointer;
     transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.programCellLabel {
+    font-style: normal;
+    font-weight: 700;
 }
 
 .calendarContainerCompact .blockCellLabel {
@@ -515,7 +569,6 @@
 
 :global(.fc-day-today .fc-daygrid-day-number) {
     color: var(--color-brand-primary) !important;
-    font-weight: 800 !important;
     text-decoration: underline !important;
 }
 
@@ -539,7 +592,6 @@
 
 .selectedDayCell :global(.fc-daygrid-day-number) {
     color: var(--color-brand-primary) !important;
-    font-weight: 800 !important;
     position: relative !important;
     z-index: 8 !important;
 }
@@ -570,31 +622,30 @@
         padding: 12px;
     }
 
-    .mobileControlRow {
-        display: flex;
-        width: 100%;
-        min-height: 44px;
-        margin-bottom: 8px;
-        align-items: flex-start;
-        justify-content: space-between;
-        flex-wrap: wrap;
+    .pageToolbar {
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-areas:
+            "nav actions"
+            "title title";
         gap: 8px;
+        margin-bottom: 8px;
     }
 
-    .mobileNavigation {
-        display: flex;
-        flex: 0 0 auto;
-        gap: 6px;
+    .toolbarTitle {
+        font-size: 1rem;
+        white-space: normal;
+    }
+
+    .toolbarButton,
+    .continuousToggle {
+        min-width: 44px;
+        height: 44px;
     }
 
     .headerActions {
-        position: static;
-        width: auto;
         min-height: 44px;
-        margin: 0 0 0 auto;
-        justify-content: flex-end;
         flex-wrap: wrap;
-        flex: 0 1 auto;
+        justify-content: flex-end;
     }
 
     .customBtn {
@@ -637,16 +688,6 @@
     :global(.fc-toolbar-chunk:nth-child(2)) {
         width: 100% !important;
         justify-content: center !important;
-    }
-
-    .calendarContainerMobileToolbar :global(.fc-header-toolbar) {
-        align-items: center !important;
-        gap: 0 !important;
-    }
-
-    .calendarContainerMobileToolbar :global(.fc-toolbar-chunk:first-child),
-    .calendarContainerMobileToolbar :global(.fc-toolbar-chunk:last-child) {
-        display: none !important;
     }
 
     :global(.fc-button) {
@@ -748,18 +789,16 @@
 }
 
 /* The streak line passes behind the date number: back the number with the
-   cell's own colour (and the selected-day tint when that cell is selected). */
+   cell's own colour. The backing starts below the cell's top edge so it never covers edge marks
+   drawn there (month edges, selection and today outlines). */
 .calendarContainer :global(.fc-daygrid-day[data-streak-link][data-calendar-background]) :global(.fc-daygrid-day-number) {
-    padding-inline: 4px;
-    background: color-mix(
+    --streak-number-backing: color-mix(
         in srgb,
         var(--program-calendar-cell-color) var(--program-calendar-color-weight),
         var(--color-bg-card)
     );
-}
-
-.calendarContainer .selectedDayCell[data-streak-link] :global(.fc-daygrid-day-number) {
-    background: color-mix(in srgb, var(--color-brand-primary) 10%, var(--color-bg-card));
+    padding-inline: 4px;
+    background: linear-gradient(transparent 0 3px, var(--streak-number-backing) 3px);
 }
 
 /* Block labels sit on the same row; back them with the cell colour so the
@@ -780,4 +819,61 @@
         background: Highlight;
     }
     .streakLength { color: Highlight; }
+}
+
+/* Continuous mode: one unbroken stream of weeks. Rows keep a readable height,
+   the 1st of each month is labelled, a stepped line marks each month edge, and
+   alternate months carry a faint tint over any block colour. */
+.calendarContainerContinuous :global(.fc-daygrid-day-frame) {
+    min-height: 128px !important;
+}
+
+.monthStartNumber {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3em;
+    white-space: nowrap;
+}
+
+/* Keep the month caption in the same typographic voice as the day number. */
+.monthStartLabel {
+    color: inherit;
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 400;
+    font-style: normal;
+    line-height: inherit;
+}
+
+.calendarContainerContinuous .alternateMonth {
+    background-image: linear-gradient(
+        color-mix(in srgb, var(--color-text-primary) 4%, transparent),
+        color-mix(in srgb, var(--color-text-primary) 4%, transparent)
+    );
+}
+
+.calendarContainerContinuous .monthEdgeTop {
+    box-shadow: inset 0 2px 0 var(--color-text-secondary);
+}
+
+.calendarContainerContinuous .monthEdgeLeft {
+    box-shadow: inset 2px 0 0 var(--color-text-secondary);
+}
+
+.calendarContainerContinuous .monthEdgeTop.monthEdgeLeft {
+    box-shadow: inset 0 2px 0 var(--color-text-secondary), inset 2px 0 0 var(--color-text-secondary);
+}
+
+@media (max-width: 768px) {
+    .calendarContainerContinuous :global(.fc-daygrid-day-frame) {
+        min-height: 96px !important;
+    }
+}
+
+@media (forced-colors: active) {
+    .calendarContainerContinuous .monthEdgeTop,
+    .calendarContainerContinuous .monthEdgeLeft {
+        box-shadow: none;
+        outline: 1px solid CanvasText;
+    }
 }

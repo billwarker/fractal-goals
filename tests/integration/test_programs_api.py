@@ -106,6 +106,25 @@ class TestProgramCRUD:
         assert len(data) >= 1
         assert any(p['id'] == sample_program['id'] for p in data)
 
+    def test_get_program_calendar_summaries_omits_program_details(
+        self, authed_client, sample_ultimate_goal, sample_program,
+    ):
+        response = authed_client.get(
+            f'/api/{sample_ultimate_goal.id}/programs/calendar?timezone=UTC'
+        )
+
+        assert response.status_code == 200
+        summaries = response.get_json()
+        assert len(summaries) == 1
+        assert summaries[0] == {
+            'id': sample_program['id'],
+            'root_id': sample_ultimate_goal.id,
+            'name': 'Test Program',
+            'color': sample_program['color'],
+            'start_date': sample_program['start_date'],
+            'end_date': sample_program['end_date'],
+        }
+
     def test_active_days_honors_requested_date_and_preserves_program_contract(
         self,
         authed_client,
@@ -882,6 +901,101 @@ class TestProgramStructure:
         assert payload['removed_schedule_count'] == 1
         assert payload['removed_session_ids'] == [placeholder.id]
         assert self._detail_occurrences(authed_client, root_id, program_id, scheduled_date) == []
+
+    def test_add_block_day_with_scheduled_dates_creates_explicit_occurrences(
+        self, authed_client, sample_ultimate_goal, sample_program,
+    ):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        block = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()['blocks'][0]
+        first = block['start_date']
+        second = (date.fromisoformat(first) + timedelta(days=2)).isoformat()
+
+        response = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block["id"]}/days',
+            json={'name': 'Specific', 'day_of_week': [], 'scheduled_dates': [second, first, first]},
+        )
+
+        assert response.status_code == 201
+        day = response.get_json()['days'][0]
+        assert day['date'] is None
+        assert sorted(day['scheduled_dates']) == [first, second]
+        for value in (first, second):
+            occurrences = self._detail_occurrences(authed_client, root_id, program_id, value)
+            assert [(row['program_day_id'], row['scheduled_explicitly']) for row in occurrences] == [(day['id'], True)]
+
+    def test_update_block_day_replaces_scheduled_dates_atomically(
+        self, authed_client, db_session, sample_ultimate_goal, sample_program,
+    ):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        block, day_id = self._reusable_day(authed_client, root_id, program_id, 'Replace Dates')
+        start = date.fromisoformat(block['start_date'])
+        kept, dropped, added = (start + timedelta(days=offset) for offset in (0, 1, 3))
+        url = f'/api/{root_id}/programs/{program_id}/blocks/{block["id"]}/days/{day_id}'
+        assert authed_client.put(url, json={'scheduled_dates': [kept.isoformat(), dropped.isoformat()]}).status_code == 200
+        version_before = db_session.get(ProgramDay, day_id).row_version
+        db_session.expire_all()
+
+        response = authed_client.put(url, json={'scheduled_dates': [kept.isoformat(), added.isoformat()]})
+
+        assert response.status_code == 200
+        assert sorted(response.get_json()['scheduled_dates']) == [kept.isoformat(), added.isoformat()]
+        assert self._detail_occurrences(authed_client, root_id, program_id, dropped.isoformat()) == []
+        db_session.expire_all()
+        assert db_session.get(ProgramDay, day_id).row_version > version_before
+
+        outside = authed_client.put(url, json={'scheduled_dates': ['1999-01-01']})
+        assert outside.status_code == 400
+        assert 'block date range' in outside.get_json()['error']
+        mixed = authed_client.put(url, json={'date': kept.isoformat(), 'scheduled_dates': [kept.isoformat()]})
+        assert mixed.status_code == 400
+        # A rejected save leaves the previous schedule untouched.
+        refreshed = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        day = next(entry for b in refreshed['blocks'] for entry in b['days'] if entry['id'] == day_id)
+        assert sorted(day['scheduled_dates']) == [kept.isoformat(), added.isoformat()]
+
+        cleared = authed_client.put(url, json={'scheduled_dates': [], 'day_of_week': ['Monday']})
+        assert cleared.status_code == 200
+        assert cleared.get_json()['scheduled_dates'] == []
+        assert cleared.get_json()['day_of_week'] == ['Monday']
+
+    def test_update_block_day_converts_legacy_dated_day_in_place(
+        self, authed_client, db_session, test_user, sample_ultimate_goal, sample_program,
+    ):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        block = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()['blocks'][0]
+        legacy_date = block['start_date']
+        created = authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block["id"]}/days',
+            json={'name': 'Legacy', 'date': legacy_date},
+        )
+        day_id = created.get_json()['days'][0]['id']
+        linked = Session(
+            owner_id=test_user.id, root_id=root_id, name='Linked', completed=True,
+            program_id=program_id, program_day_id=day_id,
+            session_start=datetime.combine(date.fromisoformat(legacy_date), datetime.min.time(), tzinfo=timezone.utc)
+            + timedelta(hours=12),
+        )
+        db_session.add(linked)
+        db_session.commit()
+        extra = (date.fromisoformat(legacy_date) + timedelta(days=1)).isoformat()
+
+        response = authed_client.put(
+            f'/api/{root_id}/programs/{program_id}/blocks/{block["id"]}/days/{day_id}',
+            json={'scheduled_dates': [legacy_date, extra], 'day_of_week': []},
+        )
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload['id'] == day_id
+        assert payload['date'] is None
+        assert sorted(payload['scheduled_dates']) == [legacy_date, extra]
+        occurrences = self._detail_occurrences(authed_client, root_id, program_id, legacy_date)
+        assert [(row['program_day_id'], row['scheduled_explicitly']) for row in occurrences] == [(day_id, True)]
+        db_session.expire_all()
+        assert db_session.get(Session, linked.id).program_day_id == day_id
 
     def test_unschedule_block_day_occurrence_emits_program_day_unscheduled(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy, monkeypatch):
         root_id = sample_ultimate_goal.id

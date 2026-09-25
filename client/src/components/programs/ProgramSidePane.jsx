@@ -161,6 +161,7 @@ export default function ProgramSidePane({
                         metrics={programMetrics || null}
                         loading={programMetricsLoading}
                         error={programMetricsError}
+                        onEditPeriod={onEditPeriod}
                     />
                 </div>
             ) : null}
@@ -202,7 +203,9 @@ export default function ProgramSidePane({
                                 View {candidate.name}
                             </Button>
                         ))}
-                        <Button unstyled className={styles.emptySidePaneButton} onClick={onCreate}>New Program</Button>
+                        {(!contextDate || contextDate >= today) ? (
+                            <Button unstyled className={styles.emptySidePaneButton} onClick={onCreate}>New Program</Button>
+                        ) : null}
                     </div>
                 </div>
             ) : null}

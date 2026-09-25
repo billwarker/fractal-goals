@@ -14,8 +14,8 @@ from validators.programs import (
     ProgramDayTemplateConfigSchema,
     ProgramCreateSchema,
     ProgramUpdateSchema,
-    ProgramDayCreateSchema,
-    ProgramDayUpdateSchema,
+    ProgramDayCreateBaseSchema,
+    ProgramDayUpdateBaseSchema,
     ProgramDayScheduleSchema,
 )
 from validators.templates import SessionTemplateCreateSchema
@@ -271,7 +271,7 @@ class UpdateBlockOperation(BaseModel):
     data: StrictBlockUpdateSchema = Field(description="Supported block name, date range, color, and goal IDs.")
 
 
-class StrictProgramDayUpdateSchema(ProgramDayUpdateSchema):
+class StrictProgramDayUpdateSchema(ProgramDayUpdateBaseSchema):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
 
@@ -322,7 +322,7 @@ class StrictProgramDayTemplateConfigSchema(ProgramDayTemplateConfigSchema):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
 
-class StrictProgramDayCreateSchema(ProgramDayCreateSchema):
+class StrictProgramDayCreateSchema(ProgramDayCreateBaseSchema):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     template_configs: list[StrictProgramDayTemplateConfigSchema] | None = None
 

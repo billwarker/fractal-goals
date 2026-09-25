@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import ProgramOverview from '../ProgramOverview';
 
@@ -94,6 +94,16 @@ describe('ProgramOverview', () => {
         expect(within(section).getByText('Lisbon')).toBeInTheDocument();
         expect(within(section).getByText((_, element) => element?.tagName === 'SPAN' && element.textContent === 'Sep 10 – Sep 17')).toBeInTheDocument();
         expect(within(section).getByText('Not protecting streaks')).toBeInTheDocument();
+    });
+
+    it('opens the event editor when an event is clicked', () => {
+        const onEditPeriod = vi.fn();
+        const period = { id: 'p1', name: 'Lisbon', kind: 'vacation', start_date: '2026-09-10', end_date: '2026-09-17', protects_streaks: true };
+        render(<ProgramOverview metrics={{ ...metrics, periods: [period] }} onEditPeriod={onEditPeriod} />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Edit event Lisbon' }));
+
+        expect(onEditPeriod).toHaveBeenCalledWith(period);
     });
 
     it('omits the events section when nothing overlaps', () => {

@@ -75,7 +75,7 @@ describe('useProgramDetailController', () => {
         expect(result.current.modalMode).toBe('view');
     });
 
-    it('opens a dated program day definition draft', () => {
+    it('opens a specific-dates program day draft on the chosen calendar date', () => {
         const { result } = renderHook(() => useProgramDetailController({ goals: [] }));
 
         act(() => {
@@ -85,8 +85,9 @@ describe('useProgramDetailController', () => {
         expect(result.current.showDayModal).toBe(true);
         expect(result.current.selectedBlockId).toBe('block-1');
         expect(result.current.dayModalInitialData).toMatchObject({
-            date: '2026-03-09',
+            scheduled_dates: ['2026-03-09'],
             day_of_week: [],
         });
+        expect(result.current.dayModalInitialData).not.toHaveProperty('date');
     });
 });

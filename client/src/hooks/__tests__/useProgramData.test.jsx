@@ -79,7 +79,23 @@ describe('useProgramData', () => {
         expect(result.current.sessions).toEqual([{ id: 'session-1', name: 'Session 1' }]);
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.program('root-1', 'program-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.programs('root-1') });
+        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.programCalendarRoot('root-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.programDayOptions('root-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessionsAll('root-1') });
+    });
+
+    it('does not fetch program detail, activities, or groups when no program is scoped', async () => {
+        const queryClient = createQueryClient();
+        getGoals.mockResolvedValueOnce({ data: { id: 'root-1', children: [] } });
+
+        const { result } = renderHook(
+            () => useProgramData('root-1', null),
+            { wrapper: createWrapper(queryClient) },
+        );
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(getProgram).not.toHaveBeenCalled();
+        expect(getActivities).not.toHaveBeenCalled();
+        expect(getActivityGroups).not.toHaveBeenCalled();
     });
 });

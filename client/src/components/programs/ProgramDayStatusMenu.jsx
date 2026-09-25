@@ -92,13 +92,19 @@ export default function ProgramDayStatusMenu({
                     <button
                         type="button"
                         disabled={pending || date > today}
+                        aria-pressed={manualStatus === 'complete'}
                         title={date > today ? 'Future days cannot be marked complete' : undefined}
                         onClick={() => chooseStatus('complete')}
-                    >Mark complete</button>
-                    <button type="button" disabled={pending} onClick={() => chooseStatus('rest')}>Mark rest</button>
+                    ><ProgramDayStatusMark status="complete" decorative />Mark complete</button>
+                    <button
+                        type="button"
+                        disabled={pending}
+                        aria-pressed={manualStatus === 'rest'}
+                        onClick={() => chooseStatus('rest')}
+                    ><ProgramDayStatusMark status="rest" decorative />Mark rest</button>
                     {manualStatus ? (
                         <button type="button" disabled={pending} onClick={() => chooseStatus('automatic')}>
-                            Use automatic status
+                            <ProgramDayStatusMark status="scheduled" decorative />Use automatic status
                         </button>
                     ) : null}
                 </div>,

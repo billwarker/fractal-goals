@@ -4,11 +4,16 @@ import {
     buildBlockMetrics,
     buildProgramDayOccurrences,
     buildProgramBlockLabels,
+    buildProgramSummaryLabels,
     buildProgramCalendarEvents,
     buildDemoProgramMetrics,
     buildProgramSidePaneData,
     buildProgramsCalendarEvents,
     getProgramColor,
+    formatSpecificDatesSummary,
+    formatWeekdaySchedule,
+    getProgramDayScheduleLabel,
+    getProgramDaySpecificDates,
 } from '../programViewModel';
 
 const program = {
@@ -98,6 +103,18 @@ describe('programViewModel calendar builders', () => {
         ]);
     });
 
+    it('builds program labels from summary fields without requiring block data', () => {
+        expect(buildProgramSummaryLabels([{
+            id: 'past-1', name: 'Past program', color: '#EF476F',
+            start_date: '2025-01-02', end_date: '2025-02-01',
+        }])).toEqual([expect.objectContaining({
+            title: 'Past program',
+            date: '2025-01-02',
+            programId: 'past-1',
+            labelType: 'program',
+        })]);
+    });
+
     it('keeps aggregate program calendar events free of metadata-only labels', () => {
         const events = buildProgramsCalendarEvents(
             [program],
@@ -109,6 +126,33 @@ describe('programViewModel calendar builders', () => {
 
         expect(events.some((event) => event.id === 'program-bg-program-1')).toBe(true);
         expect(events.some((event) => event.extendedProps?.type === 'block_label')).toBe(false);
+    });
+
+    it('renders only summary backgrounds when no program is scoped for detail', () => {
+        const summary = { id: 'past-1', name: 'Past program', color: '#EF476F', start_date: '2025-01-01', end_date: '2025-02-01' };
+        const events = buildProgramsCalendarEvents([summary], [], undefined, undefined, 'UTC', {}, null);
+
+        expect(events.map((event) => event.extendedProps?.type)).toEqual(['program_background']);
+        expect(events[0].extendedProps.program).not.toHaveProperty('blocks');
+    });
+
+    it('adds detailed events for only the currently scoped program', () => {
+        const summaries = [
+            { id: 'past-1', name: 'Past program', color: '#EF476F', start_date: '2025-01-01', end_date: '2025-02-01' },
+            { id: 'active-1', name: 'Active program', color: '#3A86FF', start_date: '2026-01-01', end_date: '2026-02-01' },
+        ];
+        const detailedProgram = {
+            ...program,
+            id: 'active-1',
+            start_date: '2026-01-01',
+            end_date: '2026-02-01',
+            blocks: [{ ...program.blocks[0], start_date: '2026-01-01', end_date: '2026-01-07' }],
+        };
+        const events = buildProgramsCalendarEvents(summaries, [], undefined, undefined, 'UTC', {}, detailedProgram);
+
+        expect(events.filter((event) => event.extendedProps?.type === 'program_background')).toHaveLength(2);
+        expect(events.filter((event) => event.extendedProps?.type === 'block_background').map((event) => event.extendedProps.programId))
+            .toEqual(['active-1']);
     });
 
     it('deduplicates goal deadline events across program scopes', () => {
@@ -463,5 +507,31 @@ describe('programViewModel calendar builders', () => {
         });
 
         expect(thresholdMetrics.completedProgramDays).toBe(1);
+    });
+});
+
+describe('program day schedule labels', () => {
+    it.each([
+        [{ day_of_week: ['Friday', 'Monday'] }, 'Mon · Fri'],
+        [{ day_of_week: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] }, 'Daily'],
+        [{ day_of_week: ['Monday'], scheduled_dates: ['2026-09-12'] }, 'Mon · +1 date'],
+        [{ day_of_week: [], scheduled_dates: ['2026-09-26'] }, 'Sep 26'],
+        [{ day_of_week: [], scheduled_dates: ['2026-10-03', '2026-09-26'] }, 'Sep 26, Oct 3'],
+        [{ day_of_week: [], scheduled_dates: ['2026-09-26', '2026-09-28', '2026-10-01', '2026-10-03'] }, 'Sep 26 +3 more'],
+        [{ date: '2026-09-26T00:00:00Z', day_of_week: [] }, 'Sep 26'],
+        [{ day_of_week: [] }, ''],
+    ])('labels %o as %s', (day, expected) => {
+        expect(getProgramDayScheduleLabel(day)).toBe(expected);
+    });
+
+    it('merges legacy and explicit dates without duplicates', () => {
+        expect(getProgramDaySpecificDates({ date: '2026-09-26', scheduled_dates: ['2026-09-26T00:00:00Z', '2026-09-20'] }))
+            .toEqual(['2026-09-20', '2026-09-26']);
+    });
+
+    it('summarizes weekly and specific-date schedules', () => {
+        expect(formatWeekdaySchedule(['Friday', 'Monday', 'Wednesday'])).toBe('Every Monday, Wednesday and Friday in the block.');
+        expect(formatSpecificDatesSummary(['2026-09-26'])).toBe('1 date · Sep 26');
+        expect(formatSpecificDatesSummary(['2026-10-10', '2026-09-26'])).toBe('2 dates · Sep 26 – Oct 10');
     });
 });

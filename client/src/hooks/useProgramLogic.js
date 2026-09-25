@@ -94,8 +94,9 @@ export function useProgramLogic(rootId, program, refreshers) {
             // Create
             await fractalApi.addBlockDay(rootId, programId, blockId, dayData);
         }
-        await invalidateProgram();
-    }, [invalidateProgram, rootId, programId]);
+        // Schedule edits move day read models and metrics, not just the definition.
+        await Promise.all([invalidateProgram(), invalidateScheduling()]);
+    }, [invalidateProgram, invalidateScheduling, rootId, programId]);
 
     const copyDay = useCallback(async (blockId, dayId, copyData) => {
         const res = await fractalApi.copyBlockDay(rootId, programId, blockId, dayId, copyData);

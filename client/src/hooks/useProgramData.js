@@ -36,7 +36,7 @@ export function useProgramData(rootId, programId, timezone = null) {
             const res = await fractalApi.getActivities(rootId);
             return res.data || [];
         },
-        enabled: !!rootId,
+        enabled: !!rootId && !!programId,
     });
 
     // 4. Activity Groups Query
@@ -46,7 +46,7 @@ export function useProgramData(rootId, programId, timezone = null) {
             const res = await fractalApi.getActivityGroups(rootId);
             return res.data || [];
         },
-        enabled: !!rootId,
+        enabled: !!rootId && !!programId,
     });
 
     // Derived State: Flattened Goals
@@ -75,6 +75,7 @@ export function useProgramData(rootId, programId, timezone = null) {
         await invalidateQueryList([
             queryKeys.program(rootId, programId),
             queryKeys.programs(rootId),
+            queryKeys.programCalendarRoot(rootId),
             queryKeys.programDayOptions(rootId),
             queryKeys.programDayReadModelRoot(rootId, programId),
             queryKeys.programMetricsRoot(rootId),
@@ -86,6 +87,7 @@ export function useProgramData(rootId, programId, timezone = null) {
             queryKeys.goalsTree(rootId),
             queryKeys.program(rootId, programId),
             queryKeys.programs(rootId),
+            queryKeys.programCalendarRoot(rootId),
             queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, programId, rootId]);
@@ -94,6 +96,7 @@ export function useProgramData(rootId, programId, timezone = null) {
         await invalidateQueryList([
             queryKeys.program(rootId, programId),
             queryKeys.programs(rootId),
+            queryKeys.programCalendarRoot(rootId),
             queryKeys.sessions(rootId),
             queryKeys.sessionsAll(rootId),
             queryKeys.programDayOptions(rootId),
@@ -106,6 +109,7 @@ export function useProgramData(rootId, programId, timezone = null) {
         await invalidateQueryList([
             queryKeys.program(rootId, programId),
             queryKeys.programs(rootId),
+            queryKeys.programCalendarRoot(rootId),
             queryKeys.goalsTree(rootId),
             queryKeys.activities(rootId),
             queryKeys.activityGroups(rootId),

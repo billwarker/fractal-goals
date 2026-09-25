@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useMemo, useReducer, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 
 import EmptyState from '../components/common/EmptyState';
@@ -40,11 +40,14 @@ import notify from '../utils/notify';
 import { buildCalendarPeriodEvents, buildUnscheduledSessionEvents } from '../utils/programDayState';
 import { useCalendarPeriodEditor, useCalendarPeriods } from '../hooks/useCalendarPeriods';
 import { createProgramCalendarContext, formatProgramCalendarSelection, getProgramOverviewMetricsRange, programCalendarContextReducer } from '../utils/programCalendarContext';
-import { getProgramColor } from '../utils/programViewModel';
+import { buildProgramBlockLabels, buildProgramsCalendarEvents, getProgramColor } from '../utils/programViewModel';
 import { getProgramStatus, isProgramActive } from '../utils/programGoalWindow';
+import { readLocalStorageValue, writeLocalStorageValue } from '../utils/localPreferences';
 import styles from './ProgramCalendarPage.module.css';
 
 const ProgramBlockModal = lazyWithRetry(() => import('../components/modals/ProgramBlockModal'), 'components/modals/ProgramBlockModal');
+// Per-viewer convenience: whether the calendar scrolls weeks continuously.
+const CONTINUOUS_CALENDAR_PREFERENCE_KEY = 'program-calendar-continuous';
 const ProgramDayModal = lazyWithRetry(() => import('../components/modals/ProgramDayModal'), 'components/modals/ProgramDayModal');
 const AttachGoalModal = lazyWithRetry(() => import('../components/modals/AttachGoalModal'), 'components/modals/AttachGoalModal');
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
@@ -109,6 +112,13 @@ function ProgramCalendarPage() {
         pendingBlockSelection,
     } = calendarContext;
     const [visibleCalendarRange, setVisibleCalendarRange] = useState(null);
+    const [isCalendarContinuous, setIsCalendarContinuous] = useState(
+        () => readLocalStorageValue(CONTINUOUS_CALENDAR_PREFERENCE_KEY) === 'true',
+    );
+    const handleCalendarContinuousChange = useCallback((enabled) => {
+        setIsCalendarContinuous(enabled);
+        writeLocalStorageValue(CONTINUOUS_CALENDAR_PREFERENCE_KEY, String(enabled));
+    }, []);
     const [viewMode, setViewMode] = useState(programId ? 'blocks' : 'calendar');
     const [isSidePaneVisible, setIsSidePaneVisible] = useState(() => {
         return !getIsMobileViewport();
@@ -124,11 +134,10 @@ function ProgramCalendarPage() {
     const {
         programs,
         goals,
-        calendarEvents,
-        blockLabels,
+        programLabels,
         loading,
         refetchPrograms,
-    } = useProgramsCalendarData(rootId, { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon, timezone });
+    } = useProgramsCalendarData(rootId, { timezone });
 
     const activeProgramId = useMemo(
         () => programs.find((program) => isProgramActive(program, todayInTimezone))?.id || null,
@@ -154,6 +163,23 @@ function ProgramCalendarPage() {
     } = useProgramData(rootId, selectedProgramId, timezone || 'UTC');
 
     const displayProgram = detailedProgram || selectedProgram;
+    const calendarEvents = useMemo(() => buildProgramsCalendarEvents(
+        programs,
+        goals,
+        getGoalColor,
+        getGoalTextColor,
+        timezone,
+        { getGoalSecondaryColor, getGoalIcon },
+        detailedProgram || null,
+    ).filter((event) => event.extendedProps?.type !== 'session'), [
+        detailedProgram, getGoalColor, getGoalIcon, getGoalSecondaryColor,
+        getGoalTextColor, goals, programs, timezone,
+    ]);
+    const blockLabels = useMemo(() => (
+        detailedProgram
+            ? buildProgramBlockLabels({ program: detailedProgram, includeProgramId: true })
+            : []
+    ), [detailedProgram]);
     const dayRangeQuery = useProgramDayRange(
         rootId, displayProgram?.id, timezone, visibleCalendarRange,
     );
@@ -485,6 +511,13 @@ function ProgramCalendarPage() {
         }
     };
 
+    const handleProgramLabelClick = (label) => {
+        if (blockCreationMode || !label?.date) return;
+        updateCalendarRangeContext({ startDate: label.date, program: null });
+        setViewMode('calendar');
+        setIsSidePaneVisible(true);
+    };
+
     const handleEventClick = (info) => {
         const eventType = info.event.extendedProps?.type;
 
@@ -772,7 +805,11 @@ function ProgramCalendarPage() {
                                 onCalendarBackgroundClick={handleCalendarBackgroundClick}
                                 onTodayClick={() => { resetCalendarContextToToday(); clearStatusSelection(); }}
                                 onBlockLabelClick={handleBlockLabelClick}
+                                onProgramLabelClick={handleProgramLabelClick}
+                                programLabels={programLabels}
                                 onDatesSet={handleCalendarDatesSet}
+                                continuous={isCalendarContinuous}
+                                onContinuousChange={handleCalendarContinuousChange}
                                 dayStates={dayRangeQuery.data?.days || []}
                                 selectedProgramName={displayProgram?.name || ''}
                                 selectedProgramId={displayProgram?.id || null}
@@ -1063,6 +1100,7 @@ function ProgramCalendarPage() {
                         onDelete={deleteDay}
                         rootId={rootId}
                         blockId={selectedBlockId}
+                        block={displayProgram?.blocks?.find((entry) => entry.id === selectedBlockId) || null}
                         initialData={dayModalInitialData}
                     />
                 </Suspense>

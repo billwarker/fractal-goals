@@ -39,6 +39,10 @@
 }
 .timeOffSummary { margin: 0; padding: 0 2px; color: var(--color-text-secondary); font-size: 12px; line-height: 1.5; }
 .timeOffList { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.timeOffList li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 9px 12px; border: 1px dashed var(--color-border); border-radius: var(--border-radius-md); font-size: 13px; }
+.timeOffItem { display: flex; box-sizing: border-box; width: 100%; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 9px 12px; border: 1px dashed var(--color-border); border-radius: var(--border-radius-md); background: transparent; color: inherit; font: inherit; font-size: 13px; text-align: left; }
+button.timeOffItem { cursor: pointer; }
+button.timeOffItem:hover { border-color: var(--color-border-hover); background: var(--color-bg-card-hover); }
+button.timeOffItem:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
+@media (max-width: 768px) { button.timeOffItem { min-height: 44px; } }
 .timeOffList strong { color: var(--color-text-primary); }
 .timeOffList span, .timeOffList small { color: var(--color-text-muted); font-size: 12px; }

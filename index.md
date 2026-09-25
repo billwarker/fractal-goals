@@ -110,7 +110,8 @@ Rest removes the scheduled date from adherence and bridges chains. Clearing a st
 automatic evaluation. Definition-level completion flags are legacy compatibility data and are not
 written or used by calendar, metrics, onboarding, create-session day options, or session-completion workflows.
 The day-review pane places one clickable effective-status icon beside the first scheduled day
-name: a blue circle while scheduled, a check when met, or an X when missed. Its dropdown escapes
+name: a blue circle while scheduled, a check when met, a moon for rest (manual or event-protected),
+or an X when missed. Its dropdown options carry the same symbols and mark the current manual status. Its dropdown escapes
 the pane's scroll clipping; when definitions overlap, its actions apply to every definition on
 that date. The calendar has one multi-day selection mode for block ranges, bulk statuses, and
 calendar events. Any date inside the selected program is selectable; `useCalendarDragSelection` owns
@@ -120,12 +121,28 @@ selection and clicks stand down in that mode. Status actions apply only to the s
 **Plan event** spans the whole selection. Cells are keyboard-selectable and highlighted when selected.
 The client expects program metrics calculation v6 and day read model schema v5.
 Calendar day ribbons use the same status symbol as the day-review pane (check, X, or blue circle from
-`getProgramDayStatusSymbol` and `ProgramDayStatusMark`), shown once per date on the selected program's
+`getProgramDayStatusSymbol` and `ProgramDayStatusMark`; a manual status wins, then met, then rest), shown once per date on the selected program's
 first ribbon; the symbol is decorative beside the ribbon's assistive state text.
+The page calendar has one toolbar on desktop and mobile (‹ › Today, a **Continuous** checkbox, title,
+multi-day actions); compact calendars keep FullCalendar's header. Its calendar-summary endpoint reads
+only program IDs, names, colors, and date bounds; full blocks, days, and sessions are requested only
+for the currently scoped program. Every program keeps its color across its date range and its name
+appears in its first date cell; selecting a non-active program's label opens a day preview, and its
+**View [Program Name]** action scopes and loads that program. Unscheduled past dates do not offer
+program creation. Continuous mode (a per-viewer
+localStorage preference) renders one unbroken stream of weeks as a custom `dayGrid` view with a weeks
+duration; `utils/programCalendarContinuous.js` owns its window: 52 weeks (the day read model allows
+366 days) centred on today, re-centred on a context date or navigation target that cannot scroll to
+the top row within it. The 1st of each month shows a small month caption beside its number. The
+title is the month of the top row's Thursday; ‹ › scroll to a month's first Thursday.
 Streaks are drawn from the server's `chain_role`/`run_length_at_date` (never recomputed in the
 client): a thin green line on the date row starts mid-cell on a run's first day, crosses member days,
 is dashed across bridging rest/event days, and ends in a compact length ("3d", full text in the
 tooltip and assistive text) on the run's last day (`utils/programCalendarStreaks.js`).
+A definition is scheduled weekly (`day_of_week`) and/or on specific dates. Specific dates are only
+ever written as `program_day_occurrence_schedules` rows: the Program Day modal sends a replace-all
+`scheduled_dates` set (app schemas only; agent proposals keep the base contract and schedule one date
+at a time), and saving it converts a legacy fixed `program_days.date` in place, keeping the day id.
 Reusable definitions are scheduled onto dates through `program_day_occurrence_schedules`
 (`schedule_block_day` writes a row, never a placeholder session); the evaluator treats those dates
 as occurrences, and the day pane keeps "Plan this day" available for today and future dates, with

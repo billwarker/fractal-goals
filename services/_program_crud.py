@@ -15,12 +15,37 @@ from services.owned_entity_queries import get_owned_program
 from services.quota_service import QuotaService
 from services.serializers import serialize_program, serialize_program_block
 from services.program_scope import resolve_program_scope, resolve_program_scopes
+from services._serialize_common import format_utc
 
 logger = logging.getLogger(__name__)
 from services.program_service_errors import ProgramServiceValidationError
 
 
 class _ProgramCrudMixin:
+    @classmethod
+    def get_program_summaries(cls, session, root_id: str, current_user_id: str | None = None) -> List[Dict]:
+        """Return calendar metadata without loading program blocks or day details."""
+        cls._require_root_access(session, root_id, current_user_id)
+        programs = session.query(
+            Program.id,
+            Program.root_id,
+            Program.name,
+            Program.color,
+            Program.start_date,
+            Program.end_date,
+        ).filter_by(root_id=root_id).all()
+        summaries = []
+        for program_id, program_root_id, name, color, start_value, end_value in programs:
+            summaries.append({
+                "id": program_id,
+                "root_id": program_root_id,
+                "name": name,
+                "color": color,
+                "start_date": format_utc(start_value),
+                "end_date": format_utc(end_value),
+            })
+        return summaries
+
     @classmethod
     def get_programs(cls, session, root_id: str, current_user_id: str | None = None, *, as_of=None) -> List[Dict]:
         cls._require_root_access(session, root_id, current_user_id)

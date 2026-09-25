@@ -4,8 +4,9 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import ProgramCalendarPage from '../ProgramCalendarPage';
 
-const { mutateStatuses } = vi.hoisted(() => ({
+const { mutateStatuses, programDataCalls } = vi.hoisted(() => ({
     mutateStatuses: vi.fn().mockResolvedValue({}),
+    programDataCalls: [],
 }));
 
 const program = {
@@ -14,6 +15,12 @@ const program = {
     start_date: '2026-09-01',
     end_date: '2026-12-31',
     blocks: [],
+};
+const pastProgram = {
+    id: 'past-program-1',
+    name: 'Past Program',
+    start_date: '2025-01-01',
+    end_date: '2025-02-01',
 };
 
 vi.mock('../../contexts/GoalsContext', () => ({
@@ -39,27 +46,36 @@ vi.mock('../../hooks/useIsMobile', () => ({
 }));
 vi.mock('../../hooks/useProgramsCalendarData', () => ({
     useProgramsCalendarData: () => ({
-        programs: [program],
+        programs: [program, pastProgram],
         goals: [],
-        calendarEvents: [],
-        blockLabels: [],
+        programLabels: [{
+            title: pastProgram.name,
+            date: pastProgram.start_date,
+            startDate: pastProgram.start_date,
+            endDate: pastProgram.end_date,
+            programId: pastProgram.id,
+            labelType: 'program',
+        }],
         loading: false,
         refetchPrograms: vi.fn(),
     }),
 }));
 vi.mock('../../hooks/useProgramData', () => ({
-    useProgramData: () => ({
-        program,
-        loading: false,
-        goals: [],
-        activities: [],
-        activityGroups: [],
-        sessions: [],
-        treeData: null,
-        refreshData: vi.fn(),
-        refreshers: {},
-        getGoalDetails: () => null,
-    }),
+    useProgramData: (_rootId, programId) => {
+        programDataCalls.push(programId);
+        return {
+            program: programId === 'past-program-1' ? { ...pastProgram, blocks: [] } : (programId ? program : null),
+            loading: false,
+            goals: [],
+            activities: [],
+            activityGroups: [],
+            sessions: [],
+            treeData: null,
+            refreshData: vi.fn(),
+            refreshers: {},
+            getGoalDetails: () => null,
+        };
+    },
 }));
 vi.mock('../../hooks/useProgramGoalSets', () => ({
     useProgramGoalSets: () => ({
@@ -133,6 +149,7 @@ vi.mock('../../components/programs/ProgramCalendarView', () => ({
         onDateClick,
         onDateSelect,
         onEventClick,
+        onProgramLabelClick,
         onCalendarBackgroundClick,
         selectedRange,
         selectionModeButtonRef,
@@ -140,6 +157,9 @@ vi.mock('../../components/programs/ProgramCalendarView', () => ({
     }) => (
         <div>
             <button type="button" ref={selectionModeButtonRef} onClick={() => setBlockCreationMode(!blockCreationMode)}>Toggle multi-select</button>
+            <button type="button" onClick={() => onProgramLabelClick({
+                title: 'Past Program', date: '2025-01-01', programId: 'past-program-1', labelType: 'program',
+            })}>Preview past program label</button>
             <button
                 type="button"
                 onClick={() => {
@@ -187,7 +207,7 @@ vi.mock('../../components/programs/ProgramCalendarView', () => ({
     ),
 }));
 vi.mock('../../components/programs/ResponsiveProgramSidePane', () => ({
-    default: ({ scope, selectedRange, selectionLabel, programMetrics }) => (
+    default: ({ scope, selectedRange, selectionLabel, programMetrics, availablePrograms, onSelectProgramForDate }) => (
         <aside>
             <output data-testid="pane-scope">{scope}</output>
             <output data-testid="pane-selection-label">{selectionLabel || 'none'}</output>
@@ -200,11 +220,38 @@ vi.mock('../../components/programs/ResponsiveProgramSidePane', () => ({
                         || `${programMetrics.requestedRange.start}/${programMetrics.requestedRange.end}`)
                     : 'whole-program'}
             </output>
+            {availablePrograms?.map((candidate) => (
+                <button type="button" key={candidate.id} onClick={() => onSelectProgramForDate(candidate)}>
+                    View {candidate.name}
+                </button>
+            ))}
         </aside>
     ),
 }));
 
 describe('ProgramCalendarPage multi-day selection', () => {
+    beforeEach(() => {
+        programDataCalls.length = 0;
+    });
+
+    it('loads a past program only after its side-pane View action', () => {
+        render(
+            <MemoryRouter initialEntries={['/root-1/programs']}>
+                <Routes>
+                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Preview past program label' }));
+        expect(programDataCalls).toContain(null);
+        expect(programDataCalls).not.toContain(pastProgram.id);
+        expect(screen.getByRole('button', { name: 'View Past Program' })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'View Past Program' }));
+        expect(programDataCalls.at(-1)).toBe(pastProgram.id);
+    });
+
     it('survives the click/select callback pair and extends through event-filled cells', () => {
         render(
             <MemoryRouter initialEntries={['/root-1/programs']}>

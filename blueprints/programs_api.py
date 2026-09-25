@@ -47,16 +47,15 @@ def _request_timezone_and_date():
         return None, None
     return timezone_name, datetime.now(zone).date()
 
-# ============================================================================
-# PROGRAM ENDPOINTS
-# ============================================================================
 
-@programs_bp.route('/<root_id>/programs', methods=['GET'])
-@token_required
-def get_programs(current_user, root_id):
-    """Get all training programs for a fractal if owned by user."""
+def _get_program_response(current_user, root_id, *, calendar_summary=False):
+    """Share the scoped read and database error boundary for program lists."""
     session = get_db_session()
     try:
+        if calendar_summary:
+            return jsonify(ProgramService.get_program_summaries(
+                session, root_id, current_user.id,
+            ))
         timezone_name, as_of = _request_timezone_and_date()
         if timezone_name is None:
             return jsonify({"error": "Invalid timezone"}), 400
@@ -73,6 +72,23 @@ def get_programs(current_user, root_id):
         return internal_error(logger, "Program API request failed")
     finally:
         session.close()
+
+# ============================================================================
+# PROGRAM ENDPOINTS
+# ============================================================================
+
+@programs_bp.route('/<root_id>/programs', methods=['GET'])
+@token_required
+def get_programs(current_user, root_id):
+    """Get all training programs for a fractal if owned by user."""
+    return _get_program_response(current_user, root_id)
+
+
+@programs_bp.route('/<root_id>/programs/calendar', methods=['GET'])
+@token_required
+def get_program_calendar_summaries(current_user, root_id):
+    """Get calendar-only program metadata without blocks, days, or sessions."""
+    return _get_program_response(current_user, root_id, calendar_summary=True)
 
 
 @programs_bp.route('/<root_id>/programs/<program_id>', methods=['GET'])

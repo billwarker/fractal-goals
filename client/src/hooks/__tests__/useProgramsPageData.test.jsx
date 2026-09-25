@@ -5,12 +5,12 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { useProgramsCalendarData } from '../useProgramsCalendarData';
 import { queryKeys } from '../queryKeys';
 
-const getPrograms = vi.fn();
+const getProgramSummaries = vi.fn();
 const getGoals = vi.fn();
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
-        getPrograms: (...args) => getPrograms(...args),
+        getProgramSummaries: (...args) => getProgramSummaries(...args),
         getGoals: (...args) => getGoals(...args),
     },
 }));
@@ -37,7 +37,7 @@ describe('useProgramsCalendarData', () => {
     it('stores programs and fractal tree data under canonical query keys', async () => {
         const queryClient = createQueryClient();
 
-        getPrograms.mockResolvedValueOnce({ data: [{ id: 'program-1', name: 'Base' }] });
+        getProgramSummaries.mockResolvedValueOnce({ data: [{ id: 'program-1', name: 'Base', start_date: '2026-01-01', end_date: '2026-02-01' }] });
         getGoals.mockResolvedValueOnce({
             data: {
                 id: 'root-1',
@@ -56,8 +56,8 @@ describe('useProgramsCalendarData', () => {
             expect(result.current.loading).toBe(false);
         });
 
-        expect(queryClient.getQueryData(queryKeys.programs('root-1', 'UTC'))).toEqual([
-            { id: 'program-1', name: 'Base' },
+        expect(queryClient.getQueryData(queryKeys.programCalendar('root-1', 'UTC'))).toEqual([
+            { id: 'program-1', name: 'Base', start_date: '2026-01-01', end_date: '2026-02-01' },
         ]);
         expect(queryClient.getQueryData(queryKeys.fractalTree('root-1'))).toEqual({
             id: 'root-1',
@@ -67,7 +67,9 @@ describe('useProgramsCalendarData', () => {
         });
         expect(result.current.goals).toHaveLength(1);
         expect(result.current.treeData?.id).toBe('root-1');
-        expect(result.current.calendarEvents).toEqual([]);
-        expect(result.current.blockLabels).toEqual([]);
+        expect(result.current.programLabels).toEqual(expect.arrayContaining([
+            expect.objectContaining({ title: 'Base', date: '2026-01-01', labelType: 'program' }),
+        ]));
+        expect(getProgramSummaries).toHaveBeenCalledWith('root-1', { timezone: 'UTC' });
     });
 });

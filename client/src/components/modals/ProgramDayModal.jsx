@@ -5,7 +5,8 @@ import { queryKeys } from '../../hooks/queryKeys';
 import { useActivityGroups, useActivities } from '../../hooks/useActivityQueries';
 import { useSessionTemplates } from '../../hooks/useSessionTemplateQueries';
 import { useCircuits, useCreateCircuitDefinition } from '../../hooks/useCircuitQueries';
-import { formatLiteralDate, getDatePart } from '../../utils/dateUtils';
+import { getDatePart } from '../../utils/dateUtils';
+import { getProgramDaySpecificDates, getProgramDayWeekdays } from '../../utils/programViewModel';
 import TemplateBuilderModal from './TemplateBuilderModal';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
@@ -21,32 +22,15 @@ import { logError } from '../../utils/logger';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import { buildTemplateActivityCatalogue } from './templateBuilderItems';
+import ProgramDayScheduleField, { SCHEDULE_MODES } from './ProgramDayScheduleField';
 
-function getInitialSelectedDaysOfWeek(initialData) {
-    if (!initialData) {
-        return [];
+function parseLegacyWeekdays(dayOfWeek) {
+    if (typeof dayOfWeek !== 'string' || !dayOfWeek.trim().startsWith('[')) return dayOfWeek;
+    try {
+        return JSON.parse(dayOfWeek);
+    } catch {
+        return dayOfWeek;
     }
-
-    if (initialData.day_of_week) {
-        if (Array.isArray(initialData.day_of_week)) {
-            return initialData.day_of_week;
-        }
-
-        if (typeof initialData.day_of_week === 'string') {
-            if (initialData.day_of_week.trim().startsWith('[')) {
-                try {
-                    const parsed = JSON.parse(initialData.day_of_week);
-                    return Array.isArray(parsed) ? parsed : [initialData.day_of_week];
-                } catch {
-                    return [initialData.day_of_week];
-                }
-            }
-
-            return [initialData.day_of_week];
-        }
-    }
-
-    return [];
 }
 
 function buildInitialProgramDayState(initialData) {
@@ -62,22 +46,35 @@ function buildInitialProgramDayState(initialData) {
             order: index,
         })).filter((entry) => Boolean(entry.templateId));
 
+    const selectedDaysOfWeek = getProgramDayWeekdays({
+        day_of_week: parseLegacyWeekdays(initialData?.day_of_week),
+    });
+    const specificDates = getProgramDaySpecificDates(initialData);
+
     return {
         name: initialData?.name || '',
         selectedTemplates,
-        selectedDaysOfWeek: getInitialSelectedDaysOfWeek(initialData),
+        selectedDaysOfWeek,
+        specificDates,
+        // A day with dates and no weekdays (including a legacy fixed-date day and a
+        // new day opened from a calendar date) edits as a specific-dates day.
+        scheduleMode: specificDates.length && !selectedDaysOfWeek.length
+            ? SCHEDULE_MODES.dates
+            : SCHEDULE_MODES.weekly,
         completionMinTemplates: initialData?.completion_min_templates || '',
         copyStatus: '',
         copyMode: 'all',
     };
 }
 
-const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initialData }) => {
+const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block, initialData }) => {
     const queryClient = useQueryClient();
     const initialState = buildInitialProgramDayState(initialData);
     const [name, setName] = useState(initialState.name);
     const [selectedTemplates, setSelectedTemplates] = useState(initialState.selectedTemplates);
     const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState(initialState.selectedDaysOfWeek);
+    const [scheduleMode, setScheduleMode] = useState(initialState.scheduleMode);
+    const [specificDates, setSpecificDates] = useState(initialState.specificDates);
 
     const [completionMinTemplates, setCompletionMinTemplates] = useState(initialState.completionMinTemplates);
     const [copyStatus, setCopyStatus] = useState(initialState.copyStatus);
@@ -88,7 +85,14 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const isEdit = Boolean(initialData?.id);
-    const fixedDate = initialData?.date ? getDatePart(initialData.date) : '';
+    const blockStart = getDatePart(block?.start_date) || '';
+    const blockEnd = getDatePart(block?.end_date) || '';
+    const isDatesMode = scheduleMode === SCHEDULE_MODES.dates;
+    const saveBlockedReason = !name.trim()
+        ? 'Give the day a name to save it.'
+        : isDatesMode && !specificDates.length
+            ? 'Add at least one date to save a specific-dates day.'
+            : '';
 
     const { sessionTemplates = [] } = useSessionTemplates(rootId);
     const availableProgramTemplates = sessionTemplates.filter((template) => !isQuickSession(template));
@@ -125,6 +129,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
     });
 
     const handleSave = () => {
+        if (saveBlockedReason) return;
         const templateConfigs = selectedTemplates.map((entry, index) => ({
             template_id: entry.templateId,
             is_required: entry.isRequired !== false,
@@ -138,9 +143,11 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
             name,
             template_ids: templateConfigs.map((entry) => entry.template_id),
             template_configs: templateConfigs,
-            day_of_week: fixedDate ? [] : selectedDaysOfWeek,
+            // Specific dates are always explicit schedule rows; the legacy
+            // fixed `date` is never written and converts server-side on save.
+            day_of_week: isDatesMode ? [] : selectedDaysOfWeek,
+            scheduled_dates: specificDates,
             completion_min_templates: parsedMinTemplates,
-            ...(fixedDate ? { date: fixedDate } : {}),
         });
     };
 
@@ -148,6 +155,14 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
         setSelectedDaysOfWeek(prev =>
             prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
         );
+    };
+
+    const handleAddDate = (value) => {
+        setSpecificDates((current) => (current.includes(value) ? current : [...current, value].sort()));
+    };
+
+    const handleRemoveDate = (value) => {
+        setSpecificDates((current) => current.filter((entry) => entry !== value));
     };
 
     const handleCopy = async () => {
@@ -237,14 +252,17 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                             fullWidth
                         />
 
-                        {fixedDate && (
-                            <Input
-                                label="Scheduled Date"
-                                value={formatLiteralDate(fixedDate)}
-                                readOnly
-                                fullWidth
-                            />
-                        )}
+                        <ProgramDayScheduleField
+                            mode={scheduleMode}
+                            onModeChange={setScheduleMode}
+                            weekdays={selectedDaysOfWeek}
+                            onToggleWeekday={handleToggleDay}
+                            dates={specificDates}
+                            onAddDate={handleAddDate}
+                            onRemoveDate={handleRemoveDate}
+                            minDate={blockStart}
+                            maxDate={blockEnd}
+                        />
 
                         <div className={styles.field}>
                             <label className={styles.label}>Sessions</label>
@@ -335,39 +353,6 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                             )}
                         </div>
 
-                        {!fixedDate && (
-                            <div className={styles.field}>
-                                <label className={styles.label}>Optional Day of Week</label>
-                                <div className={styles.dayGrid}>
-                                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => {
-                                        const isSelected = selectedDaysOfWeek.includes(d);
-                                        return (
-                                            <div
-                                                key={d}
-                                                onClick={() => handleToggleDay(d)}
-                                                className={`${styles.dayBtn} ${isSelected ? styles.dayBtnSelected : ''}`}
-                                            >
-                                                {d.substring(0, 3)}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                {selectedDaysOfWeek.length > 0 && (
-                                    <div className={styles.hint}>
-                                        Scheduled for every {
-                                            (() => {
-                                                const sorter = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
-                                                const sorted = [...selectedDaysOfWeek].sort((a, b) => sorter[a] - sorter[b]);
-                                                if (sorted.length === 0) return '';
-                                                if (sorted.length === 1) return sorted[0];
-                                                return sorted.slice(0, -1).join(', ') + ' and ' + sorted[sorted.length - 1];
-                                            })()
-                                        } in the block.
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
                         {isEdit && (
                             <div className={styles.copyArea}>
                                 <Button
@@ -391,10 +376,18 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
                     ) : <div />}
 
                     <div className={styles.rightActions} style={{ display: 'flex', gap: '8px' }}>
+                        {saveBlockedReason ? (
+                            <span id="program-day-save-blocked" className={styles.saveBlockedReason}>{saveBlockedReason}</span>
+                        ) : null}
                         <Button variant="secondary" onClick={onClose}>
                             Cancel
                         </Button>
-                        <Button variant="primary" onClick={handleSave}>
+                        <Button
+                            variant="primary"
+                            onClick={handleSave}
+                            disabled={Boolean(saveBlockedReason)}
+                            aria-describedby={saveBlockedReason ? 'program-day-save-blocked' : undefined}
+                        >
                             {isEdit ? 'Save Changes' : 'Add Day'}
                         </Button>
                     </div>
@@ -424,7 +417,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, initi
     );
 };
 
-const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, blockId, initialData }) => {
+const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, blockId, block = null, initialData }) => {
     if (!isOpen) {
         return null;
     }
@@ -438,6 +431,7 @@ const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, bl
             onCopy={onCopy}
             onDelete={onDelete}
             rootId={rootId}
+            block={block}
             initialData={initialData}
         />
     );

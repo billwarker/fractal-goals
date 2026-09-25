@@ -2,22 +2,20 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { flattenGoals } from '../utils/goalHelpers';
-import { buildProgramBlockLabels, buildProgramsCalendarEvents } from '../utils/programViewModel';
+import { buildProgramSummaryLabels } from '../utils/programViewModel';
+import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 import { useFractalTree } from './useGoalQueries';
-import { fetchPrograms } from './useProgramQueries';
 
-export function useProgramsCalendarData(rootId, {
-    getGoalColor,
-    getGoalTextColor,
-    getGoalSecondaryColor,
-    getGoalIcon,
-    timezone,
-} = {}) {
+export function useProgramsCalendarData(rootId, { timezone } = {}) {
     const programsQuery = useQuery({
-        queryKey: queryKeys.programs(rootId, timezone || 'UTC'),
+        queryKey: queryKeys.programCalendar(rootId, timezone || 'UTC'),
         enabled: Boolean(rootId),
-        queryFn: () => fetchPrograms(rootId, timezone || 'UTC'),
+        staleTime: 5 * 60 * 1000,
+        queryFn: async () => {
+            const response = await fractalApi.getProgramSummaries(rootId, { timezone: timezone || 'UTC' });
+            return response.data || [];
+        },
     });
 
     const goalsQuery = useFractalTree(rootId);
@@ -35,32 +33,12 @@ export function useProgramsCalendarData(rootId, {
         });
     }, [programsQuery.data]);
 
-    // Completed sessions come from the canonical program day read model, which
-    // applies the same credit rules as the day pane; the program payload only
-    // carries program-day-linked sessions.
-    const calendarEvents = useMemo(() => buildProgramsCalendarEvents(
-        sortedPrograms,
-        goals,
-        getGoalColor || (() => '#3A86FF'),
-        getGoalTextColor || (() => '#ffffff'),
-        timezone,
-        { getGoalSecondaryColor, getGoalIcon },
-    ).filter((event) => event.extendedProps?.type !== 'session'), [getGoalColor, getGoalIcon, getGoalSecondaryColor, getGoalTextColor, goals, sortedPrograms, timezone]);
-
-    const blockLabels = useMemo(
-        () => sortedPrograms.flatMap((program, programIndex) => buildProgramBlockLabels({
-            program,
-            includeProgramId: true,
-            programIndex,
-        })),
-        [sortedPrograms],
-    );
+    const programLabels = useMemo(() => buildProgramSummaryLabels(sortedPrograms), [sortedPrograms]);
 
     return {
         programs: sortedPrograms,
         goals,
-        calendarEvents,
-        blockLabels,
+        programLabels,
         loading: programsQuery.isLoading || goalsQuery.isLoading,
         treeData: goalsQuery.data || null,
         refetchPrograms: programsQuery.refetch,

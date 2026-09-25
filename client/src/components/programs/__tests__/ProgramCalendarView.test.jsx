@@ -1,15 +1,16 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ProgramCalendarView from '../ProgramCalendarView';
 
-const { mockCalendarApi } = vi.hoisted(() => ({
+const { mockCalendarApi, mockCalendarState } = vi.hoisted(() => ({
     mockCalendarApi: {
         next: vi.fn(),
         prev: vi.fn(),
         today: vi.fn(),
     },
+    mockCalendarState: { props: null, mounts: 0 },
 }));
 
 vi.mock('@fullcalendar/daygrid', () => ({ default: {} }));
@@ -36,6 +37,10 @@ vi.mock('@fullcalendar/react', async () => {
         ReactModule.useImperativeHandle(ref, () => ({
             getApi: () => mockCalendarApi,
         }));
+        mockCalendarState.props = props;
+        ReactModule.useEffect(() => {
+            mockCalendarState.mounts += 1;
+        }, []);
 
         ReactModule.useEffect(() => {
             if (dayRef.current) {
@@ -55,9 +60,11 @@ vi.mock('@fullcalendar/react', async () => {
                 data-expand-rows={String(Boolean(props.expandRows))}
                 data-day-max-events={String(props.dayMaxEvents)}
                 data-selectable={String(Boolean(props.selectable))}
-                data-header-left={props.headerToolbar.left}
+                data-header-left={props.headerToolbar ? props.headerToolbar.left : ''}
+                data-initial-view={props.initialView}
+                data-initial-date={String(props.initialDate)}
             >
-                {props.headerToolbar.left.includes('contextualToday') ? (
+                {props.headerToolbar && props.headerToolbar.left.includes('contextualToday') ? (
                     <button type="button" onClick={props.customButtons.contextualToday.click}>
                         Today
                     </button>
@@ -99,6 +106,7 @@ function renderCalendar(overrides = {}) {
             blockId: 'block-1',
             color: '#dceaff',
         }],
+        programLabels: [],
         blockCreationMode: false,
         setBlockCreationMode: vi.fn(),
         onAddBlockClick: vi.fn(),
@@ -135,6 +143,26 @@ describe('ProgramCalendarView', () => {
             endDate: '2026-05-23',
             programId: 'program-1',
             blockId: 'block-1',
+        }));
+    });
+
+    it('renders a program label on its first day and routes it to the program preview action', async () => {
+        const onProgramLabelClick = vi.fn();
+        renderCalendar({
+            blockLabels: [],
+            programLabels: [{
+                title: 'Past program', date: '2026-05-17', startDate: '2026-05-17',
+                endDate: '2026-06-01', programId: 'past-1', labelType: 'program',
+            }],
+            onProgramLabelClick,
+        });
+
+        fireEvent.click(await screen.findByRole('button', { name: 'View Past program' }));
+        expect(onProgramLabelClick).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Past program',
+            date: '2026-05-17',
+            programId: 'past-1',
+            labelType: 'program',
         }));
     });
 
@@ -426,5 +454,96 @@ describe('ProgramCalendarView', () => {
         expect(cell).not.toHaveAttribute('data-day-state');
         expect(screen.getByText('Daily practice: requirements met')).toBeInTheDocument();
         expect(screen.queryByText('Daily review: requirements met')).not.toBeInTheDocument();
+    });
+
+    describe('continuous mode', () => {
+        beforeEach(() => {
+            vi.useFakeTimers({ toFake: ['Date'] });
+            vi.setSystemTime(new Date(2026, 8, 25, 12));
+        });
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
+        it('offers the Continuous checkbox only when the page can change it', () => {
+            const onContinuousChange = vi.fn();
+            const { unmount } = renderCalendar();
+            expect(screen.queryByRole('checkbox', { name: 'Continuous' })).not.toBeInTheDocument();
+            unmount();
+
+            renderCalendar({ onContinuousChange, initialDate: '2026-09-25' });
+            const toggle = screen.getByRole('checkbox', { name: 'Continuous' });
+            expect(toggle).not.toBeChecked();
+            fireEvent.click(toggle);
+
+            expect(onContinuousChange).toHaveBeenCalledWith(true);
+        });
+
+        it('renders an unbroken year of weeks centred on today', () => {
+            renderCalendar({
+                continuous: true,
+                onContinuousChange: vi.fn(),
+                initialDate: '2026-09-25',
+            });
+
+            const calendar = screen.getByTestId('mock-calendar');
+            expect(calendar).toHaveAttribute('data-initial-view', 'dayGridContinuous');
+            expect(calendar).toHaveAttribute('data-initial-date', '2026-03-22');
+            expect(mockCalendarState.props.views).toEqual({
+                dayGridContinuous: { type: 'dayGrid', duration: { weeks: 52 } },
+            });
+            expect(mockCalendarState.props.headerToolbar).toBe(false);
+            expect(screen.getByRole('checkbox', { name: 'Continuous' })).toBeChecked();
+            expect(screen.getByRole('heading', { name: 'September 2026' })).toBeInTheDocument();
+
+            const { container: firstOfMonth } = render(
+                <>{mockCalendarState.props.dayCellContent({ date: new Date(2026, 9, 1), dayNumberText: '1' })}</>,
+            );
+            expect(firstOfMonth).toHaveTextContent('Oct1');
+            expect(screen.getByText('Oct')).toBeInTheDocument();
+            // FullCalendar's month-prefixed first cell ("March 22") becomes a plain number.
+            expect(mockCalendarState.props.dayCellContent({ date: new Date(2026, 2, 22), dayNumberText: 'March 22' })).toBe('22');
+            expect(mockCalendarState.props.dayCellClassNames({ date: new Date(2026, 9, 1), dateStr: '2026-10-01' }))
+                .toHaveLength(3);
+        });
+
+        it('navigates by scrolling instead of paging within the year', () => {
+            const { props } = renderCalendar({
+                continuous: true,
+                onContinuousChange: vi.fn(),
+                initialDate: '2026-09-25',
+            });
+            const mountsBefore = mockCalendarState.mounts;
+
+            // October and August are inside the year: scroll, no paging, no remount.
+            fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
+            expect(mockCalendarApi.next).not.toHaveBeenCalled();
+            expect(mockCalendarApi.prev).not.toHaveBeenCalled();
+            expect(mockCalendarState.mounts).toBe(mountsBefore);
+
+            fireEvent.click(screen.getByRole('button', { name: 'Today' }));
+            expect(mockCalendarApi.today).not.toHaveBeenCalled();
+            expect(props.onTodayClick).toHaveBeenCalledTimes(1);
+        });
+
+        it('centres the year on a context date beyond it, and Today re-centres on today', () => {
+            renderCalendar({ continuous: true, onContinuousChange: vi.fn(), initialDate: '2025-01-15' });
+            const calendar = () => screen.getByTestId('mock-calendar');
+            expect(calendar()).toHaveAttribute('data-initial-date', '2024-07-14');
+            const mountsBefore = mockCalendarState.mounts;
+
+            fireEvent.click(screen.getByRole('button', { name: 'Today' }));
+
+            expect(mockCalendarState.mounts).toBeGreaterThan(mountsBefore);
+            expect(calendar()).toHaveAttribute('data-initial-date', '2026-03-22');
+        });
+
+        it('keeps FullCalendar\'s own header for compact calendars', () => {
+            renderCalendar({ compact: true, readOnly: true, showBlockControls: false });
+
+            expect(screen.getByTestId('mock-calendar').getAttribute('data-header-left')).toContain('contextualToday');
+            expect(screen.queryByRole('checkbox', { name: 'Continuous' })).not.toBeInTheDocument();
+        });
     });
 });

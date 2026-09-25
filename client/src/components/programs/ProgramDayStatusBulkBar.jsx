@@ -1,5 +1,7 @@
 import React from 'react';
 
+import ProgramDayStatusMark from './ProgramDayStatusMark';
+
 import styles from '../../pages/ProgramCalendarPage.module.css';
 
 export default function ProgramDayStatusBulkBar({
@@ -19,9 +21,9 @@ export default function ProgramDayStatusBulkBar({
                 onClick={() => onApply('complete')}
                 title={hasFutureDate ? 'Future days cannot be marked complete' : undefined}
                 aria-describedby={hasFutureDate ? 'program-status-future-hint' : undefined}
-            >Complete</button>
-            <button type="button" disabled={noScheduled || pending} onClick={() => onApply('rest')}>Rest</button>
-            <button type="button" disabled={noScheduled || pending} onClick={() => onApply('automatic')}>Automatic</button>
+            ><ProgramDayStatusMark status="complete" size="sm" decorative />Complete</button>
+            <button type="button" disabled={noScheduled || pending} onClick={() => onApply('rest')}><ProgramDayStatusMark status="rest" size="sm" decorative />Rest</button>
+            <button type="button" disabled={noScheduled || pending} onClick={() => onApply('automatic')}><ProgramDayStatusMark status="scheduled" size="sm" decorative />Automatic</button>
             {onPlanTimeOff ? (
                 <button type="button" disabled={!dates.length || pending} onClick={onPlanTimeOff}>Plan event…</button>
             ) : null}

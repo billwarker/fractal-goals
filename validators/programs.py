@@ -14,6 +14,33 @@ from .core import (
 )
 
 VALID_DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+MAX_PROGRAM_DAY_SCHEDULED_DATES = 366
+# Program-day schemas have a field named ``date``, which shadows the type in the class body.
+CalendarDate = date
+
+
+def _normalize_scheduled_dates(values: Optional[List[Any]]) -> Optional[List[date]]:
+    """Parse, dedupe, and sort a program day's explicit schedule dates."""
+    if values is None:
+        return None
+    parsed = set()
+    for value in values:
+        if isinstance(value, date):
+            parsed.add(value)
+            continue
+        try:
+            parsed.add(parse_date_string(str(value)))
+        except ValueError:
+            raise ValueError(f"Invalid scheduled date: {value}")
+    if len(parsed) > MAX_PROGRAM_DAY_SCHEDULED_DATES:
+        raise ValueError(f"A program day can have at most {MAX_PROGRAM_DAY_SCHEDULED_DATES} scheduled dates")
+    return sorted(parsed)
+
+
+def _reject_date_with_scheduled_dates(model):
+    if model.date and model.scheduled_dates is not None:
+        raise ValueError("Send either date or scheduled_dates, not both")
+    return model
 
 class ProgramCreateSchema(BaseModel):
     """Schema for creating a program."""
@@ -156,7 +183,7 @@ class ProgramDayTemplateConfigSchema(BaseModel):
     order: Optional[int] = 0
 
 
-class ProgramDayCreateSchema(BaseModel):
+class ProgramDayCreateBaseSchema(BaseModel):
     """Schema for adding a day to a program block."""
     model_config = ConfigDict(str_strip_whitespace=True)
     
@@ -179,8 +206,26 @@ class ProgramDayCreateSchema(BaseModel):
                 raise ValueError(f"Invalid day of week: {day}. Must be one of {VALID_DAYS_OF_WEEK}")
         return v
 
+class ProgramDayCreateSchema(ProgramDayCreateBaseSchema):
+    """Schema for adding a day to a program block from the app.
 
-class ProgramDayUpdateSchema(BaseModel):
+    Adds ``scheduled_dates``, the replace-all set of explicit occurrence dates
+    (program_day_occurrence_schedules). Agent proposals extend the base schema,
+    so their reviewed contract is unchanged and they schedule dates one at a time.
+    """
+    scheduled_dates: Optional[List[CalendarDate]] = None
+
+    @field_validator('scheduled_dates', mode='before')
+    @classmethod
+    def validate_scheduled_dates(cls, v):
+        return _normalize_scheduled_dates(v)
+
+    @model_validator(mode='after')
+    def validate_date_modes(self):
+        return _reject_date_with_scheduled_dates(self)
+
+
+class ProgramDayUpdateBaseSchema(BaseModel):
     """Schema for updating a program day."""
     model_config = ConfigDict(str_strip_whitespace=True)
     
@@ -201,6 +246,25 @@ class ProgramDayUpdateSchema(BaseModel):
             if day not in VALID_DAYS_OF_WEEK:
                 raise ValueError(f"Invalid day of week: {day}. Must be one of {VALID_DAYS_OF_WEEK}")
         return v
+
+class ProgramDayUpdateSchema(ProgramDayUpdateBaseSchema):
+    """Schema for updating a program day from the app.
+
+    Adds ``scheduled_dates``, the replace-all set of explicit occurrence dates
+    (program_day_occurrence_schedules). Agent proposals extend the base schema,
+    so their reviewed contract is unchanged and they schedule dates one at a time.
+    """
+    scheduled_dates: Optional[List[CalendarDate]] = None
+
+    @field_validator('scheduled_dates', mode='before')
+    @classmethod
+    def validate_scheduled_dates(cls, v):
+        return _normalize_scheduled_dates(v)
+
+    @model_validator(mode='after')
+    def validate_date_modes(self):
+        return _reject_date_with_scheduled_dates(self)
+
 
 class ProgramBlockGoalAttachSchema(BaseModel):
     """Schema for attaching a goal to a block."""

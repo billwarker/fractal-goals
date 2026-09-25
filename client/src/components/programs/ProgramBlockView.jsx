@@ -17,9 +17,14 @@ import {
     formatLiteralDate,
     getDaysRemaining,
     getDurationDaysInclusive,
-    getWeekdayName,
 } from '../../utils/dateUtils';
+import { getProgramDayScheduleLabel } from '../../utils/programViewModel';
 import { ProgramCheckIcon } from './ProgramSvgIcons';
+
+function ProgramDayScheduleSubtext({ day }) {
+    const label = getProgramDayScheduleLabel(day);
+    return label ? <div className={styles.daySubtext}>{label}</div> : null;
+}
 
 function ProgramBlockView({
     blocks, // sortedBlocks
@@ -207,20 +212,7 @@ function ProgramBlockView({
                                                 <div className={styles.dayHeader}>
                                                     <div>
                                                         <div className={styles.dayName}>{day.name}</div>
-                                                        {(() => {
-                                                            const mapping = day.day_of_week;
-                                                            if (Array.isArray(mapping) && mapping.length > 0) {
-                                                                const dayMap = {
-                                                                    'Monday': 'Mon', 'Tuesday': 'Tue', 'Wednesday': 'Wed',
-                                                                    'Thursday': 'Thu', 'Friday': 'Fri', 'Saturday': 'Sat', 'Sunday': 'Sun'
-                                                                };
-                                                                const dayStr = mapping.length === 7 ? 'Daily' : mapping.map(d => dayMap[d] || d.substring(0, 3)).join(' · ');
-                                                                return <div className={styles.daySubtext}>{dayStr}</div>;
-                                                            } else if (day.date) {
-                                                                return <div className={styles.daySubtext}>{getWeekdayName(day.date)}</div>;
-                                                            }
-                                                            return null;
-                                                        })()}
+                                                        <ProgramDayScheduleSubtext day={day} />
                                                     </div>
                                                 </div>
 

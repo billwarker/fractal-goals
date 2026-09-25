@@ -24,11 +24,8 @@ import {
     shouldIgnoreTypeToZoomKey,
 } from '../utils/typeToZoomInput';
 import { usePrograms } from '../hooks/useProgramQueries';
-import {
-    removeLocalStorageValue,
-    useFlowTreePreferences,
-    writeLocalStorageValue,
-} from '../hooks/useFlowTreePreferences';
+import { useFlowTreePreferences } from '../hooks/useFlowTreePreferences';
+import { removeLocalStorageValue, writeLocalStorageValue } from '../utils/localPreferences';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../hooks/useFeatureFlags';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
