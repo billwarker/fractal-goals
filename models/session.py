@@ -187,7 +187,7 @@ class ActivityDurationStats(Base):
     __tablename__ = 'activity_duration_stats'
 
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True)
-    activity_definition_id = Column(String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), primary_key=True)
+    activity_definition_id = Column(String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), primary_key=True, index=True)
     sample_count = Column(Integer, nullable=False, default=0, server_default='0')
     average_duration_seconds = Column(Integer, nullable=True)
     median_duration_seconds = Column(Integer, nullable=True)

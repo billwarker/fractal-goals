@@ -6,7 +6,7 @@ Mixin for GoalService (audit P1-7). Instance methods; cross-method calls use
 from datetime import datetime, timezone
 
 from sqlalchemy import func
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session as OrmSession, selectinload
 
 from models import Goal, GoalLevel, validate_root_goal
 from validators.core import parse_date_string
@@ -14,7 +14,7 @@ from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
 from services.view_serializers import serialize_fractal_summary, serialize_goal_selection_item
 from services.serializers import serialize_goal
-from services.goal_loading import goal_serializer_relationship_loaders
+from services.goal_loading import goal_serializer_relationship_loaders, load_fractal_goals_for_serialization
 from services.events import Event, Events, event_bus
 from services.template_service import seed_default_template
 from services.user_service import UserService
@@ -22,6 +22,9 @@ from services.user_service import UserService
 
 
 class _GoalFractalsMixin:
+    # Host attribute supplied by GoalService; declared so the mixin type-checks on its own.
+    db_session: OrmSession
+
     def list_fractals(self, current_user_id) -> ServiceResult[JsonList]:
         roots = self.db_session.query(Goal).options(
             selectinload(Goal.level),
@@ -69,7 +72,10 @@ class _GoalFractalsMixin:
         roots = roots_q.all()
         if not roots:
             return None, "No goals found", 404
-        return [serialize_goal(self.load_goal_subtree(root)) for root in roots], None, 200
+        return [
+            serialize_goal(load_fractal_goals_for_serialization(self.db_session, root.id).get(root.id, root))
+            for root in roots
+        ], None, 200
 
     def create_fractal(self, current_user_id, data) -> ServiceResult[Goal]:
         quota_service = QuotaService(self.db_session)

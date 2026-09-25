@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, Float, ForeignKey, Text, Table, CheckConstraint, UniqueConstraint
+from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, Float, ForeignKey, Text, Table, CheckConstraint, UniqueConstraint, Index
 from sqlalchemy.orm import relationship
 import uuid
 from .base import Base, utc_now, JSON_TYPE
@@ -9,7 +9,9 @@ program_day_templates = Table(
     Column('program_day_id', String, ForeignKey('program_days.id', ondelete='CASCADE'), primary_key=True),
     Column('session_template_id', String, ForeignKey('session_templates.id', ondelete='CASCADE'), primary_key=True),
     Column('order', Integer, default=0),
-    Column('is_required', Boolean, nullable=False, default=True)
+    Column('is_required', Boolean, nullable=False, default=True),
+    # Reverse lookup; the composite primary key leads with the other column.
+    Index('ix_program_day_templates_session_template_id', 'session_template_id')
 )
 
 # Junction table for linking Programs to Goals
@@ -17,7 +19,9 @@ program_goals = Table(
     'program_goals', Base.metadata,
     Column('program_id', String, ForeignKey('programs.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
-    Column('created_at', DateTime, default=utc_now)
+    Column('created_at', DateTime, default=utc_now),
+    # Reverse lookup; the composite primary key leads with the other column.
+    Index('ix_program_goals_goal_id', 'goal_id')
 )
 
 # Junction table for linking ProgramBlocks to Goals
@@ -25,7 +29,9 @@ program_block_goals = Table(
     'program_block_goals', Base.metadata,
     Column('program_block_id', String, ForeignKey('program_blocks.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
-    Column('created_at', DateTime, default=utc_now)
+    Column('created_at', DateTime, default=utc_now),
+    # Reverse lookup; the composite primary key leads with the other column.
+    Index('ix_program_block_goals_goal_id', 'goal_id')
 )
 
 class Program(Base):

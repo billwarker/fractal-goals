@@ -47,7 +47,7 @@ class SessionAnalyticsService:
                 Session.total_paused_seconds,
                 Session.attributes,
                 # ProgressService.compute_comparisons_for_instances reads it per session.
-                Session.deleted_at,
+                Session.deleted_at,  # pyright: ignore[reportArgumentType] - legacy Column typing; see baseline
             ),
         )
 
