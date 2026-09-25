@@ -204,3 +204,75 @@ held for the next deploy.
   for `goals/analytics`.
 - Indexes on the agent tables.
 - The three browser failures that already exist on `main`.
+
+---
+
+## Delivery record — 2026-09-25
+
+Shipped on the single branch `production-hardening-and-performance` (20 commits on `main`,
+including the earlier S-rank hardening), at your request, so both are merged together.
+
+### Before and after
+
+Measured on the 150-goal, 150-session budget account.
+
+| Read path | Queries | Payload |
+|---|---|---|
+| `/goals/selection` | 131 → **10** | 138 KB → **82 KB** |
+| `/sessions?limit=20` | 80 → **17** | 358 KB → **293 KB** |
+| `/sessions/analytics-summary` | 62 → **12** | unchanged (677 KB) |
+| `GET /api/goals` (all roots) | 661 → **7** | 627 KB → **357 KB** |
+| Goal mutation subtree (pause) | 51 → **11** | 36 KB → **21 KB** |
+| Goal tree `/goals` | 7 | 595 KB → **339 KB** (−43%) |
+| Session goals view | 20 | 54 KB → **32 KB** |
+
+On the audit's larger seed, `/goals/selection` fell from 707 ms to about 60 ms. The `FlowTree` chunk
+went from 241 KB to 199 KB minified, and lodash is gone from the client dependency tree.
+
+### Verification
+
+- Backend: 1,113 passed (including 12 new power-account budgets).
+- Frontend: 281 files, 1,274 tests passed. MCP adapter: 7 passed.
+- `./run-tests.sh lint` is green (type checks and both maintainability gates).
+- Browser: 5 passed. The same 3 failures exist on `main` and were not caused by this pass.
+- Migration `b6d8f0a2c4e7` round-trips on a scratch database. `EXPLAIN` shows
+  `ix_session_goals_goal_id`, `ix_activity_goal_associations_goal_id` and
+  `ix_goals_parent_deleted` in use.
+- `@dagrejs/dagre` with `disableOptimalOrderHeuristic` produces a layout pixel-identical to
+  `dagre@0.8.5` across all tested configurations.
+
+### Where delivery differs from the plan
+
+- **The sweep found two more N+1s:** `GET /api/goals` (661 queries) and the subtree responses from
+  goal mutations (for example pause, 51 queries). Both are fixed and budgeted.
+- **The ten `(root_id, deleted_at)` indexes were dropped.** Each table already has a `root_id`
+  index and soft-deleted rows are rare, so they would add write cost for little benefit. 15
+  reverse-lookup and cascade indexes shipped instead, including `session_template_goals` and
+  `goal_activity_group_associations`.
+- **Keeping sibling order needed an extra option.** `@dagrejs/dagre` reorders siblings by default,
+  so layout runs with `disableOptimalOrderHeuristic`, and a regression test fails without it.
+- **Stage A caught a regression before it shipped.** The goal editor's live SMART indicator
+  cleared only the legacy `attributes` status, so `buildLiveSmartGoal` now clears the top-level
+  status too.
+- **The payload saving is 41–43% for goal responses**, against the plan's estimate of 45–50%.
+- **Stages A and B ship together** rather than in separate deploys. See the note below.
+
+### Deploy note
+
+`cloudbuild.yaml` deploys the backend before the frontend, so browser tabs opened before the deploy
+receive the slim goal payload until they reload.
+
+Most old-client reads already fell back to top-level fields. The ones that relied on `attributes`
+alone degrade cosmetically in those tabs until a reload:
+- dashboard goal-completion counts
+- a locally recomputed SMART badge
+- flow-tree child sort order (the default order is used instead)
+
+Nothing is written incorrectly. For a private beta this is acceptable; otherwise, ship the client
+changes one deploy earlier.
+
+### Follow-ups
+
+- A lighter sessions-list shape, and server-side aggregation for `goals/analytics` (440–677 KB).
+- Indexes on the agent tables.
+- The three browser failures that already exist on `main`.

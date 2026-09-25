@@ -279,6 +279,9 @@ The current backlog assessment and item-level evidence live in
 [Backlog Quality Audit — September 2026](planning/backlog-quality-audit-2026-09.md).
 The broader production assessment, release-gate gaps, and test-speed evidence are in
 [Production Quality Audit — September 7, 2026](planning/production-quality-audit-2026-09-07.md).
+Read-path query and payload budgets for a power-user-sized account live in
+`tests/performance/test_power_account_budgets.py`; the performance pass that introduced them is in
+[Performance Pass — September 2026](planning/performance-pass-2026-09.md).
 
 ## Practical invariants
 
@@ -288,6 +291,10 @@ The broader production assessment, release-gate gaps, and test-speed evidence ar
 - Catch the failure you expect; `except Exception` is reserved for containment boundaries.
 - Keep routes thin and transactions/events service-owned.
 - Reuse canonical serializers, formatters, query keys, and domain evaluators.
+- Eager-load what `serialize_goal` reads with `goal_serializer_relationship_loaders()` (nestable
+  under `Goal.children` / `Session.goals`); return subtrees via `GoalService.load_goal_subtree`.
+- Goal payload top-level fields are canonical; `attributes` holds only fields that exist nowhere
+  else. Client code reads goals through `utils/goalNodeModel.js` accessors (top-level first).
 - Bound date ranges, pagination, query count, and payload size at API boundaries.
 - Add neighbouring boundary cases for every classifier, count, state, and cursor fix.
 - Remove retired adapters and render paths when their replacement becomes canonical.
