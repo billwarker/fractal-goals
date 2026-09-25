@@ -107,6 +107,30 @@ export function buildActivityPayload({
     };
 }
 
+// Seed for a brand-new definition created from a picker search term. Returns null for
+// anything that is not a `{ name }` seed (e.g. a click event) so callers fall back to a blank
+// create.
+export function prepareActivityDefinitionDraft(seed) {
+    const name = typeof seed?.name === 'string' ? seed.name.trim() : '';
+    if (!name) return null;
+
+    return {
+        _builderKey: Date.now(),
+        id: undefined,
+        name,
+        description: '',
+        has_sets: false,
+        has_metrics: true,
+        has_splits: false,
+        group_id: null,
+        track_progress: true,
+        delta_display_mode: null,
+        metric_definitions: [],
+        split_definitions: [],
+        associated_goal_ids: [],
+    };
+}
+
 export function prepareActivityDefinitionCopy(activity) {
     if (!activity) {
         return null;

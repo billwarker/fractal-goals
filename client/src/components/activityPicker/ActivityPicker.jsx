@@ -5,6 +5,7 @@ import {
     ROOT_KEY,
     buildActivityPickerModel,
     formatActivityPickerSelectionSummary,
+    getCreateFromSearchState,
     isActivityPickerEmpty,
     resolveActivityPickerBrowseState,
     toSelectionSet,
@@ -186,6 +187,37 @@ function ActivityPicker({
         return model.searchActivities(query);
     }, [isSearching, model, query]);
 
+    const canCreateFromSearch = allowCreateActivity && !isCopyMode && Boolean(onCreateActivity);
+    const createFromSearch = useMemo(() => (
+        canCreateFromSearch && isSearching
+            ? getCreateFromSearchState({ searchText, results: searchResults, allActivities: model.activities })
+            : { seedName: '', mode: 'none' }
+    ), [canCreateFromSearch, isSearching, model.activities, searchResults, searchText]);
+
+    const handleCreateFromSearch = () => {
+        if (createFromSearch.mode === 'none') return;
+        onCreateActivity({ name: createFromSearch.seedName });
+    };
+
+    const handleCreateActivityClick = () => {
+        if (createFromSearch.mode !== 'none') {
+            handleCreateFromSearch();
+            return;
+        }
+        onCreateActivity?.();
+    };
+
+    const handleSearchKeyDown = (event) => {
+        if (event.key !== 'Enter' || event.nativeEvent?.isComposing) return;
+        if (createFromSearch.mode === 'empty') {
+            event.preventDefault();
+            handleCreateFromSearch();
+        } else if (searchResults.length === 1) {
+            event.preventDefault();
+            toggleActivity(searchResults[0]);
+        }
+    };
+
     const totalSelected = pendingActivityIds.size + pendingGroupIds.size;
     const selectedSummary = formatActivityPickerSelectionSummary(
         pendingActivityIds.size, pendingGroupIds.size, itemLabelSingular, itemLabelPlural
@@ -341,6 +373,7 @@ function ActivityPicker({
                         className={styles.searchInput}
                         value={searchText}
                         onChange={(event) => setSearchText(event.target.value)}
+                        onKeyDown={handleSearchKeyDown}
                         placeholder={searchPlaceholder}
                     />
                 )}
@@ -390,8 +423,10 @@ function ActivityPicker({
                         <div className={styles.divider} />
                         <div className={styles.primaryActions}>
                             {allowCreateActivity && (
-                                <button type="button" className={styles.secondaryAction} onClick={onCreateActivity}>
-                                    {createActionLabel}
+                                <button type="button" className={styles.secondaryAction} onClick={handleCreateActivityClick}>
+                                    {createFromSearch.mode === 'none'
+                                        ? createActionLabel
+                                        : `${createActionLabel} "${createFromSearch.seedName}"`}
                                 </button>
                             )}
                             {allowCopyActivity && (

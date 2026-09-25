@@ -50,6 +50,20 @@ describe('CircuitBuilderModal', () => {
         })).toBeInTheDocument();
     });
 
+    it('treats an id-less seeded circuit as a create', () => {
+        render(
+            <CircuitBuilderModal
+                isOpen={true}
+                onClose={vi.fn()}
+                onSave={vi.fn()}
+                activities={[]}
+                activityGroups={[]}
+                circuit={{ name: 'Leg Day', description: '', group_id: '', slots: [] }}
+            />,
+        );
+        expect(screen.getByRole('heading', { name: 'Create Circuit: Leg Day' })).toBeInTheDocument();
+    });
+
     it('preserves duplicate slots and their explicit order', async () => {
         const onSave = vi.fn().mockResolvedValue(undefined);
         render(

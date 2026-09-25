@@ -13,7 +13,7 @@ import { flattenGoalTree, isExecutionGoalType } from '../utils/goalNodeModel';
 import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
 import { importWithRetry } from '../utils/lazyWithRetry';
-import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
+import { prepareActivityDefinitionCopy, prepareActivityDefinitionDraft } from '../utils/activityBuilder';
 import { buildLiveSmartGoal, getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalDetailModalRenderSurface from './goalDetail/GoalDetailModalRenderSurface';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
@@ -540,9 +540,9 @@ function GoalDetailModal({
         setIsTargetSelectionMode(false);
     };
 
-    const handleCreateActivityFromActivities = React.useCallback(() => {
+    const handleCreateActivityFromActivities = React.useCallback((seed) => {
         setActivityBuilderReturnView('goal-activities');
-        setActivityBuilderTemplate(null);
+        setActivityBuilderTemplate(prepareActivityDefinitionDraft(seed));
         setIsActivityBuilderOpen(true);
     }, []);
 

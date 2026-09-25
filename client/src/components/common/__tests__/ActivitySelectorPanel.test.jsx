@@ -209,4 +209,86 @@ describe('ActivitySelectorPanel', () => {
         expect(screen.queryByText('Handstand Hold')).not.toBeInTheDocument();
         expect(screen.getAllByText('Pull Basics')).toHaveLength(1);
     });
+
+    describe('create from search', () => {
+        const activities = [
+            { id: 'activity-1', name: 'Back Squat', group_id: null },
+            { id: 'activity-2', name: 'Bench Press', group_id: null },
+        ];
+        const renderPanel = (props = {}) => {
+            const onCreateActivityDefinition = vi.fn();
+            const onCreateCircuitDefinition = vi.fn();
+            render(
+                <ActivitySelectorPanel
+                    activities={activities}
+                    circuits={[{ id: 'circuit-1', name: 'Leg Circuit', slots: [] }]}
+                    onClose={vi.fn()}
+                    onSelectActivity={vi.fn()}
+                    onCreateActivityDefinition={onCreateActivityDefinition}
+                    onCopyActivityDefinition={vi.fn()}
+                    onCreateCircuitDefinition={onCreateCircuitDefinition}
+                    allowCreate
+                    allowCopy
+                    showTypeToggle
+                    {...props}
+                />,
+            );
+            return { onCreateActivityDefinition, onCreateCircuitDefinition };
+        };
+        const search = (value) => fireEvent.change(screen.getByPlaceholderText(/Search/), { target: { value } });
+
+        it('offers to create an activity named after an unmatched search term', () => {
+            const { onCreateActivityDefinition } = renderPanel();
+            search('sumo squat');
+
+            expect(screen.getByText('No activities match "sumo squat"')).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: '+ Create New Activity Definition "sumo squat"' }));
+            expect(onCreateActivityDefinition).toHaveBeenCalledWith({ name: 'sumo squat' });
+        });
+
+        it('creates from the search term on Enter when nothing matches', () => {
+            const { onCreateActivityDefinition } = renderPanel();
+            search('Sumo Squat');
+            fireEvent.keyDown(screen.getByPlaceholderText(/Search/), { key: 'Enter' });
+            expect(onCreateActivityDefinition).toHaveBeenCalledWith({ name: 'Sumo Squat' });
+        });
+
+        it('carries a partially matched search term into the create action', () => {
+            const { onCreateActivityDefinition } = renderPanel();
+            search('squat');
+
+            expect(screen.getByRole('button', { name: 'Select Back Squat' })).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: '+ Create New Activity Definition "squat"' }));
+            expect(onCreateActivityDefinition).toHaveBeenCalledWith({ name: 'squat' });
+        });
+
+        it('hides create-from-search when the exact name already exists', () => {
+            const { onCreateActivityDefinition } = renderPanel();
+            search('back squat');
+
+            fireEvent.click(screen.getByRole('button', { name: '+ Create New Activity Definition' }));
+            expect(onCreateActivityDefinition).toHaveBeenCalledWith();
+        });
+
+        it('hides create-from-search in copy mode and when creating is not allowed', () => {
+            renderPanel();
+            fireEvent.click(screen.getByRole('button', { name: '+ Copy Existing Activity Definition' }));
+            search('sumo squat');
+            expect(screen.queryByRole('button', { name: /Create New Activity Definition "/ })).not.toBeInTheDocument();
+        });
+
+        it('hides create-from-search when creating is not allowed', () => {
+            renderPanel({ allowCreate: false });
+            search('sumo squat');
+            expect(screen.queryByRole('button', { name: /Create New Activity Definition "/ })).not.toBeInTheDocument();
+        });
+
+        it('seeds circuit creation from the circuits tab search', () => {
+            const { onCreateCircuitDefinition } = renderPanel();
+            fireEvent.click(screen.getByRole('tab', { name: 'Activity Circuits' }));
+            search('Leg Day');
+            fireEvent.click(screen.getByRole('button', { name: '+ Create New Activity Circuit "Leg Day"' }));
+            expect(onCreateCircuitDefinition).toHaveBeenCalledWith({ name: 'Leg Day' });
+        });
+    });
 });

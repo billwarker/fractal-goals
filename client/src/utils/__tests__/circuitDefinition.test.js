@@ -1,4 +1,16 @@
-import { prepareCircuitDefinitionCopy } from '../circuitDefinition';
+import { prepareCircuitDefinitionCopy, prepareCircuitDefinitionDraft } from '../circuitDefinition';
+
+describe('prepareCircuitDefinitionDraft', () => {
+    it('seeds an empty circuit named after the search term', () => {
+        expect(prepareCircuitDefinitionDraft({ name: ' Leg Day ' })).toEqual({
+            name: 'Leg Day',
+            description: '',
+            group_id: '',
+            slots: [],
+        });
+        expect(prepareCircuitDefinitionDraft({ type: 'click' })).toBeNull();
+    });
+});
 
 describe('prepareCircuitDefinitionCopy', () => {
     it('creates a detached draft while retaining ordered slot data', () => {

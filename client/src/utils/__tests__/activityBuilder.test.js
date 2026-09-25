@@ -1,4 +1,30 @@
-import { buildActivityPayload, prepareActivityDefinitionCopy } from '../activityBuilder';
+import { buildActivityPayload, prepareActivityDefinitionCopy, prepareActivityDefinitionDraft } from '../activityBuilder';
+import { getInitialActivityBuilderState } from '../../components/activityBuilder/activityBuilderUtils';
+
+describe('prepareActivityDefinitionDraft', () => {
+    it('seeds a new definition from a search-term name with blank-create defaults', () => {
+        const draft = prepareActivityDefinitionDraft({ name: '  Sumo Squat ' });
+        expect(draft).toMatchObject({ id: undefined, name: 'Sumo Squat', has_metrics: true, track_progress: true });
+        expect(draft._builderKey).toEqual(expect.any(Number));
+
+        const state = getInitialActivityBuilderState(draft);
+        expect(state).toMatchObject({ name: 'Sumo Squat', hasMetrics: true, hasSets: false, trackProgress: true });
+    });
+
+    it('returns null for non-seed values such as click events or blank names', () => {
+        expect(prepareActivityDefinitionDraft()).toBeNull();
+        expect(prepareActivityDefinitionDraft({ type: 'click' })).toBeNull();
+        expect(prepareActivityDefinitionDraft({ name: '   ' })).toBeNull();
+    });
+
+    it('fills blank-create defaults for partial id-less seeds', () => {
+        expect(getInitialActivityBuilderState({ name: 'Partial' })).toMatchObject({
+            name: 'Partial',
+            hasMetrics: true,
+            hasSets: false,
+        });
+    });
+});
 
 describe('buildActivityPayload', () => {
     it('includes goal_ids and filters blank metrics/splits', () => {

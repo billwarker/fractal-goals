@@ -139,28 +139,36 @@ function mergeGoalIds(...goalIdLists) {
     ));
 }
 
+function getBlankActivityBuilderState(initialSelectedGoalIds = []) {
+    return {
+        name: '',
+        description: '',
+        metrics: [DEFAULT_METRIC],
+        hasSets: false,
+        hasMetrics: true,
+        hasSplits: false,
+        splits: DEFAULT_SPLITS,
+        groupId: '',
+        selectedGoalIds: mergeGoalIds(initialSelectedGoalIds),
+        trackProgress: true,
+        deltaDisplayMode: null,
+    };
+}
+
 export function getInitialActivityBuilderState(editingActivity, initialSelectedGoalIds = []) {
+    const blankState = getBlankActivityBuilderState(initialSelectedGoalIds);
     if (!editingActivity) {
-        return {
-            name: '',
-            description: '',
-            metrics: [DEFAULT_METRIC],
-            hasSets: false,
-            hasMetrics: true,
-            hasSplits: false,
-            splits: DEFAULT_SPLITS,
-            groupId: '',
-            selectedGoalIds: mergeGoalIds(initialSelectedGoalIds),
-            trackProgress: true,
-            deltaDisplayMode: null,
-        };
+        return blankState;
     }
 
     const metricDefinitions = editingActivity.metric_definitions || [];
     const splitDefinitions = editingActivity.split_definitions || [];
+    // Id-less seeds (copies, search-term drafts) may be partial; missing flags fall back to
+    // blank-create defaults rather than reading as undefined.
+    const isNewDefinition = !editingActivity.id;
 
     return {
-        name: editingActivity.name,
+        name: editingActivity.name ?? blankState.name,
         description: editingActivity.description || '',
         metrics: metricDefinitions.length > 0
             ? metricDefinitions.map((metric) => ({
@@ -173,8 +181,9 @@ export function getInitialActivityBuilderState(editingActivity, initialSelectedG
                 track_progress: metric.track_progress !== false,
             }))
             : [DEFAULT_METRIC],
-        hasSets: editingActivity.has_sets,
-        hasMetrics: metricDefinitions.length > 0 || editingActivity.has_metrics,
+        hasSets: isNewDefinition ? Boolean(editingActivity.has_sets) : editingActivity.has_sets,
+        hasMetrics: metricDefinitions.length > 0
+            || (isNewDefinition ? (editingActivity.has_metrics ?? blankState.hasMetrics) : editingActivity.has_metrics),
         hasSplits: editingActivity.has_splits || false,
         splits: splitDefinitions.length > 0
             ? splitDefinitions.map((split) => ({ id: split.id, name: split.name }))

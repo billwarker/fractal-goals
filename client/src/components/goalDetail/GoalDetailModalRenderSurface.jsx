@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 
-import { prepareActivityDefinitionCopy } from '../../utils/activityBuilder';
+import { prepareActivityDefinitionCopy, prepareActivityDefinitionDraft } from '../../utils/activityBuilder';
 import { getProgramsAffectedByGoalCompletion } from '../../utils/goalCompletionPrograms';
 import { getTypeDisplayName } from '../../utils/goalHelpers';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
@@ -430,9 +430,9 @@ function GoalDetailModalRenderSurface({
                     onRefreshAssociations={refreshAssociations}
                     inheritParentActivities={inheritParentActivities}
                     setInheritParentActivities={setInheritParentActivities}
-                    onCreateActivity={() => {
+                    onCreateActivity={(seed) => {
                         setActivityBuilderReturnView('activity-associator');
-                        setActivityBuilderTemplate(null);
+                        setActivityBuilderTemplate(prepareActivityDefinitionDraft(seed));
                         setIsActivityBuilderOpen(true);
                     }}
                     onCopyActivity={(activity) => {

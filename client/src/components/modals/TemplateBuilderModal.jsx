@@ -24,7 +24,7 @@ import {
     SESSION_TYPE_NORMAL,
     SESSION_TYPE_QUICK,
 } from '../../utils/sessionRuntime';
-import { prepareCircuitDefinitionCopy } from '../../utils/circuitDefinition';
+import { prepareCircuitDefinitionCopy, prepareCircuitDefinitionDraft } from '../../utils/circuitDefinition';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import {
     buildActivityGroupOptions,
@@ -764,7 +764,7 @@ function TemplateBuilderModalContent({
                                                                         sectionCircuitById.get(circuit.id) || circuit,
                                                                     )}
                                                                     onCreateCircuitDefinition={onCreateCircuitDefinition
-                                                                        ? () => openCircuitBuilder('create')
+                                                                        ? (seed) => openCircuitBuilder('create', prepareCircuitDefinitionDraft(seed))
                                                                         : undefined}
                                                                     onCopyCircuitDefinition={onCreateCircuitDefinition
                                                                         ? (circuit) => openCircuitBuilder(

@@ -261,6 +261,32 @@ describe('SessionSection', () => {
         }));
     });
 
+    it('opens the builder with an unmatched search term as the new activity name', () => {
+        const onOpenActivityBuilder = vi.fn();
+        const renderSection = () => (
+            <SessionSection
+                section={{ name: 'Main Practice', activity_ids: [] }}
+                sectionIndex={0}
+                onFocusActivity={vi.fn()}
+                selectedActivityId={null}
+                onOpenActivityBuilder={onOpenActivityBuilder}
+            />
+        );
+        const { rerender } = render(renderSection());
+
+        fireEvent.click(screen.getByRole('button', { name: '+ Add Activity' }));
+        rerender(renderSection());
+        fireEvent.change(screen.getByPlaceholderText('Search activities...'), { target: { value: 'Sumo Squat' } });
+        fireEvent.click(screen.getByRole('button', { name: '+ Create New Activity Definition "Sumo Squat"' }));
+
+        expect(addActivity).not.toHaveBeenCalled();
+        expect(onOpenActivityBuilder).toHaveBeenCalledWith(0, expect.objectContaining({
+            id: undefined,
+            name: 'Sumo Squat',
+            has_metrics: true,
+        }));
+    });
+
     it('clears selected activity when clicking empty section space', () => {
         const onFocusActivity = vi.fn();
         sessionDataState.activityInstances = [

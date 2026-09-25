@@ -61,6 +61,24 @@ export function normalizeSearchText(value) {
     return String(value || '').trim().toLowerCase();
 }
 
+function normalizeNameForMatch(value) {
+    return normalizeSearchText(value).replace(/\s+/g, ' ');
+}
+
+// Decides whether the search term should be offered as the name of a new definition:
+// 'empty' when nothing matched, 'append' when only partial matches exist, 'none' when a
+// definition with that exact name already exists (or there is no search term).
+export function getCreateFromSearchState({ searchText, results = [], allActivities = [] }) {
+    const seedName = String(searchText || '').trim().replace(/\s+/g, ' ');
+    if (!seedName) return { seedName: '', mode: 'none' };
+
+    const matchKey = normalizeNameForMatch(seedName);
+    const hasExactMatch = allActivities.some((activity) => normalizeNameForMatch(activity?.name) === matchKey);
+    if (hasExactMatch) return { seedName, mode: 'none' };
+
+    return { seedName, mode: results.length > 0 ? 'append' : 'empty' };
+}
+
 export function buildActivityPickerModel(activities = [], activityGroups = []) {
     const safeActivities = (Array.isArray(activities) ? activities : []).filter(Boolean);
     const safeGroups = (Array.isArray(activityGroups) ? activityGroups : []).filter(Boolean);

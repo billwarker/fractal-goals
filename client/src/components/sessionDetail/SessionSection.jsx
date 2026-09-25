@@ -14,8 +14,8 @@ import SessionSectionActivitySelector from './SessionSectionActivitySelector';
 import useSessionCircuitDefinitionBuilder from './useSessionCircuitDefinitionBuilder';
 import { useCircuitDefinitionMutations, useCircuits, useCreateCircuitRun } from '../../hooks/useCircuitQueries';
 
-import { prepareActivityDefinitionCopy } from '../../utils/activityBuilder';
-import { prepareCircuitDefinitionCopy } from '../../utils/circuitDefinition';
+import { prepareActivityDefinitionCopy, prepareActivityDefinitionDraft } from '../../utils/activityBuilder';
+import { prepareCircuitDefinitionCopy, prepareCircuitDefinitionDraft } from '../../utils/circuitDefinition';
 import { getAverageDurationStat } from '../../utils/durationStats';
 import { calculateSectionDurationFromInstanceIds, formatClockDuration } from '../../utils/sessionTime';
 import { buildDefinitionMap, buildInstanceMap, buildPositionMap, buildSessionPositionMap } from '../../utils/sessionSection';
@@ -200,7 +200,7 @@ const SessionSection = ({
         onOpenActivityBuilder(sectionIndex, activityDefinition);
     };
 
-    const handleCreateActivityDefinition = () => openActivityBuilder();
+    const handleCreateActivityDefinition = (seed) => openActivityBuilder(prepareActivityDefinitionDraft(seed));
 
     const addCircuit = async (definitionId) => {
         setCircuitError('');
@@ -226,7 +226,7 @@ const SessionSection = ({
             onSelectCircuit={(circuit) => addCircuit(circuit.id)}
             onCreateActivityDefinition={handleCreateActivityDefinition}
             onCopyActivityDefinition={(activity) => openActivityBuilder(prepareActivityDefinitionCopy(activity))}
-            onCreateCircuitDefinition={() => openCircuitBuilder('create')}
+            onCreateCircuitDefinition={(seed) => openCircuitBuilder('create', prepareCircuitDefinitionDraft(seed))}
             onCopyCircuitDefinition={(circuit) => openCircuitBuilder(
                 'copy',
                 prepareCircuitDefinitionCopy(circuit),

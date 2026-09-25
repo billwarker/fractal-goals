@@ -296,6 +296,8 @@
 
 .secondaryAction {
     min-height: 34px;
+    padding: 6px 12px;
+    overflow-wrap: anywhere;
     border: 1px dashed var(--color-border);
     border-radius: var(--border-radius-sm);
     background: transparent;

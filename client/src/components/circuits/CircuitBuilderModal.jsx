@@ -40,7 +40,7 @@ export default function CircuitBuilderModal({
     const [draft, setDraft] = useState(() => draftFromCircuit(circuit));
     const [showActivitySelector, setShowActivitySelector] = useState(false);
     const [error, setError] = useState('');
-    const actionLabel = circuit && !isCopy ? 'Edit Circuit' : 'Create Circuit';
+    const actionLabel = circuit?.id && !isCopy ? 'Edit Circuit' : 'Create Circuit';
     const modalTitle = draft.name.trim() ? `${actionLabel}: ${draft.name.trim()}` : actionLabel;
 
     const activityById = useMemo(
