@@ -9,11 +9,10 @@ import ReactFlow, {
 import {
     DEFAULT_VIEW_SETTINGS,
     FLOWTREE_LAYOUT_NODE_DIMENSIONS,
-    buildGraphPresentation,
 } from './components/flowTree/flowTreeGraphUtils';
 import FlowTreeNode from './components/flowTree/FlowTreeNode';
 import { ACTIVE_GOAL_WINDOW_DAYS } from './hooks/useFlowTreeMetrics';
-import { useGoalLevels } from './contexts/GoalLevelsContext';
+import useFlowTreeGraph from './components/flowTree/useFlowTreeGraph';
 import useIsMobile from './hooks/useIsMobile';
 import './FlowTree.css';
 import 'reactflow/dist/style.css';
@@ -130,9 +129,6 @@ const FlowTree = React.forwardRef(({
     const flowTreeContainerRef = React.useRef(null);
     const isMobile = useIsMobile();
 
-    const { getGoalColor } = useGoalLevels();
-    const completedGoalColor = getGoalColor('Completed');
-
     React.useImperativeHandle(ref, () => ({
         startFadeOut: () => {
             skipNextVisibleFitViewRef.current = true;
@@ -140,41 +136,10 @@ const FlowTree = React.forwardRef(({
         }
     }), []);
 
-    const { nodes: graphNodes, edges: graphEdges, metrics: graphMetrics } = useMemo(() => {
-        return buildGraphPresentation({
-            treeData,
-            onNodeClick,
-            onAddChild,
-            selectedNodeId,
-            completedGoalColor,
-            viewSettings,
-            sessions,
-            evidenceGoalIds,
-            metricsSummary,
-            activities,
-            activityGroups,
-            programs,
-            allowedGoalIds,
-            isMobile,
-            layoutMode,
-        });
-    }, [
-        treeData,
-        onNodeClick,
-        onAddChild,
-        selectedNodeId,
-        completedGoalColor,
-        viewSettings,
-        sessions,
-        evidenceGoalIds,
-        metricsSummary,
-        activities,
-        activityGroups,
-        programs,
-        allowedGoalIds,
-        isMobile,
-        layoutMode,
-    ]);
+    const { nodes: graphNodes, edges: graphEdges, metrics: graphMetrics } = useFlowTreeGraph({
+        treeData, onNodeClick, onAddChild, selectedNodeId, viewSettings, sessions, evidenceGoalIds,
+        metricsSummary, activities, activityGroups, programs, allowedGoalIds, isMobile, layoutMode,
+    });
     const [nodes, setNodes, onNodesChange] = useNodesState(graphNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(graphEdges);
     const showEmptyScopedProgramMessage = Boolean(scopedProgramName) && nodes.length === 0;

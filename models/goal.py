@@ -12,7 +12,9 @@ session_goals = Table(
     Column('goal_type', String, nullable=False),  # legacy type mapping or level
     Column('association_source', String, nullable=False, default='manual'),  # manual, activity
     Column('created_at', DateTime, default=utc_now),
-    Column('deleted_at', DateTime, nullable=True)
+    Column('deleted_at', DateTime, nullable=True),
+    # Reverse lookup; the composite primary key leads with the other column.
+    sa.Index('ix_session_goals_goal_id', 'goal_id')
 )
 
 # Junction table for linking Activities to Goals
@@ -21,7 +23,9 @@ activity_goal_associations = Table(
     Column('activity_id', String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
     Column('created_at', DateTime, default=utc_now),
-    Column('deleted_at', DateTime, nullable=True)
+    Column('deleted_at', DateTime, nullable=True),
+    # Reverse lookup; the composite primary key leads with the other column.
+    sa.Index('ix_activity_goal_associations_goal_id', 'goal_id')
 )
 
 # Junction table for linking Activity GROUPS to Goals
@@ -30,7 +34,9 @@ goal_activity_group_associations = Table(
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
     Column('activity_group_id', String, ForeignKey('activity_groups.id', ondelete='CASCADE'), primary_key=True),
     Column('created_at', DateTime, default=utc_now),
-    Column('deleted_at', DateTime, nullable=True)
+    Column('deleted_at', DateTime, nullable=True),
+    # Reverse lookup; the composite primary key leads with the other column.
+    sa.Index('ix_goal_activity_group_associations_activity_group_id', 'activity_group_id')
 )
 
 # Junction table for linking Session Templates to Goals
@@ -39,7 +45,9 @@ session_template_goals = Table(
     Column('session_template_id', String, ForeignKey('session_templates.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
     Column('created_at', DateTime, default=utc_now),
-    Column('deleted_at', DateTime, nullable=True)
+    Column('deleted_at', DateTime, nullable=True),
+    # Reverse lookup; the composite primary key leads with the other column.
+    sa.Index('ix_session_template_goals_goal_id', 'goal_id')
 )
 
 # Junction table for linking Program Days to Goals
@@ -48,7 +56,9 @@ program_day_goals = Table(
     Column('program_day_id', String, ForeignKey('program_days.id', ondelete='CASCADE'), primary_key=True),
     Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
     Column('created_at', DateTime, default=utc_now),
-    Column('deleted_at', DateTime, nullable=True)
+    Column('deleted_at', DateTime, nullable=True),
+    # Reverse lookup; the composite primary key leads with the other column.
+    sa.Index('ix_program_day_goals_goal_id', 'goal_id')
 )
 
 class GoalLevel(Base):
@@ -144,6 +154,9 @@ class Goal(Base):
     __table_args__ = (
         sa.Index('ix_goals_root_deleted_level', 'root_id', 'deleted_at', 'level_id'),
         sa.Index('ix_goals_root_parent_deleted', 'root_id', 'parent_id', 'deleted_at'),
+        # Child lookups that do not filter by root (completion cascade, agent tree walks).
+        sa.Index('ix_goals_parent_deleted', 'parent_id', 'deleted_at'),
+        sa.Index('ix_goals_completed_session_id', 'completed_session_id'),
     )
     __mapper_args__ = {'version_id_col': row_version}
 
@@ -249,8 +262,8 @@ class Target(Base):
     frequency_count = Column(Integer, nullable=True)
     completed = Column(Boolean, default=False, index=True)
     completed_at = Column(DateTime, nullable=True)
-    completed_session_id = Column(String, ForeignKey('sessions.id', ondelete='SET NULL'), nullable=True)
-    completed_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True)
+    completed_session_id = Column(String, ForeignKey('sessions.id', ondelete='SET NULL'), nullable=True, index=True)
+    completed_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True, index=True)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
@@ -278,7 +291,7 @@ class TargetMetricCondition(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     target_id = Column(String, ForeignKey('targets.id', ondelete='CASCADE'), nullable=False, index=True)
-    metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False)
+    metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False, index=True)
     operator = Column(String, nullable=False) # e.g. ">=", "<", "=="
     target_value = Column(Integer, nullable=False) # stored as int/float
     created_at = Column(DateTime, default=utc_now)

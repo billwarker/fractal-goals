@@ -50,7 +50,7 @@ class TestFractalEndpoints:
         assert response.status_code == 201
         data = json.loads(response.data)
         assert data['name'] == 'Test Fractal'
-        assert data['attributes']['type'] == 'UltimateGoal'
+        assert data['type'] == 'UltimateGoal'
         assert 'id' in data
 
         created_root = db_session.query(Goal).filter_by(id=data['id']).one()
@@ -258,7 +258,7 @@ class TestGoalCRUDEndpoints:
         assert response.status_code == 201
         data = json.loads(response.data)
         assert data['name'] == 'New Long Term Goal'
-        assert data['attributes']['type'] == 'LongTermGoal'
+        assert data['type'] == 'LongTermGoal'
         assert data['attributes']['parent_id'] == sample_ultimate_goal.id
 
     def test_create_goal_can_associate_activity_atomically(
@@ -413,13 +413,13 @@ class TestGoalCompletionEndpoints:
         response = authed_client.patch(f'/api/goals/{sample_ultimate_goal.id}/complete')
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['attributes']['completed'] != initial_status
+        assert data['completed'] != initial_status
         
         # Toggle again
         response = authed_client.patch(f'/api/goals/{sample_ultimate_goal.id}/complete')
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data['attributes']['completed'] == initial_status
+        assert data['completed'] == initial_status
     
     def test_toggle_completion_nonexistent_goal(self, authed_client):
         """Test toggling completion for nonexistent goal."""

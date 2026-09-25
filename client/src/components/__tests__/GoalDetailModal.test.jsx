@@ -96,7 +96,7 @@ vi.mock('../../utils/notify', () => ({
     default: mockNotify,
 }));
 
-vi.mock('../goals/goalDetailUtils', () => ({
+vi.mock('../goals/goalDetailUtils', async (importOriginal) => ({ ...(await importOriginal()),
     getParentGoalInfo: () => null,
 }));
 

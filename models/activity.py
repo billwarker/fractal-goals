@@ -467,7 +467,7 @@ class MetricValue(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False, index=True)
     activity_set_id = Column(String, ForeignKey('activity_sets.id', ondelete='CASCADE'), nullable=True, index=True)
-    metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False)
+    metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False, index=True)
     split_definition_id = Column(String, ForeignKey('split_definitions.id', ondelete='RESTRICT'), nullable=True)
     value = Column(Float, nullable=False)
     created_at = Column(DateTime, default=utc_now)

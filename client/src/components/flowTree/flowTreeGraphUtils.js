@@ -1,4 +1,4 @@
-import dagre from 'dagre';
+import dagre from '@dagrejs/dagre';
 
 import { buildGraphMetricsFromSummary, getActiveLineageIds, getInactiveNodeIds } from '../../hooks/useFlowTreeMetrics';
 import { getValidChildTypes } from '../../utils/goalHelpers';
@@ -58,7 +58,9 @@ export const getLayoutedElements = (nodes, edges, direction = 'TB', compact = fa
         dagreGraph.setEdge(edge.source, edge.target);
     });
 
-    dagre.layout(dagreGraph);
+    // Keep siblings in insertion order (children are pre-sorted by the level's
+    // sort_children_by). This also reproduces the pre-@dagrejs/dagre layout exactly.
+    dagre.layout(dagreGraph, { disableOptimalOrderHeuristic: true });
 
     const layoutedNodes = nodes.map((node) => {
         const nodeWithPosition = dagreGraph.node(node.id);
@@ -145,6 +147,7 @@ export const convertTreeToFlow = (
         hiddenInactiveGoalIds = null,
         activeLineageIds = new Set(),
         allowedGoalIds = null,
+        getSortChildrenBy = null,
     } = {}
 ) => {
     const nodes = [];
@@ -217,7 +220,10 @@ export const convertTreeToFlow = (
 
         const children = getGoalNodeChildren(node);
         if (children.length > 0) {
-            const sortBy = node.level_characteristics?.sort_children_by || node.attributes?.level_characteristics?.sort_children_by;
+            // Landing snapshots embed level settings; app goals resolve them by level_id.
+            const sortBy = node.level_characteristics?.sort_children_by
+                || node.attributes?.level_characteristics?.sort_children_by
+                || getSortChildrenBy?.(node);
             const sortedChildren = sortChildren(children, sortBy);
             sortedChildren.forEach((child) => traverse(child, nodeId));
         }
@@ -243,6 +249,7 @@ export const buildGraphPresentation = ({
     allowedGoalIds = null,
     isMobile,
     layoutMode = 'tree',
+    getSortChildrenBy = null,
 }) => {
     if (!treeData) {
         return { nodes: [], edges: [], metrics: null };
@@ -269,6 +276,7 @@ export const buildGraphPresentation = ({
             hiddenInactiveGoalIds: normalizedSettings.hideInactiveGoals ? inactiveNodeIds : null,
             activeLineageIds,
             allowedGoalIds,
+            getSortChildrenBy,
         }
     );
 

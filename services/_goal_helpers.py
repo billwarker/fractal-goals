@@ -20,6 +20,14 @@ class _GoalHelpersMixin:
     def _load_fractal_goals_for_serialization(self, root_id):
         return load_fractal_goals_for_serialization(self.db_session, root_id)
 
+    def load_goal_subtree(self, goal: Goal) -> Goal:
+        """Return ``goal`` with its whole subtree bulk-loaded for serialize_goal.
+
+        Serializing a goal with children otherwise lazy-loads every descendant's
+        level, targets, and associations one query at a time.
+        """
+        return self._load_fractal_goals_for_serialization(goal.root_id or goal.id).get(goal.id, goal)
+
     def _validate_owned_root(self, root_id, current_user_id) -> tuple[Goal | None, tuple[str, int] | None]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:

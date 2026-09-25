@@ -60,7 +60,8 @@ vi.mock('../contexts/ThemeContext', () => ({
     useTheme: () => ({ animatedIcons: false }),
 }));
 
-vi.mock('../contexts/GoalLevelsContext', () => ({
+vi.mock('../contexts/GoalLevelsContext', async (importOriginal) => ({
+    ...(await importOriginal()),
     useGoalLevels: () => ({
         getGoalColor: () => '#38bdf8',
         getGoalSecondaryColor: () => '#0f766e',

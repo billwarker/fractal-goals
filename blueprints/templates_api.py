@@ -8,7 +8,7 @@ from validators import (
     SessionTemplateCreateSchema, SessionTemplateUpdateSchema, SessionTemplateFromSessionSchema
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import get_db_session, parse_optional_pagination, internal_error, etag_json_response
+from blueprints.api_utils import get_db_session, parse_optional_pagination, internal_error
 from services.serializers import serialize_session_template
 from services.template_service import TemplateService
 
@@ -37,7 +37,7 @@ def get_session_templates(current_user, root_id):
         if error:
             return jsonify({"error": error}), status
         result = [serialize_session_template(template) for template in templates]
-        return etag_json_response(result)
+        return jsonify(result)
         
     finally:
         session.close()
@@ -53,7 +53,7 @@ def get_session_template(current_user, root_id, template_id):
         template, error, status = service.get_template(root_id, template_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
-        return etag_json_response(serialize_session_template(template))
+        return jsonify(serialize_session_template(template))
         
     finally:
         session.close()

@@ -22,7 +22,6 @@ from blueprints.api_utils import (
     get_db_session,
     internal_error,
     parse_optional_pagination,
-    etag_json_response,
     require_owned_root,
 )
 from services.serializers import (
@@ -56,7 +55,7 @@ def get_goals(current_user):
         payload, error, status = service.list_global_goals(current_user.id, limit, offset or 0)
         if error:
             return jsonify({"error": error}), status
-        return etag_json_response(payload, status=status)
+        return jsonify(payload), status
     finally:
         db_session.close()
 
@@ -361,7 +360,7 @@ def update_goal_completion_endpoint(current_user, goal_id: str, root_id=None, va
             if isinstance(error, dict):
                 return jsonify(error), status
             return jsonify({"error": error}), status
-        return jsonify(serialize_goal(goal)), status
+        return jsonify(serialize_goal(service.load_goal_subtree(goal))), status
         
     except SQLAlchemyError:
         db_session.rollback()
@@ -440,7 +439,7 @@ def get_fractal_goals(current_user, root_id):
         root, error, status = service.get_fractal_tree(root_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
-        return etag_json_response(serialize_goal(root), status=status)
+        return jsonify(serialize_goal(root)), status
         
     except SQLAlchemyError:
         db_session.rollback()
@@ -463,7 +462,7 @@ def get_active_goals_for_selection(current_user, root_id):
         result, error, status = service.get_active_goals_for_selection(root_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
-        return etag_json_response(result, status=status)
+        return jsonify(result), status
         
     except SQLAlchemyError:
         db_session.rollback()
@@ -614,13 +613,13 @@ def get_goal_analytics(current_user, root_id):
 
         cached = get_analytics(root_id)
         if cached is not None:
-            return etag_json_response(cached)
+            return jsonify(cached)
         service = GoalAnalyticsService(db_session)
         payload, error, status = service.get_goal_analytics(root_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
         set_analytics(root_id, payload)
-        return etag_json_response(payload, status=status)
+        return jsonify(payload), status
         
     except SQLAlchemyError:
         db_session.rollback()
@@ -696,7 +695,7 @@ def copy_goal_endpoint(current_user, root_id: str, goal_id: str):
         goal, error, status = service.copy_goal(root_id, goal_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
-        return jsonify(serialize_goal(goal)), status
+        return jsonify(serialize_goal(service.load_goal_subtree(goal))), status
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error copying goal")
@@ -721,7 +720,7 @@ def pause_goal_endpoint(current_user, root_id: str, goal_id: str, validated_data
         )
         if error:
             return jsonify({"error": error}), status
-        return jsonify(serialize_goal(goal)), status
+        return jsonify(serialize_goal(service.load_goal_subtree(goal))), status
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error pausing goal")
@@ -793,7 +792,7 @@ def move_goal_endpoint(current_user, root_id: str, goal_id: str, validated_data)
         )
         if error:
             return jsonify({"error": error}), status
-        return jsonify(serialize_goal(goal)), status
+        return jsonify(serialize_goal(service.load_goal_subtree(goal))), status
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error moving goal")
@@ -818,7 +817,7 @@ def convert_goal_level_endpoint(current_user, root_id: str, goal_id: str, valida
         )
         if error:
             return jsonify({"error": error}), status
-        return jsonify(serialize_goal(goal)), status
+        return jsonify(serialize_goal(service.load_goal_subtree(goal))), status
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error converting goal level")

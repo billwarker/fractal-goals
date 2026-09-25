@@ -86,8 +86,8 @@ class TestGoalHierarchy:
         assert goal_dict['id'] == sample_ultimate_goal.id
         assert goal_dict['name'] == sample_ultimate_goal.name
         # type is nested in attributes
-        # assert goal_dict['attributes']['type'] == 'UltimateGoal' (legacy)
-        assert goal_dict['attributes']['completed'] == sample_ultimate_goal.completed
+        # assert goal_dict['type'] == 'UltimateGoal' (legacy)
+        assert goal_dict['completed'] == sample_ultimate_goal.completed
         assert 'created_at' in goal_dict['attributes']
 
     def test_goal_to_dict_includes_completed_session_id(self, db_session, sample_ultimate_goal, sample_practice_session):
@@ -102,10 +102,9 @@ class TestGoalHierarchy:
         goal_dict = serialize_goal(sample_ultimate_goal)
 
         assert goal_dict['completed_session_id'] == sample_practice_session.id
-        assert goal_dict['attributes']['completed_session_id'] == sample_practice_session.id
         assert goal_dict['completion_state']['source'] == 'manual'
         assert goal_dict['completion_state']['reason'] == 'manual'
-        assert goal_dict['attributes']['completion_state']['source'] == 'manual'
+        assert goal_dict['completion_state']['source'] == 'manual'
 
 
 @pytest.mark.unit
@@ -418,3 +417,19 @@ class TestSoftDeletes:
             assert sample_ultimate_goal not in active_goals
         else:
             pytest.skip("Soft delete not yet implemented")
+
+
+def test_serialized_goal_attributes_hold_only_non_duplicated_fields(sample_ultimate_goal):
+    """Top-level goal fields are canonical; attributes must not repeat them."""
+    from services.serializers import serialize_goal
+
+    goal_dict = serialize_goal(sample_ultimate_goal)
+
+    top_level_duplicates = {
+        "id", "type", "level_id", "description", "deadline", "completed", "completed_at",
+        "completed_session_id", "completion_state", "is_smart", "smart_status", "paused", "paused_at",
+    }
+    assert top_level_duplicates <= set(goal_dict)
+    assert not top_level_duplicates & set(goal_dict["attributes"])
+    assert "level_characteristics" not in goal_dict
+    assert {"parent_id", "root_id", "targets", "associated_activity_ids"} <= set(goal_dict["attributes"])

@@ -16,7 +16,7 @@ from validators import (
     SessionGoalScopePreviewSchema,
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import get_db_session, parse_optional_pagination, etag_json_response, internal_error, require_owned_root
+from blueprints.api_utils import get_db_session, parse_optional_pagination, internal_error, require_owned_root
 from services.serializers import serialize_activity_instance
 from services.session_service import SessionService
 from services.progress_service import ProgressService
@@ -108,7 +108,7 @@ def get_all_sessions_endpoint(current_user):
         result, error, status = service.get_all_sessions(current_user.id, limit, offset or 0)
         if error:
             return jsonify({"error": error}), status
-        return etag_json_response(result)
+        return jsonify(result)
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error getting all sessions")
@@ -139,7 +139,7 @@ def get_fractal_sessions(current_user, root_id):
         )
         if error:
             return jsonify(error if isinstance(error, dict) else {"error": error}), status
-        return etag_json_response(result)
+        return jsonify(result)
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error in get_fractal_sessions")
@@ -162,7 +162,7 @@ def get_session_heatmap(current_user, root_id):
         )
         if error:
             return jsonify(error if isinstance(error, dict) else {"error": error}), status
-        return etag_json_response(result)
+        return jsonify(result)
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error in get_session_heatmap")
@@ -186,7 +186,7 @@ def get_session_analytics_summary(current_user, root_id):
         result, error, status = service.get_session_analytics_summary(root_id, current_user.id, limit=limit)
         if error:
             return jsonify(error if isinstance(error, dict) else {"error": error}), status
-        return etag_json_response(result)
+        return jsonify(result)
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error in get_session_analytics_summary")
@@ -205,7 +205,7 @@ def get_activity_instantiation_summary(current_user, root_id):
         result, error, status = service.get_activity_instantiation_summary(root_id, current_user.id)
         if error:
             return jsonify(error if isinstance(error, dict) else {"error": error}), status
-        return etag_json_response(result)
+        return jsonify(result)
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error in get_activity_instantiation_summary")
@@ -228,7 +228,7 @@ def get_recent_evidence_goal_ids(current_user, root_id):
         )
         if error:
             return jsonify(error if isinstance(error, dict) else {"error": error}), status
-        return etag_json_response(result)
+        return jsonify(result)
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error in get_recent_evidence_goal_ids")
@@ -252,7 +252,7 @@ def get_flowtree_session_metrics(current_user, root_id):
         )
         if error:
             return jsonify(error if isinstance(error, dict) else {"error": error}), status
-        return etag_json_response(result)
+        return jsonify(result)
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error in get_flowtree_session_metrics")

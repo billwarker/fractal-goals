@@ -1,7 +1,4 @@
-import hashlib
-import json
-
-from flask import g, jsonify, request, make_response
+from flask import g, jsonify, request
 
 from models import Goal, get_scoped_session, validate_root_goal
 
@@ -54,17 +51,3 @@ def parse_optional_pagination(req, *, max_limit: int = 200):
     limit_val = max(1, min(limit_val, max_limit))
     offset_val = max(0, offset_val)
     return limit_val, offset_val
-
-
-def etag_json_response(payload, status: int = 200):
-    """Return JSON response with a stable ETag.
-
-    We intentionally avoid API-level 304 short-circuiting because several
-    frontend flows rely on always receiving a JSON payload (and can surface
-    stale UI state when a 304 empty response path is taken).
-    """
-    raw = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":"))
-    etag = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-    resp = make_response(jsonify(payload), status)
-    resp.set_etag(etag)
-    return resp

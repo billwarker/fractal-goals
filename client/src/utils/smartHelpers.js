@@ -38,13 +38,14 @@ export function calculateSMARTStatus(goal) {
     const trackActivities = attrs.track_activities !== undefined ? attrs.track_activities : (goal.track_activities !== undefined ? goal.track_activities : true);
 
     // Or use pre-calculated smart_status from backend if available
-    if (attrs.smart_status) {
+    const serverSmartStatus = goal.smart_status || attrs.smart_status;
+    if (serverSmartStatus) {
         return {
-            specific: attrs.smart_status.specific,
-            measurable: attrs.smart_status.measurable,
-            achievable: attrs.smart_status.achievable,
-            relevant: attrs.smart_status.relevant,
-            timeBound: attrs.smart_status.time_bound
+            specific: serverSmartStatus.specific,
+            measurable: serverSmartStatus.measurable,
+            achievable: serverSmartStatus.achievable,
+            relevant: serverSmartStatus.relevant,
+            timeBound: serverSmartStatus.time_bound
         };
     }
 
@@ -64,8 +65,9 @@ export function calculateSMARTStatus(goal) {
  */
 export function isSMART(goal) {
     // Use pre-calculated value from backend if available
-    if (goal?.attributes?.is_smart !== undefined) {
-        return goal.attributes.is_smart;
+    const serverIsSmart = goal?.is_smart ?? goal?.attributes?.is_smart;
+    if (serverIsSmart !== undefined) {
+        return serverIsSmart;
     }
 
     const status = calculateSMARTStatus(goal);

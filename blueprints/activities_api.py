@@ -22,7 +22,7 @@ from validators import (
     ActivityProgressViewActivateSchema, ActivityProgressQuerySchema,
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import get_db_session, parse_optional_pagination, require_owned_root, etag_json_response, internal_error
+from blueprints.api_utils import get_db_session, parse_optional_pagination, require_owned_root, internal_error
 from services.serializers import (
     serialize_activity_group, serialize_activity_definition,
     serialize_fractal_metric,
@@ -604,7 +604,7 @@ def get_activities(current_user, root_id):
         if limit is not None:
             activities_q = activities_q.offset(offset).limit(limit)
         activities = activities_q.all()
-        return etag_json_response([serialize_activity_definition(a) for a in activities])
+        return jsonify([serialize_activity_definition(a) for a in activities])
     finally:
         session.close()
 
