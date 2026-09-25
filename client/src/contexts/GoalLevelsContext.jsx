@@ -55,6 +55,48 @@ const getFallbackLevelByName = (name) => {
 };
 
 
+/**
+ * Resolve a goal (or goal type string) to its effective level.
+ *
+ * Pure function of the level list so memoized consumers can key on it.
+ * @param {Array<object> | null | undefined} goalLevels
+ * @param {object | string | null | undefined} goalOrType
+ */
+export function resolveGoalLevel(goalLevels, goalOrType) {
+    if (!goalOrType || !goalLevels) return null;
+    const getLevelById = (levelId) => goalLevels.find((l) => l.id === levelId) || null;
+    const getLevelByName = (name) => goalLevels.find((l) => l.name === name) || getFallbackLevelByName(name);
+    if (typeof goalOrType === 'string') {
+        // Normalize CamelCase to space-separated for DB match: 'LongTermGoal' -> 'Long Term Goal'
+        const normalized = goalOrType.replace(/([A-Z])/g, ' $1').trim();
+        return getLevelByName(normalized) || getLevelByName(goalOrType);
+    }
+    // Prefer style data embedded on the goal, then resolve effective levels by
+    // ID, level name, or canonical type. Name/type recovery is important when
+    // a scoped override has replaced the base level in the effective list.
+    const embeddedLevel = goalOrType.level || goalOrType.attributes?.level;
+    if (embeddedLevel) return embeddedLevel;
+
+    const levelId = goalOrType.level_id || goalOrType.attributes?.level_id;
+    if (levelId) {
+        const level = getLevelById(levelId);
+        if (level) return level;
+    }
+
+    const levelName = goalOrType.level_name || goalOrType.attributes?.level_name;
+    if (levelName) {
+        const level = getLevelByName(levelName);
+        if (level) return level;
+    }
+
+    const type = goalOrType.type || goalOrType.attributes?.type;
+    if (type) {
+        const normalized = type.replace(/([A-Z])/g, ' $1').trim();
+        return getLevelByName(normalized) || getLevelByName(type);
+    }
+    return null;
+}
+
 export function adjustBrightness(hex, percent) {
     hex = hex.replace('#', '');
     let r = parseInt(hex.substring(0, 2), 16);
@@ -287,38 +329,7 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
     };
 
     // Internal helper to resolve a goal/type to a level object
-    const _resolveLevel = (goalOrType) => {
-        if (!goalOrType || !goalLevels) return null;
-        if (typeof goalOrType === 'string') {
-            // Normalize CamelCase to space-separated for DB match: 'LongTermGoal' -> 'Long Term Goal'
-            const normalized = goalOrType.replace(/([A-Z])/g, ' $1').trim();
-            return getLevelByName(normalized) || getLevelByName(goalOrType);
-        }
-        // Prefer style data embedded on the goal, then resolve effective levels by
-        // ID, level name, or canonical type. Name/type recovery is important when
-        // a scoped override has replaced the base level in the effective list.
-        const embeddedLevel = goalOrType.level || goalOrType.attributes?.level;
-        if (embeddedLevel) return embeddedLevel;
-
-        const levelId = goalOrType.level_id || goalOrType.attributes?.level_id;
-        if (levelId) {
-            const level = getLevelById(levelId);
-            if (level) return level;
-        }
-
-        const levelName = goalOrType.level_name || goalOrType.attributes?.level_name;
-        if (levelName) {
-            const level = getLevelByName(levelName);
-            if (level) return level;
-        }
-
-        const type = goalOrType.type || goalOrType.attributes?.type;
-        if (type) {
-            const normalized = type.replace(/([A-Z])/g, ' $1').trim();
-            return getLevelByName(normalized) || getLevelByName(type);
-        }
-        return null;
-    };
+    const _resolveLevel = (goalOrType) => resolveGoalLevel(goalLevels, goalOrType);
 
     const value = {
         goalLevels,

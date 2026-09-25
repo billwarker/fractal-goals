@@ -13,7 +13,7 @@ import {
 } from './components/flowTree/flowTreeGraphUtils';
 import FlowTreeNode from './components/flowTree/FlowTreeNode';
 import { ACTIVE_GOAL_WINDOW_DAYS } from './hooks/useFlowTreeMetrics';
-import { useGoalLevels } from './contexts/GoalLevelsContext';
+import { resolveGoalLevel, useGoalLevels } from './contexts/GoalLevelsContext';
 import useIsMobile from './hooks/useIsMobile';
 import './FlowTree.css';
 import 'reactflow/dist/style.css';
@@ -130,7 +130,13 @@ const FlowTree = React.forwardRef(({
     const flowTreeContainerRef = React.useRef(null);
     const isMobile = useIsMobile();
 
-    const { getGoalColor } = useGoalLevels();
+    const { getGoalColor, goalLevels } = useGoalLevels();
+    // Keyed on the level data (stable across renders) so the graph layout below
+    // only recomputes when levels change.
+    const getSortChildrenBy = useMemo(
+        () => (node) => resolveGoalLevel(goalLevels, node)?.sort_children_by,
+        [goalLevels],
+    );
     const completedGoalColor = getGoalColor('Completed');
 
     React.useImperativeHandle(ref, () => ({
@@ -157,8 +163,10 @@ const FlowTree = React.forwardRef(({
             allowedGoalIds,
             isMobile,
             layoutMode,
+            getSortChildrenBy,
         });
     }, [
+        getSortChildrenBy,
         treeData,
         onNodeClick,
         onAddChild,

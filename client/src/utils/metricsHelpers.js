@@ -29,14 +29,14 @@ export const calculateMetrics = (goalNode) => {
 
     const traverse = (node) => {
         totalGoals++;
-        const isCompleted = node.attributes?.completed || false;
+        const isCompleted = Boolean(node.completed ?? node.attributes?.completed);
 
         if (isCompleted) {
             completedGoals++;
         }
 
         // Check for deadline
-        const deadline = node.attributes?.deadline;
+        const deadline = node.deadline ?? node.attributes?.deadline;
         if (deadline) {
             totalDeadlines++;
             const deadlineDate = new Date(deadline);

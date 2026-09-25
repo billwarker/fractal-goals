@@ -2,12 +2,12 @@ const EXECUTION_GOAL_TYPES = new Set();
 
 export const getGoalNodeId = (goal) => {
     if (!goal) return null;
-    return goal.attributes?.id ?? goal.id ?? null;
+    return goal.id ?? goal.attributes?.id ?? null;
 };
 
 export const getGoalNodeType = (goal) => {
     if (!goal) return null;
-    return goal.attributes?.type ?? goal.type ?? null;
+    return goal.type ?? goal.attributes?.type ?? null;
 };
 
 export const getGoalNodeName = (goal) => {
@@ -17,7 +17,7 @@ export const getGoalNodeName = (goal) => {
 
 export const getGoalNodeDescription = (goal) => {
     if (!goal) return '';
-    return goal.attributes?.description ?? goal.description ?? '';
+    return goal.description ?? goal.attributes?.description ?? '';
 };
 
 export const getGoalNodeParentId = (goal, fallbackParentId = null) => {
@@ -113,11 +113,11 @@ export const normalizeGoalNode = (goal, options = {}) => {
         goalCategory: getGoalNodeCategory(type),
         description: getGoalNodeDescription(goal),
         relevance_statement: goal.attributes?.relevance_statement ?? goal.relevance_statement,
-        deadline: goal.attributes?.deadline ?? goal.deadline ?? null,
+        deadline: goal.deadline ?? goal.attributes?.deadline ?? null,
         completed: Boolean(goal.completed ?? goal.attributes?.completed),
-        completed_at: goal.attributes?.completed_at ?? goal.completed_at ?? null,
+        completed_at: goal.completed_at ?? goal.attributes?.completed_at ?? null,
         paused: Boolean(goal.paused ?? goal.attributes?.paused),
-        paused_at: goal.attributes?.paused_at ?? goal.paused_at ?? null,
+        paused_at: goal.paused_at ?? goal.attributes?.paused_at ?? null,
         created_at: goal.attributes?.created_at ?? goal.created_at ?? null,
         level_id: goal.level_id ?? goal.attributes?.level_id ?? null,
         level_name: goal.level_name ?? goal.attributes?.level_name ?? null,
