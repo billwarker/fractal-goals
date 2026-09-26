@@ -76,10 +76,16 @@ export default function renderProgramCalendarEventContent(eventInfo, onGoalActiv
 
     if (type === 'program_day') {
         const color = blockColor || 'var(--color-brand-primary)';
+        const hasReadModelState = typeof dayState?.scheduled === 'boolean';
+        const occurrenceCompleted = isCompleted === true
+            || (hasReadModelState && dayState.state === 'scheduled_met');
         let statusLabel;
         if (dayState?.manual_status === 'complete') statusLabel = 'requirements met';
         else if (dayState?.manual_status === 'rest') statusLabel = 'rest day';
-        else if (isCompleted === true) statusLabel = 'requirements met';
+        else if (occurrenceCompleted) statusLabel = 'requirements met';
+        else if (hasReadModelState && typeof isCompleted !== 'boolean') {
+            statusLabel = getProgramDayStateMeta(dayState.state)?.label;
+        }
         else if (dayState?.state === 'rest') statusLabel = 'rest day';
         else if (typeof isCompleted === 'boolean') statusLabel = dayState?.closed ? 'missed' : 'pending';
         else statusLabel = getProgramDayStateMeta(dayState?.state)?.label;
@@ -98,7 +104,7 @@ export default function renderProgramCalendarEventContent(eventInfo, onGoalActiv
                             state: dayState.state,
                             manualStatus: dayState.manual_status,
                             closed: dayState.closed,
-                            programDayCompleted: isCompleted,
+                            programDayCompleted: occurrenceCompleted ? true : isCompleted,
                         })}
                         size="sm"
                         decorative

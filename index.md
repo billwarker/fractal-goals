@@ -121,7 +121,10 @@ selection and clicks stand down in that mode. Status actions apply only to the s
 **Plan event** spans the whole selection. Cells are keyboard-selectable and highlighted when selected.
 The client expects program metrics calculation v6 and day read model schema v6.
 Calendar day ribbons use the same status symbol as the day-review pane (check, X, or blue circle from
-`getProgramDayStatusSymbol` and `ProgramDayStatusMark`; each scheduled ribbon reflects that occurrence's completion (a manual date status overrides it). The date streak advances only when all scheduled program days on that date are met. Symbols are decorative beside each ribbon's assistive state text.
+`getProgramDayStatusSymbol` and `ProgramDayStatusMark`; the day read model is authoritative for
+completion when available, including manually credited sessions. The date streak advances only when
+all scheduled program days on that date are met. Symbols are decorative beside each ribbon's
+assistive state text.
 The page calendar has one toolbar on desktop and mobile (‹ › Today, a **Continuous** checkbox, title,
 multi-day actions); compact calendars keep FullCalendar's header. Its calendar-summary endpoint reads
 only program IDs, names, colors, and date bounds plus block colors and date bounds intersecting the
