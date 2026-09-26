@@ -79,6 +79,7 @@ function ProgramCalendarView({
     showBlockControls = true,
     initialDate = new Date(),
     onDatesSet,
+    onVisibleMonthChange,
     selectedDate,
     selectedRange,
     selectedRangeLabel,
@@ -109,10 +110,7 @@ function ProgramCalendarView({
     const [monthTitle, setMonthTitle] = React.useState('');
     // Continuous mode shows a year centred on today; a context date or navigation
     // target beyond it re-centres the year there.
-    const [windowAnchor, setWindowAnchor] = React.useState(() => {
-        const today = formatCalendarCellDate(new Date());
-        return canScrollWithin(initialDateStr, getContinuousWindow(today)) ? today : initialDateStr;
-    });
+    const [windowAnchor, setWindowAnchor] = React.useState(() => initialDateStr);
     const pendingScrollRef = React.useRef(continuous ? { date: initialDateStr, smooth: false } : null);
     const continuousWindow = React.useMemo(
         () => (continuous ? getContinuousWindow(windowAnchor) : null),
@@ -120,7 +118,12 @@ function ProgramCalendarView({
     );
     const calendarKey = continuousWindow ? `continuous:${continuousWindow.start}:${continuousWindow.weeks}` : 'month';
     const getScroller = React.useCallback(
-        () => calendarContainerRef.current?.querySelector('.fc-scrollgrid-section-body .fc-scroller') || null,
+        () => {
+            const dayGrid = calendarContainerRef.current?.querySelector('.fc-daygrid-body');
+            return dayGrid?.closest('.fc-scroller')
+                || calendarContainerRef.current?.querySelector('.fc-scrollgrid-section-body .fc-scroller')
+                || null;
+        },
         [],
     );
     const onEventClickRef = React.useRef(onEventClick);
@@ -161,26 +164,11 @@ function ProgramCalendarView({
     });
     const dragPreviewDates = dragSelection.previewDates;
 
-    // The date-level status symbol sits on the first selected-program ribbon of each date.
-    const dateOwnerRibbonIds = React.useMemo(() => {
-        const idsByDate = new Map();
-        (calendarEvents || [])
-            .filter((event) => event.extendedProps?.type === 'program_day'
-                && selectedProgramId
-                && String(event.extendedProps?.programId) === String(selectedProgramId))
-            .forEach((event) => {
-                const date = normalizeCalendarEventDate(event.start);
-                if (!idsByDate.has(date)) idsByDate.set(date, event.id);
-            });
-        return new Set(idsByDate.values());
-    }, [calendarEvents, selectedProgramId]);
-
     const renderCalendarEventContent = React.useCallback((eventInfo) => renderProgramCalendarEventContent(
         eventInfo,
         readOnly ? undefined : (clickInfo) => onEventClickRef.current?.(clickInfo),
         dayStatesByDate.get(normalizeCalendarEventDate(eventInfo.event.start)),
-        { ownsDate: dateOwnerRibbonIds.has(eventInfo.event.id) },
-    ), [dateOwnerRibbonIds, dayStatesByDate, readOnly]);
+    ), [dayStatesByDate, readOnly]);
 
     const getDayCellClassNames = (dayInfo) => {
         const dateStr = dayInfo.dateStr || formatCalendarCellDate(dayInfo.date);
@@ -408,13 +396,17 @@ function ProgramCalendarView({
     }, [syncBlockLabelForCell]);
 
     const scrollToDate = React.useCallback((dateStr, { smooth = true } = {}) => {
-        const scroller = getScroller();
         const row = calendarContainerRef.current
             ?.querySelector(`.fc-daygrid-day[data-date="${dateStr}"]`)
             ?.closest('tr');
+        const scroller = row?.closest('.fc-scroller') || getScroller();
         if (!scroller || !row) return false;
         const top = scroller.scrollTop + row.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-        scroller.scrollTo?.({ top, behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto' });
+        if (typeof scroller.scrollTo === 'function') {
+            scroller.scrollTo({ top, behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto' });
+        } else {
+            scroller.scrollTop = top;
+        }
         return true;
     }, [getScroller]);
 
@@ -433,6 +425,7 @@ function ProgramCalendarView({
         if (!continuous) return undefined;
         let scroller = null;
         let frame = null;
+        let initialScrollFrame = null;
         const syncTitle = () => {
             frame = null;
             if (!scroller) return;
@@ -441,31 +434,66 @@ function ProgramCalendarView({
                 .find((candidate) => candidate.getBoundingClientRect().bottom > top);
             const month = getWeekRowMonth([...(row?.querySelectorAll('.fc-daygrid-day[data-date]') || [])]
                 .map((cell) => cell.getAttribute('data-date')));
-            if (month) setVisibleMonth(month);
+            if (month) {
+                setVisibleMonth((current) => (current === month ? current : month));
+                onVisibleMonthChange?.(month);
+            }
         };
         const onScroll = () => {
             if (frame === null) frame = requestAnimationFrame(syncTitle);
         };
-        const cancelReady = whenRendered(getScroller, (el) => {
+        const findReadyScroller = () => {
+            const el = getScroller();
+            const pendingDate = pendingScrollRef.current?.date;
+            if (!el || (pendingDate && !calendarContainerRef.current?.querySelector(
+                `.fc-daygrid-day[data-date="${pendingDate}"]`,
+            ))) return null;
+            return el;
+        };
+        const cancelReady = whenRendered(findReadyScroller, (el) => {
             scroller = el;
             const pending = pendingScrollRef.current;
-            pendingScrollRef.current = null;
-            if (pending) scrollToDate(pending.date, { smooth: pending.smooth });
             scroller.addEventListener('scroll', onScroll, { passive: true });
-            syncTitle();
+            if (pending) {
+                // Anchor to the actual scroller containing the target row after
+                // FullCalendar finishes laying out the complete week grid.
+                initialScrollFrame = requestAnimationFrame(() => {
+                    initialScrollFrame = requestAnimationFrame(() => {
+                        initialScrollFrame = null;
+                        if (scrollToDate(pending.date, { smooth: pending.smooth })) {
+                            pendingScrollRef.current = null;
+                        }
+                        syncTitle();
+                    });
+                });
+            } else {
+                syncTitle();
+            }
         });
         return () => {
             cancelReady();
             if (frame !== null) cancelAnimationFrame(frame);
+            if (initialScrollFrame !== null) cancelAnimationFrame(initialScrollFrame);
             scroller?.removeEventListener('scroll', onScroll);
         };
-    }, [calendarKey, continuous, getScroller, scrollToDate]);
+    }, [calendarKey, continuous, getScroller, onVisibleMonthChange, scrollToDate]);
 
     const handleDatesSet = (info) => {
+        if (continuous && pendingScrollRef.current) {
+            const pending = pendingScrollRef.current;
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                if (pendingScrollRef.current !== pending) return;
+                if (scrollToDate(pending.date, { smooth: pending.smooth })) {
+                    pendingScrollRef.current = null;
+                }
+            }));
+        }
         if (!continuous && info?.view) {
             setMonthTitle(info.view.title || '');
             if (info.view.currentStart instanceof Date) {
-                setVisibleMonth(`${formatCalendarCellDate(info.view.currentStart).slice(0, 7)}-01`);
+                const month = `${formatCalendarCellDate(info.view.currentStart).slice(0, 7)}-01`;
+                setVisibleMonth(month);
+                onVisibleMonthChange?.(month);
             }
         }
         onDatesSet?.(info);
@@ -474,13 +502,8 @@ function ProgramCalendarView({
     const handleContinuousToggle = (event) => {
         const enable = event.target.checked;
         if (enable) {
-            // Keep the month in view: the selected or context day when it is in
-            // that month, otherwise the month's first Thursday (so it owns the top row).
-            const inVisibleMonth = (value) => Boolean(value) && value.startsWith(visibleMonth.slice(0, 7));
-            const target = [selectedDate, initialDateStr].find(inVisibleMonth) || getMonthScrollTarget(visibleMonth);
-            pendingScrollRef.current = { date: target, smooth: false };
-            const today = formatCalendarCellDate(new Date());
-            setWindowAnchor(canScrollWithin(target, getContinuousWindow(today)) ? today : target);
+            pendingScrollRef.current = { date: initialDateStr, smooth: false };
+            setWindowAnchor(initialDateStr);
         }
         onContinuousChange?.(enable);
     };

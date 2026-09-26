@@ -58,27 +58,45 @@ export function useProgramCalendarSelection({
         });
     }, [dispatchCalendarContext, today]);
 
-    const extendMultiDaySelection = useCallback((clickedDate) => {
-        const program = displayProgram && isProgramActive(displayProgram, clickedDate)
+    const programForDate = useCallback((date) => {
+        if (displayProgram && isProgramActive(displayProgram, date)) return displayProgram;
+        const matchingProgram = programs.find((candidate) => isProgramActive(candidate, date));
+        if (matchingProgram) return matchingProgram;
+        return displayProgram && getProgramStatus(displayProgram, today) === 'completed'
             ? displayProgram
             : null;
+    }, [displayProgram, programs, today]);
+
+    const programForRange = useCallback((startDate, endDate) => {
+        if (displayProgram
+            && isProgramActive(displayProgram, startDate)
+            && isProgramActive(displayProgram, endDate)) return displayProgram;
+        const matchingProgram = programs.find((candidate) => (
+            isProgramActive(candidate, startDate) && isProgramActive(candidate, endDate)
+        ));
+        if (matchingProgram) return matchingProgram;
+        return displayProgram && getProgramStatus(displayProgram, today) === 'completed'
+            ? displayProgram
+            : null;
+    }, [displayProgram, programs, today]);
+
+    const extendMultiDaySelection = useCallback((clickedDate) => {
         const { startDate, endDate } = getNextMultiDayRange(calendarContext, clickedDate);
+        const program = programForRange(startDate, endDate);
         updateRangeContext({ startDate, endDate, program, forceRange: true });
         setIsSidePaneVisible(true);
-    }, [calendarContext, displayProgram, setIsSidePaneVisible, updateRangeContext]);
+    }, [calendarContext, programForRange, setIsSidePaneVisible, updateRangeContext]);
 
     const selectCalendarRange = useCallback((info) => {
         const startDate = info.startStr;
         const endDate = subtractDaysToDateString(info.endStr, 1);
-        const program = displayProgram && isProgramActive(displayProgram, startDate)
-            ? displayProgram
-            : null;
+        const program = programForRange(startDate, endDate);
 
         info.view.calendar.unselect();
         if (blockCreationMode && startDate === endDate) return;
         updateRangeContext({ startDate, endDate, program });
         setIsSidePaneVisible(true);
-    }, [blockCreationMode, displayProgram, setIsSidePaneVisible, updateRangeContext]);
+    }, [blockCreationMode, programForRange, setIsSidePaneVisible, updateRangeContext]);
 
     const resetToToday = useCallback(() => {
         const program = displayProgram && isProgramActive(displayProgram, today)
@@ -107,6 +125,7 @@ export function useProgramCalendarSelection({
 
     return {
         updateRangeContext,
+        programForDate,
         extendMultiDaySelection,
         selectCalendarRange,
         resetToToday,

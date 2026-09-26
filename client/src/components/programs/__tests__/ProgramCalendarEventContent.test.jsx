@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import renderProgramCalendarEventContent from '../ProgramCalendarEventContent';
 
 describe('renderProgramCalendarEventContent', () => {
-    it('ends the date-owning ribbon with its decorative status symbol and no session dots', () => {
+    it('shows the scheduled status symbol on a program-day container', () => {
         const { container } = render(renderProgramCalendarEventContent(
             { event: { title: 'Planche Focus - Day 1', extendedProps: { type: 'program_day' } } },
             undefined,
@@ -11,7 +11,6 @@ describe('renderProgramCalendarEventContent', () => {
                 state: 'scheduled_met', scheduled: true, closed: true,
                 completed_sessions: [{ id: 's1', name: 'Planche Focus', color: '#336699', relation: 'credited' }],
             },
-            { ownsDate: true },
         ));
 
         const mark = container.querySelector('[data-program-day-status]');
@@ -20,17 +19,19 @@ describe('renderProgramCalendarEventContent', () => {
         expect(screen.queryByText(/completed session/i)).not.toBeInTheDocument();
     });
 
-    it('omits the status symbol from ribbons that do not own the date', () => {
+    it('shows the same date status on each program-day container', () => {
         const { container } = render(renderProgramCalendarEventContent(
             { event: { title: 'Other program day', extendedProps: { type: 'program_day' } } },
             undefined,
             { state: 'scheduled_missed', scheduled: true, closed: true },
         ));
 
-        expect(container.querySelector('[data-program-day-status]')).toBeNull();
+        expect(container.querySelector('[data-program-day-status]')).toHaveAttribute(
+            'data-program-day-status', 'missed',
+        );
     });
 
-    it('names a completed session on an unscheduled date as plain text', () => {
+    it('shows a completed session on an unscheduled date with its accessible state', () => {
         const { container } = render(renderProgramCalendarEventContent(
             { event: { title: 'Run', extendedProps: { type: 'completed_session' } } },
         ));
@@ -38,7 +39,7 @@ describe('renderProgramCalendarEventContent', () => {
         expect(container.firstChild.className).toContain('eventPillCompletedSession');
         expect(container.firstChild).not.toHaveAttribute('style');
         expect(screen.getByText('Run')).toBeInTheDocument();
-        expect(screen.getByText('Completed session: Run')).toBeInTheDocument();
+        expect(screen.getByText('1 completed session: Run')).toBeInTheDocument();
     });
 
     it('renders a calendar event as a labelled bar that states whether it protects streaks', () => {

@@ -32,12 +32,19 @@ import {
     useUpdateProgramDayStatuses,
 } from '../hooks/useProgramDayReadModel';
 import { useProgramsCalendarData } from '../hooks/useProgramsCalendarData';
+import { useVisibleProgramCalendarDetails } from '../hooks/useVisibleProgramCalendarDetails';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
-import { formatLiteralDate, getISOYMDInTimezone, subtractDaysToDateString } from '../utils/dateUtils';
+import { addDaysToDateString, formatLiteralDate, getISOYMDInTimezone, subtractDaysToDateString } from '../utils/dateUtils';
+import { getContinuousWindow } from '../utils/programCalendarContinuous';
 import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
-import { buildCalendarPeriodEvents, buildUnscheduledSessionEvents } from '../utils/programDayState';
+import {
+    buildCalendarPeriodEvents,
+    buildCompletedSessionEvents,
+    mergeCompletedSessionDays,
+    nestContributingSessionsInProgramDays,
+} from '../utils/programDayState';
 import { useCalendarPeriodEditor, useCalendarPeriods } from '../hooks/useCalendarPeriods';
 import { createProgramCalendarContext, formatProgramCalendarSelection, getProgramOverviewMetricsRange, programCalendarContextReducer } from '../utils/programCalendarContext';
 import { buildProgramBlockLabels, buildProgramsCalendarEvents, getProgramColor } from '../utils/programViewModel';
@@ -87,6 +94,18 @@ function shiftDatePart(dateValue, dayOffset) {
     return shifted.toISOString().slice(0, 10);
 }
 
+function getInitialCalendarRange(dateValue, continuous) {
+    if (continuous) {
+        const { start, end } = getContinuousWindow(dateValue);
+        return { start, end };
+    }
+    const [year, month] = dateValue.slice(0, 7).split('-').map(Number);
+    const firstOfMonth = new Date(Date.UTC(year, month - 1, 1));
+    firstOfMonth.setUTCDate(firstOfMonth.getUTCDate() - firstOfMonth.getUTCDay());
+    const start = firstOfMonth.toISOString().slice(0, 10);
+    return { start, end: addDaysToDateString(start, 41) };
+}
+
 function ProgramCalendarPage() {
     const onboarding = useOptionalOnboarding();
     const { rootId, programId } = useParams();
@@ -111,9 +130,14 @@ function ProgramCalendarPage() {
         selectedRange: selectedCalendarRange,
         pendingBlockSelection,
     } = calendarContext;
-    const [visibleCalendarRange, setVisibleCalendarRange] = useState(null);
     const [isCalendarContinuous, setIsCalendarContinuous] = useState(
         () => readLocalStorageValue(CONTINUOUS_CALENDAR_PREFERENCE_KEY) === 'true',
+    );
+    const [visibleCalendarRange, setVisibleCalendarRange] = useState(
+        () => getInitialCalendarRange(todayInTimezone, isCalendarContinuous),
+    );
+    const [visibleCalendarMonth, setVisibleCalendarMonth] = useState(
+        () => `${todayInTimezone.slice(0, 7)}-01`,
     );
     const handleCalendarContinuousChange = useCallback((enabled) => {
         setIsCalendarContinuous(enabled);
@@ -137,7 +161,8 @@ function ProgramCalendarPage() {
         programLabels,
         loading,
         refetchPrograms,
-    } = useProgramsCalendarData(rootId, { timezone });
+        calendarProjectionReady = true,
+    } = useProgramsCalendarData(rootId, { timezone, visibleRange: visibleCalendarRange });
 
     const activeProgramId = useMemo(
         () => programs.find((program) => isProgramActive(program, todayInTimezone))?.id || null,
@@ -163,23 +188,29 @@ function ProgramCalendarPage() {
     } = useProgramData(rootId, selectedProgramId, timezone || 'UTC');
 
     const displayProgram = detailedProgram || selectedProgram;
+    const visibleProgramCalendarData = useVisibleProgramCalendarDetails(
+        rootId, programs, visibleCalendarMonth, selectedProgramId, timezone,
+    );
+    const calendarPrograms = useMemo(() => programs.map((program) => (
+        visibleProgramCalendarData.details.get(program.id) || program
+    )), [programs, visibleProgramCalendarData.details]);
     const calendarEvents = useMemo(() => buildProgramsCalendarEvents(
-        programs,
+        calendarProjectionReady ? calendarPrograms : [],
         goals,
         getGoalColor,
         getGoalTextColor,
         timezone,
         { getGoalSecondaryColor, getGoalIcon },
-        detailedProgram || null,
     ).filter((event) => event.extendedProps?.type !== 'session'), [
-        detailedProgram, getGoalColor, getGoalIcon, getGoalSecondaryColor,
-        getGoalTextColor, goals, programs, timezone,
+        calendarPrograms, calendarProjectionReady, getGoalColor, getGoalIcon, getGoalSecondaryColor,
+        getGoalTextColor, goals, timezone,
     ]);
     const blockLabels = useMemo(() => (
-        detailedProgram
-            ? buildProgramBlockLabels({ program: detailedProgram, includeProgramId: true })
-            : []
-    ), [detailedProgram]);
+        programs.flatMap((program) => buildProgramBlockLabels({
+            program,
+            includeProgramId: true,
+        }))
+    ), [programs]);
     const dayRangeQuery = useProgramDayRange(
         rootId, displayProgram?.id, timezone, visibleCalendarRange,
     );
@@ -193,11 +224,17 @@ function ProgramCalendarPage() {
     const sessionCreditMutation = useSetProgramDaySessionCredit(rootId, displayProgram?.id, timezone);
     const periodEditor = useCalendarPeriodEditor(rootId);
     const fallbackPeriods = useCalendarPeriods(rootId, visibleCalendarRange, { enabled: !displayProgram }).data;
-    const calendarEventsWithSessions = useMemo(() => [
-        ...calendarEvents,
-        ...buildUnscheduledSessionEvents(dayRangeQuery.data?.days, displayProgram?.id, calendarEvents),
-        ...buildCalendarPeriodEvents(dayRangeQuery.data?.periods || fallbackPeriods, displayProgram?.id),
-    ], [calendarEvents, dayRangeQuery.data, displayProgram?.id, fallbackPeriods]);
+    const calendarEventsWithSessions = useMemo(() => {
+        const completedSessionDays = mergeCompletedSessionDays(
+            visibleProgramCalendarData.completedSessionDays,
+            dayRangeQuery.data?.days || [],
+        );
+        return nestContributingSessionsInProgramDays([
+            ...calendarEvents,
+            ...buildCompletedSessionEvents(completedSessionDays, displayProgram?.id),
+            ...buildCalendarPeriodEvents(dayRangeQuery.data?.periods || fallbackPeriods, displayProgram?.id),
+        ]);
+    }, [calendarEvents, dayRangeQuery.data, displayProgram?.id, fallbackPeriods, visibleProgramCalendarData.completedSessionDays]);
     const displayGoals = detailGoals?.length ? detailGoals : goals;
 
     const {
@@ -242,6 +279,7 @@ function ProgramCalendarPage() {
     } = useProgramDetailController({ goals: displayGoals });
     const {
         updateRangeContext: updateCalendarRangeContext,
+        programForDate,
         extendMultiDaySelection,
         selectCalendarRange: handleDateSelectForContext,
         resetToToday: resetCalendarContextToToday,
@@ -495,7 +533,7 @@ function ProgramCalendarPage() {
 
     const handleDateClick = (info) => {
         const clickedDate = info.dateStr;
-        const program = displayProgram && isProgramActive(displayProgram, clickedDate) ? displayProgram : null;
+        const program = programForDate(clickedDate);
 
         if (blockCreationMode) {
             toggleStatusDate(clickedDate, { extend: Boolean(info.jsEvent?.shiftKey) });
@@ -513,7 +551,8 @@ function ProgramCalendarPage() {
 
     const handleProgramLabelClick = (label) => {
         if (blockCreationMode || !label?.date) return;
-        updateCalendarRangeContext({ startDate: label.date, program: null });
+        const program = programs.find((candidate) => String(candidate.id) === String(label.programId)) || null;
+        updateCalendarRangeContext({ startDate: label.date, program });
         setViewMode('calendar');
         setIsSidePaneVisible(true);
     };
@@ -568,6 +607,9 @@ function ProgramCalendarPage() {
             end: subtractDaysToDateString(info.endStr, 1),
         });
     };
+    const handleCalendarVisibleMonthChange = useCallback((month) => {
+        setVisibleCalendarMonth((current) => (current === month ? current : month));
+    }, []);
 
     const handleCalendarBackgroundClick = (event) => {
         if (blockCreationMode) return;
@@ -576,6 +618,16 @@ function ProgramCalendarPage() {
         );
 
         if (interactiveTarget) {
+            return;
+        }
+
+        if (displayProgram && getProgramStatus(displayProgram, todayInTimezone) === 'completed') {
+            dispatchCalendarContext({
+                type: 'focus_program',
+                date: contextDate,
+                programId: displayProgram.id,
+            });
+            clearStatusSelection();
             return;
         }
 
@@ -798,7 +850,7 @@ function ProgramCalendarPage() {
                                         selectStatusRange(info);
                                     }
                                 }}
-                                initialDate={contextDate}
+                                initialDate={todayInTimezone}
                                 isMobile={isMobile}
                                 selectedDate={calendarScope === 'day' ? contextDate : null}
                                 selectedRange={selectedTimeframeDates.length ? null : selectedCalendarRange}
@@ -808,6 +860,7 @@ function ProgramCalendarPage() {
                                 onProgramLabelClick={handleProgramLabelClick}
                                 programLabels={programLabels}
                                 onDatesSet={handleCalendarDatesSet}
+                                onVisibleMonthChange={handleCalendarVisibleMonthChange}
                                 continuous={isCalendarContinuous}
                                 onContinuousChange={handleCalendarContinuousChange}
                                 dayStates={dayRangeQuery.data?.days || []}
@@ -881,10 +934,6 @@ function ProgramCalendarPage() {
                     getGoalIcon={getGoalIcon}
                     getGoalColor={getGoalColor}
                     getGoalSecondaryColor={getGoalSecondaryColor}
-                    availablePrograms={programs.filter((candidate) => isProgramActive(candidate, contextDate))}
-                    onSelectProgramForDate={(candidate) => dispatchCalendarContext({
-                        type: 'focus_day', date: contextDate, programId: candidate.id,
-                    })}
                     timezone={timezone || 'UTC'}
                     onSetDayStatus={(status) => updateDayStatuses([contextDate], status)}
                     dayStatusUpdating={dayStatusMutation.isPending}

@@ -31,6 +31,7 @@ from services.program_day_read_model_service import ProgramDayReadModelService
 from services.session_filters import resolve_timezone
 
 logger = logging.getLogger(__name__)
+MAX_PROGRAM_CALENDAR_RANGE_DAYS = 366
 
 # Create blueprint
 programs_bp = Blueprint('programs', __name__, url_prefix='/api')
@@ -48,13 +49,38 @@ def _request_timezone_and_date():
     return timezone_name, datetime.now(zone).date()
 
 
+def _request_program_calendar_range():
+    raw_start = request.args.get("range_start")
+    raw_end = request.args.get("range_end")
+    if raw_start is None and raw_end is None:
+        return None, None
+    if raw_start is None or raw_end is None:
+        raise ValueError("Both range_start and range_end are required")
+    try:
+        range_start = date.fromisoformat(raw_start)
+        range_end = date.fromisoformat(raw_end)
+    except ValueError as error:
+        raise ValueError("Calendar range must use YYYY-MM-DD dates") from error
+    if range_start > range_end:
+        raise ValueError("range_start must not be after range_end")
+    if (range_end - range_start).days + 1 > MAX_PROGRAM_CALENDAR_RANGE_DAYS:
+        raise ValueError(f"Calendar range cannot exceed {MAX_PROGRAM_CALENDAR_RANGE_DAYS} days")
+    return range_start, range_end
+
+
 def _get_program_response(current_user, root_id, *, calendar_summary=False):
     """Share the scoped read and database error boundary for program lists."""
     session = get_db_session()
     try:
         if calendar_summary:
+            try:
+                range_start, range_end = _request_program_calendar_range()
+            except ValueError as error:
+                return jsonify({"error": str(error)}), 400
             return jsonify(ProgramService.get_program_summaries(
                 session, root_id, current_user.id,
+                range_start=range_start,
+                range_end=range_end,
             ))
         timezone_name, as_of = _request_timezone_and_date()
         if timezone_name is None:

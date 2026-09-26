@@ -94,7 +94,9 @@ export const queryKeys = {
     programs: (rootId, timezone = null) => timezone
         ? ['programs', rootId, { timezone }]
         : ['programs', rootId],
-    programCalendar: (rootId, timezone = null) => ['program-calendar', rootId, { timezone }],
+    programCalendar: (rootId, timezone = null, rangeStart = null, rangeEnd = null) => [
+        'program-calendar', rootId, { timezone, rangeStart, rangeEnd },
+    ],
     programCalendarRoot: (rootId) => ['program-calendar', rootId],
     programMetricsRoot: (rootId) => ['program-metrics', rootId],
     programMetrics: (rootId, programId, timezone, rangeStart = null, rangeEnd = null, dates = null) => [

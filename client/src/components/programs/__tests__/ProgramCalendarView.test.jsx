@@ -369,7 +369,7 @@ describe('ProgramCalendarView', () => {
         expect(screen.getByTestId('mock-day-cell')).toHaveAttribute('data-calendar-background', 'program');
     });
 
-    it('marks each selected-program date once with its status symbol while announcing its state', () => {
+    it('marks every program-day container with its own completion status', () => {
         const { container, rerender, props } = renderCalendar({
             calendarEvents: [
                 {
@@ -430,14 +430,14 @@ describe('ProgramCalendarView', () => {
 
         const cell = screen.getByTestId('mock-day-cell');
         expect(cell).toHaveAttribute('data-day-state', 'scheduled_partial');
-        expect(screen.getByText('Daily practice: partially complete')).toBeInTheDocument();
-        expect(screen.getByText('Daily review: partially complete')).toBeInTheDocument();
+        expect(screen.getByText('Daily practice: requirements met')).toBeInTheDocument();
+        expect(screen.getByText('Daily review: missed')).toBeInTheDocument();
         const statusOf = (title) => screen.getByText(title).parentElement
             .querySelector('[data-program-day-status]')?.dataset.programDayStatus;
-        expect(statusOf('Daily practice')).toBe('missed');
-        expect(statusOf('Daily review')).toBeUndefined();
+        expect(statusOf('Daily practice')).toBe('complete');
+        expect(statusOf('Daily review')).toBe('missed');
         expect(statusOf('Future practice')).toBe('scheduled');
-        expect(container.querySelectorAll('[data-program-day-status]')).toHaveLength(2);
+        expect(container.querySelectorAll('[data-program-day-status]')).toHaveLength(3);
         expect(screen.getByText('Daily practice').parentElement).toHaveStyle({
             '--program-day-pill-bg': 'color-mix(in srgb, #663333 13%, var(--color-bg-card))',
         });
@@ -453,7 +453,7 @@ describe('ProgramCalendarView', () => {
 
         expect(cell).not.toHaveAttribute('data-day-state');
         expect(screen.getByText('Daily practice: requirements met')).toBeInTheDocument();
-        expect(screen.queryByText('Daily review: requirements met')).not.toBeInTheDocument();
+        expect(screen.getByText('Daily review: pending')).toBeInTheDocument();
     });
 
     describe('continuous mode', () => {

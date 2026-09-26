@@ -18,9 +18,16 @@ export function indexProgramDayStates(days = []) {
  * Symbol shared by the calendar ribbon, day pane, and status menus: complete,
  * rest, missed, or scheduled. A manual status wins over the evaluated state.
  */
-export function getProgramDayStatusSymbol({ state, manualStatus = null, closed = false }) {
+export function getProgramDayStatusSymbol({
+    state, manualStatus = null, closed = false, programDayCompleted,
+}) {
     if (manualStatus === 'complete') return 'complete';
     if (manualStatus === 'rest') return 'rest';
+    if (typeof programDayCompleted === 'boolean') {
+        if (programDayCompleted) return 'complete';
+        if (state === 'rest') return 'rest';
+        return closed ? 'missed' : 'scheduled';
+    }
     if (state === 'scheduled_met') return 'complete';
     if (state === 'rest') return 'rest';
     return closed ? 'missed' : 'scheduled';
@@ -30,33 +37,123 @@ export function getProgramDayStateMeta(state) {
     return PROGRAM_DAY_STATE_META[state] || null;
 }
 
-/**
- * Named completed-session events for dates with no selected-program ribbon.
- * Scheduled dates keep only their ribbon; the day pane lists their sessions.
- */
-export function buildUnscheduledSessionEvents(days = [], programId = null, calendarEvents = []) {
-    const ribbonDates = new Set((calendarEvents || [])
-        .filter((event) => event.extendedProps?.type === 'program_day'
-            && String(event.extendedProps?.programId) === String(programId))
-        .map((event) => String(event.start).slice(0, 10)));
-    return (days || [])
-        .filter((day) => !ribbonDates.has(day.date))
-        .flatMap((day) => (day.completed_sessions || []).map((session, index) => ({
-            id: `completed-session-${session.id}`,
-            title: session.name,
-            start: day.date,
-            allDay: true,
-            backgroundColor: 'transparent',
-            borderColor: 'transparent',
-            textColor: 'inherit',
-            classNames: ['completed-session-event'],
-            extendedProps: {
-                type: 'completed_session',
-                sessionId: session.id,
-                programId,
-                sortOrder: 1 + index / 1000,
-            },
-        })));
+/** Merge per-program day summaries while retaining each session's credited day links. */
+export function mergeCompletedSessionDays(...dayCollections) {
+    const daysByDate = new Map();
+    dayCollections.flat().forEach((day) => {
+        if (!day?.date) return;
+        if (!daysByDate.has(day.date)) daysByDate.set(day.date, new Map());
+        const sessions = daysByDate.get(day.date);
+        (day.completed_sessions || []).forEach((session) => {
+            if (session?.id == null) return;
+            const key = String(session.id);
+            const existing = sessions.get(key);
+            if (!existing) {
+                sessions.set(key, session);
+                return;
+            }
+            sessions.set(key, {
+                ...existing,
+                ...session,
+                program_day_ids: [...new Set([
+                    ...(existing.program_day_ids || []).map(String),
+                    ...(existing.program_day_id ? [String(existing.program_day_id)] : []),
+                    ...(session.program_day_ids || []).map(String),
+                    ...(session.program_day_id ? [String(session.program_day_id)] : []),
+                ])],
+            });
+        });
+    });
+    return [...daysByDate].map(([date, sessions]) => ({
+        date,
+        completed_sessions: [...sessions.values()],
+    }));
+}
+
+/** Display completed session events on every date, alongside any scheduled day ribbon. */
+export function buildCompletedSessionEvents(days = [], programId = null) {
+    return (days || []).flatMap((day) => {
+        const groups = new Map();
+        (day.completed_sessions || []).forEach((session, index) => {
+            const programDayIds = [...new Set([
+                ...(session.program_day_id ? [String(session.program_day_id)] : []),
+                ...(session.program_day_ids || []).map(String),
+            ])].sort();
+            const templateKey = session.template_id
+                ? `template:${session.template_id}`
+                : session.template_name?.trim()
+                    ? `template-name:${session.template_name.trim().toLocaleLowerCase()}`
+                    : `session:${session.id}`;
+            const groupKey = `${templateKey}|program-days:${programDayIds.join(',')}`;
+            const group = groups.get(groupKey);
+            if (group) group.sessions.push(session);
+            else groups.set(groupKey, { sessions: [session], sortOrder: 1 + index / 1000, programDayIds });
+        });
+
+        return [...groups.values()].map(({ sessions, sortOrder, programDayIds }) => {
+            const representative = sessions[0];
+            return {
+                id: `completed-session-${representative.id}`,
+                title: representative.name,
+                start: day.date,
+                allDay: true,
+                backgroundColor: 'transparent',
+                borderColor: 'transparent',
+                textColor: 'inherit',
+                classNames: ['completed-session-event'],
+                extendedProps: {
+                    type: 'completed_session',
+                    sessionId: representative.id,
+                    sessionIds: sessions.map((session) => session.id),
+                    count: sessions.length,
+                    programDayIds,
+                    programId,
+                    templateName: representative.template_name || null,
+                    templateColor: representative.template_color || null,
+                    sortOrder,
+                },
+            };
+        });
+    });
+}
+
+/** Place credited sessions inside their matching program-day ribbon. */
+export function nestContributingSessionsInProgramDays(events = []) {
+    const ribbonIndexes = new Map();
+    events.forEach((event, index) => {
+        if (event.extendedProps?.type !== 'program_day') return;
+        const key = `${event.start}:${event.extendedProps.pDayId}`;
+        if (!ribbonIndexes.has(key)) ribbonIndexes.set(key, index);
+    });
+
+    const nestedByIndex = new Map();
+    const standalone = [];
+    events.forEach((event) => {
+        if (event.extendedProps?.type !== 'completed_session') {
+            standalone.push(event);
+            return;
+        }
+        const matchingIndexes = [...new Set((event.extendedProps.programDayIds || [])
+            .map((dayId) => ribbonIndexes.get(`${event.start}:${dayId}`))
+            .filter((index) => index !== undefined))];
+        if (matchingIndexes.length === 0) {
+            standalone.push(event);
+            return;
+        }
+        matchingIndexes.forEach((index) => {
+            if (!nestedByIndex.has(index)) nestedByIndex.set(index, []);
+            nestedByIndex.get(index).push(event);
+        });
+    });
+
+    return standalone.map((event) => {
+        const index = events.indexOf(event);
+        const sessions = nestedByIndex.get(index);
+        return sessions ? {
+            ...event,
+            extendedProps: { ...event.extendedProps, contributingSessions: sessions },
+        } : event;
+    });
 }
 
 export const CALENDAR_PERIOD_KIND_LABELS = {

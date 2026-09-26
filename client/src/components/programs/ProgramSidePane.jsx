@@ -70,8 +70,6 @@ export default function ProgramSidePane({
     getGoalIcon,
     getGoalColor,
     getGoalSecondaryColor,
-    availablePrograms = [],
-    onSelectProgramForDate,
     timezone = 'UTC',
     onSetDayStatus,
     dayStatusUpdating = false,
@@ -192,17 +190,7 @@ export default function ProgramSidePane({
             {!program ? (
                 <div className={styles.emptySidePane}>
                     <div className={styles.emptySidePaneCard}>
-                        <p>{availablePrograms.length ? 'Choose a program for this day.' : 'No program is scheduled for this day.'}</p>
-                        {availablePrograms.map((candidate) => (
-                            <Button
-                                unstyled
-                                key={candidate.id}
-                                className={styles.emptySidePaneButton}
-                                onClick={() => onSelectProgramForDate?.(candidate)}
-                            >
-                                View {candidate.name}
-                            </Button>
-                        ))}
+                        <p>No program is scheduled for this day.</p>
                         {(!contextDate || contextDate >= today) ? (
                             <Button unstyled className={styles.emptySidePaneButton} onClick={onCreate}>New Program</Button>
                         ) : null}

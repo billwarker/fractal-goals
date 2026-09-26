@@ -1,6 +1,7 @@
 import {
     buildCalendarPeriodEvents,
-    buildUnscheduledSessionEvents,
+    buildCompletedSessionEvents,
+    nestContributingSessionsInProgramDays,
     getProgramDayStateMeta,
     getProgramDayStatusSymbol,
     indexProgramDayStates,
@@ -23,39 +24,62 @@ describe('programDayState', () => {
         expect(indexProgramDayStates([fact]).get(fact.date)).toBe(fact);
         expect(getProgramDayStateMeta('unknown')).toBeNull();
     });
+
 });
 
-describe('buildUnscheduledSessionEvents', () => {
+describe('buildCompletedSessionEvents', () => {
     const days = [
-        { date: '2026-09-01', completed_sessions: [{ id: 's1', name: 'Planche', color: '#336699' }] },
+        { date: '2026-09-01', completed_sessions: [{
+            id: 's1', name: 'Planche', template_id: 't1', template_name: 'Strength', template_color: '#336699',
+        }, {
+            id: 's4', name: 'Deadlift', template_id: 't1', template_name: 'Strength', template_color: '#336699',
+        }] },
         { date: '2026-09-02', completed_sessions: [
-            { id: 's2', name: 'Run', color: null },
-            { id: 's3', name: 'Stretch', color: '#993366' },
+            { id: 's2', name: 'Run' },
+            { id: 's3', name: 'Stretch' },
         ] },
         { date: '2026-09-03', completed_sessions: [] },
     ];
-    const ribbon = (date, programId) => ({
-        start: date, extendedProps: { type: 'program_day', programId },
-    });
 
-    it('names each session only on dates without a selected-program ribbon', () => {
-        const events = buildUnscheduledSessionEvents(days, 'program-1', [
-            ribbon('2026-09-01', 'program-1'),
-            ribbon('2026-09-02', 'other-program'),
-        ]);
+    it('names sessions on scheduled and unscheduled dates with their template badge metadata', () => {
+        const events = buildCompletedSessionEvents(days, 'program-1');
 
         expect(events.map((event) => [event.id, event.start, event.title])).toEqual([
+            ['completed-session-s1', '2026-09-01', 'Planche'],
             ['completed-session-s2', '2026-09-02', 'Run'],
             ['completed-session-s3', '2026-09-02', 'Stretch'],
         ]);
         expect(events[0].extendedProps).toEqual(expect.objectContaining({
-            type: 'completed_session', sessionId: 's2', programId: 'program-1',
+            type: 'completed_session', sessionId: 's1', programId: 'program-1',
+            sessionIds: ['s1', 's4'], count: 2,
+            templateName: 'Strength', templateColor: '#336699',
         }));
-        expect(events[0].extendedProps.sortOrder).toBeLessThan(events[1].extendedProps.sortOrder);
     });
 
     it('returns no events without read-model days', () => {
-        expect(buildUnscheduledSessionEvents(undefined, 'program-1', [])).toEqual([]);
+        expect(buildCompletedSessionEvents(undefined, 'program-1')).toEqual([]);
+    });
+
+    it('nests credited sessions under their matching program-day occurrence', () => {
+        const ribbon = {
+            id: 'pday-program-1-2026-09-01-day-1',
+            start: '2026-09-01',
+            extendedProps: { type: 'program_day', pDayId: 'day-1' },
+        };
+        const session = {
+            id: 'completed-session-s1',
+            start: '2026-09-01',
+            title: 'Planche',
+            extendedProps: { type: 'completed_session', programDayIds: ['day-1'] },
+        };
+
+        expect(nestContributingSessionsInProgramDays([ribbon, session])).toEqual([{
+            ...ribbon,
+            extendedProps: { ...ribbon.extendedProps, contributingSessions: [session] },
+        }]);
+        expect(nestContributingSessionsInProgramDays([ribbon, {
+            ...session, extendedProps: { type: 'completed_session', programDayIds: [] },
+        }])).toHaveLength(2);
     });
 });
 
@@ -63,6 +87,9 @@ describe('getProgramDayStatusSymbol', () => {
     it.each([
         [{ state: 'scheduled_met', closed: true }, 'complete'],
         [{ state: 'scheduled_pending', manualStatus: 'complete' }, 'complete'],
+        [{ state: 'scheduled_met', closed: true, programDayCompleted: false }, 'missed'],
+        [{ state: 'scheduled_pending', closed: false, programDayCompleted: true }, 'complete'],
+        [{ state: 'scheduled_pending', manualStatus: 'rest', programDayCompleted: true }, 'rest'],
         [{ state: 'scheduled_partial', closed: true }, 'missed'],
         [{ state: 'scheduled_missed', closed: true }, 'missed'],
         [{ state: 'scheduled_partial', closed: false }, 'scheduled'],

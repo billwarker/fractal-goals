@@ -77,6 +77,9 @@ vi.mock('../../hooks/useProgramData', () => ({
         };
     },
 }));
+vi.mock('../../hooks/useVisibleProgramCalendarDetails', () => ({
+    useVisibleProgramCalendarDetails: () => ({ details: new Map(), completedSessionDays: [] }),
+}));
 vi.mock('../../hooks/useProgramGoalSets', () => ({
     useProgramGoalSets: () => ({
         attachedGoalIds: [],
@@ -159,7 +162,10 @@ vi.mock('../../components/programs/ProgramCalendarView', () => ({
             <button type="button" ref={selectionModeButtonRef} onClick={() => setBlockCreationMode(!blockCreationMode)}>Toggle multi-select</button>
             <button type="button" onClick={() => onProgramLabelClick({
                 title: 'Past Program', date: '2025-01-01', programId: 'past-program-1', labelType: 'program',
-            })}>Preview past program label</button>
+            })}>Select past program label</button>
+            <button type="button" onClick={() => onDateClick({ dateStr: '2025-01-15' })}>
+                Select past program date
+            </button>
             <button
                 type="button"
                 onClick={() => {
@@ -207,7 +213,7 @@ vi.mock('../../components/programs/ProgramCalendarView', () => ({
     ),
 }));
 vi.mock('../../components/programs/ResponsiveProgramSidePane', () => ({
-    default: ({ scope, selectedRange, selectionLabel, programMetrics, availablePrograms, onSelectProgramForDate }) => (
+    default: ({ scope, selectedRange, selectionLabel, programMetrics }) => (
         <aside>
             <output data-testid="pane-scope">{scope}</output>
             <output data-testid="pane-selection-label">{selectionLabel || 'none'}</output>
@@ -220,11 +226,6 @@ vi.mock('../../components/programs/ResponsiveProgramSidePane', () => ({
                         || `${programMetrics.requestedRange.start}/${programMetrics.requestedRange.end}`)
                     : 'whole-program'}
             </output>
-            {availablePrograms?.map((candidate) => (
-                <button type="button" key={candidate.id} onClick={() => onSelectProgramForDate(candidate)}>
-                    View {candidate.name}
-                </button>
-            ))}
         </aside>
     ),
 }));
@@ -234,7 +235,7 @@ describe('ProgramCalendarPage multi-day selection', () => {
         programDataCalls.length = 0;
     });
 
-    it('loads a past program only after its side-pane View action', () => {
+    it('scopes directly to a past program when its calendar label is selected', () => {
         render(
             <MemoryRouter initialEntries={['/root-1/programs']}>
                 <Routes>
@@ -243,13 +244,23 @@ describe('ProgramCalendarPage multi-day selection', () => {
             </MemoryRouter>,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Preview past program label' }));
-        expect(programDataCalls).toContain(null);
-        expect(programDataCalls).not.toContain(pastProgram.id);
-        expect(screen.getByRole('button', { name: 'View Past Program' })).toBeInTheDocument();
-
-        fireEvent.click(screen.getByRole('button', { name: 'View Past Program' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Select past program label' }));
         expect(programDataCalls.at(-1)).toBe(pastProgram.id);
+        expect(screen.queryByRole('button', { name: 'View Past Program' })).not.toBeInTheDocument();
+    });
+
+    it('scopes directly to a past program when one of its dates is selected', () => {
+        render(
+            <MemoryRouter initialEntries={['/root-1/programs']}>
+                <Routes>
+                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Select past program date' }));
+        expect(programDataCalls.at(-1)).toBe(pastProgram.id);
+        expect(screen.queryByRole('button', { name: 'View Past Program' })).not.toBeInTheDocument();
     });
 
     it('survives the click/select callback pair and extends through event-filled cells', () => {

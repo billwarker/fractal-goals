@@ -29,7 +29,7 @@ from services.session_runtime import get_session_template_color, get_session_tem
 
 
 class ProgramDayReadModelService:
-    SCHEMA_VERSION = 5
+    SCHEMA_VERSION = 6
     CHAIN_LOOKBACK_DAYS = MAX_WINDOW_DAYS
     # A hard safety bound for one local date; the summary covers every loaded
     # session while the session list itself is cursor-paged.
@@ -194,7 +194,7 @@ class ProgramDayReadModelService:
                 "aligned_instance_count": len(fact["aligned_items"]),
                 "block_ids": block_ids,
                 "completed_sessions": [
-                    self._serialize_calendar_session(item)
+                    self._serialize_calendar_session(item, fact.get("session_credits", {}).get(item.id))
                     for item in completed_by_date.get(fact["date"], [])
                 ],
             })
@@ -406,9 +406,18 @@ class ProgramDayReadModelService:
         return "off_plan"
 
     @staticmethod
-    def _serialize_calendar_session(session):
+    def _serialize_calendar_session(session, credit_fact=None):
         """Compact calendar projection; the day detail carries full session facts."""
-        return {"id": session.id, "name": get_session_template_name(session) or session.name}
+        return {
+            "id": session.id,
+            "name": session.name or get_session_template_name(session) or "Session",
+            "template_id": session.template_id,
+            "template_name": get_session_template_name(session),
+            "template_color": get_session_template_color(session),
+            "program_day_ids": list(credit_fact["program_day_ids"])
+            if credit_fact and credit_fact.get("source") and not credit_fact.get("excluded") else [],
+            "program_day_id": session.program_day_id,
+        }
 
     def _load_day_sessions(self, root_id, current_user_id, day_value, zone):
         """Every non-deleted session of the owner on one local date, in any program."""

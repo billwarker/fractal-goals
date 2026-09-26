@@ -119,17 +119,23 @@ the gestures (press-and-drag selects the range between cells, including over eve
 live preview; a press without movement toggles one date; Shift extends), so FullCalendar's own
 selection and clicks stand down in that mode. Status actions apply only to the scheduled subset;
 **Plan event** spans the whole selection. Cells are keyboard-selectable and highlighted when selected.
-The client expects program metrics calculation v6 and day read model schema v5.
+The client expects program metrics calculation v6 and day read model schema v6.
 Calendar day ribbons use the same status symbol as the day-review pane (check, X, or blue circle from
-`getProgramDayStatusSymbol` and `ProgramDayStatusMark`; a manual status wins, then met, then rest), shown once per date on the selected program's
-first ribbon; the symbol is decorative beside the ribbon's assistive state text.
+`getProgramDayStatusSymbol` and `ProgramDayStatusMark`; each scheduled ribbon reflects that occurrence's completion (a manual date status overrides it). The date streak advances only when all scheduled program days on that date are met. Symbols are decorative beside each ribbon's assistive state text.
 The page calendar has one toolbar on desktop and mobile (‹ › Today, a **Continuous** checkbox, title,
 multi-day actions); compact calendars keep FullCalendar's header. Its calendar-summary endpoint reads
-only program IDs, names, colors, and date bounds; full blocks, days, and sessions are requested only
-for the currently scoped program. Every program keeps its color across its date range and its name
-appears in its first date cell; selecting a non-active program's label opens a day preview, and its
-**View [Program Name]** action scopes and loads that program. Unscheduled past dates do not offer
-program creation. Continuous mode (a per-viewer
+only program IDs, names, colors, and date bounds plus block colors and date bounds intersecting the
+visible calendar range. Full program details load for the focused program and for each program whose
+date range reaches the month currently in view; continuous scrolling triggers these loads by month,
+and visited details remain cached for later views. Session summaries load for those same visible
+programs and dates, so completed sessions remain visible when the calendar scrolls outside the
+focused program. Clicking a date or program-day label within a
+program immediately scopes the sidepane to that program. Every program keeps its color across its
+date range and its name appears in its first date cell. Empty-space clicks
+preserve a selected completed program's context; that context is page-local, so reloading or returning
+to the Programs page starts with the active program. Unscheduled past dates do not offer program
+creation.
+Continuous mode (a per-viewer
 localStorage preference) renders one unbroken stream of weeks as a custom `dayGrid` view with a weeks
 duration; `utils/programCalendarContinuous.js` owns its window: 52 weeks (the day read model allows
 366 days) centred on today, re-centred on a context date or navigation target that cannot scroll to
@@ -161,11 +167,14 @@ credited (with source), off-plan, or other program, with per-session goal alignm
 equal-split allocation as program metrics, via `services/program_day_summary.py`) and server-provided
 credit options. Off-plan sessions sit inside the first program-day card; planning actions appear only
 for today and future unscheduled dates. Range summaries list each observed date's completed sessions
-(any program, `id` and `name`); the calendar names them as plain text only on dates
-without a selected-program ribbon (scheduled dates keep just the ribbon and its status symbol); the legacy
-program-payload session events are not rendered on the Programs page.
+(any program, with session and template names plus template color); the calendar shows those sessions
+on scheduled and unscheduled dates, using the shared session-template badge when available. Scheduled
+program-day ribbons and their status symbols remain visible alongside the session badges; the legacy
+program-payload session events are not rendered on the Programs page. Multiple completed sessions
+using the same template on one date are represented by one badge with a count (for example, “×4”).
+Sessions credited to a specific program-day occurrence render inside that ribbon on a line below it.
 
-`ProgramDayReadModelService` emits schema v4, requires an IANA timezone, caps the complete
+`ProgramDayReadModelService` emits schema v6, requires an IANA timezone, caps the complete
 expanded chain window at `MAX_WINDOW_DAYS`, reports truncated context, and provides cursor-paged
 day detail. The client rejects unsupported schema versions. FullCalendar block labels are
 reconciled idempotently, cleaned on cell unmount, and activated through React event delegation.

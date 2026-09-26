@@ -674,6 +674,7 @@ export function buildProgramCalendarEvents({
 export function buildProgramsCalendarEvents(programs = [], goals = [], getGoalColor, getGoalTextColor, timezone, goalIconHelpers = {}, detailedProgram = undefined) {
     const events = [];
     const goalEventIds = new Set();
+    const hasCalendarProjection = detailedProgram !== undefined;
 
     programs.forEach((program, programIndex) => {
         const programStart = getDatePart(program.start_date);
@@ -699,6 +700,39 @@ export function buildProgramsCalendarEvents(programs = [], goals = [], getGoalCo
             });
         }
 
+        if (hasCalendarProjection) {
+            const programColor = getProgramColor(program, programIndex);
+            const projectedBlocks = program.blocks || (
+                String(detailedProgram?.id) === String(program.id) ? detailedProgram.blocks : []
+            );
+            (projectedBlocks || []).forEach((block) => {
+                const blockStart = getDatePart(block.start_date);
+                const blockEnd = getDatePart(block.end_date);
+                if (!blockStart || !blockEnd) return;
+                const blockColor = block.color || programColor;
+                events.push({
+                    id: `block-bg-${program.id}-${block.id}`,
+                    title: '',
+                    start: blockStart,
+                    end: addDaysToDateString(blockEnd, 1),
+                    backgroundColor: blockColor,
+                    borderColor: blockColor,
+                    textColor: 'white',
+                    allDay: true,
+                    display: 'background',
+                    sortOrder: -10,
+                    extendedProps: {
+                        type: 'block_background',
+                        blockColor,
+                        programId: program.id,
+                        program,
+                        sortOrder: -10,
+                        ...block,
+                    },
+                });
+            });
+        }
+
         const detail = detailedProgram === undefined
             ? program
             : (String(detailedProgram?.id) === String(program.id) ? detailedProgram : null);
@@ -716,6 +750,9 @@ export function buildProgramsCalendarEvents(programs = [], goals = [], getGoalCo
         }) : [];
 
         programEvents.forEach((event) => {
+            if (hasCalendarProjection && event.extendedProps?.type === 'block_background') {
+                return;
+            }
             if (event.extendedProps?.type === 'goal' && event.extendedProps?.id) {
                 if (goalEventIds.has(event.extendedProps.id)) {
                     return;

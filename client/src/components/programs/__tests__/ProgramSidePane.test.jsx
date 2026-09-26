@@ -1,7 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { vi } from 'vitest';
 
 import ProgramSidePane from '../ProgramSidePane';
 
@@ -16,7 +15,6 @@ function renderEmptyPane(contextDate) {
             onViewChange={() => {}}
             contextDate={contextDate}
             today="2026-09-25"
-            availablePrograms={[]}
         />,
     );
 }
@@ -34,8 +32,7 @@ describe('ProgramSidePane empty day actions', () => {
         expect(screen.getByRole('button', { name: 'New Program' })).toBeInTheDocument();
     });
 
-    it('offers past programs for explicit viewing without offering a new program', () => {
-        const onSelectProgramForDate = vi.fn();
+    it('no longer asks users to choose a program from the sidepane', () => {
         render(
             <ProgramSidePane
                 program={null}
@@ -46,13 +43,11 @@ describe('ProgramSidePane empty day actions', () => {
                 onViewChange={() => {}}
                 contextDate="2026-08-01"
                 today="2026-09-25"
-                availablePrograms={[{ id: 'past-1', name: 'Past program' }]}
-                onSelectProgramForDate={onSelectProgramForDate}
             />,
         );
 
-        screen.getByRole('button', { name: 'View Past program' }).click();
-        expect(onSelectProgramForDate).toHaveBeenCalledWith({ id: 'past-1', name: 'Past program' });
+        expect(screen.getByText('No program is scheduled for this day.')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'View Past program' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'New Program' })).not.toBeInTheDocument();
     });
 });
